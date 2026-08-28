@@ -62,7 +62,26 @@ function output(result: ThreadToolResult): ToolOutput {
   return { content: [{ type: "text", text: JSON.stringify(result) }], details: { result } }
 }
 
-function metadata(name: ThreadToolName): any {
+type ThreadToolSummary = Omit<ThreadHostSession, "name" | "status" | "createdAt" | "updatedAt"> & {
+  readonly thread_id: string
+  readonly name: string
+  readonly status: "live" | "resumable"
+  readonly created_at: string
+  readonly updated_at: string
+}
+
+type ThreadToolMetadata = {
+  readonly name: string
+  readonly label: string
+  readonly description: string
+  readonly exposure: "search"
+  readonly searchText: string
+  readonly searchKeywords: readonly string[]
+  readonly searchGroup: string
+  readonly allowLazyActivation: true
+}
+
+function metadata(name: ThreadToolName): ThreadToolMetadata {
   const entry = THREAD_TOOL_SEARCH_METADATA.find((candidate) => candidate.name === name)
   if (entry === undefined) throw new Error(`missing thread metadata for ${name}`)
   return {
@@ -72,10 +91,17 @@ function metadata(name: ThreadToolName): any {
   }
 }
 
-function summary(session: ThreadHostSession): ThreadHostSession & { readonly thread_id: string; readonly name: string; readonly status: "live" | "resumable"; readonly created_at: string; readonly updated_at: string } {
+function summary(session: ThreadHostSession): ThreadToolSummary {
   const id = session.durableSessionId ?? session.sessionId
   const created = session.createdAt ?? new Date(0).toISOString()
-  return { ...session, thread_id: id, name: session.name ?? id, status: session.status === "closed" ? "resumable" : "live", created_at: created, updated_at: session.updatedAt ?? created } as ThreadHostSession & { readonly thread_id: string; readonly name: string; readonly status: "live" | "resumable"; readonly created_at: string; readonly updated_at: string }
+  return {
+    ...session,
+    thread_id: id,
+    name: session.name ?? id,
+    status: session.status === "closed" ? "resumable" : "live",
+    created_at: created,
+    updated_at: session.updatedAt ?? created,
+  }
 }
 
 function resolveEntries(options: ThreadToolSurfaceOptions, sessions: readonly ThreadHostSession[]): ThreadAddressEntry[] {
@@ -136,8 +162,19 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     const session = await options.host.openSession({ cwd: value.cwd, forkFrom: value.fork_from, name: value.name })
     return { kind: "ok", thread: summary(session), deduplicated: false }
   }) }
-  const list: AnyTool = { ...metadata("thread_list"), parameters: threadToolParamSchemas.thread_list, execute: async (_id: string, args: ThreadListInput) => { const current = await sessions(); return output({ kind: "ok", threads: current.map(summary), scope: args.all_scope === true ? "all" : "workspace" }) } }
-  const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput) => execute("thread_read", id, args, async (current, value) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = readTranscript({ kind: "live", entries: () => [] }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor }); const messages = await options.host.getMessages(routingId(session)); const live = readTranscript({ kind: "live", entries: () => messages }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor }); if (live.kind === "error") return { kind: "error", error: live.error }; return { kind: "ok", thread_id: resolved.entry.thread_id, items: live.items.map((item, index) => ({ seq: index + 1, role: item.role === "user" || item.role === "assistant" || item.role === "system" ? item.role : "system", content: JSON.stringify(item.content ?? item) })), truncated: live.truncated, ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }), source: live.source } }) }
+  const list: AnyTool = {
+    ...metadata("thread_list"),
+    parameters: threadToolParamSchemas.thread_list,
+    execute: async (_id: string, args: ThreadListInput) => {
+      const current = await sessions()
+      const entries = resolveEntries(options, current)
+      const visible = args.all_scope === true
+        ? current
+        : current.filter((session) => entries.some((entry) => entry.thread_id === (session.durableSessionId ?? session.sessionId)))
+      return output({ kind: "ok", threads: visible.map(summary), scope: args.all_scope === true ? "all" : "workspace" })
+    },
+  }
+  const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput) => execute("thread_read", id, args, async (current, value) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const messages = await options.host.getMessages(routingId(session)); const live = readTranscript({ kind: "live", entries: () => messages }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor }); if (live.kind === "error") return { kind: "error", error: live.error }; return { kind: "ok", thread_id: resolved.entry.thread_id, items: live.items.map((item, index) => ({ seq: index + 1, role: item.role === "user" || item.role === "assistant" || item.role === "system" ? item.role : "system", content: JSON.stringify(item.content ?? item) })), truncated: live.truncated, ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }), source: live.source } }) }
   const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput) => execute("thread_send", id, args, async (current, value, operationId) => deliver(current, value.thread, value, operationId)) }
   const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput) => execute("thread_interrupt", id, args, async (current, value) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await options.host.interrupt(session.sessionId, value.turn_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
   const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput) => execute("thread_handoff", id, args, async (current, value, operationId) => { const entries = resolveEntries(options, current); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries, value.thread) : resolveTarget(entries, value.thread, { all_scope: value.all_scope, callerWorkspaceRoot: options.callerWorkspaceRoot() }); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
