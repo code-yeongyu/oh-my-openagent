@@ -14,6 +14,6 @@ export const BUILTIN_MCP_TOOL_HINTS: Record<string, string[]> = {
     "codegraph_files",
   ],
   context7: ["context7_resolve-library-id", "context7_query-docs"],
-  websearch: ["websearch_web_search_exa"],
+  websearch: ["websearch_web_search_exa", "websearch_web_search", "websearch_web_fetch"],
   grep_app: ["grep_app_searchGitHub"],
 }

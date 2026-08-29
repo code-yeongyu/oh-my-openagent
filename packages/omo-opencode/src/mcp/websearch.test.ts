@@ -2,6 +2,7 @@
 
 import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import * as logger from "../shared/logger"
+import { WebsearchConfigSchema } from "../config/schema/websearch"
 
 let logSpy: ReturnType<typeof spyOn>
 let createWebsearchConfig: (typeof import("./websearch"))["createWebsearchConfig"]
@@ -56,6 +57,11 @@ describe("createWebsearchConfig Tavily handling", () => {
 })
 
 describe("createWebsearchConfig Exa handling", () => {
+  test("keeps Exa as the default when no provider is selected", () => {
+    expect(createWebsearchConfig()).toEqual(createWebsearchConfig({ provider: "exa" }))
+    expect(createWebsearchConfig({})).toEqual(createWebsearchConfig({ provider: "exa" }))
+  })
+
   test("keeps EXA_API_KEY out of URL query params and sends bearer auth header", () => {
     process.env.EXA_API_KEY = "exa-secret"
 
@@ -85,5 +91,41 @@ describe("createWebsearchConfig Exa handling", () => {
       enabled: true,
       oauth: false,
     })
+  })
+})
+
+describe("createWebsearchConfig Parallel handling", () => {
+  test("accepts explicit Parallel selection through the config schema", () => {
+    expect(WebsearchConfigSchema.parse({ provider: "parallel" })).toEqual({ provider: "parallel" })
+  })
+
+  test("connects anonymously without an OAuth flow", () => {
+    // given
+    const selection = WebsearchConfigSchema.parse({ provider: "parallel" })
+
+    // when
+    const config = createWebsearchConfig(selection)
+
+    // then
+    expect(config).toEqual({
+      type: "remote",
+      url: "https://search.parallel.ai/mcp",
+      enabled: true,
+      oauth: false,
+    })
+  })
+
+  test("does not forward existing provider credentials to Parallel", () => {
+    // given
+    process.env.EXA_API_KEY = "exa-secret"
+    process.env.TAVILY_API_KEY = "tavily-secret"
+    const selection = WebsearchConfigSchema.parse({ provider: "parallel" })
+
+    // when
+    const config = createWebsearchConfig(selection)
+
+    // then
+    expect(config?.headers).toBeUndefined()
+    expect(config?.url).toBe("https://search.parallel.ai/mcp")
   })
 })
