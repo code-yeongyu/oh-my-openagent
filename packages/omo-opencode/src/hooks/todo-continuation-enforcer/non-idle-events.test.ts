@@ -41,6 +41,24 @@ describe("handleNonIdleEvent", () => {
     expect(state.tokenLimitDetected).toBe(true)
   })
 
+  test("given a non-assistant message delta after a provider failure, preserves the provider failure streak", () => {
+    // given
+    const sessionID = "ses_provider_failure_delta"
+    const state = sessionStateStore.getState(sessionID)
+    state.awaitingPostInjectionProgressCheck = true
+    state.consecutiveProviderFailures = 1
+
+    // when
+    handleNonIdleEvent({
+      eventType: "message.part.delta",
+      properties: { sessionID, delta: "partial provider output" },
+      sessionStateStore,
+    })
+
+    // then
+    expect(state.consecutiveProviderFailures).toBe(1)
+  })
+
   test("given internally marked user message update, keeps continuation countdown state intact", () => {
     // given
     const sessionID = "ses_internal_user_event"
