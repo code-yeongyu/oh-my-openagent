@@ -56,3 +56,11 @@ ISOLATION=PASS:7946
 
 The rerun again drove the built local TUI plugin in isolated HOME/XDG paths.
 The real OpenCode database held 7,946 sessions both before and after.
+
+Reviewer-auditable sanitized outputs:
+
+- [`verification-post-merge.txt`](verification-post-merge.txt): exact test,
+  typecheck, build, and bundle checks with their observed exit status and
+  summary.
+- [`tui-qa-post-merge.txt`](tui-qa-post-merge.txt): exact OpenCode QA commands
+  and the observed TUI, teardown, and database-isolation markers.

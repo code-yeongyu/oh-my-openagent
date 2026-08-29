@@ -1,0 +1,41 @@
+PR #7460 real OpenCode TUI QA after merging origin/dev
+Head: 854532ae5a2d2af742d69b2849db75dc1c6dbfa9
+
+COMMAND
+bash .agents/skills/opencode-qa/scripts/tui-smoke.sh --self-test
+
+OBSERVED
+PASS: TUI rendered under tmux (marker found; version 1.18.25)
+PASS: send-keys reached the TUI composer (sentinel echoed)
+PASS: tmux session torn down (has-session false)
+PASS: real DB untouched (session count 7946 unchanged)
+PASS: tui-smoke
+Exit status: 0
+
+COMMAND
+bash .omo/evidence/20260828-issue-7438-tui-sidebar-reactivity/live-sidebar-driver.sh
+
+OBSERVED
+ACTIVE_TRANSITION=PASS
+IDLE_TRANSITION=PASS
+ISOLATION=PASS:7946
+Exit status: 0
+
+SURFACE
+The custom driver launched the real OpenCode 1.18.25 TUI under tmux, loaded the
+built local dist/tui.js plugin, waited for the mounted Models sidebar, wrote an
+active mirror containing qa-live-agent, observed it appear without remounting,
+wrote an idle mirror, and observed the agent disappear while Models returned.
+
+ISOLATION
+The driver used temporary HOME/XDG directories through the opencode-qa harness.
+The real OpenCode database session count was 7,946 before and after. The tmux
+session and sandbox were removed.
+
+The exact sanitized driver is stored beside this receipt as
+live-sidebar-driver.sh.
+
+OMITTED
+Terminal control sequences, temporary paths, local configuration contents,
+environment dumps, prompts, provider output, tokens, credentials, and auth
+headers were omitted.

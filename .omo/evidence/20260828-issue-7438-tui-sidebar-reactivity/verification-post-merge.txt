@@ -1,0 +1,51 @@
+PR #7460 verification after merging origin/dev
+Head: 854532ae5a2d2af742d69b2849db75dc1c6dbfa9
+
+COMMAND
+bun test packages/omo-opencode/src/tui.test.ts packages/omo-opencode/src/features/tui-sidebar
+
+OBSERVED
+61 pass
+0 fail
+123 expect() calls
+Ran 61 tests across 11 files.
+Exit status: 0
+
+COMMAND
+bunx bun@1.3.12 run typecheck
+
+OBSERVED
+Root tsgo, script tsgo, and all package tsgo checks completed.
+Exit status: 0
+
+COMMAND
+bunx bun@1.3.12 run build
+
+OBSERVED
+The TUI bundle, CLI bundles, schemas, declarations, MCP runtimes, Codex plugin,
+and Senpi plugin completed.
+Final line: build: all steps completed
+Exit status: 0
+
+COMMAND
+git diff --cached --check
+
+OBSERVED
+No whitespace errors.
+Exit status: 0
+
+COMMAND
+git diff --cached --name-status origin/dev
+
+OBSERVED
+A  .omo/evidence/20260828-issue-7438-tui-sidebar-reactivity/README.md
+M  bun.lock
+M  package.json
+M  packages/omo-opencode/src/tui.test.ts
+M  packages/omo-opencode/src/tui.ts
+M  script/build.ts
+Exit status: 0
+
+OMITTED
+Full dependency-install output, generated bundle bodies, local absolute paths,
+temporary directories, and environment values were omitted. No command failed.
