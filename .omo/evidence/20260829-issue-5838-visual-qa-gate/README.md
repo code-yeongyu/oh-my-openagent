@@ -20,6 +20,7 @@ than a machine contract.
 ## Additional verification
 
 - Shared-skill suite: `138 pass, 0 fail`.
+- Canonical/OpenCode checked-in artifact parity: `4 pass, 0 fail`.
 - Codex plugin build synced the canonical skill into the packaged tree.
 - Packaged frontend skill retained the gate at line 12.
 - Full `test:codex` gate with npm 11.12.1: clean; final Node gate `493 pass`.
