@@ -1,0 +1,36 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/components/memory/worker/hold-lock-lifecycle.test.ts:
+107 |       // when: teardown closes its end of the control pipe instead of signalling the child.
+108 |       child.stdin.destroy()
+109 |
+110 |       // then
+111 |       const exit = await exitWithin(child, EXIT_BOUND_MS)
+112 |       expect(exit).not.toBeNull()
+                             ^
+error: expect(received).not.toBeNull()
+
+Received: null
+
+      at <anonymous> ($WORKTREE/packages/omo-senpi/src/components/memory/worker/hold-lock-lifecycle.test.ts:112:24)
+(fail) hold-lock fixture lifecycle > #given a hold-lock child holding its marker #when the parent-owned stdin pipe reports EOF #then the child exits within a bounded time [5070.76ms]
+145 |       // the only teardown channel left is the OS closing the wrapper's end of the stdin pipe.
+146 |       holderPid = await readHolderPid(holderPidPath, READY_TIMEOUT_MS)
+147 |       const holderGone = await pidTerminalWithin(holderPid, EXIT_BOUND_MS)
+148 |
+149 |       // then
+150 |       expect(holderGone).toBe(true)
+                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> ($WORKTREE/packages/omo-senpi/src/components/memory/worker/hold-lock-lifecycle.test.ts:150:26)
+(fail) hold-lock fixture lifecycle > #given a wrapper parent owning the holder's stdin #when the wrapper dies abruptly so no teardown can run #then the holder still exits within a bounded time [5075.18ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [11.42s]
+exit=1

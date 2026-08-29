@@ -1,0 +1,32 @@
+=== current-base memory-e2e.mjs (live senpi 2026.8.11-4) ===
+senpi: $SENPI_BIN
+PASS S1 commit landed :: seed harness fact for QA | project-eabf8170@omo.local
+chore: initialize local memory | project-eabf8170@omo.local
+PASS S1 author is identity :: seed harness fact for QA | project-eabf8170@omo.local
+PASS S1 sentinel in next-run prompt :: /tmp/omo-senpi-qa-C2ul5Z/sysdump.log
+PASS S1 memory body in next-run prompt :: /tmp/omo-senpi-qa-C2ul5Z/sysdump.log
+S2 parent stderr (rc0): omo-senpi ulw-execute-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }
+memory reflection launch failed {
+  error: 'This extension ctx is stale after session replacement or reload. Do not use a captured pi or command ctx after ctx.newSession(), ctx.fork(), ctx.switchSession(), or ctx.reload(). For newSession, fork, and switchSession, move post-replacement work into withSession and use the ctx passed to withSession. For reload, do not use the old ctx after await ctx.reload().'
+}
+
+S2 completion wait failed. reflection dirs: [
+  'facts,facts-queue,locks,notices,push-queue,reflection,reflection-sessions,tool-receipts,transcripts,viewers,worktrees'
+]
+FAIL S2 completion record :: timeout waiting for reflection completion record
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '$WORKTREE/packages/omo-senpi/src/extension/compose' imported from $WORKTREE/packages/omo-senpi/src/extension/index.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:271:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:992:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:691:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:708:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:740:52)
+    at #resolve (node:internal/modules/esm/loader:673:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:593:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:163:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:253:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file://$WORKTREE/packages/omo-senpi/src/extension/compose'
+}
+memory-e2e-exit=1

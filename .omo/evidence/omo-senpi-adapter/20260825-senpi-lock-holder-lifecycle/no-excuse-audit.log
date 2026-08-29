@@ -1,0 +1,9 @@
+   30 packages/omo-senpi/src/components/memory/worker/__fixtures__/hold-lock.ts
+  201 packages/omo-senpi/src/components/memory/facts-run-prune.test-support.ts
+  432 packages/omo-senpi/src/components/memory/worker/model-preflight.test.ts
+  178 packages/omo-senpi/src/components/memory/worker/hold-lock-lifecycle.test.ts
+  841 total
+--- banned patterns ---
+none-found
+--- setInterval scan (whole repo src) ---
+interval-helper-gone

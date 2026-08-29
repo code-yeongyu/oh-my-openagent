@@ -1,0 +1,22 @@
+# Focused battery after wave-1 marker-poll fix, 2026-08-25T17:28:19Z
+== ROUND 1 ==
+ 37 pass
+ 0 fail
+ 108 expect() calls
+Ran 37 tests across 4 files. [15.92s]
+-- residue --
+CLEAN
+== ROUND 2 ==
+ 37 pass
+ 0 fail
+ 108 expect() calls
+Ran 37 tests across 4 files. [15.28s]
+-- residue --
+CLEAN
+== ROUND 3 ==
+ 37 pass
+ 0 fail
+ 108 expect() calls
+Ran 37 tests across 4 files. [13.96s]
+-- residue --
+CLEAN

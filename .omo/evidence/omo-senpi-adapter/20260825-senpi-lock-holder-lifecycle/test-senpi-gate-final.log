@@ -1,0 +1,10 @@
+# bun run test:senpi on final audited tree, 2026-08-25T17:20:26Z
+# note: 'subscriber exploded' lines are intentional error injections from dag-runtime.test.ts (pre-existing)
+ 2270 pass
+ 7 skip
+ 0 fail
+Ran 2277 tests across 311 files. [147.43s]
+ 10 pass
+ 0 fail
+Ran 10 tests across 1 file. [1361.00ms]
+gate-exit=0
