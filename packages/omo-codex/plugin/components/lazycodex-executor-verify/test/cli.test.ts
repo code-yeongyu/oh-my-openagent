@@ -57,9 +57,21 @@ describe("lazycodex executor verify CLI", () => {
 	it("#given receipt artifact stdin #when CLI runs #then stdout is empty and exit is zero", () => {
 		// given
 		const cwd = createWorkspace();
-		const artifactPath = join(cwd, ".omo", "evidence", "receipt.txt");
+		const artifactPath = join(cwd, ".omo", "evidence", "receipt.json");
+		const deliverablePath = join(cwd, "dist", "output.txt");
 		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
-		writeFileSync(artifactPath, "verified\n");
+		mkdirSync(join(cwd, "dist"), { recursive: true });
+		writeFileSync(deliverablePath, "done\n");
+		writeFileSync(
+			artifactPath,
+			JSON.stringify({
+				verdict: "confirmed",
+				session_id: "sess.1",
+				agent_id: "agent_1",
+				turn_id: null,
+				deliverables: ["dist/output.txt"],
+			}),
+		);
 		const payload = JSON.stringify(
 			createPayload(cwd, { last_assistant_message: `EVIDENCE_RECORDED: ${artifactPath}` }),
 		);

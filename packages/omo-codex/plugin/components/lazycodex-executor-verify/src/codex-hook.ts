@@ -8,6 +8,14 @@ import { SUBAGENT_STOP_EVENT } from "./types.js";
 
 const RECEIPT_ENFORCED_AGENTS = new Set(["lazycodex-worker-low", "lazycodex-worker-medium", "lazycodex-worker-high"]);
 
+type EvidenceReceipt = {
+	readonly verdict: "confirmed";
+	readonly session_id: string;
+	readonly agent_id: string;
+	readonly turn_id: string | null;
+	readonly deliverables: readonly string[];
+};
+
 export function runSubagentStopHook(input: unknown, fs: HookFileSystem): string {
 	if (!isSubagentStopInput(input)) return "";
 	if (!RECEIPT_ENFORCED_AGENTS.has(input.agent_type)) return "";
@@ -25,7 +33,10 @@ export function runSubagentStopHook(input: unknown, fs: HookFileSystem): string 
 	writeAttemptState(input.cwd, input.session_id, input.agent_id, { attempts }, fs);
 	return JSON.stringify({
 		decision: "block",
-		reason: renderDirective(attempts, input.last_assistant_message),
+		reason: renderDirective(attempts, input.last_assistant_message)
+			.replaceAll("{{SESSION_ID}}", input.session_id)
+			.replaceAll("{{AGENT_ID}}", input.agent_id)
+			.replaceAll("{{TURN_ID_JSON}}", JSON.stringify(input.turn_id ?? null)),
 	} satisfies StopHookOutput);
 }
 
@@ -56,7 +67,41 @@ function hasValidEvidenceReceipt(input: SubagentStopInput, fs: HookFileSystem): 
 	const resolvedPath = isAbsolute(receiptPath) ? resolve(receiptPath) : resolve(input.cwd, receiptPath);
 	if (!isPathInsideDirectory(resolvedPath, evidenceRoot)) return false;
 	try {
-		return isNonEmptyFileInsideEvidenceRoot(resolvedPath, evidenceRoot, input.cwd, fs);
+		if (!isNonEmptyFileInsideEvidenceRoot(resolvedPath, evidenceRoot, input.cwd, fs)) return false;
+		const receipt: unknown = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+		if (!isEvidenceReceiptForInput(receipt, input)) return false;
+		return receipt.deliverables.every((path) => isValidDeliverable(path, evidenceRoot, input.cwd, fs));
+	} catch (error) {
+		if (error instanceof Error) return false;
+		throw error;
+	}
+}
+
+function isEvidenceReceiptForInput(value: unknown, input: SubagentStopInput): value is EvidenceReceipt {
+	if (!isRecord(value)) return false;
+	const deliverables = value["deliverables"];
+	return (
+		value["verdict"] === "confirmed" &&
+		value["session_id"] === input.session_id &&
+		value["agent_id"] === input.agent_id &&
+		value["turn_id"] === (input.turn_id ?? null) &&
+		Array.isArray(deliverables) &&
+		deliverables.length > 0 &&
+		deliverables.every((path) => typeof path === "string" && path.length > 0)
+	);
+}
+
+function isValidDeliverable(path: string, evidenceRoot: string, cwd: string, fs: HookFileSystem): boolean {
+	const resolvedPath = isAbsolute(path) ? resolve(path) : resolve(cwd, path);
+	if (!isPathInsideDirectory(resolvedPath, cwd) || isPathInsideDirectory(resolvedPath, evidenceRoot)) return false;
+	try {
+		if (!fs.existsSync(resolvedPath)) return false;
+		const realCwd = realPath(cwd, fs);
+		const realEvidenceRoot = realPath(evidenceRoot, fs);
+		const realFilePath = realPath(resolvedPath, fs);
+		if (!isPathInsideDirectory(realFilePath, realCwd)) return false;
+		if (isPathInsideDirectory(realFilePath, realEvidenceRoot)) return false;
+		return isNonEmptyFile(resolvedPath, fs);
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;

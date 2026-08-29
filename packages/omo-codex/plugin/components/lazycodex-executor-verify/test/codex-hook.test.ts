@@ -69,19 +69,51 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		// given
 		const cwd = createWorkspace();
 		runSubagentStopHook(createInput(cwd), nodeFileSystem);
-		const artifactPath = join(cwd, ".omo", "evidence", "receipt.txt");
+		const artifactPath = join(cwd, ".omo", "evidence", "receipt.json");
+		const deliverablePath = join(cwd, "dist", "output.txt");
 		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
-		writeFileSync(artifactPath, "verified\n");
+		mkdirSync(join(cwd, "dist"), { recursive: true });
+		writeFileSync(deliverablePath, "done\n");
+		writeFileSync(
+			artifactPath,
+			JSON.stringify({
+				verdict: "confirmed",
+				session_id: "sess.1",
+				agent_id: "agent_1",
+				turn_id: "turn.1",
+				deliverables: ["dist/output.txt"],
+			}),
+		);
 
 		// when
 		const output = runSubagentStopHook(
-			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/receipt.txt" }),
+			createInput(cwd, {
+				turn_id: "turn.1",
+				last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/receipt.json",
+			}),
 			nodeFileSystem,
 		);
 
 		// then
 		expect(output).toBe("");
 		expect(existsSync(join(cwd, ".omo", "lazycodex-executor-verify", "sess.1-agent_1.json"))).toBe(false);
+	});
+
+	it("#given a generic non-empty receipt without a deliverable #when executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		const artifactPath = join(cwd, ".omo", "evidence", "placeholder.txt");
+		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
+		writeFileSync(artifactPath, "verified\n");
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/placeholder.txt" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
 	});
 
 	it("#given a zero-byte evidence receipt #when lazycodex executor stops #then blocks", () => {

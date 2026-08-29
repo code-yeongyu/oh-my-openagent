@@ -4,6 +4,18 @@
 
 직접 검증하라. 관련 명령을 실제로 실행하고, 출력과 판단 근거를 `.omo/evidence/` 아래 파일로 기록하라. 실패한 항목이 있으면 완료했다고 말하지 말고 고쳐라. `stop_hook_active` 상태여도 이 검증은 생략되지 않는다. 반복은 제한되어 있지만, 증거 없는 완료 주장은 막힌다.
 
+증거 파일은 아래 JSON 형식이어야 한다. `deliverables`에는 `.omo/evidence/` 밖에 있는 실제 결과 파일을 기록하라.
+
+```json
+{
+  "verdict": "confirmed",
+  "session_id": "{{SESSION_ID}}",
+  "agent_id": "{{AGENT_ID}}",
+  "turn_id": {{TURN_ID_JSON}},
+  "deliverables": ["path/to/deliverable"]
+}
+```
+
 마지막 assistant 메시지:
 {{LAST_ASSISTANT_MESSAGE}}
 
