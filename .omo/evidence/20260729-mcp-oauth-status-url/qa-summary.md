@@ -30,3 +30,12 @@ The repository's `opencode-qa` routing was used to scope this as a CLI command. 
 ## Residual risk
 
 The command still requires `--server-url` when the display name differs from the token URL, matching the existing logout contract. The change does not alter OAuth discovery, token storage, token contents, or authentication.
+
+## Review follow-up (2026-08-29)
+
+The Commander action now types its options parameter as `StatusOptions`; runtime behavior is unchanged.
+
+- `bun test packages/omo-opencode/src/cli/mcp-oauth/status.test.ts packages/omo-opencode/src/cli/mcp-oauth/index.test.ts packages/omo-opencode/src/cli/mcp-oauth/logout.test.ts` — 16 passed, 0 failed.
+- `bun run typecheck` — passed across the root, scripts, and workspace packages.
+- `git diff --check` — passed.
+- A direct CLI smoke used fresh `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME`, and `OPENCODE_CONFIG_DIR` directories. `bun packages/omo-opencode/src/cli/index.ts mcp oauth status github --server-url https://oauth.example.test/mcp` printed `No tokens found for github` and exited 0 without reading the host token store.
