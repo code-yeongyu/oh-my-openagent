@@ -14,6 +14,7 @@ const DEFAULT_SCAN_DIRS = [
 	join(here, "skills", "ultimate-browsing"),
 	join(here, "skills", "data-scientist"),
 	join(here, "skills", "ulw-research"),
+	join(here, "skills", "xquik"),
 ];
 
 // Frozen deny list: personal identity + credential literals only.

@@ -33,6 +33,17 @@ describe("shared skills package manifest", () => {
     })
   })
 
+  test("#given the Xquik shared Skill #when its MCP map is packaged #then both remote servers keep their public URLs", async () => {
+    // when
+    const mcpConfig = await Bun.file("packages/shared-skills/skills/xquik/mcp.json").json()
+
+    // then
+    expect(mcpConfig).toEqual({
+      "xquik-docs": { url: "https://docs.xquik.com/mcp" },
+      xquik: { url: "https://xquik.com/mcp" },
+    })
+  })
+
   test("#given shared user skills #when copied into the package #then frontmatter and resource directories are preserved", async () => {
     // given
     const copiedSkills = ["coding-agent-sessions", "debugging", "programming", "refactor", "remove-ai-slops"] as const

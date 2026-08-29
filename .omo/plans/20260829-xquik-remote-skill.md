@@ -7,19 +7,19 @@ Use the existing direct remote MCP parser repair for its two HTTP servers.
 
 ## Plan
 
-- [ ] Rebase the branch onto the current `dev` head.
-- [ ] Preserve the provider-neutral direct remote MCP parser repair.
-- [ ] Add an `xquik` shared Skill with public MCP configuration.
-- [ ] Document discovery, read operations, mutations, and authentication behavior.
-- [ ] Add the Skill to cross-harness packaging and security gates.
-- [ ] Test direct URL parsing and the shipped Xquik server map.
-- [ ] Sync generated test fixtures without committing generated output.
-- [ ] Run focused package tests and type checks.
-- [ ] Run isolated OpenCode QA through `skill` and `skill_mcp`.
-- [ ] Record redacted, reviewer-readable QA evidence.
-- [ ] Inspect the public diff for credentials and private material.
-- [ ] Update the pull request title, body, and existing status comment.
-- [ ] Force-push only the personal fork branch with a lease.
+- [x] Rebase the branch onto the current `dev` head.
+- [x] Preserve the provider-neutral direct remote MCP parser repair.
+- [x] Add an `xquik` shared Skill with public MCP configuration.
+- [x] Document discovery, read operations, mutations, and authentication behavior.
+- [x] Add the Skill to cross-harness packaging and security gates.
+- [x] Test direct URL parsing and the shipped Xquik server map.
+- [x] Sync generated test fixtures without committing generated output.
+- [x] Run focused package tests and type checks.
+- [x] Run isolated OpenCode QA through `skill` and `skill_mcp`.
+- [x] Record redacted, reviewer-readable QA evidence.
+- [x] Inspect the public diff for credentials and private material.
+- [x] Update the pull request title, body, and existing status comment.
+- [x] Force-push only the personal fork branch with a lease.
 
 ## Verification
 
