@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 
+import { FAILURE_RESET_WINDOW_MS, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import { handleSessionIdle } from "./idle-event"
 import type { SessionStateStore } from "./session-state"
 import type { ContinuationProgressUpdate, SessionState } from "./types"
@@ -70,6 +71,9 @@ describe("handleSessionIdle", () => {
           messages: async () => ({ data: [] }),
           todo: async () => ({ data: [] }),
         },
+      },
+      tui: {
+        showToast: async () => ({}),
       },
       directory: "/tmp/test",
     }
@@ -146,6 +150,111 @@ describe("handleSessionIdle", () => {
     expect(trackCalls).toHaveLength(0)
     // reset is still called only once (from the first idle)
     expect(resetCalls).toHaveLength(1)
+  })
+
+  it("stops continuation after repeated post-dispatch provider failures", async () => {
+    // given
+    const sessionID = "ses_provider_failure_limit"
+    const { store, trackCalls, state } = createStateStore()
+    state.consecutiveProviderFailures = MAX_CONSECUTIVE_FAILURES
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          todo: async () => ({
+            data: [{ id: "todo-1", content: "Ship", status: "pending", priority: "high" }],
+          }),
+        },
+        tui: {
+          showToast: async () => ({}),
+        },
+      },
+      directory: "/tmp/test",
+    }
+
+    // when
+    await handleSessionIdle({
+      ctx: ctx as never,
+      sessionID,
+      sessionStateStore: store,
+    })
+
+    // then
+    expect(trackCalls).toEqual([])
+  })
+
+  it("resets the provider failure boundary after the recovery window", async () => {
+    // given
+    const sessionID = "ses_provider_failure_recovery"
+    const { store, trackCalls, state } = createStateStore()
+    state.consecutiveProviderFailures = MAX_CONSECUTIVE_FAILURES
+    state.lastInjectedAt = Date.now() - FAILURE_RESET_WINDOW_MS
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          todo: async () => ({
+            data: [{ id: "todo-1", content: "Ship", status: "pending", priority: "high" }],
+          }),
+        },
+        tui: {
+          showToast: async () => ({}),
+        },
+      },
+      directory: "/tmp/test",
+    }
+
+    try {
+      // when
+      await handleSessionIdle({
+        ctx: ctx as never,
+        sessionID,
+        sessionStateStore: store,
+      })
+
+      // then
+      expect(state.consecutiveProviderFailures).toBe(0)
+      expect(trackCalls).toEqual([sessionID])
+    } finally {
+      store.cancelCountdown(sessionID)
+    }
+  })
+
+  it("preserves the pre-dispatch failure recovery boundary", async () => {
+    // given
+    const sessionID = "ses_pre_dispatch_failure_recovery"
+    const { store, trackCalls, state } = createStateStore()
+    state.consecutiveFailures = MAX_CONSECUTIVE_FAILURES
+    state.lastInjectedAt = Date.now() - FAILURE_RESET_WINDOW_MS
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          todo: async () => ({
+            data: [{ id: "todo-1", content: "Ship", status: "pending", priority: "high" }],
+          }),
+        },
+        tui: {
+          showToast: async () => ({}),
+        },
+      },
+      directory: "/tmp/test",
+    }
+
+    try {
+      // when
+      await handleSessionIdle({
+        ctx: ctx as never,
+        sessionID,
+        sessionStateStore: store,
+      })
+
+      // then
+      expect(state.consecutiveFailures).toBe(0)
+      expect(trackCalls).toEqual([sessionID])
+    } finally {
+      store.cancelCountdown(sessionID)
+    }
   })
 
   it("skips todo continuation when the previous internal continuation has only an empty unknown assistant turn", async () => {
