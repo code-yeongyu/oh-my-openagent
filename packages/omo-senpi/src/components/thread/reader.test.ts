@@ -317,6 +317,22 @@ describe("readTranscript cursor handling", () => {
     expect(failure.error.code).toBe("cursor_stale")
   })
 
+  test("a middle-entry rewrite with the same count and final entry is cursor_stale", () => {
+    const dir = makeTempDir()
+    const entries = [sessionHeader(), ...Array.from({ length: 20 }, (_, i) => messageEntry(i, "w".repeat(300)))]
+    const path = writeJsonl(dir, "stale-middle-rewrite.jsonl", entries)
+
+    const first = expectOk(readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048 }))
+    const rewritten = entries.map((entry, index) =>
+      index === 5 ? { ...entry, timestamp: "2026-08-24T00:00:05.000Z" } : entry,
+    )
+    writeJsonl(dir, "stale-middle-rewrite.jsonl", rewritten)
+
+    const result = readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor: first.next_cursor as string })
+    const failure = expectError(result)
+    expect(failure.error.code).toBe("cursor_stale")
+  })
+
   test("an unchanged file keeps the cursor valid across repeated reads", () => {
     const dir = makeTempDir()
     const entries = [sessionHeader(), ...Array.from({ length: 12 }, (_, i) => messageEntry(i, "w".repeat(300)))]

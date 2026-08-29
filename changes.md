@@ -1,4 +1,4 @@
-## 2026-08-28 — Pin Senpi 2026.8.28 for the shared interactive host hotfix
+## 2026-08-28 — Pin Senpi 2026.8.28-2 for the shared interactive host hotfix
 
 `packages/omo-native/package.json`, `packages/omo-senpi/package.json`, and the
 root `package.json` now require the exact published `@code-yeongyu/senpi`

@@ -2,7 +2,12 @@ import { checkForLegacyPluginEntry } from "./legacy-plugin-warning"
 import { log } from "./logger"
 import { migrateLegacyPluginEntry } from "./migrate-legacy-plugin-entry"
 import { toCanonicalEntry } from "./plugin-entry-migrator"
+import { getPluginEntryName, type PluginEntry } from "./plugin-entry-shape"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "./plugin-identity"
+
+function describeEntry(entry: PluginEntry): string {
+  return getPluginEntryName(entry)
+}
 
 type LogLegacyPluginStartupWarningDeps = {
   checkForLegacyPluginEntry?: typeof checkForLegacyPluginEntry
@@ -36,11 +41,11 @@ export function logLegacyPluginStartupWarning(deps: LogLegacyPluginStartupWarnin
 
   const migrated = migrateLegacyPluginEntryFn(result.configPath)
   if (migrated) {
-    console.warn(`[oh-my-openagent] Auto-migrated opencode.json: ${result.legacyEntries.join(", ")} -> ${suggestedEntries.join(", ")}`)
+    console.warn(`[oh-my-openagent] Auto-migrated opencode.json: ${result.legacyEntries.map(describeEntry).join(", ")} -> ${suggestedEntries.map(describeEntry).join(", ")}`)
   } else {
     console.warn(
       `[oh-my-openagent] Could not auto-migrate. Please manually update your opencode.json:`
-      + ` ${result.legacyEntries.map((e, i) => `"${e}" -> "${suggestedEntries[i]}"`).join(", ")}`,
+      + ` ${result.legacyEntries.map((entry, index) => `"${describeEntry(entry)}" -> "${describeEntry(suggestedEntries[index] ?? entry)}"`).join(", ")}`,
     )
   }
 }

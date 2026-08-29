@@ -220,6 +220,42 @@ describe("TUI sidebar polling", () => {
     mountedSidebar.renderer.destroy()
   })
 
+  it("#given sidebar state changes after the slot mounts #when the host renders again #then the sidebar output is current", async () => {
+    // given
+    const { registerSidebarContentSlot } = await import("./tui")
+    let state = "initial"
+    let registration: TuiSlotPlugin | undefined
+    let mountedOutput: unknown
+    let renderedOutput: unknown
+    let requestRender = (): void => undefined
+    registerSidebarContentSlot({
+      registerSlot: (nextRegistration) => {
+        registration = nextRegistration as TuiSlotPlugin
+      },
+      requestRender: () => {
+        requestRender = () => {
+          if (typeof mountedOutput === "function") {
+            renderedOutput = (mountedOutput as () => string)()
+          }
+        }
+      },
+      renderSidebar: () => state,
+    })
+
+    // when
+    if (!registration) throw new Error("sidebar slot was not registered")
+    mountedOutput = registration.slots.sidebar_content()
+    const initialOutput = (mountedOutput as () => string)()
+    state = "updated"
+    // requestRender is the host's signal; Solid re-evaluates the returned child accessor.
+    renderedOutput = undefined
+    requestRender()
+
+    // then
+    expect(initialOutput).toBe("initial")
+    expect(renderedOutput).toBe("updated")
+  })
+
   it("#given an unexpected Error during polling #when the poll error handler runs #then the error is logged", async () => {
     // given
     const pollError = new TypeError("view derivation failed")

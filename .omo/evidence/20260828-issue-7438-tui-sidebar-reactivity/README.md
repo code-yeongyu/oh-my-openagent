@@ -33,3 +33,26 @@ transition directions. The real database count stayed 7933 before and after.
 
 Temporary paths, control sequences, provider output, configuration contents,
 tokens, credentials, prompts, and auth headers were omitted.
+
+## Verification after merging current dev
+
+The branch was merged with `origin/dev` at
+`c034b5313d65da3316db3ebf5459b30e75379ae6`. The only content conflict was in
+`packages/omo-opencode/src/tui.test.ts`; the resolution keeps both the
+mounted-root regression from this change and the newer helper-level regression
+from `dev`, with dynamic import ordering preserved for the real OpenTUI Solid
+runtime.
+
+```text
+Sidebar suite: 61 pass, 0 fail, 123 assertions
+bunx bun@1.3.12 run typecheck: exit 0
+bunx bun@1.3.12 run build: build: all steps completed
+
+OpenCode TUI smoke: PASS (OpenCode 1.18.25)
+ACTIVE_TRANSITION=PASS
+IDLE_TRANSITION=PASS
+ISOLATION=PASS:7946
+```
+
+The rerun again drove the built local TUI plugin in isolated HOME/XDG paths.
+The real OpenCode database held 7,946 sessions both before and after.

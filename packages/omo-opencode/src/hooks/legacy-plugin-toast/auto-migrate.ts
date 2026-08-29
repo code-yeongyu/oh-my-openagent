@@ -5,6 +5,7 @@ import { parseJsoncSafe } from "../../shared/jsonc-parser"
 import { getOpenCodeConfigPaths } from "../../shared/opencode-config-dir"
 import { PLUGIN_NAME } from "../../shared/plugin-identity"
 import { isCanonicalEntry, isLegacyEntry, toCanonicalEntry } from "../../shared/plugin-entry-migrator"
+import { getPluginEntryName, type PluginEntry } from "../../shared/plugin-entry-shape"
 import { migrateLegacyPluginEntry } from "./plugin-entry-migrator"
 
 export interface MigrationResult {
@@ -15,7 +16,7 @@ export interface MigrationResult {
 }
 
 interface OpenCodeConfig {
-  plugin?: string[]
+  plugin?: PluginEntry[]
 }
 
 function detectOpenCodeConfigPath(overrideConfigDir?: string): string | null {
@@ -47,8 +48,8 @@ export function autoMigrateLegacyPluginEntry(overrideConfigDir?: string): Migrat
     if (legacyEntries.length === 0) return { migrated: false, from: null, to: null, configPath }
 
     const hasCanonical = plugins.some(isCanonicalEntry)
-    const from = legacyEntries[0]
-    const to = toCanonicalEntry(from)
+    const from = getPluginEntryName(legacyEntries[0])
+    const to = getPluginEntryName(toCanonicalEntry(legacyEntries[0]))
     const migrated = migrateLegacyPluginEntry(configPath)
     if (!migrated) return { migrated: false, from: null, to: null, configPath }
 

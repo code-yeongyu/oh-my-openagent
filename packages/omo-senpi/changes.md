@@ -1,3 +1,30 @@
+## 2026-08-29 — Teach "mass ulw research" the mass path
+
+A combined mass + research invocation collected at team scale instead of mass
+scale, and two of its spellings never loaded the research skill at all.
+
+`mass-ulw/references/planning.md` sent every `ulw-research` request to the team
+path and reserved the dag for "independent harvest stages only", so the
+composite invocation could never reach mass fan-out. That routing now splits: a
+plain research request still goes to the team, while a MASS research request
+runs collection as chained dags and keeps a team only for debate rounds. A new
+"Mass research" section states the scale the mode means — a 60+ node opening
+wave covering every angle, routed across `quick` / `unspecified-low` /
+`unspecified-high` / `deep` in one graph, each wave's EXPAND leads defining the
+next wave's nodes until convergence, and a synthesis that reduces through
+several parallel `architect` nodes into one `architect` reducer, with
+`ultrabrain` substituting where the config defines no `architect` category.
+Both `ulw-research` copies (senpi-native and shared) gained the matching branch
+at their Phase 1 roster decision, so the mode is reachable from either skill.
+
+`skill-pointers` extracts the mass alias group into a shared `MASS_ALIAS`
+constant and lets it stand in for the `ulw` half of the research pattern. The
+aliases carrying no literal "ulw" (`mulw`, `meth`) and the reversed `ulw mass`
+previously matched mass-ulw alone, so "mulw research" armed dag orchestration
+with no research doctrine behind it; those spellings now inject both pointers,
+exactly like "mass ulw research". Near-miss guards (`method`, `promethean`,
+`ulw massive`) are unchanged.
+
 ## 2026-08-28 — Align the Senpi adapter with 2026.8.28
 
 `packages/omo-senpi/package.json` now requires the exact published

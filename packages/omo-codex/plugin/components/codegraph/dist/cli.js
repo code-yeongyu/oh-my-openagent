@@ -5882,9 +5882,25 @@ var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
   enabled: boolean2().default(true)
 }).strict();
 
+// ../../omo-config-core/src/schema/format-on-mutation.ts
+var mode = _enum(["off", "best-effort", "required"]);
+var languages = record(string2(), boolean2()).optional();
+var OmoFormatOnMutationLayerSchema = object({
+  mode: mode.optional(),
+  languages,
+  maxFileBytes: number2().int().positive().optional(),
+  timeoutMs: number2().int().positive().optional()
+}).strict();
+var OmoFormatOnMutationSchema = OmoFormatOnMutationLayerSchema.extend({
+  mode: mode.default("best-effort"),
+  maxFileBytes: number2().int().positive().default(1048576),
+  timeoutMs: number2().int().positive().default(3000)
+}).strict();
+
 // ../../omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoTypedHarnessConfigSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
@@ -5896,6 +5912,7 @@ var OmoTypedHarnessConfigSchema = object({
   telemetry: OmoTelemetrySettingsLayerSchema.optional()
 }).strict();
 var OmoConfigProfileSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
@@ -5910,6 +5927,7 @@ var OmoConfigProfileSchema = object({
   "[codex]": OmoTypedHarnessConfigSchema.optional()
 }).strict();
 var OmoConfigSchema = object({
+  formatOnMutation: OmoFormatOnMutationSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -5928,6 +5946,7 @@ var OmoConfigSchema = object({
   legacy_migrations: record(string2(), unknown()).optional()
 }).strict();
 var OmoConfigLayerSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -9588,7 +9607,7 @@ function defaultPluginRoot() {
 }
 
 // components/codegraph/src/session-start-cooldown.ts
-import { mkdirSync as mkdirSync4, readFileSync as readFileSync6, rmSync as rmSync2 } from "node:fs";
+import { mkdirSync as mkdirSync4, readFileSync as readFileSync6, rmSync as rmSync3 } from "node:fs";
 
 // ../../utils/src/atomic-write.ts
 import {
@@ -9596,9 +9615,12 @@ import {
   fsyncSync,
   openSync,
   renameSync as renameSync2,
+  rmSync as rmSync2,
   unlinkSync as unlinkSync2,
   writeFileSync as writeFileSync4
 } from "node:fs";
+import { randomUUID as randomUUID2 } from "node:crypto";
+import { dirname as dirname8 } from "node:path";
 var TOLERATED_FSYNC_CODES = new Set([
   "EPERM",
   "EACCES",
@@ -9620,29 +9642,41 @@ function tolerantFsyncSync(fileDescriptor, fsyncImpl) {
   }
 }
 function writeFileAtomically(filePath, content, options = {}) {
-  const tempPath = `${filePath}.tmp`;
-  writeFileSync4(tempPath, content, "utf-8");
-  const tempFileDescriptor = openSync(tempPath, "r+");
+  const platform = options.platform ?? process.platform;
+  const fsyncImpl = options.fsyncSync ?? fsyncSync;
+  const tempPath = `${filePath}.${process.pid}.${randomUUID2()}.tmp`;
   try {
-    tolerantFsyncSync(tempFileDescriptor, options.fsyncSync ?? fsyncSync);
-  } finally {
-    closeSync(tempFileDescriptor);
-  }
-  try {
-    renameSync2(tempPath, filePath);
-  } catch (error) {
-    const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
-    if ((options.platform ?? process.platform) === "win32" && isPermissionError) {
+    writeFileSync4(tempPath, content, "utf-8");
+    const tempFileDescriptor = openSync(tempPath, "r+");
+    try {
+      tolerantFsyncSync(tempFileDescriptor, fsyncImpl);
+    } finally {
+      closeSync(tempFileDescriptor);
+    }
+    try {
+      renameSync2(tempPath, filePath);
+    } catch (error) {
+      const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
+      if (platform !== "win32" || !isPermissionError)
+        throw error;
       unlinkSync2(filePath);
       renameSync2(tempPath, filePath);
-      return;
     }
-    throw error;
+    if (platform === "win32")
+      return;
+    const directoryFileDescriptor = openSync(dirname8(filePath), "r");
+    try {
+      tolerantFsyncSync(directoryFileDescriptor, fsyncImpl);
+    } finally {
+      closeSync(directoryFileDescriptor);
+    }
+  } finally {
+    rmSync2(tempPath, { force: true });
   }
 }
 
 // components/codegraph/src/session-start-paths.ts
-import { basename as basename3, dirname as dirname8, join as join14 } from "node:path";
+import { basename as basename3, dirname as dirname9, join as join14 } from "node:path";
 function resolveSessionStartStatePaths(homeDir, projectRoot) {
   const canonicalProjectRoot = canonicalizeCodegraphPath(projectRoot);
   const workspacePaths = resolveCodegraphWorkspacePaths(canonicalProjectRoot, { homeDir });
@@ -9657,7 +9691,7 @@ function resolveSessionStartStatePaths(homeDir, projectRoot) {
   };
 }
 function stateParent(path) {
-  return dirname8(path);
+  return dirname9(path);
 }
 
 // components/codegraph/src/session-start-cooldown.ts
@@ -9693,7 +9727,7 @@ function recordSessionStartFailure(options) {
 }
 function clearSessionStartCooldown(options) {
   const path = resolveSessionStartStatePaths(options.homeDir, options.projectRoot).cooldownPath;
-  rmSync2(path, { force: true });
+  rmSync3(path, { force: true });
 }
 function cooldownDuration(baseCooldownMs, failureCount, maxCooldownMs) {
   let duration3 = Math.min(baseCooldownMs, maxCooldownMs);
@@ -9777,8 +9811,8 @@ function writeSessionStartNotice(stdout, notice) {
 }
 
 // components/codegraph/src/session-start-lock.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
-import { mkdirSync as mkdirSync5, readFileSync as readFileSync7, rmSync as rmSync3, statSync as statSync3, writeFileSync as writeFileSync5 } from "node:fs";
+import { randomUUID as randomUUID3 } from "node:crypto";
+import { mkdirSync as mkdirSync5, readFileSync as readFileSync7, rmSync as rmSync4, statSync as statSync3, writeFileSync as writeFileSync5 } from "node:fs";
 function acquireSessionStartLock(options) {
   const paths = resolveSessionStartStatePaths(options.homeDir, options.projectRoot);
   const lockPath = paths.lockPath;
@@ -9807,7 +9841,7 @@ function releaseSessionStartLock(lock) {
   if (snapshot.kind !== "present" || snapshot.token !== lock.token)
     return false;
   try {
-    rmSync3(lock.path, { force: true });
+    rmSync4(lock.path, { force: true });
     return true;
   } catch (error) {
     if (error instanceof Error)
@@ -9832,7 +9866,7 @@ function reclaimStaleLock(lockPath, staleSnapshot, options) {
       const changed = current.raw !== staleSnapshot.raw || current.mtimeMs !== staleSnapshot.mtimeMs;
       if (changed || options.nowMs - current.mtimeMs < options.staleMs)
         return { kind: "locked" };
-      rmSync3(lockPath, { force: true });
+      rmSync4(lockPath, { force: true });
     }
     const acquired = tryCreateLock(lockPath, options.projectRoot);
     return acquired.kind === "acquired" ? { ...acquired, recoveredStale: true } : acquired;
@@ -9841,11 +9875,11 @@ function reclaimStaleLock(lockPath, staleSnapshot, options) {
       return { kind: "inconclusive", reason: error.message };
     throw error;
   } finally {
-    rmSync3(reclaimPath, { force: true });
+    rmSync4(reclaimPath, { force: true });
   }
 }
 function tryCreateLock(lockPath, projectRoot) {
-  const token = randomUUID2();
+  const token = randomUUID3();
   try {
     writeFileSync5(lockPath, `${JSON.stringify({ projectRoot, token })}
 `, {
@@ -9864,7 +9898,7 @@ function tryCreateLock(lockPath, projectRoot) {
 }
 function tryCreateMarker(path) {
   try {
-    writeFileSync5(path, `${randomUUID2()}
+    writeFileSync5(path, `${randomUUID3()}
 `, { encoding: "utf8", flag: "wx", mode: 384 });
     return { kind: "acquired" };
   } catch (error) {
@@ -9902,17 +9936,17 @@ function errorCode2(error) {
 
 // components/codegraph/src/session-start-outcome.ts
 import { appendFileSync as appendFileSync2, mkdirSync as mkdirSync6 } from "node:fs";
-import { dirname as dirname9, join as join15 } from "node:path";
+import { dirname as dirname10, join as join15 } from "node:path";
 function appendSessionStartOutcome(homeDir, outcome, nowMs = Date.now()) {
   const path = join15(codegraphDataRoot(homeDir), "session-start.jsonl");
-  mkdirSync6(dirname9(path), { recursive: true });
+  mkdirSync6(dirname10(path), { recursive: true });
   appendFileSync2(path, `${JSON.stringify({ ...outcome, timestamp: new Date(nowMs).toISOString() })}
 `);
 }
 
 // components/codegraph/src/session-start-project.ts
 import { realpathSync as realpathSync7, statSync as statSync4 } from "node:fs";
-import { dirname as dirname10, join as join16 } from "node:path";
+import { dirname as dirname11, join as join16 } from "node:path";
 function probeCodegraphProject(projectRoot, options = {}) {
   const resolved = resolveProjectRoot(projectRoot);
   if (resolved.kind === "inconclusive")
@@ -9944,14 +9978,14 @@ function probeResolvedExactProject(projectRoot, probeDatabase) {
   return { kind: "uninitialized" };
 }
 function probeResolvedAncestors(projectRoot, probeDatabase) {
-  let ancestorRoot = dirname10(projectRoot);
+  let ancestorRoot = dirname11(projectRoot);
   while (ancestorRoot !== projectRoot) {
     const database = probeDatabase(ancestorRoot);
     if (database.kind === "present")
       return { ancestorRoot, kind: "nested-root" };
     if (database.kind === "inconclusive")
       return database;
-    const parent = dirname10(ancestorRoot);
+    const parent = dirname11(ancestorRoot);
     if (parent === ancestorRoot)
       break;
     ancestorRoot = parent;
@@ -10113,7 +10147,7 @@ function parseNodeMajor(version2) {
 }
 
 // ../../utils/src/codegraph/provision.ts
-import { createHash as createHash2, randomUUID as randomUUID3 } from "node:crypto";
+import { createHash as createHash2, randomUUID as randomUUID4 } from "node:crypto";
 import { execFile as execFile2 } from "node:child_process";
 import { chmod, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { existsSync as existsSync9 } from "node:fs";
@@ -10233,7 +10267,7 @@ async function installExtractedBundle(extractDir, installDir, executableName) {
 }
 async function installAsset(layout) {
   const { asset, downloader, installDir, version: version2 } = layout;
-  const stagingDir = join18(installDir, ".staging", randomUUID3());
+  const stagingDir = join18(installDir, ".staging", randomUUID4());
   const archivePath = join18(stagingDir, basename4(asset.url));
   const extractDir = join18(stagingDir, "extract");
   try {
@@ -10296,7 +10330,7 @@ async function ensureCodegraphProvisioned(options) {
 import { existsSync as existsSync10 } from "node:fs";
 import { homedir as homedir10 } from "node:os";
 import { spawnSync } from "node:child_process";
-import { basename as basename5, dirname as dirname11, join as join20 } from "node:path";
+import { basename as basename5, dirname as dirname12, join as join20 } from "node:path";
 import { createRequire } from "node:module";
 
 // ../../utils/src/runtime/which.ts
@@ -10449,7 +10483,7 @@ function defaultProvisionedBin(homeDir, fileExists) {
 function resolveBundledShim(requireResolve, fileExists) {
   try {
     const packageJson = requireResolve(`${CODEGRAPH_PACKAGE}/package.json`);
-    const packageRoot = dirname11(packageJson);
+    const packageRoot = dirname12(packageJson);
     const candidates = [join20(packageRoot, "bin", "codegraph.js"), join20(packageRoot, "npm-shim.js")];
     return candidates.find((candidate) => fileExists(candidate)) ?? null;
   } catch (error) {
@@ -11759,8 +11793,8 @@ async function runBridgedCodegraphProcess(command, args, options) {
     destroyChildPipes();
     terminateCodegraphChild(child);
   });
-  const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
-    defaultResponseMode = mode;
+  const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode2) => {
+    defaultResponseMode = mode2;
   }, () => parentWatchdogFired);
   const responseForwardingDone = forwardCodegraphToClient(childOutput, options.output, pendingResponses, () => defaultResponseMode, () => parentWatchdogFired);
   const bridgeDone = Promise.all([clientForwardingDone, responseForwardingDone]);

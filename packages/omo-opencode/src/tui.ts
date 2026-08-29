@@ -24,7 +24,7 @@ type SolidRuntime<Node> = {
 type SidebarSlotRegistration<Node> = {
   readonly order: number
   readonly slots: {
-    readonly sidebar_content: () => Node
+    readonly sidebar_content: () => Node | (() => Node)
   }
 }
 
@@ -34,7 +34,7 @@ type RegisterSidebarContentSlotInput<Node> = {
   readonly renderSidebar: () => Node
 }
 
-function registerSidebarContentSlot<Node>({
+export function registerSidebarContentSlot<Node>({
   registerSlot,
   requestRender,
   renderSidebar,
@@ -42,7 +42,7 @@ function registerSidebarContentSlot<Node>({
   registerSlot({
     order: 900,
     slots: {
-      sidebar_content: renderSidebar,
+      sidebar_content: () => renderSidebar,
     },
   })
   requestRender()

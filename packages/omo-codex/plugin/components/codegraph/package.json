@@ -1,6 +1,6 @@
 {
 	"name": "@sisyphuslabs/codex-codegraph",
-	"version": "5.0.0-beta.24",
+	"version": "5.0.0-beta.26",
 	"description": "Codex plugin MCP wrapper for CodeGraph.",
 	"type": "module",
 	"private": true,

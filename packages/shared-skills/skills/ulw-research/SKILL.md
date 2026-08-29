@@ -161,7 +161,9 @@ Record the answer in the journal; Phase 5 opens by turning it into `design-spec.
 
 ## Phase 1 — Saturation wave
 
-Launch the entire first wave in one turn — every axis at once, as team members if you formed a team, else as background workers. Sequential launches and "start with one and see" defeat the mode.
+**When the user asked for MASS research, the wave is sized by the topic's angles, not by the roster ceiling.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that a team of 8 cannot produce. Where the harness has a dependency-graph surface (the `mass-ulw` skill and its `references/planning.md`), run collection through it instead: a 60+ node opening wave covering every angle the topic has, routed across the whole difficulty ladder in one graph — mechanical sweeps and per-item harvest batches on the cheapest tier, judgment-shaped angles a step up, cross-territory angles a step above that, and the deepest tier reserved for genuinely hairy contradictions. Each wave's EXPAND leads define the next wave's nodes, and the synthesis reduces through several parallel architect-tier nodes into ONE architect-tier reducer (the strongest reasoning tier substitutes wherever no architect tier exists). Absent that surface, hold the same shape with background workers in batched waves. Everything else in this skill still binds: the format gate, the journal, the claim graph, the convergence rules, and the delivery gates.
+
+Otherwise launch the entire first wave in one turn — every axis at once, as team members if you formed a team, else as background workers. Sequential launches and "start with one and see" defeat the mode.
 
 Scaling floor — more angles always justify more workers:
 

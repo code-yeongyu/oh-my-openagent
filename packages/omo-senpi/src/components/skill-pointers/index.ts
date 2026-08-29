@@ -25,11 +25,17 @@ interface SkillPointerTarget {
 // AND ulw-loop pointers while the ultrawork component arms on the same text). `\b` on
 // both edges is the only boundary rule; `[\s-]*` accepts spaced, hyphenated, and fused
 // spellings alike.
+//
+// The mass aliases that carry no literal "ulw" (`mulw`, `meth`) and the reversed spelling
+// (`ulw mass`) leave no `ulw <skill>` for the per-skill patterns to match, so each of them
+// also stands in for the `ulw` half: "mulw research" names the same composite as
+// "mass ulw research" and loads both skills.
+const MASS_ALIAS = String.raw`(?:mass[\s-]*ulw|ulw[\s-]*mass|mulw|meth)`
 const TARGETS: readonly SkillPointerTarget[] = [
   {
     skillName: "mass-ulw",
     customType: MASS_ULW_CUSTOM_TYPE,
-    pattern: /\b(?:mass[\s-]*ulw|ulw[\s-]*mass|mulw|meth)\b/i,
+    pattern: new RegExp(String.raw`\b${MASS_ALIAS}\b`, "i"),
     expandedBlockPattern: /<skill\s+name="mass-ulw"/i,
     instruction: "orchestrate the requested work as a dependency graph of child agents with the dag tool",
   },
@@ -51,7 +57,7 @@ const TARGETS: readonly SkillPointerTarget[] = [
   {
     skillName: "ulw-research",
     customType: ULW_RESEARCH_CUSTOM_TYPE,
-    pattern: /\bulw[\s-]*research\b/i,
+    pattern: new RegExp(String.raw`\b(?:ulw|${MASS_ALIAS})[\s-]*research\b`, "i"),
     expandedBlockPattern: /<skill\s+name="ulw-research"/i,
     instruction: "orchestrate team-first maximum-saturation research",
   },

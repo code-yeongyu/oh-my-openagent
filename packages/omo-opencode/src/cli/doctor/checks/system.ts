@@ -7,6 +7,7 @@ import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared/jsonc-parser"
 import { ACCEPTED_PACKAGE_NAMES, PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { getPluginEntryName } from "../../../shared/plugin-entry-shape"
 
 const runtime = globalThis as typeof globalThis & { Bun?: { version?: string } }
 
@@ -141,15 +142,16 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
   }
 
   if (pluginInfo.entry && !pluginInfo.isLocalDev) {
-    const isLegacyName = pluginInfo.entry === LEGACY_PLUGIN_NAME
-      || pluginInfo.entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+    const entryName = getPluginEntryName(pluginInfo.entry)
+    const isLegacyName = entryName === LEGACY_PLUGIN_NAME
+      || entryName.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 
     if (isLegacyName) {
-      const suggestedEntry = pluginInfo.entry.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME)
+      const suggestedEntry = entryName.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME)
       issues.push({
         title: "Using legacy package name",
         description: `Your opencode.json references "${LEGACY_PLUGIN_NAME}" which has been renamed to "${PLUGIN_NAME}". The old name may stop working in a future release.`,
-        fix: `Update your opencode.json plugin entry: "${pluginInfo.entry}" → "${suggestedEntry}"`,
+        fix: `Update your opencode.json plugin entry: "${entryName}" → "${suggestedEntry}"`,
         severity: "warning",
         affects: ["plugin loading"],
       })
