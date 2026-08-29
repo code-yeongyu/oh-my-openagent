@@ -107,6 +107,16 @@ export function shouldReexecAfterProvisioning(platform = process.platform): bool
   return platform !== "win32"
 }
 
+export function remapCompiledExecutableIdentity(
+  expectedPath: string,
+  platform = process.platform,
+  target: { execPath: string } = process,
+): void {
+  // Windows stays in-process to avoid Bun's self-reexec hang, so make sidecar
+  // lookups observe the provisioned executable that would otherwise be re-execed.
+  if (platform === "win32") target.execPath = expectedPath
+}
+
 export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, execDir: string): NodeJS.ProcessEnv {
   const env = { ...source }
   delete env.OMO_BIN
@@ -260,6 +270,7 @@ async function main(): Promise<void> {
   }
   // Inspector and custom execArgv isolation is unsupported in compiled binaries; the provisioned
   // executable delegates to the engine in-process as required by the native startup contract.
+  remapCompiledExecutableIdentity(expected)
   if (await runCompiledLauncher(process.argv.slice(2), execDir, manifest.enginePin, execDir)) return
   process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))

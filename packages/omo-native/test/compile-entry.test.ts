@@ -8,6 +8,7 @@ import {
   isProvisionedExecutable,
   materializeProvisionedExecutable,
   provisionEmbeddedRuntime,
+  remapCompiledExecutableIdentity,
   remapSenpiEnvironment,
   runningExecutablePath,
   runCompiledLauncher,
@@ -33,6 +34,15 @@ describe("compiled omo entry launcher parity", () => {
     expect(runningExecutablePath("/runtime/omo", "/usr/local/bin/bun", "darwin")).toBe("/usr/local/bin/bun")
     expect(shouldReexecAfterProvisioning("win32")).toBe(false)
     expect(shouldReexecAfterProvisioning("darwin")).toBe(true)
+  })
+
+  test("maps Windows in-process dependency lookups to the provisioned executable", () => {
+    const target = { execPath: "B:\\~BUN\\root\\omo.exe" }
+    remapCompiledExecutableIdentity("C:\\Users\\test\\.omo\\binary-runtime\\5.0.0\\omo.exe", "win32", target)
+    expect(target.execPath).toBe("C:\\Users\\test\\.omo\\binary-runtime\\5.0.0\\omo.exe")
+
+    remapCompiledExecutableIdentity("/home/test/.omo/binary-runtime/5.0.0/omo", "linux", target)
+    expect(target.execPath).toBe("C:\\Users\\test\\.omo\\binary-runtime\\5.0.0\\omo.exe")
   })
 
   test("early commands pass through without an extension", () => {
