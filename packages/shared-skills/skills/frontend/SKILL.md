@@ -9,6 +9,8 @@ This file is a router, not a rulebook. The rules live in four rulesets under `re
 
 **The bar is not clean-and-correct — it is work a senior designer at Linear, Stripe, or Supabase would ship.** Correct-but-flat is a failure, not a finish. Protect the surface as hard as you protect the build: design is a first-class deliverable, not a one-shot decision you lock and walk away from.
 
+**Completion is the `/visual-qa` dual-oracle gate, not your own glance.** Do not report a frontend design task done until `/visual-qa` passes on fresh evidence from a real browser at 375 / 768 / 1280px, every page, with interaction states and motion driven and inspected.
+
 ## Phase 0 — Route (before any UI work)
 
 | Request involves… | Read |
@@ -136,8 +138,6 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 - **No emojis as icons.** SVG icon sets only (Lucide, Heroicons, Radix, Phosphor).
 - **GPU-composited animation only** — `transform`, `opacity`, `filter`; never animate layout properties.
 - **Slop animation is forbidden — motion serves meaning.** Every animation or hover must map to a real interaction, state change, or affordance. A hover that changes nothing, motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop — do not add it.
-- **Done is the `/visual-qa` dual-oracle gate, not your own glance.** A frontend design task is verified through `/visual-qa` (real browser at 375 / 768 / 1280px, every page, with interaction states and motion driven and inspected) until the dual-oracle completion gate passes on fresh evidence.
-
 ## When to load something else instead
 
 | Situation | Load |
