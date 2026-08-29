@@ -44,3 +44,18 @@ command: bun run typecheck:script
 result: clean
 command: actionlint v1.7.10
 result: no diagnostics
+
+P1 PARENT WORKFLOW CANCELLATION RED
+command: bun test script/publish-workflow.test.ts
+result: 12 pass, 1 fail, 61 expect() calls
+failure: parent workflow cancellation must stop wrapper publication after a platform failure
+expected: true
+received: false
+
+P1 PARENT WORKFLOW CANCELLATION GREEN
+command: bun test script/publish-workflow.test.ts
+result: 13 pass, 0 fail, 62 expect() calls
+command: bun run typecheck:script
+result: clean
+command: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.10 -color -shellcheck="" .github/workflows/publish.yml
+result: no diagnostics

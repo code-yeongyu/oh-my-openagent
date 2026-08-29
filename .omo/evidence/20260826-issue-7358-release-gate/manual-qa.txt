@@ -7,8 +7,31 @@ parser: Ruby YAML
   "failure": "eligible after registry proof",
   "skipped": "eligible for skip_platform",
   "cancelled": "blocked",
+  "parentCancellationAfterPlatformFailure": "blocked",
+  "parentCancellationGuard": "!cancelled()",
+  "cancelledPlatformGuard": "needs.publish-platform.result != 'cancelled'",
   "registryProofRetained": true
 }
+
+Final parser command:
+
+```text
+ruby -ryaml -rjson -e '<parse publish-main and assert both cancellation guards,
+platform-failure eligibility, and registry proof>'
+```
+
+Final observed contract:
+
+```json
+{
+  "parsed": true,
+  "always": true,
+  "rejectsParentCancellation": true,
+  "rejectsCancelledPlatform": true,
+  "allowsPlatformFailure": true,
+  "registryProofRetained": true
+}
+```
 
 The first Bun-based parser attempt was intentionally discarded after it reported that
 the repository does not depend on the `yaml` package. No dependency was added for QA.

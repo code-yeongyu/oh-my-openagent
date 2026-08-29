@@ -672,6 +672,7 @@ jobs:
     needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, publish-platform]
     if: >-
       always() &&
+      !cancelled() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha != '' &&
       needs.gate-reuse.result == 'success' &&

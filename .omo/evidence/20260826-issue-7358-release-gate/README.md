@@ -34,6 +34,11 @@ platform npm packages are missing from the registry.
 - A P1 review identified the cancellation edge after the first push. A second
   failing-first assertion reproduced it (`Expected: true`, `Received: false`), and
   the corrected guard passed the focused and related workflow suites.
+- A later P1 separated parent-run cancellation from a cancelled
+  `publish-platform` dependency. A third failing-first assertion reproduced that
+  edge (`Expected: true`, `Received: false`). Adding `!cancelled()` beside
+  `always()` now blocks parent cancellation while retaining the dependency-result
+  guard and registry-backed recovery from a platform smoke failure.
 
 Exact concise outputs are recorded in `verification.txt` and `manual-qa.txt`.
 
@@ -43,6 +48,9 @@ The changed values are GitHub Actions machine-consumed YAML. The failing-first t
 pins the three-part safety contract, actionlint validates the workflow syntax, and the
 independent Ruby YAML driver exercises the shipped file through a real parser. The
 related workflow suite, full typecheck, and build cover surrounding release automation.
+
+The final P1 follow-up passed 13 focused tests with 62 assertions,
+`bun run typecheck:script`, actionlint 1.7.10, and the Ruby contract parser.
 
 The actual musl and Windows binary smoke defects remain tracked by #7358. This change
 only removes their ability to suppress an otherwise registry-valid npm publication.

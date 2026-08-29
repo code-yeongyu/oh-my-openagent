@@ -106,12 +106,14 @@ describe("test workflows", () => {
     )
     const requiresPlatformSuccess = publishMainJob.includes("needs.publish-platform.result == 'success'")
     const rejectsCancelledPlatform = publishMainJob.includes("needs.publish-platform.result != 'cancelled'")
+    const rejectsCancelledWorkflow = publishMainJob.includes("!cancelled()")
     const provesPlatformPackagesExist = publishMainJob.includes("name: Verify platform packages are published")
 
     // #then
     expect(waitsForPlatformPublication, "publish-main must wait until publish-platform finishes").toBe(true)
     expect(requiresPlatformSuccess, "binary smoke failures must not suppress the registry-backed npm publish gate").toBe(false)
     expect(rejectsCancelledPlatform, "a cancelled release run must not start wrapper publication").toBe(true)
+    expect(rejectsCancelledWorkflow, "parent workflow cancellation must stop wrapper publication after a platform failure").toBe(true)
     expect(provesPlatformPackagesExist, "missing platform npm packages must still fail before wrapper publication").toBe(true)
   })
 
