@@ -93,6 +93,7 @@ export function createSessionStateStore(): SessionStateStore {
     const rawState: SessionState = {
       stagnationCount: 0,
       consecutiveFailures: 0,
+      consecutiveProviderFailures: 0,
     }
     const trackedSession: TrackedSessionState = {
       state: rawState,
@@ -159,6 +160,8 @@ export function createSessionStateStore(): SessionStateStore {
 
     if (hasProgressed) {
       state.stagnationCount = 0
+      state.consecutiveFailures = 0
+      state.consecutiveProviderFailures = 0
       state.awaitingPostInjectionProgressCheck = false
       state.continuationResponseObserved = false
       state.continuationBlockReason = undefined
@@ -215,6 +218,8 @@ export function createSessionStateStore(): SessionStateStore {
     state.continuationResponseObserved = false
     state.continuationBlockReason = undefined
     state.pendingUserMessageID = undefined
+    state.consecutiveFailures = 0
+    state.consecutiveProviderFailures = 0
     state.allTodosCompletedAt = undefined
     trackedSession.lastCompletedCount = undefined
     trackedSession.lastTodoSnapshot = undefined
