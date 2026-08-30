@@ -1,6 +1,6 @@
 {
 	"name": "@oh-my-opencode/omo-codex",
-	"version": "5.0.0-beta.29",
+	"version": "5.0.0-beta.30",
 	"type": "module",
 	"private": true,
 	"description": "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",

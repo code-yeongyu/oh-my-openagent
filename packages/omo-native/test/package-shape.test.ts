@@ -58,7 +58,7 @@ describe("omo-ai published package shape", () => {
 
       test("#then the senpi pin is exact with no range operator", () => {
         const pin = manifest.dependencies?.["@code-yeongyu/senpi"]
-        expect(pin).toBe("2026.8.30-2")
+        expect(pin).toBe("2026.8.30-3")
         expect(pin).toMatch(/^\d/)
         expect(pin).not.toMatch(/^[\^~]/)
       })
