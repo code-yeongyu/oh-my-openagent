@@ -46,7 +46,8 @@ export const KNOWN_MODELS = Object.freeze({
   ]),
   xai: Object.freeze(["grok-4.20-0309-non-reasoning", "grok-4.6"]),
   xiaomi: Object.freeze(["mimo-v2.5-pro"]),
-  "zai-coding-plan": Object.freeze(["glm-5.2", "glm-5.3"]),
+  zai: Object.freeze(["glm-5.2", "glm-5.3"]),
+  "zai-coding-cn": Object.freeze(["glm-5.2", "glm-5.3"]),
 } as const)
 
 export type KnownProvider = keyof typeof KNOWN_MODELS

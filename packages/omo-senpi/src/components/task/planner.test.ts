@@ -68,7 +68,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       {},
-      () => registry([model("zai-coding-plan", "glm-5.2")]),
+      () => registry([model("zai", "glm-5.2")]),
     )
 
     // when
@@ -83,9 +83,9 @@ describe("createTaskChildPlanner", () => {
     const resolved = expectResolved(result)
     expect(resolved.plan.resolved_model).toMatchObject({
       source: "category",
-      provider: "zai-coding-plan",
+      provider: "zai",
       model_id: "glm-5.2",
-      display: "zai-coding-plan/glm-5.2",
+      display: "zai/glm-5.2",
       variant: "max",
     })
   })
@@ -225,7 +225,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       BUILTIN_AGENTS,
-      () => registry([model("zai-coding-plan", "glm-5.2")]),
+      () => registry([model("zai", "glm-5.2")]),
     )
 
     // when
@@ -238,7 +238,7 @@ describe("createTaskChildPlanner", () => {
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.plan.resolved_model).toMatchObject({ source: "category", provider: "zai-coding-plan" })
+    expect(resolved.plan.resolved_model).toMatchObject({ source: "category", provider: "zai" })
     expect(resolved.plan.category).toBe("visual-engineering")
   })
 
@@ -426,7 +426,7 @@ describe("createTaskChildPlanner plan variant", () => {
     const planner = createTaskChildPlanner(
       {},
       {},
-      () => registry([model("zai-coding-plan", "glm-5.2")]),
+      () => registry([model("zai", "glm-5.2")]),
     )
 
     // when
