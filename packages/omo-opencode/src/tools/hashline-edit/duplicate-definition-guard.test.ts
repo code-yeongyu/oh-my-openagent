@@ -36,11 +36,13 @@ describe("detectDuplicateDefinitions", () => {
     expect(warnings).toEqual([{ name: "TrustedProxy", occurrences: 2 }])
   })
 
-  test("does not flag pre-existing duplicates", () => {
+  test("flags an increase over pre-existing duplicates", () => {
     const oldContent = "class A\nend\n\nclass A\nend"
     const newContent = "class A\nend\n\nclass A\nend\n\nclass A\nend"
 
-    expect(detectDuplicateDefinitions(oldContent, newContent)).toEqual([])
+    const warnings = detectDuplicateDefinitions(oldContent, newContent)
+
+    expect(warnings).toEqual([{ name: "A", occurrences: 3 }])
   })
 
   test("does not flag single definitions added by the edit", () => {
