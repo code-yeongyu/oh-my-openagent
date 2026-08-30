@@ -2,6 +2,7 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { bunFile, bunWrite } from "../../shared/bun-file-shim"
 import { applyHashlineEditsWithReport } from "./edit-operations"
+import { detectDuplicateDefinitions, formatDuplicateDefinitionWarnings } from "./duplicate-definition-guard"
 import { countLineDiffs, generateUnifiedDiff } from "./diff-utils"
 import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalization"
 import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
@@ -112,6 +113,10 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
 
     const applyResult = applyHashlineEditsWithReport(oldEnvelope.content, edits)
     const canonicalNewContent = applyResult.content
+    const duplicateWarnings = detectDuplicateDefinitions(
+      oldEnvelope.content,
+      canonicalNewContent
+    )
 
     if (canonicalNewContent === oldEnvelope.content && !rename) {
       let diagnostic = `No changes made to ${filePath}. The edits produced identical content.`
@@ -143,8 +148,9 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
           await bunFile(filePath).delete()
           return `Moved ${filePath} to ${rename}`
         }
-        return `Updated ${filePath}`
-      }
+        const formattedResult = `Updated ${filePath}`
+        const warning = formatDuplicateDefinitionWarnings(duplicateWarnings)
+        return warning ? `${formattedResult}\n${warning}` : formattedResult
     }
 
     if (rename && rename !== filePath) {
@@ -167,7 +173,9 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
       return `Moved ${filePath} to ${rename}`
     }
 
-    return `Updated ${effectivePath}`
+    const result = `Updated ${effectivePath}`
+    const warning = formatDuplicateDefinitionWarnings(duplicateWarnings)
+    return warning ? `${result}\n${warning}` : result
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (error instanceof HashlineMismatchError) {
