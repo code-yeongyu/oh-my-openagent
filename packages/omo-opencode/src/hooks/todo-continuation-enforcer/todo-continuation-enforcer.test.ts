@@ -149,7 +149,7 @@ function createFakeTimers(): FakeTimers {
 }
 
 describe("todo-continuation-enforcer", () => {
-  let promptCalls: Array<{ sessionID: string; agent?: string; model?: { providerID?: string; modelID?: string }; text: string }>
+  let promptCalls: Array<{ sessionID: string; agent?: string; model?: { providerID?: string; modelID?: string }; variant?: string; text: string }>
   let toastCalls: Array<{ title: string; message: string }>
   let fakeTimers: FakeTimers
 
@@ -168,6 +168,7 @@ describe("todo-continuation-enforcer", () => {
     body: {
       agent?: string
       model?: { providerID?: string; modelID?: string }
+      variant?: string
       parts: Array<{ text: string }>
     }
   }
@@ -192,6 +193,7 @@ describe("todo-continuation-enforcer", () => {
       sessionID: opts.path.id,
       agent: opts.body.agent,
       model: opts.body.model,
+      variant: opts.body.variant,
       text: opts.body.parts[0].text,
     })
   }
@@ -1756,6 +1758,29 @@ describe("todo-continuation-enforcer", () => {
      // then - model should be extracted from assistant message's flat modelID/providerID
      expect(promptCalls.length).toBe(1)
      expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+  })
+
+  test("#given newest assistant message has a flat variant #when continuation is injected #then prompt body preserves the variant", async () => {
+    // given - OpenCode assistant messages carry model identity and variant as flat fields
+    const sessionID = "main-assistant-flat-variant"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.messages = async () => ({ data: [
+      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-5.5" } } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "sisyphus", providerID: "openai", modelID: "gpt-5.5", variant: "max" } },
+    ] }) as never
+    const hook = createTodoContinuationEnforcer(mockInput, {
+      backgroundManager: createMockBackgroundManager(false),
+    })
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(promptCalls[0].variant).toBe("max")
   })
 
   // COMPACTION AGENT FILTERING TESTS

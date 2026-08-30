@@ -112,7 +112,7 @@ describe("child task progress", () => {
     )
 
     // when
-    progress.accept({ type: "retry_fallback_applied", to: "quotio-openai/gpt-5.6-luna-fast:high" })
+    progress.accept({ type: "retry_fallback_applied", to: "openai-codex/gpt-5.6-luna-fast:high" })
     progress.accept({ type: "retry_fallback_applied", to: "anthropic-api/claude-haiku-4-5:medium" })
 
     // then

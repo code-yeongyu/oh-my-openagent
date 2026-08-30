@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "5.0.0-beta.20",
+  "version": "5.0.0-beta.29",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -181,7 +181,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.8.25",
+    "@code-yeongyu/senpi": "2026.8.30-2",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
@@ -222,18 +222,18 @@
     "typescript": "^7.0.2"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "5.0.0-beta.20",
-    "oh-my-opencode-darwin-x64": "5.0.0-beta.20",
-    "oh-my-opencode-darwin-x64-baseline": "5.0.0-beta.20",
-    "oh-my-opencode-linux-arm64": "5.0.0-beta.20",
-    "oh-my-opencode-linux-arm64-musl": "5.0.0-beta.20",
-    "oh-my-opencode-linux-x64": "5.0.0-beta.20",
-    "oh-my-opencode-linux-x64-baseline": "5.0.0-beta.20",
-    "oh-my-opencode-linux-x64-musl": "5.0.0-beta.20",
-    "oh-my-opencode-linux-x64-musl-baseline": "5.0.0-beta.20",
-    "oh-my-opencode-windows-arm64": "5.0.0-beta.20",
-    "oh-my-opencode-windows-x64": "5.0.0-beta.20",
-    "oh-my-opencode-windows-x64-baseline": "5.0.0-beta.20"
+    "oh-my-opencode-darwin-arm64": "5.0.0-beta.29",
+    "oh-my-opencode-darwin-x64": "5.0.0-beta.29",
+    "oh-my-opencode-darwin-x64-baseline": "5.0.0-beta.29",
+    "oh-my-opencode-linux-arm64": "5.0.0-beta.29",
+    "oh-my-opencode-linux-arm64-musl": "5.0.0-beta.29",
+    "oh-my-opencode-linux-x64": "5.0.0-beta.29",
+    "oh-my-opencode-linux-x64-baseline": "5.0.0-beta.29",
+    "oh-my-opencode-linux-x64-musl": "5.0.0-beta.29",
+    "oh-my-opencode-linux-x64-musl-baseline": "5.0.0-beta.29",
+    "oh-my-opencode-windows-arm64": "5.0.0-beta.29",
+    "oh-my-opencode-windows-x64": "5.0.0-beta.29",
+    "oh-my-opencode-windows-x64-baseline": "5.0.0-beta.29"
   },
   "overrides": {
     "@earendil-works/pi-agent-core": "0.84.2",
@@ -249,5 +249,8 @@
   },
   "trustedDependencies": [
     "@code-yeongyu/comment-checker"
-  ]
+  ],
+  "patchedDependencies": {
+    "@code-yeongyu/senpi@2026.8.30-2": "patches/@code-yeongyu%2Fsenpi@2026.8.30-2.patch"
+  }
 }

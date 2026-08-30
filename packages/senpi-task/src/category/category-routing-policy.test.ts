@@ -17,7 +17,7 @@ describe("Senpi category routing policy", () => {
     expect(routing).toEqual({
       visualEngineering: { model: "anthropic/claude-opus-5", variant: "max" },
       quick: { model: "kimi-coding/kimi-for-coding-highspeed" },
-      unspecifiedHigh: { model: "kimi-coding/k3", variant: "max" },
+      unspecifiedHigh: { model: "anthropic/claude-opus-5", variant: "xhigh" },
       unspecifiedLow: { model: "xai/grok-4.6", variant: "xhigh" },
     })
   })
@@ -30,17 +30,17 @@ describe("Senpi category routing policy", () => {
     expect(chain.map((entry) => entry.model)).not.toContain("gpt-5.6-luna")
     expect(chain).toEqual([
       {
-        providers: ["xai", "github-copilot", "opencode", "vercel"],
+        providers: ["xai", "github-copilot", "opencode"],
         model: "grok-4.6",
         variant: "xhigh",
       },
       {
-        providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
         model: "gpt-5.6-terra",
         variant: "high",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5",
         variant: "low",
       },
@@ -50,15 +50,15 @@ describe("Senpi category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["deepseek", "opencode-go", "vercel"],
+        providers: ["deepseek", "opencode-go"],
         model: "deepseek-v4-pro",
         variant: "max",
       },
       {
-        providers: ["xiaomi", "opencode-go", "vercel"],
+        providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.5-pro",
         variant: "max",
-      },
+      }
     ])
   })
 })

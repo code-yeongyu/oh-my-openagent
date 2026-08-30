@@ -41,6 +41,10 @@ export interface DagStatusUiRuntime {
   mode(): string | undefined
 }
 
+export interface DagStatusUiLogger {
+  warn(message: string, details?: unknown): void
+}
+
 // Injectable timer seam so debounce and live refresh are deterministic under test.
 export interface DagStatusUiTimers {
   set(callback: () => void, ms: number): TimerHandle
@@ -52,6 +56,7 @@ export interface DagStatusUiDeps {
   readonly runtime: DagStatusUiRuntime
   readonly debounceMs?: number
   readonly timers?: DagStatusUiTimers
+  readonly logger?: DagStatusUiLogger
   // Visible terminal width seam; defaults to process.stdout.columns like the task widget.
   readonly terminalWidth?: () => number | undefined
   // Local rendering time for live node elapsed labels and deterministic tests.
@@ -84,6 +89,20 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
   const liveActivity = new Map<string, Map<string, string>>()
   let pending: TimerHandle | undefined
   let liveRefresh: TimerHandle | undefined
+  const reportedRenderFaults = new Set<string>()
+
+  // The DAG widget renders from bare timer callbacks (the beta.20 crash stack ends at
+  // Timeout._onTimeout); contain faults here so one bad frame never kills the host process.
+  function containRenderFault(run: () => void): void {
+    try {
+      run()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (reportedRenderFaults.has(message)) return
+      reportedRenderFaults.add(message)
+      deps.logger?.warn("omo-dag status widget render failed; frame skipped", { error: message })
+    }
+  }
 
   function render(): void {
     const ui = deps.runtime.ui()
@@ -98,13 +117,40 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
     const rows = runs.flatMap((run) => runRows(run, liveActivity.get(run.runId), { maxWidth, now: renderedAt }))
     pruneActivity(runs)
     if (rows.length === 0) {
-      clearLiveRefresh()
-      ui.setWidget(DAG_STATUS_UI_KEY, undefined)
+      // Blanking is only honest when nothing is live. A run the manager still lists but whose
+      // snapshot could not be projected (pruned mid-read, unreadable checkpoint, a session id that
+      // moved under a fork/restart - see #7316) must NOT read as "the dag finished": clearing the
+      // widget there is exactly what makes a working run look dead. Keep a minimal tracking line
+      // and keep repainting so the next successful projection replaces it.
+      const liveCount = countLiveRuns()
+      if (liveCount === 0) {
+        clearLiveRefresh()
+        ui.setWidget(DAG_STATUS_UI_KEY, undefined)
+        return
+      }
+      ui.setWidget(DAG_STATUS_UI_KEY, [trackingRow(liveCount)], { placement: "belowEditor" })
+      scheduleLiveRefresh()
       return
     }
     ui.setWidget(DAG_STATUS_UI_KEY, rows, { placement: "belowEditor" })
     if (runs.some((run) => !TERMINAL_RUN_STATUSES.has(run.status))) scheduleLiveRefresh()
     else clearLiveRefresh()
+  }
+
+  // Live runs the manager still reports, independent of whether each one could be projected. This
+  // is the discriminator between "nothing is running" and "something is running but unreadable".
+  function countLiveRuns(): number {
+    const sessionId = deps.runtime.sessionId()
+    if (sessionId === undefined) return 0
+    try {
+      return deps.manager.list(sessionId).filter((summary) => !TERMINAL_RUN_STATUSES.has(summary.status)).length
+    } catch {
+      return 0
+    }
+  }
+
+  function trackingRow(liveCount: number): string {
+    return liveCount === 1 ? "◌ tracking 1 dag run" : `◌ tracking ${liveCount} dag runs`
   }
 
   function liveRuns(): readonly DagStatusRunSnapshot[] {
@@ -143,7 +189,7 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
     if (pending !== undefined) timers.clear(pending)
     pending = timers.set(() => {
       pending = undefined
-      render()
+      containRenderFault(render)
     }, debounceMs)
   }
 
@@ -152,7 +198,7 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
     const handle = timers.set(() => {
       if (liveRefresh !== handle) return
       liveRefresh = undefined
-      render()
+      containRenderFault(render)
     }, LIVE_REFRESH_MS)
     liveRefresh = handle
   }
@@ -165,7 +211,7 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
 
   return {
     scheduleSync,
-    syncNow: render,
+    syncNow: () => containRenderFault(render),
     onActivity(event) {
       const perRun = liveActivity.get(event.runId) ?? new Map<string, string>()
       perRun.set(event.nodeId, event.activity)

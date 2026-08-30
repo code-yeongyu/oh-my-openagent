@@ -361,7 +361,7 @@ describe("taskResultLines", () => {
       mode: "spawn" as const,
       category: "quick",
       resolved_model: {
-        provider: "quotio-openai",
+        provider: "openai-codex",
         model_id: "gpt-5.6-luna-fast",
         display: "gpt-5.6-luna-fast",
         reasoning_effort: "high",
@@ -369,7 +369,7 @@ describe("taskResultLines", () => {
       },
       fallback_attempts: [
         { provider: "kimi-coding", model_id: "kimi-for-coding-highspeed", display: "kimi-for-coding-highspeed", source: "category" as const },
-        { provider: "quotio-openai", model_id: "gpt-5.6-luna-fast", display: "gpt-5.6-luna-fast", reasoning_effort: "high", source: "category" as const },
+        { provider: "openai-codex", model_id: "gpt-5.6-luna-fast", display: "gpt-5.6-luna-fast", reasoning_effort: "high", source: "category" as const },
       ],
       run_in_background: false,
     }
@@ -380,7 +380,7 @@ describe("taskResultLines", () => {
 
     // then
     for (const row of [plain, compact]) {
-      expect(row).toContain("category:quick(quotio-openai/gpt-5.6-luna-fast:high)")
+      expect(row).toContain("category:quick(openai-codex/gpt-5.6-luna-fast:high)")
       expect(row).toContain("fallback:2")
     }
     expect(rendererVisibleWidth(compact)).toBeLessThanOrEqual(120)

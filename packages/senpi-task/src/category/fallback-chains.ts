@@ -7,7 +7,7 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
   "visual-engineering": [
     {
-      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-5",
       variant: "max",
     },
@@ -16,35 +16,35 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "kimi-k3",
       variant: "max",
     },
+    { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.2", variant: "max" },
     {
-      providers: ["zai-coding-plan", "opencode-go", "vercel"],
-      model: "glm-5.2",
-      variant: "max",
-    },
-    {
-      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
       model: "gpt-5.6-sol",
       variant: "medium",
-    },
+    }
   ],
   architect: [
-    { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"], model: "claude-fable-5", variant: "xhigh" },
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5",
+      variant: "xhigh",
+    }
   ],
   ultrabrain: [
-    { providers: ["openai", "quotio-openai", "vercel"], model: "gpt-5.6-sol", variant: "max" },
+    { providers: ["openai", "openai-codex"], model: "gpt-5.6-sol", variant: "max" },
     { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-    { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "max" },
+    { providers: ["openai", "openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "max" }
   ],
   deep: [
     {
-      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
       model: "gpt-5.6-sol",
       variant: "medium",
-    },
+    }
   ],
   artistry: [
     {
-      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-fable-5",
       variant: "xhigh",
     },
@@ -54,42 +54,38 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "max",
     },
     {
-      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-5",
       variant: "xhigh",
-    },
+    }
   ],
   quick: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },
     { providers: ["openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
     { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "off" },
     {
-      providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "vercel"],
+      providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
       model: "qwen3.6-flash",
       variant: "low",
     },
-    { providers: ["opencode-go", "vercel"], model: "minimax-m3", variant: "max" },
-    { providers: ["opencode-go", "vercel"], model: "minimax-m2.7", variant: "max" },
+    { providers: ["opencode-go"], model: "minimax-m3", variant: "max" },
+    { providers: ["opencode-go"], model: "minimax-m2.7", variant: "max" },
     { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
     {
-      providers: ["anthropic", "anthropic-api", "github-copilot", "vercel"],
+      providers: ["anthropic", "anthropic-api", "github-copilot"],
       model: "claude-haiku-4-5",
       variant: "off",
-    },
+    }
   ],
   "unspecified-low": [
+    { providers: ["xai", "github-copilot", "opencode"], model: "grok-4.6", variant: "xhigh" },
     {
-      providers: ["xai", "github-copilot", "opencode", "vercel"],
-      model: "grok-4.6",
-      variant: "xhigh",
-    },
-    {
-      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
       model: "gpt-5.6-terra",
       variant: "high",
     },
     {
-      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-sonnet-5",
       variant: "low",
     },
@@ -98,33 +94,21 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "qwen3.8-max-preview",
       variant: "max",
     },
-    {
-      providers: ["deepseek", "opencode-go", "vercel"],
-      model: "deepseek-v4-pro",
-      variant: "max",
-    },
-    {
-      providers: ["xiaomi", "opencode-go", "vercel"],
-      model: "mimo-v2.5-pro",
-      variant: "max",
-    },
+    { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
+    { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "max" }
   ],
   "unspecified-high": [
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-opus-5",
+      variant: "xhigh",
+    },
+    { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
     {
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: "kimi-k3",
       variant: "max",
-    },
-    {
-      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-5",
-      variant: "xhigh",
-    },
-    {
-      providers: ["openai", "quotio-openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "high",
-    },
+    }
   ],
   writing: [
     {
@@ -133,13 +117,10 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "low",
     },
     {
-      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode", "vercel"],
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-5",
       variant: "low",
     },
-    {
-      providers: ["google", "github-copilot", "opencode", "vercel"],
-      model: "gemini-3.1-pro",
-    },
+    { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" }
   ],
 }

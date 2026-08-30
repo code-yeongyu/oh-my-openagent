@@ -5,6 +5,47 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "formatOnMutation": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "default": "best-effort",
+          "type": "string",
+          "enum": [
+            "off",
+            "best-effort",
+            "required"
+          ]
+        },
+        "languages": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "maxFileBytes": {
+          "default": 1048576,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timeoutMs": {
+          "default": 3000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "mode",
+        "maxFileBytes",
+        "timeoutMs"
+      ],
+      "additionalProperties": false
+    },
     "$schema": {
       "type": "string"
     },
@@ -11789,6 +11830,39 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "formatOnMutation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "best-effort",
+                "required"
+              ]
+            },
+            "languages": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "maxFileBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -13390,6 +13464,39 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "formatOnMutation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "best-effort",
+                "required"
+              ]
+            },
+            "languages": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "maxFileBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -14997,6 +15104,39 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "formatOnMutation": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "best-effort",
+                  "required"
+                ]
+              },
+              "languages": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "maxFileBytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
           "categories": {
             "type": "object",
             "propertyNames": {
@@ -26543,6 +26683,39 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "formatOnMutation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "best-effort",
+                      "required"
+                    ]
+                  },
+                  "languages": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "maxFileBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -28144,6 +28317,39 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "formatOnMutation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "best-effort",
+                      "required"
+                    ]
+                  },
+                  "languages": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "maxFileBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {

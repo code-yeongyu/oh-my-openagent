@@ -8,12 +8,12 @@
           "model": "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
           "reasoningEffort": "none"
         },
-        "quotio-openai/gpt-5.6-luna-fast minimal"
+        "openai-codex/gpt-5.6-luna-fast minimal"
       ],
       "maxTokens": 8192
     },
     "deep": {
-      "model": "quotio-openai/gpt-5.6-sol-fast",
+      "model": "openai-codex/gpt-5.6-sol-fast",
       "variant": "medium"
     },
     "conflict": {

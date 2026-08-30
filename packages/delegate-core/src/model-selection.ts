@@ -36,6 +36,11 @@ export type DelegateModelResolutionDeps = {
   readonly log?: (message: string, metadata?: Record<string, unknown>) => void
 }
 
+function modelIDForProvider(provider: string, model: string): string {
+  const prefix = `${provider}/`
+  return model.startsWith(prefix) ? model.slice(prefix.length) : model
+}
+
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
 }
@@ -208,7 +213,7 @@ export function resolveModelForDelegateTask(
         for (const entry of fallbackChain) {
           for (const provider of entry.providers) {
             if (connectedSet.has(provider)) {
-              const transformedModelId = transformModelForProvider(provider, entry.model)
+              const transformedModelId = transformModelForProvider(provider, modelIDForProvider(provider, entry.model))
               deps.log?.("[resolveModelForDelegateTask] fallback chain resolved via connected provider", {
                 provider,
                 model: entry.model,
@@ -229,7 +234,7 @@ export function resolveModelForDelegateTask(
     } else {
       for (const [entryIndex, entry] of fallbackChain.entries()) {
         for (const provider of entry.providers) {
-          const transformedModelId = transformModelForProvider(provider, entry.model)
+          const transformedModelId = transformModelForProvider(provider, modelIDForProvider(provider, entry.model))
           const fullModel = `${provider}/${transformedModelId}`
           const match = fuzzyMatchModel(fullModel, new Set(input.availableModels), [provider])
           if (match) {

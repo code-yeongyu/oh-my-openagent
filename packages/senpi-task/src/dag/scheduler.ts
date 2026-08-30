@@ -17,8 +17,8 @@ import {
   dagWaveCompletedEvent,
   dagWaveStartedEvent,
 } from "./events"
-import { createDagJournal, type DagJournal, type DagJournalListener } from "./journal"
-import { applyDagRunMutation, type DagMaterializeSkills, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
+import { createDagJournal, subscribeDagJournal, type DagJournal, type DagJournalListener } from "./journal"
+import { applyDagRunMutation, skipDuplicateTerminalTransition, type DagMaterializeSkills, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
 import { retryDagNodes, type DagRetryOptions, type DagRunReentry } from "./node-retry"
 import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { OwnedStartResult } from "./owner"
@@ -50,6 +50,7 @@ const TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set([
   "cancelled",
   "skipped",
 ])
+
 
 export type DagSchedulerOptions = {
   readonly store: DagFileStore
@@ -162,6 +163,9 @@ type SchedulerContext = {
   readonly cancellationCompleted: Promise<void>
   readonly resolveCancellationCompleted: () => void
   cancellationStarted: boolean
+  // #7412: set by the foreign-commit subscription so a wake that fired while no settle race was
+  // armed is not lost - settleOne consumes it level-triggered.
+  foreignSettlement: boolean
   cancellationOperation?: Promise<void>
   admissionInProgress: boolean
   readonly admissionIdleWaiters: Set<() => void>
@@ -193,6 +197,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     ),
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     now,
+    skipDuplicate: skipDuplicateTerminalTransition,
   })
   const context: SchedulerContext = {
     taskManager: options.taskManager,
@@ -213,12 +218,30 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     cancellationCompleted: cancellationCompleted.promise,
     resolveCancellationCompleted: cancellationCompleted.resolve,
     cancellationStarted: false,
+    foreignSettlement: false,
     admissionInProgress: false,
     admissionIdleWaiters: new Set(),
     pendingAdmission: [],
     emittedWaveAdmissions: new Set<number>(),
     emittedWaveCompletions: new Set<number>(),
   }
+  // #7412 defect 1: control verbs (send/revive watchers, retry) commit through their OWN journal
+  // instance, and a journal cache refreshes only on its own appends. Without this subscription a
+  // foreign-journaled completion neither refreshes the live scheduler's snapshot nor wakes its
+  // admission loop - a journaled-completion-but-starved-dependent stall. Foreign commits refresh
+  // the cache; terminal node transitions additionally wake the settle loop. The subscription
+  // retires once the run record is terminal.
+  const unsubscribeCommits = subscribeDagJournal(options.store, options.initialRecord.runId, (event) => {
+    if (event.seq > journal.snapshot().checkpointSeq) {
+      journal.refresh()
+      if (event.type === "dag.node.transitioned" && TERMINAL_NODE_STATES.has(event.to)) {
+        context.foreignSettlement = true
+        context.resolveSettlementChanged()
+      }
+    }
+    const status = journal.snapshot().status
+    if (status === "completed" || status === "failed" || status === "cancelled") unsubscribeCommits()
+  })
   for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
     context.attachedTaskIds.set(nodeId, taskId)
     attachTaskSettlement(context, nodeId, taskId)
@@ -236,7 +259,9 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
       runId,
       nodeId,
       message,
-      (revivedNodeId, taskId) => context.journal.snapshot().status === "running"
+      // Refresh, not snapshot: a control-journal commit may still be a microtask away from the
+      // subscription callback, and routing a revive off a stale status was half of dag_923ad20e.
+      (revivedNodeId, taskId) => context.journal.refresh().status === "running"
         ? watchRevivedInScheduler(context, revivedNodeId, taskId)
         : undefined,
     ),
@@ -610,6 +635,16 @@ function attachOrFail(
   nodeId: DagNodeId,
   result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
 ): void {
+  if (result.kind === "owner_conflict") {
+    attachStarted(context, nodeId, {
+      kind: "started",
+      reused: true,
+      task_id: result.task_id,
+      status: "running",
+      name: result.task_id,
+    })
+    return
+  }
   if (result.kind !== "started") {
     const failure = startFailure(result)
     failNode(context, nodeId, failure.code, failure.message)
@@ -671,6 +706,12 @@ async function watchRevivedInScheduler(
 }
 
 async function settleOne(context: SchedulerContext): Promise<boolean> {
+  // #7412: a foreign commit can land while no settle race is armed (repeatableSignal wake-ups are
+  // edge-triggered); consuming the flag first keeps that wake level-triggered.
+  if (context.foreignSettlement) {
+    context.foreignSettlement = false
+    return true
+  }
   const settled = await Promise.race([
     ...[...context.attachedTasks.values()].map((entry) => entry.settled),
     context.settlementChanged().then(() => null),

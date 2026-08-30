@@ -330,8 +330,10 @@ describe("DAG crash recovery", () => {
     expect(manager.startOwnedCalls).toEqual([])
   })
 
-  test("#given a paused run owned by another parent session #when recovery scans #then it is not claimed", async () => {
-    // given
+  test("#given a paused run owned by a dead foreign session #when recovery adopts it #then the resume is journaled on the run's own ledger", async () => {
+    // given - this exact configuration used to pin the orphaning as correct (skipped, still
+    // paused); adoption retargets it to the journal contract: an adopted run carries a real
+    // dag.run.resumed event, not just a rewritten checkpoint.
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
     store.writeCheckpoint(runId, recoverableRecord(definition([node("foreign")]), {}, {
@@ -348,8 +350,9 @@ describe("DAG crash recovery", () => {
     }).resumePausedRuns(parentSessionId)
 
     // then
-    expect(outcomes).toEqual([])
-    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.status).toBe("paused")
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(["adopted"])
+    expect(store.readEvents(runId, 0, { limit: 256 }).events.map((event) => event.type)).toContain("dag.run.resumed")
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.status).not.toBe("paused")
   })
 
   test("#given two managers race a paused run #when the first claim holder is live #then exactly one resumes and the other observes the live lease", async () => {
@@ -659,5 +662,108 @@ describe("DAG recovery attempt-scoped ownership", () => {
         execAttempt: 2,
       })),
     ])
+  })
+})
+
+// #7316: a paused run whose owner session never comes back (fork, compaction, restart under a new
+// id) was skipped as foreign_session forever — invisible AND unrecoverable. A run is adoptable only
+// when its recorded lease holder is provably gone (dead pid) or is this very process; an absent
+// holder proves nothing (a residency-denied pause in a LIVE foreign session has no pid), so it
+// must stay untouched.
+describe("resumePausedRuns adoption", () => {
+  test("#given a foreign paused run with a dead lease holder #when a new session resumes #then it adopts, re-homes, and completes the run", async () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject() })
+    store.writeCheckpoint(runId, recoverableRecord(definition([node("adopt-me")]), {}, {
+      parentSessionId: "session-gone",
+      rootSessionId: "session-gone",
+      previousLeaseHolderPid: 9001,
+    }))
+
+    // when
+    const outcomes = await createDagRecovery({
+      store,
+      taskManager: new RecoveryTaskManager(),
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
+
+    // then the run is re-homed to the adopter and resumed instead of orphaned
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(["adopted"])
+    expect(outcomes[0]?.runId).toBe(runId)
+    const rehomed = store.readCheckpoint<DagRunRecordV1>(runId)
+    expect(rehomed?.parentSessionId).toBe(parentSessionId)
+    expect(rehomed?.rootSessionId).toBe(parentSessionId)
+    expect(rehomed?.status).not.toBe("paused")
+  })
+
+  test("#given a foreign paused run whose lease holder is alive #when another session resumes #then the run is left untouched", async () => {
+    // given a foreign session that is still running (its pause is mid-resume or residency-held)
+    const store = createDagFileStore({ project_dir: tempProject() })
+    store.writeCheckpoint(runId, recoverableRecord(definition([node("held")]), {}, {
+      parentSessionId: "session-alive",
+      rootSessionId: "session-alive",
+      previousLeaseHolderPid: 9001,
+    }))
+
+    // when
+    const outcomes = await createDagRecovery({
+      store,
+      taskManager: new RecoveryTaskManager(),
+      hostPid: 101,
+      isProcessAlive: (pid) => pid === 9001,
+    }).resumePausedRuns(parentSessionId)
+
+    // then
+    expect(outcomes).toEqual([])
+    const untouched = store.readCheckpoint<DagRunRecordV1>(runId)
+    expect(untouched?.parentSessionId).toBe("session-alive")
+    expect(untouched?.status).toBe("paused")
+  })
+
+  test("#given a foreign paused run with no recorded lease holder #when another session resumes #then abandonment is unproven and the run is left untouched", async () => {
+    // given a paused record that never went through the shutdown pause (no pid on record)
+    const store = createDagFileStore({ project_dir: tempProject() })
+    store.writeCheckpoint(runId, recoverableRecord(definition([node("unproven")]), {}, {
+      parentSessionId: "session-unknown",
+      rootSessionId: "session-unknown",
+    }))
+
+    // when
+    const outcomes = await createDagRecovery({
+      store,
+      taskManager: new RecoveryTaskManager(),
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
+
+    // then
+    expect(outcomes).toEqual([])
+    const untouched = store.readCheckpoint<DagRunRecordV1>(runId)
+    expect(untouched?.parentSessionId).toBe("session-unknown")
+    expect(untouched?.status).toBe("paused")
+  })
+
+  test("#given a foreign paused run whose lease holder is this process #when it resumes #then self-adoption is safe and the run completes", async () => {
+    // given a run this very process paused under a previous session id (alive, but it is us)
+    const store = createDagFileStore({ project_dir: tempProject() })
+    store.writeCheckpoint(runId, recoverableRecord(definition([node("self")]), {}, {
+      parentSessionId: "session-previous",
+      rootSessionId: "session-previous",
+      previousLeaseHolderPid: 101,
+    }))
+
+    // when
+    const outcomes = await createDagRecovery({
+      store,
+      taskManager: new RecoveryTaskManager(),
+      hostPid: 101,
+      isProcessAlive: () => true,
+    }).resumePausedRuns(parentSessionId)
+
+    // then
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(["adopted"])
+    const rehomed = store.readCheckpoint<DagRunRecordV1>(runId)
+    expect(rehomed?.parentSessionId).toBe(parentSessionId)
   })
 })

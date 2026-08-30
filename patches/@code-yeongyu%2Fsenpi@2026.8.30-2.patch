@@ -1,0 +1,24 @@
+diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js b/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js
+--- a/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js
++++ b/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js
+@@ -69,6 +69,11 @@
+         registry.closeSession(entry.senpiSessionId, "abort_uncertain");
+     turn.resolve({ uuid: turn.uuid, messages: turn.messages, aborted: turn.aborted });
+ }
++function describeUnclaimedResult(message) {
++    const errors = Array.isArray(message.errors) ? message.errors : [];
++    const detail = errors.length > 0 ? String(errors[0]) : typeof message.result === "string" ? message.result : typeof message.error === "string" ? message.error : typeof message.terminal_reason === "string" ? message.terminal_reason : undefined;
++    return `Claude SDK OAuth query result${typeof message.subtype === "string" ? ` (${message.subtype})` : ""}${detail ? `: ${detail}` : ""}`;
++}
+ function handleMessage(registry, entry, message) {
+     // A forked query mints a NEW session id (forkSession: true + resume): the
+     // init message carries it, and it must be persisted BEFORE any turn-state
+@@ -87,7 +92,7 @@
+         else if (message.type === "stream_event")
+             bufferBeforeReplay(registry, entry, turn, message);
+         else if (message.type === "result") {
+-            throw new SessionTurnAttributionError("Claude SDK OAuth result arrived before replay claim");
++            throw new SessionTurnAttributionError(describeUnclaimedResult(message));
+         }
+         return false;
+     }

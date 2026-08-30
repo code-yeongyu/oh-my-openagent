@@ -63,6 +63,7 @@ import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, "spawned")
 process.exit(0)
 `)
+  write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const artifact of [
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",

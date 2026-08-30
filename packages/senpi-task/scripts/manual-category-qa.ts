@@ -171,7 +171,7 @@ requireCondition(systemDefault.spec.provider === "local", "system default provid
 requireCondition(systemDefault.spec.modelId === "system-default", "system default model mismatch")
 
 const headerModel = {
-  provider: "quotio-openai",
+  provider: "openai-codex",
   id: "gpt-5.6-luna-fast",
   name: "header model",
   headers: { "User-Agent": "test" },

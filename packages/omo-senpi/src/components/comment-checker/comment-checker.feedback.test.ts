@@ -32,6 +32,16 @@ describe("omo-senpi comment-checker feedback", () => {
     ])
   })
 
+  it("#given a multi-file apply_patch #when checking completes #then checker receives one hook input per file", async () => {
+    const cwd = createTempCwd()
+    const { pi, calls } = await registerWithFakeRunner({ result: { hasComments: false, message: "" } })
+    await pi.dispatch("tool_result", createToolResultEvent({
+      toolName: "apply_patch",
+      input: { input: "*** Begin Patch\n*** Update File: a.ts\n@@\n-old\n+new\n*** Add File: b.ts\n+new\n*** End Patch" },
+    }), createContext(cwd))
+    expect(calls.map((call) => call.hookInput.tool_input.file_path)).toEqual([resolve(cwd, "a.ts"), resolve(cwd, "b.ts")])
+  })
+
   it("#given checker finds a clean file #when edit completes #then injects nothing", async () => {
     // given
     const cwd = createTempCwd()

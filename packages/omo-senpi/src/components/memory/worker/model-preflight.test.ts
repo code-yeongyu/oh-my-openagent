@@ -1,12 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { createServer } from "node:net"
+import type { Server, Socket } from "node:net"
 
 import { preflightMemoryModels, resetModelPreflightCacheForTests } from "./model-preflight"
 import type { MemoryModelChain } from "./memory-model-attempts"
+import { identityMatches, killIfAlive, pidAlive, pidTerminalWithin, readPidFileWhenWritten, readPidOnce, readPidWhenWritten, waitForFileToExist } from "./process-liveness.test-support"
 
 const roots: string[] = []
+
+const HELPER_EXIT_BOUND_MS = 5_000
+const HELPER_FAILSAFE_BOUND_MS = 5_000
+
 afterEach(async () => {
   resetModelPreflightCacheForTests()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
@@ -29,6 +36,18 @@ async function fixture(body: string): Promise<{
   await writeFile(launcher, `${body}\n`, "utf8")
   await writeFile(config, "{}\n", "utf8")
   return { root, launch: { command: process.execPath, prefixArgs: [launcher] }, config }
+}
+
+// Double server.close() raises ERR_SERVER_NOT_RUNNING under Node semantics; the try body closes
+// the channel and the fail-safe finally must stay a no-op then.
+const closedControlServers = new WeakSet<Server>()
+
+function closeControlChannel(control: Server, connections: Set<Socket>): void {
+  if (closedControlServers.has(control)) return
+  for (const socket of connections) socket.destroy()
+  connections.clear()
+  control.close()
+  closedControlServers.add(control)
 }
 
 describe("preflightMemoryModels", () => {
@@ -166,57 +185,118 @@ process.stdout.write("builtin/fallback\\n")
   })
 
   test("#given a launcher whose grandchild holds the output pipes #when the probe times out #then it degrades without waiting for the grandchild", async () => {
-    // given
+    // given: wrapper and grandchild park on a control socket owned by THIS test process, so both
+    // die when that socket closes - through teardown or through this process dying outright.
+    // The grandchild keeps holding the inherited output pipes even after the launcher itself is
+    // killed, which is exactly the hazard the probe must degrade past.
     const item = await fixture("")
     const wrapper = join(item.root, "wrapper.mjs")
+    const grandchildScript = join(item.root, "grandchild.mjs")
+    const wrapperPidPath = join(item.root, "wrapper.pid")
     const grandchildPidPath = join(item.root, "grandchild.pid")
+    const grandchildConnectedPath = join(item.root, "grandchild.connected")
     await writeFile(wrapper, `
 import { spawn } from "node:child_process"
+import { connect } from "node:net"
 import { writeFileSync } from "node:fs"
-const child = spawn(process.execPath, ["-e", "setInterval(() => undefined, 30_000)"], { stdio: ["ignore", "inherit", "inherit"] })
-writeFileSync(process.env.GRANDCHILD_PID, String(child.pid))
-setInterval(() => undefined, 30_000)
+writeFileSync(process.env.WRAPPER_PID_PATH, String(process.pid))
+const child = spawn(process.execPath, [process.env.GRANDCHILD_SCRIPT], { stdio: ["ignore", "inherit", "inherit"] })
+writeFileSync(process.env.GRANDCHILD_PID_PATH, String(child.pid))
+const control = connect({ host: "127.0.0.1", port: Number(process.env.CONTROL_PORT) })
+control.once("close", () => process.exit(0))
+control.once("error", () => process.exit(0))
 `, "utf8")
-    // Windows runners pay a far larger cost to spawn process.execPath plus a grandchild, so the outer
-    // wall-clock bound is platform-scoped. The injected probe timeout stays at 50ms on every platform,
-    // so an unbounded hang still blows past even the Windows budget.
-    const outerBoundMs = process.platform === "win32" ? 5000 : 500
-    const startedAt = Date.now()
-    const probe = preflightMemoryModels({
-      candidates,
-      launch: { command: process.execPath, prefixArgs: [wrapper] },
-      env: { PATH: process.env.PATH, GRANDCHILD_PID: grandchildPidPath },
-      configSources: [{ path: item.config, exists: true }],
-      timeoutMs: 50,
+    await writeFile(grandchildScript, `
+import { connect } from "node:net"
+import { writeFileSync } from "node:fs"
+writeFileSync(process.env.GRANDCHILD_PID_PATH, String(process.pid))
+const control = connect({ host: "127.0.0.1", port: Number(process.env.CONTROL_PORT) })
+control.once("connect", () => writeFileSync(process.env.GRANDCHILD_CONNECTED_PATH, "connected\\n"))
+control.once("close", () => process.exit(0))
+control.once("error", () => process.exit(0))
+`, "utf8")
+    const control = createServer()
+    const connections = new Set<Socket>()
+    control.on("connection", (socket) => connections.add(socket))
+    await new Promise<void>((resolve, reject) => {
+      control.once("error", reject)
+      control.listen(0, "127.0.0.1", resolve)
     })
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      try {
-        await stat(grandchildPidPath)
-        break
-      } catch {
-        await new Promise<void>((resolve) => setTimeout(resolve, 1))
+    const address = control.address()
+    if (address === null || typeof address === "string") throw new Error("control listener has no tcp port")
+    let grandchildIdentityForCleanup: import("./process-liveness.test-support").ProcessIdentity | null = null
+    try {
+      // The injected probe timeout doubles as the helpers' startup budget: both pid files must be
+      // registered before the probe's SIGKILL lands, so the pipe-holding premise holds even on a
+      // loaded or Windows runner (runtime boot costs far more than a tight budget would allow),
+      // while an unbounded hang still blows past the outer wall-clock bound. Windows runners pay
+      // far more to spawn process.execPath plus a grandchild, so the outer bound stays
+      // platform-scoped.
+      const probeTimeoutMs = 1_000
+      const outerBoundMs = process.platform === "win32" ? 10_000 : 2_500
+      const startedAt = Date.now()
+      const probe = preflightMemoryModels({
+        candidates,
+        launch: { command: process.execPath, prefixArgs: [wrapper] },
+        env: {
+          PATH: process.env.PATH,
+          CONTROL_PORT: String(address.port),
+          WRAPPER_PID_PATH: wrapperPidPath,
+          GRANDCHILD_PID_PATH: grandchildPidPath,
+          GRANDCHILD_CONNECTED_PATH: grandchildConnectedPath,
+          GRANDCHILD_SCRIPT: grandchildScript,
+        },
+        configSources: [{ path: item.config, exists: true }],
+        timeoutMs: probeTimeoutMs,
+      })
+
+      // when
+      const result = await Promise.race([
+        probe,
+        new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), outerBoundMs)),
+      ])
+
+      // then
+      expect(result).toEqual({ kind: "unavailable", candidates })
+      expect(Date.now() - startedAt).toBeLessThan(outerBoundMs)
+
+      // and then: the ORIGINAL wrapper is observed through its own pid file - production must
+      // have killed the launcher rather than merely abandoning it.
+      const wrapperPid = await readPidFileWhenWritten(wrapperPidPath, HELPER_EXIT_BOUND_MS)
+      expect(pidAlive(wrapperPid)).toBe(false)
+
+      // and then (POSIX only): the grandchild outlives the killed launcher while still holding the
+      // inherited pipes - the hazard this degradation is built for - and releasing the
+      // parent-owned control channel takes that ORIGINAL grandchild down with it. Windows kills
+      // the launcher's whole process tree (the same reason memory-run-supervisor's integration
+      // suite tree-kills there instead of asserting survival), so the surviving-grandchild
+      // premise cannot be staged on that platform at all.
+      if (process.platform !== "win32") {
+        const grandchildIdentity = await readPidWhenWritten(grandchildPidPath, HELPER_EXIT_BOUND_MS, "grandchild.mjs")
+        grandchildIdentityForCleanup = grandchildIdentity
+        expect(identityMatches(grandchildIdentity) && pidAlive(grandchildIdentity.pid)).toBe(true)
+        // The grandchild writes its pid file BEFORE connect(); awaiting its explicit connected
+        // marker guarantees the control snapshot below contains its socket on every runner.
+        expect(await waitForFileToExist(grandchildConnectedPath, HELPER_EXIT_BOUND_MS)).toBe(true)
+        const helperClosures = [...connections].map((socket) => new Promise<void>((resolve) => {
+          if (socket.destroyed) return resolve()
+          socket.once("close", () => resolve())
+        }))
+        closeControlChannel(control, connections)
+        await Promise.all(helperClosures)
+        expect(await pidTerminalWithin(grandchildIdentity, HELPER_EXIT_BOUND_MS)).toBe(true)
+      }
+    } finally {
+      // Fail-safe: even when an assertion above failed - or when the win32 branch never captured an
+      // identity at all - nothing this test spawned may survive it.
+      closeControlChannel(control, connections)
+      const leaked = grandchildIdentityForCleanup ?? await readPidOnce(grandchildPidPath, "grandchild.mjs")
+      if (leaked !== null) {
+        killIfAlive(leaked)
+        await pidTerminalWithin(leaked, HELPER_FAILSAFE_BOUND_MS)
       }
     }
-    let cleanupPid: number | undefined
-
-    // when
-    const result = await Promise.race([
-      probe,
-      new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), outerBoundMs)),
-    ]).finally(async () => {
-      try {
-        cleanupPid = Number((await readFile(grandchildPidPath, "utf8")).trim())
-        process.kill(cleanupPid, "SIGKILL")
-      } catch {
-        // The fixed path has already detached from the pipe-holding grandchild.
-      }
-    })
-
-    // then
-    expect(result).toEqual({ kind: "unavailable", candidates })
-    expect(Date.now() - startedAt).toBeLessThan(outerBoundMs)
-    if (cleanupPid !== undefined) await probe
-  })
+  }, 30_000)
 
   test("#given a failed child catalog probe #when candidates are preflighted #then it warns and preserves reactive fallback behavior", async () => {
     // given

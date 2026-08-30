@@ -71,6 +71,7 @@ export type DagToolDetails =
   | { readonly kind: "attached"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
   | { readonly kind: "snapshot"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
   | { readonly kind: "waited"; readonly run_id: string; readonly result: DagRunResult }
+  | { readonly kind: "detached"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
   | { readonly kind: "cancelled"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
   | {
       readonly kind: "retried"

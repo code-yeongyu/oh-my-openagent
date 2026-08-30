@@ -16,15 +16,31 @@
 // awaited it observes the same error, exactly as a static import would have failed at load time.
 export type SenpiBarrelModule = typeof import("@code-yeongyu/senpi")
 
-let barrelModule: SenpiBarrelModule | undefined
-let barrelPromise: Promise<SenpiBarrelModule> | undefined
+// The plugin ships senpi-task inside several bundles (omo.js, omo-task.js, omo-member.js), each
+// with its own copy of this module. The warm-up state lives on globalThis under a process-wide
+// symbol so awaiting loadSenpiBarrel() through one bundle copy also satisfies senpiBarrel()
+// readers compiled into another copy - the same cross-bundle split that stranded the pi-tui
+// boundary cold in omo-task.js (see ./pi-tui.ts).
+interface SenpiBarrelSharedState {
+  module: SenpiBarrelModule | undefined
+  promise: Promise<SenpiBarrelModule> | undefined
+}
+
+const SHARED_STATE_KEY = Symbol.for("omo.senpi-task.senpiBarrel")
+
+function sharedState(): SenpiBarrelSharedState {
+  const holder = globalThis as typeof globalThis & { [SHARED_STATE_KEY]?: SenpiBarrelSharedState }
+  holder[SHARED_STATE_KEY] ??= { module: undefined, promise: undefined }
+  return holder[SHARED_STATE_KEY]
+}
 
 export function loadSenpiBarrel(): Promise<SenpiBarrelModule> {
-  barrelPromise ??= import("@code-yeongyu/senpi").then((loaded) => {
-    barrelModule = loaded
+  const state = sharedState()
+  state.promise ??= import("@code-yeongyu/senpi").then((loaded) => {
+    state.module = loaded
     return loaded
   })
-  return barrelPromise
+  return state.promise
 }
 
 /**
@@ -33,10 +49,11 @@ export function loadSenpiBarrel(): Promise<SenpiBarrelModule> {
  * is a programming error rather than a runtime condition to handle.
  */
 export function senpiBarrel(): SenpiBarrelModule {
-  if (barrelModule === undefined) {
+  const loaded = sharedState().module
+  if (loaded === undefined) {
     throw new Error(
       "The @code-yeongyu/senpi barrel was accessed before it was loaded. Await loadSenpiBarrel() at the async entry point that leads here before reading barrel values synchronously.",
     )
   }
-  return barrelModule
+  return loaded
 }

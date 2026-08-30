@@ -176,8 +176,8 @@ describe("createDagStatusUi.syncNow", () => {
     expect(pendingRows[0]).toContain("ship-it")
     expect(pendingRows[0]).toContain("pending")
     expect(pendingRows[0]).toContain("wave 1/2")
-    expect(pendingRows.slice(1)).toEqual(["  ○ plan · category:quick", "  ○ build · agent:coder"])
-    expect(runningRows.slice(1)).toEqual(["  ▶ plan · category:quick", "  ○ build · agent:coder"])
+    expect(pendingRows.slice(1)).toEqual(["  ◌ plan · category:quick", "  ◌ build · agent:coder"])
+    expect(runningRows.slice(1)).toEqual(["  ▶ plan · category:quick", "  ⊟ build · agent:coder"])
     expect(settledRows.slice(1)).toEqual(["  ✗ build · agent:coder", "  ✓ plan · category:quick"])
     expect(settledRows[0]).toContain("wave 2/2")
   })
@@ -207,7 +207,7 @@ describe("createDagStatusUi.syncNow", () => {
     // then
     expect(rowsOf(ui).slice(1)).toEqual([
       "  ▶ build · category:quick · x3",
-      "  ○ ship · category:quick",
+      "  ◌ ship · category:quick",
       "  ✓ plan · category:quick",
     ])
   })
@@ -553,5 +553,33 @@ describe("createDagStatusUi.onActivity", () => {
     // then
     expect(manager.snapshotCalls).toHaveLength(0)
     expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
+  })
+})
+
+
+// #7316: a live run whose snapshot projection fails (or whose session filter yields nothing) used
+// to clear the widget outright, which reads to the user as "the DAG died".
+describe("createDagStatusUi live-run visibility", () => {
+  it("#given a live run whose snapshot throws #when syncing #then the widget is not cleared to undefined", () => {
+    // given a manager that lists one running run but cannot project it
+    const manager: DagStatusUiManager = {
+      list: () => [{ runId: "dag_x", status: "running" }],
+      snapshot: () => {
+        throw new Error("checkpoint unreadable")
+      },
+    }
+    const ui = fakeUi()
+    const statusUi = createDagStatusUi({
+      manager,
+      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
+    })
+
+    // when
+    statusUi.syncNow()
+
+    // then the widget was never blanked while the run is still live
+    const cleared = ui.widgetCalls.filter((call) => call.key === DAG_STATUS_UI_KEY && call.content === undefined)
+    expect(cleared).toEqual([])
+    statusUi.dispose()
   })
 })

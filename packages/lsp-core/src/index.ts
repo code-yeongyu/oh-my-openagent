@@ -7,6 +7,7 @@ export * from "./lsp/constants.js";
 export * from "./lsp/directory-diagnostics.js";
 export * from "./lsp/effective-extension.js";
 export * from "./lsp/errors.js";
+export * from "./lsp/format-document.js";
 export * from "./lsp/formatters.js";
 export * from "./lsp/infer-extension.js";
 export * from "./lsp/json-rpc-connection.js";

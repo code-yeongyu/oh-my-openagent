@@ -19,7 +19,7 @@ function isMissingPathError(error: unknown): boolean {
   return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
 }
 
-function buildReservation(inboxDir: string, messageId: string): DeliveryReservation {
+export function buildDeliveryReservation(inboxDir: string, messageId: string): DeliveryReservation {
   const inboxPath = path.join(inboxDir, `${messageId}.json`)
   const reservedPath = path.join(inboxDir, `${RESERVED_PREFIX}${messageId}${RESERVED_SUFFIX}`)
   const processedDir = path.join(inboxDir, "processed")
@@ -34,7 +34,7 @@ export async function reserveMessageForDelivery(
   config: TeamModeConfig,
 ): Promise<DeliveryReservation | null> {
   const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, recipientName)
-  const reservation = buildReservation(inboxDir, messageId)
+  const reservation = buildDeliveryReservation(inboxDir, messageId)
 
   // Pre-reserved by sendMessage: confirm existence without renaming.
   try {

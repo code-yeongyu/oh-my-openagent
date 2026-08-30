@@ -278,3 +278,14 @@ describe("compileDag purity", () => {
     expect(second).toBe(first)
   })
 })
+
+describe("compileDag empty definitions", () => {
+  it("#given a definition with zero nodes #when compiled #then it fails with empty_graph instead of an instantly-complete run", () => {
+    // when
+    const result = compileDag(definition([]), { at: AT })
+
+    // then
+    expect(result.ok).toBe(false)
+    expect(result.errors.map((error) => error.code)).toEqual(["empty_graph"])
+  })
+})

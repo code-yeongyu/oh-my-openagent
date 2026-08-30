@@ -384,7 +384,7 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `description`       | string        | -       | Shown in `task()` tool prompt                                       |
 | `is_unstable_agent` | boolean       | `false` | Force background mode + monitoring. Auto-enabled when the resolved model id contains "gemini" or "minimax". |
 | `disable`           | boolean       | `false` | Exclude this category from task delegation                          |
-| `warn_unavailable`  | boolean       | -       | Present on the OpenCode schema. The dead-chain warning it suppresses is a Senpi/core `task` behavior. |
+| `warn_unavailable`  | boolean       | -       | Present on the OpenCode schema. The dead-chain notice it suppresses is a Senpi/core `task` behavior. |
 
 Disable categories: `{ "categories": { "ultrabrain": { "disable": true } } }`
 

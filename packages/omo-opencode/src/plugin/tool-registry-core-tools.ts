@@ -7,6 +7,7 @@ import type { PluginContext, ToolsRecord } from "./types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
+import { loadPluginConfig } from "../plugin-config"
 import { createGoalController, type GoalController } from "../hooks/goal/controller"
 import { createGoalTools } from "../hooks/goal/tools"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
@@ -54,6 +55,10 @@ export function createCoreTools(args: {
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
     agentOverrides: pluginConfig.agents,
+    loadCurrentModelConfig: () => {
+      const current = loadPluginConfig(ctx.directory, process.env)
+      return { agents: current.agents, categories: current.categories }
+    },
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: getSisyphusJuniorModelOverride(pluginConfig.agents?.["sisyphus-junior"]),
     browserProvider: skillContext.browserProvider,

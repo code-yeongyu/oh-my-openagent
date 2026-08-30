@@ -1,0 +1,14 @@
+$ docker run --name omo-qa-5317-evidence -v "$PWD:/workspaces/oh-my-openagent" -e OPENCODE_CONFIG_DIR=/workspaces/oh-my-openagent/.local-ignore/qa-5317/opencode-config omo-qa opencode run "OMO5317_REAL_PATH: capture structured fallback route." --format json --model qa-mock/qa-model
+
+{"type":"tool_use","timestamp":1787885811147,"sessionID":"ses_fb9b39b45ffe8HgP1P38qv8jiX","part":{"type":"tool","tool":"team_send_message","callID":"call-6","state":{"status":"completed","input":{"teamRunId":"e48525fa-f22b-47be-bc45-4d692b07977c","to":"worker","body":"QA_FIRST_MESSAGE"},"output":"{\"messageId\":\"c569e8d1-71e0-443b-9516-1cb0e1ecb635\",\"deliveredTo\":[\"worker\"]}","metadata":{"truncated":false},"title":"","time":{"start":1787885811067,"end":1787885811145}},"id":"prt_0464c7578001YfbsZN0d2rKHeL","sessionID":"ses_fb9b39b45ffe8HgP1P38qv8jiX","messageID":"msg_0464c74fb001bYX1XNqUVTZjKa"}}
+{"type":"tool_use","timestamp":1787885812917,"sessionID":"ses_fb9b39b45ffe8HgP1P38qv8jiX","part":{"type":"tool","tool":"team_send_message","callID":"call-8","state":{"status":"completed","input":{"teamRunId":"e48525fa-f22b-47be-bc45-4d692b07977c","to":"worker","body":"QA_FALLBACK_MESSAGE"},"output":"{\"messageId\":\"5d52c863-71a9-496d-b071-cc298c3cc0f6\",\"deliveredTo\":[\"worker\"]}","metadata":{"truncated":false},"title":"","time":{"start":1787885812793,"end":1787885812915}},"id":"prt_0464c7c36001Gdn5LYnTGqUUkL","sessionID":"ses_fb9b39b45ffe8HgP1P38qv8jiX","messageID":"msg_0464c760d001Fz8CsR7U3FcepV"}}
+{"type":"text","timestamp":1787885814028,"sessionID":"ses_fb9b39b45ffe8HgP1P38qv8jiX","part":{"id":"prt_0464c810a001ahscUh0181iAPa","messageID":"msg_0464c80920012005TN9P6KTKlN","sessionID":"ses_fb9b39b45ffe8HgP1P38qv8jiX","type":"text","text":"OMO5317_REAL_PATH_OK memberResponses=2","time":{"start":1787885814026,"end":1787885814027}}}
+
+[team-mailbox] live delivery skipped by promptAsync gate, falling back to inbox injection {"status":"reserved"}
+[prompt-async-gate] queued prompt accepted {"source":"team-live-delivery-fallback","position":1}
+[prompt-async-gate] expired reservation released {"source":"model-suggestion-retry"}
+[prompt-async-gate] promptAsync dispatching {"source":"team-live-delivery-fallback"}
+[prompt-async-gate] promptAsync dispatched {"source":"team-live-delivery-fallback"}
+
+HOST_SESSION_COUNT_BEFORE=7928
+HOST_SESSION_COUNT_AFTER=7928

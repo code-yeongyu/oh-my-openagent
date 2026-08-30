@@ -1,0 +1,10 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/manager/manager-capacity-paths.test.ts:
+(fail) TaskManager capacity paths > #given a queued runtime fallback whose record becomes nonterminal #when capacity releases #then abort terminalizes before settling its waiter [20076.57ms]
+  ^ this test timed out after 20000ms.
+
+ 0 pass
+ 5 filtered out
+ 1 fail
+Ran 1 test across 1 file. [21.15s]

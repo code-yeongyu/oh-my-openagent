@@ -1,19 +1,26 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import {
+  answerCompiledFastPath,
   buildSenpiArgs,
-  isProvisionedExecutable,
-  provisionEmbeddedRuntime,
   remapSenpiEnvironment,
   runCompiledLauncher,
-  selectRuntimeManifest,
-  versionLine,
+  shouldPrintCompiledBanner,
   updateLine,
-  type EmbeddedManifest,
+  versionLine,
 } from "../compile-entry"
+import {
+  isProvisionedExecutable,
+  materializeProvisionedExecutable,
+  provisionEmbeddedRuntime,
+  runningExecutablePath,
+  selectRuntimeManifest,
+  shouldReexecAfterProvisioning,
+  type EmbeddedManifest,
+} from "../compile-runtime"
 
 const roots: string[] = []
 const temp = () => { const root = mkdtempSync(join(homedir(), "omo-compile-entry-test-")); roots.push(root); return root }
@@ -22,6 +29,24 @@ const sha = (value: string) => createHash("sha256").update(value).digest("hex")
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
 describe("compiled omo entry launcher parity", () => {
+  test("uses the launched Windows executable path for self-provisioning identity", () => {
+    expect(runningExecutablePath("C:\\runtime\\omo.exe", "B:\\~BUN\\root\\omo.exe", "win32")).toBe(
+      "C:\\runtime\\omo.exe",
+    )
+    expect(runningExecutablePath("bun", "/usr/local/bin/bun", "win32")).toBe("/usr/local/bin/bun")
+    expect(runningExecutablePath("/runtime/omo", "/usr/local/bin/bun", "darwin")).toBe("/usr/local/bin/bun")
+    expect(shouldReexecAfterProvisioning("win32")).toBe(false)
+    expect(shouldReexecAfterProvisioning("darwin")).toBe(true)
+  })
+
+  test("pins the engine package dir to the provisioned root", () => {
+    // Defence in depth alongside the re-exec: PACKAGE_DIR is consulted by
+    // getPackageDir() ahead of dirname(process.execPath), so the engine stays
+    // correct on any path that reaches it without having been re-executed.
+    const env = remapSenpiEnvironment({}, "/provisioned/root")
+    expect(env.OMO_PACKAGE_DIR ?? env.SENPI_PACKAGE_DIR).toBe("/provisioned/root")
+  })
+
   test("early commands pass through without an extension", () => {
     expect(buildSenpiArgs(["install", "x"], "/provisioned")).toEqual(["install", "x"])
   })
@@ -31,7 +56,7 @@ describe("compiled omo entry launcher parity", () => {
   })
 
   test("version line reads the sibling package version and pinned engine", () => {
-    expect(versionLine({ version: "9.2.1" }, "2026.8.25")).toBe("omo 9.2.1 (engine: senpi 2026.8.25)")
+    expect(versionLine({ version: "9.2.1" }, "2026.8.28")).toBe("omo 9.2.1 (engine: senpi 2026.8.28)")
   })
 
   test("realpath-equivalent executable and expected paths skip re-exec", () => {
@@ -57,10 +82,148 @@ describe("compiled omo entry launcher parity", () => {
   })
 })
 
+describe("pre-provisioning fast paths", () => {
+  const manifest: EmbeddedManifest = { omoAiVersion: "9.9.9", enginePin: "2026.1.1", manifestSha: "m", entries: [] }
+
+  const captureLog = (run: () => boolean): { handled: boolean; output: string[] } => {
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (value?: unknown) => { output.push(String(value)) }
+    try {
+      return { handled: run(), output }
+    } finally {
+      console.log = originalLog
+    }
+  }
+
+  test("answers --version from the embedded manifest before provisioning", () => {
+    const { handled, output } = captureLog(() => answerCompiledFastPath(["--version"], manifest))
+    expect(handled).toBe(true)
+    expect(output).toEqual(["omo 9.9.9 (engine: senpi 2026.1.1)"])
+  })
+
+  test("-v answers while --version with extra arguments falls through", () => {
+    expect(captureLog(() => answerCompiledFastPath(["-v"], manifest)).handled).toBe(true)
+    const extra = captureLog(() => answerCompiledFastPath(["--version", "--json"], manifest))
+    expect(extra.handled).toBe(false)
+    expect(extra.output).toEqual([])
+  })
+
+  test("self-update spellings answer with the curl line while engine updates fall through", () => {
+    const selfUpdate = captureLog(() => answerCompiledFastPath(["update"], manifest))
+    expect(selfUpdate.handled).toBe(true)
+    expect(selfUpdate.output[0]).toContain("curl")
+    expect(captureLog(() => answerCompiledFastPath(["update", "self"], manifest)).handled).toBe(true)
+    expect(captureLog(() => answerCompiledFastPath(["update", "--extensions"], manifest)).handled).toBe(false)
+  })
+
+  test("ordinary commands never fast-path", () => {
+    const result = captureLog(() => answerCompiledFastPath(["chat"], manifest))
+    expect(result.handled).toBe(false)
+    expect(result.output).toEqual([])
+  })
+
+  test("fast-path version line matches the provisioned launcher's line for the same stamp", async () => {
+    const root = temp()
+    writeFileSync(join(root, "package.json"), JSON.stringify({ version: manifest.omoAiVersion }))
+    const fast = captureLog(() => answerCompiledFastPath(["--version"], manifest))
+    const provisionedOutput: string[] = []
+    const originalLog = console.log
+    console.log = (value?: unknown) => { provisionedOutput.push(String(value)) }
+    try {
+      await runCompiledLauncher(["--version"], root, manifest.enginePin)
+    } finally {
+      console.log = originalLog
+    }
+    expect(fast.output).toEqual(provisionedOutput)
+  })
+
+  test("banner gate requires a tty and an interactive-default launch", () => {
+    expect(shouldPrintCompiledBanner(["chat"], true)).toBe(true)
+    expect(shouldPrintCompiledBanner([], true)).toBe(true)
+    expect(shouldPrintCompiledBanner(["chat"], false)).toBe(false)
+    expect(shouldPrintCompiledBanner(["-p", "hi"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["--print", "hi"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["--mode", "rpc"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["install", "x"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["--version"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["update"], true)).toBe(false)
+  })
+})
+
 describe("embedded runtime provisioning", () => {
+  test("materializes the executable directly on Windows", () => {
+    const root = temp()
+    const source = join(root, "source.exe")
+    const destination = join(root, "runtime", "omo.exe")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(source, "compiled binary")
+
+    materializeProvisionedExecutable(source, destination, "win32")
+
+    expect(readFileSync(destination, "utf8")).toBe("compiled binary")
+  })
+
+  test("does not overwrite an existing Windows provisioned executable", () => {
+    const root = temp()
+    const source = join(root, "source.exe")
+    const destination = join(root, "runtime", "omo.exe")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(source, "new binary")
+    writeFileSync(destination, "existing binary")
+
+    materializeProvisionedExecutable(source, destination, "win32")
+
+    expect(readFileSync(destination, "utf8")).toBe("existing binary")
+  })
+
+  test("skips re-copying an identical provisioned executable on POSIX", () => {
+    const root = temp()
+    const source = join(root, "source.exe")
+    const destination = join(root, "runtime", "omo.exe")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(source, "compiled binary")
+
+    materializeProvisionedExecutable(source, destination, "darwin")
+    const first = statSync(destination).mtimeMs
+
+    materializeProvisionedExecutable(source, destination, "darwin")
+
+    // Copying ~114MB on every launch was the dominant cold-start cost; an
+    // unchanged destination must not be rewritten.
+    expect(statSync(destination).mtimeMs).toBe(first)
+    expect(readFileSync(destination, "utf8")).toBe("compiled binary")
+  })
+
+  test("still replaces a provisioned executable whose contents differ on POSIX", () => {
+    const root = temp()
+    const source = join(root, "source.exe")
+    const destination = join(root, "runtime", "omo.exe")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(source, "new binary")
+    writeFileSync(destination, "stale binary of different length")
+
+    materializeProvisionedExecutable(source, destination, "darwin")
+
+    expect(readFileSync(destination, "utf8")).toBe("new binary")
+  })
+
+  test("materializes the executable through a temporary non-executable path on POSIX", () => {
+    const root = temp()
+    const source = join(root, "source.exe")
+    const destination = join(root, "runtime", "omo.exe")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(source, "compiled binary")
+
+    materializeProvisionedExecutable(source, destination, "darwin")
+
+    expect(readFileSync(destination, "utf8")).toBe("compiled binary")
+    expect(existsSync(`${destination}.tmp-${process.pid}`)).toBe(false)
+  })
+
   test("selects the omo manifest when senpi also embeds an unrelated manifest", async () => {
     const senpiManifest = { name: "runtime/lsp-daemon/dist/.omo-runtime-manifest.json", text: async () => JSON.stringify({ files: [] }) }
-    const omoManifest = { name: "omo-runtime/runtime-manifest.json", text: async () => JSON.stringify({ omoAiVersion: "9.2.1", enginePin: "2026.8.25" }) }
+    const omoManifest = { name: "omo-runtime/runtime-manifest.json", text: async () => JSON.stringify({ omoAiVersion: "9.2.1", enginePin: "2026.8.28" }) }
     await expect(selectRuntimeManifest([senpiManifest, omoManifest] as any[])).resolves.toBe(omoManifest as any)
   })
 
@@ -78,13 +241,13 @@ describe("embedded runtime provisioning", () => {
     console.log = (value?: unknown) => { output.push(String(value)) }
     process.exitCode = undefined
     try {
-      await runCompiledLauncher(["doctor"], root, "2026.8.25", root)
+      await runCompiledLauncher(["doctor"], root, "2026.8.28", root)
     } finally {
       console.log = originalLog
       process.exitCode = originalExitCode
     }
     expect(output.join("\n")).toContain("PASS plugin manifest: plugin/package.json")
-    expect(output.join("\n")).toContain("INFO omo 9.2.1 (engine: senpi 2026.8.25)")
+    expect(output.join("\n")).toContain("INFO omo 9.2.1 (engine: senpi 2026.8.28)")
   })
 
   test("version uses the manifest engine pin without a provisioned senpi package", async () => {
@@ -94,11 +257,11 @@ describe("embedded runtime provisioning", () => {
     const originalLog = console.log
     console.log = (value?: unknown) => { output.push(String(value)) }
     try {
-      await runCompiledLauncher(["--version"], root, "2026.8.25")
+      await runCompiledLauncher(["--version"], root, "2026.8.28")
     } finally {
       console.log = originalLog
     }
-    expect(output).toEqual(["omo 9.2.1 (engine: senpi 2026.8.25)"])
+    expect(output).toEqual(["omo 9.2.1 (engine: senpi 2026.8.28)"])
   })
 
   test("materializes files whose embedded names carry the omo-runtime prefix", async () => {
@@ -106,7 +269,7 @@ describe("embedded runtime provisioning", () => {
     const content = "hello changelog\n"
     const manifest: EmbeddedManifest = {
       omoAiVersion: "9.2.1",
-      enginePin: "2026.8.25",
+      enginePin: "2026.8.28",
       manifestSha: "prefixed-manifest",
       entries: [{ relPath: "CHANGELOG.md", sha256: sha(content), mode: 0o644, size: Buffer.byteLength(content) }],
     }
@@ -120,7 +283,7 @@ describe("embedded runtime provisioning", () => {
     const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0xc3])
     const manifest: EmbeddedManifest = {
       omoAiVersion: "9.2.1",
-      enginePin: "2026.8.25",
+      enginePin: "2026.8.28",
       manifestSha: "binary-manifest",
       entries: [{ relPath: "assets/clankolas.png", sha256: createHash("sha256").update(bytes).digest("hex"), mode: 0o644, size: bytes.byteLength }],
     }
@@ -134,7 +297,7 @@ describe("embedded runtime provisioning", () => {
     const content = "hello runtime\n"
     const manifest: EmbeddedManifest = {
       omoAiVersion: "9.2.1",
-      enginePin: "2026.8.25",
+      enginePin: "2026.8.28",
       manifestSha: "manifest-sha",
       entries: [{ relPath: "package.json", sha256: sha(content), mode: 0o644, size: Buffer.byteLength(content) }],
     }

@@ -113,6 +113,8 @@ evidence: screenshot + plain transcript + cleanup receipt.
 
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
 
+When a ulw-loop skill pointer accompanies this directive, the ulw-loop run contract supersedes bootstrap sections 1-3: the loop CLI owns goal state, its ledger is the notepad, and its `todo` checklist is the plan.
+
 ## 0. Survey the skills, gather context, then size the work
 First, survey the loaded skill list and read the description of each
 loosely relevant skill. Decide explicitly which skills this task will

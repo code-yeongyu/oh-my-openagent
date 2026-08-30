@@ -107,6 +107,24 @@ print(repr(data[max(0,pos-100):pos+200]))
 
 If you must keep using `strings`, lower the threshold: `strings -n 1 -t x ./target | rg ...`. The signal-to-noise drops sharply but short content is preserved.
 
+### Sanitizer build for a crashing C/C++ binary
+
+If the binary can be rebuilt from C/C++ sources, reproduce the crash with sanitizers before
+trying to infer the fault from stripped machine code. AddressSanitizer catches out-of-bounds
+accesses and use-after-free; UndefinedBehaviorSanitizer reports undefined operations.
+
+```bash
+# Rebuild with source locations and runtime checks enabled
+CFLAGS='-g -O1 -fsanitize=address,undefined' \
+CXXFLAGS='-g -O1 -fsanitize=address,undefined' \
+make clean all
+./target
+```
+
+The sanitizer report identifies the invalid access and its allocation/free or undefined
+operation stack, often making the root cause clear before dynamic analysis. For a binary
+that cannot be rebuilt, continue with the native tracing and debugger workflow below.
+
 Write the triage summary to the journal:
 
 ```markdown
@@ -228,6 +246,26 @@ lldb ./target
 (lldb) image dump sections ./target
 (lldb) image dump symtab ./target
 ```
+
+### Data watchpoints — catch the corruption, not just the crash
+
+When a value is already wrong by the time execution reaches the crash, watch the memory
+address for writes and stop at the instruction that corrupts it. Use the address of the
+field or buffer identified from the static/dynamic hypothesis; see [tools/pwndbg.md](../tools/pwndbg.md)
+for the richer pwndbg watchpoint workflow rather than duplicating it here.
+
+```text
+# lldb: watch writes to an address (replace with a valid expression/address)
+(lldb) watchpoint set expression -- <addr>
+
+# gdb: stop on writes, or on reads when a read is the first observable symptom
+(gdb) watch *(<type> *)<addr>
+(gdb) rwatch *(<type> *)<addr>
+```
+
+A watchpoint is most useful after narrowing the suspect object: continue from its
+allocation or initialization, and inspect the backtrace and writer when it triggers.
+Hardware watchpoint slots are limited, so remove broad watchpoints before adding more.
 
 **Function interception via `DYLD_INSERT_LIBRARIES`** (macOS equivalent of `LD_PRELOAD`):
 

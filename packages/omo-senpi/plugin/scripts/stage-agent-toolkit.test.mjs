@@ -17,7 +17,7 @@ async function makeFixture() {
   const directiveEntry = join(root, "built", "directive.md")
   const targetDir = join(root, "staged", "agent-toolkit")
   await mkdir(join(root, "built"), { recursive: true })
-  await writeFile(sourceEntry, "#!/usr/bin/env node\nconsole.log('ulw-loop help')\n", "utf8")
+  await writeFile(sourceEntry, "#!/usr/bin/env node\nconsole.log(process.argv.slice(2).join(' '))\n", "utf8")
   await writeFile(directiveEntry, "# Ultrawork\n", "utf8")
   await chmod(sourceEntry, 0o755)
   return { sourceEntry, directiveEntry, targetDir }
@@ -107,6 +107,16 @@ describe("agent-toolkit runtime staging", () => {
       (await readdir(dirname(fixture.targetDir))).some((entry) => entry.startsWith("agent-toolkit.backup-")),
       false,
     )
+  })
+
+  test("#given bare help #when dispatched #then ulw-loop receives help", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
+    const fixture = await makeFixture()
+    await stageAgentToolkit({ ...fixture, buildBundle: false })
+
+    const result = spawnSync(process.execPath, [join(fixture.targetDir, "cli.js"), "help"], { encoding: "utf8" })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout.trim(), "help")
   })
 
   test("#given an unknown component #when dispatched #then it exits one and lists ulw-loop", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {

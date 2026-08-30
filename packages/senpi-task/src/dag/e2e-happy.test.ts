@@ -542,7 +542,7 @@ describe("DAG happy-path end to end", () => {
     // given
     const fixture = e2eFixture()
     Reflect.set(globalThis, "tool", {
-      dag: async (args: { readonly action: string; readonly definition?: DagDefinition; readonly run_id?: string }) => {
+      workflow: async (args: { readonly action: string; readonly definition?: DagDefinition; readonly run_id?: string }) => {
         if (args.action === "start" && args.definition !== undefined) {
           const started = await fixture.start(args.definition)
           return { details: { kind: "started", run_id: started.snapshot.runId, reused: started.reused, snapshot: started.snapshot } }
@@ -592,7 +592,7 @@ describe("DAG happy-path end to end", () => {
       admit: () => Promise.resolve({ kind: "rejected", message: "resident child cap reached" }),
     })
     Reflect.set(globalThis, "tool", {
-      dag: async (args: { readonly action: string; readonly definition?: DagDefinition; readonly run_id?: string }) => {
+      workflow: async (args: { readonly action: string; readonly definition?: DagDefinition; readonly run_id?: string }) => {
         if (args.action === "start" && args.definition !== undefined) {
           const started = await fixture.start(args.definition)
           return { details: { kind: "started", run_id: started.snapshot.runId, reused: started.reused, snapshot: started.snapshot } }

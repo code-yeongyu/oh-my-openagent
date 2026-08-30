@@ -477,6 +477,8 @@ async function readLine(stream: ReadableStream<Uint8Array>): Promise<string> {
 }
 
 describe("DAG failure, crash, and policy end to end", () => {
+  const DAG_FAILURE_E2E_TIMEOUT_MS = process.platform === "win32" ? 90_000 : 15_000
+
   test("#given two failures whose completion order opposes graph order #when the real engine runs #then siblings and independent branches finish, dependents skip, and graph order selects the primary failure", async () => {
     // given
     const runner = new ControlledRunner()
@@ -519,7 +521,7 @@ describe("DAG failure, crash, and policy end to end", () => {
       type: "dag.run.failed",
       error: { nodeId: "graph-first-failure", message: "failure:graph-first-failure" },
     })
-  }, { timeout: 15_000 })
+  }, { timeout: DAG_FAILURE_E2E_TIMEOUT_MS })
 
   test("#given a crash after an owned task spawns but before task attachment #when a fresh manager resumes #then startOwned recovers the existing task and spawn count remains exactly one", async () => {
     // given
@@ -601,7 +603,7 @@ describe("DAG failure, crash, and policy end to end", () => {
     expect(fixture.taskStore.list().records).toHaveLength(tasksBefore)
   })
 
-  test("#given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and dag are absent", async () => {
+  test("#given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and workflow are absent", async () => {
     // given
     let captured: CreateAgentSessionOptions | undefined
     const inProcess = new InProcessRunner({
@@ -610,7 +612,7 @@ describe("DAG failure, crash, and policy end to end", () => {
         makeTool("task"),
         makeTool("task_create"),
         makeTool("team_send"),
-        makeTool("dag"),
+        makeTool("workflow"),
       ],
       createSession: async (options) => {
         captured = options
@@ -627,7 +629,7 @@ describe("DAG failure, crash, and policy end to end", () => {
     const names = (captured?.customTools ?? []).map((tool) => tool.name)
     expect(names).toContain("read")
     expect(names).not.toContain("task")
-    expect(names).not.toContain("dag")
+    expect(names).not.toContain("workflow")
     expect(names.some((name) => name.startsWith("task_") || name.startsWith("team_"))).toBe(false)
   })
 

@@ -32,7 +32,7 @@ describe("agent model entries carrying effort", () => {
     const config = {
       agents: {
         explore: {
-          models: [{ model: "quotio-openai/gpt-5.6-luna-fast", reasoningEffort: "minimal" as const }],
+          models: [{ model: "openai-codex/gpt-5.6-luna-fast", reasoningEffort: "minimal" as const }],
         },
       },
     }
@@ -43,7 +43,7 @@ describe("agent model entries carrying effort", () => {
     // then
     const entry = agents.explore?.models?.[0]
     if (typeof entry !== "object") throw new Error("Expected the bridged entry to stay an object")
-    expect(entry.model).toBe("quotio-openai/gpt-5.6-luna-fast")
+    expect(entry.model).toBe("openai-codex/gpt-5.6-luna-fast")
     expect(entry.reasoningEffort).toBe("minimal")
   })
 
@@ -81,9 +81,9 @@ describe("agent model entries carrying effort", () => {
     // given a canonical entry (the schema rewrites reasoningEffort to reasoning)
     const agents = roster({
       name: "explore",
-      models: [{ model: "quotio-openai/gpt-5.6-luna-fast", reasoning: "high" }],
+      models: [{ model: "openai-codex/gpt-5.6-luna-fast", reasoning: "high" }],
     })
-    const models = registry([{ provider: "quotio-openai", id: "gpt-5.6-luna-fast" }])
+    const models = registry([{ provider: "openai-codex", id: "gpt-5.6-luna-fast" }])
 
     // when resolved end to end through withDefaults
     const result = expectResolved(resolveAgent("explore", agents, models))
@@ -96,15 +96,15 @@ describe("agent model entries carrying effort", () => {
     // given
     const agents = roster({
       name: "explore",
-      models: [{ model: "quotio-openai/gpt-5.6-luna-fast", reasoningEffort: "minimal" }],
+      models: [{ model: "openai-codex/gpt-5.6-luna-fast", reasoningEffort: "minimal" }],
     })
-    const models = registry([{ provider: "quotio-openai", id: "gpt-5.6-luna-fast" }])
+    const models = registry([{ provider: "openai-codex", id: "gpt-5.6-luna-fast" }])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
 
     // then
-    expect(result.model).toBe("quotio-openai/gpt-5.6-luna-fast")
+    expect(result.model).toBe("openai-codex/gpt-5.6-luna-fast")
     expect(result.resolved_model?.reasoning_effort).toBe("minimal")
   })
 
@@ -127,11 +127,11 @@ describe("agent model entries carrying effort", () => {
     // given
     const agents = roster({
       name: "librarian",
-      model: "quotio-openai/gpt-5.6-luna-fast",
+      model: "openai-codex/gpt-5.6-luna-fast",
       reasoningEffort: "minimal",
-      models: ["quotio-openai/gpt-5.6-luna-fast"],
+      models: ["openai-codex/gpt-5.6-luna-fast"],
     })
-    const models = registry([{ provider: "quotio-openai", id: "gpt-5.6-luna-fast" }])
+    const models = registry([{ provider: "openai-codex", id: "gpt-5.6-luna-fast" }])
 
     // when
     const result = expectResolved(resolveAgent("librarian", agents, models))
@@ -146,15 +146,15 @@ describe("agent model entries carrying effort", () => {
       name: "explore",
       model: "kimi-coding/kimi-for-coding-highspeed",
       reasoningEffort: "high",
-      models: [{ model: "quotio-openai/gpt-5.6-luna-fast", reasoningEffort: "minimal" }],
+      models: [{ model: "openai-codex/gpt-5.6-luna-fast", reasoningEffort: "minimal" }],
     })
-    const models = registry([{ provider: "quotio-openai", id: "gpt-5.6-luna-fast" }])
+    const models = registry([{ provider: "openai-codex", id: "gpt-5.6-luna-fast" }])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
 
     // then
-    expect(result.model).toBe("quotio-openai/gpt-5.6-luna-fast")
+    expect(result.model).toBe("openai-codex/gpt-5.6-luna-fast")
     expect(result.resolved_model?.reasoning_effort).toBe("minimal")
   })
 

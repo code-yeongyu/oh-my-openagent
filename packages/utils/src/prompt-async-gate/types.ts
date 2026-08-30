@@ -47,7 +47,9 @@ type InternalPromptDispatchCommonArgs<TInput> = {
   readonly dispatchTimeoutMs?: number
   readonly checkStatus?: boolean
   readonly checkToolState?: boolean
-  readonly shouldDispatch?: () => boolean
+  readonly durableRetry?: boolean
+  readonly shouldDispatch?: () => boolean | Promise<boolean>
+  readonly retryDispatchFailure?: (error: unknown) => boolean
 }
 
 export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = InternalPromptDispatchCommonArgs<TInput> & (
@@ -70,7 +72,12 @@ export type InternalPromptDispatchResult =
   | { readonly status: "reserved"; readonly reservedBy: string }
   | { readonly status: "cancelled" }
   | { readonly status: "unavailable" }
-  | { readonly status: "failed"; readonly error: unknown; readonly dispatchAttempted: boolean }
+  | {
+    readonly status: "failed"
+    readonly error: unknown
+    readonly dispatchAttempted: boolean
+    readonly queueRetryable?: boolean
+  }
 
 export type PromptAsyncGateResult = InternalPromptDispatchResult
 
@@ -104,6 +111,8 @@ export type QueuedInternalPrompt = {
   readonly queueRetryMs: number
   readonly checkStatus: boolean
   readonly checkToolState: boolean
-  readonly shouldDispatch?: () => boolean
+  readonly durableRetry: boolean
+  readonly shouldDispatch?: () => boolean | Promise<boolean>
+  readonly retryDispatchFailure?: (error: unknown) => boolean
   readonly dispatch: (input: unknown) => Promise<unknown>
 }

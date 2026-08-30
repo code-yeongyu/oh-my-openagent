@@ -1,0 +1,20 @@
+=== omo doctor (worktree launcher, live process table; REPORT ONLY) ===
+FAIL plugin manifest: missing plugin/package.json
+FAIL extension: missing plugin/extensions/omo.js
+FAIL lsp-daemon runtime: missing plugin/runtime/lsp-daemon/dist/cli.js
+FAIL agent-toolkit runtime: missing plugin/runtime/agent-toolkit/cli.js
+PASS senpi CLI: /Volumes/mengmotaStorage/local-workspaces/omo-wt/launcher-signal-forward/node_modules/.bun/@code-yeongyu+senpi@2026.8.26+df14032bda52d856/node_modules/@code-yeongyu/senpi/dist/cli.js
+PASS senpi version 2026.8.26
+INFO omo 5.0.0-0.beta.20 (engine: senpi 2026.8.26)
+WARN stale engine pid 76071 (age 02:28:33, tty ??) has no launcher; it was orphaned by a signaled launcher
+WARN stale engine pid 90220 (age 02:25:59, tty ??) has no launcher; it was orphaned by a signaled launcher
+WARN stale engine pid 90387 (age 23:19:12, tty ttys005) has no launcher; it was orphaned by a signaled launcher
+WARN stale engine pid 75183 (age 01-02:19:38, tty ttys013) has no launcher; it was orphaned by a signaled launcher
+WARN stale engine pid 90878 (age 01-01:51:54, tty ttys015) has no launcher; it was orphaned by a signaled launcher
+INFO reap them explicitly by pid: omo doctor --reap 76071 90220 90387 75183 90878
+exit=1
+
+=== ps view of the live stale fixtures (user-owned; never signaled) ===
+90387     1    23:19:13 ttys005  /Users/yeongyu/.bun/bin/bun /Users/yeongyu/.bun/install/global/node_modules/omo-ai/node_modules/@code-yeongyu/senpi/d
+75183     1 01-02:19:39 ttys013  /Users/yeongyu/.bun/bin/bun /Users/yeongyu/.bun/install/global/node_modules/omo-ai/node_modules/@code-yeongyu/senpi/d
+90878     1 01-01:51:55 ttys015  /Users/yeongyu/.bun/bin/bun /Users/yeongyu/.bun/install/global/node_modules/omo-ai/node_modules/@code-yeongyu/senpi/d

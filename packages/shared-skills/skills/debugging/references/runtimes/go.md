@@ -42,9 +42,23 @@ dlv exec ./bin/myserver
 # Attach to a running process
 dlv attach $(pgrep myserver)
 
-# Headless mode (IDE / remote attach) — default port 2345
+# Delve's JSON-RPC API (IDE / remote attach) — default port 2345
 dlv debug --headless --listen=:2345 --api-version=2 ./cmd/server
 ```
+
+Delve exposes two distinct machine-readable interfaces:
+
+```bash
+# Debug Adapter Protocol: use this for editors and DAP-aware automation
+dlv dap --listen=127.0.0.1:2345
+
+# Delve's JSON-RPC API: use this for clients built directly against Delve's API
+dlv debug --headless --listen=127.0.0.1:2345 --api-version=2 ./cmd/server
+```
+
+Pick `dlv dap` when the client speaks DAP; pick headless JSON-RPC when you need Delve's
+native API or an existing JSON-RPC client. Both expose structured state, unlike scraping
+an interactive `(dlv)` session.
 
 ### Building a debuggable binary
 

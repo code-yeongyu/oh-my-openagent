@@ -7,7 +7,11 @@ import {
   getActiveReservation,
   setPromptReservation,
 } from "./reservations"
-import { getPromptGateMessagesFetchTimeoutMs, withDispatchTimeout } from "./timing"
+import {
+  getPromptGateMessagesFetchTimeoutMs,
+  getPromptGateRevalidationTimeoutMs,
+  withDispatchTimeout,
+} from "./timing"
 import type { InternalPromptDispatchResult, PromptAsyncReservation, PromptDispatchClient, PromptSessionName } from "./types"
 
 export async function dispatchAfterSessionIdle<TInput>(args: {
@@ -23,7 +27,8 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
   readonly dispatchTimeoutMs: number
   readonly checkStatus: boolean
   readonly checkToolState: boolean
-  readonly shouldDispatch?: () => boolean
+  readonly shouldDispatch?: () => boolean | Promise<boolean>
+  readonly retryDispatchFailure?: (error: unknown) => boolean
   readonly dispatch: (input: TInput) => Promise<unknown>
 }): Promise<InternalPromptDispatchResult> {
   const {
@@ -40,6 +45,7 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
     checkStatus,
     checkToolState,
     shouldDispatch,
+    retryDispatchFailure,
     dispatch,
   } = args
 
@@ -109,7 +115,18 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
       return { status: "active" }
     }
 
-    if (shouldDispatch?.() === false) {
+    const dispatchDecision = shouldDispatch?.()
+    const resolvedDispatchDecision = (
+      dispatchDecision !== undefined
+      && typeof dispatchDecision !== "boolean"
+    )
+      ? await withDispatchTimeout(
+        dispatchDecision,
+        Math.min(dispatchTimeoutMs, getPromptGateRevalidationTimeoutMs()),
+        `[prompt-async-gate] ${sessionName} shouldDispatch`,
+      )
+      : dispatchDecision
+    if (resolvedDispatchDecision === false) {
       log(`[prompt-async-gate] ${sessionName} cancelled before dispatch`, { sessionID, source })
       return { status: "cancelled" }
     }
@@ -130,6 +147,7 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
     log(`[prompt-async-gate] ${sessionName} dispatched`, { sessionID, source })
     return { status: "dispatched", response }
   } catch (error) {
+    const queueRetryable = dispatchAttempted && retryDispatchFailure?.(error) === true
     if (dispatchAttempted) {
       rememberRecentPromptDispatch({
         sessionID,
@@ -140,7 +158,12 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
     }
     const errorText = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
     log(`[prompt-async-gate] ${sessionName} failed`, { sessionID, source, error: errorText })
-    return { status: "failed", error, dispatchAttempted }
+    return {
+      status: "failed",
+      error,
+      dispatchAttempted,
+      ...(queueRetryable ? { queueRetryable: true } : {}),
+    }
   } finally {
     finishPromptReservation(sessionID, reservation, dispatchAttempted, postDispatchHoldMs)
   }

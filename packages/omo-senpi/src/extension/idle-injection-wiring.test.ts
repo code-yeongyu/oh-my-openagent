@@ -44,7 +44,7 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
           task_id: "st_done",
           name: "bg",
           status: "completed",
-          model: "quotio-openai/gpt-5.6-luna-fast",
+          model: "openai-codex/gpt-5.6-luna-fast",
           duration_ms: 1,
           final_response: "",
           continuation_hint: "",

@@ -1,0 +1,61 @@
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts
+error: timed out waiting for queued fallback mailbox wake
+(fail) createTeamSendMessageTool > #given live delivery falls back for an idle recipient #when the prompt gate clears #then a queued wake exposes the unread message
+1 tests failed
+CORRECTED_RED_EXIT=1
+
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts
+error: timed out waiting for pending-delivery fallback mailbox wake
+(fail) createTeamSendMessageTool > #given a message waits behind pending live delivery #when that prompt clears #then a queued wake exposes the waiting message
+1 tests failed
+RELEASE_RED_EXIT=1
+
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts
+Expected: 1
+Received: 2
+(fail) createTeamSendMessageTool > #given a message waits behind pending live delivery #when that prompt clears #then a queued wake exposes the waiting message
+error: timed out waiting for queue probe after cancelled fallback wake
+(fail) createTeamSendMessageTool > #given a queued fallback message was already injected #when the prompt gate clears #then the obsolete wake is cancelled
+33 pass
+2 fail
+REVIEW_CORRECTION_RED_EXIT=1
+
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts --test-name-pattern 'generic fallback wakes cover two messages'
+error: timed out waiting for second message fallback wake
+(fail) createTeamSendMessageTool > #given generic fallback wakes cover two messages #when the first is acknowledged #then the second message still wakes
+COALESCED_RED_EXIT=1
+
+$ bun test packages/utils/src/prompt-async-gate.test.ts --test-name-pattern 'queued dispatch revalidation fails transiently'
+error: timed out waiting for queued prompt after transient revalidation failure
+(fail) dispatchInternalPrompt > #given queued dispatch revalidation fails transiently #when the queue retries #then the prompt remains queued and dispatches
+REVALIDATION_RED_EXIT=1
+
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts --test-name-pattern 'queued fallback team was deleted'
+error: timed out waiting for queue probe after team deletion
+(fail) createTeamSendMessageTool > #given a queued fallback team was deleted #when the prompt gate clears #then the obsolete wake is cancelled
+DELETED_TEAM_RED_EXIT=1
+
+$ bun test packages/team-core/src/team-mailbox/inbox.test.ts --test-name-pattern 'exact unread path cannot be read'
+Expected path: "code"
+Unable to find property
+(fail) readUnreadMessageById > #given the exact unread path cannot be read #when it is inspected #then the read error is preserved for retry
+UNREADABLE_MESSAGE_RED_EXIT=1
+
+$ bun test packages/utils/src/prompt-async-gate.test.ts --test-name-pattern 'queued dispatch revalidation never settles'
+error: timed out waiting for bounded queued revalidation
+(fail) dispatchInternalPrompt > #given queued dispatch revalidation never settles #when the dispatch timeout elapses #then the prompt remains queued for retry
+STALLED_REVALIDATION_RED_EXIT=1
+
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts --test-name-pattern 'queued fallback message is pending acknowledgement'
+Expected: ["blocker", "pending-ack queue probe"]
+Received: ["blocker", "You have a new team message in your mailbox.", "pending-ack queue probe"]
+(fail) createTeamSendMessageTool > #given a queued fallback message is pending acknowledgement #when the prompt gate clears #then the obsolete wake is cancelled
+PENDING_ACK_RED_EXIT=1
+
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts --test-name-pattern 'inbox stays intact when live delivery fails'
+error: timed out waiting for fallback wake after pre-send transport failure
+(fail) createTeamSendMessageTool > inbox stays intact when live delivery fails so the fallback path still works
+TRANSPORT_RETRY_RED_EXIT=1
+
+Final review RED captures:
+  artifacts/final-review-blockers.txt

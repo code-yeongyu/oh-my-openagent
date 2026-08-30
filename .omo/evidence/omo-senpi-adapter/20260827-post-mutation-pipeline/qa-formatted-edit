@@ -1,0 +1,1 @@
+Outcome: PASS (unit-backed formatter path). Marker matrix selects biome for biome.json/biome.jsonc, and formatter result annotation contains machine tokens `auto-formatted` and `re-read before exact-text edits`. The post-mutation handler appends the annotation before invoking diagnostics.

@@ -279,7 +279,7 @@ test("#given active lock #when running check #then skips concurrent update", asy
 
 	assert.equal(result.started, false);
 	assert.equal(result.reason, "locked");
-	assert.match(await readFile(join(root, "codex-home", "config.toml"), "utf8"), /model_context_window = 372000/);
+	assert.match(await readFile(join(root, "codex-home", "config.toml"), "utf8"), /model_context_window = 650000/);
 });
 
 test("#given stale lock #when running check #then removes lock and runs update", async () => {
@@ -646,7 +646,7 @@ test("#given throttled updater and stale Codex config #when running check #then 
 	assert.equal(result.started, false);
 	assert.equal(result.reason, "throttled");
 	assert.match(content, /model = "gpt-5\.6-sol"/);
-	assert.match(content, /model_context_window = 372000/);
+	assert.match(content, /model_context_window = 650000/);
 	assert.match(content, /model_reasoning_effort = "high"/);
 	assert.match(content, /plan_mode_reasoning_effort = "xhigh"/);
 	assert.doesNotMatch(content, /gpt-5\.2/);

@@ -5,11 +5,13 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -88,13 +90,19 @@ function parseArgs(argv: readonly string[]): BuildOptions {
 }
 
 function runSenpiPluginBuild(): void {
-  const result = spawnSync("bun", ["run", "build:senpi-plugin"], {
-    cwd: repoRoot,
-    stdio: "inherit",
-  })
-  if (result.error !== undefined) throw result.error
-  if (result.status !== 0) {
-    throw new Error(`build:senpi-plugin failed with exit code ${result.status ?? 1}`)
+  const buildRoot = mkdtempSync(join(tmpdir(), "omo-native-lsp-build-"))
+  try {
+    const result = spawnSync("bun", ["run", "build:senpi-plugin"], {
+      cwd: repoRoot,
+      env: { ...process.env, OMO_LSP_DAEMON_DIST: join(buildRoot, "dist") },
+      stdio: "inherit",
+    })
+    if (result.error !== undefined) throw result.error
+    if (result.status !== 0) {
+      throw new Error(`build:senpi-plugin failed with exit code ${result.status ?? 1}`)
+    }
+  } finally {
+    rmSync(buildRoot, { recursive: true, force: true })
   }
 }
 

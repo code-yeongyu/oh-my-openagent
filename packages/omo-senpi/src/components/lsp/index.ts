@@ -1,5 +1,9 @@
 import { reportToolHookStatus } from "../../extension/tool-hook-status";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { loadSenpiOmoConfig } from "../config-resolution";
 import type { PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
+import { createFormatterStep } from "../formatter/formatter";
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types";
 import {
 	lsp_diagnostics,
@@ -38,10 +42,12 @@ interface ToolResultHandlerResult {
 }
 
 interface LspComponentOptions {
+	readonly formatter?: ReturnType<typeof createFormatterStep>;
 	readonly postEdit?: {
 		readonly runDiagnostics?: DiagnosticsRunner;
 		readonly state?: LspPostEditSessionState;
 	};
+	readonly callDaemonTool?: DaemonToolCaller;
 }
 
 const DEFAULT_POST_EDIT_SESSION_STATE = createLspPostEditSessionState();
@@ -50,10 +56,17 @@ export { createLspPostEditSessionState };
 
 export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiComponent {
 	const postEditState = options.postEdit?.state ?? createLspPostEditSessionState();
-	const runPostEditDiagnostics = options.postEdit?.runDiagnostics ?? runLspDiagnosticsForPostEdit;
 	return {
 		name: "lsp",
 		register(pi, ctx) {
+			const cwd = pi.cwd ?? process.cwd();
+			const runPostEditDiagnostics = options.postEdit?.runDiagnostics ?? createLspDiagnosticsRunner(cwd, options.callDaemonTool);
+			const formatMutation = options.formatter ?? createFormatterStep({
+				config: loadSenpiOmoConfig({ cwd }).config.formatOnMutation,
+				markers: markerCwd => listProjectMarkers(markerCwd),
+				readMarker: (markerCwd, marker) => readProjectMarker(markerCwd, marker),
+				logger: ctx.logger,
+			});
 			registerLspFlags(pi);
 			if (ctx.config.getFlag(LSP_TOOLS_ENABLED_FLAG) === false) return;
 
@@ -64,12 +77,18 @@ export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiC
 				);
 			}
 
-			registerLspTools(pi);
+			registerLspTools(pi, cwd);
 
+			pi.on("tool_result", async (event, eventCtx) => {
+					const parsed = isToolResultLike(event) ? event : undefined;
+					if (!parsed) return undefined;
+					const formatted = await formatMutation(parsed, pi.cwd ?? process.cwd(), sessionIdFromContext(eventCtx));
+					const afterFormat = formatted.content ? { ...parsed, content: [...parsed.content, ...formatted.content] } : parsed;
+					if (formatted.error) return { content: afterFormat.content, isError: true };
+					if (ctx.config.getFlag(LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG) === false) return formatted.content ? { content: afterFormat.content } : undefined;
+					return handlePostEditDiagnosticsToolResult(afterFormat, eventCtx, runPostEditDiagnostics, postEditState);
+				});
 			if (ctx.config.getFlag(LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG) !== false) {
-				pi.on("tool_result", (event, eventCtx) =>
-					handlePostEditDiagnosticsToolResult(event, eventCtx, runPostEditDiagnostics, postEditState),
-				);
 				pi.on("session_start", (_event, eventCtx) => {
 					postEditState.onSessionStart(sessionIdFromContext(eventCtx));
 				});
@@ -99,7 +118,7 @@ function registerLspFlags(pi: SenpiExtensionAPI): void {
 	});
 }
 
-function registerLspTools(pi: SenpiExtensionAPI): void {
+function registerLspTools(pi: SenpiExtensionAPI, cwd: string): void {
 	for (const tool of [
 		lsp_diagnostics,
 		lsp_goto_definition,
@@ -108,7 +127,7 @@ function registerLspTools(pi: SenpiExtensionAPI): void {
 		lsp_prepare_rename,
 		lsp_rename,
 	]) {
-		pi.registerTool(withPackagedDaemonRuntime(tool));
+		pi.registerTool(withPackagedDaemonRuntime(tool, cwd));
 	}
 }
 
@@ -123,7 +142,7 @@ type LspTool = {
 	): Promise<unknown>;
 };
 
-function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool): TTool {
+function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool, cwd: string): TTool {
 	return {
 		...tool,
 		async execute(
@@ -134,7 +153,7 @@ function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool): TTool {
 			ctx?: unknown,
 		): Promise<unknown> {
 			const args = isRecord(rawParams) ? rawParams : {};
-			return callPackagedDaemonTool(tool.name, args, signal === undefined ? {} : { signal });
+			return callPackagedDaemonTool(tool.name, args, { cwd, ...(signal === undefined ? {} : { signal }) });
 		},
 	};
 }
@@ -142,7 +161,7 @@ function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool): TTool {
 export async function handlePostEditDiagnosticsToolResult(
 	event: unknown,
 	ctx?: unknown,
-	runDiagnostics: DiagnosticsRunner = runLspDiagnosticsForPostEdit,
+	runDiagnostics: DiagnosticsRunner = createLspDiagnosticsRunner(process.cwd()),
 	state: LspPostEditSessionState = DEFAULT_POST_EDIT_SESSION_STATE,
 ): Promise<ToolResultHandlerResult | undefined> {
 	if (!isToolResultLike(event)) return undefined;
@@ -158,9 +177,13 @@ export async function handlePostEditDiagnosticsToolResult(
 	return result?.content ? { content: result.content } : undefined;
 }
 
-async function runLspDiagnosticsForPostEdit(filePath: string): Promise<PostEditDiagnosticsOutcome> {
-	const result = await callPackagedDaemonTool("lsp_diagnostics", { filePath, severity: "error" });
-	return postEditOutcomeFromDaemonResult(result);
+type DaemonToolCaller = typeof callPackagedDaemonTool;
+
+export function createLspDiagnosticsRunner(cwd: string, callDaemonTool: DaemonToolCaller = callPackagedDaemonTool): DiagnosticsRunner {
+	return async (filePath: string): Promise<PostEditDiagnosticsOutcome> => {
+		const result = await callDaemonTool("lsp_diagnostics", { filePath, severity: "error" }, { cwd });
+		return postEditOutcomeFromDaemonResult(result);
+	};
 }
 
 function postEditOutcomeFromDaemonResult(result: {
@@ -207,6 +230,13 @@ function sessionIdFromContext(value: unknown): string | undefined {
 	if (typeof getSessionId !== "function") return undefined;
 	const sessionId: unknown = Reflect.apply(getSessionId, sessionManager, []);
 	return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : undefined;
+}
+
+function listProjectMarkers(cwd: string): string[] {
+	try { return readdirSync(cwd) } catch { return [] }
+}
+function readProjectMarker(cwd: string, marker: string): string {
+	try { return readFileSync(join(cwd, marker), "utf8") } catch { return "" }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

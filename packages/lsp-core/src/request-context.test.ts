@@ -168,4 +168,33 @@ describe("LspRequestContext", () => {
 			capabilities: { installDecisionTool: true },
 		});
 	});
+
+	it("#given an injected LSP cwd #when standalone context is created #then it wins over process cwd without reading global env", () => {
+		const sessionRoot = tempRoot("lsp-context-session-");
+		const processRoot = tempRoot("lsp-context-process-");
+		const home = tempRoot("lsp-context-env-home-");
+
+		const context = createStandaloneMcpRequestContext({
+			env: {
+				LSP_TOOLS_MCP_CWD: sessionRoot,
+			},
+			homeDir: home,
+		});
+
+		expect(context.cwd).toBe(sessionRoot);
+		expect(context.projectConfigPaths).toEqual([join(sessionRoot, ".codex", "lsp-client.json")]);
+		expect(processRoot).not.toBe(context.cwd);
+	});
+
+	it("#given explicit cwd and an injected LSP cwd #when standalone context is created #then explicit cwd wins", () => {
+		const explicitRoot = tempRoot("lsp-context-explicit-");
+		const injectedRoot = tempRoot("lsp-context-injected-");
+
+		const context = createStandaloneMcpRequestContext({
+			cwd: explicitRoot,
+			env: { LSP_TOOLS_MCP_CWD: injectedRoot },
+		});
+
+		expect(context.cwd).toBe(explicitRoot);
+	});
 });

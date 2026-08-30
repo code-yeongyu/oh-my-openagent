@@ -1,3 +1,251 @@
+## 2026-08-28 — Pin Senpi 2026.8.28-2 for the shared interactive host hotfix
+
+`packages/omo-native/package.json`, `packages/omo-senpi/package.json`, and the
+root `package.json` now require the exact published `@code-yeongyu/senpi`
+`2026.8.28` release. The engine hotfix repairs the beta.23 shared-host
+regressions: Shift+Tab no longer prints `Thinking level: [object Promise]`
+and the low/med/high options render again, user messages no longer render
+twice, and resuming a session held by a live shared host attaches instead of
+failing with `session_path_in_use`. The release also carries the compiled
+eval-kernel asset resolution fix, restoring the JavaScript and Python eval
+kernels in compiled binaries.
+
+## 2026-08-27 — Keep Windows persistence and DAP paths portable
+
+The shared atomic-write helper now opens temporary files with a writable
+descriptor, tolerates filesystem-specific `fsync` limitations, uses unique
+temporary names, and skips parent-directory `fsync` on Windows where directory
+handles reject that operation. The thread mailbox and durable receipt stores
+now use that helper rather than maintaining divergent atomic-write code.
+
+The zero-dependency DAP client now accepts only numeric `host:port` strings as
+socket adapter specs. Windows drive-letter paths such as
+`C:\workspace\fixture-adapter.mjs` remain executable script paths. This fixes
+the real adapter launch path without increasing polling deadlines or masking
+transport errors.
+
+Focused regression coverage includes the real DAP fixture session, Windows
+drive-letter classification, atomic-write replacement with injected `EPERM`
+from `fsync`, mailbox persistence, and durable receipt lifecycle behavior.
+
+## 2026-08-27 — Keep platform smoke tests aligned with runtime requirements
+
+The release-binary smoke harness now exports `USERPROFILE` alongside the
+isolated Git Bash `HOME` on Windows so Node's `os.homedir()` resolves the same
+directory used by the provisioning assertion. Linux x64 musl smoke now installs
+the binary's required `libstdc++` runtime package inside Alpine before running
+the version check. These changes keep the smoke gate strict while matching the
+actual Windows home-directory and musl runtime contracts.
+
+The compiled OmO launcher now materializes its first-run Windows executable by
+copying it directly with the platform file-copy API, because Windows rejects
+renaming a newly copied `.exe` into place with `EPERM` even when the
+destination did not previously exist. POSIX keeps the temporary-copy and
+atomic-rename path. Both branches retain hash-checked provisioning and cleanup.
+The compiled Windows child now identifies its launched executable from
+`process.argv[0]` rather than Bun's original compile path, preventing repeated
+self-provisioning and the resulting `AssignProcessToJobObject` loop. Windows
+first-run provisioning now continues in-process after materialization, while
+POSIX keeps the child reexec handoff.
+The dedicated Linux arm64 Alpine smoke lane now installs `libstdc++` before
+executing the musl binary, matching the x64 musl smoke contract.
+
+Windows CI now gives the Codex installer integration test and the seven-node
+DAG failure E2E their observed platform-specific execution budgets. The
+assertions and event-driven behavior remain unchanged; only the test harness
+deadlines are widened from the prior 60-second and 15-second ceilings that
+expired on the full Windows matrix.
+
+## 2026-08-27 — Keep Windows LSP daemon stamping safe with spaced runtimes
+
+The LSP daemon build helper now disables shell execution when invoking an
+absolute runtime path such as `C:\Program Files\nodejs\node.exe`, while keeping
+shell lookup for bare `tsc` and `bun` commands on Windows. The release builder
+therefore reaches the version-stamping step instead of letting the shell split
+the runtime path at `C:\Program`. The command-policy regression tests cover
+absolute Windows paths, bare package commands, and POSIX execution.
+## 2026-08-27 — Record post-beta.23 merged follow-ups
+
+The root product changelog now records the pull requests merged after the
+beta.23 release note was authored: LSP formatting and resident-client caps
+(`#7428`), config-watch duplicate-load stand-down (`#7420`), the Codex GPT-5.6
+650k context-window contract (`#7429`), Windows portability and the beta.23
+source-state merge (`#7432`, `#7427`), and the Senpi daemon-first
+post-mutation pipeline (`#7430`). The entries include their merge commits so
+the release note remains traceable to the final `dev` history.
+
+## 2026-08-27 — Release OmO Native beta.23 with Senpi 2026.8.27
+
+This release advances the OmO Native engine contract from Senpi `2026.8.26-2`
+to `2026.8.27`. The version is exact-pinned in the native package, adapter
+peers, task runtime, package-shape contracts, compiled-entry fixtures, and
+the generated dependency lock. The package remains beta-channel-only:
+install or upgrade it with `npm i -g omo-ai@beta` or the equivalent Bun
+command; the intentionally unchanged `latest` tag is not the update channel.
+
+### JavaScript-first eval composition
+
+The eval guidance now teaches JavaScript as the primary composition surface.
+The first example cell establishes state in the persistent JavaScript kernel;
+the next example fans out independent session-tool calls with
+`await Promise.all(...)`; a later example shows the explicit cross-language
+escape hatch when the JavaScript kernel is occupied by detached work. This
+aligns the examples with the runtime's persistent-kernel and bounded-parallel
+execution model, allowing an agent to reuse state and schedule independent
+work without first translating the workflow into a separate shell script.
+
+`parallel(thunks)` executes asynchronous thunks through a bounded worker pool
+and preserves result order while allowing concurrent progress. The default
+pool width is four, and `pipeline(items, ...stages)` creates sequential stage
+barriers while using the same bounded fan-out inside each stage. This note
+does not claim a percentage speedup: the repository contains instrumentation
+for wall-clock savings and round-trip counts, but no committed cross-version
+benchmark that would justify one.
+
+### Persistent JavaScript kernel state
+
+JavaScript cells continue to share one session-scoped kernel, so values
+created in one cell remain available to the next cell. State persistence now
+rewrites only top-level declarations, including destructuring bindings and
+uninitialized declarations, while leaving declaration-shaped text inside
+strings, comments, and nested function bodies untouched. This makes the
+state-carrying transform safe for examples, templates, regular expressions,
+and nested implementation snippets.
+
+The JavaScript worker path remains the normal execution mode. When the worker
+entry cannot be loaded, the runtime can use its controlled inline fallback;
+the fallback preserves the language-level contract without requiring a
+build-time worker file to remain at its original source path. Kernel state is
+isolated per language, so resetting a Python kernel does not reset JavaScript
+state.
+
+### Busy kernels and cross-language continuation
+
+A detached cell keeps its language kernel busy until it reaches a terminal
+state. A second eval request in that language receives a diagnostic that
+identifies the occupied cell and its available output context, then lists
+each idle enabled kernel that can continue the work. This converts a vague
+same-language contention error into an explicit scheduling decision. If no
+other interpreter is idle, the diagnostic does not invent an escape route.
+
+JavaScript is always available on supported Node runtimes. Python, Ruby, and
+Julia remain optional capability-gated interpreters: their absence is
+reported as a capability gap rather than making the JavaScript path
+unavailable. This preserves a fast default while keeping polyglot workflows
+possible when the corresponding interpreter is installed.
+
+### Detached-cell lifecycle and diagnostics
+
+Detached execution remains an explicit lifecycle rather than a hidden
+background promise. A cell can be created, started, detached, completed,
+failed, stopped, or inspected through `peek`; each terminal transition is
+reported once. Completion notifications are delivered as internal,
+model-visible messages instead of synthetic user-input queue entries, so
+background eval status cannot masquerade as a user steering message.
+
+Detached overflow notices carry plain absolute spill paths, which the regular
+agent read surface can consume directly. The `local://` scheme remains an
+in-cell kernel helper for session-local artifacts and is not presented as an
+agent-facing file path. A wall-clock hard limit, defaulting to 1800 seconds,
+continues to run across detachment and bridge calls; reaching it interrupts
+the cell and settles it as cancelled instead of leaving unbounded work
+behind.
+
+### Tool orchestration and observability
+
+Tools invoked from inside an eval cell continue through the session's real
+tool execution surface. Reserved helpers such as `agent`, `output`, and
+`tool_schema` use their dedicated bridge path, while recursive eval remains
+rejected. The runtime records one bounded `senpi.eval.execution` event per
+settled cell, including wall time, kernel time, terminal status, detached
+status, nested tool-call counts, and bounded per-tool aggregates. The
+external projection excludes prompts, arguments, call identifiers, errors,
+and result previews.
+
+The OmO Native telemetry adapter accepts versioned full-detail eval events,
+reduces them to scalar rollups, correlates cells to their owning sessions,
+and fails closed on duplicate ownership or malformed metadata. Eval-only
+waves remain separated from non-eval waves so modeled savings cannot be
+inflated by mixing unlike execution modes. These metrics make composition
+behavior observable without turning an unmeasured model into a promised
+benchmark.
+
+### Failure recovery and compatibility
+
+The JavaScript kernel recovers from worker crashes by settling the active
+cell, retiring the failed worker, and preparing a fresh worker for the next
+cell. Session-generation fencing prevents callbacks from retired sessions
+from emitting into a newer session. Subprocess-backed languages continue to
+gate execution on interpreter readiness so startup time does not consume the
+cell's execution budget.
+
+The supported runtime contract remains Node `>=24`. JavaScript is available
+without a separately installed interpreter; optional languages are detected
+independently. OmO Native's launcher continues to support explicit runtime
+selection through `OMO_RUNTIME=node` or `OMO_RUNTIME=bun`, with loop guards
+preventing accidental re-execution of an already selected runtime. Bun 1.4
+remains the release/build toolchain, while the codemode package keeps its
+Node-compatible boundary and does not depend on Bun-only APIs.
+
+### Upgrade and verification notes
+
+This is a package-chain update, not a session-data reset. Existing settings,
+credentials, sessions, permissions, and enabled extensions remain outside the
+package replacement. The exact Senpi version is carried consistently through
+the native runtime, adapter peer/dev dependencies, task-engine pins,
+compiled-entry identity tests, and lockfile.
+
+The release was verified against the Senpi `2026.8.27` registry identity and
+isolated CLI checks, OmO Native package-shape and pin contracts, the
+Senpi-adapter test suite, strict type checking, native payload staging, and
+the compiled runtime identity check. No percentage latency claim is made
+because no cross-version benchmark is committed; users can inspect the
+versioned eval telemetry for their own workloads.
+
+## 2026-08-26 — Stop the omo launcher from orphaning its engine
+
+The MCP environment cleaner now accepts an optional ambient environment map,
+so callers and tests can represent absent variables without mutating
+`process.env`; the default runtime path remains unchanged. This keeps
+undefined environment entries out of spawned stdio MCP environments across
+Bun platforms.
+
+The native launcher chain blocked in `spawnSync` at both of its layers: `bin/omo.js` waiting on the
+engine, and the bun re-exec waiting on the bun launcher. No JavaScript runs while `spawnSync`
+blocks, so a launcher that received `SIGTERM` died on the spot and the engine below it was
+reparented to pid 1, still holding the terminal and still running. Those orphans are what later
+surface as stdin `EIO` crashes and as engine processes lingering for days.
+
+Both layers now go through one asynchronous spawn helper. It forwards `SIGTERM` and `SIGHUP` to the
+child, waits for the child to finish its own shutdown within a bounded grace window (10 seconds,
+overridable with `OMO_SIGNAL_GRACE_MS`), and re-raises the signal on itself if the child ignores it,
+so a supervisor still observes the death it asked for. `SIGINT` is not forwarded, because the tty
+delivers it to the entire foreground process group already and a second delivery would interrupt the
+engine twice; the launcher merely stops dying underneath it. Exit-status fidelity is unchanged - the
+child's exit code passes through, and a child killed by a signal still makes the launcher die by
+that same signal. Windows installs no signal handlers, where POSIX signal delivery does not exist.
+
+`omo doctor` now also names the orphans that earlier launcher versions left behind: interactive
+engine processes reparented to pid 1, reported with pid, age and tty. Cleaning them up is an
+explicit per-pid action, `omo doctor --reap <pid> [pid...]`, which re-reads the live process table
+and refuses any pid that is not an orphaned interactive engine at that moment - a live session, an
+`--mode` rpc or app-server engine, or anything that is not an engine at all. There is deliberately
+no pattern-matching kill.
+
+Real-surface QA drives the whole chain on a pty whose session leader outlives the launcher (so the
+kernel's own `SIGHUP` on session teardown cannot be mistaken for a fix), on both the node chain and
+the three-deep bun chain a `bun add -g omo-ai` install has. Evidence:
+`.omo/evidence/20260826-launcher-signal-forward/`.
+
+## 2026-08-26 — Release OmO beta.21 with Senpi 2026.8.26
+
+Hotfix release: OmO release metadata and platform package pins advance from
+beta.20 to beta.21 with the Senpi contract aligned to `@code-yeongyu/senpi`
+2026.8.26 (compaction liveness + anthropic sdk peer alignment), carrying the
+pi-tui/senpi cross-bundle lazy warm-up fix and status-widget render containment
+from #7354. The Bun lockfile is regenerated for the exact release dependency
+graph.
+
 ## 2026-08-25 — Release OmO beta.20 with Senpi 2026.8.25
 
 OmO release metadata and platform package pins advance from beta.19 to beta.20,
