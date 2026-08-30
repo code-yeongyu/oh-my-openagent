@@ -12,12 +12,14 @@ import { RuntimeStateSchema, type ActiveTeamSummary, type RuntimeState, type Tea
 import {
   clearLayoutCleanupRecovery,
   hasPendingLayoutCleanup,
+  isIncompleteLayoutCleanupResult,
   InvalidTransitionError,
   RuntimeStateError,
   STALE_DELETING_TTL_MS,
   createRuntimeState,
   listActiveTeams,
   loadRuntimeState,
+  preserveLayoutCleanupRecovery,
   saveRuntimeState,
   transitionRuntimeState,
 } from "./store"
@@ -418,5 +420,88 @@ describe("runtime state store", () => {
       member.tmuxPaneId === undefined && member.tmuxGridPaneId === undefined
     ))).toBe(true)
     expect(hasPendingLayoutCleanup(clearedState)).toBe(false)
+  })
+
+  test("allows a creating runtime to enter recoverable deletion and finish as failed", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec("rollback-recovery-team"), undefined, "user", config)
+
+    const deletingState = await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "deleting",
+      layoutCleanupPending: true,
+    }), config)
+    const failedState = await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...clearLayoutCleanupRecovery(currentRuntimeState),
+      status: "failed",
+    }), config)
+
+    expect(deletingState.status).toBe("deleting")
+    expect(deletingState.layoutCleanupPending).toBe(true)
+    expect(failedState.status).toBe("failed")
+    expect(hasPendingLayoutCleanup(failedState)).toBe(false)
+  })
+
+  test("preserveLayoutCleanupRecovery prunes only panes confirmed removed", async () => {
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec("partial-layout-cleanup-team"), undefined, "user", config)
+    const stateWithLayoutRecovery: RuntimeState = {
+      ...runtimeState,
+      members: runtimeState.members.map((member) => member.name === "worker"
+        ? { ...member, tmuxPaneId: "%removed", tmuxGridPaneId: "%pending" }
+        : member),
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        paneIds: ["%removed", "%pending", "%legacy"],
+      },
+    }
+    const cleanupResult = {
+      attemptedPaneIds: ["%removed", "%pending"],
+      removedPaneIds: ["%removed"],
+      skippedPaneIds: ["%pending"],
+      reason: "partial" as const,
+    }
+
+    const preservedState = preserveLayoutCleanupRecovery(stateWithLayoutRecovery, cleanupResult)
+
+    expect(isIncompleteLayoutCleanupResult(cleanupResult)).toBe(true)
+    expect(preservedState.layoutCleanupPending).toBe(true)
+    expect(preservedState.tmuxLayout?.paneIds).toEqual(["%pending", "%legacy"])
+    expect(preservedState.tmuxLayout?.targetSessionId).toBe("$caller")
+    expect(preservedState.members.find((member) => member.name === "worker")?.tmuxPaneId).toBeUndefined()
+    expect(preservedState.members.find((member) => member.name === "worker")?.tmuxGridPaneId).toBe("%pending")
+  })
+
+  test("classifies only non-terminal layout cleanup outcomes as incomplete", () => {
+    const incompleteReasons = [
+      "backend-unavailable",
+      "failed",
+      "invalid-execution-target",
+      "missing-execution-target",
+      "partial",
+    ] as const
+    const completeReasons = ["missing-pane-identifiers", "no-owned-panes", "removed"] as const
+
+    for (const reason of incompleteReasons) {
+      expect(isIncompleteLayoutCleanupResult({
+        attemptedPaneIds: [],
+        removedPaneIds: [],
+        skippedPaneIds: [],
+        reason,
+      })).toBe(true)
+    }
+    for (const reason of completeReasons) {
+      expect(isIncompleteLayoutCleanupResult({
+        attemptedPaneIds: [],
+        removedPaneIds: [],
+        skippedPaneIds: [],
+        reason,
+      })).toBe(false)
+    }
   })
 })

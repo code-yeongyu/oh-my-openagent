@@ -9,8 +9,10 @@ import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import {
   clearLayoutCleanupRecovery,
   hasPendingLayoutCleanup,
+  isIncompleteLayoutCleanupResult,
   listActiveTeams,
   loadRuntimeState,
+  preserveLayoutCleanupRecovery,
   saveRuntimeState,
   transitionRuntimeState,
 } from "../team-state-store/store"
@@ -56,16 +58,6 @@ const FORCE_BYPASS_DELETING_STATUSES = new Set<RuntimeState["status"]>(["creatin
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
 
-type TeamLayoutCleanupResult = Awaited<ReturnType<typeof removeTeamLayout>>
-
-const INCOMPLETE_LAYOUT_CLEANUP_REASONS = new Set<TeamLayoutCleanupResult["reason"]>([
-  "backend-unavailable",
-  "failed",
-  "invalid-execution-target",
-  "missing-execution-target",
-  "partial",
-])
-
 function recordLayoutCleanupResult(
   teamRunId: string,
   cleanupResult: Awaited<ReturnType<typeof removeTeamLayout>>,
@@ -82,51 +74,6 @@ function recordLayoutCleanupResult(
 
 function ignoreStaleTeamSessionSweepFailure(error: unknown): void {
   if (error instanceof Error) return
-}
-
-async function preservePendingLayoutCleanup(
-  teamRunId: string,
-  cleanupResult: TeamLayoutCleanupResult,
-  config: TeamModeConfig,
-): Promise<void> {
-  const removedPaneIds = new Set(cleanupResult.removedPaneIds)
-  const pendingPaneIds = new Set([
-    ...cleanupResult.skippedPaneIds,
-    ...cleanupResult.attemptedPaneIds.filter((paneId) => !removedPaneIds.has(paneId)),
-  ])
-  await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
-    for (const paneId of currentRuntimeState.tmuxLayout?.paneIds ?? []) {
-      if (!removedPaneIds.has(paneId)) pendingPaneIds.add(paneId)
-    }
-    for (const member of currentRuntimeState.members) {
-      if (member.tmuxPaneId !== undefined && !removedPaneIds.has(member.tmuxPaneId)) {
-        pendingPaneIds.add(member.tmuxPaneId)
-      }
-      if (member.tmuxGridPaneId !== undefined && !removedPaneIds.has(member.tmuxGridPaneId)) {
-        pendingPaneIds.add(member.tmuxGridPaneId)
-      }
-    }
-
-    return {
-      ...currentRuntimeState,
-      layoutCleanupPending: true,
-      members: currentRuntimeState.members.map((member) => {
-        const { tmuxPaneId, tmuxGridPaneId, ...memberWithoutPaneIds } = member
-        return {
-          ...memberWithoutPaneIds,
-          ...(tmuxPaneId !== undefined && pendingPaneIds.has(tmuxPaneId) ? { tmuxPaneId } : {}),
-          ...(tmuxGridPaneId !== undefined && pendingPaneIds.has(tmuxGridPaneId) ? { tmuxGridPaneId } : {}),
-        }
-      }),
-      tmuxLayout: currentRuntimeState.tmuxLayout === undefined
-        ? undefined
-        : {
-          ...currentRuntimeState.tmuxLayout,
-          paneIds: (currentRuntimeState.tmuxLayout.paneIds ?? [])
-            .filter((paneId) => pendingPaneIds.has(paneId)),
-        },
-    }
-  }, config)
 }
 
 async function clearPendingLayoutCleanup(
@@ -272,8 +219,10 @@ async function deleteTeamResources(
     } else {
       const cleanupResult = await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
       removedLayout = recordLayoutCleanupResult(teamRunId, cleanupResult, deps)
-      if (INCOMPLETE_LAYOUT_CLEANUP_REASONS.has(cleanupResult.reason)) {
-        await preservePendingLayoutCleanup(teamRunId, cleanupResult, config)
+      if (isIncompleteLayoutCleanupResult(cleanupResult)) {
+        await transitionRuntimeState(teamRunId, (currentRuntimeState) => (
+          preserveLayoutCleanupRecovery(currentRuntimeState, cleanupResult)
+        ), config)
         throw new Error(`team layout cleanup incomplete: ${cleanupResult.reason}`)
       }
       await clearPendingLayoutCleanup(teamRunId, config)

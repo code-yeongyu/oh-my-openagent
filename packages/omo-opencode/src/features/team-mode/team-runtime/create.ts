@@ -12,7 +12,7 @@ import { createRuntimeState, listActiveTeams, loadRuntimeState, transitionRuntim
 import { registerTeamSession } from "../team-session-registry"
 import type { RuntimeState, TeamSpec } from "../types"
 import { activateTeamLayout } from "./activate-team-layout"
-import { cleanupTeamRunResources } from "./cleanup-team-run-resources"
+import { cleanupTeamRunResources, type SpawnedMemberResource } from "./cleanup-team-run-resources"
 import { buildTeammateCommunicationAddendum } from "../member-guidance"
 import { resolveMember } from "./resolve-member"
 import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
@@ -21,11 +21,6 @@ import { registerTeamRunForSessionCleanup } from "./session-team-run-registry"
 import { assertNoUnresolvedTeamMembers, hasUnresolvedTeamMembers } from "./unresolved-team-members"
 
 const SESSION_ID_POLL_MS = 25
-
-type SpawnedMemberResource = {
-  taskId?: string
-  worktreePath?: string
-}
 
 type CreateTeamRunOptions = {
   callerAgentTypeId?: string
@@ -159,7 +154,7 @@ export async function createTeamRun(
   await Promise.all(spec.members.map((member) => mkdir(getInboxDir(baseDir, runtimeState.teamRunId, member.name), { recursive: true })))
 
   const deadlineAt = Date.now() + (config.max_wall_clock_minutes * 60_000)
-  const resources: SpawnedMemberResource[] = spec.members.map(() => ({}))
+  const resources: SpawnedMemberResource[] = spec.members.map((member) => ({ memberName: member.name }))
   let createdLayout = false
 
   try {
