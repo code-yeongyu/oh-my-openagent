@@ -31,7 +31,7 @@ export type TeamCleanupExecution = {
 
 export function createTeamCleanupExecution(
   target: TeamLayoutExecutionTarget,
-  paneEnvironment: Readonly<Record<string, string>>,
+  paneEnvironment: TmuxPaneEnvironment,
   ambientEnvironment: Readonly<Record<string, string | undefined>> = process.env,
 ): TeamCleanupExecution {
   const environment = { ...ambientEnvironment }

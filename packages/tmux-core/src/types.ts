@@ -20,7 +20,14 @@ export type TmuxConfig = {
   readonly isolation: TmuxIsolation
 }
 
-export type TmuxPaneEnvironment = Readonly<Record<string, string>>
+export type TmuxPaneEnvironmentBinding = Readonly<{
+  kind: "set"
+  value: string
+}>
+
+export type TmuxPaneEnvironmentValue = string | TmuxPaneEnvironmentBinding
+
+export type TmuxPaneEnvironment = Readonly<Record<string, TmuxPaneEnvironmentValue>>
 
 export type TmuxServerAccess = {
   readonly serverUrl: string

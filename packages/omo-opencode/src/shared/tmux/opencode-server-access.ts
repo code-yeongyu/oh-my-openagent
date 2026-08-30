@@ -1,4 +1,5 @@
 import {
+  bindTmuxPaneEnvironmentValue,
   createServerHealthState,
   isServerRunning,
   type TmuxPaneEnvironment,
@@ -50,7 +51,9 @@ function getTrustedPaneEnvironment(
 
   return {
     OPENCODE_SERVER_PASSWORD: credentials.password,
-    OPENCODE_SERVER_USERNAME: credentials.username,
+    OPENCODE_SERVER_USERNAME: credentials.username === ""
+      ? bindTmuxPaneEnvironmentValue("")
+      : credentials.username,
   }
 }
 

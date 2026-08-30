@@ -165,6 +165,50 @@ describe("OMO tmux listener access", () => {
     expect(activateCommand).not.toContain("trusted-password")
   })
 
+  it("preserves an explicitly empty authenticated username through every native tmux lifecycle path", async () => {
+    const contacts: Array<string | null> = []
+    const recorder = createTmuxRecorder()
+    const access = createOpenCodeTmuxServerAccess({
+      serverUrl: "http://127.0.0.1:5317",
+      source: "current-context",
+      trusted: true,
+    }, {
+      getEnvironment: () => ({
+        OPENCODE_SERVER_PASSWORD: "empty-username-password",
+        OPENCODE_SERVER_USERNAME: "",
+      }),
+      fetchImplementation: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+        contacts.push(new Headers(init?.headers).get("authorization"))
+        return new Response(null, { status: 200 })
+      }) as typeof fetch,
+    })
+    const deps = {
+      log: () => undefined,
+      runTmuxCommand: recorder.runTmuxCommand,
+      isInsideTmux: () => true,
+      getTmuxPath: async () => "tmux",
+    }
+
+    const pane = await spawnTmuxPane("pane-session", "pane", enabledTmuxConfig, access, "/tmp", undefined, "-h", deps)
+    const window = await spawnTmuxWindow("window-session", "window", enabledTmuxConfig, access, "/tmp", deps)
+    const session = await spawnTmuxSession("session-session", "session", enabledTmuxConfig, access, "/tmp", undefined, deps)
+    const replaced = await replaceTmuxPane("%replace", "replace-session", "replace", enabledTmuxConfig, access, "/tmp", deps)
+    const activated = await activateTmuxPane("%activate", "activate-session", access, "/tmp", deps)
+
+    expect([pane.success, window.success, session.success, replaced.success, activated]).toEqual([
+      true, true, true, true, true,
+    ])
+    expect(contacts).toHaveLength(5)
+    expect(new Set(contacts)).toEqual(new Set([
+      `Basic ${Buffer.from(":empty-username-password", "utf8").toString("base64")}`,
+    ]))
+    const created = creationCommands(recorder.commands)
+    expect(created).toHaveLength(5)
+    expect(created.every((args) => args.includes("OPENCODE_SERVER_PASSWORD=empty-username-password"))).toBe(true)
+    expect(created.every((args) => args.includes("OPENCODE_SERVER_USERNAME="))).toBe(true)
+    expect(created.every((args) => !args.at(-1)?.includes("-u OPENCODE_SERVER_USERNAME"))).toBe(true)
+  })
+
   it("converts raw URLs to anonymous access and actively clears inherited credentials", async () => {
     const originalPassword = process.env.OPENCODE_SERVER_PASSWORD
     const originalUsername = process.env.OPENCODE_SERVER_USERNAME

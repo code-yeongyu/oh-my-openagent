@@ -86,7 +86,7 @@ describe("OpenCode tmux server access", () => {
     )
     expect(access.getPaneEnvironment()).toEqual({
       OPENCODE_SERVER_PASSWORD: "päss🔐",
-      OPENCODE_SERVER_USERNAME: "",
+      OPENCODE_SERVER_USERNAME: { kind: "set", value: "" },
     })
   })
 

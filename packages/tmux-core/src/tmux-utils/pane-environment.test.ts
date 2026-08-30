@@ -4,6 +4,7 @@ import type { TmuxCommandResult } from "../runner"
 import type { TmuxConfig, TmuxServerAccess } from "../types"
 import { activateTmuxPane } from "./pane-activate"
 import {
+	bindTmuxPaneEnvironmentValue,
 	buildTmuxEnvironmentArgs,
 	canOmitTmuxPaneEnvironment,
 	planTmuxPaneEnvironment,
@@ -99,6 +100,23 @@ describe("tmux pane environment capabilities", () => {
 			"-e", "MIDDLE=middle",
 			"-e", "ZETA=last",
 		])
+	})
+
+	it("#given an explicit empty binding #when the pane environment is planned #then tmux binds the empty value instead of clearing it", () => {
+		const environment = {
+			HARNESS_IDENTITY: bindTmuxPaneEnvironmentValue(""),
+		}
+
+		expect(buildTmuxEnvironmentArgs(environment)).toEqual([
+			"-e", "HARNESS_IDENTITY=",
+		])
+		expect(planTmuxPaneEnvironment(environment, false)).toEqual({
+			args: ["-e", "HARNESS_IDENTITY="],
+			clearedNames: [],
+			isCmux: false,
+		})
+		expect(canOmitTmuxPaneEnvironment(environment, {})).toBe(false)
+		expect(planTmuxPaneEnvironment(environment, true)).toBeNull()
 	})
 
 	it("#given a pane environment and ambient values #when cmux omission is evaluated #then only redundant clears are safe", () => {
