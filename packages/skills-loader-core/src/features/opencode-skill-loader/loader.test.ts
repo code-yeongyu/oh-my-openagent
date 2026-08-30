@@ -274,5 +274,35 @@ Skill body.
         process.chdir(originalCwd)
       }
       })
+
+    it("loads a remote server from the direct Amp format", async () => {
+      // given
+      const skillContent = `---
+name: direct-remote
+---
+Skill body.
+`
+      const mcpJson = {
+        remote: {
+          url: "https://example.com/mcp"
+        }
+      }
+      createTestSkill("direct-remote", skillContent, mcpJson)
+
+      // when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "direct-remote")
+
+        // then
+        expect(skill?.mcpConfig?.remote?.url).toBe("https://example.com/mcp")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
   })
 })

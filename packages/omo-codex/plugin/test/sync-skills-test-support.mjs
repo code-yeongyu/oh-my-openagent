@@ -31,6 +31,7 @@ export const expectedSkills = [
 	"ulw-plan",
 	"ulw-research",
 	"visual-qa",
+	"xquik",
 ];
 
 export const componentSkillSources = [

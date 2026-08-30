@@ -32,6 +32,7 @@ const expectedSkillNames = [
   "ulw-plan",
   "ulw-research",
   "visual-qa",
+  "xquik",
 ] as const
 
 const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {}
@@ -108,7 +109,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 24 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 25 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 

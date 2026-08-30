@@ -1,14 +1,15 @@
 import { readFile, readdir } from "fs/promises"
 import type { Dirent } from "fs"
 import { join, basename } from "path"
-import * as yaml from "js-yaml"
 import { parseFrontmatter } from "@oh-my-opencode/utils"
 import { sanitizeModelField } from "@oh-my-opencode/model-core"
 import { resolveSymlink, isMarkdownFile } from "@oh-my-opencode/utils"
 import { resolveSkillPathReferences } from "../../shared/skill-path-resolver"
 import type { CommandDefinition } from "@oh-my-opencode/claude-code-compat-core/claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill } from "./types"
-import type { SkillMcpConfig } from "../../types"
+import { loadMcpJsonFromDir, parseSkillMcpConfigFromFrontmatter } from "./skill-mcp-config"
+
+export { loadMcpJsonFromDir as loadMcpJsonFromDirAsync } from "./skill-mcp-config"
 
 export async function mapWithConcurrency<T, R>(
   items: T[],
@@ -31,46 +32,6 @@ export async function mapWithConcurrency<T, R>(
   return results
 }
 
-function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpConfig | undefined {
-  const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
-  if (!frontmatterMatch) return undefined
-
-  try {
-    const parsed = yaml.load(frontmatterMatch[1]) as Record<string, unknown>
-    if (parsed && typeof parsed === "object" && "mcp" in parsed && parsed.mcp) {
-      return parsed.mcp as SkillMcpConfig
-    }
-  } catch {
-    return undefined
-  }
-  return undefined
-}
-
-export async function loadMcpJsonFromDirAsync(skillDir: string): Promise<SkillMcpConfig | undefined> {
-  const mcpJsonPath = join(skillDir, "mcp.json")
-
-  try {
-    const content = await readFile(mcpJsonPath, "utf-8")
-    const parsed = JSON.parse(content) as Record<string, unknown>
-
-    if (parsed && typeof parsed === "object" && "mcpServers" in parsed && parsed.mcpServers) {
-      return parsed.mcpServers as SkillMcpConfig
-    }
-
-    if (parsed && typeof parsed === "object" && !("mcpServers" in parsed)) {
-      const hasCommandField = Object.values(parsed).some(
-        (v) => v && typeof v === "object" && "command" in (v as Record<string, unknown>)
-      )
-      if (hasCommandField) {
-        return parsed as SkillMcpConfig
-      }
-    }
-  } catch {
-    return undefined
-  }
-  return undefined
-}
-
 export async function loadSkillFromPathAsync(
   skillPath: string,
   resolvedPath: string,
@@ -84,7 +45,7 @@ export async function loadSkillFromPathAsync(
     if (parseError) return null
 
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
-    const mcpJsonMcp = await loadMcpJsonFromDirAsync(resolvedPath)
+    const mcpJsonMcp = await loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
 
     const baseName = String(data.name || defaultName)

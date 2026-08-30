@@ -51,7 +51,7 @@ export const BUILTIN_SKILL_NAMES = Object.freeze([
   "give-me-tips", "hyperplan", "init-deep", "lsp-setup", "mass-ulw", "onboarding", "programming", "refactor",
   "remove-ai-slops",
   "review-work", "ulw-execute", "ultimate-browsing", "ultrawork", "ulw-loop", "ulw-plan", "ulw-research",
-  "visual-qa",
+  "visual-qa", "xquik",
 ] as const)
 
 export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
