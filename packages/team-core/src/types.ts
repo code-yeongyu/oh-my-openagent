@@ -203,6 +203,7 @@ export const RuntimeStateSchema = z.object({
   createdAt: z.number().int().positive(),
   status: z.enum(RUNTIME_STATUSES),
   leadSessionId: z.string().optional(),
+  layoutCleanupPending: z.boolean().optional(),
   tmuxLayout: RuntimeStateTmuxLayoutSchema.optional(),
   members: z.array(RuntimeStateMemberSchema),
   shutdownRequests: z.array(ShutdownRequestSchema).default([]),

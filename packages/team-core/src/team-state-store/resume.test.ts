@@ -584,4 +584,41 @@ describe("resumeAllTeams", () => {
     }
     expect(worktreeStatErrorCode).toBe("ENOENT")
   })
+
+  test("preserves legacy deleting teams whose pane cleanup is pending without an explicit marker", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), "ses_lead", "user", config)
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "active",
+    }), config)
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "deleting",
+    }), config)
+    const worktreePath = path.join(baseDir, "worktrees", runtimeState.teamRunId, "worker")
+    await mkdir(worktreePath, { recursive: true })
+    const pendingCleanupState = {
+      ...await loadRuntimeState(runtimeState.teamRunId, config),
+      members: runtimeState.members.map((member) => member.name === "worker"
+        ? { ...member, worktreePath, tmuxPaneId: "%pending" }
+        : member),
+    }
+    await saveRuntimeState(pendingCleanupState, config)
+
+    // when
+    const report = await resumeAllTeams(createTeamSessionContext(baseDir), config)
+
+    // then
+    expect(report.cleaned).toBe(0)
+    expect(report.errors).toEqual([])
+    const persistedState = await loadRuntimeState(runtimeState.teamRunId, config)
+    expect(persistedState.layoutCleanupPending).toBeUndefined()
+    expect(persistedState.members.find((member) => member.name === "worker")?.tmuxPaneId).toBe("%pending")
+    expect(persistedState.status).toBe("deleting")
+    await stat(worktreePath)
+  })
 })

@@ -8,6 +8,9 @@ import { log } from "../logger"
 import { type ActiveTeamSummary, type RuntimeState, RuntimeStateSchema, type TeamSpec } from "../types"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { atomicWrite, withLock } from "./locks"
+import { hasPendingLayoutCleanup } from "./pending-layout-cleanup"
+
+export { clearLayoutCleanupRecovery, hasPendingLayoutCleanup } from "./pending-layout-cleanup"
 
 const STATE_FILE_NAME = "state.json"
 export const STALE_DELETING_TTL_MS = 60_000
@@ -221,7 +224,11 @@ export async function listActiveTeams(
           continue
         }
 
-        if (runtimeState.status === "deleting" && await isDeletingRuntimeStale(baseDir, runtimeEntry.name, now)) {
+        if (
+          runtimeState.status === "deleting"
+          && !hasPendingLayoutCleanup(runtimeState)
+          && await isDeletingRuntimeStale(baseDir, runtimeEntry.name, now)
+        ) {
           await removeRuntimeDirectoryBestEffort(baseDir, runtimeEntry.name, "stale_deleting")
           continue
         }

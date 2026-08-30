@@ -370,30 +370,64 @@ describe("team-runtime shutdown", () => {
     )
   })
 
-  test("#given tmux manager but visualization disabled #when deleteTeam runs #then layout cleanup is skipped", async () => {
+  test("non-force partial layout cleanup preserves only pending pane state and succeeds on retry", async () => {
     // given
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
-    const removeLayoutMock = mock(async () => ({
-      attemptedPaneIds: [],
-      removedPaneIds: [],
-      skippedPaneIds: [],
-      reason: "missing-pane-identifiers" as const,
-    }))
-    const deps = {
-      canVisualize: () => true,
-      removeTeamLayout: removeLayoutMock,
-      log: () => {},
-    } satisfies DeleteTeamDeps
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {
       "member-a": "shutdown_approved",
       "member-b": "completed",
     })
+    await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
+      await mkdir(worktreePath, { recursive: true })
+    }))
+    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+      ...runtimeState,
+      members: runtimeState.members.map((member) => (
+        member.name === "member-a"
+          ? { ...member, tmuxPaneId: "%12", tmuxGridPaneId: "%13" }
+          : member
+      )),
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        paneIds: ["%11"],
+        executionTarget: {
+          backend: "tmux",
+          tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
+        },
+      },
+    }), fixture.config)
+    let cleanupAttempt = 0
+    const removeLayoutMock = mock(async (_teamRunId, cleanupTarget) => {
+      cleanupAttempt += 1
+      if (cleanupAttempt === 1) {
+        expect(cleanupTarget?.paneIds).toEqual(["%11", "%12", "%13"])
+        return {
+          attemptedPaneIds: ["%11", "%12", "%13"],
+          removedPaneIds: ["%11"],
+          skippedPaneIds: ["%13"],
+          reason: "partial" as const,
+        }
+      }
+      expect(cleanupTarget?.paneIds).toEqual(["%12", "%13"])
+      return {
+        attemptedPaneIds: ["%12", "%13"],
+        removedPaneIds: ["%12", "%13"],
+        skippedPaneIds: [],
+        reason: "removed" as const,
+      }
+    })
+    const deps = {
+      canVisualize: () => false,
+      removeTeamLayout: removeLayoutMock,
+      log: () => {},
+    } satisfies DeleteTeamDeps
 
     // when
-    const result = await deleteTeam(
+    const firstAttempt = deleteTeam(
       fixture.teamRunId,
-      { ...fixture.config, tmux_visualization: false },
+      fixture.config,
       { getServerUrl: () => "http://localhost" } as never,
       undefined,
       undefined,
@@ -401,9 +435,233 @@ describe("team-runtime shutdown", () => {
     )
 
     // then
-    expect(result.removedLayout).toBe(false)
-    expect(removeLayoutMock).not.toHaveBeenCalled()
+    await firstAttempt.then(
+      () => { throw new Error("expected partial cleanup to reject non-force deletion") },
+      (error: unknown) => {
+        if (!(error instanceof Error)) throw error
+        expect(error.message).toBe("team layout cleanup incomplete: partial")
+      },
+    )
+    const retryState = await loadRuntimeState(fixture.teamRunId, fixture.config)
+    const retryMember = retryState.members.find((member) => member.name === "member-a")
+    expect(retryState.status).toBe("deleting")
+    expect(retryState.layoutCleanupPending).toBe(true)
+    expect(retryState.tmuxLayout?.paneIds).toEqual([])
+    expect(retryMember?.tmuxPaneId).toBe("%12")
+    expect(retryMember?.tmuxGridPaneId).toBe("%13")
+    await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
+      await access(worktreePath)
+    }))
+
+    const retryResult = await deleteTeam(
+      fixture.teamRunId,
+      fixture.config,
+      { getServerUrl: () => "http://localhost" } as never,
+      undefined,
+      undefined,
+      deps,
+    )
+    expect(retryResult.removedLayout).toBe(true)
+    expect(removeLayoutMock).toHaveBeenCalledTimes(2)
+    const runtimeStateDirectory = getRuntimeStateDir(resolveBaseDir(fixture.config), fixture.teamRunId)
+    await expect(access(runtimeStateDirectory)).rejects.toBeDefined()
   })
+
+  test("non-force deletion atomically preserves pending layout state when the tmux manager is unavailable", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "completed",
+    })
+    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+      ...runtimeState,
+      members: runtimeState.members.map((member) => (
+        member.name === "member-a" ? { ...member, tmuxPaneId: "%pending" } : member
+      )),
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        paneIds: [],
+        executionTarget: {
+          backend: "tmux",
+          tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
+        },
+      },
+    }), fixture.config)
+    const removeLayoutMock = mock(async () => ({
+      attemptedPaneIds: [],
+      removedPaneIds: [],
+      skippedPaneIds: [],
+      reason: "removed" as const,
+    }))
+
+    // when
+    const result = deleteTeam(
+      fixture.teamRunId,
+      fixture.config,
+      undefined,
+      undefined,
+      undefined,
+      { canVisualize: () => false, removeTeamLayout: removeLayoutMock, log: () => {} },
+    )
+
+    // then
+    await expect(result).rejects.toThrow("team layout cleanup pending: tmux manager unavailable")
+    expect(removeLayoutMock).not.toHaveBeenCalled()
+    const retryState = await loadRuntimeState(fixture.teamRunId, fixture.config)
+    expect(retryState.status).toBe("deleting")
+    expect(retryState.layoutCleanupPending).toBe(true)
+    expect(retryState.members.find((member) => member.name === "member-a")?.tmuxPaneId).toBe("%pending")
+  })
+
+  test("non-force deletion preserves legacy member pane state when no layout target was persisted", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "completed",
+    })
+    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+      ...runtimeState,
+      members: runtimeState.members.map((member) => (
+        member.name === "member-a" ? { ...member, tmuxPaneId: "%legacy-pending" } : member
+      )),
+    }), fixture.config)
+    const removeLayoutMock = mock(async (_teamRunId, cleanupTarget) => {
+      expect(cleanupTarget).toBeUndefined()
+      return {
+        attemptedPaneIds: [],
+        removedPaneIds: [],
+        skippedPaneIds: [],
+        reason: "missing-execution-target" as const,
+      }
+    })
+
+    // when
+    const result = deleteTeam(
+      fixture.teamRunId,
+      fixture.config,
+      { getServerUrl: () => "http://localhost" } as never,
+      undefined,
+      undefined,
+      { canVisualize: () => false, removeTeamLayout: removeLayoutMock, log: () => {} },
+    )
+
+    // then
+    await expect(result).rejects.toThrow("team layout cleanup incomplete: missing-execution-target")
+    expect(removeLayoutMock).toHaveBeenCalledTimes(1)
+    const retryState = await loadRuntimeState(fixture.teamRunId, fixture.config)
+    expect(retryState.status).toBe("deleting")
+    expect(retryState.layoutCleanupPending).toBe(true)
+    expect(retryState.members.find((member) => member.name === "member-a")?.tmuxPaneId).toBe("%legacy-pending")
+  })
+
+  for (const reason of ["backend-unavailable", "failed"] as const) {
+    test(`non-force ${reason} layout cleanup preserves all recovery state`, async () => {
+      // given
+      const fixture = await createFixture()
+      temporaryDirectories.push(fixture.baseDir)
+      await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+        "member-a": "shutdown_approved",
+        "member-b": "completed",
+      })
+      await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
+        await mkdir(worktreePath, { recursive: true })
+      }))
+      await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+        ...runtimeState,
+        members: runtimeState.members.map((member) => (
+          member.name === "member-a" ? { ...member, tmuxPaneId: "%12" } : member
+        )),
+        tmuxLayout: {
+          ownedSession: false,
+          targetSessionId: "$caller",
+          paneIds: ["%11"],
+          executionTarget: {
+            backend: "tmux",
+            tmuxEnvironment: "/tmp/original-tmux.sock,123,0",
+          },
+        },
+      }), fixture.config)
+      const deps = {
+        canVisualize: () => false,
+        removeTeamLayout: async () => ({
+          attemptedPaneIds: ["%11", "%12"],
+          removedPaneIds: [],
+          skippedPaneIds: ["%11", "%12"],
+          reason,
+        }),
+        log: () => {},
+      } satisfies DeleteTeamDeps
+
+      // when
+      const result = deleteTeam(
+        fixture.teamRunId,
+        fixture.config,
+        { getServerUrl: () => "http://localhost" } as never,
+        undefined,
+        undefined,
+        deps,
+      )
+
+      // then
+      await result.then(
+        () => { throw new Error(`expected ${reason} cleanup to reject non-force deletion`) },
+        (error: unknown) => {
+          if (!(error instanceof Error)) throw error
+          expect(error.message).toBe(`team layout cleanup incomplete: ${reason}`)
+        },
+      )
+      const retryState = await loadRuntimeState(fixture.teamRunId, fixture.config)
+      expect(retryState.status).toBe("deleting")
+      expect(retryState.layoutCleanupPending).toBe(true)
+      expect(retryState.tmuxLayout?.paneIds).toEqual(["%11"])
+      expect(retryState.members.find((member) => member.name === "member-a")?.tmuxPaneId).toBe("%12")
+      await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
+        await access(worktreePath)
+      }))
+    })
+  }
+
+  for (const tmuxVisualization of [false, true]) {
+    test(`#given no persisted layout and visualization=${tmuxVisualization} #when deleteTeam runs #then layout cleanup is skipped`, async () => {
+      // given
+      const fixture = await createFixture()
+      temporaryDirectories.push(fixture.baseDir)
+      const removeLayoutMock = mock(async () => ({
+        attemptedPaneIds: [],
+        removedPaneIds: [],
+        skippedPaneIds: [],
+        reason: "missing-pane-identifiers" as const,
+      }))
+      const deps = {
+        canVisualize: () => true,
+        removeTeamLayout: removeLayoutMock,
+        log: () => {},
+      } satisfies DeleteTeamDeps
+      await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+        "member-a": "shutdown_approved",
+        "member-b": "completed",
+      })
+
+      // when
+      const result = await deleteTeam(
+        fixture.teamRunId,
+        { ...fixture.config, tmux_visualization: tmuxVisualization },
+        { getServerUrl: () => "http://localhost" } as never,
+        undefined,
+        undefined,
+        deps,
+      )
+
+      // then
+      expect(result.removedLayout).toBe(false)
+      expect(removeLayoutMock).not.toHaveBeenCalled()
+    })
+  }
 
   test("#given a persisted tmux target outside the original session #when deleteTeam runs #then cleanup still targets the recorded layout", async () => {
     const fixture = await createFixture()

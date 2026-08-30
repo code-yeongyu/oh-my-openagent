@@ -10,6 +10,8 @@ import { TeamModeConfigSchema } from "../config"
 import type { TeamModeConfig } from "../config"
 import { RuntimeStateSchema, type ActiveTeamSummary, type RuntimeState, type TeamSpec } from "../types"
 import {
+  clearLayoutCleanupRecovery,
+  hasPendingLayoutCleanup,
   InvalidTransitionError,
   RuntimeStateError,
   STALE_DELETING_TTL_MS,
@@ -347,5 +349,74 @@ describe("runtime state store", () => {
     // then
     expect(activeTeams).toEqual([])
     expect(await runtimeDirectoryExists(baseDir, runtimeState.teamRunId)).toBe(false)
+  })
+
+  test("listActiveTeams preserves stale deleting runtimes with pending layout cleanup", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec("pending-layout-cleanup-team"), undefined, "user", config)
+    const pendingCleanupState = {
+      ...runtimeState,
+      status: "deleting" as const,
+      layoutCleanupPending: true,
+      members: runtimeState.members.map((member) => member.name === "worker"
+        ? { ...member, tmuxPaneId: "%pending" }
+        : member),
+    }
+    await saveRuntimeState(pendingCleanupState, config)
+    const staleTimestamp = new Date(Date.now() - STALE_DELETING_TTL_MS - 1_000)
+    await utimes(path.join(baseDir, "runtime", runtimeState.teamRunId, "state.json"), staleTimestamp, staleTimestamp)
+
+    // when
+    const activeTeams = await listActiveTeams(config)
+
+    // then
+    expect(activeTeams).toEqual([{
+      teamRunId: runtimeState.teamRunId,
+      teamName: runtimeState.teamName,
+      status: "deleting",
+      memberCount: runtimeState.members.length,
+      scope: "user",
+    }])
+    const persistedState = await loadRuntimeState(runtimeState.teamRunId, config)
+    expect(persistedState.layoutCleanupPending).toBe(true)
+  })
+
+  test("clearLayoutCleanupRecovery atomically consumes all persisted tmux recovery references", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec("completed-layout-cleanup-team"), undefined, "user", config)
+    const stateWithLayoutRecovery: RuntimeState = {
+      ...runtimeState,
+      status: "deleting",
+      layoutCleanupPending: true,
+      members: runtimeState.members.map((member) => member.name === "worker"
+        ? { ...member, tmuxPaneId: "%worker", tmuxGridPaneId: "%grid" }
+        : member),
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        paneIds: ["%layout"],
+        executionTarget: {
+          backend: "tmux",
+          tmuxEnvironment: "/tmp/tmux.sock,123,0",
+        },
+      },
+    }
+
+    // when
+    const clearedState = clearLayoutCleanupRecovery(stateWithLayoutRecovery)
+
+    // then
+    expect(clearedState.layoutCleanupPending).toBeUndefined()
+    expect(clearedState.tmuxLayout).toBeUndefined()
+    expect(clearedState.members.every((member) => (
+      member.tmuxPaneId === undefined && member.tmuxGridPaneId === undefined
+    ))).toBe(true)
+    expect(hasPendingLayoutCleanup(clearedState)).toBe(false)
   })
 })
