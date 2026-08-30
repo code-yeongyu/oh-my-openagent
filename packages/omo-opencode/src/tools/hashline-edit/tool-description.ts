@@ -23,8 +23,8 @@ LINE#ID FORMAT:
   {hash_id}: Two CID letters from the set ZPMQVRWSNKTXJBYH
 
 OPERATION CHOICE:
-  replace with pos only -> replace one line at pos
-  replace with pos+end -> replace range pos..end inclusive as a block (ranges MUST NOT overlap across edits)
+  replace with pos only -> replace ONE line at pos. A multi-line `lines` is inserted AT pos; every line after pos is preserved untouched - a pos-only call NEVER consumes lines beyond pos.
+  replace with pos+end -> replace range pos..end inclusive as a block (ranges MUST NOT overlap across edits). Pass `end` whenever the replacement should consume the rest of the region (e.g. a whole-file rewrite needs pos+end spanning the last line).
   append with pos/end anchor -> insert after that anchor
   prepend with pos/end anchor -> insert before that anchor
   append/prepend without anchors -> EOF/BOF insertion (also creates missing files)
@@ -75,7 +75,9 @@ Insert after line 13 (between functions):
   { op: "append", pos: "13#QR", lines: ["", "function added() {", "  return true;", "}"] }
   Result: 4 new lines inserted after line 13. All existing lines unchanged.
 
-BAD - lines extend past end (DUPLICATES line 13):
+BAD - whole-file rewrite via pos-only (the block is inserted AT line 1 and the entire original file from line 2 onward survives AFTER it - duplicated definitions):
+  { op: "replace", pos: "1#VK", lines: [<entire new file>] }
+  CORRECT: pass end as the last LINE#ID (e.g. { op: "replace", pos: "1#VK", end: "15#WS", lines: [<new content>] }) so the old content inside the range is consumed.
   { op: "replace", pos: "11#XJ", end: "12#MB", lines: ["  return \\"hi\\";", "}"] }
   Line 13 is "}" which already exists after end. Including "}" in lines duplicates it.
   CORRECT: { op: "replace", pos: "11#XJ", end: "12#MB", lines: ["  return \\"hi\\";"] }
