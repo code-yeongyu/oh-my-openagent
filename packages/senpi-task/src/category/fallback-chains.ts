@@ -16,7 +16,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "kimi-k3",
       variant: "max",
     },
-    { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.2", variant: "max" },
+    { providers: ["zai", "zai-coding-cn", "opencode-go"], model: "glm-5.2", variant: "max" },
     {
       providers: ["openai", "openai-codex", "github-copilot", "opencode"],
       model: "gpt-5.6-sol",
@@ -103,7 +103,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "claude-opus-5",
       variant: "xhigh",
     },
-    { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
+    { providers: ["zai", "zai-coding-cn", "opencode-go"], model: "glm-5.3", variant: "max" },
     {
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: "kimi-k3",
