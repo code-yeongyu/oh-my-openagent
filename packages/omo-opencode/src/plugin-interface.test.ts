@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
+import * as connectedProvidersCache from "./shared/connected-providers-cache"
 import { createPluginInterface } from "./plugin-interface"
 import { createAutoSlashCommandHook } from "./hooks/auto-slash-command"
 import { createUlwExecuteHook } from "./hooks/ulw-execute"
@@ -366,5 +367,46 @@ describe("createPluginInterface - chat.params variant injection", () => {
 
     // then
     expect(input.message.variant).toBe("high")
+  })
+
+  test("routes agent max variant to reasoningEffort when the model has no max preset (#7100)", async () => {
+    // given - hephaestus on a custom-provider luna model with no cached variant metadata
+    const providerMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: {
+          hephaestus: { variant: "max" },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const input = {
+      sessionID: "ses-luna-max",
+      agent: "hephaestus",
+      model: { providerID: "newapi-openai", modelID: "gpt-5.6-luna" },
+      provider: { id: "newapi-openai" },
+      message: {} as { variant?: string; reasoningEffort?: string },
+    }
+    const output = { options: {} }
+
+    // when
+    try {
+      await pluginInterface["chat.params"]?.(input as never, output as never)
+    } finally {
+      providerMetadataSpy.mockRestore()
+    }
+
+    // then - max survives to the outgoing options instead of being dropped or clamped
+    expect(output.options).toEqual({ reasoningEffort: "max" })
+    expect(input.message.variant).not.toBe("high")
   })
 })

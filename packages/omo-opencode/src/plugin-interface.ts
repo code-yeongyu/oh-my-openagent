@@ -1,7 +1,9 @@
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 import type { OhMyOpenCodeConfig } from "./config"
+import { isRecord } from "@oh-my-opencode/utils"
 
 import { applyAgentVariant } from "./shared/agent-variant"
+import type { LoweredReasoning } from "./shared/agent-variant"
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
@@ -49,8 +51,17 @@ export function createPluginInterface(args: {
       const providerID = chatParamsInput.model?.providerID
       const rawModelID = chatParamsInput.model?.modelID ?? chatParamsInput.model?.id
       const modelID = typeof rawModelID === "string" ? rawModelID : undefined
+      let loweredReasoning: LoweredReasoning = {}
       if (chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
-        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
+        loweredReasoning = applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
+      }
+      if (
+        loweredReasoning.reasoningEffort !== undefined
+        && isRecord(output)
+        && isRecord(output.options)
+        && output.options.reasoningEffort === undefined
+      ) {
+        output.options.reasoningEffort = loweredReasoning.reasoningEffort
       }
       const handler = createChatParamsHandler({
         client: ctx.client,

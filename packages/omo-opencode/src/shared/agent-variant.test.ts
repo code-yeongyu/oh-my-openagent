@@ -182,6 +182,27 @@ describe("applyAgentVariant", () => {
     // then
     expect(message.variant).toBe("max")
   })
+
+  test("returns the lowered reasoning so callers can route the effort channel (#7100)", () => {
+    // given - luna exposes no max preset, so the requested level lowers to an effort
+    const config = {
+      agents: {
+        hephaestus: { variant: "max" },
+      },
+    } as OhMyOpenCodeConfig
+    const message: { variant?: string; reasoningEffort?: string } = {}
+
+    // when
+    const lowered = applyAgentVariant(config, "hephaestus", message, {
+      providerID: "newapi-openai",
+      modelID: "gpt-5.6-luna",
+      runtimeModel: { variants: { low: {}, medium: {}, high: {}, xhigh: {} } },
+    } as { providerID: string; modelID: string; runtimeModel?: { variants?: Record<string, unknown> } })
+
+    // then
+    expect(lowered).toEqual({ reasoningEffort: "max" })
+    expect(message).toEqual({ reasoningEffort: "max" })
+  })
 })
 
 describe("resolveVariantForModel", () => {

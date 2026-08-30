@@ -1,6 +1,6 @@
 import { detectHeuristicModelFamily } from "./model-capability-heuristics"
 import { isClaudeOpus47OrLaterModel } from "./model-family-detectors"
-import { clampReasoningLevel, REASONING_LEVELS } from "./reasoning-level"
+import { clampReasoningLevel, isReasoningLevel, REASONING_LEVELS } from "./reasoning-level"
 
 type CompatibilityField = "variant" | "reasoningEffort" | "temperature" | "topP" | "maxTokens" | "thinking"
 
@@ -37,6 +37,7 @@ export type ModelSettingsCompatibilityChange = {
   | "unsupported-by-model-family"
   | "unknown-model-family"
   | "unsupported-by-model-metadata"
+  | "translated-to-reasoning-effort"
   | "max-output-limit"
 }
 
@@ -116,13 +117,28 @@ export function resolveCompatibleModelSettings(
   const metadataReasoningEfforts = normalizeCapabilitiesReasoningEfforts(input.capabilities)
 
   let variant = input.desired.variant
+  let translatedReasoningEffort: string | undefined
   if (variant !== undefined) {
     const normalized = variant.toLowerCase()
     const resolved = resolveField(normalized, family?.variants, REASONING_LEVELS as unknown as string[], familyKnown, metadataVariants)
     if (resolved.value !== normalized && resolved.reason) {
-      changes.push({ field: "variant", from: variant, to: resolved.value, reason: resolved.reason })
+      const effortCaps = metadataReasoningEfforts ?? family?.reasoningEfforts
+      if (isReasoningLevel(normalized) && effortCaps?.includes(normalized)) {
+        changes.push({
+          field: "variant",
+          from: variant,
+          to: undefined,
+          reason: "translated-to-reasoning-effort",
+        })
+        variant = undefined
+        translatedReasoningEffort = normalized
+      } else {
+        changes.push({ field: "variant", from: variant, to: resolved.value, reason: resolved.reason })
+        variant = resolved.value
+      }
+    } else {
+      variant = resolved.value
     }
-    variant = resolved.value
   }
 
   let reasoningEffort = input.desired.reasoningEffort
@@ -140,6 +156,8 @@ export function resolveCompatibleModelSettings(
       changes.push({ field: "reasoningEffort", from: reasoningEffort, to: resolved.value, reason: resolved.reason })
     }
     reasoningEffort = resolved.value
+  } else if (translatedReasoningEffort !== undefined) {
+    reasoningEffort = translatedReasoningEffort
   }
 
   let temperature = input.desired.temperature

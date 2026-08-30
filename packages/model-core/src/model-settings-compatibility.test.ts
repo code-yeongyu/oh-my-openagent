@@ -454,7 +454,7 @@ describe("resolveCompatibleModelSettings", () => {
     ])
   })
 
-  test("GPT-5 downgrades unsupported max variant to xhigh", () => {
+  test("GPT-5 translates an unsupported max variant into the reasoningEffort channel (#7100)", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",
       modelID: "gpt-5.4",
@@ -462,17 +462,51 @@ describe("resolveCompatibleModelSettings", () => {
     })
 
     expect(result).toEqual({
-      variant: "xhigh",
-      reasoningEffort: undefined,
+      variant: undefined,
+      reasoningEffort: "max",
       changes: [
         {
           field: "variant",
           from: "max",
-          to: "xhigh",
-          reason: "unsupported-by-model-family",
+          to: undefined,
+          reason: "translated-to-reasoning-effort",
         },
       ],
     })
+  })
+
+  test("GPT-5.6-Luna keeps a configured max effort instead of downgrading it (#7100)", () => {
+    // given - user configures variant "max" without an explicit effort option
+    const withoutExplicitEffort = resolveCompatibleModelSettings({
+      providerID: "newapi-openai",
+      modelID: "gpt-5.6-luna",
+      desired: { variant: "max" },
+    })
+
+    // then - the max level rides the reasoningEffort channel instead of being clamped
+    expect(withoutExplicitEffort).toEqual({
+      variant: undefined,
+      reasoningEffort: "max",
+      changes: [
+        {
+          field: "variant",
+          from: "max",
+          to: undefined,
+          reason: "translated-to-reasoning-effort",
+        },
+      ],
+    })
+
+    // given - user configures both variant "max" and an explicit reasoningEffort
+    const withExplicitEffort = resolveCompatibleModelSettings({
+      providerID: "newapi-openai",
+      modelID: "gpt-5.6-luna",
+      desired: { variant: "max", reasoningEffort: "max" },
+    })
+
+    // then - the explicit effort wins and stays max
+    expect(withExplicitEffort.reasoningEffort).toBe("max")
+    expect(withExplicitEffort.changes.map((change) => change.field)).toEqual(["variant"])
   })
 
   test("GPT-5 keeps none reasoningEffort", () => {

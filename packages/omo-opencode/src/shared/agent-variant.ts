@@ -131,9 +131,11 @@ export function applyAgentVariant(
   agentName: string | undefined,
   message: { variant?: string },
   currentModel: { providerID: string; modelID: string },
-): void {
+): LoweredReasoning {
   const variant = resolveAgentVariant(config, agentName)
-  if (variant === undefined || message.variant !== undefined) return
+  if (variant === undefined || message.variant !== undefined) return {}
 
-  Object.assign(message, lowerReasoningForModel(variant, currentModel))
+  const lowered = lowerReasoningForModel(variant, currentModel)
+  Object.assign(message, lowered)
+  return lowered
 }
