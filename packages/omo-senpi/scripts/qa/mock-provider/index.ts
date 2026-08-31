@@ -2,6 +2,7 @@
 // allow: SIZE_OK - one-process manual QA mock provider keeps SSE, health, and chat endpoints in one launched fixture.
 declare const process: {
   argv: string[]
+  env: Record<string, string | undefined>
   cwd(): string
   getBuiltinModule<T>(id: string): T
 }
@@ -39,6 +40,7 @@ type LocalStreamEvent = unknown
 
 type Api = "openai-completions"
 type StopReason = "stop" | "toolUse" | "aborted"
+const mockProviderId = process.env["OMO_MOCK_PROVIDER_ID"] ?? "omo-mock"
 
 interface Model<TApi extends string = Api> {
   id: string
@@ -47,6 +49,10 @@ interface Model<TApi extends string = Api> {
 
 interface Context {
   cwd?: string
+  messages?: Array<{
+    role: string
+    content?: string | Array<{ type: string; text?: string }>
+  }>
 }
 
 interface SimpleStreamOptions {
@@ -61,7 +67,7 @@ interface AssistantMessage {
   role: "assistant"
   content: AssistantContent[]
   api: Api
-  provider: "omo-mock"
+  provider: string
   model: "mock-1"
   usage: { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; cost: number }
   stopReason: StopReason
@@ -112,7 +118,7 @@ const model = {
 }
 
 export default function registerMockProvider(pi: ExtensionAPI): void {
-  pi.registerProvider("omo-mock", {
+  pi.registerProvider(mockProviderId, {
     name: "omo mock provider",
     baseUrl: "file://mock-provider",
     apiKey: "mock",
@@ -154,7 +160,7 @@ export function stepToAssistantMessage(step: MockStep, callCount: number): Assis
     role: "assistant",
     content,
     api: "openai-completions",
-    provider: "omo-mock",
+    provider: mockProviderId,
     model: "mock-1",
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
     stopReason: step.type === "tool_call" ? "toolUse" : "stop",
@@ -167,6 +173,8 @@ let callCount = 0
 function streamMockResponse(_model: Model<Api>, context: Context, options?: SimpleStreamOptions) {
   const stream = createLocalAssistantMessageEventStream()
   const script = loadMockScript(context.cwd ?? process.cwd())
+  const capturePath = process.env["OMO_MOCK_LAST_USER_PROMPT_CAPTURE"]
+  if (capturePath !== undefined) writeFileSync(capturePath, lastUserPrompt(context))
   const step = script.steps[Math.min(callCount, script.steps.length - 1)]
   callCount += 1
   const message = stepToAssistantMessage(step, callCount)
@@ -196,6 +204,21 @@ function streamMockResponse(_model: Model<Api>, context: Context, options?: Simp
   })
 
   return stream
+}
+
+function lastUserPrompt(context: Context): string {
+  for (let index = (context.messages?.length ?? 0) - 1; index >= 0; index -= 1) {
+    const message = context.messages?.[index]
+    if (message?.role !== "user") continue
+    if (typeof message.content === "string") return message.content
+    return (
+      message.content
+        ?.filter((block) => block.type === "text" && typeof block.text === "string")
+        .map((block) => block.text)
+        .join("\n") ?? ""
+    )
+  }
+  return ""
 }
 
 export function createLocalAssistantMessageEventStream(): LocalAssistantMessageEventStream {

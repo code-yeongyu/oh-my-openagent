@@ -181,6 +181,41 @@ describe("omo-senpi ultrawork component", () => {
     expect(pi.messages[0]?.options?.["deliverAs"]).toBeUndefined()
   })
 
+  it("#given Cursor Kimi K3 #when OMO context reaches its last-user-only transport #then all trailing user messages stay in the effective prompt", async () => {
+    // given: the live first-turn order observed from Senpi's context event
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+    const messages = [
+      { role: "user", content: [{ type: "text", text: SENPI_ULTRAWORK_DIRECTIVE }], timestamp: 1 },
+      { role: "user", content: [{ type: "text", text: "<omo-senpi-task>task pointer</omo-senpi-task>" }], timestamp: 2 },
+      { role: "user", content: [{ type: "text", text: "ulw fix the login bug" }], timestamp: 3 },
+      { role: "user", content: [{ type: "text", text: "<memory_notice>recall available</memory_notice>" }], timestamp: 4 },
+    ]
+
+    // when
+    const [result] = await pi.dispatch(
+      "context",
+      { type: "context", messages },
+      { model: { provider: "cursor-cli-oauth", id: "kimi-k3" } },
+    )
+
+    // then: Cursor's lastUserPrompt() sees every user instruction in original order
+    expect(result).toMatchObject({
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: SENPI_ULTRAWORK_DIRECTIVE },
+            { type: "text", text: "<omo-senpi-task>task pointer</omo-senpi-task>" },
+            { type: "text", text: "ulw fix the login bug" },
+            { type: "text", text: "<memory_notice>recall available</memory_notice>" },
+          ],
+          timestamp: 4,
+        },
+      ],
+    })
+  })
+
   it("#given a steer-queued prompt #when a trigger arms #then the directive stays atomic with the prompt", async () => {
     // given
     const pi = new FakeExtensionAPI()

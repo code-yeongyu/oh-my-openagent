@@ -13,6 +13,7 @@ const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"
 const SKILL_COMMAND_PREFIX = "/skill:"
 const ULTRAWORK_SKILL_NAME = "ultrawork"
 const ULTRAWORK_CUSTOM_TYPE = "omo-ultrawork:directive"
+const CURSOR_CLI_OAUTH_PROVIDER = "cursor-cli-oauth"
 
 // Re-arm nudge for a session whose transcript already holds the full directive:
 // injecting ~17KB again only re-pays tokens for rules the model can already see.
@@ -126,6 +127,7 @@ export function createUltraworkComponent(arming: SessionArming = sharedSessionAr
       pi.on("input", (payload: unknown, eventCtx: unknown): SenpiInputEventResult =>
         handleInput(pi, payload, ctx, arming, sessionIdFromEventCtx(eventCtx)),
       )
+      pi.on("context", (payload: unknown, eventCtx: unknown) => mergeCursorCliTrailingUserMessages(payload, eventCtx))
       pi.on("session_start", (_payload: unknown, eventCtx: unknown) => {
         arming.trackSession(sessionIdFromEventCtx(eventCtx))
       })
@@ -381,6 +383,53 @@ function armUltrawork(
   })
 
   return { action: "continue" }
+}
+
+function mergeCursorCliTrailingUserMessages(
+  payload: unknown,
+  eventCtx: unknown,
+): { messages: readonly unknown[] } | undefined {
+  if (!isRecord(payload) || payload["type"] !== "context" || !Array.isArray(payload["messages"])) return undefined
+  if (!isRecord(eventCtx) || !isRecord(eventCtx["model"]) || !isCursorCliOauthProvider(eventCtx["model"]["provider"])) return undefined
+
+  const messages = payload["messages"]
+  let trailingStart = messages.length
+  while (trailingStart > 0 && isUserMessage(messages[trailingStart - 1])) trailingStart -= 1
+  if (messages.length - trailingStart < 2) return undefined
+
+  const lastMessage = messages[messages.length - 1]
+  if (!isRecord(lastMessage)) return undefined
+  const mergedContent: unknown[] = []
+  for (const message of messages.slice(trailingStart)) {
+    if (!isRecord(message)) return undefined
+    const content = message["content"]
+    if (typeof content === "string") {
+      mergedContent.push({ type: "text", text: content })
+    } else if (Array.isArray(content)) {
+      mergedContent.push(...content)
+    } else {
+      return undefined
+    }
+  }
+
+  return {
+    messages: [...messages.slice(0, trailingStart), { ...lastMessage, content: mergedContent }],
+  }
+}
+
+function isCursorCliOauthProvider(provider: unknown): boolean {
+  return (
+    typeof provider === "string" &&
+    (provider === CURSOR_CLI_OAUTH_PROVIDER || provider.startsWith(`${CURSOR_CLI_OAUTH_PROVIDER}-`))
+  )
+}
+
+function isUserMessage(value: unknown): boolean {
+  return isRecord(value) && value["role"] === "user"
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function isSessionEventContext(value: unknown): value is SessionEventContext {
