@@ -49,14 +49,15 @@ Conventions for human contributors and AI agents working on this repository.
 - `src/plan-io.ts`: plan persistence, append-only `ledger.jsonl`, `withUlwLoopMutationLock`.
 - `src/quality-gate.ts` (266 LOC), `src/checkpoint.ts` (260), `src/steering.ts` (227): state-transition hotspots (evidence containment, checkpoint reconciliation, steering mutations).
 - `src/codex-hook.ts`: UserPromptSubmit steering injection + `create_goal` budget guard.
-- `src/spawn-guard.ts`, `src/stop-resume-hook.ts`: spawn guards, Stop auto-resume.
+- `src/spawn-guard.ts`, `src/spawn-ledger.ts`, `src/spawn-ledger-hook.ts`, `src/stop-resume-hook.ts`: spawn guards, durable swarm spawn ledger, Stop auto-resume.
 - `src/ultrawork-skill-pointer.ts`: byte-identical mirror of ultrawork's pointer (pinned by `plugin/test/ultrawork-skill-pointer.test.mjs`).
 - `directive.md`: runtime-read directive (never inlined into TypeScript).
 
 ## Build and Hooks
 
 - Build output goes to `dist/`.
-- `hooks/hooks.json` wires `hook user-prompt-submit --with-ultrawork` (UserPromptSubmit), `hook pre-tool-use` (create_goal budget), `hook pre-tool-use-spawn` (spawn guards), and `hook stop` (auto-resume).
+- `hooks/hooks.json` wires `hook user-prompt-submit --with-ultrawork` (UserPromptSubmit), `hook pre-tool-use` (create_goal budget), `hook pre-tool-use-spawn` (spawn guards), `hook post-tool-use-spawn` (durable swarm spawn ledger on the same spawn matcher), `hook post-compact-spawn-ledger` (post-compaction swarm rehydrate), and `hook stop` (auto-resume).
+- The spawn ledger (`src/spawn-ledger.ts`) records every `spawn_agent` outcome for sessions with an active plan: successes append `workerId` lines to `.omo/ulw-loop/<session>/spawn-ledger.jsonl`; refusals matching the agent/thread-limit pattern append the full request to `pending-spawns.jsonl` and inject context ordering the lead to re-issue queued spawns as workers complete. PostCompact rebuilds both truths from disk so a lossy compaction summary cannot erase spawned workers or queued refusals (issue 6201).
 
 ## Commands
 

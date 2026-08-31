@@ -36,6 +36,31 @@
 				]
 			}
 		],
+		"PostToolUse": [
+			{
+				"matcher": "^(spawn_agent|collaborationspawn_agent|collaboration\\.spawn_agent)$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-tool-use-spawn",
+						"timeout": 5,
+						"statusMessage": "(OmO 5.0.0-beta.21) Recording Swarm Spawn Outcomes"
+					}
+				]
+			}
+		],
+		"PostCompact": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-compact-spawn-ledger",
+						"timeout": 5,
+						"statusMessage": "(OmO 5.0.0-beta.21) Rehydrating Swarm Ledger"
+					}
+				]
+			}
+		],
 		"Stop": [
 			{
 				"hooks": [

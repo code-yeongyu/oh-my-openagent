@@ -10,7 +10,7 @@ import type { UlwLoopPlan } from "./types.js";
 // spawn_agent = v1; collaborationspawn_agent = the delimiter-free flattened v2
 // hook token from codex-rs hook_names.rs; collaboration.spawn_agent = the
 // dotted token observed live in the task-1 probe (hook-tool-tokens.txt).
-const SPAWN_TOOL_TOKENS = new Set(["spawn_agent", "collaborationspawn_agent", "collaboration.spawn_agent"]);
+export const SPAWN_TOOL_TOKENS = new Set(["spawn_agent", "collaborationspawn_agent", "collaboration.spawn_agent"]);
 const DEFAULT_FANOUT_LIMIT = 60;
 const GATE_MESSAGE_PATTERN = /lazycodex-gate-reviewer|final gate review/i;
 

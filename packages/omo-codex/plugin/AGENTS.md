@@ -11,7 +11,7 @@ The shipped Codex plugin namespace `omo` (marketplace `sisyphuslabs`), v5.0.0-be
 | Path | Role |
 |------|------|
 | `components/` | 11 workspace components + `bootstrap` (standalone, deliberately outside workspaces), `test-support`, `lcx`. Each owns its `AGENTS.md` |
-| `hooks/` | 23 aggregate hook JSON files, assembled from each component's `hooks/hooks.json` by the build |
+| `hooks/` | 25 aggregate hook JSON files, assembled from each component's `hooks/hooks.json` by the build |
 | `scripts/` | Build/sync/migration orchestration (own AGENTS.md) |
 | `test/` | node:test black-box contract suite (own AGENTS.md) |
 | `shared/` | `getCodexOmoConfig()` unified-config loader + startup config migration (`src/config-loader.ts`, `src/config-migration.ts`) |

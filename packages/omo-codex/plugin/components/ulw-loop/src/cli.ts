@@ -3,6 +3,7 @@ import { isUlwLoopSubcommand, ulwLoopCommand } from "./cli-commands.js";
 import { ULW_LOOP_HELP } from "./cli-output.js";
 import { runPreToolUseGoalBudgetGuardCli, runUlwLoopHookCli } from "./codex-hook.js";
 import { runSpawnGuardCli } from "./spawn-guard.js";
+import { runSpawnLedgerCli, runSpawnLedgerPostCompactCli } from "./spawn-ledger-hook.js";
 import { runStopResumeHookCli } from "./stop-resume-hook.js";
 
 async function main(): Promise<number> {
@@ -31,6 +32,14 @@ async function main(): Promise<number> {
 		}
 		if (sub === "pre-tool-use-spawn") {
 			await runSpawnGuardCli(process.stdin, process.stdout);
+			return 0;
+		}
+		if (sub === "post-tool-use-spawn") {
+			await runSpawnLedgerCli(process.stdin, process.stdout);
+			return 0;
+		}
+		if (sub === "post-compact-spawn-ledger") {
+			await runSpawnLedgerPostCompactCli(process.stdin, process.stdout);
 			return 0;
 		}
 		process.stderr.write(`[omo] unknown hook subcommand: ${sub ?? "(none)"}\n`);

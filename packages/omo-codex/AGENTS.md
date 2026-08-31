@@ -40,7 +40,7 @@
 | `marketplace.json` | Codex marketplace manifest. Declares marketplace `sisyphuslabs`, single installable plugin `omo`. |
 | `MARKETPLACE.md` | Native Codex marketplace notes for `sisyphuslabs` / `omo`. |
 | `index.d.ts` | Type barrel re-exporting `src/`. |
-| `plugin/` | Vendored Codex plugin namespace `omo`; pkg `@sisyphuslabs/omo-codex-plugin` (dep `@oh-my-opencode/shared-skills`). Holds `.codex-plugin/plugin.json` (brandColor `#7C3AED`), the `.codex-plugin/plugin.json` `hooks` array wiring 23 individual hook JSON files in `hooks/` (each component's own `hooks/hooks.json` is assembled into those files by the build), `components/` (11 workspaces + bootstrap + test-support + lcx), generated aggregate `skills/` (gitignored, built by sync-skills), `.mcp.json`. |
+| `plugin/` | Vendored Codex plugin namespace `omo`; pkg `@sisyphuslabs/omo-codex-plugin` (dep `@oh-my-opencode/shared-skills`). Holds `.codex-plugin/plugin.json` (brandColor `#7C3AED`), the `.codex-plugin/plugin.json` `hooks` array wiring 25 individual hook JSON files in `hooks/` (each component's own `hooks/hooks.json` is assembled into those files by the build), `components/` (11 workspaces + bootstrap + test-support + lcx), generated aggregate `skills/` (gitignored, built by sync-skills), `.mcp.json`. |
 | `scripts/` | Generated/bundled Node ESM install entrypoints and parity tests. Published paths such as `scripts/install-local.mjs` stay stable while source lives in `src/install/`. |
 | `src/` | TypeScript runtime consumed by the CLI: `install/` (Codex cache install, config mutation, agent links, local marketplace snapshot, cleanup, routing) + `telemetry/`. |
 | `tsconfig.json` | Bun-targeted strict config; included in root `typecheck:packages`. |
