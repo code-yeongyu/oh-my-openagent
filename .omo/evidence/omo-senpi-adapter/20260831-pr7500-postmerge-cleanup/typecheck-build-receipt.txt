@@ -1,11 +1,35 @@
-sourceHead=fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a
-upstreamDev=dd66dfa28ab4e02a4d82af85189f13a792db9dfa
-
-$ bun install --frozen-lockfile
-status=0; installed Senpi 2026.8.31 and rebuilt current generated payloads
+sourceHead=e9520d38abc52aaebcc2322ed06dd9fd571f7fba
 
 $ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
-status=0; generated extension bundles current before and after serialized gate
+Senpi LSP runtime is current: /home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Senpi ast-grep-mcp runtime is current: /home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js sha256=73c8be0b3098809e001fe61355e11b3d7991c9eb352e1b4b6f10f2a25d83f555
+Senpi agent-toolkit runtime is current: /home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/plugin/runtime/agent-toolkit sha256=47287d8911f2c519900a2c4bcebf7e0df8efa6115bd261809fe95246ecb3a0be
+Bundled 879 modules in 72ms
+
+  omo.js  1.47 MB  (entry point)
+
+Bundled 682 modules in 56ms
+
+  omo-task.js  0.95 MB  (entry point)
+
+Bundled 285 modules in 29ms
+
+  omo-member.js  175.38 KB  (entry point)
+
+Bundled 101 modules in 16ms
+
+  omo-memory-mcp.js  97.35 KB  (entry point)
+
+Bundled 132 modules in 16ms
+
+  memory-run-supervisor.mjs  29.25 KB  (entry point)
+
+Bundled 118 modules in 16ms
+
+  omo-init-deep-advisor.js  77.84 KB  (entry point)
+
+omo-senpi extension build is current: /home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/plugin/extensions/omo.js
+status=0
 
 $ bun x tsgo --noEmit -p packages/omo-native/tsconfig.json
 status=0
@@ -17,16 +41,435 @@ $ bun x tsgo --noEmit -p packages/senpi-task/tsconfig.json
 status=0
 
 $ bun run typecheck:script
+$ tsgo --noEmit -p script/tsconfig.json
 status=0
 
 $ bunx biome lint packages/omo-senpi/scripts/qa/isolation-state.mjs packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/drive.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
-status=0; informational existing literal-key suggestions only
+packages/omo-senpi/scripts/qa/drive.mjs:122:14 lint/complexity/noUselessUndefinedInitialization  FIXABLE  ━━━━━━━━━━
 
-$ bun run .../check-no-excuse-rules.ts packages/omo-senpi/scripts/qa/task-13.test.ts packages/omo-native/test/compile-entry-oauth-registration.test.ts
-status=0; no violations
+  i It's not necessary to initialize reason to undefined.
 
-LSP diagnostics:
-- isolation-state.mjs: none
-- isolation-state.test.mjs: none
-- drive.mjs: none
-- task-13.test.ts: none
+    120 │   let ultraworkInjected = false
+    121 │   let result = "FAIL"
+  > 122 │   let reason = undefined
+        │              ^^^^^^^^^^^
+    123 │
+    124 │   try {
+
+  i A variable that is declared and not initialized to any value automatically gets the value of undefined.
+
+  i Safe fix: Remove undefined initialization.
+
+    122 │ ··let·reason·=·undefined
+        │              -----------
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:215:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    213 │       expect(result.status).toBe(0)
+    214 │       const payload = parseLastJsonLine(result.stdout)
+  > 215 │       expect(payload["providedSenpiCodingAgentDir"]).toBe("IGNORED")
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    216 │       expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
+    217 │       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+
+  i Unsafe fix: Use a literal key instead.
+
+    213 213 │         expect(result.status).toBe(0)
+    214 214 │         const payload = parseLastJsonLine(result.stdout)
+    215     │ - ······expect(payload["providedSenpiCodingAgentDir"]).toBe("IGNORED")
+        215 │ + ······expect(payload.providedSenpiCodingAgentDir).toBe("IGNORED")
+    216 216 │         expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
+    217 217 │         expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:216:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    214 │       const payload = parseLastJsonLine(result.stdout)
+    215 │       expect(payload["providedSenpiCodingAgentDir"]).toBe("IGNORED")
+  > 216 │       expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
+        │                      ^^^^^^^^^^^^^^^^^
+    217 │       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+    218 │       expect(payload["realSenpiUntouched"]).toBe(true)
+
+  i Unsafe fix: Use a literal key instead.
+
+    214 214 │         const payload = parseLastJsonLine(result.stdout)
+    215 215 │         expect(payload["providedSenpiCodingAgentDir"]).toBe("IGNORED")
+    216     │ - ······expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
+        216 │ + ······expect(payload.sandboxAgentDir).not.toBe(callerAgentDir)
+    217 217 │         expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+    218 218 │         expect(payload["realSenpiUntouched"]).toBe(true)
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:217:29 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    215 │       expect(payload["providedSenpiCodingAgentDir"]).toBe("IGNORED")
+    216 │       expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
+  > 217 │       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+        │                             ^^^^^^^^^^^^^^^^^
+    218 │       expect(payload["realSenpiUntouched"]).toBe(true)
+    219 │       expect(payload["realSenpiChangedPaths"]).toEqual([])
+
+  i Unsafe fix: Use a literal key instead.
+
+    215 215 │         expect(payload["providedSenpiCodingAgentDir"]).toBe("IGNORED")
+    216 216 │         expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
+    217     │ - ······expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+        217 │ + ······expect(String(payload.sandboxAgentDir)).toContain("omo-senpi-qa-")
+    218 218 │         expect(payload["realSenpiUntouched"]).toBe(true)
+    219 219 │         expect(payload["realSenpiChangedPaths"]).toEqual([])
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:218:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    216 │       expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
+    217 │       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+  > 218 │       expect(payload["realSenpiUntouched"]).toBe(true)
+        │                      ^^^^^^^^^^^^^^^^^^^^
+    219 │       expect(payload["realSenpiChangedPaths"]).toEqual([])
+    220 │       expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+
+  i Unsafe fix: Use a literal key instead.
+
+    216 216 │         expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
+    217 217 │         expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+    218     │ - ······expect(payload["realSenpiUntouched"]).toBe(true)
+        218 │ + ······expect(payload.realSenpiUntouched).toBe(true)
+    219 219 │         expect(payload["realSenpiChangedPaths"]).toEqual([])
+    220 220 │         expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:219:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    217 │       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+    218 │       expect(payload["realSenpiUntouched"]).toBe(true)
+  > 219 │       expect(payload["realSenpiChangedPaths"]).toEqual([])
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^
+    220 │       expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+    221 │       expect(payload["realSenpiProtectedErrors"]).toEqual([])
+
+  i Unsafe fix: Use a literal key instead.
+
+    217 217 │         expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
+    218 218 │         expect(payload["realSenpiUntouched"]).toBe(true)
+    219     │ - ······expect(payload["realSenpiChangedPaths"]).toEqual([])
+        219 │ + ······expect(payload.realSenpiChangedPaths).toEqual([])
+    220 220 │         expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+    221 221 │         expect(payload["realSenpiProtectedErrors"]).toEqual([])
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:220:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    218 │       expect(payload["realSenpiUntouched"]).toBe(true)
+    219 │       expect(payload["realSenpiChangedPaths"]).toEqual([])
+  > 220 │       expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    221 │       expect(payload["realSenpiProtectedErrors"]).toEqual([])
+    222 │       expect(payload["realOmoUntouched"]).toBe(true)
+
+  i Unsafe fix: Use a literal key instead.
+
+    218 218 │         expect(payload["realSenpiUntouched"]).toBe(true)
+    219 219 │         expect(payload["realSenpiChangedPaths"]).toEqual([])
+    220     │ - ······expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+        220 │ + ······expect(payload.realSenpiProtectedStateComplete).toBe(true)
+    221 221 │         expect(payload["realSenpiProtectedErrors"]).toEqual([])
+    222 222 │         expect(payload["realOmoUntouched"]).toBe(true)
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:221:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    219 │       expect(payload["realSenpiChangedPaths"]).toEqual([])
+    220 │       expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+  > 221 │       expect(payload["realSenpiProtectedErrors"]).toEqual([])
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    222 │       expect(payload["realOmoUntouched"]).toBe(true)
+    223 │       expect(payload["realOmoChangedPaths"]).toEqual([])
+
+  i Unsafe fix: Use a literal key instead.
+
+    219 219 │         expect(payload["realSenpiChangedPaths"]).toEqual([])
+    220 220 │         expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+    221     │ - ······expect(payload["realSenpiProtectedErrors"]).toEqual([])
+        221 │ + ······expect(payload.realSenpiProtectedErrors).toEqual([])
+    222 222 │         expect(payload["realOmoUntouched"]).toBe(true)
+    223 223 │         expect(payload["realOmoChangedPaths"]).toEqual([])
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:222:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    220 │       expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+    221 │       expect(payload["realSenpiProtectedErrors"]).toEqual([])
+  > 222 │       expect(payload["realOmoUntouched"]).toBe(true)
+        │                      ^^^^^^^^^^^^^^^^^^
+    223 │       expect(payload["realOmoChangedPaths"]).toEqual([])
+    224 │       expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+
+  i Unsafe fix: Use a literal key instead.
+
+    220 220 │         expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+    221 221 │         expect(payload["realSenpiProtectedErrors"]).toEqual([])
+    222     │ - ······expect(payload["realOmoUntouched"]).toBe(true)
+        222 │ + ······expect(payload.realOmoUntouched).toBe(true)
+    223 223 │         expect(payload["realOmoChangedPaths"]).toEqual([])
+    224 224 │         expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:223:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    221 │       expect(payload["realSenpiProtectedErrors"]).toEqual([])
+    222 │       expect(payload["realOmoUntouched"]).toBe(true)
+  > 223 │       expect(payload["realOmoChangedPaths"]).toEqual([])
+        │                      ^^^^^^^^^^^^^^^^^^^^^
+    224 │       expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+    225 │       expect(payload["realOmoProtectedErrors"]).toEqual([])
+
+  i Unsafe fix: Use a literal key instead.
+
+    221 221 │         expect(payload["realSenpiProtectedErrors"]).toEqual([])
+    222 222 │         expect(payload["realOmoUntouched"]).toBe(true)
+    223     │ - ······expect(payload["realOmoChangedPaths"]).toEqual([])
+        223 │ + ······expect(payload.realOmoChangedPaths).toEqual([])
+    224 224 │         expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+    225 225 │         expect(payload["realOmoProtectedErrors"]).toEqual([])
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:224:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    222 │       expect(payload["realOmoUntouched"]).toBe(true)
+    223 │       expect(payload["realOmoChangedPaths"]).toEqual([])
+  > 224 │       expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    225 │       expect(payload["realOmoProtectedErrors"]).toEqual([])
+    226 │       expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+
+  i Unsafe fix: Use a literal key instead.
+
+    222 222 │         expect(payload["realOmoUntouched"]).toBe(true)
+    223 223 │         expect(payload["realOmoChangedPaths"]).toEqual([])
+    224     │ - ······expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+        224 │ + ······expect(payload.realOmoProtectedStateComplete).toBe(true)
+    225 225 │         expect(payload["realOmoProtectedErrors"]).toEqual([])
+    226 226 │         expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:225:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    223 │       expect(payload["realOmoChangedPaths"]).toEqual([])
+    224 │       expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+  > 225 │       expect(payload["realOmoProtectedErrors"]).toEqual([])
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^^
+    226 │       expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+    227 │       expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+
+  i Unsafe fix: Use a literal key instead.
+
+    223 223 │         expect(payload["realOmoChangedPaths"]).toEqual([])
+    224 224 │         expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+    225     │ - ······expect(payload["realOmoProtectedErrors"]).toEqual([])
+        225 │ + ······expect(payload.realOmoProtectedErrors).toEqual([])
+    226 226 │         expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+    227 227 │         expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:226:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    224 │       expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+    225 │       expect(payload["realOmoProtectedErrors"]).toEqual([])
+  > 226 │       expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    227 │       expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+    228 │       expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+
+  i Unsafe fix: Use a literal key instead.
+
+    224 224 │         expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+    225 225 │         expect(payload["realOmoProtectedErrors"]).toEqual([])
+    226     │ - ······expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+        226 │ + ······expect(payload.realSenpiObservedChangedPaths).toEqual([])
+    227 227 │         expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+    228 228 │         expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:227:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    225 │       expect(payload["realOmoProtectedErrors"]).toEqual([])
+    226 │       expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+  > 227 │       expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    228 │       expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+    229 │       expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+
+  i Unsafe fix: Use a literal key instead.
+
+    225 225 │         expect(payload["realOmoProtectedErrors"]).toEqual([])
+    226 226 │         expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+    227     │ - ······expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+        227 │ + ······expect(payload.realOmoObservedChangedPaths).toEqual([])
+    228 228 │         expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+    229 229 │         expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:228:29 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    226 │       expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+    227 │       expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+  > 228 │       expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+        │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    229 │       expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+    230 │       expect(payload["realSenpiObservationErrors"]).toEqual([])
+
+  i Unsafe fix: Use a literal key instead.
+
+    226 226 │         expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+    227 227 │         expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+    228     │ - ······expect(typeof·payload["realSenpiObservationComplete"]).toBe("boolean")
+        228 │ + ······expect(typeof·payload.realSenpiObservationComplete).toBe("boolean")
+    229 229 │         expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+    230 230 │         expect(payload["realSenpiObservationErrors"]).toEqual([])
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:229:29 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    227 │       expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+    228 │       expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+  > 229 │       expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+        │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    230 │       expect(payload["realSenpiObservationErrors"]).toEqual([])
+    231 │       expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+
+  i Unsafe fix: Use a literal key instead.
+
+    227 227 │         expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+    228 228 │         expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+    229     │ - ······expect(typeof·payload["realSenpiObservationTruncated"]).toBe("boolean")
+        229 │ + ······expect(typeof·payload.realSenpiObservationTruncated).toBe("boolean")
+    230 230 │         expect(payload["realSenpiObservationErrors"]).toEqual([])
+    231 231 │         expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:230:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    228 │       expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+    229 │       expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+  > 230 │       expect(payload["realSenpiObservationErrors"]).toEqual([])
+        │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    231 │       expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+    232 │       expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
+
+  i Unsafe fix: Use a literal key instead.
+
+    228 228 │         expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+    229 229 │         expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+    230     │ - ······expect(payload["realSenpiObservationErrors"]).toEqual([])
+        230 │ + ······expect(payload.realSenpiObservationErrors).toEqual([])
+    231 231 │         expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+    232 232 │         expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:231:29 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    229 │       expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+    230 │       expect(payload["realSenpiObservationErrors"]).toEqual([])
+  > 231 │       expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+        │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    232 │       expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
+    233 │       expect(typeof payload["realOmoObservationTruncated"]).toBe("boolean")
+
+  i Unsafe fix: Use a literal key instead.
+
+    229 229 │         expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+    230 230 │         expect(payload["realSenpiObservationErrors"]).toEqual([])
+    231     │ - ······expect(typeof·payload["realSenpiObservationBytesRead"]).toBe("number")
+        231 │ + ······expect(typeof·payload.realSenpiObservationBytesRead).toBe("number")
+    232 232 │         expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
+    233 233 │         expect(typeof payload["realOmoObservationTruncated"]).toBe("boolean")
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:232:29 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    230 │       expect(payload["realSenpiObservationErrors"]).toEqual([])
+    231 │       expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+  > 232 │       expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
+        │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    233 │       expect(typeof payload["realOmoObservationTruncated"]).toBe("boolean")
+    234 │       expect(payload["realOmoObservationErrors"]).toEqual([])
+
+  i Unsafe fix: Use a literal key instead.
+
+    230 230 │         expect(payload["realSenpiObservationErrors"]).toEqual([])
+    231 231 │         expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+    232     │ - ······expect(typeof·payload["realOmoObservationComplete"]).toBe("boolean")
+        232 │ + ······expect(typeof·payload.realOmoObservationComplete).toBe("boolean")
+    233 233 │         expect(typeof payload["realOmoObservationTruncated"]).toBe("boolean")
+    234 234 │         expect(payload["realOmoObservationErrors"]).toEqual([])
+
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:233:29 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    231 │       expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+    232 │       expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
+  > 233 │       expect(typeof payload["realOmoObservationTruncated"]).toBe("boolean")
+        │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    234 │       expect(payload["realOmoObservationErrors"]).toEqual([])
+    235 │       expect(typeof payload["realOmoObservationBytesRead"]).toBe("number")
+
+  i Unsafe fix: Use a literal key instead.
+
+    231 231 │         expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
+    232 232 │         expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
+    233     │ - ······expect(typeof·payload["realOmoObservationTruncated"]).toBe("boolean")
+        233 │ + ······expect(typeof·payload.realOmoObservationTruncated).toBe("boolean")
+    234 234 │         expect(payload["realOmoObservationErrors"]).toEqual([])
+    235 235 │         expect(typeof payload["realOmoObservationBytesRead"]).toBe("number")
+
+
+The number of diagnostics exceeds the limit allowed. Use --max-diagnostics to increase it.
+Diagnostics not shown: 6.
+Checked 4 files in 25ms. No fixes applied.
+Found 26 infos.
+status=0
+
+$ bun run /home/minpeter/.bun/install/global/node_modules/omo-ai/plugin/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-senpi/scripts/qa/task-13.test.ts packages/omo-native/test/compile-entry-oauth-registration.test.ts
+No violations in 2 file(s).
+status=0
+
+LSP diagnostics: isolation-state.mjs and isolation-state.test.mjs clean

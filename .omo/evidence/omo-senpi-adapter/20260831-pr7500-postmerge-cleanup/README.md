@@ -1,46 +1,50 @@
-# PR #7500 post-merge cleanup: Senpi 2026.8.31 combined-head evidence
+# PR #7500 post-merge cleanup: mutation-safe isolation evidence
 
-Validated source head: `fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a`, the normal merge of isolation
-evidence head `e96b71f4adf9ffa3bd068abc8fcb2c5e252b9074` and `origin/dev`
-`dd66dfa28ab4e02a4d82af85189f13a792db9dfa`.
+Validated production source head: `e9520d38abc52aaebcc2322ed06dd9fd571f7fba`, based on combined-head
+evidence commit `6b67bb4051ca77d82b2a07c5571877e7fdc83773`.
 
-## What was tested
+## Review findings and deterministic RED
 
-- Isolation RED/GREEN: [`isolation-blockers-red.log`](isolation-blockers-red.log),
-  [`focused-tests.log`](focused-tests.log).
-- Real live Senpi driver: [`driver-live.json`](driver-live.json),
-  [`driver-live-validation.json`](driver-live-validation.json), and
-  [`driver-self-test.log`](driver-self-test.log).
-- Pin/patch integration: [`pin-integration-receipt.json`](pin-integration-receipt.json).
-- Typechecks, diagnostics, quality, and generated extension freshness:
-  [`typecheck-build-receipt.txt`](typecheck-build-receipt.txt).
-- Serialized Senpi gate: [`senpi-gate.log`](senpi-gate.log).
-- Cleanup: [`cleanup-receipt.txt`](cleanup-receipt.txt).
+[`isolation-metadata-blockers-red.log`](isolation-metadata-blockers-red.log) records 9 pass / 3 fail
+before production changes:
 
-## What was observed
+- a same-inode, same-size recursive overwrite after the descriptor read was accepted as complete;
+- the same overwrite after the protected read was accepted as complete and could remain untouched;
+- inaccessible protected state was classified absent because an existence probe returned false.
 
-- Isolation/driver contracts: 19 pass. OAuth/compile-entry: 26 pass. Package/pin: 20 pass.
-- PR #7545 independently landed the OMO Senpi `2026.8.31` pin in current dev. The obsolete
-  `2026.8.30-3` patch is absent. The new `2026.8.31` patch is byte-identical to dev and contains only
-  the independent Claude SDK OAuth diagnostic; no hooks trust-storage hunk remains anywhere in
-  `patches/`.
-- The real live driver passed against installed Senpi `2026.8.31`, ignored the caller agent dir, and
-  removed its sandbox. Senpi and OMO protected snapshots were complete, error-free, unchanged, and
-  therefore untouched. Recursive observation stayed explicitly bounded/truncated with no errors.
-- The single serialized `bun run test:senpi` passed 2,461 tests with 7 platform skips and 0 failures;
-  its resolver phase passed 10 tests.
-- Extension freshness, OMO Native, OMO Senpi, Senpi Task, script typechecks, LSP, Biome, and
-  no-excuse checks passed.
+The byte-budget regression was already green at RED: an oversized file yielded `complete=false`,
+`truncated=true`, `errors=[]`, and zero reads. This is the public limit contract.
 
-## Packed-install gate
+## GREEN and implementation
 
-[`packed-install-verdict.json`](packed-install-verdict.json) remains a historical pre-#7545 capture
-from source head `c5000ed20`; it is not relabeled as a rerun. The OMO pin is now complete through
-#7545. A fresh clean packed-install **hooks behavior** proof remains a separate final gate; `ELOCKED`
-is not success.
+- [`focused-tests.log`](focused-tests.log): isolation/task contracts 23 pass, OAuth/compile-entry 26
+  pass, package/pin 20 pass.
+- Recursive and protected reads compare bigint `dev`, `ino`, `size`, `mtimeNs`, and `ctimeNs` before
+  and after reading and against final path identity. Same-identity metadata movement is
+  `FILE_CHANGED`; identity movement is `FILE_REPLACED`.
+- Protected digest/settings normalization consumes bytes read from the verified descriptor inside
+  that metadata window. There is no protected `existsSync` absence decision.
+- Absence requires both direct path stat and direct open to return `ENOENT`. Any other stat/open/read,
+  final-stat, or close failure is sanitized to relative path plus code and makes the snapshot
+  incomplete, so untouched is false.
+- Oversized observation files truncate before opening. The hard `maxBytes` guarantee remains, and
+  dead internal `BYTE_LIMIT` branches/classification were removed.
+- [`driver-live.json`](driver-live.json) and [`driver-live-validation.json`](driver-live-validation.json):
+  live Senpi 2026.8.31 PASS; protected snapshots complete, error-free, and untouched; observation
+  reads bounded; sandbox removed.
+- [`senpi-gate.log`](senpi-gate.log): serialized gate 2,465 pass, 7 platform skips, 0 fail; resolver
+  10 pass, 0 fail.
+- [`typecheck-build-receipt.txt`](typecheck-build-receipt.txt): extension freshness, relevant
+  typechecks, LSP, Biome, and no-excuse checks passed.
 
-## Isolation and redaction
+## Platform behavior and evidence safety
 
-Protected errors expose only phase, relative path, and error code. Recursive observations expose
-relative changed paths, bounded status, and byte counts—not content or file hashes. No credentials,
-tokens, private keys, environment dumps, or raw TUI output are retained.
+Node bigint stat fields provide nanosecond timestamps where the platform exposes them and preserve
+the platform's stable integer representation without millisecond coercion. Filesystems with coarse
+native timestamp precision cannot provide precision Node does not have; identity, size, mtime, and
+ctime are nevertheless compared using the highest-resolution values available. Windows/POSIX error
+codes remain sanitized strings.
+
+Evidence contains no protected bytes, snapshot hashes, credential hashes, secrets, private keys,
+tokens, or raw environment output. PR #7545 remains the independent source of the Senpi 2026.8.31
+pin. The historical packed-install artifact is not relabeled as an exact-head rerun.

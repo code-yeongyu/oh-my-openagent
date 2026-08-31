@@ -1,5 +1,5 @@
 {
-  "sourceHead": "fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a",
+  "sourceHead": "e9520d38abc52aaebcc2322ed06dd9fd571f7fba",
   "result": "PASS",
   "ultraworkInjected": true,
   "commentChecker": "PASS",
@@ -13,9 +13,7 @@
   "realOmoProtectedErrors": [],
   "realSenpiObservedChangedPaths": [],
   "realOmoObservedChangedPaths": [
-    "OmO-debug.log",
-    "logs/compaction.log",
-    "logs/session.log"
+    "OmO-debug.log"
   ],
   "realSenpiObservationComplete": false,
   "realSenpiObservationTruncated": true,
@@ -23,8 +21,13 @@
   "realSenpiObservationBytesRead": 101608656,
   "realOmoObservationComplete": false,
   "realOmoObservationTruncated": true,
-  "realOmoObservationErrors": [],
-  "realOmoObservationBytesRead": 129792594,
+  "realOmoObservationErrors": [
+    {
+      "path": "OmO-debug.log",
+      "code": "FILE_CHANGED"
+    }
+  ],
+  "realOmoObservationBytesRead": 123123312,
   "protectedStateFiles": [
     "auth.json",
     "settings.json",
@@ -43,6 +46,6 @@
     "/home/minpeter/.omo/agent"
   ],
   "providedSenpiCodingAgentDir": "IGNORED",
-  "sandboxAgentDir": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-O1wk10/agent",
-  "sandboxCwd": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-O1wk10/project"
+  "sandboxAgentDir": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-d6NkE9/agent",
+  "sandboxCwd": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-d6NkE9/project"
 }

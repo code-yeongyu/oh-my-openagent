@@ -1,0 +1,13 @@
+{
+  "validatedSourceHead": "e9520d38abc52aaebcc2322ed06dd9fd571f7fba",
+  "red": { "pass": 9, "fail": 3 },
+  "greenIsolationAndTask": { "pass": 23, "fail": 0 },
+  "metadataFields": ["dev", "ino", "size", "mtimeNs", "ctimeNs"],
+  "protectedExistsProbeRemoved": true,
+  "absenceRequiresStatAndOpenEnoent": true,
+  "protectedReadInsideMetadataWindow": true,
+  "sameSizeMutationFailsClosed": true,
+  "oversizedFile": { "complete": false, "truncated": true, "errors": [], "bytesRead": 0 },
+  "byteLimitClassificationRemoved": true,
+  "contentOrHashesEmitted": false
+}

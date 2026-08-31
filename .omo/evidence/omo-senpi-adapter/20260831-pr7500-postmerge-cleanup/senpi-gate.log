@@ -1,10 +1,9 @@
-sourceHead=fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a
-upstreamDev=dd66dfa28ab4e02a4d82af85189f13a792db9dfa
+sourceHead=e9520d38abc52aaebcc2322ed06dd9fd571f7fba
 $ env -u OMO_CODING_AGENT_DIR -u SENPI_CODING_AGENT_DIR -u PI_CODING_AGENT_DIR bun run test:senpi
 
 Serialized build/staging: PASS
 Typecheck: PASS
-Package suite: 2461 pass, 7 platform skip, 0 fail
-Package suite scope: 2468 tests across 328 files
+Package suite: 2465 pass, 7 platform skip, 0 fail
+Package suite scope: 2472 tests across 328 files
 Evidence resolver suite: 10 pass, 0 fail
 status=0
