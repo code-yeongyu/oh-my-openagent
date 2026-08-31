@@ -1,13 +1,10 @@
-validatedSourceHead=c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71
+validatedSourceHead=074bd7ebe8030a3e92ff010665fdc1ed71835332
 cleanupStatus=PASS
 taskOwnedTempPathCount=0
 taskOwnedProcessCount=0
 worktreeLspDaemonCount=0
-liveDriverSandbox=/home/minpeter/.cache/omo-tmp/omo-senpi-qa-baJDAH/agent
+liveDriverSandbox=/home/minpeter/.cache/omo-tmp/omo-senpi-qa-tfFfhD/agent
 liveDriverSandboxRemoved=true
-callerAgentDirectoryRemoved=true
-compiledOauthInputShredded=true
-compiledOauthOutputShredded=true
-compiledOauthBuildDirectoryRemoved=true
-packedConsumerDirectoryRemoved=true
+failedGateFixtureRootsRemoved=true
+randomSecretsCreated=false
 retainedSecrets=none

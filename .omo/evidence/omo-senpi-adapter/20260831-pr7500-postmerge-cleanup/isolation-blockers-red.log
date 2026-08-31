@@ -1,0 +1,10 @@
+sourceBase=30443d97c09bbb4eec3ca57035b7c88ad8690e14
+command=bun test packages/omo-senpi/scripts/qa/isolation-state.test.mjs
+exit=1
+result=3 pass, 5 fail
+protectedFailure=complete was undefined and identical EACCES snapshots could not fail closed
+byteBoundFailure=injected descriptor read counter remained 0 because production used unbounded readFileSync
+shortReadFailure=observation incorrectly completed
+growthFailure=observation incorrectly completed
+replacementFailure=observation incorrectly completed
+redaction=no protected content, hashes, or real-home data retained

@@ -1,418 +1,108 @@
-sourceHead=c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71
-upstreamDev=c53faf72fd05c32be7521eb8e406685cb1eb4115
-
-$ bun test packages/omo-native/test/compile-entry-oauth-registration.test.ts packages/omo-native/test/compile-entry.test.ts
-bun test v1.4.0 (34cbb9a40)
-
-packages/omo-native/test/compile-entry.test.ts:
-(pass) compiled omo entry launcher parity > uses the launched Windows executable path for self-provisioning identity [3.95ms]
-(pass) compiled omo entry launcher parity > pins the engine package dir to the provisioned root [0.46ms]
-(pass) compiled omo entry launcher parity > early commands pass through without an extension [0.12ms]
-(pass) compiled omo entry launcher parity > main commands prepend the provisioned plugin extension [0.18ms]
-(pass) compiled omo entry launcher parity > version line reads the sibling package version and pinned engine [0.17ms]
-(pass) compiled omo entry launcher parity > realpath-equivalent executable and expected paths skip re-exec [0.65ms]
-(pass) compiled omo entry launcher parity > self-update prints the curl reinstall command [0.31ms]
-(pass) compiled omo entry launcher parity > package-root environment values point into the provisioned runtime [0.28ms]
-(pass) pre-provisioning fast paths > answers --version from the embedded manifest before provisioning [0.18ms]
-(pass) pre-provisioning fast paths > -v answers while --version with extra arguments falls through [0.12ms]
-(pass) pre-provisioning fast paths > self-update spellings answer with the curl line while engine updates fall through [0.22ms]
-(pass) pre-provisioning fast paths > ordinary commands never fast-path [0.20ms]
-(pass) pre-provisioning fast paths > fast-path version line matches the provisioned launcher's line for the same stamp [0.53ms]
-(pass) pre-provisioning fast paths > banner gate requires a tty and an interactive-default launch [0.16ms]
-(pass) embedded runtime provisioning > materializes the executable directly on Windows [0.53ms]
-(pass) embedded runtime provisioning > does not overwrite an existing Windows provisioned executable [0.50ms]
-(pass) embedded runtime provisioning > skips re-copying an identical provisioned executable on POSIX [0.59ms]
-(pass) embedded runtime provisioning > still replaces a provisioned executable whose contents differ on POSIX [0.67ms]
-(pass) embedded runtime provisioning > materializes the executable through a temporary non-executable path on POSIX [0.94ms]
-(pass) embedded runtime provisioning > selects the omo manifest when senpi also embeds an unrelated manifest [0.21ms]
-(pass) embedded runtime provisioning > compiled doctor resolves package artifacts from the provided execDir [4.99ms]
-(pass) embedded runtime provisioning > version uses the manifest engine pin without a provisioned senpi package [0.43ms]
-(pass) embedded runtime provisioning > materializes files whose embedded names carry the omo-runtime prefix [1.27ms]
-(pass) embedded runtime provisioning > materializes non-utf8 embedded bytes without a text round-trip [1.68ms]
-(pass) embedded runtime provisioning > materializes files with sha256 and mode, then skips on matching marker [0.52ms]
-
-packages/omo-native/test/compile-entry-oauth-registration.test.ts:
-(pass) #given a sentinel bundled OAuth loader #when compile-entry loads #then it registers the real nested OpenAI Codex flow [46.21ms]
-
- 26 pass
- 0 fail
- 54 expect() calls
-Ran 26 tests across 2 files. [2.73s]
+sourceHead=074bd7ebe8030a3e92ff010665fdc1ed71835332
 
 $ bun test packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
 bun test v1.4.0 (34cbb9a40)
 
 packages/omo-senpi/scripts/qa/isolation-state.test.mjs:
-(pass) #given protected and volatile files #when snapshots are compared #then only protected path changes affect isolation [5.45ms]
-(pass) #given nested files within the observation bounds #when scanned #then the full-tree observation is complete [1.93ms]
-(pass) #given a tree beyond the file bound #when observed #then truncation is explicit and never complete [0.39ms]
+(pass) #given protected and volatile files #when snapshots are compared #then only protected path changes affect isolation [28.95ms]
+(pass) #given nested files within the observation bounds #when scanned #then the full-tree observation is complete [1.88ms]
+(pass) #given a tree beyond the file bound #when observed #then truncation is explicit and never complete [0.65ms]
+(pass) #given identical protected read failures #when snapshots are compared #then isolation fails closed with structured relative errors [0.63ms]
+(pass) #given files exceed the byte budget #when observed #then descriptor reads never exceed maxBytes [0.56ms]
+(pass) #given a file shrinks after traversal #when observed #then short read is explicit and incomplete [0.60ms]
+(pass) #given a file grows while hashing #when observed #then growth is explicit and incomplete [0.57ms]
+(pass) #given a path is replaced after open #when observed #then replacement is explicit and incomplete [6.58ms]
 
 packages/omo-senpi/scripts/qa/task-13.test.ts:
-(pass) task 13 senpi QA scripts > #given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup [0.24ms]
-(pass) task 13 senpi QA scripts > #given drive.mjs self-test #when executed #then sandbox helpers validate successfully [47.46ms]
-(pass) task 13 senpi QA scripts > #given probe-continuation self-test #when executed #then continuation helpers validate successfully [54.70ms]
-(pass) task 13 senpi QA scripts > #given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape [0.21ms]
-(pass) task 13 senpi QA scripts > #given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi [0.18ms]
-(pass) task 13 senpi QA scripts > #given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory [0.14ms]
-(pass) task 13 senpi QA scripts > #given mock provider self-test #when executed #then text and tool-call script steps validate [18.28ms]
-(pass) task 13 senpi QA scripts > #given a scripted tool call #when converted to an assistant message #then it stops with toolUse [0.21ms]
-(pass) task 13 senpi QA scripts > #given terminal stream events #when result is awaited #then done and error events settle the promise [0.39ms]
-(pass) task 13 senpi QA scripts > #given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result [0.68ms]
-(pass) task 13 senpi QA scripts > #given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox [46.29ms]
+(pass) task 13 senpi QA scripts > #given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup [0.80ms]
+(pass) task 13 senpi QA scripts > #given drive.mjs self-test #when executed #then sandbox helpers validate successfully [91.20ms]
+(pass) task 13 senpi QA scripts > #given probe-continuation self-test #when executed #then continuation helpers validate successfully [79.05ms]
+(pass) task 13 senpi QA scripts > #given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape [0.30ms]
+(pass) task 13 senpi QA scripts > #given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi [0.13ms]
+(pass) task 13 senpi QA scripts > #given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory [0.12ms]
+(pass) task 13 senpi QA scripts > #given mock provider self-test #when executed #then text and tool-call script steps validate [21.56ms]
+(pass) task 13 senpi QA scripts > #given a scripted tool call #when converted to an assistant message #then it stops with toolUse [0.26ms]
+(pass) task 13 senpi QA scripts > #given terminal stream events #when result is awaited #then done and error events settle the promise [0.55ms]
+(pass) task 13 senpi QA scripts > #given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result [0.84ms]
+(pass) task 13 senpi QA scripts > #given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox [80.76ms]
 
- 14 pass
+ 19 pass
  0 fail
- 56 expect() calls
-Ran 14 tests across 2 files. [1409.00ms]
+ 79 expect() calls
+Ran 19 tests across 2 files. [3.56s]
 
-$ bun test packages/omo-native/test/package-shape.test.ts packages/omo-native/test/senpi-pin.test.ts packages/omo-native/test/brand-contract-pin.test.ts packages/omo-senpi/src/package-shape.test.ts script/package-layout.test.ts script/package-layout-exclusion.test.ts
+$ bun test packages/omo-native/test/compile-entry-oauth-registration.test.ts packages/omo-native/test/compile-entry.test.ts
 bun test v1.4.0 (34cbb9a40)
 
-script/package-layout.test.ts:
-(pass) published package layout > #given vendored LSP MCP package #when inspecting tracked package files #then it is not a git submodule [10.92ms]
-(pass) published package layout > #given Codex LSP file dependency #when packing package #then lsp-tools-mcp package metadata ships [308.38ms]
-(pass) published package layout > #given generated Codex installer bundle #when packing package #then generated output ships and stale forks do not [0.50ms]
-(pass) published package layout > #given Codex materialized runtime payloads #when packing package #then every current payload target ships [0.19ms]
-(pass) published package layout > #given shipped QA skills reference web terminal helpers #when packing package #then helper runtime ships [0.17ms]
-(pass) published package layout > #given shipped QA skills reference guidance docs #when packing package #then referenced docs ship [0.16ms]
-(pass) published package layout > #given Codex installer source tree #when checking obsolete forks #then hand-written install mjs files are absent [0.31ms]
-(pass) published package layout > #given dot-directory command and skill assets #when packing package #then slash-command discovery assets ship [0.80ms]
+packages/omo-native/test/compile-entry.test.ts:
+(pass) compiled omo entry launcher parity > uses the launched Windows executable path for self-provisioning identity [3.55ms]
+(pass) compiled omo entry launcher parity > pins the engine package dir to the provisioned root [0.69ms]
+(pass) compiled omo entry launcher parity > early commands pass through without an extension [0.21ms]
+(pass) compiled omo entry launcher parity > main commands prepend the provisioned plugin extension [0.15ms]
+(pass) compiled omo entry launcher parity > version line reads the sibling package version and pinned engine [0.14ms]
+(pass) compiled omo entry launcher parity > realpath-equivalent executable and expected paths skip re-exec [3.44ms]
+(pass) compiled omo entry launcher parity > self-update prints the curl reinstall command [0.28ms]
+(pass) compiled omo entry launcher parity > package-root environment values point into the provisioned runtime [0.32ms]
+(pass) pre-provisioning fast paths > answers --version from the embedded manifest before provisioning [0.48ms]
+(pass) pre-provisioning fast paths > -v answers while --version with extra arguments falls through [0.18ms]
+(pass) pre-provisioning fast paths > self-update spellings answer with the curl line while engine updates fall through [0.16ms]
+(pass) pre-provisioning fast paths > ordinary commands never fast-path [0.20ms]
+(pass) pre-provisioning fast paths > fast-path version line matches the provisioned launcher's line for the same stamp [4.15ms]
+(pass) pre-provisioning fast paths > banner gate requires a tty and an interactive-default launch [0.23ms]
+(pass) embedded runtime provisioning > materializes the executable directly on Windows [0.50ms]
+(pass) embedded runtime provisioning > does not overwrite an existing Windows provisioned executable [0.44ms]
+(pass) embedded runtime provisioning > skips re-copying an identical provisioned executable on POSIX [0.67ms]
+(pass) embedded runtime provisioning > still replaces a provisioned executable whose contents differ on POSIX [0.89ms]
+(pass) embedded runtime provisioning > materializes the executable through a temporary non-executable path on POSIX [0.57ms]
+(pass) embedded runtime provisioning > selects the omo manifest when senpi also embeds an unrelated manifest [0.26ms]
+(pass) embedded runtime provisioning > compiled doctor resolves package artifacts from the provided execDir [10.08ms]
+(pass) embedded runtime provisioning > version uses the manifest engine pin without a provisioned senpi package [0.59ms]
+(pass) embedded runtime provisioning > materializes files whose embedded names carry the omo-runtime prefix [10.80ms]
+(pass) embedded runtime provisioning > materializes non-utf8 embedded bytes without a text round-trip [6.03ms]
+(pass) embedded runtime provisioning > materializes files with sha256 and mode, then skips on matching marker [0.68ms]
 
-script/package-layout-exclusion.test.ts:
-(pass) published package layout exclusions > #given internal-only skill assets #when packing package #then forbidden skill assets do not ship [92.68ms]
-(pass) published package layout exclusions > #given internal-only command assets #when packing package #then forbidden command assets do not ship [0.16ms]
+packages/omo-native/test/compile-entry-oauth-registration.test.ts:
+(pass) #given a sentinel bundled OAuth loader #when compile-entry loads #then it registers the real nested OpenAI Codex flow [65.38ms]
+
+ 26 pass
+ 0 fail
+ 54 expect() calls
+Ran 26 tests across 2 files. [1.60s]
+
+$ bun test packages/omo-native/test/package-shape.test.ts packages/omo-native/test/senpi-pin.test.ts packages/omo-native/test/brand-contract-pin.test.ts packages/omo-senpi/src/package-shape.test.ts
+bun test v1.4.0 (34cbb9a40)
 
 packages/omo-native/test/package-shape.test.ts:
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [0.19ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.21ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships exactly bin and plugin [0.18ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.09ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then it declares exactly the engine and codemode parser runtime dependencies [0.08ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the codemode parser dependency is exactly pinned [0.11ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.16ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.14ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [7.23ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.15ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships exactly bin and plugin [0.08ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.14ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then it declares exactly the engine and codemode parser runtime dependencies [0.15ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the codemode parser dependency is exactly pinned [0.14ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.22ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.15ms]
 (pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.12ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.17ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no postinstall lifecycle hook exists [0.09ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.08ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no postinstall lifecycle hook exists [0.06ms]
 
 packages/omo-native/test/senpi-pin.test.ts:
-(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [0.17ms]
-(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.19ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [0.23ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.15ms]
 (pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then the root devDependency pin matches [0.15ms]
-(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.15ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.23ms]
 
 packages/omo-native/test/brand-contract-pin.test.ts:
-(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then it is an exact version, never a range [0.11ms]
-(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then a brand-aware pin must ship the brand resolver [0.51ms]
+(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then it is an exact version, never a range [0.17ms]
+(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then a brand-aware pin must ship the brand resolver [0.74ms]
 
 packages/omo-senpi/src/package-shape.test.ts:
-(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [0.98ms]
-(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.34ms]
-(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.36ms]
+(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [1.40ms]
+(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.27ms]
+(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.38ms]
 
- 30 pass
+ 20 pass
  0 fail
- 69 expect() calls
-Ran 30 tests across 6 files. [1.61s]
-
-$ bun test packages/memory-core/src/identity/layout.test.ts packages/memory-core/src/recall/index.test.ts packages/memory-core/src/recall/ledger.test.ts packages/memory-core/src/recall/planner.test.ts packages/memory-core/src/recall/provider.test.ts packages/memory-core/src/recall/receipts.test.ts packages/memory-core/src/recall/render.test.ts packages/memory-core/src/recall/select.test.ts packages/memory-core/src/search/senpi-session-provider.test.ts packages/omo-senpi/src/components/memory/index.test.ts packages/omo-senpi/src/components/memory/journal-wiring.test.ts packages/omo-senpi/src/components/memory/recall-notice.test.ts packages/omo-senpi/src/components/memory/recall-reingestion.test.ts packages/omo-senpi/src/components/memory/recall-wiring.test.ts packages/omo-senpi/src/components/memory/wiring.test.ts packages/senpi-task/src/dag/scheduler.test.ts
-bun test v1.4.0 (34cbb9a40)
-
-packages/senpi-task/src/dag/scheduler.test.ts:
-(pass) DAG scheduler owner conflict adoption > #given a live task owned by another DAG attempt #when its node is admitted #then the scheduler adopts its completion and admits the dependent [398.45ms]
-(pass) DAG scheduler terminal result persistence > #given only the senpi-task scheduler #when a node completes #then output and run stats are persisted without an adapter [233.87ms]
-(pass) DAG scheduler subscriber backpressure > #given a non-default subscriber ring #when a scheduler listener falls behind #then overflow occurs at the configured bound [435.12ms]
-(pass) DAG scheduler execution mode dispatch > #given task.default_execution_mode #when a DAG node is dispatched #then the scheduler resolves through the existing chain [579.31ms]
-(pass) DAG scheduler failure semantics > #given every terminal task status #when folded #then each maps to its exact node outcome and error code [1275.69ms]
-(pass) DAG scheduler failure semantics > #given every start denial #when admission fails #then each maps to its exact node error code [324.99ms]
-(pass) DAG scheduler failure semantics > #given a failed root with a descendant chain #when failure cascades #then every descendant skip is persisted separately [376.69ms]
-(pass) DAG scheduler failure semantics > #given graph-ordered failures finish out of order #when independent work settles #then the run uses the first wave and declaration failure [684.27ms]
-(pass) DAG scheduler cancellation > #given durable waiters armed before and during cancellation #when the scheduler cancels through a separate journal path #then every wait and re-attach settles cancelled [323.61ms]
-(pass) DAG scheduler cancellation > #given a running wave and pending descendants #when cancelled #then admitted tasks cancel, frontier admission stops, and waiters resolve cancelled [668.71ms]
-(pass) DAG scheduler cancellation > #given one startOwned rejects after a sibling starts #when cancellation follows #then admission clears and the sibling is attached and cancelled [295.13ms]
-(pass) DAG scheduler cancellation > #given an AbortError returned by task cancellation #when the run is cancelled #then durable cancellation settles and the rejection still surfaces [217.69ms]
-(pass) DAG scheduler cancellation > #given a genuine task cancellation failure #when a wave is cancelled #then the run settles cancelled and the failure still surfaces [307.68ms]
-(pass) DAG scheduler cancellation > #given a paused unclaimed run #when cancelled #then it ends cancelled without task cancellation [96.73ms]
-(pass) DAG scheduler dependency-frontier admission > #given a linear three-wave DAG #when run #then nodes and wave events still settle in order [586.78ms]
-(pass) DAG scheduler dependency-frontier admission > #given a diamond DAG #when run #then the fan-out shares one admission pass and the join waits for both [680.96ms]
-(pass) DAG scheduler dependency-frontier admission > #given an unrelated sibling still running #when a dependent's dependencies are all terminal #then the dependent is admitted without waiting for the sibling [517.57ms]
-(pass) DAG scheduler dependency-frontier admission > #given a dependency still running #when the scheduler is active #then its dependent is not admitted before terminal [407.13ms]
-(pass) DAG scheduler dependency-frontier admission > #given one waitFor rejects while a sibling is running #when the wave settles #then the rejection becomes one node failure and the sibling completes [345.96ms]
-(pass) DAG scheduler dependency-frontier admission > #given one root start fails #when its wave is admitted #then siblings and the independent branch still run [469.75ms]
-(pass) DAG scheduler dependency-frontier admission > #given startOwned queues a scheduled node #when attached #then its queue position is journaled [244.27ms]
-(pass) DAG scheduler dependency-frontier admission > #given startOwned queues a scheduled node #when the queued child is promoted to running #then the node transitions to running with startedAt [247.50ms]
-(pass) DAG scheduler dependency-frontier admission > #given the queue promotes the child before its watch is armed #when the node attaches #then the arm-time check transitions it to running [260.32ms]
-(pass) DAG scheduler dependency-frontier admission > #given a queued child that terminalizes without ever running #when the run settles #then no running transition is journaled and the watch is released [225.14ms]
-(pass) DAG scheduler dependency-frontier admission > #given a queued node with an armed promotion watch #when the run is cancelled #then the watch is disposed without a running transition [194.98ms]
-(pass) DAG scheduler dependency-frontier admission > #given a same-wave node is residency denied #when an attached sibling frees a slot #then admission retries without failing it [328.07ms]
-(pass) DAG scheduler dependency-frontier admission > #given a wave wider than residency capacity #when tasks settle #then all nodes are admitted in batches without a second concurrency limit [692.69ms]
-(pass) DAG scheduler node spawn policy > #given a policy that denies an agent-routed node #when the wave admits #then the node fails with the denial message and startOwned is never called [166.40ms]
-(pass) DAG scheduler node spawn policy > #given a policy that forces the prompt #when the node starts #then the child receives the forced prompt [261.31ms]
-(pass) DAG scheduler node spawn policy > #given category-routed nodes #when the wave admits #then the policy is never consulted [262.90ms]
-(pass) DAG scheduler node controls > #given a completed node #when retry is requested #then it refuses with node_not_retryable [32.14ms]
-(pass) DAG scheduler node controls > #given a cancelled node child #when send is requested #then it refuses with node_not_continuable and names retry [34.62ms]
-(pass) DAG scheduler node controls > #given a failed node with skipped dependents #when retried #then execAttempt increments, dependents unblock, and the run re-enters to completion [583.83ms]
-(pass) DAG scheduler node controls > #given a retried node #when it is admitted again #then the owner fingerprint folds the new execAttempt [337.17ms]
-(pass) DAG scheduler node controls > #given an explicit retry of only the failed ancestor #when re-entered #then its skipped dependents are restored to blocked [797.63ms]
-(pass) DAG scheduler node controls > #given a skipped node whose failed ancestor stays failed #when retried alone #then it refuses and names the ancestor [29.45ms]
-(pass) DAG scheduler node controls > #given a running run #when retry is requested #then it refuses with run_still_active and journals nothing [25.23ms]
-(pass) DAG scheduler node controls > #given a foreign pid holds the lease and is alive #when retry is requested for THIS run #then it refuses with run_not_owned naming that pid [31.22ms]
-(pass) DAG scheduler node controls > #given the lease pid is dead #when retry is requested #then the guard lets it through and the node re-runs [314.83ms]
-(pass) DAG scheduler node controls > #given a running node #when send delivers a steer #then the node stays running and the journal records delivery steer [296.42ms]
-(pass) DAG scheduler node controls > #given a failed node whose child is still resident #when send revives it #then the node runs again and its new outcome settles exactly once [145.11ms]
-(pass) DAG scheduler node controls > #given the full send outcome vocabulary #when a node child is messaged #then each outcome maps to its exact result or refusal [24.31ms]
-(pass) DAG scheduler node controls > #given a single explicit node and a prompt override #when retried #then the amendment is journaled before the retry and the new prompt runs [558.03ms]
-(pass) DAG scheduler node controls > #given a prompt override the definition compiler rejects #when retried #then the refusal is total: invalid_arguments, nothing journaled, no task started [25.45ms]
-(pass) DAG scheduler node controls > #given a prompt override with more than one target #when retried #then it refuses with invalid_arguments [29.57ms]
-(pass) applyDagSchedulerEvent resume reducer > #given a settled run record #when a resume is applied #then status runs again and the stale completedAt is cleared [0.44ms]
-(pass) applyDagSchedulerEvent resume reducer > #given a retried event #when applied through the scheduler reducer #then the shared record mutation runs [0.24ms]
-(pass) DAG scheduler control-event replay > #given a retried and revived run #when the checkpoint is rebuilt from the WAL alone #then it matches the live record [578.97ms]
-(pass) DAG scheduler terminal-run send gate (#7412) > #given a completed run #when send would revive a finished child #then it refuses before touching the child and the checkpoint stays terminal [24.87ms]
-(pass) DAG scheduler terminal-run send gate (#7412) > #given a cancelled run with a completed node #when send would revive its child #then it refuses and the checkpoint stays cancelled [25.69ms]
-(pass) DAG scheduler terminal-run send gate (#7412) > #given a stale control journal #when it re-appends an already-journaled terminal transition #then the WAL keeps exactly one completed event [79.21ms]
-
-packages/memory-core/src/identity/layout.test.ts:
-(pass) memory identity layout constants > #given the layout module #when constants are inspected #then they pin the decided directory names [4.01ms]
-(pass) defaultMemoryRoot > #given no override #when the default root is computed #then it is ~/.omo/memory [0.19ms]
-(pass) resolveMemoryRoot > #given an absolute OMO_MEMORY_HOME #when the root is resolved #then the override is used verbatim [0.17ms]
-(pass) resolveMemoryRoot > #given a relative OMO_MEMORY_HOME #when the root is resolved #then it resolves against the given cwd [0.12ms]
-(pass) resolveMemoryRoot > #given an empty or whitespace OMO_MEMORY_HOME #when the root is resolved #then the default root is used [0.11ms]
-(pass) buildIdentityPaths > #given a memory root and id #when paths are built #then the decided layout shape is produced [0.39ms]
-(pass) buildIdentityPaths > #given built paths #when runtime subdirs are enumerated #then every declared subdir is present under runtime [0.26ms]
-
-packages/memory-core/src/recall/receipts.test.ts:
-(pass) appendRecallReceipt > #given a receipt #when appended #then one JSON line with every field lands [2.83ms]
-(pass) appendRecallReceipt > #given two receipts #when appended #then both lines persist in order [1.49ms]
-(pass) appendRecallReceipt > #given a receipts path with missing parents #when appended #then the parents are created [1.43ms]
-(pass) appendRecallReceipt > #given a newly created receipts file #when the mode is inspected #then it is private to the owner [1.01ms]
-
-packages/memory-core/src/recall/planner.test.ts:
-(pass) planRecallQueries > #given no texts #when queries are planned #then no query is emitted [0.45ms]
-(pass) planRecallQueries > #given only stopword chatter #when queries are planned #then no query is emitted [0.42ms]
-(pass) planRecallQueries > #given a distinctive newest text #when queries are planned #then lowercase terms and verbatim bigram phrases come out [0.25ms]
-(pass) planRecallQueries > #given a term repeated across every text #when queries are planned #then rarer terms outrank the repeated one [0.21ms]
-(pass) planRecallQueries > #given a newest text without kept terms #when queries are planned #then the next text tops up [0.19ms]
-(pass) planRecallQueries > #given a text rich in distinctive terms #when queries are planned #then at most four queries are emitted [0.26ms]
-(pass) planRecallQueries > #given the same input twice #when queries are planned #then the output is deterministic [0.16ms]
-(pass) planRecallQueries > #given short or stopword tokens #when queries are planned #then terms under three characters and stopwords drop [0.16ms]
-
-packages/memory-core/src/recall/provider.test.ts:
-(pass) loadRecallCorpus > #given a committed HEAD tree #when the corpus is loaded #then only non-system parseable markdown survives [130.76ms]
-(pass) loadRecallCorpus > #given committed files #when documents are parsed #then description and body come from frontmatter parsing [104.43ms]
-(pass) loadRecallCorpus > #given a committed file whose path merely contains a system segment #when the corpus is loaded #then only the reserved root system tree is excluded [85.52ms]
-(pass) loadRecallCorpus > #given uncommitted working-tree edits #when the corpus is loaded #then only committed HEAD content is visible [73.62ms]
-(pass) loadRecallCorpus > #given a directory that is not a git repository #when the corpus is loaded #then the revision is null and no documents load [3.03ms]
-(pass) loadRecallCorpus > #given HEAD advances with a new recallable file #when the corpus reloads #then the new revision and document appear [127.71ms]
-(pass) RecallCorpusCache > #given an unchanged HEAD #when the corpus loads twice #then the cached corpus object is reused [70.51ms]
-(pass) RecallCorpusCache > #given HEAD changes #when the corpus reloads #then the cache invalidates and the new corpus is loaded [106.20ms]
-(pass) RecallCorpusCache > #given a cleared cache #when the corpus reloads #then the corpus is reloaded even at the same HEAD [86.83ms]
-
-packages/memory-core/src/recall/select.test.ts:
-(pass) selectRecallCandidates > #given no queries #when candidates are selected #then nothing is returned [0.33ms]
-(pass) selectRecallCandidates > #given matching documents #when candidates are selected #then scores are ascending [0.58ms]
-(pass) selectRecallCandidates > #given multiple queries #when candidates are selected #then each path keeps its best score [0.20ms]
-(pass) selectRecallCandidates > #given surfaced paths #when candidates are selected #then already surfaced paths drop [0.15ms]
-(pass) selectRecallCandidates > #given exclude patterns #when candidates are selected #then prefix globs and exact paths drop [0.20ms]
-(pass) selectRecallCandidates > #given a minScore ceiling #when candidates are selected #then scores above the ceiling drop [0.17ms]
-(pass) selectRecallCandidates > #given more matches than maxItems #when candidates are selected #then only the best capped set returns [0.15ms]
-(pass) selectRecallCandidates > #given equal scores #when candidates are selected #then the path breaks the tie [0.14ms]
-(pass) selectRecallCandidates > #given a term match inside the body #when the excerpt is built #then it is a centered whitespace-normalized window [0.15ms]
-(pass) selectRecallCandidates > #given a match only in the description #when the excerpt is built #then the body head is used [0.13ms]
-(pass) selectRecallCandidates > #given a multi-line body #when the excerpt is built #then newlines collapse to single spaces [0.12ms]
-(pass) selectRecallCandidates > #given a non-positive maxItems #when candidates are selected #then nothing is returned [0.16ms]
-
-packages/memory-core/src/recall/render.test.ts:
-(pass) renderRecallMessage > #given no candidates #when the message is rendered #then the result is empty [0.38ms]
-(pass) renderRecallMessage > #given one candidate #when the message is rendered #then the exact block shape is produced [0.25ms]
-(pass) renderRecallMessage > #given several candidates #when the message is rendered #then one sourced block per candidate keeps order [0.13ms]
-(pass) renderRecallMessage > #given a rendered message #when the shape is inspected #then no trailing newline is appended [0.12ms]
-
-packages/memory-core/src/recall/index.test.ts:
-(pass) recall package surface > #given the package barrel #when the recall surface is imported #then every recall unit is exported [0.17ms]
-
-packages/memory-core/src/recall/ledger.test.ts:
-(pass) sanitizeSessionFilename > #given a plain session id #when sanitized #then it survives unchanged [0.34ms]
-(pass) sanitizeSessionFilename > #given an unsafe session id #when sanitized #then colons, separators and globs collapse to dashes [0.17ms]
-(pass) sanitizeSessionFilename > #given path traversal or empty input #when sanitized #then a safe fallback name results [0.13ms]
-(pass) RecallLedger > #given an unknown session #when surfaced paths are read #then the set is empty [1.00ms]
-(pass) RecallLedger > #given a malformed ledger file #when surfaced paths are read #then the set is empty and nothing throws [1.12ms]
-(pass) RecallLedger > #given marked entries #when surfaced paths are read #then exactly those paths return [1.71ms]
-(pass) RecallLedger > #given marked entries #when the ledger file is inspected #then the versioned shape and mode are pinned [1.77ms]
-(pass) RecallLedger > #given a second mark on the same session #when the ledger is read #then earlier entries persist and repeats update [2.43ms]
-(pass) RecallLedger > #given two sessions #when both mark entries #then separate files hold separate sets [2.93ms]
-(pass) RecallLedger > #given an unsafe session id #when entries are marked #then the file lands sanitized inside the ledger dir [1.26ms]
-(pass) RecallLedger > #given no entries #when marking #then nothing is written [0.53ms]
-(pass) RecallLedger > #given a ledger dir that does not exist yet #when entries are marked #then the directory is created [1.59ms]
-
-packages/memory-core/src/search/senpi-session-provider.test.ts:
-(pass) SenpiSessionProvider > #given a session file #when conversations are listed #then the file is one conversation keyed by the header id [1.13ms]
-(pass) SenpiSessionProvider > #given user, assistant and tool-result entries #when mapped #then text, reasoning, tool names, arguments and returns are searchable [1.39ms]
-(pass) SenpiSessionProvider > #given branches that repeat a shared ancestor entry #when mapped #then each entry id appears once [0.52ms]
-(pass) SenpiSessionProvider > #given a malformed line and a missing header #when read #then bad lines are skipped and the rest of the file survives [0.71ms]
-(pass) SenpiSessionProvider > #given an archived sidecar, an excluded directory and a hidden-marker hook #when listed #then those conversations are hidden but still readable with includeHidden [1.38ms]
-(pass) SenpiSessionProvider > #given a hidden marker file inside a session directory #when listed #then every session in that directory is hidden [0.89ms]
-(pass) SenpiSessionProvider > #given extension-injected custom messages #when mapped #then only memory-owned channels are hidden and other custom content stays searchable [0.85ms]
-(pass) SenpiSessionProvider > #given a missing sessions directory or non-jsonl files #when listed #then reading is empty and never throws [0.69ms]
-
-packages/omo-senpi/src/components/memory/recall-wiring.test.ts:
-(pass) RECALL_CUSTOM_TYPE > #given the recall injection channel #when the custom type is read #then it is the memorian recall channel [1.10ms]
-(pass) createMemoryRecallWiring > #given a bound session matching the corpus #when before_agent_start dispatches #then a hidden recall message is returned [88.92ms]
-(pass) createMemoryRecallWiring > #given an empty branch on the first turn #when before_agent_start dispatches #then the event prompt drives the recall query [69.08ms]
-(pass) createMemoryRecallWiring > #given a recall hit #when the handler finishes #then a rendered transcript entry names the surfaced path [58.54ms]
-(pass) createMemoryRecallWiring > #given no recall hit #when before_agent_start dispatches #then no transcript entry is appended [58.88ms]
-(pass) createMemoryRecallWiring > #given a per-agent recall override #when before_agent_start dispatches #then the override beats the base block [70.47ms]
-(pass) createMemoryRecallWiring > #given recall disabled by config #when before_agent_start dispatches #then no message is returned [75.69ms]
-(pass) createMemoryRecallWiring > #given a memory worker child sentinel #when before_agent_start dispatches #then no message is returned [59.21ms]
-(pass) createMemoryRecallWiring > #given an unbound session #when before_agent_start dispatches #then no message is returned [52.23ms]
-(pass) createMemoryRecallWiring > #given conversation text matching nothing in the corpus #when before_agent_start dispatches #then no message is returned [64.62ms]
-(pass) createMemoryRecallWiring > #given a path already surfaced in the session #when before_agent_start dispatches again #then the hint never repeats [66.71ms]
-(pass) createMemoryRecallWiring > #given an injected recall hint in the branch #when the query window is built #then recall and notice entries are excluded [53.38ms]
-(pass) createMemoryRecallWiring > #given a successful injection #when the handler finishes #then the ledger and the receipt record the surfaced path [66.81ms]
-(pass) createMemoryRecallWiring > #given a budget smaller than one whole block #when before_agent_start dispatches #then nothing is injected and nothing is marked [106.50ms]
-(pass) createMemoryRecallWiring > #given a budget that fits only the first whole block #when before_agent_start dispatches #then exactly that candidate is injected and recorded [104.71ms]
-(pass) createMemoryRecallWiring > #given a receipt writer that always fails #when before_agent_start dispatches #then the message is still emitted and the path is surfaced [74.50ms]
-(pass) createMemoryRecallWiring > #given a ledger that cannot record surfaced paths #when before_agent_start dispatches #then the message is still emitted and the path stays re-eligible [88.67ms]
-(pass) createMemoryRecallWiring > #given a transcript trace writer that always fails #when before_agent_start dispatches #then the message is still returned [90.77ms]
-(pass) createMemoryRecallWiring > #given a corpus load failure #when before_agent_start dispatches #then the turn is unaffected and the failure is logged [67.71ms]
-
-packages/omo-senpi/src/components/memory/wiring.test.ts:
-(pass) memory pressure dream wiring > #given committed system memory at soft pressure #when bind refresh computes the advisory estimate #then it attempts one pressure reservation [77.20ms]
-(pass) memory pressure compile wiring > #given a bound fixture repo below pressure #when a committed write crosses the threshold #then the next real compile refresh adds pressure metadata without truncating memory [145.67ms]
-(pass) memory recall wiring > #given a bound session whose memory matches the turn #when before_agent_start dispatches #then recall adds its own hidden message and leaves the system prompt to the projection [89.81ms]
-(pass) memory footer wiring > #given committed memory bound without a visible footer #when memory tools return #then only the first result shows relative age [13.68ms]
-(pass) memory footer wiring > #given a completed first-use attempt #when a new session starts #then the once-only footer gate resets [7.52ms]
-(pass) memory footer wiring > #given bind reconciliation is pending #when a footer publishes #then bind completion does not erase it [20.18ms]
-(pass) memory footer wiring > #given a failed first memory result #when a later call succeeds #then the footer waits for success [11.96ms]
-(pass) memory wiring reflection completion delivery > #given a pending completion and a bound session with a real UI callback > #when afterBind drains the identity completion directory > #then the callback receives the completion notification payload and level [22.29ms]
-(pass) memory wiring reflection policy > #given reflection disabled for the bound agent #when an automatic settle arrives #then no reservation evaluation starts [2.34ms]
-(pass) memory wiring reflection policy > #given the memory block is absent #when an automatic settle arrives #then schema-default reflection remains enabled [3.09ms]
-(pass) memory footer live wiring > #given a spinner animating mid-session #when the footer is cleared #then the interval is released and nothing repaints [7.67ms]
-(pass) memory footer live wiring > #given a spinner animating mid-session #when the session shuts down #then the animation interval is released [15.92ms]
-
-packages/omo-senpi/src/components/memory/recall-notice.test.ts:
-(pass) renderRecallEntry > #given surfaced recall paths #when the entry renders collapsed #then the compact title names every path [1.81ms]
-(pass) renderRecallEntry > #given a record without paths #when the entry renders #then nothing is drawn [0.10ms]
-(pass) renderRecallEntry > #given the renderer channel #when its custom type is read #then it matches the injected recall message [0.10ms]
-
-packages/omo-senpi/src/components/memory/journal-wiring.test.ts:
-(pass) memory journal wiring > #given a 3-turn session with a tool call #when agent_settled fires #then rows are projected and steps equal 3 [10.56ms]
-(pass) memory journal wiring > #given turn 1 journaled before a crash #when session_start reconciles the full branch #then only missing rows are appended [7.79ms]
-(pass) memory journal wiring > #given role-custom entries in the branch #when settled #then only user and assistant rows journal, whatever the custom type [3.25ms]
-(pass) memory journal wiring > #given a tool-only assistant message #when settled #then no assistant row and no step increment [4.52ms]
-(pass) memory journal wiring > #given redacted and visible thinking blocks #when settled #then reasoning rows use the placeholder and source index [3.37ms]
-(pass) memory journal wiring > #given an aborted run with an error message #when settled #then rows still journal including an error row [4.73ms]
-(pass) memory journal wiring > #given message_end and turn_end #when dispatched #then nothing is written and only settle/start handlers exist [2.02ms]
-(pass) memory journal wiring > #given block-structured user content and split assistant texts #when settled #then texts concatenate canonically [4.00ms]
-(pass) memory journal wiring > #given a fresh session #when session_start fires #then the branch reconciles like a settle [16.60ms]
-(pass) memory journal wiring > #given an errored tool result #when settled #then the tool_call row joins resultOk false [3.15ms]
-(pass) memory journal wiring > #given a malformed event context #when handlers fire #then the reconcile is a no-op [0.28ms]
-(pass) memory journal wiring > #given the journal lock is contended by a live foreign owner #when agent_settled fires #then the handler degrades to a no-op and warns instead of rejecting [5007.62ms]
-
-packages/omo-senpi/src/components/memory/index.test.ts:
-(pass) createMemoryComponent > #given missing custom-entry capabilities #when registered #then it warns once and registers nothing [0.65ms]
-(pass) createMemoryComponent > #given no memory section #when config resolves #then memory defaults enabled with the auto identity [0.23ms]
-(pass) createMemoryComponent > #given no memory key in config #when resolved through adapter fallback #then it matches parsing {} through the schema [0.20ms]
-(pass) createMemoryComponent > #given disabled config or a global/component disable flag #when registered #then the host registration surface is byte-identical [0.31ms]
-(pass) createMemoryComponent > #given a memory child sentinel in env #when registered #then memory registers nothing so a forked child cannot recurse [0.21ms]
-(pass) createMemoryComponent > #given the sentinel is absent or not exactly 1 #when registered #then memory stays enabled [1.06ms]
-(pass) createMemoryComponent > #given enabled memory #when session_start binds an auto identity #then it appends a hidden binding and performs no filesystem writes [1.70ms]
-(pass) createMemoryComponent > #given a resumed session bound to another identity #when session_start resolves fresh config #then it notifies an error and fails closed without rebinding [0.80ms]
-(pass) createMemoryComponent > #given enablement latched false or true at session_start #when config reload flips it #then registration stays fixed and restart notice appears once [3.76ms]
-(pass) createMemoryComponent > #given per-instance module state #when session_shutdown fires #then the identity context and supervisor reference are released [2.62ms]
-(pass) createMemoryComponent > #given a stale footer #when session start exits disabled or conflicted #then the status is cleared first [1.54ms]
-
-packages/omo-senpi/src/components/memory/recall-reingestion.test.ts:
-(pass) recall re-ingestion guard > #given an injected recall hint in the branch #when session entries are projected #then only real conversation rows survive [0.31ms]
-(pass) recall re-ingestion guard > #given a reconciled session containing a recall hint #when the facts payload and the reflection snapshot read the journal #then neither carries the hint [5.79ms]
-
- 175 pass
- 0 fail
- 529 expect() calls
-Ran 175 tests across 16 files. [25.87s]
-
-$ combined-head cleanup and ancestry checks
-PASS: both parents are ancestors; isolation cleanup preserved; stale hooks patch absent; Claude diagnostic retained
+ 46 expect() calls
+Ran 20 tests across 4 files. [1452.00ms]
 
 FOCUSED_STATUS=PASS
-
-$ bun test packages/omo-senpi/src/components/init-deep-advisor/state.test.ts packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts packages/omo-senpi/src/components/task/dag-tool.test.ts (combined-head focused attribution after aggregate timeouts)
-bun test v1.4.0 (34cbb9a40)
-
-packages/omo-senpi/src/components/init-deep-advisor/state.test.ts:
-(pass) getAdvisorStateDir > #given an agent home env #when resolving the advisor state dir #then it nests under the omo-native state dir [4.89ms]
-(pass) repoHash > #given the same repo #when hashing twice #then the hash is stable [38.58ms]
-(pass) repoHash > #given two distinct repos #when hashing #then the hashes differ [56.71ms]
-Preparing worktree (new branch 'linked-branch')
-(pass) repoHash > #given a linked worktree of one repo #when hashing #then it shares the main repo hash [46.18ms]
-(pass) global and project declines > #given a fresh state dir #when writing a global decline #then it reads back as declined [0.77ms]
-(pass) global and project declines > #given a nested state dir that does not exist yet #when writing a project decline #then the parent is created [0.71ms]
-(pass) global and project declines > #given a project decline for one repo #when checking another repo #then it is not declined [1.01ms]
-(pass) cooldown > #given a cooldown written now #when reading the deadline #then it is COOLDOWN_DAYS ahead [0.60ms]
-(pass) cooldown > #given no cooldown record #when reading the deadline #then it returns 0 [0.38ms]
-(pass) cooldown > #given a malformed cooldown record #when reading the deadline #then it returns 0 [0.40ms]
-(pass) cooldown > #given a cooldown record with a non-number until #when reading the deadline #then it returns 0 [0.53ms]
-(pass) last proposed head > #given a written head #when reading it back #then it round-trips [0.57ms]
-(pass) last proposed head > #given no proposal record #when reading the head #then it returns null [0.31ms]
-(pass) last proposed head > #given a malformed proposal record #when reading the head #then it returns null [0.60ms]
-(pass) readSnapshot > #given no snapshot file #when reading #then it reports missing [0.81ms]
-(pass) readSnapshot > #given a complete valid snapshot #when reading #then it reports valid with the parsed snapshot [0.81ms]
-(pass) readSnapshot > #given a snapshot with extra fields #when reading #then it stays valid (forward compatible) [0.44ms]
-(pass) readSnapshot > #given unparseable JSON #when reading #then it reports invalid [0.48ms]
-(pass) readSnapshot > #given non-object JSON roots #when reading #then each reports invalid [1.55ms]
-(pass) readSnapshot > #given a snapshot missing a required field #when reading #then it reports invalid [0.52ms]
-(pass) readSnapshot > #given a snapshot with wrong field types #when reading #then it reports invalid [0.34ms]
-(pass) readSnapshot > #given negative or non-finite numbers #when reading #then it reports invalid [0.65ms]
-(pass) readSnapshot > #given a mode outside the frozen enum #when reading #then it reports invalid [0.43ms]
-
-packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts:
-(pass) task RPC launch profile parity > #given ambient PATH resolves a foreign senpi #when the catalog spawn is built #then it pins the package-local CLI [0.43ms]
-(pass) task RPC launch profile parity > #given an explicit provider extension #when process model admission runs #then its model is visible without credentials [2451.03ms]
-(pass) task RPC launch profile parity > #given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch [7493.85ms]
-
-packages/omo-senpi/src/components/task/dag-tool.test.ts:
-(pass) dag tool registration > #given the workflow tool factory #when a tool is created #then it registers exactly one tool named workflow [10.61ms]
-(pass) dag tool start action > #given a valid definition #when start runs #then a run_id and snapshot round-trip through the DagManager [98.30ms]
-(pass) dag tool start action > #given an identical definition #when start runs twice #then the second call reuses the same run [121.86ms]
-(pass) dag tool start action > #given start without a definition #when the tool runs #then it rejects with invalid_definition [1.01ms]
-(pass) dag tool definition validation > #given a cyclic definition #when start runs #then it is rejected with diagnostics and NO run is created [1.68ms]
-(pass) dag tool definition validation > #given a node with both category and model #when start runs #then it is rejected with category_with_model [0.77ms]
-(pass) dag tool definition validation > #given a node with both category and subagent_type #when start runs #then it is rejected with both_targets [0.89ms]
-(pass) dag tool definition validation > #given a node with neither category nor subagent_type #when start runs #then it is rejected with no_target [0.94ms]
-(pass) dag tool definition validation > #given a node with subagent_type and model #when start runs #then the explicit-model spawn is accepted [102.92ms]
-(pass) dag tool attach and snapshot actions > #given a started run #when attach runs #then it round-trips the live snapshot [90.92ms]
-(pass) dag tool attach and snapshot actions > #given a started run #when snapshot runs #then it returns the manager's projection [82.90ms]
-(pass) dag tool attach and snapshot actions > #given an unknown run id #when snapshot runs #then it rejects with run_not_found [0.81ms]
-(pass) dag tool attach and snapshot actions > #given a run owned by another session #when snapshot runs #then it rejects with run_not_owned [100.50ms]
-(pass) dag tool wait action > #given a started run #when wait runs with detach disabled #then it blocks and resolves through the injected wait surface [107.48ms]
-(pass) dag tool wait action > #given a started run #when wait runs with the default detach #then it returns a detached envelope without touching the wait surface [91.56ms]
-(pass) dag tool wait action > #given a run that already settled #when wait runs with the default detach #then it still returns the final result through the wait surface [104.17ms]
-(pass) dag tool wait action > #given no wait surface is wired #when wait runs #then ownership is still enforced before dispatch [0.94ms]
-(pass) dag tool cancel action > #given a started run #when cancel runs #then the reason reaches the injected cancel seam [76.50ms]
-(pass) dag tool cancel action > #given a run owned by another session #when cancel runs #then it rejects with run_not_owned and never dispatches [115.04ms]
-(pass) dag tool start warnings > #given a definition violating the node prompt contract #when start runs #then the run starts AND the result carries advisory warnings [84.07ms]
-(pass) dag tool start warnings > #given a contract-complete definition #when start runs #then warnings are empty [83.59ms]
-(pass) dag tool argument validation for the control verbs > #given retry without run_id #when the tool runs #then it rejects with run_not_found and never reaches the retry seam [1.00ms]
-(pass) dag tool argument validation for the control verbs > #given retry with BOTH node_id and node_ids #when the tool runs #then it rejects with invalid_arguments and never reaches the retry seam [89.63ms]
-(pass) dag tool argument validation for the control verbs > #given send without a message #when the tool runs #then it rejects with invalid_arguments and never reaches the send seam [111.12ms]
-(pass) dag tool argument validation for the control verbs > #given send without a node_id #when the tool runs #then it rejects with invalid_arguments [99.91ms]
-(pass) dag tool argument validation for the control verbs > #given amend without a definition #when the tool runs #then it rejects with invalid_arguments and never reaches the amend seam [99.89ms]
-(pass) dag tool argument validation for the control verbs > #given a retry prompt override alongside node_ids #when the tool runs #then it rejects with invalid_arguments [100.91ms]
-(pass) dag tool argument validation for the control verbs > #given an amend definition whose nodes carry an impossible target #when the tool runs #then node validation rejects it before the amend seam [114.42ms]
-(pass) dag tool control verb dispatch > #given a retry seam #when retry runs with node_ids and a prompt #then the seam receives them and the snapshot round-trips [129.36ms]
-(pass) dag tool control verb dispatch > #given retry with neither node selector #when retry runs #then the seam is called with no node ids (retry every failed node) [85.51ms]
-(pass) dag tool control verb dispatch > #given a send seam #when send runs #then the delivery kind reaches the caller [93.36ms]
-(pass) dag tool control verb dispatch > #given an amend seam #when amend runs #then the compiled definition reaches it and the amended snapshot returns [92.98ms]
-(pass) dag tool control verb refusal vocabulary > #given the engine refuses with node_not_found #when the tool dispatches #then the code surfaces verbatim in the error envelope [114.28ms]
-(pass) dag tool control verb refusal vocabulary > #given the engine refuses with node_not_retryable #when the tool dispatches #then the code surfaces verbatim in the error envelope [105.01ms]
-(pass) dag tool control verb refusal vocabulary > #given the engine refuses with node_not_continuable #when the tool dispatches #then the code surfaces verbatim in the error envelope [103.67ms]
-(pass) dag tool control verb refusal vocabulary > #given the engine refuses with run_still_active #when the tool dispatches #then the code surfaces verbatim in the error envelope [118.44ms]
-(pass) dag tool control verb refusal vocabulary > #given the engine refuses with invalid_arguments #when the tool dispatches #then the code surfaces verbatim in the error envelope [114.35ms]
-(pass) dag tool control verb refusal vocabulary > #given the engine refuses an amendment #when amend dispatches #then invalid_amendment surfaces verbatim [103.15ms]
-(pass) dag tool control verb refusal vocabulary > #given the engine refuses to amend running nodes #when amend dispatches #then amend_running_node surfaces verbatim [111.33ms]
-(pass) dag tool control verb refusal vocabulary > #given a run owned by another session #when retry dispatches #then run_not_owned is enforced before the retry seam [87.56ms]
-(pass) dag tool control verb schema > #given the shipped tool #when its action union is read #then retry, send, and amend are offered with verb-teaching descriptions [0.98ms]
-
- 67 pass
- 0 fail
- 169 expect() calls
-Ran 67 tests across 3 files. [20.33s]

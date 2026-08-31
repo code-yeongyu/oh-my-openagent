@@ -1,8 +1,7 @@
-sourceHead=c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71
-upstreamDev=c53faf72fd05c32be7521eb8e406685cb1eb4115
+sourceHead=074bd7ebe8030a3e92ff010665fdc1ed71835332
 
 $ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
-status=0; generated extension bundles current after merge and after the serialized gate
+status=0; generated extension bundles current before and after the serialized gate attempt
 
 $ bun x tsgo --noEmit -p packages/omo-native/tsconfig.json
 status=0
@@ -16,14 +15,14 @@ status=0
 $ bun run typecheck:script
 status=0
 
-$ bunx biome lint packages/omo-senpi/scripts/qa/drive.mjs packages/omo-senpi/scripts/qa/isolation-state.mjs packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
+$ bunx biome lint packages/omo-senpi/scripts/qa/isolation-state.mjs packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/drive.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
 status=0; informational existing literal-key suggestions only
 
-$ bun run .../check-no-excuse-rules.ts packages/omo-senpi/scripts/qa/task-13.test.ts packages/omo-native/test/compile-entry-oauth-registration.test.ts
+$ bun run .../check-no-excuse-rules.ts packages/omo-senpi/scripts/qa/task-13.test.ts
 status=0; no violations
 
 LSP diagnostics:
-- packages/omo-senpi/scripts/qa/drive.mjs: none
-- packages/omo-senpi/scripts/qa/isolation-state.mjs: none
-- packages/omo-senpi/src/components/memory/recall-wiring.ts: none
-- packages/senpi-task/src/dag/scheduler.ts: none
+- isolation-state.mjs: none
+- isolation-state.test.mjs: none
+- drive.mjs: none
+- task-13.test.ts: none

@@ -1,5 +1,5 @@
 {
-  "sourceHead": "c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71",
+  "sourceHead": "074bd7ebe8030a3e92ff010665fdc1ed71835332",
   "ok": true,
   "checks": {
     "exactSourceHead": true,
@@ -7,10 +7,13 @@
     "callerIgnored": true,
     "callerNotReused": true,
     "sandboxWasRemoved": true,
+    "protectedSnapshotsComplete": true,
+    "protectedErrorsEmpty": true,
     "protectedIsolationPass": true,
     "protectedChangedPathsEmpty": true,
     "arrayFieldsPresent": true,
     "booleanFieldsPresent": true,
+    "observationBytesBounded": true,
     "observationLimitsPresent": true,
     "protectedSetExact": true
   }

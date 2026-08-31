@@ -1,0 +1,33 @@
+{
+  "validatedSourceHead": "074bd7ebe8030a3e92ff010665fdc1ed71835332",
+  "baseHead": "30443d97c09bbb4eec3ca57035b7c88ad8690e14",
+  "red": {
+    "exitCode": 1,
+    "pass": 3,
+    "fail": 5
+  },
+  "green": {
+    "isolationAndDriverPass": 19,
+    "oauthCompileEntryPass": 26,
+    "packagePinPass": 20,
+    "resolverPass": 10
+  },
+  "protectedContract": {
+    "failClosed": true,
+    "structuredRelativeErrors": true,
+    "contentEmitted": false,
+    "hashesEmitted": false
+  },
+  "observationContract": {
+    "descriptorChunkHashing": true,
+    "hardPerSnapshotByteBound": 67108864,
+    "shortReadExplicit": true,
+    "growthExplicit": true,
+    "replacementExplicit": true
+  },
+  "serializedSenpiGate": {
+    "status": "BLOCKED_BEFORE_TESTS",
+    "cause": "ENOSPC during npm ci in build:senpi-plugin:stage",
+    "rerun": false
+  }
+}
