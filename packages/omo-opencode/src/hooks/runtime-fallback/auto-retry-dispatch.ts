@@ -34,6 +34,8 @@ export function createAutoRetryDispatcher(
     pluginConfig,
   } = deps
 
+  const acceptedDispatchTuples = new Map<string, string>()
+
   return async (
     sessionID: string,
     newModel: string,
@@ -118,6 +120,17 @@ export function createAutoRetryDispatcher(
               return [createRuntimeFallbackRetryTextPart("continue")]
             })()
       const retryMessageID = usingFetchedUserParts ? originalRetryMetadata.messageID : undefined
+      const acceptedTuple = `${retryMessageID ?? ""}\u0000${effectiveRetryModel}`
+      if (
+        sessionAwaitingFallbackResult.has(sessionID) &&
+        acceptedDispatchTuples.get(sessionID) === acceptedTuple
+      ) {
+        log(`[${HOOK_NAME}] Auto-retry skipped - identical dispatch already accepted and progressing (${source})`, {
+          sessionID,
+          model: newModel,
+        })
+        return { accepted: false, status: "blocked", reason: "identical fallback dispatch already accepted" }
+      }
       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
         sessionID,
         model: newModel,
@@ -237,6 +250,7 @@ export function createAutoRetryDispatcher(
         state.pendingFallbackPromptMayHaveBeenAccepted = false
       }
       retryDispatched = true
+      acceptedDispatchTuples.set(sessionID, acceptedTuple)
       return { accepted: true, status: acceptedStatus }
     } catch (retryError) {
       if (!(retryError instanceof Error)) {

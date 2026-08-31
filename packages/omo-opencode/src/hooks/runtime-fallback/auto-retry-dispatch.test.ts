@@ -640,4 +640,60 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     await currentRetry
     expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
   })
+
+  test("#given an accepted fallback dispatch still awaiting its result #when the identical retry is dispatched again #then the dispatcher refuses without a second promptAsync", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    deps.ctx.client.session.messages = async () => ({
+      data: [
+        {
+          info: { id: "msg-original-user", role: "user" },
+          parts: [{ type: "text", text: "retry this" }],
+        },
+      ],
+    })
+    const sessionID = "session-identical-redispatch"
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+    const helpers = createAutoRetryHelpers(deps)
+
+    // given - the first fallback dispatch is accepted
+    const first = await helpers.autoRetryWithFallback(sessionID, "test-provider/test-model", undefined, "session.error")
+    expect(first.accepted).toBe(true)
+    expect(promptCalls.count).toBe(1)
+
+    // when the same user message and model are dispatched again while the result is awaited
+    releaseAllPromptAsyncReservationsForTesting()
+    const second = await helpers.autoRetryWithFallback(sessionID, "test-provider/test-model", undefined, "session.status")
+
+    // then
+    expect(second.accepted).toBe(false)
+    expect(second.reason).toBe("identical fallback dispatch already accepted")
+    expect(promptCalls.count).toBe(1)
+  })
+
+  test("#given an accepted fallback dispatch awaiting its result #when the timeout escalates to the next model #then escalation is not blocked by the identical-dispatch refusal", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-escalation-still-allowed"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.currentModel = "test-provider/test-model"
+    state.fallbackIndex = 0
+    deps.sessionStates.set(sessionID, state)
+    const helpers = createAutoRetryHelpers(deps)
+
+    // given
+    const first = await helpers.autoRetryWithFallback(sessionID, "test-provider/test-model", undefined, "session.error")
+    expect(first.accepted).toBe(true)
+    releaseAllPromptAsyncReservationsForTesting()
+
+    // when the escalation dispatches a different model
+    const escalated = await helpers.autoRetryWithFallback(sessionID, "test-provider/next-model", undefined, "session.timeout")
+
+    // then
+    expect(escalated.accepted).toBe(true)
+    expect(promptCalls.count).toBe(2)
+    expect(deps.sessionStates.get(sessionID)?.pendingFallbackModel).toBe("test-provider/next-model")
+  })
 })
