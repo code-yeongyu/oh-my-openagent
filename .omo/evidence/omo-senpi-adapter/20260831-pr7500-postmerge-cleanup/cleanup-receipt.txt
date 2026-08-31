@@ -1,7 +1,9 @@
+validatedSourceHead=c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71
 cleanupStatus=PASS
 taskOwnedTempPathCount=0
 taskOwnedProcessCount=0
-liveDriverSandbox=/home/minpeter/.cache/omo-tmp/omo-senpi-qa-YmADak/agent
+worktreeLspDaemonCount=0
+liveDriverSandbox=/home/minpeter/.cache/omo-tmp/omo-senpi-qa-baJDAH/agent
 liveDriverSandboxRemoved=true
 callerAgentDirectoryRemoved=true
 compiledOauthInputShredded=true

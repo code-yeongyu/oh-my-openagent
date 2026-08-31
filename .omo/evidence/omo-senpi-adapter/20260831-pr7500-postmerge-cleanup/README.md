@@ -1,4 +1,6 @@
-# PR #7500 post-merge cleanup: final review evidence
+# PR #7500 post-merge cleanup: final combined-head evidence
+
+Validated production/source head: `c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71`, the normal merge of cleanup head `704431497b0bd88ed498aa1db26ee563fde31a58` with `origin/dev` `c53faf72fd05c32be7521eb8e406685cb1eb4115`. The final evidence-only follow-up does not change validated runtime source.
 
 ## What was tested
 
@@ -16,34 +18,43 @@
   [`packed-install-verdict.json`](packed-install-verdict.json).
 - Compiled Linux OAuth credential derivation:
   [`compiled-oauth-verdict.json`](compiled-oauth-verdict.json).
+- Merge ancestry and exact-head gate summary: [`post-merge-receipt.json`](post-merge-receipt.json).
 - Task-owned resource removal and secret shredding: [`cleanup-receipt.txt`](cleanup-receipt.txt).
 
 ## What was observed
 
-- The driver contract failed first because protected snapshots, bounded observations, and final JSON
-  fields did not exist. GREEN is 14 pass / 0 fail across isolation and task-13 tests.
-- The real live driver returned `PASS`, ignored the caller agent directory, used and removed its own
-  sandbox, and reported empty protected changed paths for both `~/.senpi/agent` and `~/.omo/agent`.
+- The conflict-free merge preserved the cleanup isolation implementation and added current-dev memory
+  recall, DAG queued-promotion handling, and regenerated OMO Senpi bundles.
+- The real live driver returned `PASS` on the combined source head, ignored the caller agent
+  directory, removed its sandbox, and reported empty protected changed paths for both real homes.
 - Full-tree observation was explicitly truncated for both homes at 10,000 files / 64 MiB / 20,000
-  entries. It reported no observation errors. An ambient `~/.omo` change to `OmO-debug.log` was observed separately and were not attributed to QA or described as full-home
-  integrity.
+  entries with no observation errors. Ambient `~/.omo` changes to `OmO-debug.log` and `settings.json`
+  were reported separately and were not attributed to QA or described as full-home integrity.
 - OAuth/compile-entry tests: 26 pass. Driver/isolation tests: 14 pass. Package/pin/layout tests:
-  30 pass. Build-binary tests: 21 pass / 1 unavailable-platform skip.
-- The serialized Senpi gate passed 2,427 tests with 7 platform skips and 0 failures; the resolver
-  contract passed 10 tests.
+  30 pass. Merged memory/DAG tests: 175 pass. The three files affected by aggregate timeouts passed
+  67 focused tests with 0 failures on the exact source head.
+- The one serialized `bun run test:senpi` aggregate reached 2,445 pass and 7 platform skips, then
+  recorded 8 timeout-only failures under workstation load. All affected tests passed immediately as
+  one focused exact-source run, and those test files are byte-identical to upstream dev. This is
+  recorded as a nonreproducing aggregate timeout result, not mislabeled as a green full gate or as a
+  proven baseline product failure.
+- The resolver contract passed 10 tests. Extension freshness, OMO Native, OMO Senpi, Senpi Task, and
+  script typechecks passed.
 - `npm pack --dry-run` passed with 4,224 files. The clean consumer installed `omo-ai`
-  `5.0.0-0.beta.30` and resolved pristine registry Senpi `2026.8.30-3` from the URL recorded in the
-  packed-install verdict.
-- The compiled Linux binary derived an exact 64-byte OpenAI Codex bearer token from mode-0600
-  isolated state, exited 0, and emitted no stderr. Input and captured output were shredded.
+  `5.0.0-0.beta.30` and resolved pristine registry Senpi `2026.8.30-3`.
+- Because current dev changed generated bundles embedded by the binary, compiled Linux OAuth was
+  rebuilt and rerun: exact 64-byte token match, mode 0600, exit 0, and no stderr. Input and captured
+  output were shredded.
 
 ## Why this is sufficient
 
 Protected paths are the isolation verdict and include `auth.json`, `settings.json`, `models.json`,
 `models-store.json`, `trust.json`, and `hooks-state.json`. Bounded recursive snapshots independently
 report observed paths, completion, truncation, and errors, so a large or concurrently active home can
-never be mislabeled untouched. The live harness proof is backed by unit contracts, package/build
-gates, a clean packed consumer, and a compiled-binary OAuth derivation through the shipped surface.
+never be mislabeled untouched. The live harness proof is backed by unit contracts, merged memory/DAG coverage, package/build gates,
+a clean packed consumer, and a rebuilt compiled-binary OAuth derivation through the shipped surface.
+The aggregate timeout result and its passing focused attribution are both retained so reviewers do
+not have to infer or trust an undocumented green claim.
 
 ## External gate
 

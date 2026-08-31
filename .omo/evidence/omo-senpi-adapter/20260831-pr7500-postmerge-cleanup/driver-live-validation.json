@@ -1,6 +1,8 @@
 {
+  "sourceHead": "c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71",
   "ok": true,
   "checks": {
+    "exactSourceHead": true,
     "resultPass": true,
     "callerIgnored": true,
     "callerNotReused": true,

@@ -1,4 +1,5 @@
 {
+  "sourceHead": "c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71",
   "result": "PASS",
   "ultraworkInjected": true,
   "commentChecker": "PASS",
@@ -8,7 +9,8 @@
   "realOmoChangedPaths": [],
   "realSenpiObservedChangedPaths": [],
   "realOmoObservedChangedPaths": [
-    "OmO-debug.log"
+    "OmO-debug.log",
+    "settings.json"
   ],
   "realSenpiObservationComplete": false,
   "realSenpiObservationTruncated": true,
@@ -34,6 +36,6 @@
     "/home/minpeter/.omo/agent"
   ],
   "providedSenpiCodingAgentDir": "IGNORED",
-  "sandboxAgentDir": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-YmADak/agent",
-  "sandboxCwd": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-YmADak/project"
+  "sandboxAgentDir": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-baJDAH/agent",
+  "sandboxCwd": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-baJDAH/project"
 }

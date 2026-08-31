@@ -1,4 +1,6 @@
 {
+  "sourceHead": "c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71",
+  "rerunReason": "origin/dev changed generated omo-senpi runtime bundles embedded in the compiled payload",
   "ok": true,
   "credentialBytes": 64,
   "stdoutBytes": 65,
@@ -6,5 +8,5 @@
   "exactMatch": true,
   "credentialFileMode": "0600",
   "exitCode": 0,
-  "binarySha256": "a84d0c1ead611ce8ec08f75a7faf3c64b60fb3b9507f181d523e414628346f03"
+  "binarySha256": "9be6381409762114211a1a1eca1fee3a51f11be8233d91da1ecfc3ae3de9b42d"
 }

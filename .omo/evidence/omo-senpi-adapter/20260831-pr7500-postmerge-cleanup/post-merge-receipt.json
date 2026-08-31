@@ -1,0 +1,23 @@
+{
+  "validatedSourceHead": "c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71",
+  "cleanupParent": "704431497b0bd88ed498aa1db26ee563fde31a58",
+  "upstreamDevParent": "c53faf72fd05c32be7521eb8e406685cb1eb4115",
+  "mergeConflictFree": true,
+  "cleanupParentIsAncestor": true,
+  "upstreamDevIsAncestor": true,
+  "generatedExtensionCurrent": true,
+  "upstreamTouchedCompiledPayloadInputs": true,
+  "compiledOauthRerun": true,
+  "fullGate": {
+    "pass": 2445,
+    "skip": 7,
+    "timeoutFailures": 8,
+    "affectedFocusedRerunPass": 67,
+    "affectedFocusedRerunFail": 0,
+    "affectedTestsIdenticalToUpstreamDev": true
+  },
+  "resolverTests": {
+    "pass": 10,
+    "fail": 0
+  }
+}
