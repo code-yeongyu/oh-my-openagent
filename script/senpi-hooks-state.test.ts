@@ -49,7 +49,7 @@ describe("patched Senpi hooks state snapshots", () => {
   test("recovers a trusted snapshot at a synchronized legacy truncate/write boundary", () => {
     const runner = join(import.meta.dir, "fixtures", "senpi-hooks-state-legacy-reader.ts")
     const child = spawnSync(process.execPath, [runner], { encoding: "utf8", timeout: 10_000 })
-    if (child.error?.code === "ETIMEDOUT") {
+    if (child.error !== undefined && "code" in child.error && child.error.code === "ETIMEDOUT") {
       const marker = join(tmpdir(), `omo-hooks-legacy-reader-${child.pid}.json`)
       try {
         const { root, writerPid } = JSON.parse(readFileSync(marker, "utf8")) as { root: string; writerPid?: number }
