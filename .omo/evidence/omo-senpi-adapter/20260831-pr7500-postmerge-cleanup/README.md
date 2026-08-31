@@ -31,10 +31,12 @@
 ## External gate
 
 Normal packed `omo-ai` installs resolve pristine registry Senpi `2026.8.30-3`; the repository-root
-Bun patch is not applied inside a clean consumer install. Hooks behavior therefore remains gated on
-a published Senpi release containing approved Senpi source commit `0ff5b97f` (Senpi PR #1210).
-This cleanup does **not** claim that npm-installed hooks are fixed. A future release gate must test a
-clean packed install against that published Senpi version; `ELOCKED` is not a green feature result.
+Bun patch is not applied inside a clean consumer install. Senpi PR #1210 merged as
+`9e65ad35974b2cee055544301445de56cd822f1d` from reviewed head
+`9644a13027f8bbe837a830578bfcff35ea715dec`; hooks behavior therefore remains gated only on
+publishing a Senpi release containing that merged implementation, pinning the published version in
+OMO, and testing a clean packed install against it. This cleanup does **not** claim that
+npm-installed hooks are fixed; `ELOCKED` is not a green feature result.
 
 ## Isolation and status
 
