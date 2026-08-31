@@ -59,10 +59,10 @@ not have to infer or trust an undocumented green claim.
 ## External gate
 
 Senpi PR #1210 merged as `9e65ad35974b2cee055544301445de56cd822f1d` from reviewed head
-`9644a13027f8bbe837a830578bfcff35ea715dec`. Packed OMO still resolves registry Senpi
-`2026.8.30-3`, whose pristine hooks markers are recorded in the packed-install verdict. Hooks are not
-green for npm consumers until Senpi publishes the merged implementation, OMO pins that release, and
-a clean packed-install hooks test passes. `ELOCKED` is not a green result.
+`9644a13027f8bbe837a830578bfcff35ea715dec`. Senpi `2026.8.31`, which contains that merge, is now
+published. Packed OMO still resolves registry Senpi `2026.8.30-3`, whose pristine hooks markers are
+recorded in the packed-install verdict. Hooks are not green for npm consumers until OMO pins
+`2026.8.31` and a clean packed-install hooks test passes. `ELOCKED` is not a green result.
 
 ## What was omitted or redacted
 

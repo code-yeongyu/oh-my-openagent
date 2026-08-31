@@ -14,5 +14,5 @@
     "completeSnapshotFastPathAbsent": true
   },
   "hooksFeatureResult": "NOT_GREEN_EXTERNAL_GATE",
-  "externalGate": "Publish Senpi containing merged 9e65ad35 from reviewed 9644a130, pin OMO to it, then pass a clean packed-install hooks test; ELOCKED is not success."
+  "externalGate": "Senpi 2026.8.31 containing merged 9e65ad35 from reviewed 9644a130 is published; pin OMO to 2026.8.31, then pass a clean packed-install hooks test. ELOCKED is not success."
 }
