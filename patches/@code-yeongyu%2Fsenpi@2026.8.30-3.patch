@@ -22,3 +22,55 @@ diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump
          }
          return false;
      }
+diff --git a/dist/core/agent-session.js b/dist/core/agent-session.js
+--- a/dist/core/agent-session.js
++++ b/dist/core/agent-session.js
+@@ -4840,8 +4840,8 @@
+             this._delegatedCompactionKey.provider === model.provider &&
+             this._delegatedCompactionKey.id === model.id);
+     }
+-    async _runPrePromptCompaction(lastAssistantMessage, skipAbortedCheck, reason = "pre_prompt", willRetry = false, allowSummaryOnly = false) {
+-        if (this._isCompactionDelegated())
++    async _runPrePromptCompaction(lastAssistantMessage, skipAbortedCheck, reason = "pre_prompt", willRetry = false, allowSummaryOnly = reason === "overflow") {
++        if (reason !== "overflow" && this._isCompactionDelegated())
+             return false;
+         const controller = new AbortController();
+         const requestId = randomUUID();
+@@ -5015,7 +5015,7 @@
+      * @returns Whether the post-run loop should call `agent.continue()`
+      */
+     async _runAutoCompaction(reason, willRetry) {
+-        if (this._isCompactionDelegated())
++        if (reason !== "overflow" && this._isCompactionDelegated())
+             return false;
+         const finishCompactionWork = this._sessionWorkBarrier.begin();
+         const agentMessagesAtStart = this.agent.state.messages.slice();
+@@ -5062,7 +5062,7 @@
+             }
+             if (!this._ownsCompactionController(autoCompactionController, "auto"))
+                 return false;
+-            const preparation = prepareCompaction(this.sessionManager.getBranch(), cursorOverflowCompactionSettings(this.settingsManager.getCompactionSettings(), this.model?.provider, reason), reason === "overflow");
++            const preparation = prepareCompaction(this.sessionManager.getBranch(), cursorOverflowCompactionSettings(this.settingsManager.getCompactionSettings(), this.model?.provider, reason), reason === "overflow", reason === "overflow");
+             if (!preparation) {
+                 return endBeforeExecution();
+             }
+@@ -5075,6 +5075,7 @@
+                 reason,
+                 requestId,
+                 willRetry,
++                allowSummaryOnly: reason === "overflow",
+                 agentMessagesAtStart,
+             });
+             if (!execution.accepted) {
+diff --git a/dist/core/extensions/builtin/compaction/index.js b/dist/core/extensions/builtin/compaction/index.js
+--- a/dist/core/extensions/builtin/compaction/index.js
++++ b/dist/core/extensions/builtin/compaction/index.js
+@@ -448,7 +448,7 @@
+         let warmJobConsumed = false;
+         invalidateSpeculativeCompaction(ctx);
+         try {
+-            if (lanePolicy.disablesSenpiCompaction(ctx)) {
++            if (lanePolicy.disablesSenpiCompaction(ctx) && event.reason !== "overflow") {
+                 return {
+                     cancel: true,
+                     rejectionCause: "external-owner",
