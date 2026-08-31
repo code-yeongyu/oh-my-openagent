@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
@@ -7,61 +6,29 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { createRequire } from "node:module"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
+import {
+  changedSnapshotPaths,
+  digestDirectory,
+  OBSERVATION_LIMITS,
+  PROTECTED_STATE_FILES,
+  snapshotDirectory,
+  snapshotProtectedState,
+} from "./isolation-state.mjs"
+
+export { credentialDigest, digestDirectory } from "./isolation-state.mjs"
+
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
 const repoRoot = resolve(packageRoot, "..", "..")
 const pluginRoot = join(packageRoot, "plugin")
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
+const realOmoAgentDir = join(homedir(), ".omo", "agent")
 const commentCheckerHeader = "comment-checker found issues in"
 
-// Isolation is proven by these four files staying byte-identical: a live dev machine writes
-// senpi-debug.log, mcp caches, and concurrent session JSONL into the real agent dir throughout any
-// run, so a whole-directory digest can only ever be informational. settings.json is compared after
-// dropping its volatile interactive-session stamps (tipsHistory, lastChangelogVersion): a concurrent
-// host TUI rewrites those on its own lifecycle events, which cannot identify QA pollution.
-const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
-
-export function credentialDigest(agentDir) {
-  const hash = createHash("sha256")
-  for (const name of CREDENTIAL_FILES) {
-    const path = join(agentDir, name)
-    hash.update(name)
-    hash.update("\0")
-    hash.update(existsSync(path) ? credentialBytes(path, name) : Buffer.from("absent"))
-    hash.update("\0")
-  }
-  return hash.digest("hex")
-}
-
-function credentialBytes(path, name) {
-  const content = readFileSync(path)
-  if (name !== "settings.json") return content
-  try {
-    const settings = JSON.parse(content.toString("utf8"))
-    if (typeof settings !== "object" || settings === null || Array.isArray(settings)) return content
-    delete settings.tipsHistory
-    delete settings.lastChangelogVersion
-    return JSON.stringify(settings)
-  } catch {
-    return content
-  }
-}
-
-export function digestDirectory(root) {
-  if (!existsSync(root)) return "absent"
-  const files = []
-  collectFiles(root, files)
-  const hash = createHash("sha256")
-  for (const file of files.sort()) {
-    const rel = file.slice(root.length + 1)
-    hash.update(rel)
-    hash.update("\0")
-    hash.update(createHash("sha256").update(readFileSync(file)).digest("hex"))
-    hash.update("\0")
-  }
-  return hash.digest("hex")
-}
+// Protected top-level state determines the isolation verdict. Bounded full-tree observations are
+// supporting evidence only: concurrent host sessions legitimately update logs, caches, and session
+// JSONL, so observed paths are never attributed to QA.
 
 export function createSandbox() {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-senpi-qa-")))
@@ -141,7 +108,12 @@ function runSenpi(senpiBin, sandbox, prompt, script, extraEnv = {}) {
 
 function main() {
   const providedSenpiCodingAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset"
-  const beforeDigest = digestDirectory(realSenpiAgentDir)
+  const isolationBefore = {
+    senpiProtected: snapshotProtectedState(realSenpiAgentDir),
+    omoProtected: snapshotProtectedState(realOmoAgentDir),
+    senpiObserved: snapshotDirectory(realSenpiAgentDir),
+    omoObserved: snapshotDirectory(realOmoAgentDir),
+  }
   const sandbox = createSandbox()
   let commentChecker = "NOT-RUN"
   let ultraworkInjected = false
@@ -155,14 +127,14 @@ function main() {
     if (senpiBin.includes("/") && !existsSync(senpiBin)) {
       result = "SKIP"
       reason = "senpi-binary-unavailable"
-      return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, sandbox, providedSenpiCodingAgentDir })
+      return printResult({ result, reason, ultraworkInjected, commentChecker, isolationBefore, sandbox, providedSenpiCodingAgentDir })
     }
 
     const resolvedSenpi = senpiBin.includes("/") ? senpiBin : findOnPath(senpiBin)
     if (resolvedSenpi === null) {
       result = "SKIP"
       reason = "senpi-binary-unavailable"
-      return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, sandbox, providedSenpiCodingAgentDir })
+      return printResult({ result, reason, ultraworkInjected, commentChecker, isolationBefore, sandbox, providedSenpiCodingAgentDir })
     }
 
     const ultrawork = runSenpi(resolvedSenpi, sandbox, "ulw please respond", {
@@ -197,20 +169,39 @@ function main() {
     }
 
     result = ultraworkInjected && (commentChecker === "PASS" || commentChecker === "SKIPPED-no-binary") ? "PASS" : "FAIL"
-    return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, sandbox, providedSenpiCodingAgentDir })
+    return printResult({ result, reason, ultraworkInjected, commentChecker, isolationBefore, sandbox, providedSenpiCodingAgentDir })
   } finally {
     rmSync(sandbox.root, { recursive: true, force: true })
   }
 }
 
-function printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, sandbox, providedSenpiCodingAgentDir }) {
-  const afterDigest = digestDirectory(realSenpiAgentDir)
+function printResult({ result, reason, ultraworkInjected, commentChecker, isolationBefore, sandbox, providedSenpiCodingAgentDir }) {
+  const senpiProtectedAfter = snapshotProtectedState(realSenpiAgentDir)
+  const omoProtectedAfter = snapshotProtectedState(realOmoAgentDir)
+  const senpiObservedAfter = snapshotDirectory(realSenpiAgentDir)
+  const omoObservedAfter = snapshotDirectory(realOmoAgentDir)
+  const realSenpiChangedPaths = changedSnapshotPaths(isolationBefore.senpiProtected, senpiProtectedAfter)
+  const realOmoChangedPaths = changedSnapshotPaths(isolationBefore.omoProtected, omoProtectedAfter)
   const payload = {
     result,
     ...(reason ? { reason } : {}),
     ultraworkInjected,
     commentChecker,
-    realSenpiUntouched: beforeDigest === afterDigest,
+    realSenpiUntouched: realSenpiChangedPaths.length === 0,
+    realSenpiChangedPaths,
+    realOmoUntouched: realOmoChangedPaths.length === 0,
+    realOmoChangedPaths,
+    realSenpiObservedChangedPaths: changedSnapshotPaths(isolationBefore.senpiObserved.snapshot, senpiObservedAfter.snapshot),
+    realOmoObservedChangedPaths: changedSnapshotPaths(isolationBefore.omoObserved.snapshot, omoObservedAfter.snapshot),
+    realSenpiObservationComplete: isolationBefore.senpiObserved.complete && senpiObservedAfter.complete,
+    realSenpiObservationTruncated: isolationBefore.senpiObserved.truncated || senpiObservedAfter.truncated,
+    realSenpiObservationErrors: [...isolationBefore.senpiObserved.errors, ...senpiObservedAfter.errors],
+    realOmoObservationComplete: isolationBefore.omoObserved.complete && omoObservedAfter.complete,
+    realOmoObservationTruncated: isolationBefore.omoObserved.truncated || omoObservedAfter.truncated,
+    realOmoObservationErrors: [...isolationBefore.omoObserved.errors, ...omoObservedAfter.errors],
+    protectedStateFiles: PROTECTED_STATE_FILES,
+    observationLimits: OBSERVATION_LIMITS,
+    realHomesChecked: [realSenpiAgentDir, realOmoAgentDir],
     providedSenpiCodingAgentDir,
     sandboxAgentDir: sandbox.agentDir,
     sandboxCwd: sandbox.cwd,

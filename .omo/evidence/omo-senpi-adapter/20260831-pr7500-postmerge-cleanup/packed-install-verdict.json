@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "npmPackDryRun": {
+    "status": "PASS",
+    "fileCount": 4224,
+    "unpackedSize": 40718459
+  },
+  "packedOmoAiVersion": "5.0.0-0.beta.30",
+  "resolvedSenpiVersion": "2026.8.30-3",
+  "resolvedSenpiUrl": "https://registry.npmjs.org/@code-yeongyu/senpi/-/senpi-2026.8.30-3.tgz",
+  "pristineRegistryHooksMarkers": {
+    "randomUuidAtomicPublicationAbsent": true,
+    "completeSnapshotFastPathAbsent": true
+  },
+  "hooksFeatureResult": "NOT_GREEN_EXTERNAL_GATE",
+  "externalGate": "Publish Senpi containing merged 9e65ad35 from reviewed 9644a130, pin OMO to it, then pass a clean packed-install hooks test; ELOCKED is not success."
+}

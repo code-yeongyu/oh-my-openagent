@@ -167,11 +167,11 @@ describe("task 13 senpi QA scripts", () => {
 
   test("#given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result", async () => {
     let capturedProvider: CapturedProvider | undefined
-    const fakePi = {
+    const fakePi: Parameters<typeof registerMockProvider>[0] = {
       registerProvider(_id: string, provider: CapturedProvider) {
         capturedProvider = provider
       },
-    } as unknown as Parameters<typeof registerMockProvider>[0]
+    }
     const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-mock-provider-"))
 
     try {
@@ -201,9 +201,11 @@ describe("task 13 senpi QA scripts", () => {
 
   test("#given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox", () => {
     const callerAgentDir = mkdtempSync(join(tmpdir(), "omo-senpi-caller-agent-"))
+    const callerHome = mkdtempSync(join(tmpdir(), "omo-senpi-caller-home-"))
 
     try {
       const result = runNode([driveScript], {
+        HOME: callerHome,
         SENPI_CODING_AGENT_DIR: callerAgentDir,
         SENPI_BIN: "/nonexistent/senpi",
       })
@@ -214,9 +216,34 @@ describe("task 13 senpi QA scripts", () => {
       expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
       expect(payload["realSenpiUntouched"]).toBe(true)
+      expect(payload["realSenpiChangedPaths"]).toEqual([])
+      expect(payload["realOmoUntouched"]).toBe(true)
+      expect(payload["realOmoChangedPaths"]).toEqual([])
+      expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
+      expect(payload["realOmoObservedChangedPaths"]).toEqual([])
+      expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
+      expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
+      expect(payload["realSenpiObservationErrors"]).toEqual([])
+      expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
+      expect(typeof payload["realOmoObservationTruncated"]).toBe("boolean")
+      expect(payload["realOmoObservationErrors"]).toEqual([])
+      expect(payload["protectedStateFiles"]).toEqual([
+        "auth.json",
+        "settings.json",
+        "models.json",
+        "models-store.json",
+        "trust.json",
+        "hooks-state.json",
+      ])
+      expect(payload["observationLimits"]).toEqual({ maxFiles: 10_000, maxBytes: 67_108_864, maxEntries: 20_000 })
+      expect(payload["realHomesChecked"]).toEqual([
+        join(callerHome, ".senpi", "agent"),
+        join(callerHome, ".omo", "agent"),
+      ])
       expect(String(payload["result"])).toMatch(/^(SKIP|FAIL)$/)
     } finally {
       rmSync(callerAgentDir, { recursive: true, force: true })
+      rmSync(callerHome, { recursive: true, force: true })
     }
   })
 })

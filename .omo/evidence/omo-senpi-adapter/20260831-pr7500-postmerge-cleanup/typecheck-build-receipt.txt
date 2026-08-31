@@ -1,0 +1,29 @@
+$ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+status=0; extension build current
+
+$ bun x tsgo --noEmit -p packages/omo-native/tsconfig.json
+status=0
+
+$ bun x tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+status=0
+
+$ bun run typecheck:script
+status=0
+
+$ bunx biome lint packages/omo-senpi/scripts/qa/drive.mjs packages/omo-senpi/scripts/qa/isolation-state.mjs packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
+status=0; informational existing literal-key suggestions only
+
+$ bun run /home/minpeter/.bun/install/global/node_modules/omo-ai/plugin/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-senpi/scripts/qa/task-13.test.ts
+status=0; no violations
+
+$ bun run /home/minpeter/.bun/install/global/node_modules/omo-ai/plugin/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-native/test/compile-entry-oauth-registration.test.ts
+status=0; no violations
+
+LSP diagnostics:
+- packages/omo-senpi/scripts/qa/drive.mjs: none
+- packages/omo-senpi/scripts/qa/isolation-state.mjs: none
+- packages/omo-senpi/scripts/qa/isolation-state.test.mjs: none
+- packages/omo-senpi/scripts/qa/task-13.test.ts: none
+
+$ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+status=0 after the final exact-source serialized Senpi gate; extension build current

@@ -1,0 +1,11 @@
+cleanupStatus=PASS
+taskOwnedTempPathCount=0
+taskOwnedProcessCount=0
+liveDriverSandbox=/home/minpeter/.cache/omo-tmp/omo-senpi-qa-YmADak/agent
+liveDriverSandboxRemoved=true
+callerAgentDirectoryRemoved=true
+compiledOauthInputShredded=true
+compiledOauthOutputShredded=true
+compiledOauthBuildDirectoryRemoved=true
+packedConsumerDirectoryRemoved=true
+retainedSecrets=none

@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "credentialBytes": 64,
+  "stdoutBytes": 65,
+  "stderrBytes": 0,
+  "exactMatch": true,
+  "credentialFileMode": "0600",
+  "exitCode": 0,
+  "binarySha256": "a84d0c1ead611ce8ec08f75a7faf3c64b60fb3b9507f181d523e414628346f03"
+}

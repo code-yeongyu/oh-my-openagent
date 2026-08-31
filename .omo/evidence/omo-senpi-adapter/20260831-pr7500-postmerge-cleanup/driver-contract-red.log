@@ -1,0 +1,8 @@
+command: bun test packages/omo-senpi/scripts/qa/task-13.test.ts
+exit: 1
+expected RED failures: 4
+- snapshotProtectedState was not exported/implemented.
+- snapshotDirectory was not exported/implemented for complete observation.
+- snapshotDirectory was not exported/implemented for bounded truncation.
+- final driver JSON omitted realSenpiChangedPaths and the required isolation/observation schema.
+No credential values or raw home contents retained.

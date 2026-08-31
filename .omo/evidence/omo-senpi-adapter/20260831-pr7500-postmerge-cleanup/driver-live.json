@@ -1,0 +1,39 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realOmoUntouched": true,
+  "realOmoChangedPaths": [],
+  "realSenpiObservedChangedPaths": [],
+  "realOmoObservedChangedPaths": [
+    "OmO-debug.log"
+  ],
+  "realSenpiObservationComplete": false,
+  "realSenpiObservationTruncated": true,
+  "realSenpiObservationErrors": [],
+  "realOmoObservationComplete": false,
+  "realOmoObservationTruncated": true,
+  "realOmoObservationErrors": [],
+  "protectedStateFiles": [
+    "auth.json",
+    "settings.json",
+    "models.json",
+    "models-store.json",
+    "trust.json",
+    "hooks-state.json"
+  ],
+  "observationLimits": {
+    "maxFiles": 10000,
+    "maxBytes": 67108864,
+    "maxEntries": 20000
+  },
+  "realHomesChecked": [
+    "/home/minpeter/.senpi/agent",
+    "/home/minpeter/.omo/agent"
+  ],
+  "providedSenpiCodingAgentDir": "IGNORED",
+  "sandboxAgentDir": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-YmADak/agent",
+  "sandboxCwd": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-YmADak/project"
+}

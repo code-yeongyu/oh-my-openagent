@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "checks": {
+    "resultPass": true,
+    "callerIgnored": true,
+    "callerNotReused": true,
+    "sandboxWasRemoved": true,
+    "protectedIsolationPass": true,
+    "protectedChangedPathsEmpty": true,
+    "arrayFieldsPresent": true,
+    "booleanFieldsPresent": true,
+    "observationLimitsPresent": true,
+    "protectedSetExact": true
+  }
+}
