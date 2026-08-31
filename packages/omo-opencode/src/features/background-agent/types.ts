@@ -1,3 +1,4 @@
+import type { AgentSpawnUserPermission } from "../../shared/agent-tool-restrictions"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
@@ -129,8 +130,8 @@ export interface LaunchInput {
   category?: string
   sessionPermission?: SessionPermissionRule[]
   onSessionCreated?: (sessionId: string) => void | Promise<void>
-  /** User tool overrides (ask/allow/deny) from category or agent config. Merged into launchTools before hardcoded restrictions. */
-  userPermission?: Record<string, "ask" | "allow" | "deny">
+  /** User tool overrides (ask/allow/deny, legacy booleans) from category or agent config. Merged after fixed restrictions per issue #6877. */
+  userPermission?: AgentSpawnUserPermission
 }
 
 export interface ResumeInput {

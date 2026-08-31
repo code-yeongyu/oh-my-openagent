@@ -4805,11 +4805,11 @@ describe("buildSyncPromptTools (issue #5182)", () => {
   })
 
   test("categories.<name>.tools propagates to session tools end-to-end (issue #5182)", async () => {
-    // #given a categoryModel with tools restriction
+    // #given a categoryModel with tools restriction and an explicit allow
     const categoryModel = {
       providerID: "anthropic",
       modelID: "claude-sonnet-4-6",
-      tools: { grep: false, glob: false },
+      tools: { grep: false, glob: false, read: true },
     }
 
     const mockPromptResolve = () => Promise.resolve()
@@ -4858,8 +4858,29 @@ describe("buildSyncPromptTools (issue #5182)", () => {
     // unconditionally allowed tools remain unchanged
     expect(storedTools!.call_omo_agent).toBe(true)
     expect(storedTools!.question).toBe(false)
-    // buildSyncPromptTools only processes denials, not allows,
-    // so read:true from tools config does not appear in the result
-    expect(storedTools!.read).toBeUndefined()
+    // user allows must now punch through restricted baselines (issue #6877):
+    // tools config read:true migrates to an allow and lands in the session tools
+    expect(storedTools!.read).toBe(true)
+  })
+
+  test("user allow overrides fixed restriction baseline on restricted subagents (issue #6877)", () => {
+    // #given - explore denies write/edit/task/call_omo_agent via its fixed table,
+    //          and the user grants a plugin-registered session tool
+    const { buildSyncPromptTools } = require("./sync-prompt-sender")
+    const userPermission = {
+      session_read: "allow",
+      write: "deny",
+    }
+
+    // #when buildSyncPromptTools merges the user permission for explore
+    const result = buildSyncPromptTools("explore", userPermission)
+
+    // #then the explicit allow punches through the restriction table...
+    expect(result.session_read).toBe(true)
+    // ...the explicit deny is preserved...
+    expect(result.write).toBe(false)
+    // ...and harness integrity pins still hold
+    expect(result.task).toBe(false)
+    expect(result.question).toBe(false)
   })
 })

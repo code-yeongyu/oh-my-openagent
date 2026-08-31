@@ -2,6 +2,7 @@ import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import type { AgentSpawnUserPermission } from "../../shared/agent-tool-restrictions"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveMessageContext } from "../../features/hook-message-injector"
@@ -24,6 +25,7 @@ export async function executeBackground(
   client: PluginInput["client"],
   fallbackChain?: FallbackEntry[],
   model?: DelegatedModelConfig,
+  userPermission?: AgentSpawnUserPermission,
 ): Promise<string> {
   try {
     const messageDir = getMessageDir(toolContext.sessionID)
@@ -56,6 +58,7 @@ export async function executeBackground(
       parentTools: getSessionTools(toolContext.sessionID),
       model,
       fallbackChain,
+      userPermission,
     })
 
     const WAIT_FOR_SESSION_INTERVAL_MS = 50

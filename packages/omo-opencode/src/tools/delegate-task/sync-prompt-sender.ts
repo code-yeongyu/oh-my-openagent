@@ -1,6 +1,6 @@
 import type { SisyphusAgentConfig } from "../../config/schema"
 import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
-import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { buildAgentSpawnTools, type AgentSpawnUserPermission } from "../../shared/agent-tool-restrictions"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import {
   promptWithModelSuggestionRetry,
@@ -54,19 +54,9 @@ export function buildSyncPromptTools(
   agentToUse: string,
   permission?: Record<string, "ask" | "allow" | "deny">,
 ): Record<string, boolean> {
-  const userDenied: Record<string, boolean> = {}
-  if (permission) {
-    for (const [tool, value] of Object.entries(permission)) {
-      if (value === "deny") userDenied[tool] = false
-    }
-  }
-  return {
-    task: isPlanFamily(agentToUse),
-    call_omo_agent: true,
-    question: false,
-    ...userDenied,
-    ...getAgentToolRestrictions(agentToUse),
-  }
+  return buildAgentSpawnTools(agentToUse, permission as AgentSpawnUserPermission | undefined, {
+    allowTask: isPlanFamily(agentToUse),
+  })
 }
 
 export async function sendSyncPrompt(

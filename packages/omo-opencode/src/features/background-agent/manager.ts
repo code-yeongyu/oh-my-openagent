@@ -9,8 +9,8 @@ import {
 import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
 import { resolveDispatchClient } from "../../shared/live-server-route"
 import {
+  buildAgentSpawnTools,
   createInternalAgentTextPart,
-  getAgentToolRestrictions,
   hasInternalInitiatorMarker,
   isAmbiguousPostDispatchPromptFailure,
   log,
@@ -886,22 +886,9 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(sessionID, input.model)
     }
 
-    const userDenied: Record<string, boolean> = {}
-    if (input.userPermission) {
-      for (const [tool, value] of Object.entries(input.userPermission)) {
-        if (value === "deny") userDenied[tool] = false
-      }
-    }
-
-    const launchTools = {
-      task: false,
-      call_omo_agent: true,
-      question: false,
-      ...userDenied,
-      ...getAgentToolRestrictions(input.agent, {
-        includeTeamToolDenylist: input.teamRunId === undefined,
-      }),
-    }
+    const launchTools = buildAgentSpawnTools(input.agent, input.userPermission, {
+      includeTeamToolDenylist: input.teamRunId === undefined,
+    })
     setSessionTools(sessionID, launchTools)
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
@@ -1397,14 +1384,9 @@ The fallback retry session is now created and can be inspected directly.
           ...(resumeModel ? { model: resumeModel } : {}),
           ...(resumeVariant ? { variant: resumeVariant } : {}),
           tools: (() => {
-            const tools = {
-              task: false,
-              call_omo_agent: true,
-              question: false,
-              ...getAgentToolRestrictions(existingTask.agent, {
-                includeTeamToolDenylist: existingTask.teamRunId === undefined,
-              }),
-            }
+            const tools = buildAgentSpawnTools(existingTask.agent, undefined, {
+              includeTeamToolDenylist: existingTask.teamRunId === undefined,
+            })
             setSessionTools(existingTask.sessionId!, tools)
             return tools
           })(),

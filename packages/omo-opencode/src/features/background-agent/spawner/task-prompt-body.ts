@@ -1,4 +1,4 @@
-import { createInternalAgentTextPart, getAgentToolRestrictions } from "../../../shared"
+import { buildAgentSpawnTools, createInternalAgentTextPart, type AgentSpawnUserPermission } from "../../../shared"
 import type { LaunchInput } from "../types"
 
 type PromptModel = LaunchInput["model"]
@@ -11,6 +11,7 @@ type TaskPromptBodyOptions =
       readonly system: LaunchInput["skillContent"]
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly userPermission?: AgentSpawnUserPermission
     }
   | {
       readonly kind: "resume"
@@ -18,6 +19,7 @@ type TaskPromptBodyOptions =
       readonly model: PromptModel
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly userPermission?: AgentSpawnUserPermission
     }
 
 export type TaskPromptBody = {
@@ -50,14 +52,9 @@ export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptB
     ...(promptModel ? { model: promptModel } : {}),
     ...(promptVariant ? { variant: promptVariant } : {}),
     ...(options.kind === "launch" ? { system: options.system } : {}),
-    tools: {
-      task: false,
-      call_omo_agent: true,
-      question: false,
-      ...getAgentToolRestrictions(options.agent, {
-        includeTeamToolDenylist: options.includeTeamToolDenylist,
-      }),
-    },
+    tools: buildAgentSpawnTools(options.agent, options.userPermission, {
+      includeTeamToolDenylist: options.includeTeamToolDenylist,
+    }),
     parts: [createInternalAgentTextPart(options.prompt)],
   }
 }

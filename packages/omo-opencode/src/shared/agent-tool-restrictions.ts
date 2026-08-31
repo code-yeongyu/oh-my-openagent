@@ -1,4 +1,5 @@
 import { stripInvisibleAgentCharacters } from "./agent-display-names"
+import type { PermissionValue } from "./permission-compat"
 
 /**
  * Agent tool restrictions for session.prompt calls.
@@ -78,4 +79,57 @@ export function getAgentToolRestrictions(agentName: string, options: AgentToolRe
 export function hasAgentToolRestrictions(agentName: string): boolean {
   const restrictions = getAgentToolRestrictions(agentName)
   return Object.keys(restrictions).length > 0
+}
+
+export type AgentSpawnUserPermission = Record<string, PermissionValue | boolean>
+
+type AgentSpawnToolsOptions = AgentToolRestrictionsOptions & {
+  allowTask?: boolean
+}
+
+const HARNESS_PINNED_TOOLS = ["question"] as const
+
+/**
+ * Builds the `tools` map for a delegated subagent session prompt.
+ *
+ * Merge order (issue #6877): operational defaults, then the agent's fixed
+ * restriction table, then explicit user permission entries LAST so a user
+ * grant (`"allow"` / `true`) punches through the restricted baseline and a
+ * user deny stays denied. `task` keeps its caller-supplied operational value
+ * unless the user explicitly denies it, and `question` always stays false,
+ * matching the #5182/#5193 contract where hardcoded delegation-loop guards win.
+ */
+export function buildAgentSpawnTools(
+  agentName: string,
+  userPermission?: AgentSpawnUserPermission,
+  options: AgentSpawnToolsOptions = {},
+): Record<string, boolean> {
+  const operationalTask = options.allowTask ?? false
+  const tools: Record<string, boolean> = {
+    task: operationalTask,
+    call_omo_agent: true,
+    question: false,
+    ...getAgentToolRestrictions(agentName, options),
+  }
+
+  let userDeniedTask = false
+  if (userPermission) {
+    for (const [tool, value] of Object.entries(userPermission)) {
+      const permission: PermissionValue | undefined = typeof value === "boolean"
+        ? (value ? "allow" : "deny")
+        : value
+      if (permission === "allow") tools[tool] = true
+      if (permission === "deny") {
+        tools[tool] = false
+        if (tool === "task") userDeniedTask = true
+      }
+    }
+  }
+
+  tools.task = userDeniedTask ? false : operationalTask
+  for (const tool of HARNESS_PINNED_TOOLS) {
+    tools[tool] = false
+  }
+
+  return tools
 }

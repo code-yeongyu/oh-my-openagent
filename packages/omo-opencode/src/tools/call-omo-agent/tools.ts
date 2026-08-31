@@ -12,6 +12,7 @@ import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { log } from "../../shared"
 import { parseModelString } from "../../shared"
+import { migrateAgentConfig } from "../../shared/permission-compat"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
 import { resolveCallableAgents } from "./agent-resolver"
@@ -183,11 +184,18 @@ export function createCallOmoAgent(
         userCategories,
       })
 
+      const overrideEntry = agentOverrides?.[args.subagent_type]
+        ?? Object.entries(agentOverrides ?? {}).find(([key]) => key.toLowerCase() === args.subagent_type.toLowerCase())?.[1]
+      const migratedOverride = overrideEntry
+        ? migrateAgentConfig(overrideEntry as Record<string, unknown>)
+        : undefined
+      const overridePermission = migratedOverride?.permission as Record<string, "ask" | "allow" | "deny"> | undefined
+
       if (args.run_in_background) {
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`;
         }
-        return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain, resolvedModel)
+        return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain, resolvedModel, overridePermission)
       }
 
       if (!args.session_id) {
@@ -202,6 +210,7 @@ export function createCallOmoAgent(
             fallbackChain,
             spawnReservation,
             resolvedModel,
+            overridePermission,
           )
         } catch (error) {
           spawnReservation?.rollback()
@@ -217,6 +226,7 @@ export function createCallOmoAgent(
         fallbackChain,
         undefined,
         resolvedModel,
+        overridePermission,
       )
     },
   });
