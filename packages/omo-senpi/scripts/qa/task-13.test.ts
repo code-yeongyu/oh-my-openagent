@@ -75,6 +75,10 @@ function runNode(args: string[], env: Record<string, string | undefined> = {}) {
   })
 }
 
+function isolatedHomeEnv(home: string) {
+  return { HOME: home, USERPROFILE: home }
+}
+
 function parseLastJsonLine(stdout: string): Record<string, unknown> {
   const line = stdout
     .trim()
@@ -226,7 +230,7 @@ describe("task 13 senpi QA scripts", () => {
 
     try {
       const result = runNode([driveScript], {
-        HOME: callerHome,
+        ...isolatedHomeEnv(callerHome),
         SENPI_CODING_AGENT_DIR: callerAgentDir,
         SENPI_BIN: "/nonexistent/senpi",
       })
@@ -272,6 +276,11 @@ describe("task 13 senpi QA scripts", () => {
       rmSync(callerAgentDir, { recursive: true, force: true })
       rmSync(callerHome, { recursive: true, force: true })
     }
+  })
+
+  test("#given an isolated child home #when cross-platform variables are built #then HOME and USERPROFILE match", () => {
+    const home = join(tmpdir(), "omo-senpi-cross-platform-home")
+    expect(isolatedHomeEnv(home)).toEqual({ HOME: home, USERPROFILE: home })
   })
 })
 

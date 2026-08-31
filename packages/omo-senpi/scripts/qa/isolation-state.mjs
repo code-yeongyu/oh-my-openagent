@@ -90,17 +90,22 @@ export function classifyObservedChanges(paths) {
   return { volatile, protectedState, other }
 }
 
-export function digestDirectory(root) {
+export function digestDirectory(root, { readdir = readdirSync, readFile = readFileSync } = {}) {
   if (!existsSync(root)) return "absent"
   const files = []
-  collectFiles(root, files)
+  collectFiles(root, files, readdir)
   const hash = createHash("sha256")
   for (const file of files.sort()) {
     const rel = file.slice(root.length + 1)
-    hash.update(rel)
-    hash.update("\0")
-    hash.update(createHash("sha256").update(readFileSync(file)).digest("hex"))
-    hash.update("\0")
+    try {
+      const fileDigest = createHash("sha256").update(readFile(file)).digest("hex")
+      hash.update(rel)
+      hash.update("\0")
+      hash.update(fileDigest)
+      hash.update("\0")
+    } catch (error) {
+      if (!isTransientSnapshotEntryError(error)) throw error
+    }
   }
   return hash.digest("hex")
 }
@@ -171,9 +176,11 @@ function hashFileBounded(file, remainingBytes, io) {
   try {
     fd = io.openSync(file.path, "r")
     const opened = fileMetadata(io.fstatSync(fd, { bigint: true }))
-    if (changedMetadataCode(file.metadata, opened) !== undefined) {
+    const openingError = changedMetadataCode(file.metadata, opened)
+    if (openingError !== undefined) {
       const openingPath = fileMetadata(io.statSync(file.path, { bigint: true }))
-      throw snapshotError(sameIdentity(opened, openingPath) ? "FILE_CHANGED" : "FILE_REPLACED")
+      if (!sameIdentity(opened, openingPath)) throw snapshotError("FILE_REPLACED")
+      throw snapshotError(openingError)
     }
     const hash = createHash("sha256")
     const settingsChunks = file.rel === "settings.json" ? [] : undefined
@@ -207,7 +214,9 @@ function hashFileBounded(file, remainingBytes, io) {
     result = { bytesRead, error: errorCode(error) }
   } finally {
     if (fd !== undefined) {
-      try { io.closeSync(fd) } catch (error) { result = { bytesRead, error: errorCode(error) } }
+      try { io.closeSync(fd) } catch (error) {
+        if (result?.error === undefined) result = { bytesRead, error: errorCode(error) }
+      }
     }
   }
   return result
@@ -228,7 +237,9 @@ function readProtectedFileStable(path, io) {
       result = errorCode(openError) === "ENOENT" ? { absent: true } : { error: errorCode(openError) }
     } finally {
       if (absentFd !== undefined) {
-        try { io.closeSync(absentFd) } catch (closeError) { result = { error: errorCode(closeError) } }
+        try { io.closeSync(absentFd) } catch (closeError) {
+          if (result?.error === undefined) result = { error: errorCode(closeError) }
+        }
       }
     }
     return result
@@ -238,9 +249,11 @@ function readProtectedFileStable(path, io) {
   try {
     fd = io.openSync(path, "r")
     const opened = fileMetadata(io.fstatSync(fd, { bigint: true }))
-    if (changedMetadataCode(beforePath, opened) !== undefined) {
+    const openingError = changedMetadataCode(beforePath, opened)
+    if (openingError !== undefined) {
       const openingPath = fileMetadata(io.statSync(path, { bigint: true }))
-      throw snapshotError(sameIdentity(opened, openingPath) ? "FILE_CHANGED" : "FILE_REPLACED")
+      if (!sameIdentity(opened, openingPath)) throw snapshotError("FILE_REPLACED")
+      throw snapshotError(openingError)
     }
     const content = io.readFileSync(fd)
     const finished = fileMetadata(io.fstatSync(fd, { bigint: true }))
@@ -254,7 +267,9 @@ function readProtectedFileStable(path, io) {
     result = { error: errorCode(error) }
   } finally {
     if (fd !== undefined) {
-      try { io.closeSync(fd) } catch (error) { result = { error: errorCode(error) } }
+      try { io.closeSync(fd) } catch (error) {
+        if (result?.error === undefined) result = { error: errorCode(error) }
+      }
     }
   }
   return result
@@ -306,10 +321,17 @@ function compareSnapshotErrors(left, right) {
   return left.path.localeCompare(right.path) || left.code.localeCompare(right.code)
 }
 
-function collectFiles(root, files) {
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
+function collectFiles(root, files, readdir = readdirSync) {
+  let entries
+  try {
+    entries = readdir(root, { withFileTypes: true })
+  } catch (error) {
+    if (isTransientSnapshotEntryError(error)) return
+    throw error
+  }
+  for (const entry of entries) {
     const path = join(root, entry.name)
-    if (entry.isDirectory()) collectFiles(path, files)
+    if (entry.isDirectory()) collectFiles(path, files, readdir)
     else if (entry.isFile()) files.push(path)
   }
 }

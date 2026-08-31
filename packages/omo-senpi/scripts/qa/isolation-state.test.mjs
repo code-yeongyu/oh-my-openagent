@@ -361,3 +361,94 @@ test("#given an enumerated entry vanishes before stat #when the bounded complete
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+
+test("#given replacement between initial stat and open #when snapshotted #then public paths preserve FILE_REPLACED", () => {
+  for (const kind of ["observed", "protected"]) {
+    const root = mkdtempSync(join(tmpdir(), `omo-senpi-preopen-${kind}-`))
+    try {
+      const name = kind === "observed" ? "state.json" : "auth.json"
+      const path = join(root, name)
+      writeFileSync(path, "AAAA")
+      let replaced = false
+      const io = { openSync(file, flags) {
+        if (!replaced && file === path) {
+          replaced = true
+          renameSync(path, join(root, `${name}.old`))
+          writeFileSync(path, "BBBB")
+        }
+        return openSync(file, flags)
+      } }
+      const result = kind === "observed"
+        ? snapshotDirectory(root, { maxFiles: 10, maxBytes: 1024, maxEntries: 10 }, io)
+        : snapshotProtectedState(root, io)
+      expect(result.complete).toBe(false)
+      expect(result.errors).toEqual([{ path: name, code: "FILE_REPLACED" }])
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  }
+})
+
+test("#given success or primary failure plus close failure #when reading #then primary-operation precedence is stable", () => {
+  for (const kind of ["observed", "protected"]) {
+    const root = mkdtempSync(join(tmpdir(), `omo-senpi-close-${kind}-`))
+    try {
+      const name = kind === "observed" ? "state.json" : "auth.json"
+      writeFileSync(join(root, name), "AAAA")
+      const run = (io) => kind === "observed"
+        ? snapshotDirectory(root, { maxFiles: 10, maxBytes: 1024, maxEntries: 10 }, io)
+        : snapshotProtectedState(root, io)
+      expect(run({ closeSync() { throw codedError("ECLOSE") } }).errors).toEqual([{ path: name, code: "ECLOSE" }])
+      const io = kind === "observed"
+        ? { readSync() { throw codedError("EIO") }, closeSync() { throw codedError("ECLOSE") } }
+        : { readFileSync() { throw codedError("EIO") }, closeSync() { throw codedError("ECLOSE") } }
+      expect(run(io).errors).toEqual([{ path: name, code: "EIO" }])
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  }
+})
+
+test("#given ENOENT stat then open success and close failure #when absence races #then FILE_REPLACED remains primary", () => {
+  const root = mkdtempSync(join(tmpdir(), "omo-senpi-absence-close-"))
+  try {
+    const path = join(root, "auth.json")
+    let firstStat = true
+    const snapshot = snapshotProtectedState(root, {
+      statSync(file, options) {
+        if (file === path && firstStat) {
+          firstStat = false
+          writeFileSync(path, "AAAA")
+          throw codedError("ENOENT")
+        }
+        return statSync(file, options)
+      },
+      closeSync() { throw codedError("ECLOSE") },
+    })
+    expect(snapshot.errors).toEqual([{ path: "auth.json", code: "FILE_REPLACED" }])
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test("#given transient or primary complete-tree read errors #when digesting #then only ENOENT and ENOTDIR are tolerated", () => {
+  const root = mkdtempSync(join(tmpdir(), "omo-senpi-digest-read-"))
+  try {
+    writeFileSync(join(root, "stable.txt"), "stable")
+    writeFileSync(join(root, "raced.tmp"), "temporary")
+    const stableEntries = [{ name: "stable.txt", isDirectory: () => false, isFile: () => true }]
+    const allEntries = [...stableEntries, { name: "raced.tmp", isDirectory: () => false, isFile: () => true }]
+    const expected = isolationState.digestDirectory(root, { readdir: () => stableEntries, readFile: () => Buffer.from("stable") })
+    for (const code of ["ENOENT", "ENOTDIR"]) {
+      const digest = isolationState.digestDirectory(root, {
+        readdir: () => allEntries,
+        readFile(file) { if (file.endsWith("raced.tmp")) throw codedError(code); return Buffer.from("stable") },
+      })
+      expect(digest).toBe(expected)
+    }
+    for (const code of ["EACCES", "EIO"]) {
+      expect(() => isolationState.digestDirectory(root, { readFile() { throw codedError(code) } })).toThrow()
+    }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+function codedError(code) {
+  const error = new Error(code)
+  error.code = code
+  return error
+}
