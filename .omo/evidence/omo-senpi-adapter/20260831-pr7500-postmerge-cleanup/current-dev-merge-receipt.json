@@ -1,0 +1,18 @@
+{
+  "validatedSourceHead": "81b673b7df987e7088bfa240e7d6a76ce01617b4",
+  "mergeCommit": "5baeb6c77c5b0e72dedc149d35ae6c273c1d3c43",
+  "cleanupParent": "cd17abb4b7bd2e709bafd4596b4d3d278659e20d",
+  "upstreamDevParent": "b52f098280e812506c7fa83f513ee9b921d6c108",
+  "oauthPatchByteExact": true,
+  "oauthPackedTestByteExact": true,
+  "trustStorageTransformAbsent": true,
+  "upstreamHooksRegressionsRestored": true,
+  "downstreamHooksPatchRestored": false,
+  "mutationSafeIsolationRetained": true,
+  "completeTreeInventoryIntegrated": true,
+  "volatileSettingsNormalized": true,
+  "transientEntriesTolerated": ["ENOENT", "ENOTDIR"],
+  "packedConsumerOAuthProof": true,
+  "rootUpstreamHooksProof": true,
+  "packedConsumerHooksProof": false
+}

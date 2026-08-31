@@ -1,112 +1,149 @@
-sourceHead=e9520d38abc52aaebcc2322ed06dd9fd571f7fba
+sourceHead=81b673b7df987e7088bfa240e7d6a76ce01617b4
+upstreamDev=b52f098280e812506c7fa83f513ee9b921d6c108
 
 $ bun test packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
 bun test v1.4.0 (34cbb9a40)
 
 packages/omo-senpi/scripts/qa/isolation-state.test.mjs:
-(pass) #given protected and volatile files #when snapshots are compared #then only protected path changes affect isolation [6.56ms]
-(pass) #given nested files within the observation bounds #when scanned #then the full-tree observation is complete [1.89ms]
-(pass) #given a tree beyond the file bound #when observed #then truncation is explicit and never complete [0.53ms]
-(pass) #given identical protected read failures #when snapshots are compared #then isolation fails closed with structured relative errors [0.78ms]
-(pass) #given files exceed the byte budget #when observed #then descriptor reads never exceed maxBytes [0.54ms]
-(pass) #given a file shrinks after traversal #when observed #then short read is explicit and incomplete [0.60ms]
-(pass) #given a file grows while hashing #when observed #then growth is explicit and incomplete [0.60ms]
-(pass) #given a path is replaced after open #when observed #then replacement is explicit and incomplete [0.94ms]
-(pass) #given one file exceeds the byte budget #when observed #then truncation occurs without reading or BYTE_LIMIT errors [0.48ms]
-(pass) #given a same-size in-place overwrite after an observation read #when metadata is verified #then the snapshot fails closed [0.55ms]
-(pass) #given a same-size in-place overwrite after a protected read #when metadata is verified #then the snapshot fails closed [0.58ms]
-(pass) #given an existence probe would hide inaccessible protected state #when opened directly #then EACCES fails closed [1.01ms]
+(pass) #given protected and volatile files #when snapshots are compared #then only protected path changes affect isolation [3.14ms]
+(pass) #given nested files within the observation bounds #when scanned #then the full-tree observation is complete [1.90ms]
+(pass) #given a tree beyond the file bound #when observed #then truncation is explicit and never complete [9.84ms]
+(pass) #given identical protected read failures #when snapshots are compared #then isolation fails closed with structured relative errors [1.06ms]
+(pass) #given files exceed the byte budget #when observed #then descriptor reads never exceed maxBytes [0.68ms]
+(pass) #given a file shrinks after traversal #when observed #then short read is explicit and incomplete [5.85ms]
+(pass) #given a file grows while hashing #when observed #then growth is explicit and incomplete [0.50ms]
+(pass) #given a path is replaced after open #when observed #then replacement is explicit and incomplete [0.46ms]
+(pass) #given one file exceeds the byte budget #when observed #then truncation occurs without reading or BYTE_LIMIT errors [0.40ms]
+(pass) #given a same-size in-place overwrite after an observation read #when metadata is verified #then the snapshot fails closed [0.38ms]
+(pass) #given a same-size in-place overwrite after a protected read #when metadata is verified #then the snapshot fails closed [0.52ms]
+(pass) #given an existence probe would hide inaccessible protected state #when opened directly #then EACCES fails closed [5.37ms]
+(pass) #given only volatile settings stamps change #when bounded complete-tree snapshots are compared #then settings stay unchanged [0.72ms]
+(pass) #given an enumerated entry vanishes before stat #when the bounded complete-tree snapshot runs #then the transient entry is tolerated [0.49ms]
 
 packages/omo-senpi/scripts/qa/task-13.test.ts:
-(pass) task 13 senpi QA scripts > #given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup [0.30ms]
-(pass) task 13 senpi QA scripts > #given drive.mjs self-test #when executed #then sandbox helpers validate successfully [60.78ms]
-(pass) task 13 senpi QA scripts > #given probe-continuation self-test #when executed #then continuation helpers validate successfully [66.89ms]
-(pass) task 13 senpi QA scripts > #given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape [0.26ms]
-(pass) task 13 senpi QA scripts > #given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi [0.23ms]
-(pass) task 13 senpi QA scripts > #given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory [0.31ms]
-(pass) task 13 senpi QA scripts > #given mock provider self-test #when executed #then text and tool-call script steps validate [23.03ms]
-(pass) task 13 senpi QA scripts > #given a scripted tool call #when converted to an assistant message #then it stops with toolUse [0.21ms]
-(pass) task 13 senpi QA scripts > #given terminal stream events #when result is awaited #then done and error events settle the promise [0.61ms]
-(pass) task 13 senpi QA scripts > #given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result [0.67ms]
-(pass) task 13 senpi QA scripts > #given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox [60.10ms]
+(pass) task 13 senpi QA scripts > #given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup [0.23ms]
+(pass) task 13 senpi QA scripts > #given drive.mjs self-test #when executed #then sandbox helpers validate successfully [56.40ms]
+(pass) task 13 senpi QA scripts > #given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched [0.84ms]
+(pass) task 13 senpi QA scripts > #given probe-continuation self-test #when executed #then continuation helpers validate successfully [61.66ms]
+(pass) task 13 senpi QA scripts > #given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape [0.20ms]
+(pass) task 13 senpi QA scripts > #given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi [0.12ms]
+(pass) task 13 senpi QA scripts > #given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory [0.14ms]
+(pass) task 13 senpi QA scripts > #given mock provider self-test #when executed #then text and tool-call script steps validate [20.34ms]
+(pass) task 13 senpi QA scripts > #given a scripted tool call #when converted to an assistant message #then it stops with toolUse [0.26ms]
+(pass) task 13 senpi QA scripts > #given terminal stream events #when result is awaited #then done and error events settle the promise [0.54ms]
+(pass) task 13 senpi QA scripts > #given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result [0.66ms]
+(pass) task 13 senpi QA scripts > #given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox [54.63ms]
 
- 23 pass
+ 26 pass
  0 fail
- 98 expect() calls
-Ran 23 tests across 2 files. [1.82s]
+ 106 expect() calls
+Ran 26 tests across 2 files. [1.66s]
+
+$ bun test script/senpi-hooks-state.test.ts script/senpi-hooks-state-errors.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+script/senpi-hooks-state-errors.test.ts:
+(pass) patched Senpi hooks state publication failures > removes the temporary snapshot and preserves the publication error [53.72ms]
+(pass) patched Senpi hooks state publication failures > reports publication then cleanup errors in an ordered AggregateError [48.29ms]
+(pass) patched Senpi hooks state publication failures > reports chmod then cleanup errors in an ordered AggregateError [47.47ms]
+
+script/senpi-hooks-state.test.ts:
+(pass) patched Senpi hooks state snapshots > reads the last complete snapshot while the exact writer lock is held [0.91ms]
+(pass) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [106.27ms]
+(pass) patched Senpi hooks state snapshots > keeps malformed state fail-closed when no writer lock exists [44.53ms]
+(pass) patched Senpi hooks state snapshots > publishes by replacing the destination and leaves no temporary snapshot [2.12ms]
+(pass) patched Senpi hooks state snapshots > preserves an existing POSIX snapshot mode under a restrictive umask [56.05ms]
+(pass) patched Senpi hooks state snapshots > creates a new POSIX snapshot with mode 0600 under a permissive umask [0.89ms]
+
+ 9 pass
+ 0 fail
+ 15 expect() calls
+Ran 9 tests across 2 files. [1.84s]
 
 $ bun test packages/omo-native/test/compile-entry-oauth-registration.test.ts packages/omo-native/test/compile-entry.test.ts
 bun test v1.4.0 (34cbb9a40)
 
 packages/omo-native/test/compile-entry.test.ts:
-(pass) compiled omo entry launcher parity > uses the launched Windows executable path for self-provisioning identity [4.50ms]
-(pass) compiled omo entry launcher parity > pins the engine package dir to the provisioned root [0.62ms]
-(pass) compiled omo entry launcher parity > early commands pass through without an extension [0.23ms]
-(pass) compiled omo entry launcher parity > main commands prepend the provisioned plugin extension [0.18ms]
-(pass) compiled omo entry launcher parity > version line reads the sibling package version and pinned engine [0.24ms]
-(pass) compiled omo entry launcher parity > realpath-equivalent executable and expected paths skip re-exec [0.66ms]
-(pass) compiled omo entry launcher parity > self-update prints the curl reinstall command [0.18ms]
-(pass) compiled omo entry launcher parity > package-root environment values point into the provisioned runtime [0.23ms]
-(pass) pre-provisioning fast paths > answers --version from the embedded manifest before provisioning [0.20ms]
-(pass) pre-provisioning fast paths > -v answers while --version with extra arguments falls through [0.22ms]
-(pass) pre-provisioning fast paths > self-update spellings answer with the curl line while engine updates fall through [0.23ms]
-(pass) pre-provisioning fast paths > ordinary commands never fast-path [0.25ms]
-(pass) pre-provisioning fast paths > fast-path version line matches the provisioned launcher's line for the same stamp [0.54ms]
-(pass) pre-provisioning fast paths > banner gate requires a tty and an interactive-default launch [0.16ms]
-(pass) embedded runtime provisioning > materializes the executable directly on Windows [0.47ms]
-(pass) embedded runtime provisioning > does not overwrite an existing Windows provisioned executable [0.45ms]
-(pass) embedded runtime provisioning > skips re-copying an identical provisioned executable on POSIX [0.68ms]
+(pass) compiled omo entry launcher parity > uses the launched Windows executable path for self-provisioning identity [3.74ms]
+(pass) compiled omo entry launcher parity > pins the engine package dir to the provisioned root [0.32ms]
+(pass) compiled omo entry launcher parity > early commands pass through without an extension [0.16ms]
+(pass) compiled omo entry launcher parity > main commands prepend the provisioned plugin extension [0.17ms]
+(pass) compiled omo entry launcher parity > version line reads the sibling package version and pinned engine [0.14ms]
+(pass) compiled omo entry launcher parity > realpath-equivalent executable and expected paths skip re-exec [0.50ms]
+(pass) compiled omo entry launcher parity > self-update prints the curl reinstall command [0.14ms]
+(pass) compiled omo entry launcher parity > package-root environment values point into the provisioned runtime [0.15ms]
+(pass) pre-provisioning fast paths > answers --version from the embedded manifest before provisioning [0.15ms]
+(pass) pre-provisioning fast paths > -v answers while --version with extra arguments falls through [0.10ms]
+(pass) pre-provisioning fast paths > self-update spellings answer with the curl line while engine updates fall through [0.15ms]
+(pass) pre-provisioning fast paths > ordinary commands never fast-path [0.16ms]
+(pass) pre-provisioning fast paths > fast-path version line matches the provisioned launcher's line for the same stamp [0.43ms]
+(pass) pre-provisioning fast paths > banner gate requires a tty and an interactive-default launch [0.13ms]
+(pass) embedded runtime provisioning > materializes the executable directly on Windows [0.41ms]
+(pass) embedded runtime provisioning > does not overwrite an existing Windows provisioned executable [0.38ms]
+(pass) embedded runtime provisioning > skips re-copying an identical provisioned executable on POSIX [0.58ms]
 (pass) embedded runtime provisioning > still replaces a provisioned executable whose contents differ on POSIX [0.83ms]
-(pass) embedded runtime provisioning > materializes the executable through a temporary non-executable path on POSIX [0.79ms]
-(pass) embedded runtime provisioning > selects the omo manifest when senpi also embeds an unrelated manifest [0.22ms]
-(pass) embedded runtime provisioning > compiled doctor resolves package artifacts from the provided execDir [2.84ms]
-(pass) embedded runtime provisioning > version uses the manifest engine pin without a provisioned senpi package [0.44ms]
-(pass) embedded runtime provisioning > materializes files whose embedded names carry the omo-runtime prefix [0.95ms]
-(pass) embedded runtime provisioning > materializes non-utf8 embedded bytes without a text round-trip [0.75ms]
-(pass) embedded runtime provisioning > materializes files with sha256 and mode, then skips on matching marker [0.63ms]
+(pass) embedded runtime provisioning > materializes the executable through a temporary non-executable path on POSIX [0.45ms]
+(pass) embedded runtime provisioning > selects the omo manifest when senpi also embeds an unrelated manifest [0.14ms]
+(pass) embedded runtime provisioning > compiled doctor resolves package artifacts from the provided execDir [3.49ms]
+(pass) embedded runtime provisioning > version uses the manifest engine pin without a provisioned senpi package [0.49ms]
+(pass) embedded runtime provisioning > materializes files whose embedded names carry the omo-runtime prefix [0.99ms]
+(pass) embedded runtime provisioning > materializes non-utf8 embedded bytes without a text round-trip [0.78ms]
+(pass) embedded runtime provisioning > materializes files with sha256 and mode, then skips on matching marker [0.48ms]
 
 packages/omo-native/test/compile-entry-oauth-registration.test.ts:
-(pass) #given a sentinel bundled OAuth loader #when compile-entry loads #then it registers the real nested OpenAI Codex flow [59.77ms]
+(pass) #given a sentinel bundled OAuth loader #when compile-entry loads #then it registers the real nested OpenAI Codex flow [63.25ms]
 
  26 pass
  0 fail
  54 expect() calls
-Ran 26 tests across 2 files. [1.54s]
+Ran 26 tests across 2 files. [1470.00ms]
 
 $ bun test packages/omo-native/test/package-shape.test.ts packages/omo-native/test/senpi-pin.test.ts packages/omo-native/test/brand-contract-pin.test.ts packages/omo-senpi/src/package-shape.test.ts
 bun test v1.4.0 (34cbb9a40)
 
 packages/omo-native/test/package-shape.test.ts:
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [2.95ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.20ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships exactly bin and plugin [0.14ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.16ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then it declares exactly the engine and codemode parser runtime dependencies [0.17ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the codemode parser dependency is exactly pinned [0.31ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.31ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.15ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.13ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.15ms]
-(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no postinstall lifecycle hook exists [0.12ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [3.43ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.13ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships the launcher, plugin, and published Senpi patch installer [0.08ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.10ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then it declares exactly the engine and codemode parser runtime dependencies [0.09ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the codemode parser dependency is exactly pinned [0.07ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.19ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.28ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.14ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.07ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then postinstall applies the shipped Senpi patch [0.07ms]
 
 packages/omo-native/test/senpi-pin.test.ts:
-(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [0.15ms]
-(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.10ms]
-(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then the root devDependency pin matches [0.09ms]
-(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.16ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [0.17ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.12ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then the root devDependency pin matches [0.10ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.15ms]
 
 packages/omo-native/test/brand-contract-pin.test.ts:
-(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then it is an exact version, never a range [0.16ms]
-(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then a brand-aware pin must ship the brand resolver [0.49ms]
+(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then it is an exact version, never a range [0.17ms]
+(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then a brand-aware pin must ship the brand resolver [0.59ms]
 
 packages/omo-senpi/src/package-shape.test.ts:
-(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [2.18ms]
-(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.29ms]
-(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.50ms]
+(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [1.12ms]
+(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.28ms]
+(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.48ms]
 
  20 pass
  0 fail
  46 expect() calls
-Ran 20 tests across 4 files. [1467.00ms]
+Ran 20 tests across 4 files. [1288.00ms]
 
-GREEN_STATUS=PASS
+$ bun test packages/omo-native/test/packed-install.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-native/test/packed-install.test.ts:
+(pass) omo-ai packed install > ships and applies the Senpi patch installer from the packed artifact [5078.31ms]
+
+ 1 pass
+ 0 fail
+ 8 expect() calls
+Ran 1 test across 1 file. [6.43s]
+
+Integration shape: OAuth patch and packed test byte-exact to origin/dev; no trust-storage transform; all six hooks files restored from current dev, with only behavior-neutral timeout error narrowing in the test; mutation-safe ancestry retained.
+FOCUSED_STATUS=PASS

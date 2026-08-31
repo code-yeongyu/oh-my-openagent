@@ -1,5 +1,5 @@
 {
-  "sourceHead": "e9520d38abc52aaebcc2322ed06dd9fd571f7fba",
+  "sourceHead": "81b673b7df987e7088bfa240e7d6a76ce01617b4",
   "result": "PASS",
   "ultraworkInjected": true,
   "commentChecker": "PASS",
@@ -12,22 +12,29 @@
   "realOmoProtectedStateComplete": true,
   "realOmoProtectedErrors": [],
   "realSenpiObservedChangedPaths": [],
+  "realSenpiVolatileChangedPaths": [],
+  "realSenpiProtectedObservedChangedPaths": [],
+  "realSenpiOtherObservedChangedPaths": [],
   "realOmoObservedChangedPaths": [
-    "OmO-debug.log"
+    "logs/compaction.log",
+    "logs/config-reload.log",
+    "logs/mcp/_ast_grep.log"
   ],
+  "realOmoVolatileChangedPaths": [
+    "logs/compaction.log",
+    "logs/config-reload.log",
+    "logs/mcp/_ast_grep.log"
+  ],
+  "realOmoProtectedObservedChangedPaths": [],
+  "realOmoOtherObservedChangedPaths": [],
   "realSenpiObservationComplete": false,
   "realSenpiObservationTruncated": true,
   "realSenpiObservationErrors": [],
   "realSenpiObservationBytesRead": 101608656,
   "realOmoObservationComplete": false,
   "realOmoObservationTruncated": true,
-  "realOmoObservationErrors": [
-    {
-      "path": "OmO-debug.log",
-      "code": "FILE_CHANGED"
-    }
-  ],
-  "realOmoObservationBytesRead": 123123312,
+  "realOmoObservationErrors": [],
+  "realOmoObservationBytesRead": 66685051,
   "protectedStateFiles": [
     "auth.json",
     "settings.json",
@@ -46,6 +53,6 @@
     "/home/minpeter/.omo/agent"
   ],
   "providedSenpiCodingAgentDir": "IGNORED",
-  "sandboxAgentDir": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-d6NkE9/agent",
-  "sandboxCwd": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-d6NkE9/project"
+  "sandboxAgentDir": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-FKMEga/agent",
+  "sandboxCwd": "/home/minpeter/.cache/omo-tmp/omo-senpi-qa-FKMEga/project"
 }
