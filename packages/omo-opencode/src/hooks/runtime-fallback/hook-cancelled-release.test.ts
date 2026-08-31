@@ -10,6 +10,7 @@ function createInertHelpers(): AutoRetryHelpers {
   return {
     abortSessionRequest: async () => {},
     clearSessionFallbackTimeout: () => {},
+    rearmSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
     autoRetryWithFallback: async () => {},
     resolveAgentForSessionFromContext: async () => undefined,

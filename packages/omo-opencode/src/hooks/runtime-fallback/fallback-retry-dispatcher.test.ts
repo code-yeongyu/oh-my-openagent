@@ -52,6 +52,7 @@ function createRejectedDispatchHelpers(dispatchCalls: string[]): AutoRetryHelper
   return {
     abortSessionRequest: async () => {},
     clearSessionFallbackTimeout: () => {},
+    rearmSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
     autoRetryWithFallback: async (_sessionID, model) => {
       dispatchCalls.push(model)

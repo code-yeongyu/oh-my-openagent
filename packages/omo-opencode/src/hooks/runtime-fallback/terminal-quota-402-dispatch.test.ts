@@ -54,6 +54,7 @@ function createHelpers(
   return {
     abortSessionRequest: async () => {},
     clearSessionFallbackTimeout: () => {},
+    rearmSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
     autoRetryWithFallback: async (sessionID: string, newModel: string, _agent?: string, source?: string) => {
       dispatchCalls.push({ sessionID, newModel, source: source ?? "" })

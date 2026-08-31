@@ -59,7 +59,8 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
       const hasVisible = await checkVisibleResponse(ctx, sessionID, info)
       if (!hasVisible) {
-        log(`[${HOOK_NAME}] Assistant update observed without visible final response; keeping fallback timeout`, {
+        helpers.rearmSessionFallbackTimeout(sessionID)
+        log(`[${HOOK_NAME}] Assistant update observed without visible final response; re-armed fallback timeout`, {
           sessionID,
           model,
         })

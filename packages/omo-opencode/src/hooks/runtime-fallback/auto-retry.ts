@@ -9,7 +9,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
   const abortSessionRequest = createAbortSessionRequest(deps)
   let autoRetryWithFallback: ReturnType<typeof createAutoRetryDispatcher>
 
-  const { clearSessionFallbackTimeout, scheduleSessionFallbackTimeout } = createFallbackTimeoutHelpers(
+  const { clearSessionFallbackTimeout, scheduleSessionFallbackTimeout, rearmSessionFallbackTimeout } = createFallbackTimeoutHelpers(
     deps,
     abortSessionRequest,
     (sessionID, newModel, resolvedAgent, source) =>
@@ -26,6 +26,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     abortSessionRequest,
     clearSessionFallbackTimeout,
     scheduleSessionFallbackTimeout,
+    rearmSessionFallbackTimeout,
     autoRetryWithFallback,
     resolveAgentForSessionFromContext: createAgentContextResolver(deps),
     cleanupStaleSessions: createStaleSessionCleanup(deps, clearSessionFallbackTimeout),

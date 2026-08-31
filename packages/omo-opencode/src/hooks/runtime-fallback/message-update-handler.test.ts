@@ -142,6 +142,7 @@ function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): Aut
       }
     },
     clearSessionFallbackTimeout: () => {},
+    rearmSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
     autoRetryWithFallback: async (_sessionID: string, model: string) => {
       operations.push(`retry:${model}`)

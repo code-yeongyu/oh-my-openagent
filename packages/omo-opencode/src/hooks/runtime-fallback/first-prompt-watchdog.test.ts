@@ -128,6 +128,7 @@ function createHelpers(calls: RecordedCalls, resolvedAgentName?: string): AutoRe
       calls.abort.push({ sessionID, source })
     },
     clearSessionFallbackTimeout: () => {},
+    rearmSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
     autoRetryWithFallback: async (sessionID, newModel, resolvedAgent, source) => {
       calls.autoRetry.push({ sessionID, newModel, resolvedAgent, source })
