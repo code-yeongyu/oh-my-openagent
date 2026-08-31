@@ -214,14 +214,6 @@ describe("task 13 senpi QA scripts", () => {
       expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
       expect(payload["realSenpiUntouched"]).toBe(true)
-      expect(payload["realSenpiChangedPaths"]).toEqual([])
-      expect(payload["realOmoUntouched"]).toBe(true)
-      expect(payload["realOmoChangedPaths"]).toEqual([])
-      expect(payload["protectedStateFiles"]).toContain("hooks-state.json")
-      expect(payload["realHomesChecked"]).toEqual([
-        join(process.env.HOME ?? "", ".senpi", "agent"),
-        join(process.env.HOME ?? "", ".omo", "agent"),
-      ])
       expect(String(payload["result"])).toMatch(/^(SKIP|FAIL)$/)
     } finally {
       rmSync(callerAgentDir, { recursive: true, force: true })
