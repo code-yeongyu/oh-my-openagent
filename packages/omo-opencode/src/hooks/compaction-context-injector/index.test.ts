@@ -20,6 +20,7 @@ afterAll(() => {
 
 import { createCompactionContextInjector } from "./index"
 import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
+import { OMO_INTERNAL_INITIATOR_METADATA_KEY } from "../../shared/internal-initiator-marker"
 
 type PromptAsyncInput = {
   path: { id: string }
@@ -32,7 +33,7 @@ type PromptAsyncInput = {
       type: "text"
       text: string
       synthetic?: true
-      metadata?: { compaction_continue?: true }
+      metadata?: Record<string, unknown>
     }>
   }
   query?: { directory: string }
@@ -124,7 +125,10 @@ describe("createCompactionContextInjector", () => {
       expect(recoveryCall?.body.tools).toEqual({ bash: true })
       expect(recoveryCall?.body.parts[0]?.type).toBe("text")
       expect(recoveryCall?.body.parts[0]?.synthetic).toBe(true)
-      expect(recoveryCall?.body.parts[0]?.metadata).toEqual({ compaction_continue: true })
+      expect(recoveryCall?.body.parts[0]?.metadata).toEqual({
+        [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true,
+        compaction_continue: true,
+      })
       expect(recoveryCall?.query).toEqual({ directory: "/tmp/test" })
     })
 
@@ -190,7 +194,10 @@ describe("createCompactionContextInjector", () => {
       expect(recoveryCall?.body.tools).toEqual({ bash: true })
       expect(recoveryCall?.body.parts[0]?.type).toBe("text")
       expect(recoveryCall?.body.parts[0]?.synthetic).toBe(true)
-      expect(recoveryCall?.body.parts[0]?.metadata).toEqual({ compaction_continue: true })
+      expect(recoveryCall?.body.parts[0]?.metadata).toEqual({
+        [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true,
+        compaction_continue: true,
+      })
       expect(recoveryCall?.query).toEqual({ directory: "/tmp/test" })
     })
 

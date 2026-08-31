@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import { handleNonIdleEvent } from "./non-idle-events"
 import { createSessionStateStore, type SessionStateStore } from "./session-state"
 
@@ -55,9 +55,7 @@ describe("handleNonIdleEvent", () => {
       properties: {
         sessionID,
         info: { role: "user" },
-        parts: [
-          { type: "text", text: `internal wake\n${OMO_INTERNAL_INITIATOR_MARKER}` },
-        ],
+        parts: [createInternalAgentTextPart("internal wake")],
       },
       sessionStateStore,
     })
@@ -83,11 +81,7 @@ describe("handleNonIdleEvent", () => {
         sessionID,
         info: { role: "user" },
         parts: [
-          {
-            type: "text",
-            text: `ultrawork [SYSTEM DIRECTIVE: OH-MY-OPENCODE - RALPH LOOP 2/500]\ncontinue\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-            synthetic: true,
-          },
+          createInternalAgentTextPart("ultrawork [SYSTEM DIRECTIVE: OH-MY-OPENCODE - RALPH LOOP 2/500]\ncontinue"),
         ],
       },
       sessionStateStore,
@@ -167,9 +161,7 @@ describe("handleNonIdleEvent", () => {
         sessionID,
         part: {
           messageID,
-          type: "text",
-          text: `internal wake\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-          synthetic: true,
+          ...createInternalAgentTextPart("internal wake"),
         },
       },
       sessionStateStore,
@@ -234,7 +226,7 @@ describe("handleNonIdleEvent", () => {
         part: {
           type: "text",
           messageID: "msg_split_internal",
-          text: `${OMO_INTERNAL_INITIATOR_MARKER}\ncontinuation echo`,
+          ...createInternalAgentTextPart("continuation echo"),
         },
       },
       sessionStateStore,

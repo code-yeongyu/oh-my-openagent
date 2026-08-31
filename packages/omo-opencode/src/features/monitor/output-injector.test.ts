@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { MonitorOutputInjector } from "./output-injector"
 import type { MonitorCounters, MonitorRecord, OutputBatch } from "./types"
 import type { InternalPromptDispatchResult, PromptAsyncInput, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import { OMO_INTERNAL_INITIATOR_METADATA_KEY } from "../../shared/internal-initiator-marker"
 
 type DispatchCall = {
   source: string
@@ -19,7 +20,7 @@ type FakeMessage = {
   role?: string
   finish?: string
   time?: { created?: unknown }
-  parts?: Array<{ type?: string; text?: string; synthetic?: boolean; content?: unknown; state?: { status?: unknown } }>
+  parts?: Array<{ type?: string; text?: string; synthetic?: boolean; metadata?: Record<string, unknown>; content?: unknown; state?: { status?: unknown } }>
 }
 
 const baseCounters = {
@@ -239,7 +240,7 @@ describe("MonitorOutputInjector", () => {
       const acceptedText = "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 7\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->"
       const { injector, calls } = createHarness({
         dispatchResults: [{ status: "failed", error: new Error("unexpected eof"), dispatchAttempted: true }],
-        messages: [{ role: "user", time: { created: 1_000 }, parts: [{ type: "text", text: acceptedText }] }],
+        messages: [{ role: "user", time: { created: 1_000 }, parts: [{ type: "text", text: acceptedText, synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }] }],
         now: 1_000,
       })
       injector.queueBatch(record, batch)
@@ -277,7 +278,7 @@ describe("MonitorOutputInjector", () => {
       const priorNoReplyMonitorMessage = {
         role: "user",
         time: { created: 900 },
-        parts: [{ type: "text", text: "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 1\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->" }],
+        parts: [{ type: "text", text: "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 1\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->", synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       }
       const batch = createBatch(12)
       const { injector, calls } = createHarness({ messages: [priorNoReplyMonitorMessage], now: 1_000 })

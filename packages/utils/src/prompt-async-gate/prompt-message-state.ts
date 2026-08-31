@@ -76,6 +76,9 @@ function toInternalInitiatorTextPartLike(part: unknown): InternalInitiatorTextPa
   if (typeof part.synthetic === "boolean") {
     result.synthetic = part.synthetic
   }
+  if (isRecord(part.metadata)) {
+    result.metadata = part.metadata as Record<string, unknown>
+  }
   return result
 }
 

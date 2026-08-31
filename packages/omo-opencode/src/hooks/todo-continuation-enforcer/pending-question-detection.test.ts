@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import { hasUnansweredQuestion } from "./pending-question-detection"
 
 describe("hasUnansweredQuestion", () => {
@@ -118,9 +118,7 @@ describe("hasUnansweredQuestion", () => {
       },
       {
         info: { role: "user" },
-        parts: [
-          { type: "text", text: `internal continuation\n${OMO_INTERNAL_INITIATOR_MARKER}` },
-        ],
+        parts: [createInternalAgentTextPart("internal continuation")],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)
