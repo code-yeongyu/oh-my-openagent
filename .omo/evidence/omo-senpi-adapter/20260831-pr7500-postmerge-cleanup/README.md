@@ -1,39 +1,51 @@
-# PR #7500 post-merge cleanup: current-dev combined evidence
+# PR #7500 post-merge cleanup: final error-semantics evidence
 
-Validated source head: `81b673b7df987e7088bfa240e7d6a76ce01617b4`.
+Validated production source head: `7796dd423bd2867042e42860506f00a0d8877b8d`, based on current-dev
+combined evidence head `a6d8f10a9214dac7df70d96c284ee2ebceb4075b`.
 
-This head contains normal merge `5baeb6c77c5b0e72dedc149d35ae6c273c1d3c43`, whose parents are cleanup
-head `cd17abb4b7bd2e709bafd4596b4d3d278659e20d` and `origin/dev`
-`b52f098280e812506c7fa83f513ee9b921d6c108`, plus one behavior-neutral hooks-test type narrowing.
+## Deterministic RED
 
-## Merge resolution
+[`isolation-error-semantics-red.log`](isolation-error-semantics-red.log) records 26 pass / 5 fail
+before production changes:
 
-- `drive.mjs`: retained mutation-safe protected snapshot verdicts/fields. Integrated current-dev
-  complete-tree inventories, volatile classification, volatile `settings.json` normalization, and
-  transient `ENOENT`/`ENOTDIR` tolerance into bounded observations. Complete-tree evidence remains
-  supporting evidence; protected state remains the fail-closed isolation verdict.
-- All current-dev hooks regressions and referenced fixtures were restored. They exercise pristine
-  installed Senpi 2026.8.31; no deleted downstream hooks patch or trust-storage transform returned.
-  One test-only `Error.code` access was narrowed for script typecheck.
-- `packages/omo-native/senpi-patch.mjs` and its packed test are byte-identical to current dev. The
-  installer contains only the `describeUnclaimedResult` Claude OAuth transform.
-- Mutation-safe metadata windows, ENOENT-only protected absence, RED evidence, and byte bounds remain.
+- recursive and protected pre-open replacement was misclassified `FILE_CHANGED`;
+- close failure replaced an earlier recursive/protected primary error;
+- close failure replaced the absence-race `FILE_REPLACED` primary error;
+- `digestDirectory` ignored its injected read seam and lacked transient read filtering;
+- isolated child environments omitted Windows `USERPROFILE`.
+
+All races and errors are injected synchronously at stat/open/read/close seams. No sleeps, permissions,
+platform skips, or timing luck are used.
+
+## GREEN semantics
+
+- Initial-path to opened-descriptor metadata changes preserve the exact `changedMetadataCode` result.
+  If the opened descriptor also differs from the current path, that additional race is independently
+  `FILE_REPLACED`.
+- Recursive and protected close errors surface only when the operation has no primary error. Read,
+  stat, metadata, and absence-race codes retain precedence over close failure. Successful read plus
+  failed close remains incomplete with the sanitized close code.
+- The ENOENT-stat/open-success branch retains `FILE_REPLACED` even if close also fails.
+- `digestDirectory` tolerates only `ENOENT` and `ENOTDIR` from recursion or read. `EACCES`, `EIO`, and
+  all other errors propagate. Surviving files retain sorted deterministic digest input.
+- Child QA isolation sets both `HOME` and `USERPROFILE` to the caller sandbox home without a platform
+  skip.
+- Bigint mutation metadata, ENOENT-only protected absence, hard byte bounds, oversized-file
+  truncation, transient bounded observations, volatile settings normalization, and current-dev
+  inventory fields remain unchanged.
 
 ## Exact-head gates
 
-- Combined isolation/task: 26 pass; upstream hooks: 9 pass; OAuth/compile-entry: 26 pass;
-  package/pin: 20 pass; packed OAuth consumer: 1 pass.
-- Real Senpi driver: PASS; protected snapshots complete/error-free/untouched; complete-tree inventory
-  present; observations bounded; caller directory ignored; sandbox removed.
-- Serialized gate: 2,468 pass, 7 platform skips, 0 fail; resolver 10 pass, 0 fail.
-- Extension freshness, relevant typechecks, LSP, and Biome completed. Integration-owned no-excuse
-  passes. The byte-exact current-dev packed test retains three pre-existing non-null assertions that
-  the all-files no-excuse invocation reports; runtime and typecheck pass.
+- Combined isolation/task: 31 pass, 0 fail.
+- Upstream Senpi hooks regressions: 9 pass, 0 fail.
+- OAuth/compile-entry: 26 pass, 0 fail.
+- Package/pin: 20 pass, 0 fail.
+- Packed OAuth consumer: 1 pass, 0 fail.
+- Real live Senpi driver: PASS; protected snapshots complete/error-free/untouched, observations
+  bounded, caller directory ignored, sandbox removed.
+- Serialized gate: 2,473 pass, 7 platform skips, 0 fail; resolver 10 pass, 0 fail.
+- Extension freshness, relevant typechecks, LSP, Biome, and integration-owned no-excuse checks pass.
 
-## Release-gate facts
-
-Current dev independently landed (1) packed-consumer postinstall proof for the OAuth-only transform
-and (2) root-worktree regressions for pristine upstream Senpi 2026.8.31 hooks behavior. Neither is a
-clean packed-consumer hooks semantics proof. That gate remains separate and missing.
-
-Evidence contains no protected bytes, hashes, secrets, private keys, tokens, or raw environment output.
+Current dev's packed installer remains OAuth-only; root hooks tests exercise pristine Senpi 2026.8.31.
+A clean packed-consumer hooks semantics proof remains a separate missing gate. Evidence contains no
+protected content, hashes, secrets, tokens, private keys, or raw environment output.

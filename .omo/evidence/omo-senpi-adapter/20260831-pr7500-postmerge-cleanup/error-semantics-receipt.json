@@ -1,0 +1,14 @@
+{
+  "validatedSourceHead": "7796dd423bd2867042e42860506f00a0d8877b8d",
+  "red": { "pass": 26, "fail": 5 },
+  "greenIsolationAndTask": { "pass": 31, "fail": 0 },
+  "preOpenReplacement": "FILE_REPLACED",
+  "additionalOpenToPathReplacement": "FILE_REPLACED",
+  "closePrecedence": "primary operation error wins; close error surfaces only without primary error",
+  "absenceRacePrimary": "FILE_REPLACED",
+  "digestTransientCodes": ["ENOENT", "ENOTDIR"],
+  "digestNonTransientCodesPropagate": ["EACCES", "EIO"],
+  "digestSurvivorOrderingDeterministic": true,
+  "childHomeVariables": ["HOME", "USERPROFILE"],
+  "contentOrHashesEmitted": false
+}

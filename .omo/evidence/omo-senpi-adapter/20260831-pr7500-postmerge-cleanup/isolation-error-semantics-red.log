@@ -1,0 +1,144 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/isolation-state.test.mjs:
+(pass) #given protected and volatile files #when snapshots are compared #then only protected path changes affect isolation [3.14ms]
+(pass) #given nested files within the observation bounds #when scanned #then the full-tree observation is complete [1.68ms]
+(pass) #given a tree beyond the file bound #when observed #then truncation is explicit and never complete [0.57ms]
+(pass) #given identical protected read failures #when snapshots are compared #then isolation fails closed with structured relative errors [0.84ms]
+(pass) #given files exceed the byte budget #when observed #then descriptor reads never exceed maxBytes [0.72ms]
+(pass) #given a file shrinks after traversal #when observed #then short read is explicit and incomplete [0.68ms]
+(pass) #given a file grows while hashing #when observed #then growth is explicit and incomplete [0.63ms]
+(pass) #given a path is replaced after open #when observed #then replacement is explicit and incomplete [9.86ms]
+(pass) #given one file exceeds the byte budget #when observed #then truncation occurs without reading or BYTE_LIMIT errors [0.36ms]
+(pass) #given a same-size in-place overwrite after an observation read #when metadata is verified #then the snapshot fails closed [0.48ms]
+(pass) #given a same-size in-place overwrite after a protected read #when metadata is verified #then the snapshot fails closed [0.40ms]
+(pass) #given an existence probe would hide inaccessible protected state #when opened directly #then EACCES fails closed [0.51ms]
+(pass) #given only volatile settings stamps change #when bounded complete-tree snapshots are compared #then settings stay unchanged [0.47ms]
+(pass) #given an enumerated entry vanishes before stat #when the bounded complete-tree snapshot runs #then the transient entry is tolerated [0.41ms]
+381 |       } }
+382 |       const result = kind === "observed"
+383 |         ? snapshotDirectory(root, { maxFiles: 10, maxBytes: 1024, maxEntries: 10 }, io)
+384 |         : snapshotProtectedState(root, io)
+385 |       expect(result.complete).toBe(false)
+386 |       expect(result.errors).toEqual([{ path: name, code: "FILE_REPLACED" }])
+                                  ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+-     "code": "FILE_REPLACED",
++     "code": "FILE_CHANGED",
+      "path": "state.json",
+    },
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-state.test.mjs:386:29)
+(fail) #given replacement between initial stat and open #when snapshotted #then public paths preserve FILE_REPLACED [0.71ms]
+399 |         : snapshotProtectedState(root, io)
+400 |       expect(run({ closeSync() { throw codedError("ECLOSE") } }).errors).toEqual([{ path: name, code: "ECLOSE" }])
+401 |       const io = kind === "observed"
+402 |         ? { readSync() { throw codedError("EIO") }, closeSync() { throw codedError("ECLOSE") } }
+403 |         : { readFileSync() { throw codedError("EIO") }, closeSync() { throw codedError("ECLOSE") } }
+404 |       expect(run(io).errors).toEqual([{ path: name, code: "EIO" }])
+                                   ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+-     "code": "EIO",
++     "code": "ECLOSE",
+      "path": "state.json",
+    },
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-state.test.mjs:404:30)
+(fail) #given success or primary failure plus close failure #when reading #then primary-operation precedence is stable [0.74ms]
+420 |         }
+421 |         return statSync(file, options)
+422 |       },
+423 |       closeSync() { throw codedError("ECLOSE") },
+424 |     })
+425 |     expect(snapshot.errors).toEqual([{ path: "auth.json", code: "FILE_REPLACED" }])
+                                  ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+-     "code": "FILE_REPLACED",
++     "code": "ECLOSE",
+      "path": "auth.json",
+    },
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-state.test.mjs:425:29)
+(fail) #given ENOENT stat then open success and close failure #when absence races #then FILE_REPLACED remains primary [0.64ms]
+440 |         readFile(file) { if (file.endsWith("raced.tmp")) throw codedError(code); return Buffer.from("stable") },
+441 |       })
+442 |       expect(digest).toBe(expected)
+443 |     }
+444 |     for (const code of ["EACCES", "EIO"]) {
+445 |       expect(() => isolationState.digestDirectory(root, { readFile() { throw codedError(code) } })).toThrow()
+                                                                                                          ^
+error: expect(received).toThrow()
+
+Received function did not throw
+Received value: "40cf423fe75e1e6c1649edb845bd777410b943ba6c0826a5aeb54e3f762baea5"
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-state.test.mjs:445:101)
+(fail) #given transient or primary complete-tree read errors #when digesting #then only ENOENT and ENOTDIR are tolerated [0.84ms]
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:
+(pass) task 13 senpi QA scripts > #given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup [0.16ms]
+(pass) task 13 senpi QA scripts > #given drive.mjs self-test #when executed #then sandbox helpers validate successfully [50.22ms]
+(pass) task 13 senpi QA scripts > #given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched [0.75ms]
+(pass) task 13 senpi QA scripts > #given probe-continuation self-test #when executed #then continuation helpers validate successfully [59.98ms]
+(pass) task 13 senpi QA scripts > #given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape [0.25ms]
+(pass) task 13 senpi QA scripts > #given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi [0.20ms]
+(pass) task 13 senpi QA scripts > #given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory [0.12ms]
+(pass) task 13 senpi QA scripts > #given mock provider self-test #when executed #then text and tool-call script steps validate [22.02ms]
+(pass) task 13 senpi QA scripts > #given a scripted tool call #when converted to an assistant message #then it stops with toolUse [0.35ms]
+(pass) task 13 senpi QA scripts > #given terminal stream events #when result is awaited #then done and error events settle the promise [0.63ms]
+(pass) task 13 senpi QA scripts > #given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result [0.77ms]
+(pass) task 13 senpi QA scripts > #given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox [53.99ms]
+278 |     }
+279 |   })
+280 |
+281 |   test("#given an isolated child home #when cross-platform variables are built #then HOME and USERPROFILE match", () => {
+282 |     const home = join(tmpdir(), "omo-senpi-cross-platform-home")
+283 |     expect(isolatedHomeEnv(home)).toEqual({ HOME: home, USERPROFILE: home })
+                                        ^
+error: expect(received).toEqual(expected)
+
+  {
+    "HOME": "/home/minpeter/.cache/omo-tmp/omo-senpi-cross-platform-home",
+-   "USERPROFILE": "/home/minpeter/.cache/omo-tmp/omo-senpi-cross-platform-home",
+  }
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/task-13.test.ts:283:35)
+(fail) task 13 senpi QA scripts > #given an isolated child home #when cross-platform variables are built #then HOME and USERPROFILE match [0.30ms]
+
+5 tests failed:
+(fail) #given replacement between initial stat and open #when snapshotted #then public paths preserve FILE_REPLACED [0.71ms]
+(fail) #given success or primary failure plus close failure #when reading #then primary-operation precedence is stable [0.74ms]
+(fail) #given ENOENT stat then open success and close failure #when absence races #then FILE_REPLACED remains primary [0.64ms]
+(fail) #given transient or primary complete-tree read errors #when digesting #then only ENOENT and ENOTDIR are tolerated [0.84ms]
+(fail) task 13 senpi QA scripts > #given an isolated child home #when cross-platform variables are built #then HOME and USERPROFILE match [0.30ms]
+
+ 26 pass
+ 5 fail
+ 115 expect() calls
+Ran 31 tests across 2 files. [1.57s]
+
+status=1

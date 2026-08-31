@@ -1,9 +1,9 @@
-validatedSourceHead=81b673b7df987e7088bfa240e7d6a76ce01617b4
+validatedSourceHead=7796dd423bd2867042e42860506f00a0d8877b8d
 cleanupStatus=PASS
 taskOwnedTempPathCount=0
 taskOwnedProcessCount=0
 worktreeLspDaemonCount=0
-liveDriverSandbox=/home/minpeter/.cache/omo-tmp/omo-senpi-qa-FKMEga/agent
+liveDriverSandbox=/home/minpeter/.cache/omo-tmp/omo-senpi-qa-LIsDR2/agent
 liveDriverSandboxRemoved=true
 serializedGateFixtureRootsRemoved=true
 retainedSecrets=none

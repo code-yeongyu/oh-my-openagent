@@ -1,17 +1,10 @@
-sourceHead=81b673b7df987e7088bfa240e7d6a76ce01617b4
-upstreamDev=b52f098280e812506c7fa83f513ee9b921d6c108
-
-extensionFreshness=PASS
+sourceHead=7796dd423bd2867042e42860506f00a0d8877b8d
+extensionFreshnessBeforeSerializedGate=PASS
+extensionFreshnessAfterSerializedGate=PASS
 omoNativeTypecheck=PASS
 omoSenpiTypecheck=PASS
 senpiTaskTypecheck=PASS
 scriptTypecheck=PASS
 lspDiagnostics=PASS
-biome=PASS_WITH_CURRENT_DEV_WARNINGS
+biome=PASS_WITH_INFORMATIONAL_LITERAL_KEY_SUGGESTIONS
 integrationOwnedNoExcuse=PASS
-postSerializedGateExtensionFreshness=PASS
-
-Byte-exact current-dev exception:
-- packages/omo-native/test/packed-install.test.ts contains three pre-existing non-null assertions.
-- The all-relevant-files no-excuse invocation was run and reported those three violations.
-- The file remains byte-identical to origin/dev as explicitly required; runtime and typecheck pass.
