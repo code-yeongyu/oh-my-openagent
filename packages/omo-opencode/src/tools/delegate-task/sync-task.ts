@@ -176,7 +176,7 @@ export async function executeSyncTask(
       // session.idle), so handedBackSyncSessions is the signal the enforcer keys on;
       // the abort still cancels the child's opencode-side background jobs.
       if (typeof client?.session?.abort === "function") {
-        void client.session.abort({ path: { id: syncSessionID } }).catch((error: unknown) => {
+        await client.session.abort({ path: { id: syncSessionID } }).catch((error: unknown) => {
           log(`[task] Failed to abort completed sync session:`, error)
         })
       }
