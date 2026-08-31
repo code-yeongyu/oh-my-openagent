@@ -178,6 +178,7 @@ class TaskManagerImpl implements TaskManager {
         return removed
       },
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
+      promoteToBackground: (taskId) => this.promoteToBackground(taskId),
       destruction: options.destruction ?? NOOP_DESTRUCTION,
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       now: this.#now,

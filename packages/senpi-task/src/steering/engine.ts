@@ -94,15 +94,27 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (!reservation.ok) {
       return { kind: "capacity_deferred", task_id: record.task_id, reason: "Task capacity is full; retry explicitly." }
     }
+    // A revived run is asynchronous from the parent's perspective: the parent may go idle while it
+    // runs, so its terminal must wake the parent even for an originally sync spawn. Promote BEFORE
+    // the follow-up starts so even a fast-settling turn notifies; roll back if the follow-up fails
+    // to start, leaving no phantom notification intent on a task that never revived.
+    const wasNotifying = record.notify_on_terminal
+    if (!wasNotifying) port.promoteToBackground(record.task_id)
+    let followUpStarted = false
     try {
       // Revive is a follow-up prompt on the SAME session (codex followup_task), not a fresh child.
       await handle.followUp(message)
-      const revived = buildRevived(record, nowIso())
+      followUpStarted = true
+      // Build from the FRESH record: the promotion above mutated persisted notification intent
+      // that the stale sendToTask snapshot would silently revert on replace.
+      const current = tryLoad(record.task_id) ?? record
+      const revived = buildRevived(current, nowIso())
       port.store.replace(revived)
       port.store.appendEvent(record.task_id, { type: "revived", payload: { run_epoch: revived.notification.run_epoch } })
       reservation.commit()
       return { kind: "revived", task_id: record.task_id, run_epoch: revived.notification.run_epoch }
     } catch (error) {
+      if (!wasNotifying && !followUpStarted) rollbackRevivalPromotion(port, record)
       reservation.release()
       throw error
     }
@@ -309,4 +321,13 @@ function buildRevived(record: TaskRecord, timestamp: string): TaskRecord {
     updated_at: timestamp,
     notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
   }
+}
+
+function rollbackRevivalPromotion(port: SteeringPort, record: TaskRecord): void {
+  // Restore exactly the pre-promotion values, and only while the fresh record still carries the
+  // promotion: a concurrent writer that changed notification intent must never be clobbered.
+  port.store.mutate(record.task_id, (fresh) => {
+    if (!fresh.notify_on_terminal) return fresh
+    return { ...fresh, notify_on_terminal: false, background_mode: record.background_mode }
+  })
 }

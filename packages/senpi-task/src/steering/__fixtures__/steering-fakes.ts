@@ -95,6 +95,7 @@ export type SteeringHarness = {
   readonly destruction: FakeDestruction
   readonly reviveCalls: string[]
   readonly dequeueCalls: string[]
+  readonly promoteCalls: string[]
   setLive(taskId: string, handle: ManagedChildHandle): void
   clearLive(taskId: string): void
   seedRecord(overrides?: Partial<TaskRecordInput>): TaskRecord
@@ -107,6 +108,7 @@ export function makeHarness(): SteeringHarness {
   const destruction = makeFakeDestruction()
   const reviveCalls: string[] = []
   const dequeueCalls: string[] = []
+  const promoteCalls: string[] = []
   let clock = Date.parse("2026-07-06T00:00:00.000Z")
   const port: SteeringPort = {
     store,
@@ -116,6 +118,18 @@ export function makeHarness(): SteeringHarness {
       release: () => undefined,
       commit: () => { reviveCalls.push(taskId) },
     }),
+    // Mirrors the manager's promotion semantics: persisted notify_on_terminal flip plus the
+    // "promoted" background mode for a formerly foreground record.
+    promoteToBackground: (taskId) => {
+      promoteCalls.push(taskId)
+      let promoted = false
+      store.mutate(taskId, (record) => {
+        if (record.notify_on_terminal) return record
+        promoted = true
+        return { ...record, notify_on_terminal: true, background_mode: "promoted" }
+      })
+      return promoted
+    },
     dequeuePending: (taskId) => {
       dequeueCalls.push(taskId)
       return false
@@ -130,6 +144,7 @@ export function makeHarness(): SteeringHarness {
     destruction,
     reviveCalls,
     dequeueCalls,
+    promoteCalls,
     setLive: (taskId, handle) => {
       live.set(taskId, handle)
     },

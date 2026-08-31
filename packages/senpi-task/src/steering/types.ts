@@ -21,6 +21,11 @@ export type SteeringPort = {
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
+  // Reviving a terminal child re-arms it as an asynchronous run from the parent's perspective, so
+  // its terminal must notify even for an originally sync spawn. The manager owns background
+  // intent; steering promotes through this port before the follow-up starts. Returns true when
+  // the task was foreground and is now promoted, false when it already notified on terminal.
+  promoteToBackground(taskId: string): boolean
   readonly destruction: DestructionPort
   // Snapshot of the manager-owned run-stats accumulator for a live task, attached to the cancel
   // transition steering performs (the manager's later outcome transition is late-transition

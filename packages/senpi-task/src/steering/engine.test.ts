@@ -72,6 +72,91 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     expect(harness.reviveCalls).toContain(record.task_id)
   })
 
+  test("#given a completed resident sync child #when sent a message #then the revived epoch is promoted to background before the follow-up starts", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord({ notify_on_terminal: false, background_mode: "foreground" })
+    toCompleted(harness, record)
+    const fake = makeFakeHandle(record.task_id, flavor)
+    const notifyStateAtFollowUp: Array<boolean | undefined> = []
+    const handle: ManagedChildHandle = {
+      ...fake.handle,
+      followUp: async (text) => {
+        notifyStateAtFollowUp.push(harness.store.load(record.task_id)?.notify_on_terminal)
+        await fake.handle.followUp(text)
+      },
+    }
+    harness.setLive(record.task_id, handle)
+
+    // when
+    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "second pass" })
+
+    // then
+    if (outcome.kind !== "revived") throw new Error("expected revived")
+    expect(outcome.run_epoch).toBe(1)
+    // The promotion must land BEFORE the follow-up begins: once revived, the run is asynchronous
+    // from the parent's perspective, so even a fast-settling turn must notify on terminal.
+    expect(notifyStateAtFollowUp).toEqual([true])
+    const revived = harness.store.load(record.task_id)
+    expect(revived?.notify_on_terminal).toBe(true)
+    expect(revived?.background_mode).toBe("promoted")
+  })
+
+  test("#given a completed resident sync child whose follow-up fails to start #when revival fails #then the promotion is rolled back and the error propagates", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord({ notify_on_terminal: false, background_mode: "foreground" })
+    toCompleted(harness, record)
+    const fake = makeFakeHandle(record.task_id, flavor)
+    const notifyStateAtFollowUp: Array<boolean | undefined> = []
+    const handle: ManagedChildHandle = {
+      ...fake.handle,
+      followUp: (text) => {
+        notifyStateAtFollowUp.push(harness.store.load(record.task_id)?.notify_on_terminal)
+        return Promise.reject(new Error("session refused the follow-up"))
+      },
+    }
+    harness.setLive(record.task_id, handle)
+
+    // when
+    let failure: unknown
+    try {
+      await harness.engine.sendToTask({ idOrName: record.task_id, message: "second pass" })
+    } catch (error) {
+      failure = error
+    }
+
+    // then
+    expect((failure as Error | undefined)?.message).toBe("session refused the follow-up")
+    // The promotion DID happen before the follow-up was attempted...
+    expect(notifyStateAtFollowUp).toEqual([true])
+    // ...and is rolled back because the revived run never started.
+    const rolledBack = harness.store.load(record.task_id)
+    expect(rolledBack?.status).toBe("completed")
+    expect(rolledBack?.notify_on_terminal).toBe(false)
+    expect(rolledBack?.background_mode).toBe("foreground")
+    // The revive reservation was released, not committed: no outcome tracking for a run that never started.
+    expect(harness.reviveCalls).not.toContain(record.task_id)
+  })
+
+  test("#given an originally background resident child #when sent a message #then revival keeps the background mode without mutating it", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord({ notify_on_terminal: true, background_mode: "background" })
+    toCompleted(harness, record)
+    const fake = makeFakeHandle(record.task_id, flavor)
+    harness.setLive(record.task_id, fake.handle)
+
+    // when
+    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "second pass" })
+
+    // then
+    if (outcome.kind !== "revived") throw new Error("expected revived")
+    const revived = harness.store.load(record.task_id)
+    expect(revived?.notify_on_terminal).toBe(true)
+    expect(revived?.background_mode).toBe("background")
+  })
+
   test("#given a running resident child #when interrupted then sent #then interrupt keeps partial text and the later send revives", async () => {
     // given
     const harness = makeHarness()
@@ -258,6 +343,7 @@ describe("steering pending cancellation", () => {
       store: harness.store,
       liveHandle: (taskId) => live.get(taskId),
       reserveForRevive: () => ({ ok: true, commit: () => undefined, release: () => undefined }),
+      promoteToBackground: () => false,
       dequeuePending: (taskId) => {
         dequeued.push(taskId)
         return true
@@ -337,6 +423,7 @@ describe("durable prelaunch steering", () => {
       store,
       liveHandle: (taskId) => live.get(taskId),
       reserveForRevive: () => ({ ok: true, commit: () => undefined, release: () => undefined }),
+      promoteToBackground: () => false,
       dequeuePending: () => false,
       runStatsSnapshot: () => undefined,
       destruction: makeFakeDestruction(),
