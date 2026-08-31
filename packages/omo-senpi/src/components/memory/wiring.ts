@@ -10,6 +10,7 @@ import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } 
 import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
 import { createMemoryNoticeWiring } from "./memory-notice-wiring"
+import { createMemoryRecallWiring } from "./recall-wiring"
 import { branchEntryCount } from "./wiring-context"
 import {
   createMemoryReflectionLiveWiring,
@@ -69,6 +70,13 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         return true
       }
     },
+  })
+
+  const recallWiring = createMemoryRecallWiring({
+    resolveContext,
+    resolveSettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
+    env: options.env,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
 
   async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
@@ -133,6 +141,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         promptCache,
         nudgeWiring,
         noticeWiring,
+        recallWiring,
         dreamTriggerWiring,
         completionApi: createReflectionCompletionApi,
         resolveContext,

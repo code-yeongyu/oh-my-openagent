@@ -32,6 +32,19 @@ export const OmoMemorySearchSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
+// Recall (M1 lexical; no gated mode)
+// ---------------------------------------------------------------------------
+
+export const OmoMemoryRecallSchema = z.object({
+  enabled: z.boolean().default(true),
+  max_items: z.number().int().min(1).max(5).default(2),
+  budget_tokens: z.number().int().positive().default(600),
+  excerpt_chars: z.number().int().positive().default(200),
+  min_score: z.number().optional(),
+  exclude: z.array(z.string()).default([]),
+}).strict()
+
+// ---------------------------------------------------------------------------
 // Nudge
 // ---------------------------------------------------------------------------
 
@@ -115,6 +128,15 @@ export const OmoMemorySearchLayerSchema = z.object({
   enabled: z.boolean().optional(),
 }).strict()
 
+export const OmoMemoryRecallLayerSchema = z.object({
+  enabled: z.boolean().optional(),
+  max_items: z.number().int().min(1).max(5).optional(),
+  budget_tokens: z.number().int().positive().optional(),
+  excerpt_chars: z.number().int().positive().optional(),
+  min_score: z.number().optional(),
+  exclude: z.array(z.string()).optional(),
+}).strict()
+
 export const OmoMemoryNudgeLayerSchema = z.object({
   enabled: z.boolean().optional(),
   every_user_turns: z.number().int().min(1).optional(),
@@ -164,6 +186,7 @@ export const OmoMemoryAgentOverridesSchema = z.object({
   write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
+  recall: OmoMemoryRecallLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
 }).strict()
 
@@ -200,6 +223,13 @@ export const OmoMemorySettingsSchema = z.object({
   write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
   sync: OmoMemorySyncSchema.default({ enabled: true }),
   search: OmoMemorySearchSchema.default({ enabled: true }),
+  recall: OmoMemoryRecallSchema.default({
+    enabled: true,
+    max_items: 2,
+    budget_tokens: 600,
+    excerpt_chars: 200,
+    exclude: [],
+  }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
 }).strict()
@@ -217,6 +247,7 @@ export const OmoMemorySettingsLayerSchema = z.object({
   write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
+  recall: OmoMemoryRecallLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).optional(),
 }).strict()
@@ -229,6 +260,7 @@ export type OmoMemoryReflectionTrigger = z.infer<typeof OmoMemoryReflectionTrigg
 export type OmoMemoryReflection = z.infer<typeof OmoMemoryReflectionSchema>
 export type OmoMemorySync = z.infer<typeof OmoMemorySyncSchema>
 export type OmoMemorySearch = z.infer<typeof OmoMemorySearchSchema>
+export type OmoMemoryRecall = z.infer<typeof OmoMemoryRecallSchema>
 export type OmoMemoryNudge = z.infer<typeof OmoMemoryNudgeSchema>
 export type OmoMemoryFacts = z.infer<typeof OmoMemoryFactsSchema>
 export type OmoMemoryDream = z.infer<typeof OmoMemoryDreamSchema>
