@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
+import { createAutoRetryHelpers } from "./auto-retry"
+import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { createFirstPromptWatchdog, observeEventForWatchdog, type FirstPromptWatchdog } from "./first-prompt-watchdog"
 
@@ -171,6 +173,25 @@ describe("first-prompt-watchdog", () => {
     fakeTimers?.restore()
     fakeTimers = undefined
     subagentSessions.clear()
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  it("#given the watchdog abort returns to us as a session.error abort #when the watchdog fires with real auto-retry helpers #then the abort is classified as internal so retry state survives the error", async () => {
+    // given
+    const sessionID = "session-watchdog-error-classification"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const helpers = createAutoRetryHelpers(deps)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+
+    watchdog.dispose()
   })
 
   it("#given a subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model", async () => {

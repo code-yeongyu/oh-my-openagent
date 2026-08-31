@@ -11,6 +11,7 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { SUBAGENT_QUOTA_NO_FALLBACK_ABORT_SOURCE } from "./auto-retry-abort"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -161,7 +162,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
             sessionID,
             model,
           })
-          await helpers.abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
+          await helpers.abortSessionRequest(sessionID, SUBAGENT_QUOTA_NO_FALLBACK_ABORT_SOURCE)
         }
         return
       }

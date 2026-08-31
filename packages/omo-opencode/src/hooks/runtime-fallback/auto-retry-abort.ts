@@ -3,16 +3,26 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 
+export const FIRST_PROMPT_WATCHDOG_ABORT_SOURCE = "first-prompt-watchdog"
+export const SUBAGENT_QUOTA_NO_FALLBACK_ABORT_SOURCE = "message.updated.subagent-quota-no-fallback"
+
+// Every abort WE trigger to swap a fallback model must be classified internal here;
+// an unclassified source surfaces as session.error cancellation and poisons the
+// cancelledSessions mark (runaway abort/re-dispatch loop, incident ses_fa750d527ffe).
+const INTERNALLY_ABORTED_SOURCES: ReadonlySet<string> = new Set([
+  "session.status.retry-signal",
+  "message.updated.retry-signal",
+  "message.updated.quota-fallback",
+  "session.timeout",
+  FIRST_PROMPT_WATCHDOG_ABORT_SOURCE,
+  SUBAGENT_QUOTA_NO_FALLBACK_ABORT_SOURCE,
+])
+
 export function createAbortSessionRequest(deps: HookDeps) {
   const { ctx } = deps
 
   return async (sessionID: string, source: string): Promise<void> => {
-    if (
-      source === "session.status.retry-signal" ||
-      source === "message.updated.retry-signal" ||
-      source === "message.updated.quota-fallback" ||
-      source === "session.timeout"
-    ) {
+    if (INTERNALLY_ABORTED_SOURCES.has(source)) {
       deps.internallyAbortedSessions.add(sessionID)
       deps.sessionLastAccess.set(sessionID, Date.now())
     }

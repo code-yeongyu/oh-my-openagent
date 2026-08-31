@@ -10,8 +10,7 @@ import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
-
-const SOURCE = "first-prompt-watchdog"
+import { FIRST_PROMPT_WATCHDOG_ABORT_SOURCE as SOURCE } from "./auto-retry-abort"
 const SESSION_NEXT_EVENT_PREFIX = "session.next."
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout

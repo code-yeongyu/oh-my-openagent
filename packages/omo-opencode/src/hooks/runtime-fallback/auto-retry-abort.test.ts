@@ -3,6 +3,9 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { getPromptReservation, setPromptReservation } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
 import { createAbortSessionRequest } from "./auto-retry-abort"
+import { createEventHandler } from "./event-handler"
+import { createFallbackState } from "./fallback-state"
+import type { AutoRetryHelpers } from "./auto-retry"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
 function createContext(): RuntimeFallbackPluginInput {
@@ -52,6 +55,22 @@ function reserveSession(sessionID: string, source: string): void {
     token: Symbol("in-flight-stream"),
     expiresAt: Date.now() + 60_000,
   })
+}
+
+function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[]): AutoRetryHelpers {
+  return {
+    abortSessionRequest: async (sessionID: string) => {
+      abortCalls.push(sessionID)
+    },
+    clearSessionFallbackTimeout: (sessionID: string) => {
+      clearCalls.push(sessionID)
+      deps.sessionFallbackTimeouts.delete(sessionID)
+    },
+    scheduleSessionFallbackTimeout: () => {},
+    autoRetryWithFallback: async () => {},
+    resolveAgentForSessionFromContext: async () => undefined,
+    cleanupStaleSessions: () => {},
+  }
 }
 
 describe("createAbortSessionRequest reservation release", () => {
@@ -113,5 +132,75 @@ describe("createAbortSessionRequest reservation release", () => {
 
     // then
     expect(getPromptReservation(sessionID)?.source).toBe("user-prompt")
+  })
+})
+
+describe("createAbortSessionRequest internal-abort classification", () => {
+  afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given a first-prompt watchdog abort #when abortSessionRequest records the source #then the session is classified as internally aborted so session.error preserves retry state", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-watchdog-abort"
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    // when
+    await abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    // then
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  test("#given a subagent quota abort with no fallback configured #when abortSessionRequest records the source #then the session is classified as internally aborted", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-subagent-quota-abort"
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    // when
+    await abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
+
+    // then
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  test("#given a user-initiated session.stop abort #when abortSessionRequest records the source #then the session is NOT classified as internally aborted", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-user-stop-abort"
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    // when
+    await abortSessionRequest(sessionID, "session.stop")
+
+    // then - an explicit user stop must stay on the cancellation path
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  test("#given a user-initiated cancel surfaced as an abort session.error #when the event handler processes it #then the session is marked cancelled but a fresh accepted user message releases the mark on the next idle", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-cancel-released"
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("lmstudio/google/gemma-4-26b-a4b")
+    state.currentModel = "lmstudio/qwen3-vl-30b"
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when - external abort poisons, then a fresh user turn arrives, then idle fires
+    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+    const poisoned = deps.sessionStates.get(sessionID)
+    expect(poisoned?.attemptCount).toBe(0)
+    poisoned.attemptCount = 2
+
+    await handler({ event: { type: "message.updated", properties: { info: { role: "user", sessionID } } } })
+    await handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+    // then - the cancel mark was released by the accepted user dispatch; idle must not reset accounting
+    expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
   })
 })
