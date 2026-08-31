@@ -1,20 +1,32 @@
 import { createHash } from "node:crypto"
-import { closeSync, existsSync, fstatSync, openSync, opendirSync, readFileSync, readSync, readdirSync, statSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { join, relative } from "node:path"
+import {
+  errorCode,
+  FILE_IO,
+  fileMetadata,
+  hashFileBounded,
+  isTransientSnapshotEntryError,
+  readProtectedFileStable,
+} from "./isolation-file-readers.mjs"
 
 const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
 export const PROTECTED_STATE_FILES = ["auth.json", "settings.json", "models.json", "models-store.json", "trust.json", "hooks-state.json"]
 export const OBSERVATION_LIMITS = { maxFiles: 10_000, maxBytes: 64 * 1024 * 1024, maxEntries: 20_000 }
-const FILE_IO = { closeSync, fstatSync, openSync, opendirSync, readFileSync, readSync, statSync }
-const HASH_CHUNK_BYTES = 64 * 1024
 
-export function credentialDigest(agentDir) {
+export function credentialDigest(agentDir, { readFile = readFileSync } = {}) {
   const hash = createHash("sha256")
   for (const name of CREDENTIAL_FILES) {
-    const path = join(agentDir, name)
+    let content
+    try {
+      content = credentialBytes(readFile(join(agentDir, name)), name)
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw error
+      content = Buffer.from("absent")
+    }
     hash.update(name)
     hash.update("\0")
-    hash.update(existsSync(path) ? credentialBytes(readFileSync(path), name) : Buffer.from("absent"))
+    hash.update(content)
     hash.update("\0")
   }
   return hash.digest("hex")
@@ -39,9 +51,6 @@ export function protectedSnapshotsUntouched(before, after) {
 
 export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, ioOverrides = {}) {
   const io = { ...FILE_IO, ...ioOverrides }
-  if (!existsSync(root)) {
-    return { snapshot: new Map(), complete: true, truncated: false, errors: [], bytesRead: 0 }
-  }
   const state = { root, files: [], errors: [], entries: 0, truncated: false }
   collectFilesBounded(root, state, {
     maxFiles: limits.maxFiles,
@@ -55,7 +64,7 @@ export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, ioOverrides
       state.truncated = true
       break
     }
-    const result = hashFileBounded(file, remainingBytes, io)
+    const result = hashFileBounded(file, remainingBytes, io, credentialBytes)
     bytesRead += result.bytesRead
     if (result.error !== undefined) {
       if (!isTransientSnapshotEntryError({ code: result.error })) state.errors.push({ path: file.rel, code: result.error })
@@ -75,28 +84,43 @@ export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, ioOverrides
 export function changedSnapshotPaths(before, after) {
   return [...new Set([...before.keys(), ...after.keys()])]
     .filter((path) => before.get(path) !== after.get(path))
+    .map(canonicalRelativePath)
     .sort()
 }
 
 export function classifyObservedChanges(paths) {
-  const volatile = []
-  const protectedState = []
-  const other = []
-  for (const path of paths) {
-    if (path.startsWith("sessions/") || path.startsWith("cache/") || path.startsWith("logs/") || path.endsWith(".log")) volatile.push(path)
-    else if (PROTECTED_STATE_FILES.includes(path)) protectedState.push(path)
-    else other.push(path)
+  const volatile = new Set()
+  const protectedState = new Set()
+  const other = new Set()
+  for (const rawPath of paths) {
+    const path = canonicalRelativePath(rawPath)
+    if (path.startsWith("sessions/") || path.startsWith("cache/") || path.startsWith("logs/") || path.endsWith(".log")) volatile.add(path)
+    else if (PROTECTED_STATE_FILES.includes(path)) protectedState.add(path)
+    else other.add(path)
   }
-  return { volatile, protectedState, other }
+  return {
+    volatile: [...volatile].sort(),
+    protectedState: [...protectedState].sort(),
+    other: [...other].sort(),
+  }
+}
+
+export function isolationVerdict(beforeProtected, afterProtected, observedChangedPaths) {
+  const directProtected = changedSnapshotPaths(beforeProtected.snapshot, afterProtected.snapshot)
+  const observed = classifyObservedChanges(observedChangedPaths)
+  const changedPaths = [...new Set([...directProtected, ...observed.protectedState, ...observed.other])].sort()
+  return {
+    changedPaths,
+    untouched: beforeProtected.complete && afterProtected.complete && changedPaths.length === 0,
+  }
 }
 
 export function digestDirectory(root, { readdir = readdirSync, readFile = readFileSync } = {}) {
-  if (!existsSync(root)) return "absent"
   const files = []
-  collectFiles(root, files, readdir)
+  if (!collectFiles(root, files, readdir, true)) return "absent"
   const hash = createHash("sha256")
   for (const file of files.sort()) {
-    const rel = file.slice(root.length + 1)
+    const rel = canonicalRelativePath(file.slice(root.length + 1))
     try {
       const fileDigest = createHash("sha256").update(readFile(file)).digest("hex")
       hash.update(rel)
@@ -129,7 +153,9 @@ function collectFilesBounded(currentRoot, state, limits, io) {
   try {
     directory = io.opendirSync(currentRoot)
   } catch (error) {
-    if (!isTransientSnapshotEntryError(error)) state.errors.push({ path: relative(state.root, currentRoot) || ".", code: errorCode(error) })
+    if (!isTransientSnapshotEntryError(error)) {
+      state.errors.push({ path: canonicalRelativePath(relative(state.root, currentRoot) || "."), code: errorCode(error) })
+    }
     return
   }
   try {
@@ -152,127 +178,28 @@ function collectFilesBounded(currentRoot, state, limits, io) {
         }
         try {
           const metadata = fileMetadata(io.statSync(path, { bigint: true }))
-          state.files.push({ path, rel: relative(state.root, path), size: boundedSize(metadata.size), metadata })
+          state.files.push({
+            path,
+            rel: canonicalRelativePath(relative(state.root, path)),
+            size: boundedSize(metadata.size),
+            metadata,
+          })
         } catch (error) {
-          if (!isTransientSnapshotEntryError(error)) state.errors.push({ path: relative(state.root, path), code: errorCode(error) })
+          if (!isTransientSnapshotEntryError(error)) {
+            state.errors.push({ path: canonicalRelativePath(relative(state.root, path)), code: errorCode(error) })
+          }
         }
       }
     }
   } catch (error) {
-    state.errors.push({ path: relative(state.root, currentRoot) || ".", code: errorCode(error) })
+    state.errors.push({ path: canonicalRelativePath(relative(state.root, currentRoot) || "."), code: errorCode(error) })
   } finally {
     try {
       directory.closeSync()
     } catch (error) {
-      state.errors.push({ path: relative(state.root, currentRoot) || ".", code: errorCode(error) })
+      state.errors.push({ path: canonicalRelativePath(relative(state.root, currentRoot) || "."), code: errorCode(error) })
     }
   }
-}
-
-function hashFileBounded(file, remainingBytes, io) {
-  let fd
-  let bytesRead = 0
-  let result
-  try {
-    fd = io.openSync(file.path, "r")
-    const opened = fileMetadata(io.fstatSync(fd, { bigint: true }))
-    const openingError = changedMetadataCode(file.metadata, opened)
-    if (openingError !== undefined) {
-      const openingPath = fileMetadata(io.statSync(file.path, { bigint: true }))
-      if (!sameIdentity(opened, openingPath)) throw snapshotError("FILE_REPLACED")
-      throw snapshotError(openingError)
-    }
-    const hash = createHash("sha256")
-    const settingsChunks = file.rel === "settings.json" ? [] : undefined
-    const buffer = Buffer.allocUnsafe(Math.min(HASH_CHUNK_BYTES, Math.max(file.size, 1)))
-    while (bytesRead < file.size) {
-      const requested = Math.min(buffer.length, file.size - bytesRead, remainingBytes - bytesRead)
-      let count
-      try {
-        count = io.readSync(fd, buffer, 0, requested, bytesRead)
-      } catch (error) {
-        if (fileMetadata(io.fstatSync(fd, { bigint: true })).size < file.metadata.size) throw snapshotError("SHORT_READ")
-        throw error
-      }
-      if (count === 0) throw snapshotError("SHORT_READ")
-      const chunk = buffer.subarray(0, count)
-      hash.update(chunk)
-      if (settingsChunks !== undefined) settingsChunks.push(Buffer.from(chunk))
-      bytesRead += count
-    }
-    const finished = fileMetadata(io.fstatSync(fd, { bigint: true }))
-    const pathMetadata = fileMetadata(io.statSync(file.path, { bigint: true }))
-    if (!sameIdentity(finished, pathMetadata)) throw snapshotError("FILE_REPLACED")
-    if (changedMetadataCode(opened, finished) !== undefined || changedMetadataCode(finished, pathMetadata) !== undefined) {
-      throw snapshotError("FILE_CHANGED")
-    }
-    const digest = settingsChunks === undefined
-      ? hash.digest("hex")
-      : createHash("sha256").update(credentialBytes(Buffer.concat(settingsChunks), "settings.json")).digest("hex")
-    result = { bytesRead, digest }
-  } catch (error) {
-    result = { bytesRead, error: errorCode(error) }
-  } finally {
-    if (fd !== undefined) {
-      try { io.closeSync(fd) } catch (error) {
-        if (result?.error === undefined) result = { bytesRead, error: errorCode(error) }
-      }
-    }
-  }
-  return result
-}
-
-function readProtectedFileStable(path, io) {
-  let beforePath
-  try {
-    beforePath = fileMetadata(io.statSync(path, { bigint: true }))
-  } catch (error) {
-    if (errorCode(error) !== "ENOENT") return { error: errorCode(error) }
-    let absentFd
-    let result
-    try {
-      absentFd = io.openSync(path, "r")
-      result = { error: "FILE_REPLACED" }
-    } catch (openError) {
-      result = errorCode(openError) === "ENOENT" ? { absent: true } : { error: errorCode(openError) }
-    } finally {
-      if (absentFd !== undefined) {
-        try { io.closeSync(absentFd) } catch (closeError) {
-          if (result?.error === undefined) result = { error: errorCode(closeError) }
-        }
-      }
-    }
-    return result
-  }
-  let fd
-  let result
-  try {
-    fd = io.openSync(path, "r")
-    const opened = fileMetadata(io.fstatSync(fd, { bigint: true }))
-    const openingError = changedMetadataCode(beforePath, opened)
-    if (openingError !== undefined) {
-      const openingPath = fileMetadata(io.statSync(path, { bigint: true }))
-      if (!sameIdentity(opened, openingPath)) throw snapshotError("FILE_REPLACED")
-      throw snapshotError(openingError)
-    }
-    const content = io.readFileSync(fd)
-    const finished = fileMetadata(io.fstatSync(fd, { bigint: true }))
-    const afterPath = fileMetadata(io.statSync(path, { bigint: true }))
-    if (!sameIdentity(finished, afterPath)) throw snapshotError("FILE_REPLACED")
-    if (changedMetadataCode(opened, finished) !== undefined || changedMetadataCode(finished, afterPath) !== undefined) {
-      throw snapshotError("FILE_CHANGED")
-    }
-    result = { content }
-  } catch (error) {
-    result = { error: errorCode(error) }
-  } finally {
-    if (fd !== undefined) {
-      try { io.closeSync(fd) } catch (error) {
-        if (result?.error === undefined) result = { error: errorCode(error) }
-      }
-    }
-  }
-  return result
 }
 
 function protectedFileIo(readFileOrIo) {
@@ -282,51 +209,20 @@ function protectedFileIo(readFileOrIo) {
   return { ...FILE_IO, ...readFileOrIo }
 }
 
-function fileMetadata(stat) {
-  return {
-    dev: BigInt(stat.dev),
-    ino: BigInt(stat.ino),
-    size: BigInt(stat.size),
-    mtimeNs: BigInt(stat.mtimeNs),
-    ctimeNs: BigInt(stat.ctimeNs),
-  }
-}
-
-function sameIdentity(before, after) {
-  return before.dev === after.dev && before.ino === after.ino
-}
-
-function changedMetadataCode(before, after) {
-  if (!sameIdentity(before, after)) return "FILE_REPLACED"
-  if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) return "FILE_CHANGED"
-  return undefined
-}
-
 function boundedSize(size) {
   return size > BigInt(Number.MAX_SAFE_INTEGER) ? Number.POSITIVE_INFINITY : Number(size)
-}
-
-function snapshotError(code) {
-  const error = new Error(code)
-  error.code = code
-  return error
-}
-
-function isTransientSnapshotEntryError(error) {
-  const code = errorCode(error)
-  return code === "ENOENT" || code === "ENOTDIR"
 }
 
 function compareSnapshotErrors(left, right) {
   return left.path.localeCompare(right.path) || left.code.localeCompare(right.code)
 }
 
-function collectFiles(root, files, readdir = readdirSync) {
+function collectFiles(root, files, readdir, isRoot = false) {
   let entries
   try {
     entries = readdir(root, { withFileTypes: true })
   } catch (error) {
-    if (isTransientSnapshotEntryError(error)) return
+    if (isTransientSnapshotEntryError(error)) return !isRoot
     throw error
   }
   for (const entry of entries) {
@@ -334,8 +230,9 @@ function collectFiles(root, files, readdir = readdirSync) {
     if (entry.isDirectory()) collectFiles(path, files, readdir)
     else if (entry.isFile()) files.push(path)
   }
+  return true
 }
 
-function errorCode(error) {
-  return typeof error === "object" && error !== null && "code" in error ? String(error.code) : "UNKNOWN"
+function canonicalRelativePath(path) {
+  return path.replaceAll("\\", "/")
 }

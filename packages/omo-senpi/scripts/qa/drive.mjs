@@ -10,9 +10,9 @@ import {
   changedSnapshotPaths,
   classifyObservedChanges,
   digestDirectory,
+  isolationVerdict,
   OBSERVATION_LIMITS,
   PROTECTED_STATE_FILES,
-  protectedSnapshotsUntouched,
   snapshotDirectory,
   snapshotProtectedState,
 } from "./isolation-state.mjs"
@@ -28,9 +28,8 @@ const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 const realOmoAgentDir = join(homedir(), ".omo", "agent")
 const commentCheckerHeader = "comment-checker found issues in"
 
-// Protected top-level state determines the isolation verdict. Bounded full-tree observations are
-// supporting evidence only: concurrent host sessions legitimately update logs, caches, and session
-// JSONL, so observed paths are never attributed to QA.
+// The isolation verdict combines protected snapshots with every observed nonvolatile change.
+// Bounded recursive observations remain explicit and never claim whole-home completeness.
 
 export function createSandbox() {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-senpi-qa-")))
@@ -182,23 +181,23 @@ function printResult({ result, reason, ultraworkInjected, commentChecker, isolat
   const omoProtectedAfter = snapshotProtectedState(realOmoAgentDir)
   const senpiObservedAfter = snapshotDirectory(realSenpiAgentDir)
   const omoObservedAfter = snapshotDirectory(realOmoAgentDir)
-  const realSenpiChangedPaths = changedSnapshotPaths(isolationBefore.senpiProtected.snapshot, senpiProtectedAfter.snapshot)
-  const realOmoChangedPaths = changedSnapshotPaths(isolationBefore.omoProtected.snapshot, omoProtectedAfter.snapshot)
   const realSenpiObservedChangedPaths = changedSnapshotPaths(isolationBefore.senpiObserved.snapshot, senpiObservedAfter.snapshot)
   const realOmoObservedChangedPaths = changedSnapshotPaths(isolationBefore.omoObserved.snapshot, omoObservedAfter.snapshot)
   const senpiObserved = classifyObservedChanges(realSenpiObservedChangedPaths)
   const omoObserved = classifyObservedChanges(realOmoObservedChangedPaths)
+  const senpiVerdict = isolationVerdict(isolationBefore.senpiProtected, senpiProtectedAfter, realSenpiObservedChangedPaths)
+  const omoVerdict = isolationVerdict(isolationBefore.omoProtected, omoProtectedAfter, realOmoObservedChangedPaths)
   const payload = {
     result,
     ...(reason ? { reason } : {}),
     ultraworkInjected,
     commentChecker,
-    realSenpiUntouched: protectedSnapshotsUntouched(isolationBefore.senpiProtected, senpiProtectedAfter),
-    realSenpiChangedPaths,
+    realSenpiUntouched: senpiVerdict.untouched,
+    realSenpiChangedPaths: senpiVerdict.changedPaths,
     realSenpiProtectedStateComplete: isolationBefore.senpiProtected.complete && senpiProtectedAfter.complete,
     realSenpiProtectedErrors: protectedErrors(isolationBefore.senpiProtected, senpiProtectedAfter),
-    realOmoUntouched: protectedSnapshotsUntouched(isolationBefore.omoProtected, omoProtectedAfter),
-    realOmoChangedPaths,
+    realOmoUntouched: omoVerdict.untouched,
+    realOmoChangedPaths: omoVerdict.changedPaths,
     realOmoProtectedStateComplete: isolationBefore.omoProtected.complete && omoProtectedAfter.complete,
     realOmoProtectedErrors: protectedErrors(isolationBefore.omoProtected, omoProtectedAfter),
     realSenpiObservedChangedPaths,
