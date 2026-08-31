@@ -8,10 +8,14 @@
   },
   "files": [
     "bin",
-    "plugin"
+    "plugin",
+    "senpi-patch.mjs"
   ],
   "engines": {
     "node": ">=24.0.0"
+  },
+  "scripts": {
+    "postinstall": "node senpi-patch.mjs"
   },
   "dependencies": {
     "@babel/parser": "8.0.4",

@@ -52,6 +52,11 @@ const { spawnSync } = await loadModule<ChildProcessModule>("node:child_process")
 
 const repoRoot = process.cwd()
 const driveScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "drive.mjs")
+const isolationScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "isolation-state.mjs")
+const { snapshotDirectory, changedSnapshotPaths } = await loadModule<{
+  snapshotDirectory(root: string): { snapshot: Map<string, string>; complete: boolean }
+  changedSnapshotPaths(before: Map<string, string>, after: Map<string, string>): string[]
+}>(isolationScript)
 const probeScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "probe-continuation.mjs")
 const mockProviderScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "mock-provider", "index.ts")
 
@@ -101,6 +106,22 @@ describe("task 13 senpi QA scripts", () => {
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("SELF-TEST OK")
   })
+
+  test("#given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-senpi-settings-snapshot-"))
+    const settings = join(root, "settings.json")
+    try {
+      writeFileSync(settings, JSON.stringify({ theme: "dark", tipsHistory: { first: 1 }, lastChangelogVersion: "1.0.0", modelLastOnThinkingLevels: { model: "low" } }))
+      const before = snapshotDirectory(root)
+      writeFileSync(settings, JSON.stringify({ theme: "dark", tipsHistory: { second: 2 }, lastChangelogVersion: "2.0.0", modelLastOnThinkingLevels: { model: "high" } }))
+      const after = snapshotDirectory(root)
+
+      expect(changedSnapshotPaths(before.snapshot, after.snapshot)).toEqual([])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
 
   test("#given probe-continuation self-test #when executed #then continuation helpers validate successfully", () => {
     const result = runNode([probeScript, "--self-test"])

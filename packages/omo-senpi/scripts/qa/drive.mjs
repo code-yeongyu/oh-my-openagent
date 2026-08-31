@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import {
   changedSnapshotPaths,
+  classifyObservedChanges,
   digestDirectory,
   OBSERVATION_LIMITS,
   PROTECTED_STATE_FILES,
@@ -183,6 +184,10 @@ function printResult({ result, reason, ultraworkInjected, commentChecker, isolat
   const omoObservedAfter = snapshotDirectory(realOmoAgentDir)
   const realSenpiChangedPaths = changedSnapshotPaths(isolationBefore.senpiProtected.snapshot, senpiProtectedAfter.snapshot)
   const realOmoChangedPaths = changedSnapshotPaths(isolationBefore.omoProtected.snapshot, omoProtectedAfter.snapshot)
+  const realSenpiObservedChangedPaths = changedSnapshotPaths(isolationBefore.senpiObserved.snapshot, senpiObservedAfter.snapshot)
+  const realOmoObservedChangedPaths = changedSnapshotPaths(isolationBefore.omoObserved.snapshot, omoObservedAfter.snapshot)
+  const senpiObserved = classifyObservedChanges(realSenpiObservedChangedPaths)
+  const omoObserved = classifyObservedChanges(realOmoObservedChangedPaths)
   const payload = {
     result,
     ...(reason ? { reason } : {}),
@@ -196,8 +201,14 @@ function printResult({ result, reason, ultraworkInjected, commentChecker, isolat
     realOmoChangedPaths,
     realOmoProtectedStateComplete: isolationBefore.omoProtected.complete && omoProtectedAfter.complete,
     realOmoProtectedErrors: protectedErrors(isolationBefore.omoProtected, omoProtectedAfter),
-    realSenpiObservedChangedPaths: changedSnapshotPaths(isolationBefore.senpiObserved.snapshot, senpiObservedAfter.snapshot),
-    realOmoObservedChangedPaths: changedSnapshotPaths(isolationBefore.omoObserved.snapshot, omoObservedAfter.snapshot),
+    realSenpiObservedChangedPaths,
+    realSenpiVolatileChangedPaths: senpiObserved.volatile,
+    realSenpiProtectedObservedChangedPaths: senpiObserved.protectedState,
+    realSenpiOtherObservedChangedPaths: senpiObserved.other,
+    realOmoObservedChangedPaths,
+    realOmoVolatileChangedPaths: omoObserved.volatile,
+    realOmoProtectedObservedChangedPaths: omoObserved.protectedState,
+    realOmoOtherObservedChangedPaths: omoObserved.other,
     realSenpiObservationComplete: isolationBefore.senpiObserved.complete && senpiObservedAfter.complete,
     realSenpiObservationTruncated: isolationBefore.senpiObserved.truncated || senpiObservedAfter.truncated,
     realSenpiObservationErrors: [...isolationBefore.senpiObserved.errors, ...senpiObservedAfter.errors],

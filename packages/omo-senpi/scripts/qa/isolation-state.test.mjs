@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { appendFileSync, closeSync, fstatSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { appendFileSync, closeSync, fstatSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, opendirSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as isolationState from "./isolation-state.mjs"
@@ -306,6 +306,57 @@ test("#given an existence probe would hide inaccessible protected state #when op
     expect(snapshot.errors).toEqual([{ path: "auth.json", code: "EACCES" }])
     expect(snapshot.snapshot.has("auth.json")).toBe(false)
     expect(isolationState.protectedSnapshotsUntouched(snapshot, snapshot)).toBe(false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+
+test("#given only volatile settings stamps change #when bounded complete-tree snapshots are compared #then settings stay unchanged", () => {
+  const root = mkdtempSync(join(tmpdir(), "omo-senpi-volatile-settings-"))
+  try {
+    const path = join(root, "settings.json")
+    writeFileSync(path, JSON.stringify({ theme: "dark", tipsHistory: { first: 1 }, lastChangelogVersion: "1", modelLastOnThinkingLevels: { model: "low" } }))
+    const before = snapshotDirectory(root)
+    writeFileSync(path, JSON.stringify({ theme: "dark", tipsHistory: { second: 2 }, lastChangelogVersion: "2", modelLastOnThinkingLevels: { model: "high" } }))
+    const after = snapshotDirectory(root)
+    expect(before.complete).toBe(true)
+    expect(after.complete).toBe(true)
+    expect(changedSnapshotPaths(before.snapshot, after.snapshot)).toEqual([])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("#given an enumerated entry vanishes before stat #when the bounded complete-tree snapshot runs #then the transient entry is tolerated", () => {
+  const root = mkdtempSync(join(tmpdir(), "omo-senpi-transient-entry-"))
+  try {
+    const path = join(root, "vanished.tmp")
+    writeFileSync(path, "temporary")
+    let removed = false
+    const io = {
+      openSync,
+      closeSync,
+      fstatSync,
+      opendirSync,
+      readFileSync,
+      readSync,
+      statSync(file, options) {
+        if (!removed && file === path) {
+          removed = true
+          rmSync(path)
+          const error = new Error("entry vanished")
+          error.code = "ENOENT"
+          throw error
+        }
+        return statSync(file, options)
+      },
+    }
+    const scan = snapshotDirectory(root, { maxFiles: 10, maxBytes: 1024, maxEntries: 10 }, io)
+    expect(scan.complete).toBe(true)
+    expect(scan.truncated).toBe(false)
+    expect(scan.errors).toEqual([])
+    expect(scan.snapshot.size).toBe(0)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

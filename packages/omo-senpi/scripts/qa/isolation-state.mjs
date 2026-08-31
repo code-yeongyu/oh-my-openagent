@@ -5,7 +5,7 @@ import { join, relative } from "node:path"
 const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
 export const PROTECTED_STATE_FILES = ["auth.json", "settings.json", "models.json", "models-store.json", "trust.json", "hooks-state.json"]
 export const OBSERVATION_LIMITS = { maxFiles: 10_000, maxBytes: 64 * 1024 * 1024, maxEntries: 20_000 }
-const FILE_IO = { closeSync, fstatSync, openSync, readFileSync, readSync, statSync }
+const FILE_IO = { closeSync, fstatSync, openSync, opendirSync, readFileSync, readSync, statSync }
 const HASH_CHUNK_BYTES = 64 * 1024
 
 export function credentialDigest(agentDir) {
@@ -37,7 +37,8 @@ export function protectedSnapshotsUntouched(before, after) {
   return before.complete && after.complete && changedSnapshotPaths(before.snapshot, after.snapshot).length === 0
 }
 
-export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, io = FILE_IO) {
+export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, ioOverrides = {}) {
+  const io = { ...FILE_IO, ...ioOverrides }
   if (!existsSync(root)) {
     return { snapshot: new Map(), complete: true, truncated: false, errors: [], bytesRead: 0 }
   }
@@ -57,7 +58,7 @@ export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, io = FILE_I
     const result = hashFileBounded(file, remainingBytes, io)
     bytesRead += result.bytesRead
     if (result.error !== undefined) {
-      state.errors.push({ path: file.rel, code: result.error })
+      if (!isTransientSnapshotEntryError({ code: result.error })) state.errors.push({ path: file.rel, code: result.error })
       continue
     }
     snapshot.set(file.rel, result.digest)
@@ -75,6 +76,18 @@ export function changedSnapshotPaths(before, after) {
   return [...new Set([...before.keys(), ...after.keys()])]
     .filter((path) => before.get(path) !== after.get(path))
     .sort()
+}
+
+export function classifyObservedChanges(paths) {
+  const volatile = []
+  const protectedState = []
+  const other = []
+  for (const path of paths) {
+    if (path.startsWith("sessions/") || path.startsWith("cache/") || path.startsWith("logs/") || path.endsWith(".log")) volatile.push(path)
+    else if (PROTECTED_STATE_FILES.includes(path)) protectedState.push(path)
+    else other.push(path)
+  }
+  return { volatile, protectedState, other }
 }
 
 export function digestDirectory(root) {
@@ -109,9 +122,9 @@ function credentialBytes(content, name) {
 function collectFilesBounded(currentRoot, state, limits, io) {
   let directory
   try {
-    directory = opendirSync(currentRoot)
+    directory = io.opendirSync(currentRoot)
   } catch (error) {
-    state.errors.push({ path: relative(state.root, currentRoot) || ".", code: errorCode(error) })
+    if (!isTransientSnapshotEntryError(error)) state.errors.push({ path: relative(state.root, currentRoot) || ".", code: errorCode(error) })
     return
   }
   try {
@@ -136,7 +149,7 @@ function collectFilesBounded(currentRoot, state, limits, io) {
           const metadata = fileMetadata(io.statSync(path, { bigint: true }))
           state.files.push({ path, rel: relative(state.root, path), size: boundedSize(metadata.size), metadata })
         } catch (error) {
-          state.errors.push({ path: relative(state.root, path), code: errorCode(error) })
+          if (!isTransientSnapshotEntryError(error)) state.errors.push({ path: relative(state.root, path), code: errorCode(error) })
         }
       }
     }
@@ -163,6 +176,7 @@ function hashFileBounded(file, remainingBytes, io) {
       throw snapshotError(sameIdentity(opened, openingPath) ? "FILE_CHANGED" : "FILE_REPLACED")
     }
     const hash = createHash("sha256")
+    const settingsChunks = file.rel === "settings.json" ? [] : undefined
     const buffer = Buffer.allocUnsafe(Math.min(HASH_CHUNK_BYTES, Math.max(file.size, 1)))
     while (bytesRead < file.size) {
       const requested = Math.min(buffer.length, file.size - bytesRead, remainingBytes - bytesRead)
@@ -174,7 +188,9 @@ function hashFileBounded(file, remainingBytes, io) {
         throw error
       }
       if (count === 0) throw snapshotError("SHORT_READ")
-      hash.update(buffer.subarray(0, count))
+      const chunk = buffer.subarray(0, count)
+      hash.update(chunk)
+      if (settingsChunks !== undefined) settingsChunks.push(Buffer.from(chunk))
       bytesRead += count
     }
     const finished = fileMetadata(io.fstatSync(fd, { bigint: true }))
@@ -183,7 +199,10 @@ function hashFileBounded(file, remainingBytes, io) {
     if (changedMetadataCode(opened, finished) !== undefined || changedMetadataCode(finished, pathMetadata) !== undefined) {
       throw snapshotError("FILE_CHANGED")
     }
-    result = { bytesRead, digest: hash.digest("hex") }
+    const digest = settingsChunks === undefined
+      ? hash.digest("hex")
+      : createHash("sha256").update(credentialBytes(Buffer.concat(settingsChunks), "settings.json")).digest("hex")
+    result = { bytesRead, digest }
   } catch (error) {
     result = { bytesRead, error: errorCode(error) }
   } finally {
@@ -276,6 +295,11 @@ function snapshotError(code) {
   const error = new Error(code)
   error.code = code
   return error
+}
+
+function isTransientSnapshotEntryError(error) {
+  const code = errorCode(error)
+  return code === "ENOENT" || code === "ENOTDIR"
 }
 
 function compareSnapshotErrors(left, right) {
