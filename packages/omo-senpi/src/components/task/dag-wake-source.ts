@@ -1,4 +1,5 @@
-import type { SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
+import { publishWakeSourceState } from "./wake-source-publication"
 
 // senpi's monitor-state event: goal continuation reads it to decide whether a wake source is still
 // live and auto-continuation must wait. Liveness only, it never carries or triggers work.
@@ -29,6 +30,7 @@ export interface DagWakeSourceDeps {
   readonly pi: SenpiExtensionAPI
   readonly manager: DagWakeSourceManager
   readonly sessionId: () => string | undefined
+  readonly logger: Pick<ComponentLogger, "warn">
 }
 
 export interface DagWakeSourceChannel {
@@ -77,11 +79,7 @@ export function createDagWakeSource(deps: DagWakeSourceDeps): DagWakeSource {
   }
 
   function publish(channels: readonly DagWakeSourceChannel[]): void {
-    deps.pi.events?.emit(DAG_WAKE_SOURCE_STATE_EVENT, {
-      source: DAG_WAKE_SOURCE,
-      activeCount: channels.length,
-      channels,
-    })
+    publishWakeSourceState(deps.pi, deps.logger, DAG_WAKE_SOURCE, channels)
   }
 
   return {
