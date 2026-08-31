@@ -1,0 +1,46 @@
+(fail) processFilePathForReadmeInjection > logs and skips a README when truncation fails
+(fail) runtime-fallback > cooldown mechanism > should respect cooldown period before retrying failed model
+(fail) runtime-fallback > custom error codes > should support custom retry_on_errors configuration
+(fail) runtime-fallback > edge cases > should handle error as string
+(fail) runtime-fallback > edge cases > should handle null error
+(fail) runtime-fallback > edge cases > should handle session.error without sessionID
+(fail) runtime-fallback > error code extraction > should extract status code from error object
+(fail) runtime-fallback > error code extraction > should extract status code from nested error.data
+(fail) runtime-fallback > fallback models configuration > should detect agent from sessionID pattern
+(fail) runtime-fallback > fallback models configuration > should use agent-level fallback_models
+(fail) runtime-fallback > max attempts limit > should stop after max_fallback_attempts
+(fail) runtime-fallback > message.updated handling > #given promptAsync fails after fallback retry may have been accepted #when the gate hold expires and the same error repeats #then the pending fallback state prevents a duplicate retry prompt
+(fail) runtime-fallback > message.updated handling > should advance fallback after session timeout when Copilot retry emits no retryable events
+(fail) runtime-fallback > message.updated handling > should bootstrap message.updated fallback from session category model and preserve variant
+(fail) runtime-fallback > message.updated handling > should force advance fallback from message.updated when Copilot auto-retry signal appears during in-flight retry
+(fail) runtime-fallback > message.updated handling > should handle assistant message errors
+(fail) runtime-fallback > message.updated handling > should not advance fallback state from message.updated while retry is already in flight
+(fail) runtime-fallback > message.updated handling > should not advance fallback timeout after completed subagent clears eligibility
+(fail) runtime-fallback > message.updated handling > should trigger fallback when message.updated has missing API key error without model
+(fail) runtime-fallback > race condition guards > #given a dispatched fallback retry #when stale original assistant error arrives before duplicate session.error #then only one assistant retry prompt is sent
+(fail) runtime-fallback > race condition guards > consecutive session.errors advance chain normally when retry completes between them
+(fail) runtime-fallback > race condition guards > pendingFallbackModel advances chain on subsequent error even when persisted
+(fail) runtime-fallback > race condition guards > session.error is skipped while retry request is in flight
+(fail) runtime-fallback > race condition guards > session.error is skipped while waiting for the dispatched fallback result
+(fail) runtime-fallback > session lifecycle > should cleanup state on session.deleted
+(fail) runtime-fallback > session lifecycle > should create state on session.created
+(fail) runtime-fallback > session lifecycle > should handle session.error without prior session.created
+(fail) runtime-fallback > session.error handling > should bootstrap session.error fallback from session category model and preserve variant
+(fail) runtime-fallback > session.error handling > should continue fallback chain when fallback model is not found
+(fail) runtime-fallback > session.error handling > should continue fallback chain when ProviderModelNotFoundError occurs
+(fail) runtime-fallback > session.error handling > should detect retryable error from message pattern 'rate limit'
+(fail) runtime-fallback > session.error handling > should detect retryable error with status code 429
+(fail) runtime-fallback > session.error handling > should detect retryable error with status code 503
+(fail) runtime-fallback > session.error handling > should detect retryable error with status code 529
+(fail) runtime-fallback > session.error handling > should log missing API key errors with classification details
+(fail) runtime-fallback > session.error handling > should log when no fallback models configured
+(fail) runtime-fallback > session.error handling > should skip non-retryable errors
+(fail) runtime-fallback > session.error handling > should trigger fallback for missing API key errors when fallback models are configured
+(fail) runtime-fallback > session.error handling > should trigger fallback for quota exhaustion to try next configured model
+(fail) runtime-fallback > session.error handling > should trigger fallback on auto-retry signal in assistant text parts
+(fail) runtime-fallback > session.error handling > should trigger fallback on Copilot auto-retry signal in message.updated
+(fail) runtime-fallback > session.error handling > should trigger fallback on OpenAI auto-retry signal in message.updated
+(fail) runtime-fallback > session.error handling > should trigger fallback on session.status auto-retry signal
+(fail) runtime-fallback > session.error handling > should trigger fallback when auto-retry text parts are nested under info.parts
+(fail) sanitizeEmptyMessagesBeforeSummarize > #given sqlite message with mixed content and failed replacement #when sanitizing #then it injects the placeholder text part
+(fail) sanitizeEmptyMessagesBeforeSummarize > #given sqlite message with tool content and empty text part #when sanitizing #then it fixes the mixed-content message

@@ -1,0 +1,3 @@
+db_path=/Users/privettoli/.local/share/opencode/opencode.db
+session_count_before=1475
+session_count_after=1475

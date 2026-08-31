@@ -1,0 +1,624 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/directory-readme-injector/injector.test.ts:
+277 | 
+278 |     // then
+279 |     expect(output.output).toBe("base")
+280 |     expect(storageMaps.has(sessionID)).toBe(false)
+281 |     expect(sessionCaches.get(sessionID)?.has(sourceDirectory) ?? false).toBe(false)
+282 |     expect(logMock).toHaveBeenCalledWith(
+                          ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+Expected: [ "[directory-readme-injector] Skipped README injection after read/truncate failure",
+  {
+    error: "truncator unavailable",
+    readmePath: "/var/folders/sp/6v5fmwfx4c39g3qswpdgfz_h0000gn/T/directory-readme-injector-7c41320f-a119-4e53-84b9-417cf1d99dae/src/README.md",
+    sessionID: "session-truncation-failure",
+  }
+]
+But it was not called.
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/directory-readme-injector/injector.test.ts:282:21)
+(fail) processFilePathForReadmeInjection > logs and skips a README when truncation fails [0.87ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:
+157 |           properties: { sessionID, error: { statusCode: 429, message: "Rate limit exceeded" } },
+158 |         },
+159 |       })
+160 | 
+161 |       const fallbackLog = logCalls.find((c) => c.msg.includes("session.error received"))
+162 |       expect(fallbackLog).toBeDefined()
+                                ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:162:27)
+(fail) runtime-fallback > session.error handling > should detect retryable error with status code 429 [1.10ms]
+180 |           properties: { sessionID, error: { statusCode: 503, message: "Service unavailable" } },
+181 |         },
+182 |       })
+183 | 
+184 |       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+185 |       expect(errorLog).toBeDefined()
+                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:185:24)
+(fail) runtime-fallback > session.error handling > should detect retryable error with status code 503 [0.51ms]
+202 |           properties: { sessionID, error: { statusCode: 529, message: "Overloaded" } },
+203 |         },
+204 |       })
+205 | 
+206 |       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+207 |       expect(errorLog).toBeDefined()
+                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:207:24)
+(fail) runtime-fallback > session.error handling > should detect retryable error with status code 529 [0.43ms]
+224 |           properties: { sessionID, error: { statusCode: 400, message: "Bad request" } },
+225 |         },
+226 |       })
+227 | 
+228 |       const skipLog = logCalls.find((c) => c.msg.includes("Error not retryable"))
+229 |       expect(skipLog).toBeDefined()
+                            ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:229:23)
+(fail) runtime-fallback > session.error handling > should skip non-retryable errors [0.54ms]
+253 |           },
+254 |         },
+255 |       })
+256 | 
+257 |       const sessionErrorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+258 |       expect(sessionErrorLog).toBeDefined()
+                                    ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:258:31)
+(fail) runtime-fallback > session.error handling > should log missing API key errors with classification details [0.44ms]
+294 |           },
+295 |         },
+296 |       })
+297 | 
+298 |       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+299 |       expect(fallbackLog).toBeDefined()
+                                ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:299:27)
+(fail) runtime-fallback > session.error handling > should trigger fallback for missing API key errors when fallback models are configured [0.73ms]
+317 |           properties: { sessionID, error: { message: "You have hit the rate limit" } },
+318 |         },
+319 |       })
+320 | 
+321 |       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+322 |       expect(errorLog).toBeDefined()
+                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:322:24)
+(fail) runtime-fallback > session.error handling > should detect retryable error from message pattern 'rate limit' [0.42ms]
+347 |         },
+348 |       })
+349 | 
+350 |       // quota exhaustion now triggers fallback to the next model
+351 |       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+352 |       expect(fallbackLog).toBeDefined()
+                                ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:352:27)
+(fail) runtime-fallback > session.error handling > should trigger fallback for quota exhaustion to try next configured model [0.47ms]
+401 |           },
+402 |         },
+403 |       })
+404 | 
+405 |       const fallbackLogs = logCalls.filter((c) => c.msg.includes("Preparing fallback"))
+406 |       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+                                        ^
+error: expect(received).toBeGreaterThanOrEqual(expected)
+
+Expected: >= 2
+Received: 0
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:406:35)
+(fail) runtime-fallback > session.error handling > should continue fallback chain when fallback model is not found [0.90ms]
+465 |           },
+466 |         },
+467 |       })
+468 | 
+469 |       const fallbackLogs = logCalls.filter((c) => c.msg.includes("Preparing fallback"))
+470 |       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+                                        ^
+error: expect(received).toBeGreaterThanOrEqual(expected)
+
+Expected: >= 2
+Received: 0
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:470:35)
+(fail) runtime-fallback > session.error handling > should continue fallback chain when ProviderModelNotFoundError occurs [0.65ms]
+516 |       expect(promptBody?.variant).toBe("high")
+517 | 
+518 |       const bootstrapLog = logCalls.find((call) =>
+519 |         call.msg.includes("Derived model from session category config for session.error"),
+520 |       )
+521 |       expect(bootstrapLog?.data).toMatchObject({
+                                       ^
+error: expect(received).toMatchObject(expected)
+
+Matcher error: received value must be a non-null object
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:521:34)
+(fail) runtime-fallback > session.error handling > should bootstrap session.error fallback from session category model and preserve variant [0.78ms]
+672 |           },
+673 |         },
+674 |       })
+675 | 
+676 |       const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal"))
+677 |       expect(signalLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:677:25)
+(fail) runtime-fallback > session.error handling > should trigger fallback on Copilot auto-retry signal in message.updated [0.67ms]
+710 |           },
+711 |         },
+712 |       })
+713 | 
+714 |       const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal"))
+715 |       expect(signalLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:715:25)
+(fail) runtime-fallback > session.error handling > should trigger fallback on OpenAI auto-retry signal in message.updated [0.75ms]
+753 |           },
+754 |         },
+755 |       })
+756 | 
+757 |       const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal"))
+758 |       expect(signalLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:758:25)
+(fail) runtime-fallback > session.error handling > should trigger fallback on auto-retry signal in assistant text parts [0.73ms]
+796 |           },
+797 |         },
+798 |       })
+799 | 
+800 |       const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal"))
+801 |       expect(signalLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:801:25)
+(fail) runtime-fallback > session.error handling > should trigger fallback when auto-retry text parts are nested under info.parts [0.70ms]
+854 |           },
+855 |         },
+856 |       })
+857 | 
+858 |       const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal in session.status"))
+859 |       expect(signalLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:859:25)
+(fail) runtime-fallback > session.error handling > should trigger fallback on session.status auto-retry signal [0.58ms]
+ 997 |           properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+ 998 |         },
+ 999 |       })
+1000 | 
+1001 |       const noFallbackLog = logCalls.find((c) => c.msg.includes("No fallback models configured"))
+1002 |       expect(noFallbackLog).toBeDefined()
+                                   ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1002:29)
+(fail) runtime-fallback > session.error handling > should log when no fallback models configured [0.42ms]
+1034 |           properties: { info: { id: sessionID, model } },
+1035 |         },
+1036 |       })
+1037 | 
+1038 |       const createLog = logCalls.find((c) => c.msg.includes("Session created with model"))
+1039 |       expect(createLog).toBeDefined()
+                               ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1039:25)
+(fail) runtime-fallback > session lifecycle > should create state on session.created [0.40ms]
+1057 |           properties: { info: { id: sessionID } },
+1058 |         },
+1059 |       })
+1060 | 
+1061 |       const deleteLog = logCalls.find((c) => c.msg.includes("Cleaning up session state"))
+1062 |       expect(deleteLog).toBeDefined()
+                               ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1062:25)
+(fail) runtime-fallback > session lifecycle > should cleanup state on session.deleted [0.41ms]
+1077 |           },
+1078 |         },
+1079 |       })
+1080 | 
+1081 |       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+1082 |       expect(errorLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1082:24)
+(fail) runtime-fallback > session lifecycle > should handle session.error without prior session.created [0.39ms]
+1104 |           },
+1105 |         },
+1106 |       })
+1107 | 
+1108 |       const statusLog = logCalls.find((c) => c.data && typeof c.data === "object" && "statusCode" in c.data)
+1109 |       expect(statusLog?.data).toMatchObject({ statusCode: 429 })
+                                     ^
+error: expect(received).toMatchObject(expected)
+
+Matcher error: received value must be a non-null object
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1109:31)
+(fail) runtime-fallback > error code extraction > should extract status code from error object [0.39ms]
+1129 |           },
+1130 |         },
+1131 |       })
+1132 | 
+1133 |       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+1134 |       expect(errorLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1134:24)
+(fail) runtime-fallback > error code extraction > should extract status code from nested error.data [0.40ms]
+1155 |           properties: { sessionID, error: { statusCode: 500 } },
+1156 |         },
+1157 |       })
+1158 | 
+1159 |       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+1160 |       expect(errorLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1160:24)
+(fail) runtime-fallback > custom error codes > should support custom retry_on_errors configuration [0.39ms]
+1179 |           },
+1180 |         },
+1181 |       })
+1182 | 
+1183 |       const errorLog = logCalls.find((c) => c.msg.includes("message.updated with assistant error"))
+1184 |       expect(errorLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1184:24)
+(fail) runtime-fallback > message.updated handling > should handle assistant message errors [0.35ms]
+1237 |           },
+1238 |         },
+1239 |       })
+1240 | 
+1241 |       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+1242 |       expect(fallbackLog).toBeDefined()
+                                 ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1242:27)
+(fail) runtime-fallback > message.updated handling > should trigger fallback when message.updated has missing API key error without model [0.53ms]
+1291 |       expect(promptBody?.variant).toBe("high")
+1292 | 
+1293 |       const bootstrapLog = logCalls.find((call) =>
+1294 |         call.msg.includes("Derived model from session category config for message.updated"),
+1295 |       )
+1296 |       expect(bootstrapLog?.data).toMatchObject({
+                                        ^
+error: expect(received).toMatchObject(expected)
+
+Matcher error: received value must be a non-null object
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1296:34)
+(fail) runtime-fallback > message.updated handling > should bootstrap message.updated fallback from session category model and preserve variant [0.76ms]
+1371 |           },
+1372 |         },
+1373 |       })
+1374 | 
+1375 |       const fallbackLogs = logCalls.filter((c) => c.msg.includes("Preparing fallback"))
+1376 |       expect(fallbackLogs).toHaveLength(1)
+                                  ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1376:28)
+(fail) runtime-fallback > message.updated handling > should not advance fallback state from message.updated while retry is already in flight [3.88ms]
+1438 | 
+1439 |       // then
+1440 |       expect(released).toBe(true)
+1441 |       expect(promptCalls).toBe(1)
+1442 |       const skipLog = logCalls.find((call) => call.msg.includes("session.error skipped - awaiting fallback result"))
+1443 |       expect(skipLog).toBeDefined()
+                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1443:23)
+(fail) runtime-fallback > message.updated handling > #given promptAsync fails after fallback retry may have been accepted #when the gate hold expires and the same error repeats #then the pending fallback state prevents a duplicate retry prompt [1.15ms]
+1524 |       expect(retriedModels.length).toBeGreaterThanOrEqual(2)
+1525 |       expect(retriedModels[0]).toBe("github-copilot/claude-opus-4.7")
+1526 |       expect(retriedModels[1]).toBe("openai/gpt-5.4")
+1527 | 
+1528 |       const equivalentSkipLog = logCalls.find((c) => c.msg.includes("Skipping equivalent fallback model"))
+1529 |       expect(equivalentSkipLog).toBeDefined()
+                                       ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1529:33)
+(fail) runtime-fallback > message.updated handling > should force advance fallback from message.updated when Copilot auto-retry signal appears during in-flight retry [1.99ms]
+1601 |       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
+1602 |       expect(retriedModels).toContain("openai/gpt-5.4")
+1603 |       expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
+1604 | 
+1605 |       const timeoutLog = logCalls.find((c) => c.msg.includes("Session fallback timeout reached"))
+1606 |       expect(timeoutLog).toBeDefined()
+                                ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1606:26)
+(fail) runtime-fallback > message.updated handling > should advance fallback after session timeout when Copilot retry emits no retryable events [1.16ms]
+1901 |       await clock.advanceBy(50)
+1902 | 
+1903 |       expect(retriedModels).toEqual(["github-copilot/claude-opus-4.7"])
+1904 |       expect(abortCalls).toEqual([])
+1905 |       const skipLog = logCalls.find((c) => c.msg.includes("Session fallback timeout skipped for completed subagent"))
+1906 |       expect(skipLog).toBeDefined()
+                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:1906:23)
+(fail) runtime-fallback > message.updated handling > should not advance fallback timeout after completed subagent clears eligibility [0.65ms]
+2554 |           properties: { error: { statusCode: 429 } },
+2555 |         },
+2556 |       })
+2557 | 
+2558 |       const skipLog = logCalls.find((c) => c.msg.includes("session.error without sessionID"))
+2559 |       expect(skipLog).toBeDefined()
+                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:2559:23)
+(fail) runtime-fallback > edge cases > should handle session.error without sessionID [0.63ms]
+2576 |           properties: { sessionID, error: "rate limit exceeded" },
+2577 |         },
+2578 |       })
+2579 | 
+2580 |       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+2581 |       expect(errorLog).toBeDefined()
+                              ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:2581:24)
+(fail) runtime-fallback > edge cases > should handle error as string [0.57ms]
+2598 |           properties: { sessionID, error: null },
+2599 |         },
+2600 |       })
+2601 | 
+2602 |       const skipLog = logCalls.find((c) => c.msg.includes("Error not retryable"))
+2603 |       expect(skipLog).toBeDefined()
+                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:2603:23)
+(fail) runtime-fallback > edge cases > should handle null error [0.53ms]
+2736 |         },
+2737 |       })
+2738 | 
+2739 |       //#then - should prepare fallback to openai/gpt-5.4
+2740 |       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+2741 |       expect(fallbackLog).toBeDefined()
+                                 ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:2741:27)
+(fail) runtime-fallback > fallback models configuration > should use agent-level fallback_models [0.51ms]
+2763 |         },
+2764 |       })
+2765 | 
+2766 |       //#then - should detect sisyphus from sessionID and use its fallback
+2767 |       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+2768 |       expect(fallbackLog).toBeDefined()
+                                 ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:2768:27)
+(fail) runtime-fallback > fallback models configuration > should detect agent from sessionID pattern [0.46ms]
+2915 |           properties: { sessionID, model: "openai/gpt-5.4", error: { statusCode: 429 } },
+2916 |         },
+2917 |       })
+2918 | 
+2919 |       const cooldownSkipLog = logCalls.find((c) => c.msg.includes("Skipping fallback model in cooldown"))
+2920 |       expect(cooldownSkipLog).toBeDefined()
+                                     ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:2920:31)
+(fail) runtime-fallback > cooldown mechanism > should respect cooldown period before retrying failed model [0.61ms]
+2945 |         })
+2946 |       }
+2947 | 
+2948 |       //#then - should have stopped after max attempts
+2949 |       const maxLog = logCalls.find((c) => c.msg.includes("Max fallback attempts reached") || c.msg.includes("No fallback models"))
+2950 |       expect(maxLog).toBeDefined()
+                            ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:2950:22)
+(fail) runtime-fallback > max attempts limit > should stop after max_fallback_attempts [0.47ms]
+3009 |         },
+3010 |       })
+3011 | 
+3012 |       //#then
+3013 |       const skipLog = logCalls.find((call) => call.msg.includes("session.error skipped"))
+3014 |       expect(skipLog).toBeDefined()
+                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:3014:23)
+(fail) runtime-fallback > race condition guards > session.error is skipped while retry request is in flight [4.01ms]
+3065 |       await clock.advanceBy(3_000)
+3066 |       await secondErrorPromise
+3067 | 
+3068 |       //#then - both should advance the chain (no skip)
+3069 |       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
+3070 |       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+                                         ^
+error: expect(received).toBeGreaterThanOrEqual(expected)
+
+Expected: >= 2
+Received: 0
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:3070:35)
+(fail) runtime-fallback > race condition guards > consecutive session.errors advance chain normally when retry completes between them [0.97ms]
+3128 |       })
+3129 | 
+3130 |       //#then
+3131 |       expect(promptCalls).toHaveLength(1)
+3132 |       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
+3133 |       expect(fallbackLogs).toHaveLength(1)
+                                  ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:3133:28)
+(fail) runtime-fallback > race condition guards > session.error is skipped while waiting for the dispatched fallback result [0.71ms]
+3202 |         },
+3203 |       })
+3204 | 
+3205 |       expect(promptCalls).toHaveLength(1)
+3206 |       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
+3207 |       expect(fallbackLogs).toHaveLength(1)
+                                  ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:3207:28)
+(fail) runtime-fallback > race condition guards > #given a dispatched fallback retry #when stale original assistant error arrives before duplicate session.error #then only one assistant retry prompt is sent [0.68ms]
+3308 | 
+3309 |       const autoRetryLog = logCalls.find((call) =>
+3310 |         call.msg.includes("No user message parts found for auto-retry") &&
+3311 |         call.msg.includes("using synthetic continuation"),
+3312 |       )
+3313 |       expect(autoRetryLog).toBeDefined()
+                                  ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts:3313:28)
+(fail) runtime-fallback > race condition guards > pendingFallbackModel advances chain on subsequent error even when persisted [0.58ms]
+
+packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/message-builder.test.ts:
+64 |     findMessagesWithEmptyTextPartsFromSDK.mockResolvedValue(["msg-1"])
+65 |     replaceEmptyTextPartsAsync.mockResolvedValue(true)
+66 | 
+67 |     const fixedCount = await sanitizeEmptyMessagesBeforeSummarize("ses-1", client)
+68 | 
+69 |     expect(fixedCount).toBe(1)
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/message-builder.test.ts:69:24)
+(fail) sanitizeEmptyMessagesBeforeSummarize > #given sqlite message with tool content and empty text part #when sanitizing #then it fixes the mixed-content message [0.30ms]
+91 |     findMessagesWithEmptyTextPartsFromSDK.mockResolvedValue(["msg-2"])
+92 |     injectTextPartAsync.mockResolvedValue(true)
+93 | 
+94 |     const fixedCount = await sanitizeEmptyMessagesBeforeSummarize("ses-2", client)
+95 | 
+96 |     expect(fixedCount).toBe(1)
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/Users/privettoli/Projects/oh-my-openagent-wt/fix/runtime-fallback-cancel-poison-loop/packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/message-builder.test.ts:96:24)
+(fail) sanitizeEmptyMessagesBeforeSummarize > #given sqlite message with mixed content and failed replacement #when sanitizing #then it injects the placeholder text part [0.15ms]
+
+ 2137 pass
+ 46 fail
+ 4604 expect() calls
+Ran 2183 tests across 279 files. [22.33s]
