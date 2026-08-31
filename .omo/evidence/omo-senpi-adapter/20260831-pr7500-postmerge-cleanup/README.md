@@ -3,6 +3,7 @@
 Starting production head: `e2cc57f4042862efa28c6abd2de1d35b36c7531a` (verified clean).
 Semantic fix commit: `4ed3c4a99df909ebd9444b789a639f252124c834`.
 Validated production/merge head: `745f7ffa075ec4c9ee20c16ba7bc4d385b344256`.
+Final production head after the parameter-shape self-review: `8f87cf778c2f83661a1d4b5c15ed399b981905b3` (the focused blocker suite remained 9/0).
 Current `origin/dev`: `8e8d06c90cc38600c2b4c9f1ef9fe9e0e09850e2`, integrated as the second parent of the validated merge head without conflicts.
 The exact evidence-content commit is recorded in `final-heads.json` after this directory is committed.
 

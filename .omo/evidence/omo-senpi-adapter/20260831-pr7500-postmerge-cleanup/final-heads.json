@@ -2,6 +2,8 @@
   "startingHead": "e2cc57f4042862efa28c6abd2de1d35b36c7531a",
   "semanticFixCommit": "4ed3c4a99df909ebd9444b789a639f252124c834",
   "validatedProductionMergeHead": "745f7ffa075ec4c9ee20c16ba7bc4d385b344256",
+  "finalProductionHead": "8f87cf778c2f83661a1d4b5c15ed399b981905b3",
   "originDevIntegrated": "8e8d06c90cc38600c2b4c9f1ef9fe9e0e09850e2",
-  "evidenceContentHead": "623b58e03cf95674153d5cab338e0e56f34d313e"
+  "evidenceContentHead": "623b58e03cf95674153d5cab338e0e56f34d313e",
+  "evidenceHeadsCommit": "f4065a06da6fb88da7e967ecaec12a70b7b95f96"
 }
