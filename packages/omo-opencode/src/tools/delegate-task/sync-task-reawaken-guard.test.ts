@@ -11,7 +11,7 @@ const CHILD_SESSION_ID = "ses_test_5112_child"
 
 function createDeps() {
   return {
-    createSyncSession: async () => ({ ok: true as const, sessionID: CHILD_SESSION_ID, parentDirectory: "/tmp" }),
+    createSyncSession: async () => ({ ok: true as const, sessionID: CHILD_SESSION_ID, sessionDirectory: "/tmp" }),
     sendSyncPrompt: async () => null,
     pollSyncSession: async () => null,
     fetchSyncResult: async () => ({ ok: false as const, error: "Fetch failed" }),

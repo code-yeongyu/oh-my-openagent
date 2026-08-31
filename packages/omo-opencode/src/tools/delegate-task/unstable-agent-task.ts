@@ -35,6 +35,7 @@ export async function executeUnstableAgentTask(
       description: persistedDescription,
       prompt: effectivePrompt,
       agent: agentToUse,
+      directory: args.directory,
       parentSessionId: parentContext.sessionID,
       parentMessageId: parentContext.messageID,
       parentModel: parentContext.model,

@@ -51,8 +51,8 @@ export async function startTask(
     log(`[background-agent] Failed to get parent session: ${err}`)
     return null
   })
-  const parentDirectory = parentSession?.data?.directory ?? directory
-  log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
+  const sessionDirectory = input.directory ?? parentSession?.data?.directory ?? directory
+  log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${sessionDirectory}`)
 
   const createResult = await client.session.create({
     body: {
@@ -60,7 +60,7 @@ export async function startTask(
       ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
     } as Record<string, unknown>,
     query: {
-      directory: parentDirectory,
+      directory: sessionDirectory,
     },
   }).catch((error: unknown) => {
     concurrencyManager.release(concurrencyKey)
@@ -119,7 +119,7 @@ export async function startTask(
   const promptChain = promptWithRetryInDirectory(client, {
     path: { id: sessionID },
     body: promptBody,
-  }, parentDirectory).catch(async (error) => {
+  }, sessionDirectory).catch(async (error) => {
     if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
       log("[background-agent] Agent not found, retrying with fallback agent", {
         original: input.agent,
@@ -136,7 +136,7 @@ export async function startTask(
         await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
           body: fallbackBody,
-        }, parentDirectory)
+        }, sessionDirectory)
         task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {

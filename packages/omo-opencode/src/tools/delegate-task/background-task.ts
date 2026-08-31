@@ -120,6 +120,7 @@ export async function executeBackgroundTask(
       description: persistedDescription,
       prompt: effectivePrompt,
       agent: normalizedAgent,
+      directory: args.directory,
       parentSessionId: parentContext.sessionID,
       parentMessageId: parentContext.messageID,
       parentModel: parentContext.model,

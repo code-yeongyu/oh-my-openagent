@@ -51,6 +51,7 @@ export async function executeSyncTask(
       parentSessionID: parentContext.sessionID,
       agentToUse,
       description: args.description,
+      directory: args.directory,
       defaultDirectory: directory,
       categoryModel,
     })
@@ -125,10 +126,8 @@ export async function executeSyncTask(
       return await runSyncTaskLoop({
         args,
         ctx,
-        executorCtx: {
-          ...executorCtx,
-          directory: createSessionResult.parentDirectory,
-        },
+        executorCtx,
+        sessionDirectory: createSessionResult.sessionDirectory,
         parentContext,
         agentToUse,
         categoryModel,

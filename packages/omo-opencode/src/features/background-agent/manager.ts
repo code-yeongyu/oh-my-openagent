@@ -615,6 +615,7 @@ export class BackgroundManager {
         description: input.description,
         prompt: input.prompt,
         agent: input.agent,
+        directory: input.directory,
         spawnDepth: spawnReservation.spawnContext.childDepth,
         parentSessionId: input.parentSessionId,
         parentMessageId: input.parentMessageId,
@@ -774,8 +775,8 @@ export class BackgroundManager {
       log(`[background-agent] Failed to get parent session: ${err}`)
       return null
     })
-    const parentDirectory = parentSession?.data?.directory ?? this.directory
-    log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
+    const sessionDirectory = input.directory ?? parentSession?.data?.directory ?? this.directory
+    log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${sessionDirectory}`)
 
     const createResult = await this.client.session.create({
       body: {
@@ -793,7 +794,7 @@ export class BackgroundManager {
           : {}),
       } as Record<string, unknown>,
       query: {
-        directory: parentDirectory,
+        directory: sessionDirectory,
       },
     })
 
@@ -853,7 +854,7 @@ export class BackgroundManager {
 
     if (task.retryNotification) {
       const attemptNumber = boundAttempt.attemptNumber
-      const retrySessionUrl = buildLocalSessionUrl(parentDirectory, sessionID)
+      const retrySessionUrl = buildLocalSessionUrl(sessionDirectory, sessionID)
       const previousAttempt = getPreviousAttempt(task, boundAttempt.attemptId)
       const failedSessionID = previousAttempt?.sessionId ?? task.retryNotification.previousSessionID
       const failedSessionLine = failedSessionID
@@ -960,7 +961,7 @@ The fallback retry session is now created and can be inspected directly.
     promptWithRetryInDirectory(this.client, {
       path: { id: sessionID },
       body: promptBody,
-    }, parentDirectory).catch(async (error) => {
+    }, sessionDirectory).catch(async (error) => {
       // Retry with fallback agent if the original agent was unregistered (e.g., after a model switch)
       if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
         log("[background-agent] Agent not found, retrying with fallback agent", {
@@ -987,7 +988,7 @@ The fallback retry session is now created and can be inspected directly.
           await promptWithRetryInDirectory(this.client, {
             path: { id: sessionID },
             body: fallbackBody,
-          }, parentDirectory)
+          }, sessionDirectory)
           task.agent = FALLBACK_AGENT
           return
         } catch (retryError) {

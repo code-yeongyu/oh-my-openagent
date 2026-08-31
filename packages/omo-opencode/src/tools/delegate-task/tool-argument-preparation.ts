@@ -83,6 +83,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
 
   const taskID = typeof args.task_id === "string" ? args.task_id : undefined
   const command = typeof args.command === "string" ? args.command : undefined
+  const directory = typeof args.directory === "string" ? args.directory : undefined
 
 
   return {
@@ -92,6 +93,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     description,
     descriptionSource,
     prompt,
+    directory,
     run_in_background: runInBackground === true,
     task_id: taskID,
     command,
