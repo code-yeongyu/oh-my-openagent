@@ -1,0 +1,13 @@
+Command:
+bunx bun@1.4.0 test ./packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts -t "RPC child marker"
+
+Observed before production change:
+0 pass
+1 fail
+
+Assertion:
+expected reconcileCalls = []
+received reconcileCalls = ["parent-session"]
+
+The unchanged event bridge ran persisted-task reconciliation inside an RPC
+child marked by SENPI_CODING_AGENT_SESSION_DIR.

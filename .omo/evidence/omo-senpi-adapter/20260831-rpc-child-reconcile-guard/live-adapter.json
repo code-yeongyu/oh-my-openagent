@@ -1,0 +1,23 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realSenpiObservedChangedPaths": [
+    "<concurrent-volatile-session>.jsonl"
+  ],
+  "realSenpiVolatileChangedPaths": [
+    "<concurrent-volatile-session>.jsonl"
+  ],
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoChangedPaths": [],
+  "realOmoObservedChangedPaths": [],
+  "realOmoVolatileChangedPaths": [],
+  "realOmoProtectedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "unset",
+  "sandboxAgentDir": "$TMPDIR/omo-senpi-qa-TXSADM/agent",
+  "sandboxCwd": "$TMPDIR/omo-senpi-qa-TXSADM/project"
+}

@@ -1,0 +1,14 @@
+Command:
+bunx bun@1.4.0 test ./packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts -t "RPC child marker"
+
+Observed after production change:
+1 pass
+0 fail
+4 assertions
+
+The identical scenario proved:
+- reconciliation was skipped;
+- unnotified parent reconciliation was skipped;
+- resumption channels still emitted;
+- transition, mailbox reclaim, cleanup, lead polling, status sync, and RPC
+  attachment remained active in their expected order.

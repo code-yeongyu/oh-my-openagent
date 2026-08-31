@@ -59,6 +59,35 @@ describe("event-bridge session_start recovery chain", () => {
     expect(warnings).toHaveLength(0)
   })
 
+  it("#given the RPC child marker #when session_start fires #then parent task reconciliation is skipped", async () => {
+    const previousSessionDir = process.env.SENPI_CODING_AGENT_SESSION_DIR
+    process.env.SENPI_CODING_AGENT_SESSION_DIR = "/tmp/omo-rpc-child"
+    const { pi, order, reconcileCalls, notifyCalls, resumptionCalls } = wireHarness("parent-session", {
+      resumptionChannelCount: 1,
+    })
+
+    try {
+      await pi.dispatch("session_start", {}, {})
+    } finally {
+      if (previousSessionDir === undefined) delete process.env.SENPI_CODING_AGENT_SESSION_DIR
+      else process.env.SENPI_CODING_AGENT_SESSION_DIR = previousSessionDir
+    }
+
+    expect(reconcileCalls).toEqual([])
+    expect(notifyCalls).toEqual([])
+    expect(resumptionCalls).toEqual([1])
+    expect(order).toEqual([
+      "capture",
+      "onSessionStart",
+      "resumptionStart:1",
+      "reclaim",
+      "cleanup:start",
+      "cleanup:end",
+      "poll",
+      "statusSync",
+    ])
+  })
+
   it("#given a terminal child persisted before restart #when reconcile returns no outcome #then session_start still re-observes it for liveness", async () => {
     const terminal = {
       task_id: "task-terminal",

@@ -1,0 +1,36 @@
+{
+  "driverExit": 0,
+  "driverResult": "FAIL",
+  "relevantChecks": {
+    "extension_suppression": "PASS",
+    "spawn_background": "PASS",
+    "resume_spawn_children": "PASS",
+    "real_senpi_untouched": "PASS",
+    "no_leaked_pids": "PASS"
+  },
+  "markerChildExtensions": 1,
+  "mainExit": 0,
+  "mainSignatures": [
+    "running/resident",
+    "assistant_message",
+    "completed/resident",
+    "completed/persisted_only",
+    "suspended"
+  ],
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "leakedPids": 0,
+  "unrelatedFailedChecks": [
+    "followup_revive",
+    "task_output_peek",
+    "jsonl_sequence",
+    "resume_revived_resident",
+    "resume_midturn_continuation",
+    "resume_finished_steerable",
+    "resume_cancel_not_revived",
+    "resume_killed_not_revived",
+    "resume_lru_evict_not_revived",
+    "resume_ttl_not_revived"
+  ],
+  "sandboxCount": 9
+}
