@@ -1,0 +1,141 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:
+27 |   // Given
+28 |   const before = completeProtected([["auth.json", "before"]])
+29 |   const after = completeProtected([["auth.json", "after"]])
+30 |
+31 |   // When
+32 |   const verdict = isolationVerdict(before, after, [
+                       ^
+TypeError: isolationState.isolationVerdict is not a function. (In 'isolationState.isolationVerdict(...args)', 'isolationState.isolationVerdict' is undefined)
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:32:19)
+(fail) #given direct, protected-observed, persistent-observed, and volatile changes #when the canonical verdict is built #then only volatile paths are excluded from the sorted union [5.16ms]
+45 |   // Given
+46 |   const before = completeProtected([["auth.json", "stable"]])
+47 |   const after = completeProtected([["auth.json", "stable"]])
+48 |
+49 |   // When
+50 |   const verdict = isolationVerdict(before, after, ["cache\\index.json", "logs/run.log", "sessions/live.jsonl"])
+                       ^
+TypeError: isolationState.isolationVerdict is not a function. (In 'isolationState.isolationVerdict(...args)', 'isolationState.isolationVerdict' is undefined)
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:50:19)
+(fail) #given only explicitly volatile observed writes #when the canonical verdict is built #then the protected home remains untouched [0.34ms]
+59 |   const stable = completeProtected([["auth.json", "stable"]])
+60 |   const changed = completeProtected([["auth.json", "changed"]])
+61 |   const incomplete = { snapshot: new Map(stable.snapshot), complete: false, errors: [{ path: "auth.json", code: "EIO" }] }
+62 |
+63 |   // When
+64 |   const changedVerdict = isolationVerdict(stable, changed, [])
+                              ^
+TypeError: isolationState.isolationVerdict is not a function. (In 'isolationState.isolationVerdict(...args)', 'isolationState.isolationVerdict' is undefined)
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:64:26)
+(fail) #given a protected change or incomplete protected snapshot #when the canonical verdict is built #then untouched fails closed [0.30ms]
+76 |
+77 |   // When
+78 |   const classified = classifyObservedChanges(paths)
+79 |
+80 |   // Then
+81 |   expect(classified.volatile).toEqual(["sessions/a", "sessions/b", "cache/a", "cache/b", "logs/a", "logs/b"])
+                                   ^
+error: expect(received).toEqual(expected)
+
+  [
+    "sessions/a",
+-   "sessions/b",
+    "cache/a",
+-   "cache/b",
+    "logs/a",
+-   "logs/b",
+  ]
+
+- Expected  - 3
++ Received  + 0
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:81:31)
+(fail) #given POSIX and Windows-shaped observed paths #when changes are classified #then volatile prefixes are canonical on both platforms [0.48ms]
+92 |     const digest = credentialDigest(root, { readFile: absent })
+93 |
+94 |     // Then
+95 |     expect(typeof digest).toBe("string")
+96 |     for (const code of ["EACCES", "EIO"]) {
+97 |       expect(() => credentialDigest(root, { readFile() { throw codedError(code) } })).toThrow(code)
+                                                                                           ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "EACCES"
+
+Received function did not throw
+Received value: "cf5b2b96184d582c9cdd5c7601cbd2e99e7b341f80fbb224f9853b68422bb1b1"
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:97:87)
+(fail) #given credential files are absent or inaccessible #when credentialDigest reads directly #then only ENOENT is treated as absent [1.20ms]
+108 |     for (const code of ["EACCES", "EIO"]) {
+109 |       // When
+110 |       const scan = snapshotDirectory(join(root, "missing"), LIMITS, { opendirSync() { throw codedError(code) } })
+111 |
+112 |       // Then
+113 |       expect(scan.complete).toBe(false)
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:113:29)
+(fail) #given bounded observation root enumeration fails #when snapshotDirectory runs #then inaccessible IO is structured and incomplete while absence is empty-complete [0.81ms]
+126 | test("#given digest enumeration and reads fail through injected seams #when digestDirectory runs #then transient absence is tolerated and inaccessible IO propagates", () => {
+127 |   // Given
+128 |   const root = mkdtempSync(join(tmpdir(), "omo-senpi-digest-io-"))
+129 |   try {
+130 |     for (const code of ["ENOENT", "ENOTDIR"]) {
+131 |       expect(digestDirectory(root, { readdir() { throw codedError(code) } })).toBe("absent")
+                                                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "absent"
+Received: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:131:79)
+(fail) #given digest enumeration and reads fail through injected seams #when digestDirectory runs #then transient absence is tolerated and inaccessible IO propagates [0.78ms]
+168 |         const result = kind === "observed"
+169 |           ? snapshotDirectory(root, LIMITS, io)
+170 |           : snapshotProtectedState(root, io)
+171 |
+172 |         // Then
+173 |         expect(result.complete).toBe(false)
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:173:33)
+(fail) #given pre-open metadata changed and current-path diagnostic stat fails #when public readers report the race #then the established replacement error wins [1.98ms]
+201 |     // When
+202 |     const result = snapshotDirectory(root, LIMITS, io)
+203 |
+204 |     // Then
+205 |     expect(result.complete).toBe(false)
+206 |     expect(result.errors).toEqual([{ path: "state.json", code: "EREAD" }])
+                                ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+-     "code": "EREAD",
++     "code": "EFSTAT",
+      "path": "state.json",
+    },
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:206:27)
+(fail) #given a primary read error and failing shrink diagnostic #when an observed file is hashed #then the primary read error is preserved [0.94ms]
+
+ 0 pass
+ 9 fail
+ 8 expect() calls
+Ran 9 tests across 1 file. [3.60s]

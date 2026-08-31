@@ -1,0 +1,64 @@
+bun test v1.4.0 (34cbb9a40)
+
+postinstall.test.ts:
+(pass) postinstall rename notice > announces the omo-agent-toolkit rename exactly once [389.07ms]
+(pass) postinstall rename notice > never fails the install regardless of platform binary resolution [150.94ms]
+(pass) postinstall rename notice > stays idempotent across repeated runs [344.40ms]
+
+script/senpi-test-script.test.ts:
+(pass) Senpi compatibility test script > #given published root package #when payload contract is inspected #then senpi payload is contained while local build stays available [6.32ms]
+(pass) Senpi compatibility test script > #given a packed-layout root with only senpi plugin artifacts #when installer runs #then settings points at that shipped plugin tree [272.44ms]
+(pass) Senpi compatibility test script > #given root scripts #when test:senpi is inspected #then it runs the hermetic adapter gate in order [0.73ms]
+(pass) Senpi compatibility test script > #given CI workflow #when inspected #then senpi compatibility is a merge-blocking matrix job [9.85ms]
+
+script/senpi-hooks-state-errors.test.ts:
+(pass) patched Senpi hooks state publication failures > removes the temporary snapshot and preserves the publication error [430.01ms]
+(pass) patched Senpi hooks state publication failures > reports publication then cleanup errors in an ordered AggregateError [611.89ms]
+(pass) patched Senpi hooks state publication failures > reports chmod then cleanup errors in an ordered AggregateError [666.81ms]
+
+script/senpi-hooks-state.test.ts:
+(pass) patched Senpi hooks state snapshots > reads the last complete snapshot while the exact writer lock is held [29.91ms]
+(pass) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [491.57ms]
+(pass) patched Senpi hooks state snapshots > keeps malformed state fail-closed when no writer lock exists [13.15ms]
+(pass) patched Senpi hooks state snapshots > publishes by replacing the destination and leaves no temporary snapshot [9.80ms]
+(pass) patched Senpi hooks state snapshots > preserves an existing POSIX snapshot mode under a restrictive umask [656.36ms]
+(pass) patched Senpi hooks state snapshots > creates a new POSIX snapshot with mode 0600 under a permissive umask [4.58ms]
+
+packages/omo-native/test/package-shape.test.ts:
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [19.02ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.23ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships the launcher, plugin, and published Senpi patch installer [2.37ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.17ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then it declares exactly the engine and codemode parser runtime dependencies [0.18ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the codemode parser dependency is exactly pinned [0.13ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.22ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.13ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.14ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.13ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then postinstall applies the shipped Senpi patch [0.12ms]
+
+packages/omo-native/test/senpi-pin.test.ts:
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [0.34ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.14ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then the root devDependency pin matches [0.14ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.19ms]
+
+packages/omo-native/test/compile-entry-oauth-registration.test.ts:
+(pass) #given a sentinel bundled OAuth loader #when compile-entry loads #then it registers the real nested OpenAI Codex flow [426.02ms]
+
+packages/omo-native/test/packed-install.test.ts:
+(pass) omo-ai packed install > ships and applies the Senpi patch installer from the packed artifact [27510.54ms]
+
+packages/omo-senpi/src/package-shape.test.ts:
+(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [25.77ms]
+(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [5.94ms]
+(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.52ms]
+
+packages/omo-senpi/src/bundle-purity.test.ts:
+(pass) omo-senpi bundle purity > #given the senpi loader aliases #when tested #then the shared build constant pins all 19 peers [0.37ms]
+(pass) omo-senpi bundle purity > #given built extension artifacts #when static imports are inspected #then only senpi peers and node builtins remain external [38.27ms]
+
+ 38 pass
+ 0 fail
+ 98 expect() calls
+Ran 38 tests across 10 files. [50.70s]
