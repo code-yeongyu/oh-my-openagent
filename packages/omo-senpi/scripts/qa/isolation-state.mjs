@@ -64,7 +64,7 @@ export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, ioOverrides
       state.truncated = true
       break
     }
-    const result = hashFileBounded(file, remainingBytes, io, credentialBytes)
+    const result = hashFileBounded(file, { remainingBytes, io, normalizeCredential: credentialBytes })
     bytesRead += result.bytesRead
     if (result.error !== undefined) {
       if (!isTransientSnapshotEntryError({ code: result.error })) state.errors.push({ path: file.rel, code: result.error })

@@ -5,7 +5,7 @@ const HASH_CHUNK_BYTES = 64 * 1024
 
 export const FILE_IO = { closeSync, fstatSync, openSync, opendirSync, readFileSync, readSync, statSync }
 
-export function hashFileBounded(file, remainingBytes, io, normalizeCredential) {
+export function hashFileBounded(file, { remainingBytes, io, normalizeCredential }) {
   let fd
   let bytesRead = 0
   let result
