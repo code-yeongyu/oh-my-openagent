@@ -5,6 +5,7 @@ import type { PreToolUsePayload } from "./codex-hook.js";
 import { parsePreToolUsePayload } from "./codex-hook.js";
 import { isFinalRunCompletionCandidate } from "./goal-status.js";
 import { ulwLoopAttemptEvidenceDir, ulwLoopDir } from "./paths.js";
+import { GATE_REVIEWER_AGENT_NAMES } from "./surface.js";
 import type { UlwLoopPlan } from "./types.js";
 
 // spawn_agent = v1; collaborationspawn_agent = the delimiter-free flattened v2
@@ -12,7 +13,7 @@ import type { UlwLoopPlan } from "./types.js";
 // dotted token observed live in the task-1 probe (hook-tool-tokens.txt).
 const SPAWN_TOOL_TOKENS = new Set(["spawn_agent", "collaborationspawn_agent", "collaboration.spawn_agent"]);
 const DEFAULT_FANOUT_LIMIT = 60;
-const GATE_MESSAGE_PATTERN = /lazycodex-gate-reviewer|final gate review/i;
+const GATE_MESSAGE_PATTERN = /lazycodex-gate-reviewer|omo-senpi-gate-reviewer|final gate review/i;
 
 export function applySpawnGuards(payload: PreToolUsePayload): string {
 	if (payload.hook_event_name !== "PreToolUse" || !SPAWN_TOOL_TOKENS.has(payload.tool_name)) return "";
@@ -77,7 +78,7 @@ function isGateReviewerSpawn(toolInput: unknown): boolean {
 	if (typeof toolInput !== "object" || toolInput === null) return false;
 	const record = toolInput as Record<string, unknown>;
 	const agentType = record["agent_type"];
-	if (typeof agentType === "string") return agentType === "lazycodex-gate-reviewer";
+	if (typeof agentType === "string") return GATE_REVIEWER_AGENT_NAMES.has(agentType);
 	const message = record["message"];
 	return typeof message === "string" && GATE_MESSAGE_PATTERN.test(message);
 }

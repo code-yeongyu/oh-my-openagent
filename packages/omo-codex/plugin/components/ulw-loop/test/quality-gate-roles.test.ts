@@ -75,14 +75,28 @@ function gateWith(overrides: Record<string, unknown>): Record<string, unknown> {
 	return { ...BASE_GATE, ...overrides };
 }
 
-function qualityGateError(input: unknown): UlwLoopError {
+function qualityGateError(input: unknown, surface?: "lazycodex" | "omo-senpi"): UlwLoopError {
 	try {
-		validateQualityGate(input);
+		validateQualityGate(input, surface === undefined ? undefined : { reviewerSurface: surface });
 	} catch (error) {
 		if (error instanceof UlwLoopError) return error;
 		throw error;
 	}
 	throw new Error("Expected UlwLoopError");
+}
+
+function senpiGate(): Record<string, unknown> {
+	return gateWith({
+		codeReview: { ...BASE_GATE.codeReview, by: "omo-senpi-code-reviewer" },
+		manualQa: { ...BASE_GATE.manualQa, by: "omo-senpi-qa-executor" },
+		gateReview: { ...BASE_GATE.gateReview, by: "omo-senpi-gate-reviewer" },
+		criteriaCoverage: {
+			...BASE_GATE.criteriaCoverage,
+			originalIntent: "User wanted the senpi surface to accept honest reviewer attribution.",
+			desiredOutcome: "A gate naming the omo-senpi reviewers validates on the omo-senpi surface.",
+			userOutcomeReview: "The senpi-surface gate passed with truthful reviewer identities.",
+		},
+	});
 }
 
 describe("validateQualityGate reviewer roles", () => {
@@ -104,6 +118,35 @@ describe("validateQualityGate reviewer roles", () => {
 			expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
 			expect(error.message).toContain(roleCase.field);
 		}
+	});
+
+	it("#given omo-senpi reviewer identities #when validated on the omo-senpi surface #then the gate is accepted", () => {
+		expect(() => validateQualityGate(senpiGate(), { reviewerSurface: "omo-senpi" })).not.toThrow();
+	});
+
+	it("#given lazycodex identities #when validated on the omo-senpi surface #then each role names the omo-senpi identity", () => {
+		const error = qualityGateError(gateWith({}), "omo-senpi");
+		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
+		expect(error.message).toContain("omo-senpi-code-reviewer");
+	});
+
+	it("#given omo-senpi identities #when validated on the default lazycodex surface #then the gate is rejected", () => {
+		const error = qualityGateError(senpiGate());
+		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
+		expect(error.message).toContain("lazycodex-code-reviewer");
+	});
+
+	it("#given swapped omo-senpi reviewer roles #when validated on the omo-senpi surface #then section-specific roles are enforced", () => {
+		const swapped = gateWith({
+			codeReview: { ...BASE_GATE.codeReview, by: "omo-senpi-qa-executor" },
+			manualQa: { ...BASE_GATE.manualQa, by: "omo-senpi-qa-executor" },
+			gateReview: { ...BASE_GATE.gateReview, by: "omo-senpi-gate-reviewer" },
+		});
+
+		const error = qualityGateError(swapped, "omo-senpi");
+
+		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
+		expect(error.message).toContain("codeReview.by");
 	});
 
 	it("#given swapped LazyCodex reviewer roles #when validated #then section-specific roles are enforced", () => {

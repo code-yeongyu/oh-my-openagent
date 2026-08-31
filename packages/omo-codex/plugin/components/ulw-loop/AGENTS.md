@@ -50,6 +50,7 @@ Conventions for human contributors and AI agents working on this repository.
 - `src/quality-gate.ts` (266 LOC), `src/checkpoint.ts` (260), `src/steering.ts` (227): state-transition hotspots (evidence containment, checkpoint reconciliation, steering mutations).
 - `src/codex-hook.ts`: UserPromptSubmit steering injection + `create_goal` budget guard.
 - `src/spawn-guard.ts`, `src/stop-resume-hook.ts`: spawn guards, Stop auto-resume.
+- `src/surface.ts`: toolkit surface + reviewer-identity resolution (`lazycodex` default; staged `surface.json` marker or `OMO_AGENT_TOOLKIT_SURFACE` selects `omo-senpi`).
 - `src/ultrawork-skill-pointer.ts`: byte-identical mirror of ultrawork's pointer (pinned by `plugin/test/ultrawork-skill-pointer.test.mjs`).
 - `directive.md`: runtime-read directive (never inlined into TypeScript).
 

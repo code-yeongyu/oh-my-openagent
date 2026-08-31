@@ -5,6 +5,7 @@ import {
 	isEssentialCriterion,
 	isFinalRunCompletionCandidate,
 } from "./goal-status.js";
+import { resolveToolkitSurface, reviewerRolesFor, type UlwLoopToolkitSurface } from "./surface.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 
 export interface CodexCreateGoalPayload {
@@ -20,11 +21,13 @@ export function buildCodexGoalInstruction(args: {
 	readonly plan: UlwLoopPlan;
 	readonly goal: UlwLoopItem;
 	readonly isFinal?: boolean;
+	readonly surface?: UlwLoopToolkitSurface;
 }): UlwLoopGoalInstruction {
 	const mode = codexGoalMode(args.plan);
 	const createGoal = buildCreateGoalPayload(args.plan, args.goal);
 	const isFinal = args.isFinal ?? isFinalRunCompletionCandidate(args.plan, args.goal);
-	return { text: buildText(mode, args.plan, args.goal, createGoal, isFinal), json: createGoal };
+	const surface = args.surface ?? resolveToolkitSurface();
+	return { text: buildText(mode, args.plan, args.goal, createGoal, isFinal, surface), json: createGoal };
 }
 
 function buildCreateGoalPayload(plan: UlwLoopPlan, goal: UlwLoopItem): CodexCreateGoalPayload {
@@ -37,6 +40,7 @@ function buildText(
 	goal: UlwLoopItem,
 	createGoal: CodexCreateGoalPayload,
 	isFinal: boolean,
+	surface: UlwLoopToolkitSurface,
 ): string {
 	return joinLines([
 		mode === "aggregate" ? "UlwLoop aggregate-goal handoff" : "UlwLoop active-goal handoff",
@@ -54,7 +58,7 @@ function buildText(
 		"- Goals are unlimited. Do not add numeric limits.",
 		...modeConstraintLines(mode, isFinal),
 		...evidenceLayoutLines(plan),
-		finalSection(plan, goal, isFinal, mode === "aggregate"),
+		finalSection(plan, goal, isFinal, mode === "aggregate", surface),
 		...checkpointLines(plan, mode),
 		"",
 		"create_goal payload:",
@@ -112,7 +116,14 @@ function evidenceLayoutLines(plan: UlwLoopPlan): string[] {
 	];
 }
 
-function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, aggregate: boolean): string {
+function finalSection(
+	plan: UlwLoopPlan,
+	goal: UlwLoopItem,
+	isFinal: boolean,
+	aggregate: boolean,
+	surface: UlwLoopToolkitSurface,
+): string {
+	const roles = reviewerRolesFor(surface);
 	if (!isFinal)
 		return "- This is not the final ulw-loop story; do not run the final reviewer/manual-QA/gate-review quality gate yet.";
 	const option = sessionOption(plan);
@@ -122,8 +133,8 @@ function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, ag
 		"Final story — run mandatory quality gate before update_goal:",
 		"- Run targeted verification for changed behavior.",
 		"- Confirm every manualQa artifact path exists and has non-zero size.",
-		"- First spawn lazycodex-code-reviewer and lazycodex-qa-executor in parallel (fork_context: false on the v1 surface; fork_turns: \"none\" on v2). Include the original brief, goal objectives, desired user-visible outcome, diff, and evidence; wait for BOTH to return and confirm their report artifacts exist on disk (code-review report + manualQa matrix).",
-		"- Only then spawn lazycodex-gate-reviewer (same fork settings), passing those artifact paths.",
+		`- First spawn ${roles.codeReview} and ${roles.manualQa} in parallel (fork_context: false on the v1 surface; fork_turns: "none" on v2). Include the original brief, goal objectives, desired user-visible outcome, diff, and evidence; wait for BOTH to return and confirm their report artifacts exist on disk (code-review report + manualQa matrix).`,
+		`- Only then spawn ${roles.gateReview} (same fork settings), passing those artifact paths.`,
 		"- Require clean codeReview, manualQa, gateReview, iteration, and criteriaCoverage. criteriaCoverage must summarize originalIntent, desiredOutcome, and userOutcomeReview; counts alone are not approval.",
 		"- On a reviewer REJECT, fix only the cited blockers, rerun the affected verification/Manual-QA, and re-review the delta at most TWICE; if blockers remain, record them and surface to the user.",
 		"- If codeQualityStatus is WATCH, include the WATCH notes verbatim in your final user-facing message.",

@@ -10,18 +10,13 @@ import {
 	textField,
 } from "./quality-gate-fields.js";
 import { adversarialVerdict, codeQualityStatusField, passedVerdict } from "./quality-gate-verdicts.js";
+import { reviewerRolesFor, type UlwLoopToolkitSurface } from "./surface.js";
 import type {
 	UlwLoopManualQaArtifactKind,
 	UlwLoopManualQaArtifactRef,
 	UlwLoopManualQaSurface,
 	UlwLoopQualityGate,
 } from "./types.js";
-
-const REVIEWER_ROLES = {
-	codeReview: "lazycodex-code-reviewer",
-	manualQa: "lazycodex-qa-executor",
-	gateReview: "lazycodex-gate-reviewer",
-} as const;
 
 export {
 	classifyExternalAuthorizationBlocker,
@@ -36,12 +31,13 @@ export interface QualityGateFs {
 }
 
 export interface ValidateQualityGateOptions {
-	readonly repoRoot: string;
-	readonly fs: QualityGateFs;
+	readonly repoRoot?: string;
+	readonly fs?: QualityGateFs;
 	readonly currentAttemptDir?: string;
+	readonly reviewerSurface?: UlwLoopToolkitSurface;
 }
 
-function reviewerRoleField<T extends string>(value: unknown, expected: T, field: string): T {
+function reviewerRoleField(value: unknown, expected: string, field: string): string {
 	const actual = textField(value, field);
 	if (actual !== expected) invalid(`${field} must be ${expected}.`, field);
 	return expected;
@@ -91,11 +87,11 @@ function artifactCompatible(surface: UlwLoopManualQaSurface, kind: UlwLoopManual
 }
 
 function checkFile(path: string, field: string, opts?: ValidateQualityGateOptions): void {
-	if (opts === undefined) return;
+	if (opts?.repoRoot === undefined || opts.fs === undefined) return;
 	const absolute = resolve(opts.repoRoot, path);
 	if (!opts.fs.existsSync(absolute)) invalid(`${field} must point to an existing artifact.`, field);
 	if (opts.fs.statSync(absolute).size <= 0) invalid(`${field} must point to a non-empty artifact.`, field);
-	if (opts.currentAttemptDir !== undefined) {
+	if (opts.currentAttemptDir !== undefined && opts.repoRoot !== undefined) {
 		const attemptRoot = resolve(opts.repoRoot, opts.currentAttemptDir);
 		if (!isWithinAttemptDir(absolute, attemptRoot))
 			invalid(
@@ -143,6 +139,7 @@ function referencedArtifacts(
 }
 
 export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOptions): UlwLoopQualityGate {
+	const reviewerRoles = reviewerRolesFor(opts?.reviewerSurface ?? "lazycodex");
 	const gate = section(input, "qualityGate");
 	const codeReview = section(gate["codeReview"], "codeReview");
 	const manualQa = section(gate["manualQa"], "manualQa");
@@ -163,7 +160,7 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 	checkFile(gateReportPath, "gateReview.reportPath", opts);
 	return {
 		codeReview: {
-			by: reviewerRoleField(codeReview["by"], REVIEWER_ROLES.codeReview, "codeReview.by"),
+			by: reviewerRoleField(codeReview["by"], reviewerRoles.codeReview, "codeReview.by"),
 			recommendation: literal(codeReview["recommendation"], "APPROVE", "codeReview.recommendation"),
 			codeQualityStatus: codeQualityStatusField(codeReview["codeQualityStatus"], "codeReview.codeQualityStatus"),
 			reportPath: codeReportPath,
@@ -171,7 +168,7 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 			blockers: emptyBlockers(codeReview["blockers"], "codeReview.blockers"),
 		},
 		manualQa: {
-			by: reviewerRoleField(manualQa["by"], REVIEWER_ROLES.manualQa, "manualQa.by"),
+			by: reviewerRoleField(manualQa["by"], reviewerRoles.manualQa, "manualQa.by"),
 			status: literal(manualQa["status"], "passed", "manualQa.status"),
 			evidence: textField(manualQa["evidence"], "manualQa.evidence"),
 			surfaceEvidence,
@@ -179,7 +176,7 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 			artifactRefs,
 		},
 		gateReview: {
-			by: reviewerRoleField(gateReview["by"], REVIEWER_ROLES.gateReview, "gateReview.by"),
+			by: reviewerRoleField(gateReview["by"], reviewerRoles.gateReview, "gateReview.by"),
 			recommendation: literal(gateReview["recommendation"], "APPROVE", "gateReview.recommendation"),
 			reportPath: gateReportPath,
 			evidence: textField(gateReview["evidence"], "gateReview.evidence"),
