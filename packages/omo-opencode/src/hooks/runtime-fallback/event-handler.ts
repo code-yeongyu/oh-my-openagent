@@ -66,10 +66,11 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const sessionStatusHandler = createSessionStatusHandler(deps, helpers, sessionStatusRetryKeys)
   const cancelledSessions = new Set<string>()
 
-  const resetRetryState = (sessionID: string) => {
+  const resetRetryState = (sessionID: string, liveModel?: string) => {
     const state = sessionStates.get(sessionID)
     if (state) {
-      sessionStates.set(sessionID, createFallbackState(state.originalModel))
+      const seedModel = liveModel ?? state.currentModel ?? state.originalModel
+      sessionStates.set(sessionID, createFallbackState(seedModel))
     }
 
     sessionRetryInFlight.delete(sessionID)
@@ -210,7 +211,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
         return
       }
       cancelledSessions.add(sessionID)
-      resetRetryState(sessionID)
+      resetRetryState(sessionID, resolveEventModel(props))
       log(`[${HOOK_NAME}] session.error matched cancellation; cleared retry state`, { sessionID, resolvedAgent })
       return
     }

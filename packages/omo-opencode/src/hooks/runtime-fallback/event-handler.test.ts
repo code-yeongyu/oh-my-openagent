@@ -133,8 +133,8 @@ describe("createEventHandler", () => {
     await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "AbortError" } } } })
 
     const resetState = deps.sessionStates.get(sessionID)
-    expect(resetState?.originalModel).toBe("google/gemini-2.5-pro")
-    expect(resetState?.currentModel).toBe("google/gemini-2.5-pro")
+    expect(resetState?.originalModel).toBe("openai/gpt-5.4")
+    expect(resetState?.currentModel).toBe("openai/gpt-5.4")
     expect(resetState?.fallbackIndex).toBe(-1)
     expect(resetState?.attemptCount).toBe(0)
     expect(resetState?.pendingFallbackModel).toBe(undefined)
@@ -165,7 +165,7 @@ describe("createEventHandler", () => {
     await handler({ event: { type: "session.idle", properties: { sessionID } } })
 
     const resetState = deps.sessionStates.get(sessionID)
-    expect(resetState?.currentModel).toBe("google/gemini-2.5-pro")
+    expect(resetState?.currentModel).toBe("openai/gpt-5.4")
     expect(resetState?.attemptCount).toBe(0)
     expect(clearCalls).toEqual([sessionID])
     expect(abortCalls).toEqual([])
@@ -221,7 +221,7 @@ describe("createEventHandler", () => {
     // then - state reset, behaviour matches pre-fix cancellation path
     const reset = deps.sessionStates.get(sessionID)
     expect(reset?.attemptCount).toBe(0)
-    expect(reset?.currentModel).toBe("opencode-go/glm-5.1")
+    expect(reset?.currentModel).toBe("github-copilot/claude-haiku-4.5")
   })
 
   it("#given two consecutive internal-abort cycles #when session.error fires each time #then attemptCount can progress past 1", async () => {
@@ -464,5 +464,78 @@ describe("createEventHandler", () => {
     expect(created?.originalModel).toBe("anthropic/claude-opus-4-7")
     expect(created?.currentModel).toBe("test-provider/test-model")
     expect(created?.fallbackIndex).toBe(0)
+  })
+
+  it("#given a cancellation abort carrying the live fallback model #when the cancel branch rebuilds retry state #then the rebuild seeds the live model instead of the original", async () => {
+    // given
+    const sessionID = "session-cancel-seed-live"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "litellm/openai.eu.gpt-5.5"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" }, model: "litellm/openai.eu.gpt-5.5" },
+      },
+    })
+
+    // then
+    const rebuilt = deps.sessionStates.get(sessionID)
+    expect(rebuilt?.currentModel).toBe("litellm/openai.eu.gpt-5.5")
+    expect(rebuilt?.attemptCount).toBe(0)
+    expect(rebuilt?.fallbackIndex).toBe(-1)
+  })
+
+  it("#given cancel-rebuilt state on the live fallback model #when a retryable provider error arrives #then the next fallback continues after the live model", async () => {
+    // given
+    const sessionID = "session-cancel-then-continue"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      categories: {
+        test: { fallback_models: ["litellm/openai.eu.gpt-5.5", "google/gemini-2.5-pro"] },
+      },
+    }
+    SessionCategoryRegistry.register(sessionID, "test")
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const retried: string[] = []
+    const helpers: AutoRetryHelpers = {
+      ...createHelpers(deps, abortCalls, clearCalls),
+      autoRetryWithFallback: async (_sessionID, model) => {
+        retried.push(model)
+        return { accepted: true, status: "dispatched" }
+      },
+    }
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "litellm/openai.eu.gpt-5.5"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    const handler = createEventHandler(deps, helpers)
+
+    // given - user abort on the live fallback model rebuilds the state
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" }, model: "litellm/openai.eu.gpt-5.5" },
+      },
+    })
+
+    // when a retryable provider error follows
+    await handler({
+      event: { type: "session.error", properties: { sessionID, error: { statusCode: 429 } } },
+    })
+
+    // then the chain continues after the live model, not from the original
+    expect(retried).toEqual(["google/gemini-2.5-pro"])
+    expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(1)
   })
 })
