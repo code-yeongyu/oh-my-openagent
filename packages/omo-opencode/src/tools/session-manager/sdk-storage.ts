@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { normalizeSDKResponse } from "../../shared"
+import { callWithSessionPathCompatibility } from "../../shared/session-path-compat"
 import type { SessionMessage, SessionMetadata, TodoItem } from "./types"
 import { isSessionSdkUnavailableError } from "./sdk-unavailable"
 
@@ -39,6 +40,13 @@ async function fetchSdkResponse(operation: () => Promise<unknown>): Promise<unkn
   throw lastError
 }
 
+async function fetchSessionPathResponse<TInput extends { readonly path: { readonly id: string } }>(
+  operation: (input: TInput) => Promise<unknown>,
+  input: TInput,
+): Promise<unknown> {
+  return fetchSdkResponse(() => callWithSessionPathCompatibility(operation, input))
+}
+
 export async function getSdkMainSessions(
   client: PluginInput["client"],
   directory?: string,
@@ -74,7 +82,10 @@ export async function getSdkSessionMessages(
   client: PluginInput["client"],
   sessionID: string,
 ): Promise<SessionMessage[]> {
-  const response = await fetchSdkResponse(() => client.session.messages({ path: { id: sessionID } }))
+  const response = await fetchSessionPathResponse(
+    (input) => client.session.messages(input),
+    { path: { id: sessionID } },
+  )
 
   const rawMessages = normalizeSDKResponse(response, [] as Array<{
     info?: {
@@ -131,7 +142,10 @@ export async function getSdkSessionMessages(
 }
 
 export async function getSdkSessionTodos(client: PluginInput["client"], sessionID: string): Promise<TodoItem[]> {
-  const response = await fetchSdkResponse(() => client.session.todo({ path: { id: sessionID } }))
+  const response = await fetchSessionPathResponse(
+    (input) => client.session.todo(input),
+    { path: { id: sessionID } },
+  )
 
   const data = normalizeSDKResponse(response, [] as Array<{
     id?: string

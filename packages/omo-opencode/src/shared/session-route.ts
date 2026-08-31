@@ -4,6 +4,7 @@ import {
   promptWithModelSuggestionRetry,
 } from "./model-suggestion-retry"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "./prompt-async-gate"
+import { callWithSessionPathCompatibility } from "./session-path-compat"
 import { isAmbiguousPostDispatchPromptFailure } from "./prompt-failure-classifier"
 
 type OpencodeClient = PluginInput["client"]
@@ -103,5 +104,8 @@ export function messagesInDirectory(
   args: SessionMessagesArgs,
   directory: string,
 ): Promise<unknown> {
-  return client.session.messages(routeSessionMessages(args, directory))
+  return callWithSessionPathCompatibility(
+    (input) => client.session.messages(input),
+    routeSessionMessages(args, directory),
+  )
 }

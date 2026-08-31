@@ -1,6 +1,7 @@
 import type { OpencodeClient } from "./types"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { callWithSessionPathCompatibility } from "../../shared/session-path-compat"
 
 export async function createSyncSession(
   client: OpencodeClient,
@@ -12,7 +13,10 @@ export async function createSyncSession(
     categoryModel?: DelegatedModelConfig
   }
 ): Promise<{ ok: true; sessionID: string; parentDirectory: string } | { ok: false; error: string }> {
-  const parentSession = await client.session.get({ path: { id: input.parentSessionID } }).catch(() => null)
+  const parentSession = await callWithSessionPathCompatibility(
+    (input) => client.session.get(input),
+    { path: { id: input.parentSessionID } },
+  ).catch(() => null)
   const parentDirectory = parentSession?.data?.directory ?? input.defaultDirectory
 
   const createResult = await client.session.create({

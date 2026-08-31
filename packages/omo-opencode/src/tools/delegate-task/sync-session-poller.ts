@@ -4,6 +4,7 @@ import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
+import { callWithSessionPathCompatibility } from "../../shared/session-path-compat"
 
 export { isSessionComplete } from "./sync-session-turns"
 
@@ -19,9 +20,10 @@ function wait(milliseconds: number): Promise<void> {
 
 function abortSyncSession(client: OpencodeClient, sessionID: string, reason: string): void {
   log("[task] Aborting sync session", { sessionID, reason })
-  void client.session.abort({
-    path: { id: sessionID },
-  }).catch((error: unknown) => {
+  void callWithSessionPathCompatibility(
+    (input) => client.session.abort(input),
+    { path: { id: sessionID } },
+  ).catch((error: unknown) => {
     log("[task] Failed to abort sync session", { sessionID, reason, error: String(error) })
   })
 }
@@ -34,7 +36,10 @@ async function fetchSessionMessages(
   client: OpencodeClient,
   sessionID: string
 ): Promise<SessionMessage[]> {
-  const messagesResult = await client.session.messages({ path: { id: sessionID } })
+  const messagesResult = await callWithSessionPathCompatibility(
+    (input) => client.session.messages(input),
+    { path: { id: sessionID } },
+  )
   const rawData = (messagesResult as { data?: unknown })?.data ?? messagesResult
   return Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
 }

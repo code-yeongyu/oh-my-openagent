@@ -8,6 +8,7 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
+import { callWithSessionPathCompatibility } from "../../shared/session-path-compat"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
@@ -136,7 +137,10 @@ export async function executeUnstableAgentTask(
 
       if (Date.now() - pollStart < timingCfg.MIN_STABILITY_TIME_MS) continue
 
-      const messagesCheck = await client.session.messages({ path: { id: sessionID } })
+      const messagesCheck = await callWithSessionPathCompatibility(
+        (input) => client.session.messages(input),
+        { path: { id: sessionID } },
+      )
       const msgs = normalizeSDKResponse(messagesCheck, [] as Array<unknown>, {
         preferResponseOnMissingData: true,
       })
@@ -188,7 +192,10 @@ The task session may still contain partial results.
 ${taskMetadataBlock}`
     }
 
-    const messagesResult = await client.session.messages({ path: { id: sessionID } })
+    const messagesResult = await callWithSessionPathCompatibility(
+      (input) => client.session.messages(input),
+      { path: { id: sessionID } },
+    )
     const messages = normalizeSDKResponse(messagesResult, [] as SessionMessage[], {
       preferResponseOnMissingData: true,
     })

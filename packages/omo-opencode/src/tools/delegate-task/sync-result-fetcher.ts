@@ -1,6 +1,7 @@
 import type { OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { normalizeSDKResponse } from "../../shared"
+import { callWithSessionPathCompatibility } from "../../shared/session-path-compat"
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -60,9 +61,10 @@ export async function fetchSyncResult(
   anchorMessageCount?: number,
   options?: { strictAbortRecovery?: boolean; deliverableTag?: string }
 ): Promise<{ ok: true; textContent: string } | { ok: false; error: string }> {
-  const messagesResult = await client.session.messages({
-    path: { id: sessionID },
-  })
+  const messagesResult = await callWithSessionPathCompatibility(
+    (input) => client.session.messages(input),
+    { path: { id: sessionID } },
+  )
 
   if ((messagesResult as { error?: unknown }).error) {
     return { ok: false, error: `Error fetching result: ${(messagesResult as { error: unknown }).error}\n\nSession ID: ${sessionID}` }

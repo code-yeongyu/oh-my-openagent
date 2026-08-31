@@ -101,6 +101,10 @@
       "types": "./src/session-idle-settle.ts",
       "import": "./src/session-idle-settle.ts"
     },
+    "./session-path-compat": {
+      "types": "./src/session-path-compat.ts",
+      "import": "./src/session-path-compat.ts"
+    },
     "./zip-entry-listing": {
       "types": "./src/zip-entry-listing.ts",
       "import": "./src/zip-entry-listing.ts"

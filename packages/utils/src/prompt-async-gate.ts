@@ -1,5 +1,8 @@
 import { log } from "./logger"
 import {
+  callWithSessionPathCompatibility,
+} from "./session-path-compat"
+import {
   LIVE_ROUTE_DISPATCH_LOG,
   LIVE_ROUTE_UNAVAILABLE_LOG,
   isPreSendConnectionFailure,
@@ -68,46 +71,11 @@ export type {
   PromptAsyncGateResult,
 } from "./prompt-async-gate/types"
 
-type ObjectPathPromptInput = {
-  readonly path?: { readonly id?: string } | string
-  readonly [key: string]: unknown
-}
-
-function hasObjectSessionPath(input: unknown): input is ObjectPathPromptInput & { readonly path: { readonly id: string } } {
-  return typeof input === "object"
-    && input !== null
-    && "path" in input
-    && typeof input.path === "object"
-    && input.path !== null
-    && "id" in input.path
-    && typeof input.path.id === "string"
-}
-
-function isObjectPathTypeError(error: unknown): boolean {
-  const message = error instanceof Error
-    ? error.message
-    : typeof error === "string" ? error : ""
-  return message.includes('The "path" property must be of type string')
-    && (message.includes("got object") || message.includes("got undefined"))
-}
-
 async function dispatchWithPathCompatibility<TInput>(
   dispatch: (dispatchInput: TInput) => Promise<unknown>,
   input: TInput,
 ): Promise<unknown> {
-  try {
-    return await dispatch(input)
-  } catch (error) {
-    if (!isObjectPathTypeError(error) || !hasObjectSessionPath(input)) {
-      throw error
-    }
-
-    const retryInput = {
-      ...input,
-      path: input.path.id,
-    } as TInput
-    return dispatch(retryInput)
-  }
+  return callWithSessionPathCompatibility(dispatch, input)
 }
 
 export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(

@@ -10,6 +10,7 @@ import { type SyncTaskDeps, syncTaskDeps } from "./sync-task-deps"
 import { publishSyncTaskMetadata } from "./sync-task-metadata"
 import { runSyncTaskLoop } from "./sync-task-runner"
 import { cleanupSyncSessionSideEffects, registerSyncSessionSideEffects } from "./sync-session-lifecycle"
+import { callWithSessionPathCompatibility } from "../../shared/session-path-compat"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 export async function executeSyncTask(
@@ -166,7 +167,10 @@ export async function executeSyncTask(
       // session.idle), so handedBackSyncSessions is the signal the enforcer keys on;
       // the abort still cancels the child's opencode-side background jobs.
       if (typeof client.session.abort === "function") {
-        void client.session.abort({ path: { id: syncSessionID } }).catch((error: unknown) => {
+        void callWithSessionPathCompatibility(
+          (input) => client.session.abort(input),
+          { path: { id: syncSessionID } },
+        ).catch((error: unknown) => {
           log(`[task] Failed to abort completed sync session:`, error)
         })
       }

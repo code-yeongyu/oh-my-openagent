@@ -6,6 +6,7 @@ import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { getMessageDir, normalizeSDKResponse } from "../../shared"
+import { callWithSessionPathCompatibility } from "../../shared/session-path-compat"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
@@ -57,7 +58,10 @@ async function resolveResumeContext(
   continuationID: string
 ): Promise<ResumeContext> {
   try {
-    const messagesResp = await client.session.messages({ path: { id: continuationID } })
+    const messagesResp = await callWithSessionPathCompatibility(
+      (input) => client.session.messages(input),
+      { path: { id: continuationID } },
+    )
     const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
 
     for (let index = messages.length - 1; index >= 0; index--) {
@@ -254,7 +258,10 @@ ${buildTaskMetadataBlock({
      if (handedBackToParent) {
        handedBackSyncSessions.add(continuationID)
        if (typeof client.session.abort === "function") {
-         void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {
+         void callWithSessionPathCompatibility(
+           (input) => client.session.abort(input),
+           { path: { id: continuationID } },
+         ).catch((error: unknown) => {
            log(`[task] Failed to abort completed sync continuation session:`, error)
          })
        }
