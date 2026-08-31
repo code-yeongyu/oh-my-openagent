@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-08-31. Total shim exports found: 286.
+Snapshot date: 2026-08-31. Total shim exports found: 256.
 
 ## Aggregate By Target Package
 
@@ -84,36 +84,6 @@ Snapshot date: 2026-08-31. Total shim exports found: 286.
 | `packages/omo-opencode/src/config/schema/team-mode.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/boulder-state/format-duration.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/features/boulder-state/top-level-task.ts` | `@oh-my-opencode/boulder-state` |
-| `packages/omo-opencode/src/features/builtin-skills/index.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skill-file-loader.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/agent-browser-skill.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/agent-browser-template.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/debugging.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/dev-browser.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/frontend.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-atomic-planning.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-context-analysis.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-execution-verification.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-workflow.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/history-search-workflow.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/overview.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/quick-reference.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/rebase-workflow.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-skill-metadata.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/index.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/init-deep.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/playwright-cli.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/playwright-mcp-skill.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/playwright.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/remove-ai-slops.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/review-work.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/security-research.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/security-review.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/team-mode.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/visual-qa.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/types.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/agent-definitions-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/claude-model-mapper.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/index.ts` | `@oh-my-opencode/claude-code-compat-core` |
