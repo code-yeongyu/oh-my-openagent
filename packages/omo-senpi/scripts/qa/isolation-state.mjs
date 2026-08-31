@@ -5,7 +5,7 @@ import { join, relative } from "node:path"
 const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
 export const PROTECTED_STATE_FILES = ["auth.json", "settings.json", "models.json", "models-store.json", "trust.json", "hooks-state.json"]
 export const OBSERVATION_LIMITS = { maxFiles: 10_000, maxBytes: 64 * 1024 * 1024, maxEntries: 20_000 }
-const FILE_IO = { closeSync, fstatSync, openSync, readSync, statSync }
+const FILE_IO = { closeSync, fstatSync, openSync, readFileSync, readSync, statSync }
 const HASH_CHUNK_BYTES = 64 * 1024
 
 export function credentialDigest(agentDir) {
@@ -14,26 +14,21 @@ export function credentialDigest(agentDir) {
     const path = join(agentDir, name)
     hash.update(name)
     hash.update("\0")
-    hash.update(existsSync(path) ? credentialBytes(path, name) : Buffer.from("absent"))
+    hash.update(existsSync(path) ? credentialBytes(readFileSync(path), name) : Buffer.from("absent"))
     hash.update("\0")
   }
   return hash.digest("hex")
 }
 
-export function snapshotProtectedState(root, readFile = readFileSync) {
+export function snapshotProtectedState(root, readFileOrIo = FILE_IO) {
+  const io = protectedFileIo(readFileOrIo)
   const snapshot = new Map()
   const errors = []
   for (const name of PROTECTED_STATE_FILES) {
-    const path = join(root, name)
-    if (!existsSync(path)) {
-      snapshot.set(name, "absent")
-      continue
-    }
-    try {
-      snapshot.set(name, createHash("sha256").update(credentialBytes(path, name, readFile)).digest("hex"))
-    } catch (error) {
-      errors.push({ path: name, code: errorCode(error) })
-    }
+    const result = readProtectedFileStable(join(root, name), io)
+    if (result.error !== undefined) errors.push({ path: name, code: result.error })
+    else if (result.absent) snapshot.set(name, "absent")
+    else snapshot.set(name, createHash("sha256").update(credentialBytes(result.content, name)).digest("hex"))
   }
   return { snapshot, complete: errors.length === 0, errors }
 }
@@ -50,7 +45,7 @@ export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, io = FILE_I
   collectFilesBounded(root, state, {
     maxFiles: limits.maxFiles,
     maxEntries: limits.maxEntries ?? OBSERVATION_LIMITS.maxEntries,
-  })
+  }, io)
   const snapshot = new Map()
   let bytesRead = 0
   for (const file of state.files.sort((left, right) => left.rel.localeCompare(right.rel))) {
@@ -97,8 +92,7 @@ export function digestDirectory(root) {
   return hash.digest("hex")
 }
 
-function credentialBytes(path, name, readFile = readFileSync) {
-  const content = readFile(path)
+function credentialBytes(content, name) {
   if (name !== "settings.json") return content
   try {
     const settings = JSON.parse(content.toString("utf8"))
@@ -112,7 +106,7 @@ function credentialBytes(path, name, readFile = readFileSync) {
   }
 }
 
-function collectFilesBounded(currentRoot, state, limits) {
+function collectFilesBounded(currentRoot, state, limits, io) {
   let directory
   try {
     directory = opendirSync(currentRoot)
@@ -131,7 +125,7 @@ function collectFilesBounded(currentRoot, state, limits) {
       }
       const path = join(currentRoot, entry.name)
       if (entry.isDirectory()) {
-        collectFilesBounded(path, state, limits)
+        collectFilesBounded(path, state, limits, io)
         if (state.truncated) return
       } else if (entry.isFile()) {
         if (state.files.length >= limits.maxFiles) {
@@ -139,8 +133,8 @@ function collectFilesBounded(currentRoot, state, limits) {
           return
         }
         try {
-          const stat = statSync(path)
-          state.files.push({ path, rel: relative(state.root, path), size: stat.size, dev: stat.dev, ino: stat.ino })
+          const metadata = fileMetadata(io.statSync(path, { bigint: true }))
+          state.files.push({ path, rel: relative(state.root, path), size: boundedSize(metadata.size), metadata })
         } catch (error) {
           state.errors.push({ path: relative(state.root, path), code: errorCode(error) })
         }
@@ -158,51 +152,130 @@ function collectFilesBounded(currentRoot, state, limits) {
 }
 
 function hashFileBounded(file, remainingBytes, io) {
-  if (file.size > remainingBytes) return { bytesRead: 0, error: "BYTE_LIMIT" }
   let fd
   let bytesRead = 0
   let result
   try {
     fd = io.openSync(file.path, "r")
-    const opened = io.fstatSync(fd)
-    if (opened.dev !== file.dev || opened.ino !== file.ino) return { bytesRead, error: "FILE_REPLACED" }
-    if (opened.size !== file.size) return { bytesRead, error: "FILE_CHANGED" }
+    const opened = fileMetadata(io.fstatSync(fd, { bigint: true }))
+    if (changedMetadataCode(file.metadata, opened) !== undefined) {
+      const openingPath = fileMetadata(io.statSync(file.path, { bigint: true }))
+      throw snapshotError(sameIdentity(opened, openingPath) ? "FILE_CHANGED" : "FILE_REPLACED")
+    }
     const hash = createHash("sha256")
     const buffer = Buffer.allocUnsafe(Math.min(HASH_CHUNK_BYTES, Math.max(file.size, 1)))
     while (bytesRead < file.size) {
       const requested = Math.min(buffer.length, file.size - bytesRead, remainingBytes - bytesRead)
-      if (requested <= 0) return { bytesRead, error: "BYTE_LIMIT" }
       let count
       try {
         count = io.readSync(fd, buffer, 0, requested, bytesRead)
       } catch (error) {
-        if (io.fstatSync(fd).size < file.size) return { bytesRead, error: "SHORT_READ" }
-        return { bytesRead, error: errorCode(error) }
+        if (fileMetadata(io.fstatSync(fd, { bigint: true })).size < file.metadata.size) throw snapshotError("SHORT_READ")
+        throw error
       }
-      if (count === 0) return { bytesRead, error: "SHORT_READ" }
+      if (count === 0) throw snapshotError("SHORT_READ")
       hash.update(buffer.subarray(0, count))
       bytesRead += count
     }
-    const finished = io.fstatSync(fd)
-    if (finished.dev !== file.dev || finished.ino !== file.ino || finished.size !== file.size) {
-      return { bytesRead, error: "FILE_CHANGED" }
+    const finished = fileMetadata(io.fstatSync(fd, { bigint: true }))
+    const pathMetadata = fileMetadata(io.statSync(file.path, { bigint: true }))
+    if (!sameIdentity(finished, pathMetadata)) throw snapshotError("FILE_REPLACED")
+    if (changedMetadataCode(opened, finished) !== undefined || changedMetadataCode(finished, pathMetadata) !== undefined) {
+      throw snapshotError("FILE_CHANGED")
     }
-    const pathStat = io.statSync(file.path)
-    if (pathStat.dev !== file.dev || pathStat.ino !== file.ino) return { bytesRead, error: "FILE_REPLACED" }
-    if (pathStat.size !== file.size) return { bytesRead, error: "FILE_CHANGED" }
     result = { bytesRead, digest: hash.digest("hex") }
   } catch (error) {
     result = { bytesRead, error: errorCode(error) }
   } finally {
     if (fd !== undefined) {
-      try {
-        io.closeSync(fd)
-      } catch (error) {
-        result = { bytesRead, error: errorCode(error) }
-      }
+      try { io.closeSync(fd) } catch (error) { result = { bytesRead, error: errorCode(error) } }
     }
   }
   return result
+}
+
+function readProtectedFileStable(path, io) {
+  let beforePath
+  try {
+    beforePath = fileMetadata(io.statSync(path, { bigint: true }))
+  } catch (error) {
+    if (errorCode(error) !== "ENOENT") return { error: errorCode(error) }
+    let absentFd
+    let result
+    try {
+      absentFd = io.openSync(path, "r")
+      result = { error: "FILE_REPLACED" }
+    } catch (openError) {
+      result = errorCode(openError) === "ENOENT" ? { absent: true } : { error: errorCode(openError) }
+    } finally {
+      if (absentFd !== undefined) {
+        try { io.closeSync(absentFd) } catch (closeError) { result = { error: errorCode(closeError) } }
+      }
+    }
+    return result
+  }
+  let fd
+  let result
+  try {
+    fd = io.openSync(path, "r")
+    const opened = fileMetadata(io.fstatSync(fd, { bigint: true }))
+    if (changedMetadataCode(beforePath, opened) !== undefined) {
+      const openingPath = fileMetadata(io.statSync(path, { bigint: true }))
+      throw snapshotError(sameIdentity(opened, openingPath) ? "FILE_CHANGED" : "FILE_REPLACED")
+    }
+    const content = io.readFileSync(fd)
+    const finished = fileMetadata(io.fstatSync(fd, { bigint: true }))
+    const afterPath = fileMetadata(io.statSync(path, { bigint: true }))
+    if (!sameIdentity(finished, afterPath)) throw snapshotError("FILE_REPLACED")
+    if (changedMetadataCode(opened, finished) !== undefined || changedMetadataCode(finished, afterPath) !== undefined) {
+      throw snapshotError("FILE_CHANGED")
+    }
+    result = { content }
+  } catch (error) {
+    result = { error: errorCode(error) }
+  } finally {
+    if (fd !== undefined) {
+      try { io.closeSync(fd) } catch (error) { result = { error: errorCode(error) } }
+    }
+  }
+  return result
+}
+
+function protectedFileIo(readFileOrIo) {
+  if (typeof readFileOrIo === "function") {
+    return { ...FILE_IO, ...Object.fromEntries(Object.entries(readFileOrIo)), readFileSync: readFileOrIo }
+  }
+  return { ...FILE_IO, ...readFileOrIo }
+}
+
+function fileMetadata(stat) {
+  return {
+    dev: BigInt(stat.dev),
+    ino: BigInt(stat.ino),
+    size: BigInt(stat.size),
+    mtimeNs: BigInt(stat.mtimeNs),
+    ctimeNs: BigInt(stat.ctimeNs),
+  }
+}
+
+function sameIdentity(before, after) {
+  return before.dev === after.dev && before.ino === after.ino
+}
+
+function changedMetadataCode(before, after) {
+  if (!sameIdentity(before, after)) return "FILE_REPLACED"
+  if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) return "FILE_CHANGED"
+  return undefined
+}
+
+function boundedSize(size) {
+  return size > BigInt(Number.MAX_SAFE_INTEGER) ? Number.POSITIVE_INFINITY : Number(size)
+}
+
+function snapshotError(code) {
+  const error = new Error(code)
+  error.code = code
+  return error
 }
 
 function compareSnapshotErrors(left, right) {
