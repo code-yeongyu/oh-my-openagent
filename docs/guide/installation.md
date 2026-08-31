@@ -180,6 +180,10 @@ without copying it, so a standalone senpi install keeps working. Set `OMO_CODING
 override the location; the legacy `SENPI_*` and `PI_*` variables are still read when the `OMO_*`
 one is unset.
 
+The native package also includes five opt-in terminal themes: `dracula`, `github-dark`,
+`night-owl`, `one-dark-pro`, and `tokyo-night`. Select one from `/settings`; Omo registers
+the package-owned theme files at launch without copying over themes in `~/.omo/themes`.
+
 **Upgrade order on older machines.** If the machine still has oh-my-openagent/oh-my-opencode 4.19.4 or earlier installed globally, that package owns a global `omo` bin and the install above fails with EEXIST. Upgrade or uninstall the old package first, then install `omo-ai@beta`.
 
 ### First run: `omo setup`

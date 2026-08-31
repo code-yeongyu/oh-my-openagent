@@ -33,8 +33,8 @@ describe("omo-ai published package shape", () => {
     })
 
     describe("#when the files array is audited", () => {
-      test("#then it ships exactly bin and plugin", () => {
-        expect(manifest.files).toEqual(["bin", "plugin"])
+      test("#then it ships exactly bin, plugin, and themes", () => {
+        expect(manifest.files).toEqual(["bin", "plugin", "themes"])
       })
     })
 
