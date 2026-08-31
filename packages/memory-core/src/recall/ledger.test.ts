@@ -98,7 +98,9 @@ describe("RecallLedger", () => {
     expect(Object.keys(parsed.surfaced)).toEqual(["reference/a.md"])
     expect(parsed.surfaced["reference/a.md"]?.hash).toBe("aaaa")
     expect(parsed.surfaced["reference/a.md"]?.at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-    expect((await stat(filePath)).mode & 0o777).toBe(0o600)
+    if (process.platform !== "win32") {
+      expect((await stat(filePath)).mode & 0o777).toBe(0o600)
+    }
   })
 
   it("#given a second mark on the same session #when the ledger is read #then earlier entries persist and repeats update", async () => {

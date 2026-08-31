@@ -102,6 +102,10 @@ describe("appendRecallReceipt", () => {
     })
 
     // then
-    expect((await stat(filePath)).mode & 0o777).toBe(0o600)
+    if (process.platform === "win32") {
+      expect(await stat(filePath)).toBeDefined()
+    } else {
+      expect((await stat(filePath)).mode & 0o777).toBe(0o600)
+    }
   })
 })

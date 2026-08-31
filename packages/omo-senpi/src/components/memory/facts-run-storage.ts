@@ -185,9 +185,6 @@ export function finalResult(record: FactsFinalRecord): FactsLaunchResult {
   return { status: "failed", runId: record.runId }
 }
 
-export function delay(_attempt: number, milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
-}
 
 export function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)

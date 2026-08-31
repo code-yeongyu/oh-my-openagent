@@ -1,0 +1,8 @@
+MERGED-BASE CLEANUP PASS
+
+- task-owned Senpi sandboxes removed: 10
+- raw merged-base task-driver directory removed after redaction
+- isolated Bun 1.4.0 cache removed
+- task-owned LSP daemon tree terminated: 3 processes
+- matching task-owned processes after cleanup: 0
+- live task-driver leakedPids: 0

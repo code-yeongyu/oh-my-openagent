@@ -51,6 +51,17 @@
   - seven broader revive/output/sequence assertions remain outside this
     dedicated-marker boundary and are disclosed in
     `p1-live-task.redacted.json`.
+- After merging current `upstream/dev@ee7ae5d66`, all changed-input checks
+  were repeated:
+  - focused boundary/adjacent suites passed 42/42 with 101 assertions;
+  - adapter TypeScript diagnostics passed;
+  - full Senpi gate passed 2464 tests with one Windows skip, 0 failures,
+    7913 assertions across 327 files, plus evidence resolver 10/10;
+  - real adapter returned `PASS` with zero observed or protected Senpi/OMO
+    path changes;
+  - real task issue observables remained `PASS`: one child extension marker,
+    main exit `0`, resume-child and parent-suspension checks, real-home
+    isolation, and leaked PID count `0`.
 
 ## Why this is enough
 
@@ -75,6 +86,10 @@ parent-owned actions.
 - Removed the task-owned isolated Bun 1.4.0 cache.
 - Verified no process referenced any P1 sandbox token.
 - Task-driver `leakedPids=0`.
+- After the current-dev rerun, removed another ten task-owned sandboxes, the
+  raw merged-base task-driver directory, and the second isolated Bun cache.
+- Terminated the task-owned LSP daemon, language server, and tsserver tree
+  observed after the live adapter run; verified all three PIDs absent.
 
 ## What was omitted
 

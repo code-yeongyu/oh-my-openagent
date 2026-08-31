@@ -1,4 +1,4 @@
-# src/features/ — 25 Feature Modules
+# src/features/ — 24 Feature Modules
 
 **Generated:** 2026-08-07
 
@@ -17,7 +17,6 @@ Standalone feature modules wired into `plugin/` layer. Each is self-contained wi
 | **opencode-skill-loader** | HIGH | yes | OpenCode adapter for YAML frontmatter skill discovery; reusable loader primitives live in `packages/skills-loader-core/` |
 | **builtin-skills** | LOW–MED | yes | Built-in skill files (git-master, playwright, frontend, review-work, remove-ai-slops, init-deep, security-research, security-review, dev-browser, playwright-cli, **team-mode**, …) |
 | **skill-mcp-manager** | HIGH | yes | OpenCode adapter for tier-3 MCP client lifecycle; reusable client/OAuth primitives live in `packages/mcp-client-core/` |
-| **claude-code-plugin-loader** | MEDIUM | yes | OpenCode adapter for Claude Code plugin discovery; reusable compatibility loaders live in `packages/claude-code-compat-core/` |
 | **builtin-commands** | LOW | yes | Command templates: refactor, init-deep, handoff, ulw-loop, etc. |
 | **mcp-oauth** | HIGH | yes | OAuth 2.0 + PKCE + DCR (RFC 7591) + step-up auth for MCP servers |
 | **claude-code-agent-loader** | LOW | yes | OpenCode adapter for agents from `.opencode/agents/` and Claude Code plugins; shared loader lives in `packages/claude-code-compat-core/` |

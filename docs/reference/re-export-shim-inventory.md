@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-06-13. Total shim exports found: 316.
+Snapshot date: 2026-08-31. Total shim exports found: 296.
 
 ## Aggregate By Target Package
 
@@ -131,25 +131,6 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/features/claude-code-mcp-loader/scope-filter.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-mcp-loader/transformer.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-mcp-loader/types.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/agent-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/command-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/discovery-core.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/discovery-paths.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/discovery.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/hook-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/index.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/install-path-resolver.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/installed-plugin-database.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/loaded-plugin.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/mcp-server-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/plugin-key.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/plugin-manifest.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/plugin-path-resolver.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/plugin-settings.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/scope-filter.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/skill-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/types.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/mcp-oauth/callback-server.ts` | `@oh-my-opencode/mcp-client-core` |
 | `packages/omo-opencode/src/features/mcp-oauth/dcr.ts` | `@oh-my-opencode/mcp-client-core` |
 | `packages/omo-opencode/src/features/mcp-oauth/discovery.ts` | `@oh-my-opencode/mcp-client-core` |
@@ -343,7 +324,6 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/shared/zip-entry-listing/read-zip-symlink-target.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/zip-entry-listing/tar-zip-entry-listing.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/zip-entry-listing/zipinfo-zip-entry-listing.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/tools/delegate-task/model-string-parser.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/tools/hashline-edit/edit-deduplication.ts` | `@oh-my-opencode/hashline-core` |
 | `packages/omo-opencode/src/tools/hashline-edit/edit-ordering.ts` | `@oh-my-opencode/hashline-core` |
 | `packages/omo-opencode/src/tools/hashline-edit/file-text-canonicalization.ts` | `@oh-my-opencode/hashline-core` |
