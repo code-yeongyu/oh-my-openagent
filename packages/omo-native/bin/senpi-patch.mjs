@@ -3,7 +3,7 @@ import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 
-const packageRoot = dirname(fileURLToPath(import.meta.url))
+const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(join(packageRoot, "package.json"))
 let senpiRoot
 try {
