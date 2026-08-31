@@ -1,4 +1,5 @@
 import type { BackgroundTaskConfig } from "../../config/schema"
+import { log } from "../../shared/logger"
 import type { OpencodeClient } from "./constants"
 
 export const DEFAULT_MAX_SUBAGENT_DEPTH = 3
@@ -7,10 +8,66 @@ export interface SubagentSpawnContext {
   rootSessionID: string
   parentDepth: number
   childDepth: number
+  degraded?: boolean
 }
 
 export function getMaxSubagentDepth(config?: BackgroundTaskConfig): number {
   return config?.maxDepth ?? DEFAULT_MAX_SUBAGENT_DEPTH
+}
+
+type SessionParentLookup =
+  | { ok: true; parentID?: string }
+  | { ok: false; reason: string }
+
+function describeLookupError(error: unknown): string {
+  if (typeof error === "string" && error.length > 0) return error
+  if (error instanceof Error && error.message.length > 0) return error.message
+  try {
+    return JSON.stringify(error) ?? String(error)
+  } catch (stringifyError) {
+    if (!(stringifyError instanceof Error)) throw stringifyError
+    return String(error)
+  }
+}
+
+async function requestSessionParent(
+  client: OpencodeClient,
+  sessionID: string,
+  directory?: string
+): Promise<SessionParentLookup> {
+  try {
+    const response = await client.session.get({
+      path: { id: sessionID },
+      ...(directory ? { query: { directory } } : {}),
+    })
+    if (response.error) {
+      return { ok: false, reason: describeLookupError(response.error) }
+    }
+
+    if (!response.data) {
+      return { ok: false, reason: "No session data returned" }
+    }
+
+    return { ok: true, parentID: response.data.parentID }
+  } catch (error) {
+    return { ok: false, reason: describeLookupError(error) }
+  }
+}
+
+async function fetchSessionParent(
+  client: OpencodeClient,
+  sessionID: string,
+  directory?: string
+): Promise<SessionParentLookup> {
+  const scoped = await requestSessionParent(client, sessionID, directory)
+  if (scoped.ok || !directory) {
+    return scoped
+  }
+
+  // Session IDs are globally unique in opencode, but a directory-scoped lookup can miss a
+  // session that lives in another project (remote clients connecting to `opencode serve`).
+  // Retry unscoped before giving up on lineage resolution.
+  return requestSessionParent(client, sessionID)
 }
 
 export async function resolveSubagentSpawnContext(
@@ -19,7 +76,6 @@ export async function resolveSubagentSpawnContext(
   directory?: string
 ): Promise<SubagentSpawnContext> {
   const visitedSessionIDs = new Set<string>()
-  let rootSessionID = parentSessionID
   let currentSessionID = parentSessionID
   let parentDepth = 0
 
@@ -30,41 +86,33 @@ export async function resolveSubagentSpawnContext(
 
     visitedSessionIDs.add(currentSessionID)
 
-    let nextParentSessionID: string | undefined
-    try {
-      const response = await client.session.get({
-        path: { id: currentSessionID },
-        ...(directory ? { query: { directory } } : {}),
-      })
-      if (response.error) {
-        throw new Error(String(response.error))
-      }
-
-      if (!response.data) {
-        throw new Error("No session data returned")
-      }
-
-      nextParentSessionID = response.data.parentID
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      throw new Error(
-        `Subagent spawn blocked: failed to resolve session lineage for ${parentSessionID}, so background_task.maxDepth cannot be enforced safely. ${reason}`
+    const lookup = await fetchSessionParent(client, currentSessionID, directory)
+    if (!lookup.ok) {
+      log(
+        `[background-agent] Could not resolve session lineage for ${parentSessionID} ` +
+        `(failed at ${currentSessionID}: ${lookup.reason}). ` +
+        "Treating the parent as the root session so delegation still works; " +
+        "background_task.maxDepth cannot be enforced for this spawn.",
+        { parentSessionID, failedAtSessionID: currentSessionID }
       )
+      return {
+        rootSessionID: parentSessionID,
+        parentDepth: 0,
+        childDepth: 1,
+        degraded: true,
+      }
     }
 
-    if (!nextParentSessionID) {
-      rootSessionID = currentSessionID
-      break
+    if (!lookup.parentID) {
+      return {
+        rootSessionID: currentSessionID,
+        parentDepth,
+        childDepth: parentDepth + 1,
+      }
     }
 
-    currentSessionID = nextParentSessionID
+    currentSessionID = lookup.parentID
     parentDepth += 1
-  }
-
-  return {
-    rootSessionID,
-    parentDepth,
-    childDepth: parentDepth + 1,
   }
 }
 

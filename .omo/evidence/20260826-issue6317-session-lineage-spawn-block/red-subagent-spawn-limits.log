@@ -1,0 +1,78 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.test.ts:
+45 |       }
+46 |
+47 |       nextParentSessionID = response.data.parentID
+48 |     } catch (error) {
+49 |       const reason = error instanceof Error ? error.message : String(error)
+50 |       throw new Error(
+                     ^
+error: Subagent spawn blocked: failed to resolve session lineage for child-session, so background_task.maxDepth cannot be enforced safely. [object Object]
+      at resolveSubagentSpawnContext (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.ts:50:17)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.test.ts:68:28)
+(fail) resolveSubagentSpawnContext > #given a directory-scoped lookup fails but unscoped succeeds > retries without query.directory and resolves the lineage [0.47ms]
+45 |       }
+46 |
+47 |       nextParentSessionID = response.data.parentID
+48 |     } catch (error) {
+49 |       const reason = error instanceof Error ? error.message : String(error)
+50 |       throw new Error(
+                     ^
+error: Subagent spawn blocked: failed to resolve session lineage for parent-session, so background_task.maxDepth cannot be enforced safely. [object Object]
+      at resolveSubagentSpawnContext (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.ts:50:17)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.test.ts:100:28)
+(fail) resolveSubagentSpawnContext > #given every lineage lookup fails with an SDK error response > returns a degraded spawn context instead of blocking the spawn [0.23ms]
+45 |       }
+46 |
+47 |       nextParentSessionID = response.data.parentID
+48 |     } catch (error) {
+49 |       const reason = error instanceof Error ? error.message : String(error)
+50 |       throw new Error(
+                     ^
+error: Subagent spawn blocked: failed to resolve session lineage for parent-session, so background_task.maxDepth cannot be enforced safely. connection refused
+      at resolveSubagentSpawnContext (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.ts:50:17)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.test.ts:120:28)
+(fail) resolveSubagentSpawnContext > #given session.get throws for every lineage node > returns a degraded spawn context instead of throwing [4.59ms]
+45 |       }
+46 |
+47 |       nextParentSessionID = response.data.parentID
+48 |     } catch (error) {
+49 |       const reason = error instanceof Error ? error.message : String(error)
+50 |       throw new Error(
+                     ^
+error: Subagent spawn blocked: failed to resolve session lineage for child-session, so background_task.maxDepth cannot be enforced safely. not found
+      at resolveSubagentSpawnContext (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.ts:50:17)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.test.ts:148:28)
+(fail) resolveSubagentSpawnContext > #given a mid-chain scoped failure recovered unscoped > continues the walk and reports an exact depth [0.34ms]
+
+ 10 pass
+ 4 fail
+ 25 expect() calls
+Ran 14 tests across 1 file. [2.43s]
+error: Subagent spawn blocked: failed to resolve session lineage for session-root, so background_task.maxDepth cannot be enforced safely. session lookup failed
+(fail) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > degrades spawn enforcement and still launches when session lineage lookup fails [5.19ms]
+ 0 pass
+ 1 fail
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/background-agent/manager.test.ts:
+45 |       }
+46 |
+47 |       nextParentSessionID = response.data.parentID
+48 |     } catch (error) {
+49 |       const reason = error instanceof Error ? error.message : String(error)
+50 |       throw new Error(
+                     ^
+error: Subagent spawn blocked: failed to resolve session lineage for session-root, so background_task.maxDepth cannot be enforced safely. session lookup failed
+      at resolveSubagentSpawnContext (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.ts:50:17)
+      at async assertCanSpawn (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/manager.ts:346:32)
+      at async reserveSubagentSpawn (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/manager.ts:366:37)
+      at async launch (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/manager.ts:577:41)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6317/packages/omo-opencode/src/features/background-agent/manager.test.ts:3896:34)
+(fail) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > degrades spawn enforcement and still launches when session lineage lookup fails [4.54ms]
+
+ 0 pass
+ 194 filtered out
+ 1 fail
+Ran 1 test across 1 file. [2.83s]

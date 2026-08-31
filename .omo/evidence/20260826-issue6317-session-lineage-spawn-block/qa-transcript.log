@@ -1,0 +1,23 @@
+== isolation envelope ==
+HOME=/tmp/opencode/issue-6317/home
+XDG_DATA_HOME=/tmp/opencode/issue-6317/xdg-data
+XDG_CONFIG_HOME=/tmp/opencode/issue-6317/xdg-config
+XDG_STATE_HOME=/tmp/opencode/issue-6317/xdg-state
+XDG_CACHE_HOME=/tmp/opencode/issue-6317/xdg-cache
+[PASS] create root session via other-directory client :: {"id":"ses_fc2ddffffffeMRRjS5CP6CTggC"}
+root session: ses_fc2ddffffffeMRRjS5CP6CTggC
+server-dir resolution: {"rootSessionID":"ses_fc2ddffffffeMRRjS5CP6CTggC","parentDepth":0,"childDepth":1}
+[PASS] server-dir lineage resolves without blocking :: root=ses_fc2ddffffffeMRRjS5CP6CTggC childDepth=1 degraded=undefined
+other-dir resolution: {"rootSessionID":"ses_fc2ddffffffeMRRjS5CP6CTggC","parentDepth":0,"childDepth":1}
+[PASS] other-dir lineage resolves without blocking :: root=ses_fc2ddffffffeMRRjS5CP6CTggC childDepth=1 degraded=undefined
+[PASS] create child session with parentID :: {"id":"ses_fc2ddfe38ffeCoHD6VY2OEqkGt"}
+child other-dir resolution: {"rootSessionID":"ses_fc2ddffffffeMRRjS5CP6CTggC","parentDepth":1,"childDepth":2}
+[PASS] child depth computed exactly (parentDepth=1) :: {"rootSessionID":"ses_fc2ddffffffeMRRjS5CP6CTggC","parentDepth":1,"childDepth":2}
+child server-dir resolution (cross-project): {"rootSessionID":"ses_fc2ddffffffeMRRjS5CP6CTggC","parentDepth":1,"childDepth":2}
+[PASS] cross-project child lineage still resolves (retry or direct) :: {"rootSessionID":"ses_fc2ddffffffeMRRjS5CP6CTggC","parentDepth":1,"childDepth":2}
+scoped probe (server dir): error=null dataId=ses_fc2ddfe38ffeCoHD6VY2OEqkGt
+bare probe (no directory): error=null dataId=ses_fc2ddfe38ffeCoHD6VY2OEqkGt
+[PASS] bare session.get resolves by unique id :: {"id":"ses_fc2ddfe38ffeCoHD6VY2OEqkGt"}
+dead-server resolution: {"rootSessionID":"ses_fc2ddffffffeMRRjS5CP6CTggC","parentDepth":0,"childDepth":1,"degraded":true}
+[PASS] dead server degrades instead of throwing :: {"rootSessionID":"ses_fc2ddffffffeMRRjS5CP6CTggC","parentDepth":0,"childDepth":1,"degraded":true}
+ALL QA CHECKS PASSED

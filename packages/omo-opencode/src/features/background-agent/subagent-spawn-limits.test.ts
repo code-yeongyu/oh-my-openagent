@@ -48,34 +48,113 @@ describe("resolveSubagentSpawnContext", () => {
     })
   })
 
-  describe("#given session.get returns an SDK error response", () => {
-    test("throws a fail-closed spawn blocked error", async () => {
+  describe("#given a directory-scoped lookup fails but unscoped succeeds", () => {
+    test("retries without query.directory and resolves the lineage", async () => {
       // given
-      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async () => ({
-        error: "lookup failed",
-        data: undefined,
-      }))))
+      const sessionGetCalls: Array<Record<string, unknown>> = []
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async (input) => {
+        sessionGetCalls.push(input as Record<string, unknown>)
+        const scoped = "query" in input && input.query != null
+        if (scoped) {
+          return { error: { code: -32000, message: "session not found in project" }, data: undefined }
+        }
+        if (input.path.id === "child-session") {
+          return { data: { id: "child-session", parentID: "root-session" } }
+        }
+        return { data: { id: "root-session", parentID: undefined } }
+      })))
 
       // when
-      const result = resolveSubagentSpawnContext(client, "parent-session")
+      const result = await resolveSubagentSpawnContext(client, "child-session", "/project/root")
 
       // then
-      await expect(result).rejects.toThrow(/background_task\.maxDepth cannot be enforced safely.*lookup failed/)
+      expect(result.rootSessionID).toBe("root-session")
+      expect(result.parentDepth).toBe(1)
+      expect(result.childDepth).toBe(2)
+      expect(result.degraded).toBeFalsy()
+      expect(sessionGetCalls).toEqual([
+        {
+          path: { id: "child-session" },
+          query: { directory: "/project/root" },
+        },
+        {
+          path: { id: "child-session" },
+        },
+        {
+          path: { id: "root-session" },
+          query: { directory: "/project/root" },
+        },
+        {
+          path: { id: "root-session" },
+        },
+      ])
     })
   })
 
-  describe("#given session.get returns no session data", () => {
-    test("throws a fail-closed spawn blocked error", async () => {
+  describe("#given every lineage lookup fails with an SDK error response", () => {
+    test("returns a degraded spawn context instead of blocking the spawn", async () => {
       // given
       const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async () => ({
+        error: { code: -32000, message: "project mismatch" },
         data: undefined,
       }))))
 
       // when
-      const result = resolveSubagentSpawnContext(client, "parent-session")
+      const result = await resolveSubagentSpawnContext(client, "parent-session")
 
       // then
-      await expect(result).rejects.toThrow(/background_task\.maxDepth cannot be enforced safely.*No session data returned/)
+      expect(result).toEqual({
+        rootSessionID: "parent-session",
+        parentDepth: 0,
+        childDepth: 1,
+        degraded: true,
+      })
+    })
+  })
+
+  describe("#given session.get throws for every lineage node", () => {
+    test("returns a degraded spawn context instead of throwing", async () => {
+      // given
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async () => {
+        throw new Error("connection refused")
+      })))
+
+      // when
+      const result = await resolveSubagentSpawnContext(client, "parent-session")
+
+      // then
+      expect(result).toEqual({
+        rootSessionID: "parent-session",
+        parentDepth: 0,
+        childDepth: 1,
+        degraded: true,
+      })
+    })
+  })
+
+  describe("#given a mid-chain scoped failure recovered unscoped", () => {
+    test("continues the walk and reports an exact depth", async () => {
+      // given
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async (input) => {
+        const scoped = "query" in input && input.query != null
+        if (input.path.id === "child-session") {
+          if (scoped) return { error: "not found", data: undefined }
+          return { data: { id: "child-session", parentID: "root-session" } }
+        }
+        if (input.path.id === "root-session") {
+          return { data: { id: "root-session", parentID: undefined } }
+        }
+        return { error: "not found", data: undefined }
+      })))
+
+      // when
+      const result = await resolveSubagentSpawnContext(client, "child-session", "/project/root")
+
+      // then
+      expect(result.rootSessionID).toBe("root-session")
+      expect(result.parentDepth).toBe(1)
+      expect(result.childDepth).toBe(2)
+      expect(result.degraded).toBeFalsy()
     })
   })
 

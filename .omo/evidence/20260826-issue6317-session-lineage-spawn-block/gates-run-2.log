@@ -1,0 +1,12 @@
+=== GATES RUN 2 (2026-08-26T08:21:04Z) ===
+--- focused bun test ---
+ 1301 pass
+ 0 fail
+ 3189 expect() calls
+Ran 1301 tests across 113 files. [46.30s]
+--- tsgo ---
+tsgo exit: 0
+--- git diff --check ---
+clean
+--- hygiene grep (changed paths) ---
+hygiene exit: 1 (1 = zero hits)

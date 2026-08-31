@@ -3869,7 +3869,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       })
     })
 
-    test("should fail closed when session lineage lookup fails", async () => {
+    test("degrades spawn enforcement and still launches when session lineage lookup fails", async () => {
       // given
       manager.shutdown()
       manager = new BackgroundManager(
@@ -3893,10 +3893,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       }
 
       // when
-      const result = manager.launch(input)
+      const task = await manager.launch(input)
 
       // then
-      await expectRejectsWithMessage(result, "background_task.maxDepth cannot be enforced safely")
+      expect(task.rootSessionId).toBe("session-root")
+      expect(task.spawnDepth).toBe(1)
+      expect(manager.getTask(task.id)?.status).toBe("pending")
     })
 
     test("allows replacement launch when a queued task is cancelled before session starts", async () => {
