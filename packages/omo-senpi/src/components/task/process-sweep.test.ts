@@ -4,11 +4,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { sweepStaleLspDaemonVersions } from "@oh-my-opencode/utils/process-sweep"
+import { SENPI_TASK_RPC_CHILD_ENV } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { resolveSenpiDaemonRuntime } from "../lsp/daemon-runtime"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
-import { SENPI_RPC_CHILD_MARKER_ENV, wireSessionStartProcessSweep } from "./process-sweep"
+import { wireSessionStartProcessSweep } from "./process-sweep"
 
 interface RecordedLog {
   level: "info" | "warn" | "error"
@@ -207,13 +208,32 @@ describe("wireSessionStartProcessSweep()", () => {
     expect(sweepCalls).toBe(1)
   })
 
-  it("#given the RPC child marker is set #when session_start fires #then the sweep is skipped", async () => {
-    // given an env carrying SENPI_CODING_AGENT_SESSION_DIR (senpi-task RPC child)
+  it("#given an ordinary session dir override #when session_start fires #then the sweep still runs", async () => {
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
     let sweepCalls = 0
     wireSessionStartProcessSweep(pi, ctxFor(logger), {
-      env: { [SENPI_RPC_CHILD_MARKER_ENV]: "/tmp/child-session" },
+      env: { SENPI_CODING_AGENT_SESSION_DIR: "/tmp/parent-session" },
+      sweep: async () => {
+        sweepCalls += 1
+      },
+    })
+
+    // when
+    await pi.dispatch("session_start", {})
+    await flushMicrotasks()
+
+    // then
+    expect(sweepCalls).toBe(1)
+    expect(logger.entries).toHaveLength(0)
+  })
+
+  it("#given the dedicated RPC child marker #when session_start fires #then the sweep is skipped", async () => {
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+    let sweepCalls = 0
+    wireSessionStartProcessSweep(pi, ctxFor(logger), {
+      env: { [SENPI_TASK_RPC_CHILD_ENV]: "1" },
       sweep: async () => {
         sweepCalls += 1
       },

@@ -1,0 +1,29 @@
+Bot P1 failing-first proof
+==========================
+
+Commands:
+- `bun test ./packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts -t "session dir override|dedicated RPC child marker"`
+- `bun test ./packages/senpi-task/src/runners/rpc/spawn.test.ts -t "parent env"`
+- `bun test ./packages/omo-senpi/src/components/task/process-sweep.test.ts -t "ordinary session dir override|dedicated RPC child marker"`
+
+Observed before the P1 fix:
+- ordinary top-level `SENPI_CODING_AGENT_SESSION_DIR` override incorrectly
+  skipped reconciliation:
+  - expected `["parent-session"]`
+  - received `[]`
+- dedicated `OMO_SENPI_TASK_RPC_CHILD` marker did not skip reconciliation:
+  - expected `[]`
+  - received `["parent-session"]`
+- RPC spawn omitted the dedicated marker:
+  - expected `"1"`
+  - received `undefined`
+- ordinary top-level session-directory override incorrectly skipped process
+  hygiene:
+  - expected one sweep
+  - received zero
+- dedicated RPC marker did not skip process hygiene:
+  - expected zero sweeps
+  - received one
+
+All five failures exercised the product contract; no syntax/import failure was
+used as evidence.

@@ -2,10 +2,10 @@ bunx bun@1.4.0 run test:senpi
 exit: 0
 
 Largest combined suite:
-2462 pass
+2464 pass
 1 platform-specific Windows skip
 0 fail
-7910 expect() calls
+7913 expect() calls
 327 files
 
 Evidence resolver:

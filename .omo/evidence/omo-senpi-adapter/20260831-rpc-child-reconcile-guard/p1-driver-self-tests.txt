@@ -1,0 +1,6 @@
+Senpi adapter driver self-test: PASS
+Senpi task RPC driver self-test: PASS
+
+Commands:
+- `node packages/omo-senpi/scripts/qa/drive.mjs --self-test`
+- `node packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs --self-test`

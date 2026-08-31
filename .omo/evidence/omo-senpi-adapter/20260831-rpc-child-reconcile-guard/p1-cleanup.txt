@@ -1,0 +1,7 @@
+CLEANUP PASS
+
+- task-owned Senpi sandboxes removed: 10
+- raw P1 task-driver directory removed after redaction
+- isolated Bun 1.4.0 cache removed
+- matching task-owned processes: 0
+- live task-driver leakedPids: 0

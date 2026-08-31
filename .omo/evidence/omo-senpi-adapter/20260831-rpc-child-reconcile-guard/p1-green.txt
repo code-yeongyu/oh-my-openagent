@@ -1,0 +1,21 @@
+Bot P1 GREEN proof
+==================
+
+CI runtime: Bun 1.4.0
+
+Identical scenarios after the fix:
+- event bridge parent/child boundary: 2 pass, 0 fail, 5 assertions;
+- RPC spawn marker injection: 1 pass, 0 fail, 9 assertions.
+
+Observed behavior:
+- a top-level session-directory override still reconciles persisted tasks;
+- only `OMO_SENPI_TASK_RPC_CHILD=1` suppresses parent reconciliation;
+- every RPC child descriptor sets the dedicated marker after member-env
+  overrides, so callers cannot clear or spoof the boundary accidentally.
+- the same parent override still runs process hygiene, while the exact
+  dedicated marker suppresses it inside RPC children.
+
+Latest focused boundary run:
+- event bridge, process sweep, and RPC spawn: 5 pass, 0 fail;
+- adjacent complete scope: 42 pass, 0 fail, 101 assertions;
+- adapter TypeScript diagnostics: PASS.

@@ -132,6 +132,7 @@ export {
   RpcCommandError,
   RpcProcessRunner,
   RpcProtocolClient,
+  SENPI_TASK_RPC_CHILD_ENV,
   buildAutoUiResponse,
   buildChildArgs,
   buildRpcSpawn,

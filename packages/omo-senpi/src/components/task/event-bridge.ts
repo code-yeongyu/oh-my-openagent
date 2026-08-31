@@ -1,10 +1,10 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
+import { SENPI_TASK_RPC_CHILD_ENV } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
 import type { LiveTaskContext } from "./runtime-context"
-import { SENPI_RPC_CHILD_MARKER_ENV } from "./process-sweep"
 import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
@@ -44,7 +44,7 @@ export function wireEventBridge(
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
     transitions.onSessionStart(sessionId)
-    const isRpcChild = process.env[SENPI_RPC_CHILD_MARKER_ENV] !== undefined
+    const isRpcChild = process.env[SENPI_TASK_RPC_CHILD_ENV] === "1"
     if (!isRpcChild) {
       const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
       const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()

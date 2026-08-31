@@ -4,6 +4,12 @@
 
 - Deterministic failing-first test:
   - `bunx bun@1.4.0 test ./packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts -t "RPC child marker"`
+- P1 failing-first boundary tests:
+  - parent sessions with `SENPI_CODING_AGENT_SESSION_DIR` still reconcile and
+    still run process hygiene;
+  - only `OMO_SENPI_TASK_RPC_CHILD=1` suppresses parent-only reconciliation,
+    notification, and process hygiene;
+  - the RPC spawn descriptor always sets that marker after member overrides.
 - Adjacent recovery and process-sweep tests:
   - `bunx bun@1.4.0 test ./packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts ./packages/omo-senpi/src/components/task/process-sweep.test.ts`
 - Generated Senpi extension bundle with the CI Bun 1.4.0 runtime.
@@ -21,8 +27,8 @@
   were skipped while the remaining session-start chain stayed active.
 - Adjacent focused suites passed 16/16.
 - Adapter tsgo passed.
-- Full `test:senpi` passed with 2462 tests, one Windows platform skip,
-  0 failures, and 7910 assertions across 327 files. The evidence resolver
+- Final P1 `test:senpi` passed with 2464 tests, one Windows platform skip,
+  0 failures, and 7913 assertions across 327 files. The evidence resolver
   passed 10/10.
 - Both QA driver self-tests passed.
 - The real adapter driver returned `PASS`, injected ultrawork, passed comment
@@ -36,6 +42,15 @@
   revive/output/sequence assertions outside session-start reconciliation
   failed. They are preserved in `live-task-rpc/verdict.redacted.json`; no
   assertion was weakened or hidden.
+- P1 remediation reran the real adapter and task surfaces:
+  - adapter result `PASS`, protected Senpi/OMO paths unchanged, credential
+    digest unchanged;
+  - task main exit `0`, exactly one child extension marker, extension
+    suppression `PASS`, resume-child setup `PASS`, real Senpi untouched, and
+    leaked PID count `0`;
+  - seven broader revive/output/sequence assertions remain outside this
+    dedicated-marker boundary and are disclosed in
+    `p1-live-task.redacted.json`.
 
 ## Why this is enough
 
@@ -46,12 +61,19 @@ The generated bundle, package gate, and real Senpi runs cover distribution and
 runtime wiring. The live task driver's single marker and zero leaked PIDs are
 the closest real-surface observables for the reported process-storm regression;
 the unrelated lifecycle failures do not execute the new marker guard.
+The P1 parent-override cases additionally prove that top-level sandboxed or
+resumed parents retain reconciliation and process hygiene, while the spawn
+descriptor and real child marker prove only RPC children suppress those
+parent-owned actions.
 
 ## Cleanup
 
 - Removed the adapter sandbox plus all nine task-driver sandboxes.
-- Verified no `omo-senpi-qa-*` directory remained under the temporary root.
-- Verified no process referenced any task-owned sandbox token.
+- Verified all ten P1 sandbox tokens were absent after cleanup.
+- Removed the raw P1 task-driver directory after recording the redacted
+  reviewer artifact.
+- Removed the task-owned isolated Bun 1.4.0 cache.
+- Verified no process referenced any P1 sandbox token.
 - Task-driver `leakedPids=0`.
 
 ## What was omitted

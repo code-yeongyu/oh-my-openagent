@@ -33,6 +33,7 @@ export type {
   TerminateOptions,
 } from "./types"
 export {
+  SENPI_TASK_RPC_CHILD_ENV,
   buildChildArgs,
   buildRpcSpawn,
   detectBunBinary,

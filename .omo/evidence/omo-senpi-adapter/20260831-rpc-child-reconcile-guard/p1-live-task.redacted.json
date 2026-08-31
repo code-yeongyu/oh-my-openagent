@@ -1,0 +1,30 @@
+{
+  "issueSurface": "PASS",
+  "checks": {
+    "spawn_background": "PASS",
+    "unconditional_wake": "PASS",
+    "extension_suppression": "PASS",
+    "batch_fanout_two_children": "PASS",
+    "resume_spawn_children": "PASS",
+    "resume_quit_suspends_both": "PASS",
+    "resume_midturn_continuation": "PASS",
+    "resume_unrelated_no_revive": "PASS",
+    "real_senpi_untouched": "PASS",
+    "no_leaked_pids": "PASS"
+  },
+  "markerChildExtensions": 1,
+  "mainExit": 0,
+  "leakedPids": 0,
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "aggregateDriverResult": "FAIL",
+  "disclosedUnrelatedFailures": [
+    "followup_revive",
+    "task_output_peek",
+    "jsonl_sequence",
+    "resume_revived_resident",
+    "resume_finished_steerable",
+    "resume_ttl_not_revived"
+  ],
+  "omitted": "Raw transcripts, process ids, machine paths, active-session paths, and environment details were not copied into committed evidence."
+}

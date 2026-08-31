@@ -59,9 +59,24 @@ describe("event-bridge session_start recovery chain", () => {
     expect(warnings).toHaveLength(0)
   })
 
-  it("#given the RPC child marker #when session_start fires #then parent task reconciliation is skipped", async () => {
+  it("#given an ordinary session dir override #when session_start fires #then root reconciliation still runs", async () => {
     const previousSessionDir = process.env.SENPI_CODING_AGENT_SESSION_DIR
-    process.env.SENPI_CODING_AGENT_SESSION_DIR = "/tmp/omo-rpc-child"
+    process.env.SENPI_CODING_AGENT_SESSION_DIR = "/tmp/omo-parent-session"
+    const { pi, reconcileCalls } = wireHarness("parent-session")
+
+    try {
+      await pi.dispatch("session_start", {}, {})
+    } finally {
+      if (previousSessionDir === undefined) delete process.env.SENPI_CODING_AGENT_SESSION_DIR
+      else process.env.SENPI_CODING_AGENT_SESSION_DIR = previousSessionDir
+    }
+
+    expect(reconcileCalls).toEqual(["parent-session"])
+  })
+
+  it("#given the dedicated RPC child marker #when session_start fires #then parent task reconciliation is skipped", async () => {
+    const previousRpcChild = process.env.OMO_SENPI_TASK_RPC_CHILD
+    process.env.OMO_SENPI_TASK_RPC_CHILD = "1"
     const { pi, order, reconcileCalls, notifyCalls, resumptionCalls } = wireHarness("parent-session", {
       resumptionChannelCount: 1,
     })
@@ -69,8 +84,8 @@ describe("event-bridge session_start recovery chain", () => {
     try {
       await pi.dispatch("session_start", {}, {})
     } finally {
-      if (previousSessionDir === undefined) delete process.env.SENPI_CODING_AGENT_SESSION_DIR
-      else process.env.SENPI_CODING_AGENT_SESSION_DIR = previousSessionDir
+      if (previousRpcChild === undefined) delete process.env.OMO_SENPI_TASK_RPC_CHILD
+      else process.env.OMO_SENPI_TASK_RPC_CHILD = previousRpcChild
     }
 
     expect(reconcileCalls).toEqual([])

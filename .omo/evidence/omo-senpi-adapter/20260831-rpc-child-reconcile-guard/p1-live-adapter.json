@@ -1,0 +1,19 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realSenpiObservedChangedPaths": ["[redacted active volatile sessions]"],
+  "realSenpiVolatileChangedPaths": ["[redacted active volatile sessions]"],
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoChangedPaths": [],
+  "realOmoObservedChangedPaths": [],
+  "realOmoVolatileChangedPaths": [],
+  "realOmoProtectedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "IGNORED",
+  "sandboxAgentDir": "[redacted task-owned sandbox]/agent",
+  "sandboxCwd": "[redacted task-owned sandbox]/project"
+}

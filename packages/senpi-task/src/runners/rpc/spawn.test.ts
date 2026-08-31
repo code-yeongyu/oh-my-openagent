@@ -313,6 +313,7 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.env.PATH).toBe("/usr/bin")
     expect(descriptor.env.ANTHROPIC_API_KEY).toBe("secret")
     expect(descriptor.env.SENPI_CODING_AGENT_DIR).toBeUndefined()
+    expect(descriptor.env.OMO_SENPI_TASK_RPC_CHILD).toBe("1")
     // a fresh object, not a mutation of the caller's env
     expect(descriptor.env).not.toBe(parentEnv)
     expect(parentEnv).not.toHaveProperty(SESSION_DIR_ENV)
