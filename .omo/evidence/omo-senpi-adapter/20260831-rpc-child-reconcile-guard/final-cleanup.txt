@@ -17,3 +17,10 @@ NESTED RPC-AGENT RECOVERY FOLLOW-UP CLEANUP PASS
 - nested task driver leaked PIDs: 0
 - task-owned nested LSP daemon and typings-installer processes terminated: 2
 - matching nested task-owned processes after cleanup: 0
+
+LATEST UPSTREAM REVERIFICATION CLEANUP PASS
+
+- latest-upstream adapter sandbox removed: 1
+- latest-upstream isolated Bun 1.4.0 runtime removed: 1
+- latest-upstream LSP daemon and typings installer terminated: 2
+- matching latest-upstream task-owned processes after cleanup: 0

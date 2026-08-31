@@ -1,5 +1,5 @@
 {
-  "base": "upstream/dev@00fc6bdb8",
+  "base": "upstream/dev@12697e3ae",
   "issueRelevantResult": "PASS",
   "failingFirst": {
     "command": "bun test event-bridge-session-lifecycle.test.ts -t 'marked RPC agent with a captured session'",
@@ -39,6 +39,17 @@
     "realOmoUntouched": true,
     "realOmoProtectedChangedPaths": [],
     "providedSenpiCodingAgentDir": "IGNORED"
+  },
+  "latestUpstreamReverification": {
+    "focusedSuitesPassed": 43,
+    "packageTypechecks": "PASS",
+    "bundleFreshness": "PASS",
+    "fullSenpiGatePassed": 2465,
+    "fullSenpiGateFailed": 0,
+    "liveAdapterResult": "PASS",
+    "realSenpiProtectedChangedPaths": [],
+    "realSenpiCredentialDigestUntouched": true,
+    "concurrentVolatileSessionWrites": "[redacted]"
   },
   "realTaskSurface": {
     "aggregateResult": "FAIL",

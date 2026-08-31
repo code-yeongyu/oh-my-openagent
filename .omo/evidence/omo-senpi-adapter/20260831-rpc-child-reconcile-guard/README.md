@@ -137,6 +137,13 @@ unsafe legacy global sweep.
 
 Reviewer-safe machine details are in `nested-rpc-recovery.redacted.json`.
 
+Upstream advanced again to `12697e3ae` before publication. The MoerAI merge
+had no conflicts. On that exact merged tree, the 43 focused tests, both package
+typechecks, canonical six-bundle build/freshness, and full Senpi gate were run
+again with Bun 1.4.0; all passed with the same 2465/0 result. A fresh real
+adapter run also passed with no protected path or credential-digest change.
+One unrelated concurrent volatile session write was redacted.
+
 ## What was omitted
 
 No credentials, provider tokens, authentication headers, environment dumps,
