@@ -149,6 +149,7 @@ function main() {
   let result = "FAIL"
   let reason
   let transcript = ""
+  const cursorPromptCapture = join(sandbox.root, "cursor-last-user-prompt.log")
 
   try {
     const senpiBin = process.env.SENPI_BIN?.trim() || "senpi"
@@ -164,24 +165,30 @@ function main() {
       join(sandbox.cwd, "mock-script.json"),
       `${JSON.stringify({ steps: [{ type: "text", text: "ulw prompts e2e complete" }] }, null, 2)}\n`,
     )
-    const run = spawnSync(resolvedSenpi, ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", "ulw please respond"], {
-      cwd: sandbox.cwd,
-      env: {
-        ...process.env,
-        OMO_CODING_AGENT_DIR: sandbox.agentDir,
-        SENPI_CODING_AGENT_DIR: sandbox.agentDir,
-        PI_CODING_AGENT_DIR: sandbox.agentDir,
-        HOME: sandbox.homeDir,
-        USERPROFILE: sandbox.homeDir,
-        XDG_CONFIG_HOME: sandbox.xdgConfigHome,
-        XDG_DATA_HOME: sandbox.xdgDataHome,
-        XDG_CACHE_HOME: sandbox.xdgCacheHome,
-        PI_OFFLINE: "1",
-        OMO_SENPI_QA: "1",
+    const run = spawnSync(
+      resolvedSenpi,
+      ["-e", mockProviderEntry, "-p", "--provider", "cursor-cli-oauth-sandbox", "--model", "mock-1", "ulw please respond"],
+      {
+        cwd: sandbox.cwd,
+        env: {
+          ...process.env,
+          OMO_CODING_AGENT_DIR: sandbox.agentDir,
+          SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+          PI_CODING_AGENT_DIR: sandbox.agentDir,
+          HOME: sandbox.homeDir,
+          USERPROFILE: sandbox.homeDir,
+          XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+          XDG_DATA_HOME: sandbox.xdgDataHome,
+          XDG_CACHE_HOME: sandbox.xdgCacheHome,
+          PI_OFFLINE: "1",
+          OMO_SENPI_QA: "1",
+          OMO_MOCK_PROVIDER_ID: "cursor-cli-oauth-sandbox",
+          OMO_MOCK_LAST_USER_PROMPT_CAPTURE: cursorPromptCapture,
+        },
+        encoding: "utf8",
+        timeout: 60_000,
       },
-      encoding: "utf8",
-      timeout: 60_000,
-    })
+    )
     transcript = run.status === 0 ? readSandboxText(sandbox.agentDir) : ""
 
     const missingMarkers = REQUIRED_DIRECTIVE_MARKERS.filter((marker) => !transcript.includes(marker))
@@ -194,8 +201,15 @@ function main() {
       session.hiddenDirectives.length === 1 &&
       session.visibleDirectives.length === 0 &&
       REQUIRED_DIRECTIVE_MARKERS.every((marker) => session.hiddenDirectives[0].content.includes(marker))
+    const cursorPrompt = existsSync(cursorPromptCapture) ? readFileSync(cursorPromptCapture, "utf8") : ""
+    const cursorEffectivePromptOk = REQUIRED_DIRECTIVE_MARKERS.every((marker) => cursorPrompt.includes(marker))
     result =
-      ultraworkInjected && staged.ulwResearchNative && staged.ultraworkDescriptionOk && userTextClean && hiddenInjectionOk
+      ultraworkInjected &&
+      staged.ulwResearchNative &&
+      staged.ultraworkDescriptionOk &&
+      userTextClean &&
+      hiddenInjectionOk &&
+      cursorEffectivePromptOk
         ? "PASS"
         : "FAIL"
     return printResult({
@@ -209,6 +223,7 @@ function main() {
       ultraworkInjected,
       userTextClean,
       hiddenInjectionOk,
+      cursorEffectivePromptOk,
       userTexts: session.userTexts,
       hiddenDirectiveCount: session.hiddenDirectives.length,
       visibleDirectiveCount: session.visibleDirectives.length,
@@ -229,6 +244,7 @@ function printResult({
   ultraworkInjected = false,
   userTextClean = false,
   hiddenInjectionOk = false,
+  cursorEffectivePromptOk = false,
   userTexts = [],
   hiddenDirectiveCount = 0,
   visibleDirectiveCount = 0,
@@ -241,6 +257,7 @@ function printResult({
       ultraworkInjected,
       userTextClean,
       hiddenInjectionOk,
+      cursorEffectivePromptOk,
       hiddenDirectiveCount,
       visibleDirectiveCount,
       userTexts,
