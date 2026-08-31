@@ -7,8 +7,9 @@ import {
   type TaskRecord,
 } from "@oh-my-opencode/senpi-task"
 
-import type { SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import { isTerminal, taskStatusDescription } from "./status-row-format"
+import { publishWakeSourceState } from "./wake-source-publication"
 
 export const RESUMPTION_CHANNEL_STATE_EVENT = "wake_source_state"
 const RESUMPTION_CHANNEL_SOURCE = "senpi-task"
@@ -43,6 +44,7 @@ export type ResumptionChannelEmitterDeps = {
   readonly stateDir: StateDirConfig
   readonly settings: OmoTaskSettings
   readonly isOwnedTeamMember?: OwnedTeamMemberResolver
+  readonly logger: Pick<ComponentLogger, "warn">
 }
 
 export function createResumptionChannelEmitter(
@@ -82,12 +84,9 @@ export function createResumptionChannelEmitter(
   }
 
   function publish(channels: readonly ResumptionChannel[]): void {
-    lastCount = channels.length
-    deps.pi.events?.emit(RESUMPTION_CHANNEL_STATE_EVENT, {
-      source: RESUMPTION_CHANNEL_SOURCE,
-      activeCount: channels.length,
-      channels,
-    })
+    if (publishWakeSourceState(deps.pi, deps.logger, RESUMPTION_CHANNEL_SOURCE, channels)) {
+      lastCount = channels.length
+    }
   }
 
   return {

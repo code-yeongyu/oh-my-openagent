@@ -79,10 +79,15 @@ function createHarness(options: {
 } = {}) {
   const records = options.records ?? []
   const emitted: Array<{ name: string; data: unknown }> = []
+  const warnings: Array<{ message: string; details?: unknown }> = []
+  let eventError: unknown
   const pi = new FakeExtensionAPI()
   if (options.withEvents !== false) {
     pi.events = {
-      emit: (name, data) => emitted.push({ name, data }),
+      emit: (name, data) => {
+        if (eventError !== undefined) throw eventError
+        emitted.push({ name, data })
+      },
       on: () => () => {},
     }
   }
@@ -97,8 +102,23 @@ function createHarness(options: {
     stateDir: { project_dir: "/tmp/omo-resumption-channel-test" },
     settings: {} as OmoTaskSettings,
     isOwnedTeamMember: async (record) => options.ownedTaskIds?.has(record.task_id) === true,
+    logger: {
+      warn: (message: string, details?: unknown) => warnings.push({ message, details }),
+    },
   })
-  return { emitted, emitter, records }
+  return {
+    emitted,
+    emitter,
+    records,
+    warnings,
+    setEventError: (error: unknown) => {
+      eventError = error
+    },
+  }
+}
+
+function errno(code: "ENOSPC" | "EDQUOT"): Error & { code: string } {
+  return Object.assign(new Error(`${code}: storage exhausted`), { code })
 }
 
 describe("createResumptionChannelEmitter", () => {
@@ -196,6 +216,7 @@ describe("createResumptionChannelEmitter", () => {
       sessionId: () => SESSION_ID,
       stateDir,
       settings,
+      logger: { warn: () => {} },
     })
 
     // when
@@ -229,6 +250,61 @@ describe("createResumptionChannelEmitter", () => {
 
     // then
     expect(harness.emitted).toEqual([])
+  })
+
+  it("#given an external event listener exhausting storage #when session start publishes #then lifecycle continues and the unchanged count remains retryable", async () => {
+    const harness = createHarness({ records: [taskRecord()] })
+    harness.setEventError(errno("ENOSPC"))
+
+    await expect(harness.emitter.emitSessionStart()).resolves.toBeUndefined()
+    expect(harness.warnings).toHaveLength(1)
+
+    harness.setEventError(undefined)
+    await harness.emitter.emitIfChanged()
+    expect(harness.emitted).toHaveLength(1)
+  })
+
+  it("#given quota exhaustion during shutdown publication #when shutdown and a later session start run #then both lifecycles continue and the later state publishes", async () => {
+    const harness = createHarness({ records: [taskRecord()] })
+    await harness.emitter.emitSessionStart()
+    harness.emitted.length = 0
+    harness.setEventError(errno("EDQUOT"))
+
+    await expect(harness.emitter.emitShutdown()).resolves.toBeUndefined()
+    await expect(harness.emitter.emitIfChanged()).resolves.toBeUndefined()
+    expect(harness.emitted).toEqual([])
+
+    harness.setEventError(undefined)
+    await harness.emitter.emitSessionStart()
+    expect(harness.emitted).toHaveLength(1)
+  })
+
+  it("#given a programming exception from an event listener #when publication runs #then the exception is not swallowed", async () => {
+    const harness = createHarness()
+    const defect = new TypeError("listener defect")
+    harness.setEventError(defect)
+
+    await expect(harness.emitter.emitSessionStart()).rejects.toBe(defect)
+  })
+
+  it("#given storage exhaustion while reading the durable task store #when snapshotting runs #then the durable failure is not swallowed", async () => {
+    const harness = createHarness({ records: [taskRecord()] })
+    const durableFailure = errno("ENOSPC")
+    harness.records.splice(0)
+    const manager = {
+      list: (): readonly ListedTask[] => { throw durableFailure },
+      wasBackground: () => true,
+    }
+    const emitter = createResumptionChannelEmitter({
+      pi: new FakeExtensionAPI(),
+      manager,
+      sessionId: () => SESSION_ID,
+      stateDir: { project_dir: "/tmp/omo-resumption-channel-test" },
+      settings: {} as OmoTaskSettings,
+      logger: { warn: () => {} },
+    })
+
+    await expect(emitter.emitSessionStart()).rejects.toBe(durableFailure)
   })
 
   it("#given an ExtensionAPI without events #when the emitter lifecycle is driven #then registration and emissions are harmless no-ops", async () => {

@@ -143,6 +143,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           ...(engine.settings.state_dir !== undefined ? { task: { state_dir: engine.settings.state_dir } } : {}),
         },
         settings: engine.settings,
+        logger: ctx.logger,
       })
       engine.onStoreMutation(() => {
         statusUi.scheduleSync()

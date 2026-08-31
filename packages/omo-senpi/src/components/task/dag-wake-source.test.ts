@@ -21,9 +21,14 @@ interface RunFixture {
 
 function createHarness(runs: RunFixture[] = []) {
   const emitted: Array<{ name: string; data: unknown }> = []
+  const warnings: Array<{ message: string; details?: unknown }> = []
+  let eventError: unknown
   const pi = new FakeExtensionAPI()
   pi.events = {
-    emit: (name, data) => emitted.push({ name, data }),
+    emit: (name, data) => {
+      if (eventError !== undefined) throw eventError
+      emitted.push({ name, data })
+    },
     on: () => () => {},
   }
   const listLive = (): readonly DagWakeSourceRunSummary[] =>
@@ -48,12 +53,19 @@ function createHarness(runs: RunFixture[] = []) {
     pi,
     manager,
     sessionId: () => SESSION_ID,
+    logger: {
+      warn: (message: string, details?: unknown) => warnings.push({ message, details }),
+    },
   })
   return {
     emitted,
     listLive,
     pi,
     runs,
+    warnings,
+    setEventError: (error: unknown) => {
+      eventError = error
+    },
     setList: (next: () => readonly DagWakeSourceRunSummary[]) => {
       list = next
     },
@@ -216,6 +228,7 @@ describe("createDagWakeSource", () => {
     }
     const wakeSource = createDagWakeSource({
       pi,
+      logger: { warn: () => {} },
       manager: {
         list: () => [],
         snapshot: () => {
@@ -233,6 +246,25 @@ describe("createDagWakeSource", () => {
       name: DAG_WAKE_SOURCE_STATE_EVENT,
       data: { source: DAG_WAKE_SOURCE, activeCount: 0, channels: [] },
     }])
+  })
+
+  it("#given storage exhaustion in an external listener #when start and shutdown publish #then DAG lifecycle continues and both failures are logged", () => {
+    const run = runFixture()
+    const harness = createHarness([run])
+    harness.setEventError(Object.assign(new Error("disk full"), { code: "ENOSPC" }))
+
+    expect(() => harness.wakeSource.onRunStart(run.runId)).not.toThrow()
+    expect(() => harness.wakeSource.emitShutdown()).not.toThrow()
+    expect(harness.warnings).toHaveLength(2)
+  })
+
+  it("#given an ordinary listener defect #when DAG state publishes #then the programming exception escapes", () => {
+    const run = runFixture()
+    const harness = createHarness([run])
+    const defect = new TypeError("listener defect")
+    harness.setEventError(defect)
+
+    expect(() => harness.wakeSource.onRunStart(run.runId)).toThrow(defect)
   })
 
   it("#given a run pruned between list and snapshot #when the state is republished #then the surviving run still reports as live", () => {
