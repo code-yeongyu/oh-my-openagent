@@ -74,10 +74,10 @@ describe("event-bridge session_start recovery chain", () => {
     expect(reconcileCalls).toEqual(["parent-session"])
   })
 
-  it("#given the dedicated RPC child marker #when session_start fires #then parent task reconciliation is skipped", async () => {
+  it("#given the dedicated RPC child marker without a session id #when session_start fires #then the unsafe global sweep is skipped", async () => {
     const previousRpcChild = process.env.OMO_SENPI_TASK_RPC_CHILD
     process.env.OMO_SENPI_TASK_RPC_CHILD = "1"
-    const { pi, order, reconcileCalls, notifyCalls, resumptionCalls } = wireHarness("parent-session", {
+    const { pi, order, reconcileCalls, notifyCalls, resumptionCalls } = wireHarness(undefined, {
       resumptionChannelCount: 1,
     })
 
@@ -96,6 +96,43 @@ describe("event-bridge session_start recovery chain", () => {
       "onSessionStart",
       "resumptionStart:1",
       "reclaim",
+      "cleanup:start",
+      "cleanup:end",
+      "poll",
+      "statusSync",
+    ])
+  })
+
+  it("#given a marked RPC agent with a captured session #when session_start fires #then its owned descendants recover", async () => {
+    const previousRpcChild = process.env.OMO_SENPI_TASK_RPC_CHILD
+    process.env.OMO_SENPI_TASK_RPC_CHILD = "1"
+    const descendant = {
+      task_id: "task-rpc-descendant",
+      parent_session_id: "rpc-agent-session",
+    } as TaskRecord
+    const { pi, order, reconcileCalls, notifyCalls, livenessCalls } = wireHarness("rpc-agent-session", {
+      outcomes: [{ task_id: descendant.task_id, kind: "resumed" }],
+      records: { [descendant.task_id]: descendant },
+    })
+
+    try {
+      await pi.dispatch("session_start", {}, {})
+    } finally {
+      if (previousRpcChild === undefined) delete process.env.OMO_SENPI_TASK_RPC_CHILD
+      else process.env.OMO_SENPI_TASK_RPC_CHILD = previousRpcChild
+    }
+
+    expect(reconcileCalls).toEqual(["rpc-agent-session"])
+    expect(notifyCalls).toEqual([{ sessionId: "rpc-agent-session", parentState: { kind: "idle" } }])
+    expect(livenessCalls).toEqual([descendant.task_id])
+    expect(order).toEqual([
+      "capture",
+      "onSessionStart",
+      "reconcile",
+      "liveness:task-rpc-descendant",
+      "resumptionStart:0",
+      "reclaim",
+      "notify",
       "cleanup:start",
       "cleanup:end",
       "poll",

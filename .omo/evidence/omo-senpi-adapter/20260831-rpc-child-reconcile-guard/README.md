@@ -112,6 +112,31 @@ changed. The final merged tree was rebuilt and tested with CI Bun 1.4.0.
   PID count 0. The same six unrelated revive/output/sequence assertions remain
   disclosed in `final-live-task.redacted.json`.
 
+## Nested RPC-agent recovery follow-up
+
+A later review identified that a persistent RPC-child marker also suppressed
+recovery after the RPC agent had a captured session and owned descendant
+tasks. Only a marked process without a captured session needs to skip the
+unsafe legacy global sweep.
+
+- failing-first captured-session test: failed because reconciliation received
+  no call instead of `rpc-agent-session`;
+- smallest fix: skip reconciliation only when the RPC marker is set and the
+  captured session ID is absent;
+- identical focused test: 1 pass, 0 fail, 4 assertions;
+- lifecycle/process-sweep/RPC-spawn suites: 43 pass, 0 fail, 105 assertions;
+- both package TypeScript checks: pass;
+- Bun 1.4.0 canonical six-bundle build and freshness: pass;
+- full Senpi gate: 2465 pass, one Windows-only skip, 0 fail, 7917 assertions
+  across 327 files; evidence resolver 10 pass, 0 fail;
+- real adapter: pass with protected Senpi/OMO state and credential digest
+  unchanged;
+- real process-task surface: one RPC child marker, main exit 0, all
+  issue-relevant isolation/spawn/resume checks passed, and leaked PID count 0.
+  The same six unrelated lifecycle assertions remain disclosed, not hidden.
+
+Reviewer-safe machine details are in `nested-rpc-recovery.redacted.json`.
+
 ## What was omitted
 
 No credentials, provider tokens, authentication headers, environment dumps,

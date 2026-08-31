@@ -7,3 +7,13 @@ FINAL OPEN-CODE-ONLY REFRESH CLEANUP PASS
 - final task driver leaked PIDs: 0
 - task-owned LSP daemon and typings-installer processes terminated: 2
 - matching task-owned processes after cleanup: 0
+
+NESTED RPC-AGENT RECOVERY FOLLOW-UP CLEANUP PASS
+
+- task-owned nested adapter sandbox removed: 1
+- task-owned nested task-driver sandboxes removed: 9
+- task-owned nested raw task-driver directory removed: 1
+- task-owned isolated Bun 1.4.0 runtime removed: 1
+- nested task driver leaked PIDs: 0
+- task-owned nested LSP daemon and typings-installer processes terminated: 2
+- matching nested task-owned processes after cleanup: 0

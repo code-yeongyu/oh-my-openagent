@@ -1,0 +1,58 @@
+{
+  "base": "upstream/dev@00fc6bdb8",
+  "issueRelevantResult": "PASS",
+  "failingFirst": {
+    "command": "bun test event-bridge-session-lifecycle.test.ts -t 'marked RPC agent with a captured session'",
+    "observed": "reconcileCalls was empty instead of containing rpc-agent-session"
+  },
+  "green": {
+    "identicalFocused": {
+      "passed": 1,
+      "failed": 0,
+      "assertions": 4
+    },
+    "adjacentSuites": {
+      "passed": 43,
+      "failed": 0,
+      "assertions": 105
+    },
+    "fullSenpiGate": {
+      "passed": 2465,
+      "skippedWindowsOnly": 1,
+      "failed": 0,
+      "assertions": 7917,
+      "files": 327
+    },
+    "evidenceResolver": {
+      "passed": 10,
+      "failed": 0,
+      "assertions": 31
+    }
+  },
+  "realAdapter": {
+    "result": "PASS",
+    "ultraworkInjected": true,
+    "commentChecker": "PASS",
+    "realSenpiUntouched": true,
+    "realSenpiProtectedChangedPaths": [],
+    "realSenpiCredentialDigestUntouched": true,
+    "realOmoUntouched": true,
+    "realOmoProtectedChangedPaths": [],
+    "providedSenpiCodingAgentDir": "IGNORED"
+  },
+  "realTaskSurface": {
+    "aggregateResult": "FAIL",
+    "issueRelevantResult": "PASS",
+    "markerChildExtensions": 1,
+    "mainExit": 0,
+    "leakedPids": 0,
+    "disclosedUnrelatedFailures": [
+      "followup_revive",
+      "task_output_peek",
+      "jsonl_sequence",
+      "resume_revived_resident",
+      "resume_finished_steerable",
+      "resume_ttl_not_revived"
+    ]
+  }
+}

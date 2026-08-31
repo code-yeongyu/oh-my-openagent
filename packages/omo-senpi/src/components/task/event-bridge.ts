@@ -45,7 +45,8 @@ export function wireEventBridge(
     const sessionId = engine.runtime.sessionId()
     transitions.onSessionStart(sessionId)
     const isRpcChild = process.env[SENPI_TASK_RPC_CHILD_ENV] === "1"
-    if (!isRpcChild) {
+    const skipUnsafeGlobalReconciliation = isRpcChild && sessionId === undefined
+    if (!skipUnsafeGlobalReconciliation) {
       const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
       const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
       for (const outcome of reconciliation.outcomes) {
@@ -66,7 +67,7 @@ export function wireEventBridge(
     }
     await state.resumptionChannels.emitSessionStart()
     await reconcileTeamMailboxBestEffort(ctx, state)
-    if (!isRpcChild && sessionId !== undefined) {
+    if (!skipUnsafeGlobalReconciliation && sessionId !== undefined) {
       engine.notifier.reconcileUnnotifiedNotifications({ sessionId, parentState: engine.runtime.parentState() })
     }
     const cleanup = await engine.lifecycle.cleanupExpiredRecords()
