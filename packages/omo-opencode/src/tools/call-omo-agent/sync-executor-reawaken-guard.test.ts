@@ -101,7 +101,7 @@ describe("issue #5112 - completed sync subagent must not be re-awakened", () => 
     expect(reawakened).toBe(false)
   })
 
-  test("#given a created sync subagent completed #when the handoff finishes #then the child session is aborted (PR #5113)", async () => {
+  test("#given a created sync subagent completed #when the handoff finishes #then no session.abort is fired and the handback guard stays armed (issue #6336)", async () => {
     //#given
     const childSessionID = "ses-sync-child-abort"
     const abortMock = mock(async () => ({ data: true }))
@@ -110,7 +110,13 @@ describe("issue #5112 - completed sync subagent must not be re-awakened", () => 
     await executeSync(args, createToolContext(), createExecuteContext(abortMock) as never, createDependencies(childSessionID, true))
 
     //#then
-    expect(abortMock).toHaveBeenCalledWith({ path: { id: childSessionID } })
+    // A fire-and-forget abort here races the parent's next prompt to the SAME
+    // session (task_id continuation): OpenCode applies the late abort to the
+    // now-active turn, suppressing its live rendering until the session is
+    // reopened. Reawakening is prevented by the handedBackSyncSessions guard.
+    expect(abortMock).not.toHaveBeenCalled()
+    const reawakened = await driveEnforcerIdle(childSessionID)
+    expect(reawakened).toBe(false)
   })
 
   test("#given the sync run reused an existing session (isNew=false) #when the run finishes #then it is neither aborted nor exempted from continuation", async () => {

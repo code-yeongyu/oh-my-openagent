@@ -15,7 +15,6 @@ import { buildTaskPrompt } from "./prompt-builder"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
-import { log } from "../../shared/logger"
 
 type ResumeModel = { providerID: string; modelID: string }
 
@@ -252,12 +251,11 @@ ${buildTaskMetadataBlock({
        toastManager.removeTask(taskId)
      }
      if (handedBackToParent) {
+       // Guard-only handback: mark for the todo-continuation-enforcer but never fire a
+       // post-completion session.abort. The unawaited call races the parent's next
+       // prompt to this same session, and OpenCode applies the late abort to the
+       // now-active turn, suppressing its live rendering until reopen (issue #6336).
        handedBackSyncSessions.add(continuationID)
-       if (typeof client.session.abort === "function") {
-         void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {
-           log(`[task] Failed to abort completed sync continuation session:`, error)
-         })
-       }
      }
    }
 }

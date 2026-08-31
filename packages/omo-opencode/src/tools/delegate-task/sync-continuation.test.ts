@@ -480,7 +480,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(result).toContain("Result")
   })
 
-  test("marks and aborts resumed sync session after successful handback", async () => {
+  test("marks resumed sync session after successful handback without aborting it", async () => {
     //#given - a resumed sync continuation completes successfully
     const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
     handedBackSyncSessions.clear()
@@ -544,7 +544,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#then - todo-continuation wake paths can identify and stop the handed-back child
     expect(result).toContain("Task continued and completed")
     expect(handedBackSyncSessions.has("ses_test_12345678")).toBe(true)
-    expect(abortCalls).toEqual([{ path: { id: "ses_test_12345678" } }])
+    expect(abortCalls).toEqual([])
 
     handedBackSyncSessions.clear()
   })

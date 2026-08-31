@@ -65,7 +65,7 @@ describe("issue #5112 - delegate-task sync child must not be re-awakened after h
     _resetForTesting()
   })
 
-  test("#given a sync task whose session was created and handed back #when the child later idles #then todo-continuation does not re-awaken it and the child was aborted", async () => {
+  test("#given a sync task whose session was created and handed back #when the child later idles #then todo-continuation does not re-awaken it and no session.abort was fired (issue #6336)", async () => {
     //#given
     const abortMock = mock(async () => ({ data: true }))
     const mockCtx = { sessionID: "parent-session", callID: "call-123", metadata: () => {} }
@@ -103,7 +103,7 @@ describe("issue #5112 - delegate-task sync child must not be re-awakened after h
     store.cancelCountdown(CHILD_SESSION_ID)
 
     //#then
-    expect(abortMock).toHaveBeenCalledWith({ path: { id: CHILD_SESSION_ID } })
+    expect(abortMock).not.toHaveBeenCalled()
     expect(countdownArmed).toBe(false)
   })
 })

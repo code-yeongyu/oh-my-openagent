@@ -200,21 +200,12 @@ export async function executeSync(
       syncSubagentSessions.delete(sessionID)
       deleteSessionTools(sessionID)
       clearSessionAgent(sessionID)
+      // Guard-only handback: handedBackSyncSessions is what stops todo-continuation-enforcer
+      // from re-awakening this session (idle-event.ts checks it first). Do NOT fire a
+      // post-completion session.abort: the unawaited call races the parent's next prompt
+      // to the same session, and OpenCode applies the late abort to the now-active turn,
+      // suppressing its live rendering until reopen (issue #6336).
       handedBackSyncSessions.add(sessionID)
-
-      // Prevent todo-continuation-enforcer from re-awakening a completed sync subagent.
-      // When a sync subagent finishes, its session may still exist and have incomplete
-      // todos; without an explicit abort, the continuation hook sees session.idle and
-      // injects a continuation prompt, causing the subagent to resume after the parent
-      // has already moved on. This creates a race where two agents work concurrently.
-      // Aborting an already-idle session emits no error event (opencode re-publishes
-      // session.idle), so handedBackSyncSessions is the signal the enforcer keys on;
-      // the abort still cancels the child's opencode-side background jobs.
-      if (typeof ctx.client.session.abort === "function") {
-        void ctx.client.session.abort({ path: { id: sessionID } }).catch((error: unknown) => {
-          log(`[call_omo_agent] Failed to abort completed sync session:`, error)
-        })
-      }
     }
   }
 }
