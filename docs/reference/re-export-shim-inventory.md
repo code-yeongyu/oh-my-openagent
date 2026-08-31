@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-08-31. Total shim exports found: 296.
+Snapshot date: 2026-08-31. Total shim exports found: 286.
 
 ## Aggregate By Target Package
 
@@ -297,16 +297,6 @@ Snapshot date: 2026-08-31. Total shim exports found: 296.
 | `packages/omo-opencode/src/shared/model-sanitizer.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/model-string-parser.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/process-stream-reader.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/message-inspection-error.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/pending-tool-turn.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/prompt-message-state.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/queue.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/recent-dispatches.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/reservations.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/semantic-dedupe.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/session-idle-dispatch.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/timing.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/types.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/prompt-failure-classifier.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/provider-model-id-transform.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/record-type-guard.ts` | `@oh-my-opencode/utils` |

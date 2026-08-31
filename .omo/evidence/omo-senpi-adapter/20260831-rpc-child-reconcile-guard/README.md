@@ -91,6 +91,21 @@ parent-owned actions.
 - Terminated the task-owned LSP daemon, language server, and tsserver tree
   observed after the live adapter run; verified all three PIDs absent.
 
+## Final OpenCode-only upstream refresh
+
+`upstream/dev` advanced to `00fc6bdb8`. The staged delta touches no Senpi
+source, package manifest, or lockfile; its only Senpi path is the generated
+main `omo.js` bundle.
+
+- dedicated-marker boundary and adjacent suites: 42 pass, 0 fail,
+  101 assertions;
+- adapter TypeScript diagnostics: pass;
+- real isolated adapter: `result=PASS`, protected Senpi/OMO paths empty,
+  credential digest unchanged, and one unrelated concurrent volatile session
+  write redacted in `final-live-adapter.json`.
+- final sandbox removed; the task-owned LSP daemon, language server, and two
+  tsserver children were terminated with no matching process left.
+
 ## What was omitted
 
 No credentials, provider tokens, authentication headers, environment dumps,

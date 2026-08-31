@@ -1,0 +1,5 @@
+FINAL OPEN-CODE-ONLY REFRESH CLEANUP PASS
+
+- task-owned Senpi sandbox removed: 1
+- task-owned LSP daemon / language-server / tsserver processes terminated: 4
+- matching task-owned processes after cleanup: 0

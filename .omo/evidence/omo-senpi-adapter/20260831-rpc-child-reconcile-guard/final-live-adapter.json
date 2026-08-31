@@ -1,0 +1,20 @@
+{
+  "base": "upstream/dev@00fc6bdb8",
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realSenpiObservedChangedPaths": ["[redacted concurrent volatile session]"],
+  "realSenpiVolatileChangedPaths": ["[redacted concurrent volatile session]"],
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoChangedPaths": [],
+  "realOmoObservedChangedPaths": [],
+  "realOmoVolatileChangedPaths": [],
+  "realOmoProtectedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "unset",
+  "sandboxAgentDir": "[redacted task-owned sandbox]/agent",
+  "sandboxCwd": "[redacted task-owned sandbox]/project"
+}
