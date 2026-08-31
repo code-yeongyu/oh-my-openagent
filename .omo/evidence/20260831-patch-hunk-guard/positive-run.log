@@ -1,0 +1,5 @@
+$ bun run script/verify-patch-hunks.ts
+verifying patches\@code-yeongyu%2Fsenpi@2026.8.31.patch against @code-yeongyu/senpi@2026.8.31
+  all hunks apply to @code-yeongyu/senpi@2026.8.31
+patch verification passed: 1 patch file(s), every hunk applies
+positive_exit=0

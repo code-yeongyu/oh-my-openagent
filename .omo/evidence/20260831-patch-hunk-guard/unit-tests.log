@@ -1,0 +1,6 @@
+$ bun test script/verify-patch-hunks.test.ts
+
+9 pass
+0 fail
+19 expect() calls
+Ran 9 tests across 1 file.
