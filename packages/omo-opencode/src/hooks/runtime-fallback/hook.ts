@@ -90,6 +90,7 @@ export function createRuntimeFallbackHook(
       if (!config.enabled) return
       const props = event.properties as Record<string, unknown> | undefined
       await messageUpdateHandler(props)
+      await baseEventHandler({ event })
       return
     }
     await baseEventHandler({ event })
