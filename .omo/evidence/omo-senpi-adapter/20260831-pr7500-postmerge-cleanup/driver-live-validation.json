@@ -1,20 +1,16 @@
 {
-  "sourceHead": "074bd7ebe8030a3e92ff010665fdc1ed71835332",
+  "sourceHead": "fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a",
   "ok": true,
   "checks": {
     "exactSourceHead": true,
     "resultPass": true,
     "callerIgnored": true,
     "callerNotReused": true,
-    "sandboxWasRemoved": true,
-    "protectedSnapshotsComplete": true,
+    "sandboxRemoved": true,
+    "protectedComplete": true,
     "protectedErrorsEmpty": true,
-    "protectedIsolationPass": true,
-    "protectedChangedPathsEmpty": true,
-    "arrayFieldsPresent": true,
-    "booleanFieldsPresent": true,
-    "observationBytesBounded": true,
-    "observationLimitsPresent": true,
-    "protectedSetExact": true
+    "protectedUntouched": true,
+    "changedPathsEmpty": true,
+    "observationBytesBounded": true
   }
 }

@@ -1,7 +1,11 @@
-sourceHead=074bd7ebe8030a3e92ff010665fdc1ed71835332
+sourceHead=fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a
+upstreamDev=dd66dfa28ab4e02a4d82af85189f13a792db9dfa
+
+$ bun install --frozen-lockfile
+status=0; installed Senpi 2026.8.31 and rebuilt current generated payloads
 
 $ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
-status=0; generated extension bundles current before and after the serialized gate attempt
+status=0; generated extension bundles current before and after serialized gate
 
 $ bun x tsgo --noEmit -p packages/omo-native/tsconfig.json
 status=0
@@ -18,7 +22,7 @@ status=0
 $ bunx biome lint packages/omo-senpi/scripts/qa/isolation-state.mjs packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/drive.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
 status=0; informational existing literal-key suggestions only
 
-$ bun run .../check-no-excuse-rules.ts packages/omo-senpi/scripts/qa/task-13.test.ts
+$ bun run .../check-no-excuse-rules.ts packages/omo-senpi/scripts/qa/task-13.test.ts packages/omo-native/test/compile-entry-oauth-registration.test.ts
 status=0; no violations
 
 LSP diagnostics:

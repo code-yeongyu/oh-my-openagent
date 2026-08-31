@@ -1,41 +1,10 @@
-sourceHead=074bd7ebe8030a3e92ff010665fdc1ed71835332
+sourceHead=fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a
+upstreamDev=dd66dfa28ab4e02a4d82af85189f13a792db9dfa
 $ env -u OMO_CODING_AGENT_DIR -u SENPI_CODING_AGENT_DIR -u PI_CODING_AGENT_DIR bun run test:senpi
-$ bun run build:senpi-plugin && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && bun test packages/omo-senpi && bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
-$ bun run build:lsp-daemon && bun run build:ast-grep-mcp && bun run build:senpi-plugin:stage
-$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
 
-added 51 packages, and audited 54 packages in 2s
-
-18 packages are looking for funding
-  run `npm fund` for details
-
-found 0 vulnerabilities
-
-> @code-yeongyu/lsp-daemon@0.1.0 build
-> node scripts/build.mjs
-
-Bundled 82 modules in 13ms
-
-  cli.js     249.1 KB   (entry point)
-  index.js   229.85 KB  (entry point)
-  client.js  227.57 KB  (entry point)
-
-$ bun run --cwd packages/ast-grep-mcp build
-$ bun build src/cli.ts --outdir dist --target node --format esm
-Bundled 255 modules in 36ms
-
-  cli.js  85.17 KB  (entry point)
-
-$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
-$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
-[materialize] wrote 148 frontend reference files from submodules
-Staged Senpi LSP runtime: /home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
-Staged Senpi ast-grep MCP runtime: /home/minpeter/github.com/code-yeongyu/worktrees/omo-pr7500-postmerge-cleanup/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
-npm warn tar TAR_ENTRY_ERROR ENOSPC: no space left on device, write
-npm error A complete log of this run can be found in: /home/minpeter/.npm/_logs/2026-08-31T12_08_24_442Z-debug-0.log
-npm --prefix packages/omo-codex/plugin ci failed with exit code 1
-error: script "build:senpi-plugin:stage" exited with code 1
-error: script "build:senpi-plugin" exited with code 1
-error: script "test:senpi" exited with code 1
-
-status=1
+Serialized build/staging: PASS
+Typecheck: PASS
+Package suite: 2461 pass, 7 platform skip, 0 fail
+Package suite scope: 2468 tests across 328 files
+Evidence resolver suite: 10 pass, 0 fail
+status=0

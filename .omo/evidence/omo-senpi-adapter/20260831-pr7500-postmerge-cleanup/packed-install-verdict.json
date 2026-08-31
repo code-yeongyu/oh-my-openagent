@@ -1,5 +1,6 @@
 {
   "sourceHead": "c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71",
+  "historicalCapture": true,
   "ok": true,
   "npmPackDryRun": {
     "status": "PASS",
@@ -14,5 +15,5 @@
     "completeSnapshotFastPathAbsent": true
   },
   "hooksFeatureResult": "NOT_GREEN_EXTERNAL_GATE",
-  "externalGate": "Senpi 2026.8.31 containing merged 9e65ad35 from reviewed 9644a130 is published; pin OMO to 2026.8.31, then pass a clean packed-install hooks test. ELOCKED is not success."
+  "currentStatus": "PR #7545 independently pinned OMO to published Senpi 2026.8.31 after this capture; a fresh clean packed-install hooks behavior proof remains the separate final gate. ELOCKED is not success."
 }

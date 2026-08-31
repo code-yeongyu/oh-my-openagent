@@ -1,0 +1,11 @@
+{
+  "validatedSourceHead": "fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a",
+  "upstreamDev": "dd66dfa28ab4e02a4d82af85189f13a792db9dfa",
+  "independentPr": 7545,
+  "senpiPin": "2026.8.31",
+  "oldPatchAbsent": true,
+  "newPatchMatchesUpstreamDev": true,
+  "newPatchClaudeDiagnosticOnly": true,
+  "staleHooksHunkAbsent": true,
+  "cleanPackedHooksBehaviorProof": "REMAINING_SEPARATE_GATE"
+}

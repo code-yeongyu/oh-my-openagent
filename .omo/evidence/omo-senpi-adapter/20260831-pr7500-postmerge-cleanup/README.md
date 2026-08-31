@@ -1,61 +1,46 @@
-# PR #7500 post-merge cleanup: isolation review evidence
+# PR #7500 post-merge cleanup: Senpi 2026.8.31 combined-head evidence
 
-Validated source head: `074bd7ebe8030a3e92ff010665fdc1ed71835332`, based on reviewed cleanup head
-`30443d97c09bbb4eec3ca57035b7c88ad8690e14`. The final evidence-only commit does not change runtime
-source.
+Validated source head: `fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a`, the normal merge of isolation
+evidence head `e96b71f4adf9ffa3bd068abc8fcb2c5e252b9074` and `origin/dev`
+`dd66dfa28ab4e02a4d82af85189f13a792db9dfa`.
 
 ## What was tested
 
-- Deterministic RED for both review blockers: [`isolation-blockers-red.log`](isolation-blockers-red.log).
-- Focused isolation/driver, OAuth, and package-pin suites: [`focused-tests.log`](focused-tests.log).
-- Driver self-test: [`driver-self-test.log`](driver-self-test.log).
-- Real `node_modules/.bin/senpi` drive with an intentionally ignored caller agent directory:
-  [`driver-live.json`](driver-live.json), checked by
-  [`driver-live-validation.json`](driver-live-validation.json).
-- Typechecks, LSP, Biome, no-excuse, and generated extension freshness:
+- Isolation RED/GREEN: [`isolation-blockers-red.log`](isolation-blockers-red.log),
+  [`focused-tests.log`](focused-tests.log).
+- Real live Senpi driver: [`driver-live.json`](driver-live.json),
+  [`driver-live-validation.json`](driver-live-validation.json), and
+  [`driver-self-test.log`](driver-self-test.log).
+- Pin/patch integration: [`pin-integration-receipt.json`](pin-integration-receipt.json).
+- Typechecks, diagnostics, quality, and generated extension freshness:
   [`typecheck-build-receipt.txt`](typecheck-build-receipt.txt).
-- Serialized Senpi gate attempt: [`senpi-gate.log`](senpi-gate.log).
-- Machine summary: [`isolation-review-receipt.json`](isolation-review-receipt.json).
+- Serialized Senpi gate: [`senpi-gate.log`](senpi-gate.log).
 - Cleanup: [`cleanup-receipt.txt`](cleanup-receipt.txt).
 
 ## What was observed
 
-- RED was 3 pass / 5 fail: protected completeness did not exist; descriptor reads were bypassed by
-  `readFileSync`; short read, growth, and replacement all falsely completed.
-- GREEN is 19 pass for isolation/driver contracts. Identical protected `EACCES` failures now emit
-  structured `{ path, code }` errors and force `real*Untouched` false. No protected content or hash is
-  emitted.
-- Observation hashing uses bounded descriptor chunks. Tests prove actual reads never exceed the
-  remaining byte budget and deterministically classify short read, file growth, and path replacement
-  without sleeps.
-- The real live driver passed on the exact source head. Senpi and OMO protected snapshots were
-  complete, error-free, unchanged, and therefore untouched. Recursive supporting observations were
-  explicitly truncated with no errors. Across before and after snapshots, Senpi read 101,608,656
-  bytes and OMO read 127,873,330 bytes; each individual snapshot is hard-bounded to 64 MiB.
-- OAuth/compile-entry: 26 pass. Package/pin: 20 pass. Resolver: 10 pass. Extension freshness and all
-  relevant typechecks passed.
-- The required serialized `bun run test:senpi` was attempted once but did not reach tests: npm
-  staging failed with `ENOSPC` while the root filesystem was full. This is recorded as blocked, not
-  green and not a test failure. It was not retried. Task-owned fixtures were removed; unrelated user
-  caches were not deleted.
+- Isolation/driver contracts: 19 pass. OAuth/compile-entry: 26 pass. Package/pin: 20 pass.
+- PR #7545 independently landed the OMO Senpi `2026.8.31` pin in current dev. The obsolete
+  `2026.8.30-3` patch is absent. The new `2026.8.31` patch is byte-identical to dev and contains only
+  the independent Claude SDK OAuth diagnostic; no hooks trust-storage hunk remains anywhere in
+  `patches/`.
+- The real live driver passed against installed Senpi `2026.8.31`, ignored the caller agent dir, and
+  removed its sandbox. Senpi and OMO protected snapshots were complete, error-free, unchanged, and
+  therefore untouched. Recursive observation stayed explicitly bounded/truncated with no errors.
+- The single serialized `bun run test:senpi` passed 2,461 tests with 7 platform skips and 0 failures;
+  its resolver phase passed 10 tests.
+- Extension freshness, OMO Native, OMO Senpi, Senpi Task, script typechecks, LSP, Biome, and
+  no-excuse checks passed.
 
-## Why this is sufficient
+## Packed-install gate
 
-The focused tests directly force both prior false-success paths, while the real driver proves the
-new fields and fail-closed verdict through the production QA surface. Structured errors contain only
-phase, relative path, and error code. Bounded observation reports paths/status only and never emits
-file content or file hashes.
+[`packed-install-verdict.json`](packed-install-verdict.json) remains a historical pre-#7545 capture
+from source head `c5000ed20`; it is not relabeled as a rerun. The OMO pin is now complete through
+#7545. A fresh clean packed-install **hooks behavior** proof remains a separate final gate; `ELOCKED`
+is not success.
 
-## Unchanged release evidence and external gate
+## Isolation and redaction
 
-This change touches only QA isolation code/tests, not packed or compiled production inputs. The prior
-packed-install and compiled-OAuth artifacts remain applicable and are not relabeled as reruns on this
-head. Packed OMO still pins Senpi `2026.8.30-3`; published Senpi `2026.8.31` contains the upstream
-hooks fix, but npm hooks remain externally gated until OMO pins it and a clean packed-install hooks
-test passes. `ELOCKED` is not success.
-
-## Omitted or redacted
-
-- No auth content, token, credential hash, private key, environment dump, or raw TUI output is
-  retained.
-- No file hash from protected or recursive snapshots is emitted in evidence.
+Protected errors expose only phase, relative path, and error code. Recursive observations expose
+relative changed paths, bounded status, and byte counts—not content or file hashes. No credentials,
+tokens, private keys, environment dumps, or raw TUI output are retained.

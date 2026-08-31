@@ -1,23 +1,19 @@
 {
-  "validatedSourceHead": "c5000ed2041ce8b0897cfcbebf9dbcabde9b5c71",
-  "cleanupParent": "704431497b0bd88ed498aa1db26ee563fde31a58",
-  "upstreamDevParent": "c53faf72fd05c32be7521eb8e406685cb1eb4115",
-  "mergeConflictFree": true,
+  "validatedSourceHead": "fc695caf0f4a421cfb64ff9477aa3b9ac9c7088a",
+  "cleanupParent": "e96b71f4adf9ffa3bd068abc8fcb2c5e252b9074",
+  "upstreamDevParent": "dd66dfa28ab4e02a4d82af85189f13a792db9dfa",
+  "mergeConflict": "obsolete 2026.8.30-3 patch modify/delete",
+  "resolution": "accepted upstream deletion and retained byte-exact 2026.8.31 Claude-only patch",
   "cleanupParentIsAncestor": true,
   "upstreamDevIsAncestor": true,
+  "isolationCodeCommitIsAncestor": true,
+  "isolationEvidenceCommitIsAncestor": true,
   "generatedExtensionCurrent": true,
-  "upstreamTouchedCompiledPayloadInputs": true,
-  "compiledOauthRerun": true,
-  "fullGate": {
-    "pass": 2445,
+  "serializedSenpiGate": {
+    "pass": 2461,
     "skip": 7,
-    "timeoutFailures": 8,
-    "affectedFocusedRerunPass": 67,
-    "affectedFocusedRerunFail": 0,
-    "affectedTestsIdenticalToUpstreamDev": true
-  },
-  "resolverTests": {
-    "pass": 10,
-    "fail": 0
+    "fail": 0,
+    "resolverPass": 10,
+    "resolverFail": 0
   }
 }
