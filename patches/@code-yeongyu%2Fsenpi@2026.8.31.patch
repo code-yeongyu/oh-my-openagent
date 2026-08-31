@@ -1,7 +1,8 @@
 diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js b/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js
+index 2417da2..013ed5f 100644
 --- a/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js
 +++ b/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js
-@@ -69,6 +69,11 @@
+@@ -69,6 +69,11 @@ function finishTurn(registry, entry, turn, message) {
          registry.closeSession(entry.senpiSessionId, "abort_uncertain");
      turn.resolve({ uuid: turn.uuid, messages: turn.messages, aborted: turn.aborted });
  }
@@ -13,7 +14,7 @@ diff --git a/dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump
  function handleMessage(registry, entry, message) {
      // A forked query mints a NEW session id (forkSession: true + resume): the
      // init message carries it, and it must be persisted BEFORE any turn-state
-@@ -87,7 +92,7 @@
+@@ -87,7 +92,7 @@ function handleMessage(registry, entry, message) {
          else if (message.type === "stream_event")
              bufferBeforeReplay(registry, entry, turn, message);
          else if (message.type === "result") {

@@ -39,8 +39,12 @@ process.exit(result.status ?? 1)
 `
 const posixShim = "#!/bin/sh\nexec node \"$(dirname \"$0\")/cli.js\" \"$@\"\n"
 const windowsShim = "@echo off\r\nnode \"%~dp0cli.js\" %*\r\n"
+// The staged bundle serves the omo-senpi surface; the marker switches the ulw-loop quality gate to
+// the omo-senpi reviewer identities (the unmarked Codex layout defaults to lazycodex-*).
+const surfaceMarker = `${JSON.stringify({ surface: "omo-senpi" })}\n`
 const stagedTopLevelEntries = ["cli.js", "directive.md", "omo-agent-toolkit", "omo-agent-toolkit.cmd", "ulw-loop"]
-const stagedArtifactPaths = ["cli.js", "directive.md", join("ulw-loop", "cli.js"), "omo-agent-toolkit", "omo-agent-toolkit.cmd"]
+const stagedUlwLoopEntries = ["cli.js", "surface.json"]
+const stagedArtifactPaths = ["cli.js", "directive.md", join("ulw-loop", "cli.js"), join("ulw-loop", "surface.json"), "omo-agent-toolkit", "omo-agent-toolkit.cmd"]
 
 export async function stageAgentToolkit(options = {}) {
   const sourceEntry = resolve(options.sourceEntry ?? defaultSourceEntry)
@@ -62,6 +66,7 @@ export async function stageAgentToolkit(options = {}) {
   try {
     await mkdir(join(tempDir, "ulw-loop"), { recursive: true })
     await copyFile(sourceEntry, join(tempDir, "ulw-loop", "cli.js"))
+    await writeFile(join(tempDir, "ulw-loop", "surface.json"), surfaceMarker, "utf8")
     await copyFile(directiveEntry, join(tempDir, "directive.md"))
     await writeFile(join(tempDir, "cli.js"), dispatcher, "utf8")
     await writeFile(join(tempDir, "omo-agent-toolkit"), posixShim, "utf8")
@@ -113,7 +118,7 @@ async function stagedToolkitMatches(tempDir, targetDir) {
       readdir(join(targetDir, "ulw-loop")),
     ])
     if (topLevelEntries.toSorted().join("\n") !== stagedTopLevelEntries.join("\n")) return false
-    if (ulwLoopEntries.join("\n") !== "cli.js") return false
+    if (ulwLoopEntries.toSorted().join("\n") !== stagedUlwLoopEntries.join("\n")) return false
     const matches = await Promise.all(
       stagedArtifactPaths.map((path) => filesEqual(join(tempDir, path), join(targetDir, path))),
     )
@@ -133,6 +138,7 @@ export async function checkAgentToolkitFresh(options = {}) {
     dispatcher: join(targetDir, "cli.js"),
     directive: join(targetDir, "directive.md"),
     bundle: join(targetDir, "ulw-loop", "cli.js"),
+    surface: join(targetDir, "ulw-loop", "surface.json"),
     posix: join(targetDir, "omo-agent-toolkit"),
     windows: join(targetDir, "omo-agent-toolkit.cmd"),
   }
@@ -141,6 +147,7 @@ export async function checkAgentToolkitFresh(options = {}) {
   await Promise.all(Object.values(paths).map((path) => validateFile(path, "staged agent-toolkit artifact")))
   if (!(await readFile(paths.directive)).equals(await readFile(directiveEntry))) throw new Error(`agent-toolkit runtime stale: directive content differs: ${paths.directive}`)
   if (await readFile(paths.dispatcher, "utf8") !== dispatcher) throw new Error(`agent-toolkit runtime stale: dispatcher content differs: ${paths.dispatcher}`)
+  if (await readFile(paths.surface, "utf8") !== surfaceMarker) throw new Error(`agent-toolkit runtime stale: surface marker differs: ${paths.surface}`)
   if (await readFile(paths.posix, "utf8") !== posixShim) throw new Error(`agent-toolkit runtime stale: POSIX shim content differs: ${paths.posix}`)
   if (await readFile(paths.windows, "utf8") !== windowsShim) throw new Error(`agent-toolkit runtime stale: Windows shim content differs: ${paths.windows}`)
   if (process.platform !== "win32" && ((await stat(paths.posix)).mode & 0o777) !== 0o755) {
