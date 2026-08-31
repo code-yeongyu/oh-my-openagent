@@ -2,7 +2,7 @@
  * Agent/model detection utilities for ultrawork message routing.
  *
  * Routing logic:
- * 1. Planner agents (prometheus, plan) → planner.ts
+ * 1. Planner agents (prometheus, planner-named) → planner.ts
  * 2. GPT 5.4 models → gpt5.4.ts
  * 3. Gemini models → gemini.ts
  * 4. GLM models → glm.ts
@@ -14,10 +14,18 @@ import { isGeminiModel, isGlmModel, isGptModel } from "../../../agents/types"
 /**
  * Checks if agent is a planner-type agent.
  * Planners don't need ultrawork injection (they ARE the planner).
+ *
+ * The exact name "plan" is deliberately NOT matched: that is OpenCode's
+ * native built-in plan-mode agent, already classified non-OMO by
+ * isNonOmoAgent. Steering it with OMO planner instructions makes delegated
+ * subagents enter the native plan-exit flow and leaves the parent waiting
+ * (#5850). OMO planning delegates to prometheus instead.
  */
 export function isPlannerAgent(agentName?: string): boolean {
   if (!agentName) return false
   const lowerName = agentName.toLowerCase()
+  if (lowerName === "plan") return false
+
   if (lowerName.includes("prometheus") || lowerName.includes("planner")) return true
 
   const normalized = lowerName.replace(/[_-]+/g, " ")
