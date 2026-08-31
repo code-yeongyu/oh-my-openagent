@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { DEFAULT_PROMPT_QUEUE_RETRY_MS, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import { createSemanticPromptDedupeKey } from "@oh-my-opencode/utils/prompt-async-gate/semantic-dedupe"
+import { getRecentPromptDispatch } from "@oh-my-opencode/utils/prompt-async-gate/recent-dispatches"
 import { setPromptReservation } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
@@ -695,5 +697,30 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     expect(escalated.accepted).toBe(true)
     expect(promptCalls.count).toBe(2)
     expect(deps.sessionStates.get(sessionID)?.pendingFallbackModel).toBe("test-provider/next-model")
+  })
+
+  test("#given a fallback timeout of 30s #when a dispatch is accepted #then the semantic dedupe window outlives the retry period by the margin", async () => {
+    // given
+    installRuntimeFallbackTestClock()
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    deps.config.timeout_seconds = 30
+    const sessionID = "session-dedupe-hold-sizes-to-timeout"
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+    let capturedInput: unknown
+    deps.ctx.client.session.promptAsync = async (input: unknown) => {
+      capturedInput = input
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "test-provider/test-model", undefined, "session.error")
+
+    // then
+    expect(capturedInput).toBeDefined()
+    const recent = getRecentPromptDispatch(sessionID, createSemanticPromptDedupeKey(capturedInput))
+    expect(recent?.expiresAt).toBeDefined()
+    expect((recent?.expiresAt ?? 0) - Date.now()).toBe(35_000)
   })
 })

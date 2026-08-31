@@ -10,6 +10,7 @@ import {
   OMO_RUNTIME_FALLBACK_RETRY_MARKER,
 } from "../../shared/runtime-fallback-retry-marker"
 import { hasInternalInitiatorMarker } from "../../shared/internal-initiator-marker"
+import { resolveRuntimeFallbackDedupeHoldMs } from "./retry-dedupe-hold"
 import {
   dispatchInternalPrompt,
   isInternalPromptDispatchAccepted,
@@ -27,6 +28,8 @@ export function createAutoRetryDispatcher(
 ) {
   const {
     ctx,
+    config,
+    options,
     sessionStates,
     sessionRetryInFlight,
     sessionAwaitingFallbackResult,
@@ -34,6 +37,7 @@ export function createAutoRetryDispatcher(
     pluginConfig,
   } = deps
 
+  const semanticDedupeHoldMs = resolveRuntimeFallbackDedupeHoldMs(config, options)
   const acceptedDispatchTuples = new Map<string, string>()
 
   return async (
@@ -164,6 +168,7 @@ export function createAutoRetryDispatcher(
         sessionID,
         source: retrySource,
         settleMs: 0,
+        ...(semanticDedupeHoldMs !== undefined ? { semanticDedupeHoldMs } : {}),
         ...(queueBehavior ? { queueBehavior } : {}),
         ...(wasInternallyAborted ? { checkToolState: false } : {}),
         shouldDispatch: isCurrentFallbackGeneration,

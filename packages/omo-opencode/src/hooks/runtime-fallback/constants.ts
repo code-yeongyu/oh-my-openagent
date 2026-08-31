@@ -21,6 +21,13 @@ export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
 }
 
 /**
+ * Semantic dedupe hold beyond the effective fallback timeout, so a repeat of an
+ * accepted dispatch is still deduped when the retry cycle equals the timeout
+ * period (incident ses_fa750d527ffe: 15s hold == 15s cycle slipped through).
+ */
+export const RUNTIME_FALLBACK_SEMANTIC_DEDUPE_MARGIN_MS = 5_000
+
+/**
  * Error patterns that indicate rate limiting or temporary failures
  * These are checked in addition to HTTP status codes
  */
