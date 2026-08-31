@@ -93,18 +93,24 @@ parent-owned actions.
 
 ## Final OpenCode-only upstream refresh
 
-`upstream/dev` advanced to `00fc6bdb8`. The staged delta touches no Senpi
-source, package manifest, or lockfile; its only Senpi path is the generated
-main `omo.js` bundle.
+`upstream/dev` advanced to `00fc6bdb8`. Its handwritten Senpi delta is the
+LSP document-URI normalization; the generated main `omo.js` bundle also
+changed. The final merged tree was rebuilt and tested with CI Bun 1.4.0.
 
 - dedicated-marker boundary and adjacent suites: 42 pass, 0 fail,
   101 assertions;
-- adapter TypeScript diagnostics: pass;
+- `senpi-task` and adapter TypeScript diagnostics: pass;
+- full Senpi gate: 2464 pass, one Windows-only skip, 0 fail, 7913 assertions
+  across 327 files; evidence resolver 10 pass, 0 fail;
+- all six generated extensions and staged runtimes: current under Bun 1.4.0;
+- adapter-driver and task-RPC-driver self-tests: pass;
 - real isolated adapter: `result=PASS`, protected Senpi/OMO paths empty,
-  credential digest unchanged, and one unrelated concurrent volatile session
-  write redacted in `final-live-adapter.json`.
-- final sandbox removed; the task-owned LSP daemon, language server, and two
-  tsserver children were terminated with no matching process left.
+  credential digest unchanged, and unrelated concurrent volatile session
+  writes redacted in `final-live-adapter.json`;
+- real task surface: one child extension marker, main exit 0, all
+  issue-relevant spawn/suppression/resume/isolation checks passed, and leaked
+  PID count 0. The same six unrelated revive/output/sequence assertions remain
+  disclosed in `final-live-task.redacted.json`.
 
 ## What was omitted
 
