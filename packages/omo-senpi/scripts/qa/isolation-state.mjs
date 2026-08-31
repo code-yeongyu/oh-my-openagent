@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto"
-import { existsSync, opendirSync, readFileSync, readdirSync, statSync } from "node:fs"
+import { closeSync, existsSync, fstatSync, openSync, opendirSync, readFileSync, readSync, readdirSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
 
 const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
 export const PROTECTED_STATE_FILES = ["auth.json", "settings.json", "models.json", "models-store.json", "trust.json", "hooks-state.json"]
 export const OBSERVATION_LIMITS = { maxFiles: 10_000, maxBytes: 64 * 1024 * 1024, maxEntries: 20_000 }
+const FILE_IO = { closeSync, fstatSync, openSync, readSync, statSync }
+const HASH_CHUNK_BYTES = 64 * 1024
 
 export function credentialDigest(agentDir) {
   const hash = createHash("sha256")
@@ -18,41 +20,59 @@ export function credentialDigest(agentDir) {
   return hash.digest("hex")
 }
 
-export function snapshotProtectedState(root) {
-  return new Map(PROTECTED_STATE_FILES.map((name) => {
+export function snapshotProtectedState(root, readFile = readFileSync) {
+  const snapshot = new Map()
+  const errors = []
+  for (const name of PROTECTED_STATE_FILES) {
     const path = join(root, name)
-    if (!existsSync(path)) return [name, "absent"]
-    try {
-      return [name, createHash("sha256").update(credentialBytes(path, name)).digest("hex")]
-    } catch (error) {
-      return [name, `error:${errorCode(error)}`]
+    if (!existsSync(path)) {
+      snapshot.set(name, "absent")
+      continue
     }
-  }))
+    try {
+      snapshot.set(name, createHash("sha256").update(credentialBytes(path, name, readFile)).digest("hex"))
+    } catch (error) {
+      errors.push({ path: name, code: errorCode(error) })
+    }
+  }
+  return { snapshot, complete: errors.length === 0, errors }
 }
 
-export function snapshotDirectory(root, limits = OBSERVATION_LIMITS) {
+export function protectedSnapshotsUntouched(before, after) {
+  return before.complete && after.complete && changedSnapshotPaths(before.snapshot, after.snapshot).length === 0
+}
+
+export function snapshotDirectory(root, limits = OBSERVATION_LIMITS, io = FILE_IO) {
   if (!existsSync(root)) {
-    return { snapshot: new Map(), complete: true, truncated: false, errors: [] }
+    return { snapshot: new Map(), complete: true, truncated: false, errors: [], bytesRead: 0 }
   }
-  const state = { root, files: [], errors: [], fileCount: 0, bytes: 0, entries: 0, truncated: false }
+  const state = { root, files: [], errors: [], entries: 0, truncated: false }
   collectFilesBounded(root, state, {
     maxFiles: limits.maxFiles,
-    maxBytes: limits.maxBytes,
     maxEntries: limits.maxEntries ?? OBSERVATION_LIMITS.maxEntries,
   })
   const snapshot = new Map()
+  let bytesRead = 0
   for (const file of state.files.sort((left, right) => left.rel.localeCompare(right.rel))) {
-    try {
-      snapshot.set(file.rel, createHash("sha256").update(readFileSync(file.path)).digest("hex"))
-    } catch (error) {
-      state.errors.push(`${file.rel}: ${errorCode(error)}`)
+    const remainingBytes = limits.maxBytes - bytesRead
+    if (file.size > remainingBytes) {
+      state.truncated = true
+      break
     }
+    const result = hashFileBounded(file, remainingBytes, io)
+    bytesRead += result.bytesRead
+    if (result.error !== undefined) {
+      state.errors.push({ path: file.rel, code: result.error })
+      continue
+    }
+    snapshot.set(file.rel, result.digest)
   }
   return {
     snapshot,
     complete: !state.truncated && state.errors.length === 0,
     truncated: state.truncated,
-    errors: state.errors.sort(),
+    errors: state.errors.sort(compareSnapshotErrors),
+    bytesRead,
   }
 }
 
@@ -77,8 +97,8 @@ export function digestDirectory(root) {
   return hash.digest("hex")
 }
 
-function credentialBytes(path, name) {
-  const content = readFileSync(path)
+function credentialBytes(path, name, readFile = readFileSync) {
+  const content = readFile(path)
   if (name !== "settings.json") return content
   try {
     const settings = JSON.parse(content.toString("utf8"))
@@ -97,7 +117,7 @@ function collectFilesBounded(currentRoot, state, limits) {
   try {
     directory = opendirSync(currentRoot)
   } catch (error) {
-    state.errors.push(`${relative(state.root, currentRoot) || "."}: ${errorCode(error)}`)
+    state.errors.push({ path: relative(state.root, currentRoot) || ".", code: errorCode(error) })
     return
   }
   try {
@@ -114,33 +134,79 @@ function collectFilesBounded(currentRoot, state, limits) {
         collectFilesBounded(path, state, limits)
         if (state.truncated) return
       } else if (entry.isFile()) {
-        if (state.fileCount >= limits.maxFiles) {
+        if (state.files.length >= limits.maxFiles) {
           state.truncated = true
           return
         }
         try {
-          const size = statSync(path).size
-          if (state.bytes + size > limits.maxBytes) {
-            state.truncated = true
-            return
-          }
-          state.files.push({ path, rel: relative(state.root, path) })
-          state.fileCount += 1
-          state.bytes += size
+          const stat = statSync(path)
+          state.files.push({ path, rel: relative(state.root, path), size: stat.size, dev: stat.dev, ino: stat.ino })
         } catch (error) {
-          state.errors.push(`${relative(state.root, path)}: ${errorCode(error)}`)
+          state.errors.push({ path: relative(state.root, path), code: errorCode(error) })
         }
       }
     }
   } catch (error) {
-    state.errors.push(`${relative(state.root, currentRoot) || "."}: ${errorCode(error)}`)
+    state.errors.push({ path: relative(state.root, currentRoot) || ".", code: errorCode(error) })
   } finally {
     try {
       directory.closeSync()
     } catch (error) {
-      state.errors.push(`${relative(state.root, currentRoot) || "."}: ${errorCode(error)}`)
+      state.errors.push({ path: relative(state.root, currentRoot) || ".", code: errorCode(error) })
     }
   }
+}
+
+function hashFileBounded(file, remainingBytes, io) {
+  if (file.size > remainingBytes) return { bytesRead: 0, error: "BYTE_LIMIT" }
+  let fd
+  let bytesRead = 0
+  let result
+  try {
+    fd = io.openSync(file.path, "r")
+    const opened = io.fstatSync(fd)
+    if (opened.dev !== file.dev || opened.ino !== file.ino) return { bytesRead, error: "FILE_REPLACED" }
+    if (opened.size !== file.size) return { bytesRead, error: "FILE_CHANGED" }
+    const hash = createHash("sha256")
+    const buffer = Buffer.allocUnsafe(Math.min(HASH_CHUNK_BYTES, Math.max(file.size, 1)))
+    while (bytesRead < file.size) {
+      const requested = Math.min(buffer.length, file.size - bytesRead, remainingBytes - bytesRead)
+      if (requested <= 0) return { bytesRead, error: "BYTE_LIMIT" }
+      let count
+      try {
+        count = io.readSync(fd, buffer, 0, requested, bytesRead)
+      } catch (error) {
+        if (io.fstatSync(fd).size < file.size) return { bytesRead, error: "SHORT_READ" }
+        return { bytesRead, error: errorCode(error) }
+      }
+      if (count === 0) return { bytesRead, error: "SHORT_READ" }
+      hash.update(buffer.subarray(0, count))
+      bytesRead += count
+    }
+    const finished = io.fstatSync(fd)
+    if (finished.dev !== file.dev || finished.ino !== file.ino || finished.size !== file.size) {
+      return { bytesRead, error: "FILE_CHANGED" }
+    }
+    const pathStat = io.statSync(file.path)
+    if (pathStat.dev !== file.dev || pathStat.ino !== file.ino) return { bytesRead, error: "FILE_REPLACED" }
+    if (pathStat.size !== file.size) return { bytesRead, error: "FILE_CHANGED" }
+    result = { bytesRead, digest: hash.digest("hex") }
+  } catch (error) {
+    result = { bytesRead, error: errorCode(error) }
+  } finally {
+    if (fd !== undefined) {
+      try {
+        io.closeSync(fd)
+      } catch (error) {
+        result = { bytesRead, error: errorCode(error) }
+      }
+    }
+  }
+  return result
+}
+
+function compareSnapshotErrors(left, right) {
+  return left.path.localeCompare(right.path) || left.code.localeCompare(right.code)
 }
 
 function collectFiles(root, files) {

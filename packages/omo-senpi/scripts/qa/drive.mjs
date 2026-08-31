@@ -11,6 +11,7 @@ import {
   digestDirectory,
   OBSERVATION_LIMITS,
   PROTECTED_STATE_FILES,
+  protectedSnapshotsUntouched,
   snapshotDirectory,
   snapshotProtectedState,
 } from "./isolation-state.mjs"
@@ -180,25 +181,31 @@ function printResult({ result, reason, ultraworkInjected, commentChecker, isolat
   const omoProtectedAfter = snapshotProtectedState(realOmoAgentDir)
   const senpiObservedAfter = snapshotDirectory(realSenpiAgentDir)
   const omoObservedAfter = snapshotDirectory(realOmoAgentDir)
-  const realSenpiChangedPaths = changedSnapshotPaths(isolationBefore.senpiProtected, senpiProtectedAfter)
-  const realOmoChangedPaths = changedSnapshotPaths(isolationBefore.omoProtected, omoProtectedAfter)
+  const realSenpiChangedPaths = changedSnapshotPaths(isolationBefore.senpiProtected.snapshot, senpiProtectedAfter.snapshot)
+  const realOmoChangedPaths = changedSnapshotPaths(isolationBefore.omoProtected.snapshot, omoProtectedAfter.snapshot)
   const payload = {
     result,
     ...(reason ? { reason } : {}),
     ultraworkInjected,
     commentChecker,
-    realSenpiUntouched: realSenpiChangedPaths.length === 0,
+    realSenpiUntouched: protectedSnapshotsUntouched(isolationBefore.senpiProtected, senpiProtectedAfter),
     realSenpiChangedPaths,
-    realOmoUntouched: realOmoChangedPaths.length === 0,
+    realSenpiProtectedStateComplete: isolationBefore.senpiProtected.complete && senpiProtectedAfter.complete,
+    realSenpiProtectedErrors: protectedErrors(isolationBefore.senpiProtected, senpiProtectedAfter),
+    realOmoUntouched: protectedSnapshotsUntouched(isolationBefore.omoProtected, omoProtectedAfter),
     realOmoChangedPaths,
+    realOmoProtectedStateComplete: isolationBefore.omoProtected.complete && omoProtectedAfter.complete,
+    realOmoProtectedErrors: protectedErrors(isolationBefore.omoProtected, omoProtectedAfter),
     realSenpiObservedChangedPaths: changedSnapshotPaths(isolationBefore.senpiObserved.snapshot, senpiObservedAfter.snapshot),
     realOmoObservedChangedPaths: changedSnapshotPaths(isolationBefore.omoObserved.snapshot, omoObservedAfter.snapshot),
     realSenpiObservationComplete: isolationBefore.senpiObserved.complete && senpiObservedAfter.complete,
     realSenpiObservationTruncated: isolationBefore.senpiObserved.truncated || senpiObservedAfter.truncated,
     realSenpiObservationErrors: [...isolationBefore.senpiObserved.errors, ...senpiObservedAfter.errors],
+    realSenpiObservationBytesRead: isolationBefore.senpiObserved.bytesRead + senpiObservedAfter.bytesRead,
     realOmoObservationComplete: isolationBefore.omoObserved.complete && omoObservedAfter.complete,
     realOmoObservationTruncated: isolationBefore.omoObserved.truncated || omoObservedAfter.truncated,
     realOmoObservationErrors: [...isolationBefore.omoObserved.errors, ...omoObservedAfter.errors],
+    realOmoObservationBytesRead: isolationBefore.omoObserved.bytesRead + omoObservedAfter.bytesRead,
     protectedStateFiles: PROTECTED_STATE_FILES,
     observationLimits: OBSERVATION_LIMITS,
     realHomesChecked: [realSenpiAgentDir, realOmoAgentDir],
@@ -207,6 +214,13 @@ function printResult({ result, reason, ultraworkInjected, commentChecker, isolat
     sandboxCwd: sandbox.cwd,
   }
   console.log(JSON.stringify(payload))
+}
+
+function protectedErrors(before, after) {
+  return [
+    ...before.errors.map((error) => ({ phase: "before", ...error })),
+    ...after.errors.map((error) => ({ phase: "after", ...error })),
+  ]
 }
 
 function collectFiles(root, files) {

@@ -217,16 +217,22 @@ describe("task 13 senpi QA scripts", () => {
       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
       expect(payload["realSenpiUntouched"]).toBe(true)
       expect(payload["realSenpiChangedPaths"]).toEqual([])
+      expect(payload["realSenpiProtectedStateComplete"]).toBe(true)
+      expect(payload["realSenpiProtectedErrors"]).toEqual([])
       expect(payload["realOmoUntouched"]).toBe(true)
       expect(payload["realOmoChangedPaths"]).toEqual([])
+      expect(payload["realOmoProtectedStateComplete"]).toBe(true)
+      expect(payload["realOmoProtectedErrors"]).toEqual([])
       expect(payload["realSenpiObservedChangedPaths"]).toEqual([])
       expect(payload["realOmoObservedChangedPaths"]).toEqual([])
       expect(typeof payload["realSenpiObservationComplete"]).toBe("boolean")
       expect(typeof payload["realSenpiObservationTruncated"]).toBe("boolean")
       expect(payload["realSenpiObservationErrors"]).toEqual([])
+      expect(typeof payload["realSenpiObservationBytesRead"]).toBe("number")
       expect(typeof payload["realOmoObservationComplete"]).toBe("boolean")
       expect(typeof payload["realOmoObservationTruncated"]).toBe("boolean")
       expect(payload["realOmoObservationErrors"]).toEqual([])
+      expect(typeof payload["realOmoObservationBytesRead"]).toBe("number")
       expect(payload["protectedStateFiles"]).toEqual([
         "auth.json",
         "settings.json",
