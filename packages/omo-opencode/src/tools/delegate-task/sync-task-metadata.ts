@@ -3,16 +3,20 @@ import type { ParentContext } from "./executor-types"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
-export async function publishSyncTaskMetadata(input: {
+export interface SyncTaskMetadataInput {
   readonly args: DelegateTaskArgs
-  readonly ctx: ToolContextWithMetadata
   readonly currentSessionID: string
   readonly currentModel: DelegatedModelConfig | undefined
   readonly parentContext: ParentContext
   readonly agentToUse: string
   readonly spawnDepth: number
-}): Promise<void> {
-  await publishToolMetadata(input.ctx, {
+}
+
+export function buildSyncTaskMetadataInput(input: SyncTaskMetadataInput): {
+  title: string
+  metadata: Record<string, unknown>
+} {
+  return {
     title: input.args.description,
     metadata: {
       prompt: input.args.prompt,
@@ -29,5 +33,12 @@ export async function publishSyncTaskMetadata(input: {
       command: input.args.command,
       model: resolveMetadataModel(input.currentModel, input.parentContext.model),
     },
-  })
+  }
+}
+
+export async function publishSyncTaskMetadata(input: SyncTaskMetadataInput & {
+  readonly ctx: ToolContextWithMetadata
+}): Promise<void> {
+  const payload = buildSyncTaskMetadataInput(input)
+  await publishToolMetadata(input.ctx, payload)
 }

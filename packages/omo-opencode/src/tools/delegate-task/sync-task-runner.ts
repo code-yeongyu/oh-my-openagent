@@ -7,6 +7,7 @@ import { getDeliverableTag } from "./constants"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { buildRecoveredSyncTaskCompletion, buildSyncTaskCompletion } from "./sync-completion-message"
 import { shouldAttemptPollErrorRecovery } from "./sync-poll-error-recovery"
+import { createSyncProgressPublisher } from "./sync-progress-reporter"
 import type { SyncTaskDeps } from "./sync-task-deps"
 import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
@@ -90,6 +91,15 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
   const hasPendingParentWake = executorCtx.manager?.hasPendingParentWake?.bind(executorCtx.manager)
   const deliverableTag = getDeliverableTag(agentToUse)
   let effectiveCategoryModel = input.categoryModel
+  const publishProgress = createSyncProgressPublisher({
+    ctx,
+    args,
+    agentToUse,
+    parentContext,
+    getSessionID: () => activeSessionID,
+    getModel: () => effectiveCategoryModel,
+    getSpawnDepth: () => spawnDepth,
+  })
   let fallbackState: ModelFallbackState | undefined = effectiveCategoryModel && fallbackChain?.length
     ? {
         providerID: effectiveCategoryModel.providerID,
@@ -150,6 +160,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       taskId,
       hasActiveChildBackgroundTasks,
       hasPendingParentWake,
+      onProgress: publishProgress,
     }, syncPollTimeoutMs)
     if (pollError) {
       if (shouldAttemptPollErrorRecovery(pollError)) {

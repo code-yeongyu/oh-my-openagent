@@ -1,0 +1,49 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/tools/delegate-task/sync-session-poller.progress-streaming.test.ts:
+122 |             },
+123 |           })
+124 |         })
+125 | 
+126 |         // then: progress streamed DURING the busy phase, before completion
+127 |         expect(result).toBeNull()
+                             ^
+error: expect(received).toBeNull()
+
+Received: "Poll inactivity timeout reached after 5000ms without active OpenCode status for session ses_progress"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-3588/packages/omo-opencode/src/tools/delegate-task/sync-session-poller.progress-streaming.test.ts:127:24)
+(fail) pollSyncSession progress streaming (#3588) > #given a busy sync child session whose transcript accumulates tool parts while it runs > #when the parent polls the session with an onProgress callback > #then progress snapshots stream in while the child is still busy, tracking growing toolCalls and the newest tool [3091.61ms]
+186 |           })
+187 |         })
+188 | 
+189 |         // then
+190 |         expect(result).toBeNull()
+191 |         expect(snapshots.length).toBeGreaterThanOrEqual(1)
+                                       ^
+error: expect(received).toBeGreaterThanOrEqual(expected)
+
+Expected: >= 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-3588/packages/omo-opencode/src/tools/delegate-task/sync-session-poller.progress-streaming.test.ts:191:34)
+(fail) pollSyncSession progress streaming (#3588) > #given a busy sync child session that spans two assistant turns > #when the transcript grows to a second assistant message before completing > #then the streamed progress reports the rising assistantTurns count [95.35ms]
+231 |           })
+232 |         })
+233 | 
+234 |         // then: one publish for the first observation, none for repeats; loop still bounded by timeout
+235 |         expect(result).toContain("Poll inactivity timeout reached")
+236 |         expect(snapshots.length).toBe(1)
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-3588/packages/omo-opencode/src/tools/delegate-task/sync-session-poller.progress-streaming.test.ts:236:34)
+(fail) pollSyncSession progress streaming (#3588) > #given a busy session whose transcript stays frozen > #when every observation sees the identical activity signature before the child goes idle unfinished > #then onProgress fires exactly once instead of once per poll [3264.86ms]
+
+ 3 pass
+ 3 fail
+ 11 expect() calls
+Ran 6 tests across 1 file. [10.42s]

@@ -2,6 +2,7 @@ import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
+import { extractProgressActivity, type SyncTaskProgressSnapshot } from "./sync-progress-reporter"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 
@@ -9,6 +10,7 @@ export { isSessionComplete } from "./sync-session-turns"
 
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const CHILD_WAKE_GRACE_MS = 5_000
+const DEFAULT_PROGRESS_INTERVAL_MS = 2_000
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -54,6 +56,8 @@ export async function pollSyncSession(
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
     hasPendingParentWake?: (sessionID: string) => boolean
     childWakeGraceMs?: number
+    onProgress?: (snapshot: SyncTaskProgressSnapshot) => void | Promise<void>
+    progressIntervalMs?: number
   },
   timeoutMs?: number
 ): Promise<string | null> {
@@ -69,6 +73,30 @@ export async function pollSyncSession(
   const childSettleMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
   let childWaitAssistantId: string | undefined
   let childSettleStartedAt = 0
+  // Issue #3588: sample the child transcript while it is active and publish activity
+  // snapshots through onProgress, so toolcall progress streams into the parent's live
+  // tool metadata instead of appearing only at completion.
+  const progressIntervalMs = input.progressIntervalMs ?? DEFAULT_PROGRESS_INTERVAL_MS
+  let lastProgressSignature: string | undefined
+  let lastProgressFetchAt = 0
+
+  const publishProgressFromMessages = async (messages: SessionMessage[]): Promise<void> => {
+    if (!input.onProgress) return
+    if (input.anchorMessageCount !== undefined && messages.length <= input.anchorMessageCount) return
+    const activity = extractProgressActivity(messages)
+    const signature = `${activity.assistantTurns}:${activity.toolCalls}:${activity.latestTool ?? ""}`
+    if (signature === lastProgressSignature) return
+    lastProgressSignature = signature
+    const snapshot: SyncTaskProgressSnapshot = { ...activity, elapsedMs: Date.now() - pollStart }
+    try {
+      await input.onProgress(snapshot)
+    } catch (error) {
+      log("[task] Progress publish failed", {
+        sessionID: input.sessionID,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
   // A sync subagent can end its turn and then be re-woken by a parent-wake
   // notification once its background children finish. The task is only truly done
   // when no direct child work remains AND no wake is queued/in-flight for this
@@ -166,6 +194,18 @@ export async function pollSyncSession(
 
     if (isActiveSessionStatus(sessionStatus)) {
       inactiveStart = Date.now()
+      if (input.onProgress && Date.now() >= lastProgressFetchAt + progressIntervalMs) {
+        lastProgressFetchAt = Date.now()
+        try {
+          const progressMessages = await fetchSessionMessages(client, input.sessionID)
+          await publishProgressFromMessages(progressMessages)
+        } catch (error) {
+          log("[task] Progress sampling failed", {
+            sessionID: input.sessionID,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
       continue
     }
 
