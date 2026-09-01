@@ -33,6 +33,13 @@ const FULL_DEFAULTS: OmoMemorySettings = {
   write_notice: { enabled: true },
   sync: { enabled: true },
   search: { enabled: true },
+  recall: {
+    enabled: true,
+    max_items: 2,
+    budget_tokens: 600,
+    excerpt_chars: 200,
+    exclude: [],
+  },
   compile_warn_tokens: 30000,
   agents: {},
 }
@@ -78,6 +85,14 @@ describe("OmoMemorySettingsSchema defaults", () => {
       write_notice: { enabled: false },
       sync: { remote: "file:///tmp/memory-mirror.git", enabled: true },
       search: { enabled: false },
+      recall: {
+        enabled: false,
+        max_items: 5,
+        budget_tokens: 800,
+        excerpt_chars: 120,
+        min_score: 0.25,
+        exclude: ["notes/scratch.md"],
+      },
       compile_warn_tokens: 50000,
       agents: {
         "backend-lead": {
@@ -199,5 +214,113 @@ describe("OmoMemorySettingsSchema defaults", () => {
     // then
     expect(rootResult.success).toBe(false)
     expect(nestedResult.success).toBe(false)
+  })
+
+  test("#given recall omitted #when parsing empty #then the M1 defaults apply", () => {
+    // given
+    const input = {}
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.recall).toEqual({
+      enabled: true,
+      max_items: 2,
+      budget_tokens: 600,
+      excerpt_chars: 200,
+      exclude: [],
+    })
+    expect(parsed.recall).not.toHaveProperty("min_score")
+    expect(parsed.recall).not.toHaveProperty("mode")
+  })
+
+  test("#given an empty recall block #when parsed #then nested defaults still materialize", () => {
+    // given
+    const input = { recall: {} }
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.recall.enabled).toBe(true)
+    expect(parsed.recall.max_items).toBe(2)
+    expect(parsed.recall.budget_tokens).toBe(600)
+    expect(parsed.recall.excerpt_chars).toBe(200)
+    expect(parsed.recall.exclude).toEqual([])
+    expect(parsed.recall).not.toHaveProperty("min_score")
+  })
+
+  test("#given an explicit recall override #when parsed #then the explicit values win and omitted knobs keep defaults", () => {
+    // given
+    const input = { recall: { enabled: false, max_items: 4, min_score: 0.1 } }
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.recall).toEqual({
+      enabled: false,
+      max_items: 4,
+      budget_tokens: 600,
+      excerpt_chars: 200,
+      min_score: 0.1,
+      exclude: [],
+    })
+  })
+
+  test("#given recall max_items outside 1..5 #when parsed #then validation fails", () => {
+    // given
+    const tooLow = { recall: { max_items: 0 } }
+    const tooHigh = { recall: { max_items: 6 } }
+
+    // when
+    const lowResult = OmoMemorySettingsSchema.safeParse(tooLow)
+    const highResult = OmoMemorySettingsSchema.safeParse(tooHigh)
+
+    // then
+    expect(lowResult.success).toBe(false)
+    expect(highResult.success).toBe(false)
+  })
+
+  test("#given invalid recall field types #when parsed #then validation fails", () => {
+    // given
+    const cases = [
+      { recall: { budget_tokens: 0 } },
+      { recall: { excerpt_chars: 0 } },
+      { recall: { enabled: "yes" } },
+      { recall: { exclude: "notes/**" } },
+      { recall: { min_score: "high" } },
+    ]
+
+    // when
+    const results = cases.map((input) => OmoMemorySettingsSchema.safeParse(input))
+
+    // then
+    for (const result of results) {
+      expect(result.success).toBe(false)
+    }
+  })
+
+  test("#given a recall mode field #when parsed #then the strict schema rejects it", () => {
+    // given
+    const input = { recall: { mode: "lexical" } }
+
+    // when
+    const result = OmoMemorySettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("#given a per-agent recall override #when parsed #then the layer accepts it as a deep-partial", () => {
+    // given
+    const input = { recall: { enabled: false }, agents: { "backend-lead": { recall: { max_items: 1 } } } }
+
+    // when
+    const parsed = OmoMemorySettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed).toEqual(input)
   })
 })

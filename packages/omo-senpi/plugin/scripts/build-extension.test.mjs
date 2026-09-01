@@ -16,7 +16,10 @@ const repoRoot = join(scriptDir, "..", "..", "..", "..")
 const perTestRoots = []
 let sharedBuildPromise = null
 
-setDefaultTimeout(30_000)
+// A focused run builds the six artifacts twice in ~14s, while the package suite shares CPU and disk
+// with other build/staging files. Keep the test bounded, but give the real two-build workload enough
+// headroom under suite contention instead of timing out before the freshness assertion runs.
+setDefaultTimeout(60_000)
 
 afterEach(async () => {
   await Promise.all(perTestRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))

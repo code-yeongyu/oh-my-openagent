@@ -109,6 +109,18 @@ const expectedToolSurface = [
 		},
 	},
 	{
+		name: "format",
+		title: "LSP Format",
+		description: "Format a source file with its language server and write the returned edits to disk.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				filePath: { type: "string", description: "Source file path to format." },
+			},
+			required: ["filePath"],
+		},
+	},
+	{
 		name: "install_decision",
 		title: "LSP Install Decision",
 		description:
@@ -132,7 +144,7 @@ const expectedToolSurface = [
 ] as const;
 
 describe("LSP MCP tool surface", () => {
-	it("#given a JSON-RPC tools/list request #when descriptors are returned #then the eight public tool schemas are pinned", async () => {
+	it("#given a JSON-RPC tools/list request #when descriptors are returned #then the nine public tool schemas are pinned", async () => {
 		// given
 		const request = { jsonrpc: "2.0", id: 21, method: "tools/list" };
 

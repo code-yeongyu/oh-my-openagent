@@ -1,0 +1,41 @@
+WHAT WAS TESTED
+- RED-first co-located compile-entry contract tests were created before implementation.
+- GREEN tests cover early-command passthrough without --extension, main-path --extension <execDir>/plugin, sibling package version formatting with pinned engine, curl reinstall update guidance, provisioned-dir environment remapping, and synthetic embedded manifest provisioning with sha256/mode plus matching-marker skip.
+- TypeScript diagnostics/typecheck were run for the new entry and test.
+
+RED BEFORE IMPLEMENTATION
+Command:
+  cd /tmp/work-binary-assets && bun test packages/omo-native/test/compile-entry.test.ts
+Observed output:
+  error: Cannot find module '../compile-entry' from '/private/tmp/work-binary-assets/packages/omo-native/test/compile-entry.test.ts'
+  0 pass 1 fail 1 error
+
+GREEN FOCUSED
+Command:
+  cd /tmp/work-binary-assets && bun test packages/omo-native/test/compile-entry.test.ts
+Observed output:
+  6 pass
+  0 fail
+  12 expect() calls
+  Ran 6 tests across 1 file.
+
+TYPECHECK
+Command:
+  cd /tmp/work-binary-assets && bunx tsgo --noEmit -p packages/omo-native/tsconfig.json
+Observed output:
+  clean (no output, exit 0)
+
+SCOPED PACKAGE SUITE
+Command:
+  cd /tmp/work-binary-assets && bun test packages/omo-native
+Observed output:
+  159 pass, 10 fail, 504 expect() calls, 169 tests across 17 files.
+  The ten failures are existing setup-import/doctor fixture failures unrelated to compile-entry; the new compile-entry tests pass in the same package run. The run also completed the repository's vendored runtime build setup.
+
+WHY ENOUGH
+The focused tests directly exercise each requested acceptance contract, including real hash and mode verification and the marker short-circuit. The package suite was run once as required; all new tests pass. Typecheck and language-server diagnostics are clean for the changed implementation/test.
+
+CLEANUP RECEIPTS
+- Test-created temporary roots use afterEach teardown and were removed by the test process.
+- No package manifest or allowlist was edited; `git diff -- packages/omo-native/package.json` is empty.
+- Existing unrelated worktree modification `.omo/evidence/20260816-remove-omo-telemetry-command/tui-pass/terminal-ansi.txt` was not touched or staged.

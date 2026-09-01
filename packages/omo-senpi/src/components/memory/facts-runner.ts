@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { existsSync } from "node:fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { basename, join } from "node:path"
 
 import {

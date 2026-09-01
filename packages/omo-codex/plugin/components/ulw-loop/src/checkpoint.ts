@@ -28,6 +28,7 @@ import {
 	sameBlockerOccurrences,
 	validateQualityGate,
 } from "./quality-gate.js";
+import { resolveToolkitSurface } from "./surface.js";
 import type {
 	UlwLoopAggregateCompletion,
 	UlwLoopItem,
@@ -230,6 +231,7 @@ export async function checkpointUlwLoop(
 				qualityGate = validateQualityGate(await readJsonInput(args.qualityGateJson, repoRoot), {
 					repoRoot,
 					fs: QUALITY_GATE_FS,
+					reviewerSurface: resolveToolkitSurface(),
 					...(plan.evidenceLayoutVersion === 2
 						? { currentAttemptDir: ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope) }
 						: {}),

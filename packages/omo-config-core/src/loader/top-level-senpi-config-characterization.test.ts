@@ -17,13 +17,13 @@ const CURRENT_USER_CONFIG = `{
       "model": "kimi-coding/kimi-for-coding-highspeed-unlocked",
       "reasoningEffort": "minimal",
       "fallback_models": [
-        { "model": "quotio-openai/gpt-5.6-luna-fast", "reasoningEffort": "minimal" },
+        { "model": "openai-codex/gpt-5.6-luna-fast", "reasoningEffort": "minimal" },
         { "model": "example-gateway/z-ai/glm-5.2-ultrafast-unlocked", "reasoningEffort": "none" }
       ],
       "prompt_append": ${JSON.stringify(QUICK_PROMPT_APPEND)}
     },
     "deep": {
-      "model": "quotio-openai/gpt-5.6-terra",
+      "model": "openai-codex/gpt-5.6-terra",
       "variant": "xhigh"
     }
   },
@@ -31,13 +31,13 @@ const CURRENT_USER_CONFIG = `{
     "explore": {
       "model": "kimi-coding/kimi-for-coding-highspeed",
       "models": [
-        { "model": "quotio-openai/gpt-5.6-luna-fast", "reasoningEffort": "minimal" },
+        { "model": "openai-codex/gpt-5.6-luna-fast", "reasoningEffort": "minimal" },
         "example-gateway/z-ai/glm-5.2-ultrafast-unlocked",
-        { "model": "quotio-openai/gpt-5.6-luna-fast", "reasoningEffort": "minimal" }
+        { "model": "openai-codex/gpt-5.6-luna-fast", "reasoningEffort": "minimal" }
       ]
     },
     "oracle": {
-      "model": "quotio-openai/gpt-5.6-sol",
+      "model": "openai-codex/gpt-5.6-sol",
       "reasoningEffort": "max"
     }
   }
@@ -48,20 +48,20 @@ const EXPECTED_CONFIG = {
     explore: {
       model: "kimi-coding/kimi-for-coding-highspeed",
       models: [
-        { model: "quotio-openai/gpt-5.6-luna-fast", reasoning: "minimal" },
+        { model: "openai-codex/gpt-5.6-luna-fast", reasoning: "minimal" },
         "example-gateway/z-ai/glm-5.2-ultrafast-unlocked",
-        { model: "quotio-openai/gpt-5.6-luna-fast", reasoning: "minimal" },
+        { model: "openai-codex/gpt-5.6-luna-fast", reasoning: "minimal" },
       ],
     },
     oracle: {
-      model: "quotio-openai/gpt-5.6-sol",
+      model: "openai-codex/gpt-5.6-sol",
       reasoning: "max",
     },
   },
   categories: {
     quick: {
       fallback_models: [
-        { model: "quotio-openai/gpt-5.6-luna-fast", reasoning: "minimal" },
+        { model: "openai-codex/gpt-5.6-luna-fast", reasoning: "minimal" },
         { model: "example-gateway/z-ai/glm-5.2-ultrafast-unlocked", reasoning: "off" },
       ],
       model: "kimi-coding/kimi-for-coding-highspeed-unlocked",
@@ -69,7 +69,7 @@ const EXPECTED_CONFIG = {
       reasoning: "minimal",
     },
     deep: {
-      model: "quotio-openai/gpt-5.6-terra",
+      model: "openai-codex/gpt-5.6-terra",
       reasoning: "xhigh",
     },
   },
@@ -84,7 +84,7 @@ const EXPECTED_CONFIG = {
     global_concurrency: Math.max(8, availableParallelism() * 2),
     default_execution_mode: "in-process",
     max_depth: 1,
-    residency_max_children: Math.max(8, availableParallelism() * 3),
+    residency_max_children: Math.min(16, Math.max(8, availableParallelism() * 2)),
     resume_children: true,
     team: {
       max_members: 8,

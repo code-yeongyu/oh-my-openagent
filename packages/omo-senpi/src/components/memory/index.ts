@@ -9,6 +9,7 @@ import {
   findLatestMemoryBinding,
   type SessionEntryLike,
 } from "./binding"
+import { logBindReconcileFailure } from "./bind-reconcile-log"
 import { renderMemoryBindingEntry } from "./bindings/entry-renderer"
 import { hasMemoryCapabilities, missingMemoryCapabilities } from "./capabilities"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -133,7 +134,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         // Bind-time reconcile floats past session_start by design, but its rejection must not
         // float: an unhandled rejection is attributed to whatever code is running when it lands.
         void wiring.afterBind(pi, surface.id, state.context, eventCtx).catch((error: unknown) => {
-          ctx.logger.warn("memory bind-time reconcile failed", { error: String(error) })
+          logBindReconcileFailure(ctx.logger, error)
         })
       })
 

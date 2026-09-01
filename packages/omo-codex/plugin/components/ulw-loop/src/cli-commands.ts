@@ -1,6 +1,6 @@
 import { checkpoint } from "./checkpoint-continuation.js";
 import { hasFlag, readValue } from "./cli-arg-parser.js";
-import { printJsonError, ULW_LOOP_HELP } from "./cli-output.js";
+import { printJsonError, subcommandHelp, ULW_LOOP_HELP } from "./cli-output.js";
 import {
 	addGoal,
 	captureEvidence,
@@ -52,6 +52,10 @@ export async function ulwLoopCommand(argv: readonly string[]): Promise<number> {
 			}
 			process.stdout.write(`${ULW_LOOP_HELP}\n`);
 			return 1;
+		}
+		if (command !== "help" && (hasFlag(rest, "--help") || hasFlag(rest, "-h"))) {
+			process.stdout.write(`${subcommandHelp(command)}\n`);
+			return 0;
 		}
 		switch (command) {
 			case "help":

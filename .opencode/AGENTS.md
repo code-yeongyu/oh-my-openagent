@@ -46,6 +46,6 @@ Each skill follows the standard layout (`SKILL.md` + optional `scripts/`, `refer
 
 ## ANTI-PATTERNS
 
-- Never duplicate a built-in skill from `packages/omo-opencode/src/features/builtin-skills/` here without a clear reason.
+- Never duplicate a built-in skill from `packages/skills-loader-core/src/features/builtin-skills/` here without a clear reason.
 - Never commit `background-tasks.json` contents that include session IDs or token secrets.
 - Never write a skill that calls `session.promptAsync` directly — go through `dispatchInternalPrompt` (see root AGENTS.md "Internal message injection is dangerous").

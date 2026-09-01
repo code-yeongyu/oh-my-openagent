@@ -31,6 +31,7 @@ describe("memory identity layout constants", () => {
       "facts",
       "notices",
       "tool-receipts",
+      "recall",
     ])
   })
 })
@@ -98,6 +99,9 @@ describe("buildIdentityPaths", () => {
     expect(paths.facts).toBe(join(runtime, "facts"))
     expect(paths.notices).toBe(join(runtime, "notices"))
     expect(paths.toolReceipts).toBe(join(runtime, "tool-receipts"))
+    expect(paths.recall).toBe(join(runtime, "recall"))
+    expect(paths.recallLedger).toBe(join(runtime, "recall", "ledger"))
+    expect(paths.recallReceipts).toBe(join(runtime, "recall", "receipts.jsonl"))
   })
 
   it("#given built paths #when runtime subdirs are enumerated #then every declared subdir is present under runtime", () => {

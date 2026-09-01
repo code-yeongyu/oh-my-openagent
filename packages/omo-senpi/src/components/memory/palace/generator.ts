@@ -1,7 +1,7 @@
 // Memory palace generator: collects committed HEAD data plus local runtime state and writes a
 // self-contained HTML viewer to <identity runtime>/viewers/palace-<ts>.html (0600 in a 0700 dir).
 
-import { chmod, mkdir, writeFile } from "node:fs/promises"
+import { chmod, mkdir, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import { GitMemoryRepo, renderExternalProjection } from "@oh-my-opencode/memory-core"

@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process"
-import { existsSync, readFileSync } from "node:fs"
-import { mkdir } from "node:fs/promises"
+import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
+import { mkdir } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {

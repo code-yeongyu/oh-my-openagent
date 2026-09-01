@@ -42,6 +42,10 @@ export interface StatusUiRuntime {
   mode(): string | undefined
 }
 
+export interface StatusUiLogger {
+  warn(message: string, details?: unknown): void
+}
+
 // Injectable timer seam so the 250ms debounce is deterministic under test; defaults to global timers.
 export interface StatusUiTimers {
   set(callback: () => void, ms: number): TimerHandle
@@ -53,6 +57,7 @@ export interface TaskStatusUiDeps {
   readonly runtime: StatusUiRuntime
   readonly debounceMs?: number
   readonly timers?: StatusUiTimers
+  readonly logger?: StatusUiLogger
   readonly terminalWidth?: () => number | undefined
   // Local rendering time used by the live-refresh timer and deterministic tests.
   readonly now?: () => number
@@ -81,6 +86,21 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   let cachedRecords: readonly TaskRecord[] = []
   let pending: TimerHandle | undefined
   let liveRefresh: TimerHandle | undefined
+  const reportedRenderFaults = new Set<string>()
+
+  // Render runs from bare timer callbacks; an uncontained throw escapes as an uncaughtException
+  // and kills the host process (the beta.20 pi-tui incident). Warn once per distinct fault so the
+  // 250ms/1s timers cannot spam the log.
+  function containRenderFault(run: () => void): void {
+    try {
+      run()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (reportedRenderFaults.has(message)) return
+      reportedRenderFaults.add(message)
+      deps.logger?.warn("omo-task status widget render failed; frame skipped", { error: message })
+    }
+  }
 
   function syncNow(): void {
     if (!refreshCachedRecords()) {
@@ -143,8 +163,10 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     if (pending !== undefined) timers.clear(pending)
     pending = timers.set(() => {
       pending = undefined
-      if (recordsRefreshed) renderCachedRecords()
-      else syncNow()
+      containRenderFault(() => {
+        if (recordsRefreshed) renderCachedRecords()
+        else syncNow()
+      })
     }, debounceMs)
   }
 
@@ -178,7 +200,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       timers.clear(handle)
       if (liveRefresh !== handle) return
       liveRefresh = undefined
-      renderCachedRecords()
+      containRenderFault(renderCachedRecords)
     }, LIVE_STATUS_REFRESH_MS)
     liveRefresh = handle
   }
@@ -201,7 +223,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     cachedRecords = []
   }
 
-  return { scheduleSync, syncNow, dispose }
+  return { scheduleSync, syncNow: () => containRenderFault(syncNow), dispose }
 }
 
 function activityFromEvent(event: ManagedChildEvent): string | undefined {

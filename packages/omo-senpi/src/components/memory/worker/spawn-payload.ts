@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
 import {

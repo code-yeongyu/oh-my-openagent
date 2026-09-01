@@ -752,8 +752,10 @@ describe("assembled DAG runtime", () => {
     resumedRuntime.dispose()
   })
 
-  test("#given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then shipped RPC receives the recovery scheduler overflow", async () => {
-    // given
+  test("#given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then the overflow is journaled and shipped RPC receives the recovered snapshot", async () => {
+    // given - the bridge attaches AFTER recovery (#7316), so recovery-window events are never
+    // pushed live; the overflow marker must be durable in the journal for history-paging viewers,
+    // and RPC's first wholesale snapshot must already carry the recovered run.
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-recovery-ring-"))
     cleanupRoots.push(cwd)
     const runId = "dag-adapter-recovery-ring" as DagRunId
@@ -768,13 +770,14 @@ describe("assembled DAG runtime", () => {
       previousLeaseHolderPid: 2_147_483_647,
     })
     const runner = new ScriptedRunner()
-    const overflow = deferred<Extract<DagRunEvent, { type: "dag.stream.overflow" }>>()
+    const recoveredSnapshot = deferred<{ readonly status?: string }>()
     const pi = Object.assign(new FakeExtensionAPI(), {
       rpc: {
         emit: (name: string, data: unknown) => {
-          if (name !== "omo.dag.event" || typeof data !== "object" || data === null ||
-            !("type" in data) || data.type !== "dag.stream.overflow") return
-          overflow.resolve(data as Extract<DagRunEvent, { type: "dag.stream.overflow" }>)
+          if (name !== "omo.dag.updated" || typeof data !== "object" || data === null) return
+          const payload = data as { readonly runs?: ReadonlyArray<{ readonly run_id?: string; readonly status?: string }> }
+          const run = payload.runs?.find((entry) => entry.run_id === runId)
+          if (run !== undefined) recoveredSnapshot.resolve(run)
         },
         handle: () => undefined,
       },
@@ -798,12 +801,16 @@ describe("assembled DAG runtime", () => {
     await within(runner.whenStarted(1))
     runner.handles[0]?.settle("resumed through configured ring")
     await within(attaching)
-    const delivered = await within(overflow.promise)
+    const delivered = await within(recoveredSnapshot.promise)
 
-    // then
-    expect(delivered.droppedCount).toBeGreaterThan(0)
-    expect(delivered.recoverAfterSeq).toBeGreaterThanOrEqual(0)
-    expect(dagEvents(cwd, runId)).toContainEqual(delivered)
+    // then the overflow survived durably for history paging, and the pushed snapshot is recovered
+    const journaled = dagEvents(cwd, runId).find(
+      (event): event is Extract<DagRunEvent, { type: "dag.stream.overflow" }> => event.type === "dag.stream.overflow",
+    )
+    expect(journaled).toBeDefined()
+    expect(journaled?.droppedCount).toBeGreaterThan(0)
+    expect(journaled?.recoverAfterSeq).toBeGreaterThanOrEqual(0)
+    expect(delivered.status).toBe("completed")
     expect(runtime.manager.snapshot(runId, sessionId).status).toBe("completed")
     runtime.dispose()
   })

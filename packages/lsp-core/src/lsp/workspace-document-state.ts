@@ -88,6 +88,17 @@ function canonicalPath(filePath: string): string {
 	}
 }
 
+function normalizeDocumentUri(uri: string): string {
+	let decoded = uri;
+	try {
+		decoded = decodeURIComponent(uri);
+	} catch {
+		decoded = uri;
+	}
+	if (process.platform !== "win32") return decoded;
+	return decoded.replace(/^(file:\/\/\/)([a-z]):/, (_match, prefix: string, drive: string) => `${prefix}${drive.toUpperCase()}:`);
+}
+
 function isSameOrDescendant(candidate: string, parent: string): boolean {
 	const suffix = relative(parent, candidate);
 	return suffix === "" || (!suffix.startsWith("..") && suffix !== "..");
@@ -135,7 +146,7 @@ export class WorkspaceDocumentState {
 	}
 
 	getStoredDiagnostics(uri: string): readonly Diagnostic[] {
-		const state = this.openByUri.get(uri);
+		const state = this.openByUri.get(normalizeDocumentUri(uri));
 		if (!state) return [];
 		return state.lastPublish?.diagnostics ?? state.pullCache?.diagnostics ?? [];
 	}
@@ -163,13 +174,13 @@ export class WorkspaceDocumentState {
 	}
 
 	getPullCache(snapshot: DiagnosticSnapshot): PullDiagnosticsCacheHit | null {
-		const state = this.openByUri.get(snapshot.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state?.pullCache || state.pullCache.documentVersion !== snapshot.version) return null;
 		return state.pullCache;
 	}
 
 	recordPullDiagnostics(snapshot: DiagnosticSnapshot, report: PullDiagnosticsReport): void {
-		const state = this.openByUri.get(snapshot.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state) return;
 		state.pullCache = {
 			documentVersion: snapshot.version,
@@ -183,7 +194,7 @@ export class WorkspaceDocumentState {
 		readonly diagnostics: readonly Diagnostic[];
 		readonly version?: number;
 	}): void {
-		const state = this.openByUri.get(params.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(params.uri));
 		if (!state) return;
 		state.publishGeneration += 1;
 		state.lastPublish = {
@@ -197,7 +208,7 @@ export class WorkspaceDocumentState {
 	}
 
 	resolvePushDiagnostics(snapshot: DiagnosticSnapshot): PushDiagnosticsResolution {
-		const state = this.openByUri.get(snapshot.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state?.lastPublish) return { status: "missing" };
 		const publish = state.lastPublish;
 		if (publish.version !== undefined) {
@@ -214,7 +225,7 @@ export class WorkspaceDocumentState {
 	}
 
 	waitForDiagnosticsActivity(snapshot: DiagnosticSnapshot, timeoutMs: number): Promise<void> {
-		const state = this.openByUri.get(snapshot.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state || timeoutMs <= 0) return Promise.resolve();
 		return new Promise((resolveActivity) => {
 			let settled = false;
@@ -329,7 +340,7 @@ export class WorkspaceDocumentState {
 				waiters: new Set(),
 			};
 			this.openDocuments.set(path, state);
-			this.openByUri.set(state.uri, state);
+			this.openByUri.set(normalizeDocumentUri(state.uri), state);
 			this.notifyWaiters(state);
 			await this.sendNotification("textDocument/didOpen", {
 				textDocument: { uri: state.uri, languageId: state.languageId, version: state.version, text },
@@ -356,7 +367,7 @@ export class WorkspaceDocumentState {
 
 	private async closeDocument(state: OpenDocumentState): Promise<void> {
 		this.openDocuments.delete(state.path);
-		this.openByUri.delete(state.uri);
+		this.openByUri.delete(normalizeDocumentUri(state.uri));
 		this.clearDiagnostics(state.uri);
 		this.notifyWaiters(state);
 		await this.sendNotification("textDocument/didClose", { textDocument: { uri: state.uri } });

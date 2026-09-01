@@ -25,7 +25,7 @@ const HOOK_EVENTS_BY_COMPONENT = {
 	"lazycodex-executor-verify": "subagent-stop",
 	lsp: "post-compact",
 	rules: "session-start",
-	"start-work-continuation": "stop",
+	"ulw-execute-continuation": "stop",
 	telemetry: "session-start",
 	teammode: "post-tool-use",
 	ultrawork: "user-prompt-submit",

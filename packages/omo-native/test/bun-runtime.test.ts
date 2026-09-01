@@ -333,12 +333,12 @@ describe("bun runtime re-exec", () => {
     const bunPath = posix.join(POSIX_HOME, ".bun", "bin", "bun")
     const treeScript = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
 
-    test("#then the script and its arguments are handed to bun with inherited stdio", () => {
+    test("#then the script and its arguments are handed to bun with inherited stdio", async () => {
       // given
       const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
       const propagated: Array<Record<string, unknown>> = []
       // when
-      const consumed = maybeReexecUnderBun({
+      const consumed = await maybeReexecUnderBun({
         scriptPath: treeScript,
         argv: ["node", treeScript, "say", "hi"],
         env: {},
@@ -364,11 +364,11 @@ describe("bun runtime re-exec", () => {
       expect(propagated).toEqual([{ status: 0, signal: null }])
     })
 
-    test("#then a stay decision spawns nothing and lets the caller continue", () => {
+    test("#then a stay decision spawns nothing and lets the caller continue", async () => {
       // given
       let spawned = 0
       // when
-      const consumed = maybeReexecUnderBun({
+      const consumed = await maybeReexecUnderBun({
         scriptPath: treeScript,
         argv: ["node", treeScript, "say", "hi"],
         env: { OMO_RUNTIME: "node" },
@@ -388,11 +388,11 @@ describe("bun runtime re-exec", () => {
       expect(spawned).toBe(0)
     })
 
-    test("#then a bun process already running never re-execs itself", () => {
+    test("#then a bun process already running never re-execs itself", async () => {
       // given
       let spawned = 0
       // when
-      const consumed = maybeReexecUnderBun({
+      const consumed = await maybeReexecUnderBun({
         scriptPath: treeScript,
         argv: ["bun", treeScript],
         env: {},

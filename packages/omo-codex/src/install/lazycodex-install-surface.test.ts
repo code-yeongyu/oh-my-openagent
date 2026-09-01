@@ -11,9 +11,9 @@ import { createRepoWithBuiltComponentBins, EXPECTED_OMO_COMPONENT_BINS, expected
 const STALE_CODEX_COMPONENT_BINS = [
   "codex-comment-checker",
   "codex-rules",
-  "codex-start-work-continuation",
   "codex-telemetry",
   "codex-ultrawork",
+  "codex-ulw-execute-continuation",
 ] as const
 
 const LAZYCODEX_AGENT_ROLE_NAMES = [

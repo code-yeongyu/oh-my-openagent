@@ -117,7 +117,7 @@ describe("omo-ai publish workflow shape", () => {
 
   test("checks out before asserting root bin ownership", () => {
     const metadataSteps = steps("release-metadata")
-    const checkoutIndex = metadataSteps.findIndex((step) => step.uses === "actions/checkout@v5")
+    const checkoutIndex = metadataSteps.findIndex((step) => step.uses === "actions/checkout@v7")
     const assertionIndex = metadataSteps.findIndex((step) => step.name === "Assert omo bin ownership")
     const assertionRun = metadataSteps[assertionIndex]?.run ?? ""
 
