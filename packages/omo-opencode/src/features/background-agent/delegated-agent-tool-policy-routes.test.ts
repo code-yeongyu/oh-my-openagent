@@ -50,7 +50,8 @@ describe("delegated agent tool policy routes", () => {
     const syncTools = buildSyncPromptTools("general", undefined, undefined, anthropic)
     const fallbackBody = buildFallbackBody({
       agent: "general",
-      tools: syncTools,
+      model: anthropic,
+      tools: { ...syncTools, call_omo_agent: true },
       parts: [{ type: "text", text: "work" }],
     }, "general")
 

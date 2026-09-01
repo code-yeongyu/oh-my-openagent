@@ -16,6 +16,20 @@ describe("buildFallbackBody", () => {
     expect(fallbackBody.tools.call_omo_agent).toBe(false)
   })
 
+  test("keeps call_omo_agent enabled for a non-Anthropic fallback", () => {
+    //#given
+    const originalBody = {
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+      tools: { task: false, call_omo_agent: true, question: false },
+    }
+
+    //#when
+    const fallbackBody = buildFallbackBody(originalBody, "general")
+
+    //#then
+    expect(fallbackBody.tools.call_omo_agent).toBe(true)
+  })
+
   test("preserves a disabled inherited-provider policy during fallback", () => {
     //#given
     const originalBody = {
