@@ -27,6 +27,11 @@ function spawnCommentChecker(args: readonly string[]): SpawnProcess {
   })
   const exited = new Promise<number>((resolve) => {
     subprocess.on("error", () => resolve(1))
+    subprocess.stdin.on("error", (error) => {
+      if (!("code" in error) || error.code !== "EPIPE") {
+        subprocess.kill("SIGKILL")
+      }
+    })
     subprocess.on("close", (code) => resolve(code ?? 1))
   })
   return {

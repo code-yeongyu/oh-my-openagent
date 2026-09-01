@@ -16,13 +16,12 @@ function normalizeMessage(message: string): string {
   return message.replace(/\r\n/g, "\n")
 }
 
-function killProcessSafely(process: SpawnProcess, signal: SpawnSignal): void {
+function tryKillProcess(process: SpawnProcess, signal: SpawnSignal): boolean {
   try {
     process.kill(signal)
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -68,33 +67,50 @@ export async function runCommentChecker(
   const setTimer = options.setTimeoutFn ?? setTimeout
   const clearTimer = options.clearTimeoutFn ?? clearTimeout
 
-  const process = options.spawn(args)
-  process.stdin.write(JSON.stringify(input.hookInput))
-  process.stdin.end()
+  let process: SpawnProcess
+  try {
+    process = options.spawn(args)
+  } catch (error) {
+    if (error instanceof Error) {
+      return EMPTY_RESULT
+    }
+    throw error
+  }
 
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   let graceId: ReturnType<typeof setTimeout> | null = null
+  let timedOut = false
+  const clearGraceTimer = () => {
+    if (graceId !== null) {
+      clearTimer(graceId)
+      graceId = null
+    }
+  }
+  void process.exited.then(clearGraceTimer, clearGraceTimer)
 
   const timeoutPromise = new Promise<"timeout">((resolve) => {
     timeoutId = setTimer(() => {
-      killProcessSafely(process, "SIGTERM")
+      timedOut = true
+      void tryKillProcess(process, "SIGTERM")
 
       graceId = setTimer(() => {
-        killProcessSafely(process, "SIGKILL")
+        void tryKillProcess(process, "SIGKILL")
       }, killGraceMs)
-
       resolve("timeout")
     }, timeoutMs)
   })
 
   try {
+    process.stdin.write(JSON.stringify(input.hookInput))
+    process.stdin.end()
+
     const stdoutPromise = new Response(process.stdout).text()
     const stderrPromise = new Response(process.stderr).text()
     const exitCodePromise = process.exited
     const completed = Promise.all([stdoutPromise, stderrPromise, exitCodePromise] as const)
     const race = await Promise.race([completed, timeoutPromise] as const)
 
-    if (race === "timeout") {
+    if (race === "timeout" || timedOut) {
       return EMPTY_RESULT
     }
 
@@ -108,6 +124,7 @@ export async function runCommentChecker(
 
     return EMPTY_RESULT
   } catch (error) {
+    void tryKillProcess(process, "SIGKILL")
     if (error instanceof Error) {
       return EMPTY_RESULT
     }
@@ -116,8 +133,6 @@ export async function runCommentChecker(
     if (timeoutId !== null) {
       clearTimer(timeoutId)
     }
-    if (graceId !== null) {
-      clearTimer(graceId)
-    }
+    if (!timedOut) clearGraceTimer()
   }
 }
