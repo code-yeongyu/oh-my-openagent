@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	listDirectoryEntries,
 	readHooksJson,
+	readJsonFile,
 	readMcpJson,
 	readPackageJson,
 	readTextFile,
@@ -44,7 +45,16 @@ describe("plugin package metadata", () => {
 		expect(postCompactCommand).toBe(`node "${pluginRoot}/dist/cli.js" hook post-compact`);
 		expect(lspServer?.command).toBe("node");
 		expect(lspServer?.args).toEqual(["../../../../lsp-daemon/dist/cli.js", "mcp"]);
-		expect(lspServer?.startup_timeout_sec).toBe(10);
+		expect(readJsonFile(".mcp.json")).toEqual({
+			mcpServers: {
+				lsp: {
+					command: "node",
+					args: ["../../../../lsp-daemon/dist/cli.js", "mcp"],
+					cwd: ".",
+					startup_timeout_sec: 10,
+				},
+			},
+		});
 		expect(cliSource).not.toContain("./lazy-lsp-mcp.js");
 		expect(cliSource).toContain("resolveLspDaemonCliPath");
 		expect(daemonCliPathSource).toContain("@code-yeongyu/lsp-daemon/cli");

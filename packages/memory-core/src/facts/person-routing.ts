@@ -9,7 +9,7 @@
  * people/human/observations.md. The whole path is gated by people.enabled.
  */
 
-import { readFile } from "node:fs/promises"
+import { readFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { parseMemoryFile, renderMemoryFile } from "../memfs"

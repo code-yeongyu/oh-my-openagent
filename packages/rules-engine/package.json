@@ -21,6 +21,6 @@
   },
   "dependencies": {
     "@oh-my-opencode/utils": "workspace:*",
-    "picomatch": "^4.0.5"
+    "picomatch": "^4.0.7"
   }
 }

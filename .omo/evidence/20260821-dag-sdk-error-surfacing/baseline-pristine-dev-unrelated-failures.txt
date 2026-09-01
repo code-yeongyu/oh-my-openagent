@@ -1,0 +1,20 @@
+13 tests failed:
+(fail) cli-local > #given isolated agent dir #when install then uninstall are invoked #then stdout is one-line JSON and settings round-trip [68.57ms]
+(fail) session_start component ordering > #given real onboarding state and an active ulw loop #when startup then agent_end fire #then onboarding is preserved and the first-session advisor stays detached and suppressed [110.84ms]
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Run now #then the correct response state is applied [103.99ms]
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Skip this time #then the correct response state is applied [98.88ms]
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never in this project #then the correct response state is applied [108.02ms]
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never anywhere #then the correct response state is applied [116.50ms]
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the dialog times out #then the correct response state is applied [120.56ms]
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is tracked #when Run now is chosen #then suggestedMode is committed [121.29ms]
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is untracked #when Run now is chosen #then suggestedMode is local [109.08ms]
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the advisor opens #then last proposed HEAD is written first [96.19ms]
+(fail) createInitDeepAdvisorComponent > #given session_start #when the handler returns #then ui.select has not run synchronously [5011.46ms]
+  ^ this test timed out after 5000ms.
+(fail) createInitDeepAdvisorComponent > #given fake timers #when session_start fires #then ui.select waits for setTimeout zero [127.20ms]
+(fail) OmO Native product identity > #given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi [4.92ms]
+
+ 103 pass
+ 13 fail
+ 458 expect() calls
+Ran 116 tests across 10 files. [10.61s]

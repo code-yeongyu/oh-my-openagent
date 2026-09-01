@@ -3,6 +3,49 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createReflectionTriggerWiring, type ReflectionTriggerSession } from "./trigger-wiring"
 import { CONVERSATION, compact, fixture, successfulSettle, agentEnd, settle } from "./trigger-wiring.test-support"
 
+describe("reflection trigger wiring compaction observers", () => {
+  test("#given an accepted compaction #when the event fires #then the observer is told which conversation was rewritten", async () => {
+    // given: the memorian gate drops that session's pending nudges here - they judged a
+    // transcript the compaction has just replaced
+    const observed: string[] = []
+    const { pi } = await fixture({ stepCount: 0, onCompactionAccepted: (conversationId) => observed.push(conversationId) })
+
+    // when
+    await compact(pi, true)
+
+    // then
+    expect(observed).toEqual([CONVERSATION])
+  })
+
+  test("#given a rejected compaction #when the event fires #then the observer never runs", async () => {
+    // given
+    const observed: string[] = []
+    const { pi } = await fixture({ stepCount: 0, onCompactionAccepted: (conversationId) => observed.push(conversationId) })
+
+    // when
+    await compact(pi, false)
+
+    // then
+    expect(observed).toEqual([])
+  })
+
+  test("#given an observer that throws #when a compaction is accepted #then the reflection flag is still recorded", async () => {
+    // given
+    const { pi, ledger } = await fixture({
+      stepCount: 0,
+      onCompactionAccepted: () => {
+        throw new Error("observer exploded")
+      },
+    })
+
+    // when
+    await compact(pi, true)
+
+    // then
+    expect(ledger.pendingCompaction).toBe(true)
+  })
+})
+
 describe("reflection trigger wiring", () => {
   test("#given a met step threshold #when a clean run settles #then exactly one step-count launch fires with no visible message", async () => {
     const { pi, launches, store } = await fixture({ stepCount: 1 })

@@ -2,6 +2,8 @@ import { writeFileSync } from "node:fs";
 
 import { afterEach, describe, expect, it } from "bun:test";
 
+import { ControlledClock } from "./controlled-clock-test-support.js";
+
 import {
 	createWorkspaceEditTestHarness,
 	diagnostic,
@@ -17,6 +19,7 @@ afterEach(async () => {
 
 describe("LspClient diagnostics freshness", () => {
 	it("#given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload", async () => {
+		const clock = new ControlledClock();
 		const context = await harness.makeClient(
 			{
 				publishDiagnostics: [
@@ -27,7 +30,7 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 80, versionlessPublishQuiescenceMs: 20 },
+			{ diagnosticsFreshnessTimeoutMs: 80, versionlessPublishQuiescenceMs: 20, timerProvider: clock },
 		);
 		await context.client.openFile(context.source);
 		const versionlessDelivery = waitForEventCount(
@@ -35,36 +38,52 @@ describe("LspClient diagnostics freshness", () => {
 			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
 			1,
 		);
-		const startedAt = Date.now();
 		writeFileSync(context.source, "const after = 1;\n", "utf-8");
 		await context.client.openFile(context.source);
 		expect(await versionlessDelivery).toHaveLength(1);
 
-		const result = await context.client.diagnostics(context.source);
-		const elapsedMs = Date.now() - startedAt;
+		const pending = context.client.diagnostics(context.source);
+		await clock.waitForTimer(20);
+		expect(clock.scheduledDelays.at(-1)).toBe(20);
+		clock.advanceBy(20);
+		const result = await pending;
 
 		expect(result.items).toEqual([diagnostic("post-generation-versionless")]);
-		expect(elapsedMs).toBeGreaterThanOrEqual(15);
 	});
 
 	it("#given only a pre-generation versionless publish #when a newer local version asks for diagnostics #then the stale versionless publish is ignored and the request does not resolve clean", async () => {
+		const clock = new ControlledClock();
 		const context = await harness.makeClient(
 			{
 				publishDiagnostics: [
 					{
 						trigger: "didOpen",
 						diagnostics: [diagnostic("pre-generation-versionless")],
+						awaitClientDelivery: true,
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 300, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 300, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
 		);
 		await context.client.openFile(context.source);
-		expect((await context.client.diagnostics(context.source)).items).toEqual([diagnostic("pre-generation-versionless")]);
+		await waitForEventCount(
+			context.events,
+			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+			1,
+		);
+		const initial = context.client.diagnostics(context.source);
+		await clock.waitForTimer(5);
+		expect(clock.scheduledDelays.at(-1)).toBe(5);
+		clock.advanceBy(5);
+		expect((await initial).items).toEqual([diagnostic("pre-generation-versionless")]);
 		writeFileSync(context.source, "const after = 1;\n", "utf-8");
 		await context.client.openFile(context.source);
 
-		const result = await context.client.diagnostics(context.source);
+		const pending = context.client.diagnostics(context.source);
+		await clock.waitForTimer(300);
+		expect(clock.scheduledDelays.at(-1)).toBe(300);
+		clock.advanceBy(300);
+		const result = await pending;
 
 		expect(result.items).toEqual([]);
 		expect(result.transientError?.kind).toBe("freshness_timeout");
@@ -248,19 +267,20 @@ describe("LspClient diagnostics freshness", () => {
 	});
 
 	it("#given a server without pull support that never publishes diagnostics #when diagnostics run on a clean file #then the request resolves clean after the freshness window instead of reporting a timeout", async () => {
+		const clock = new ControlledClock();
 		const context = await harness.makeClient(
 			{},
-			{ diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
 		);
 
-		const startedAt = Date.now();
-		const result = await context.client.diagnostics(context.source);
-		const elapsedMs = Date.now() - startedAt;
+		const pending = context.client.diagnostics(context.source);
+		await clock.waitForTimer(60);
+		expect(clock.scheduledDelays.at(-1)).toBe(60);
+		clock.advanceBy(60);
+		const result = await pending;
 
 		expect(result.transientError).toBeUndefined();
 		expect(result.items).toEqual([]);
-		// The full freshness window is still honored so a slow publisher can win.
-		expect(elapsedMs).toBeGreaterThanOrEqual(45);
 	});
 
 	it("#given a pull-supported server that cached diagnostics for an older document version #when the file changes and a later pull is rejected as unsupported without any publish #then the fallback resolves empty instead of returning the stale cached diagnostics", async () => {

@@ -119,6 +119,7 @@ function runChild(
       cwd: env.HOME ?? process.cwd(),
       env: { ...env, SENPI_PTY_FORCE_PIPE: "1" },
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
     })
     let stdout = ""
     let settled = false

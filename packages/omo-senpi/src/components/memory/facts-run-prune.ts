@@ -19,7 +19,7 @@
 // blows the byte cap: retention exists to bound growth, not to erase the run a user just made.
 
 import { randomUUID } from "node:crypto"
-import { lstat, readdir, rename, rm } from "node:fs/promises"
+import { lstat, readdir, rename, rm } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {

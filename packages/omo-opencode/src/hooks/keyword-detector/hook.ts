@@ -12,6 +12,7 @@ import {
   isSyntheticOrInternalOnlyTextParts,
   log,
 } from "../../shared"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import {
   isSystemDirective,
   removeSystemReminders,
@@ -21,6 +22,24 @@ import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 
 const defaultModeUltraworkInjectedSessions = new Set<string>()
+const DEFAULT_MODE_ULTRAWORK_SESSION_CAP = 256
+
+function rememberDefaultModeUltraworkInjectedSession(sessionID: string): void {
+  if (defaultModeUltraworkInjectedSessions.has(sessionID)) return
+  if (defaultModeUltraworkInjectedSessions.size >= DEFAULT_MODE_ULTRAWORK_SESSION_CAP) {
+    const oldest = defaultModeUltraworkInjectedSessions.values().next().value
+    if (oldest !== undefined) defaultModeUltraworkInjectedSessions.delete(oldest)
+  }
+  defaultModeUltraworkInjectedSessions.add(sessionID)
+}
+
+function clearDefaultModeUltraworkInjectedSession(sessionID: string): void {
+  defaultModeUltraworkInjectedSessions.delete(sessionID)
+}
+
+function clearAllDefaultModeUltraworkInjectedSessions(): void {
+  defaultModeUltraworkInjectedSessions.clear()
+}
 
 function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
   const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
@@ -118,7 +137,7 @@ export function createKeywordDetectorHook(
 
       if (detectedKeywords.length === 0) {
         if (defaultMode?.ultrawork && !isNonMainSession && !defaultModeUltraworkInjectedSessions.has(input.sessionID)) {
-          defaultModeUltraworkInjectedSessions.add(input.sessionID)
+          rememberDefaultModeUltraworkInjectedSession(input.sessionID)
 
           log(`[keyword-detector] Default ultrawork mode auto-activated (injected via system prompt)`, { sessionID: input.sessionID })
 
@@ -243,6 +262,14 @@ export function createKeywordDetectorHook(
         sessionID: input.sessionID,
         types: detectedKeywords.map((k) => k.type),
       })
+    },
+    event: ({ event }: { event: { type: string; properties?: unknown } }): void => {
+      if (event.type !== "session.deleted") return
+      const sessionID = resolveSessionEventID(event.properties)
+      if (sessionID) clearDefaultModeUltraworkInjectedSession(sessionID)
+    },
+    dispose: (): void => {
+      clearAllDefaultModeUltraworkInjectedSessions()
     },
   }
 }

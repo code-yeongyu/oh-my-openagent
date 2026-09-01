@@ -274,6 +274,8 @@ type E2eFixture = {
   readonly wait: (runId: DagRunId) => Promise<DagRunResult>
   readonly running: (runId: DagRunId) => Promise<DagRunRecordV1>
   readonly events: (runId: DagRunId) => readonly DagRunEvent[]
+  readonly whenEvent: (runId: DagRunId, predicate: (event: DagRunEvent) => boolean) => Promise<void>
+  readonly whenIdle: (runId: DagRunId) => Promise<void>
   readonly retry: (runId: DagRunId, nodeIds?: readonly DagNodeId[]) => DagRunReentry
   readonly amend: (input: DagDefinition, runId: DagRunId) => Promise<DagRunReentry>
   readonly send: (runId: DagRunId, nodeId: DagNodeId, message: string) => Promise<DagNodeSendResult>
@@ -343,6 +345,22 @@ function e2eFixture(options: E2eFixtureOptions = {}): E2eFixture {
       return running
     },
     events: (runId) => manager.history({ runId, parentSessionId, limit: 256 }).events,
+    whenEvent(runId, predicate) {
+      const scheduler = schedulers.get(runId)
+      if (scheduler === undefined) throw new Error(`missing scheduler for ${runId}`)
+      return new Promise<void>((resolve) => {
+        const unsubscribe = scheduler.subscribe((event) => {
+          if (!predicate(event)) return
+          unsubscribe()
+          resolve()
+        })
+      })
+    },
+    whenIdle(runId) {
+      const scheduler = schedulers.get(runId)
+      if (scheduler === undefined) throw new Error(`missing scheduler for ${runId}`)
+      return scheduler.whenIdle()
+    },
     // The runtime's re-entry seam in miniature: control verbs run against the CURRENT durable
     // record, and the fresh scheduler they build replaces the settled one in the map.
     retry(runId, nodeIds) {
@@ -459,6 +477,8 @@ async function readLine(stream: ReadableStream<Uint8Array>): Promise<string> {
 }
 
 describe("DAG failure, crash, and policy end to end", () => {
+  const DAG_FAILURE_E2E_TIMEOUT_MS = process.platform === "win32" ? 90_000 : 15_000
+
   test("#given two failures whose completion order opposes graph order #when the real engine runs #then siblings and independent branches finish, dependents skip, and graph order selects the primary failure", async () => {
     // given
     const runner = new ControlledRunner()
@@ -501,7 +521,7 @@ describe("DAG failure, crash, and policy end to end", () => {
       type: "dag.run.failed",
       error: { nodeId: "graph-first-failure", message: "failure:graph-first-failure" },
     })
-  }, { timeout: 15_000 })
+  }, { timeout: DAG_FAILURE_E2E_TIMEOUT_MS })
 
   test("#given a crash after an owned task spawns but before task attachment #when a fresh manager resumes #then startOwned recovers the existing task and spawn count remains exactly one", async () => {
     // given
@@ -583,7 +603,7 @@ describe("DAG failure, crash, and policy end to end", () => {
     expect(fixture.taskStore.list().records).toHaveLength(tasksBefore)
   })
 
-  test("#given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and dag are absent", async () => {
+  test("#given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and workflow are absent", async () => {
     // given
     let captured: CreateAgentSessionOptions | undefined
     const inProcess = new InProcessRunner({
@@ -592,7 +612,7 @@ describe("DAG failure, crash, and policy end to end", () => {
         makeTool("task"),
         makeTool("task_create"),
         makeTool("team_send"),
-        makeTool("dag"),
+        makeTool("workflow"),
       ],
       createSession: async (options) => {
         captured = options
@@ -609,7 +629,7 @@ describe("DAG failure, crash, and policy end to end", () => {
     const names = (captured?.customTools ?? []).map((tool) => tool.name)
     expect(names).toContain("read")
     expect(names).not.toContain("task")
-    expect(names).not.toContain("dag")
+    expect(names).not.toContain("workflow")
     expect(names.some((name) => name.startsWith("task_") || name.startsWith("team_"))).toBe(false)
   })
 
@@ -1027,6 +1047,63 @@ describe("DAG retry, amend, and revive end to end", () => {
     expect(record.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual(["first:completed", "second:completed"])
     expect(runner.startedSpecs.map((spec) => spec.prompt)).toEqual(["do first", "do second"])
     expect(fs.readFileSync(fixture.store.paths.result(runId, "second"), "utf8")).toBe("output:second")
+  })
+
+  test("#given a live wave with one failed node revived before its sibling settles #when the sibling completes #then the run awaits the revival and schedules their dependent", async () => {
+    // given - mirrors dag_2d12c2f7: A and B share wave 0; C depends on both.
+    const runner = new ControlledRunner()
+    const fixture = e2eFixture({ runner })
+    const started = await fixture.start(definition("revive-inside-live-wave", [
+      categoryNode("A"),
+      categoryNode("B"),
+      categoryNode("C", ["A", "B"]),
+    ]))
+    const runId = started.snapshot.runId
+    await runner.whenStarted(2)
+    const bFailed = fixture.whenEvent(runId, (event) =>
+      event.type === "dag.node.transitioned" && event.nodeId === "B" && event.to === "failed",
+    )
+    runner.settle("B", failed("B"))
+    await bFailed
+    const sent = await fixture.send(runId, "B" as DagNodeId, "continue after the transient abort")
+
+    // when - A is the last settlement still known to the original wave await set.
+    const aCompleted = fixture.whenEvent(runId, (event) =>
+      event.type === "dag.node.transitioned" && event.nodeId === "A" && event.to === "completed",
+    )
+    runner.settle("A", completed("A"))
+    await aCompleted
+    await fixture.whenIdle(runId)
+
+    // then - B's revived turn remains part of the live barrier, so no terminal event can land yet.
+    expect(sent.delivery).toBe("revive")
+    expect(fixture.manager.record(runId, parentSessionId).status).toBe("running")
+    expect(fixture.events(runId).some((event) =>
+      event.type === "dag.run.completed" || event.type === "dag.run.failed",
+    )).toBe(false)
+
+    const bCompleted = fixture.whenEvent(runId, (event) =>
+      event.type === "dag.node.transitioned" && event.nodeId === "B" && event.to === "completed",
+    )
+    runner.settle("B", completed("B-revived"))
+    await bCompleted
+    await sent.settled
+    await runner.whenStarted(3)
+    expect(runner.startedSpecs[2]?.prompt).toBe("do C")
+    runner.settle("C", completed("C"))
+    const record = await fixture.running(runId)
+
+    expect(record.status).toBe("completed")
+    expect(record.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
+      "A:completed",
+      "B:completed",
+      "C:completed",
+    ])
+    const terminal = fixture.events(runId).filter((event) =>
+      event.type === "dag.run.completed" || event.type === "dag.run.failed",
+    )
+    expect(terminal).toHaveLength(1)
+    expect(terminal[0]?.type).toBe("dag.run.completed")
   })
 
   test("#given a failed node whose child is still resident #when send revives it #then the child continues in place and the node reaches completed once", async () => {

@@ -34,11 +34,26 @@ export async function sendToDagNode(
   runId: DagRunId,
   nodeId: DagNodeId,
   message: string,
+  watchRevived?: (nodeId: DagNodeId, taskId: string) => Promise<void> | undefined,
 ): Promise<DagNodeSendResult> {
   const record = ownedRecord(options, runId)
   const node = record.nodes.find((entry) => entry.id === nodeId)
   if (node === undefined) {
     throw new DagNodeControlError({ code: "node_not_found", message: `unknown dag node "${nodeId}"`, runId, nodeIds: [nodeId] })
+  }
+  // #7412 defect 2: a completed or cancelled run is settled evidence. Reviving a child here
+  // would journal running nodes under a terminal run - a checkpoint no recovery path can ever
+  // claim again (resume claims only "paused" runs). Failed runs stay sendable: revive is the
+  // documented remedy for a failed node whose child is still resident.
+  if (record.status === "completed" || record.status === "cancelled") {
+    throw new DagNodeControlError({
+      code: "node_not_continuable",
+      message: record.status === "completed"
+        ? `dag run "${runId}" already completed; node "${nodeId}" cannot be steered or revived. Amend the definition or start a new run.`
+        : `dag run "${runId}" was cancelled; node "${nodeId}" cannot be steered or revived. Retry the node to run it again.`,
+      runId,
+      nodeIds: [nodeId],
+    })
   }
   const taskId = node.taskId
   if (taskId === undefined) {
@@ -63,7 +78,7 @@ export async function sendToDagNode(
     callerSessionId: record.parentSessionId,
     allScope: true,
   })
-  return foldSendOutcome(options, record, node, taskId, outcome)
+  return foldSendOutcome(options, record, node, taskId, outcome, watchRevived)
 }
 
 function foldSendOutcome(
@@ -72,6 +87,7 @@ function foldSendOutcome(
   node: DagNode,
   taskId: string,
   outcome: SendOutcome,
+  watchRevived?: (nodeId: DagNodeId, taskId: string) => Promise<void> | undefined,
 ): DagNodeSendResult {
   const runId = record.runId
   const nodeId = node.id
@@ -87,8 +103,20 @@ function foldSendOutcome(
       const journal = controlJournal(options, record)
       journal.append(dagNodeSteeredEvent({ nodeId, taskId, delivery: "revive" }))
       journal.append(dagNodeTransitionedEvent({ nodeId, from: node.state, to: "running", reason: { kind: "revived" } }))
-      return { nodeId, taskId, delivery: "revive", settled: watchRevivedTask(options, nodeId, taskId) }
+      return {
+        nodeId,
+        taskId,
+        delivery: "revive",
+        settled: watchRevived?.(nodeId, taskId) ?? watchRevivedTask(options, nodeId, taskId),
+      }
     }
+    case "capacity_deferred":
+      throw new DagNodeControlError({
+        code: "node_not_continuable",
+        message: `dag node "${nodeId}" could not revive: ${outcome.reason}`,
+        runId,
+        nodeIds: [nodeId],
+      })
     case "one_shot_agent":
       throw new DagNodeControlError({
         code: "node_not_continuable",
@@ -120,8 +148,9 @@ function foldSendOutcome(
   }
 }
 
-// A revived child settles OUTSIDE any wave: no wave loop is awaiting this task, so the send arms the
-// one watcher that folds its new terminal outcome and persists its result exactly once.
+// A revived child can settle OUTSIDE the live settle loop (the run may already be quiescent):
+// no admission pass is necessarily awaiting this task, so the send arms the one watcher that folds
+// its new terminal outcome and persists its result exactly once.
 async function watchRevivedTask(
   options: DagSchedulerOptions,
   nodeId: DagNodeId,

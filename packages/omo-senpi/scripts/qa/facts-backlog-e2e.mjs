@@ -49,7 +49,20 @@ function findOnPath(bin) {
 
 /** Digest of a real user directory: the isolation proof. Volatile session/log paths a live host
  * rewrites on its own are excluded, exactly as memory-e2e.mjs does. */
-const VOLATILE = new Set(["sessions", "senpi-debug.log", "mcp-cache.json", "mcp-auth", "settings.json", "telemetry.log", "goals", "logs", "omo-debug.log", "last-payloads.json"])
+const VOLATILE = new Set([
+  "sessions",
+  "senpi-debug.log",
+  "mcp-cache.json",
+  "mcp-auth",
+  "settings.json",
+  "telemetry.log",
+  "goals",
+  "logs",
+  "omo-debug.log",
+  "OmO-debug.log",
+  "OmO-crash.log",
+  "last-payloads.json",
+])
 function hashFiles(root, excludePrefix = undefined) {
   const files = new Map()
   if (!existsSync(root)) return files

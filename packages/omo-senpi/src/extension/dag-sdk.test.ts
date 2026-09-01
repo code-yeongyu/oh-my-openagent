@@ -14,7 +14,7 @@ import { DAG_SDK_ROOT_ENV, createDagSdkRootProvisioning } from "./dag-sdk-root-p
 // The eval kernel installs `tool` as a global proxy whose properties are async tool callers
 // (senpi packages/senpi-codemode/src/kernels/js/worker-runtime.js). The SDK is loaded inside that
 // worker, so the tests drive it exactly the same way: install a stub global, import the artifact,
-// and assert on the recorded `tool.dag` arguments.
+// and assert on the recorded `tool.workflow` arguments.
 type DagCall = Record<string, unknown>
 
 type DagRunHandle = {
@@ -45,7 +45,7 @@ const sdkPath = join(import.meta.dir, "../../plugin/runtime/dag/sdk.js")
 function installToolStub(reply: (args: DagCall) => unknown): DagCall[] {
   const calls: DagCall[] = []
   Reflect.set(globalThis, "tool", {
-    dag: async (args: DagCall) => {
+    workflow: async (args: DagCall) => {
       calls.push(args)
       return reply(args)
     },
@@ -108,7 +108,7 @@ describe("dag eval sdk", () => {
               ],
             },
           },
-          { action: "wait", run_id: "run-7" },
+          { action: "wait", run_id: "run-7", detach: false },
         ])
         expect(started).toEqual(expect.objectContaining({
           run_id: "run-7",
@@ -134,7 +134,7 @@ describe("dag eval sdk", () => {
         expect(handle.run_id).toBe("run-9")
         expect(calls).toEqual([
           { action: "attach", run_id: "run-9" },
-          { action: "wait", run_id: "run-9" },
+          { action: "wait", run_id: "run-9", detach: false },
           { action: "cancel", run_id: "run-9", reason: "superseded" },
           { action: "snapshot", run_id: "run-9" },
           { action: "cancel", run_id: "run-9" },
@@ -242,6 +242,114 @@ describe("dag eval sdk", () => {
       await sdk.amend("run-14", definition)
 
       expect(calls).toEqual([{ action: "amend", run_id: "run-14", definition }])
+    })
+  })
+
+  // Captured from a live incident: when the dag tool refuses a call it answers with a well-formed
+  // envelope whose details.kind is "error" and which carries no run_id. The SDK used to report only
+  // "did not include a run_id", so the operator had to re-probe the raw tool from a Python cell to
+  // learn the run key had merely collided.
+  const CONFLICT_MESSAGE = 'dag run key "ship-dag" already exists with a different definition'
+  const conflictResponse = {
+    content: [{ type: "text", text: CONFLICT_MESSAGE }],
+    details: {
+      kind: "error",
+      error: {
+        code: "definition_conflict",
+        message: CONFLICT_MESSAGE,
+        nodes: [],
+        errors: [],
+        diagnostics: [],
+        node_ids: [],
+      },
+    },
+  }
+
+  describe("#given the dag tool refuses a call with a details.kind=error envelope", () => {
+    describe("#when start receives a definition_conflict", () => {
+      it("#then it throws the tool's own code and human message instead of hiding them behind run_id", async () => {
+        installToolStub(() => conflictResponse)
+        const sdk = await loadSdk()
+
+        const rejection = expect(
+          sdk.start({ key: "ship-dag", nodes: [{ id: "a", prompt: "A", category: "quick" }] }),
+        ).rejects
+        await rejection.toThrow(/definition_conflict/)
+        await rejection.toThrow(/already exists with a different definition/)
+        await rejection.toThrow(/start/)
+        await rejection.not.toThrow(/did not include a run_id/)
+      })
+    })
+
+    describe("#when wait receives the same error envelope", () => {
+      it("#then the non-start actions surface the code and message too", async () => {
+        installToolStub(() => conflictResponse)
+        const sdk = await loadSdk()
+
+        const rejection = expect(sdk.wait("run-77")).rejects
+        await rejection.toThrow(/definition_conflict/)
+        await rejection.toThrow(/already exists with a different definition/)
+        await rejection.toThrow(/wait/)
+      })
+    })
+
+    describe("#when attach receives the same error envelope", () => {
+      it("#then it rejects rather than handing back a handle for a run that was never attached", async () => {
+        installToolStub(() => ({
+          content: [{ type: "text", text: "dag run \"run-88\" was not found" }],
+          details: {
+            kind: "error",
+            error: {
+              code: "run_not_found",
+              message: 'dag run "run-88" was not found',
+              nodes: [],
+              errors: [],
+              diagnostics: [],
+              node_ids: [],
+            },
+          },
+        }))
+        const sdk = await loadSdk()
+
+        const rejection = expect(sdk.attach("run-88")).rejects
+        await rejection.toThrow(/run_not_found/)
+        await rejection.toThrow(/was not found/)
+        await rejection.toThrow(/attach/)
+      })
+    })
+
+    describe("#when the error envelope carries no code or message", () => {
+      it("#then it falls back to the first content text so the operator still sees the tool's words", async () => {
+        installToolStub(() => ({
+          content: [{ type: "text", text: "the dag engine is not wired up" }],
+          details: { kind: "error" },
+        }))
+        const sdk = await loadSdk()
+
+        await expect(sdk.snapshot("run-99")).rejects.toThrow(/the dag engine is not wired up/)
+      })
+    })
+
+    describe("#when the error envelope carries neither error fields nor content text", () => {
+      it("#then it still names the failing action rather than throwing something unreadable", async () => {
+        installToolStub(() => ({ details: { kind: "error" } }))
+        const sdk = await loadSdk()
+
+        await expect(sdk.cancel("run-100")).rejects.toThrow(/cancel/)
+      })
+    })
+  })
+
+  describe("#given a well-formed non-error response that still lacks a run_id", () => {
+    describe("#when start reads it", () => {
+      it("#then the existing run_id diagnostic is preserved", async () => {
+        installToolStub(() => ({ details: { kind: "started" } }))
+        const sdk = await loadSdk()
+
+        await expect(
+          sdk.start({ key: "no-run-id", nodes: [{ id: "a", prompt: "A", category: "quick" }] }),
+        ).rejects.toThrow(/did not include a run_id/)
+      })
     })
   })
 

@@ -80,21 +80,45 @@ export async function load(name, options) {
   return { ...fillPlaceholders(definition, utcVars(finalKey, now)), key: finalKey }
 }
 
+// Mirrors sdk.js: a refused start resolves with { details: { kind: "error", error: { code, message } } }
+// and no run_id, so surface the tool's own words instead of the missing-run_id symptom.
+function throwIfToolError(action, response) {
+  if (response?.details?.kind !== "error") return response
+  const error = response.details.error
+  const code = typeof error?.code === "string" && error.code !== "" ? error.code : undefined
+  const message = typeof error?.message === "string" && error.message !== "" ? error.message : undefined
+  const detail =
+    code === undefined && message === undefined
+      ? firstContentText(response) ?? "the dag tool reported an error with no details."
+      : [code, message].filter((part) => part !== undefined).join(": ")
+  throw new Error(`dag library: ${action} failed: ${detail}`)
+}
+
+function firstContentText(response) {
+  const content = response?.content
+  if (!Array.isArray(content)) return undefined
+  for (const entry of content) {
+    if (typeof entry?.text === "string" && entry.text !== "") return entry.text
+  }
+  return undefined
+}
+
 export async function start(name, options) {
   const definition = await load(name, options)
-  const response = await kernel("tool").dag({ action: "start", definition })
+  const response = throwIfToolError("start", await kernel("tool").workflow({ action: "start", definition }))
   const runId = response?.details?.run_id ?? response?.run_id
   if (typeof runId !== "string" || runId === "") {
     throw new Error("dag library: the dag start response did not include a run_id.")
   }
-  const dag = kernel("tool").dag
+  const workflow = kernel("tool").workflow
   return {
     ...response,
     run_id: runId,
-    done: () => dag({ action: "wait", run_id: runId }),
+    // done() blocks for the final result, opting out of the tool's detached default.
+    done: () => workflow({ action: "wait", run_id: runId, detach: false }),
     cancel: (reason) =>
       reason === undefined
-        ? dag({ action: "cancel", run_id: runId })
-        : dag({ action: "cancel", run_id: runId, reason }),
+        ? workflow({ action: "cancel", run_id: runId })
+        : workflow({ action: "cancel", run_id: runId, reason }),
   }
 }
