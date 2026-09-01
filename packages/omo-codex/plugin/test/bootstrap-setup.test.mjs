@@ -14,6 +14,7 @@ const PERMISSIONS_KEY_PATTERN = /approval_policy|sandbox_mode|network_access/;
 const PLUGIN_VERSION = "9.9.9";
 
 const BUNDLED_EXPLORER_TOML = 'description = "Explorer agent"\nmodel_reasoning_effort = "medium"\n';
+const BUNDLED_EXPLORER_TOML_V2 = 'description = "Explorer agent v2"\nmodel_reasoning_effort = "medium"\n';
 const BUNDLED_METIS_TOML = 'description = "Metis agent"\nmodel_reasoning_effort = "high"\n';
 
 async function withSetupFixture(run) {
@@ -130,6 +131,7 @@ test("#given a completed first run #when the worker setup runs again #then confi
 test("#given a config.toml that already declares [agents.explorer] at a different path (Orca mirror) #when the worker setup runs #then no second colliding registration is added for that role", async () => {
 	await withSetupFixture(async (fixture) => {
 		const orcaMirrorPath = "/orca-mirrored-home/.codex/agents/explorer.toml";
+		await runWorkerSetup(setupOptions(fixture));
 		await writeFile(
 			join(fixture.codexHome, "config.toml"),
 			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "${orcaMirrorPath}"\n`,
@@ -149,11 +151,62 @@ test("#given a config.toml that already declares [agents.explorer] at a differen
 			"no colliding ./agents registration for the mirrored role",
 		);
 		assert.match(config, /\[agents\.metis\]\nconfig_file = "\.\/agents\/metis\.toml"/);
-		assert.equal(
-			await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8"),
-			BUNDLED_EXPLORER_TOML,
-			"the linked toml is still staged for Codex directory discovery",
+		await assert.rejects(() => stat(join(fixture.codexHome, "agents", "explorer.toml")), { code: "ENOENT" });
+	});
+});
+
+test("#given shared plugin data from another CODEX_HOME #when an Orca runtime has a mirrored explorer #then the managed runtime copy is removed", async () => {
+	await withSetupFixture(async (fixture) => {
+		await runWorkerSetup(setupOptions(fixture));
+		const orcaHome = join(fixture.root, "orca-codex-home");
+		await mkdir(join(orcaHome, "agents"), { recursive: true });
+		await writeFile(
+			join(orcaHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "/canonical-codex-home/agents/explorer.toml"\n`,
 		);
+		await writeFile(join(orcaHome, "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML);
+
+		const outcome = await runWorkerSetup({ ...setupOptions(fixture), codexHome: orcaHome });
+
+		assert.deepEqual(outcome.degraded, []);
+		await assert.rejects(() => stat(join(orcaHome, "agents", "explorer.toml")), { code: "ENOENT" });
+		assert.equal(await readFile(join(orcaHome, "agents", "metis.toml"), "utf8"), BUNDLED_METIS_TOML);
+	});
+});
+
+test("#given missing bootstrap state #when an Orca runtime has a bundled explorer copy #then the exact bundled duplicate is removed", async () => {
+	await withSetupFixture(async (fixture) => {
+		await runWorkerSetup(setupOptions(fixture));
+		await rm(join(fixture.pluginData, "bootstrap", "agents-stage"), { force: true, recursive: true });
+		const orcaHome = join(fixture.root, "orca-codex-home");
+		await mkdir(join(orcaHome, "agents"), { recursive: true });
+		await writeFile(
+			join(orcaHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "/canonical-codex-home/agents/explorer.toml"\n`,
+		);
+		await writeFile(join(orcaHome, "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML);
+
+		await runWorkerSetup({ ...setupOptions(fixture), codexHome: orcaHome });
+
+		await assert.rejects(() => stat(join(orcaHome, "agents", "explorer.toml")), { code: "ENOENT" });
+	});
+});
+
+test("#given stale staged agent content #when an Orca runtime has the current bundled explorer #then the current duplicate is removed", async () => {
+	await withSetupFixture(async (fixture) => {
+		await runWorkerSetup(setupOptions(fixture));
+		await writeFile(join(fixture.pluginRoot, "components", "ultrawork", "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML_V2);
+		const orcaHome = join(fixture.root, "orca-codex-home");
+		await mkdir(join(orcaHome, "agents"), { recursive: true });
+		await writeFile(
+			join(orcaHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "/canonical-codex-home/agents/explorer.toml"\n`,
+		);
+		await writeFile(join(orcaHome, "agents", "explorer.toml"), BUNDLED_EXPLORER_TOML_V2);
+
+		await runWorkerSetup({ ...setupOptions(fixture), codexHome: orcaHome });
+
+		await assert.rejects(() => stat(join(orcaHome, "agents", "explorer.toml")), { code: "ENOENT" });
 	});
 });
 
@@ -165,6 +218,22 @@ test("#given a config.toml with no pre-existing agent entries #when the worker s
 		const config = await readConfig(fixture);
 		assert.match(config, /\[agents\.explorer\]\nconfig_file = "\.\/agents\/explorer\.toml"/);
 		assert.match(config, /\[agents\.metis\]\nconfig_file = "\.\/agents\/metis\.toml"/);
+	});
+});
+
+test("#given a previously managed role replaced by a user file and an Orca registration #when the worker setup runs #then the user file is preserved", async () => {
+	await withSetupFixture(async (fixture) => {
+		const userAgent = 'description = "User-owned explorer"\nmodel = "gpt-5.6"\n';
+		await runWorkerSetup(setupOptions(fixture));
+		await writeFile(join(fixture.codexHome, "agents", "explorer.toml"), userAgent);
+		await writeFile(
+			join(fixture.codexHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "/orca-mirrored-home/.codex/agents/explorer.toml"\n`,
+		);
+
+		await runWorkerSetup(setupOptions(fixture));
+
+		assert.equal(await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8"), userAgent);
 	});
 });
 
