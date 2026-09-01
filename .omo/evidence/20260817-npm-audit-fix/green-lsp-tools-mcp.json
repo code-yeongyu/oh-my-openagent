@@ -1,0 +1,15 @@
+{
+  "command": "npm --prefix packages/lsp-tools-mcp audit --json --package-lock-only",
+  "exit_code": 0,
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    }
+  },
+  "vulnerabilities": {}
+}

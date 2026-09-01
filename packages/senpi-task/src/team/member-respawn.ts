@@ -6,6 +6,7 @@ import type { TrustedRespawnLaunchResolver } from "../manager"
 import type { TaskRecord } from "../state"
 import { resolveStateDir, type StateDirConfig } from "../store"
 import { readMemberTaskMap } from "./member-map"
+import { assembleMemberExtensions } from "./member-extensions"
 import type { TeamMemberExtensionConfig } from "./runtime-types"
 import { toTeamCoreConfig } from "./runtime-config"
 import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
@@ -50,7 +51,7 @@ export function createTeamMemberRespawnLaunchResolver(
 ): TrustedRespawnLaunchResolver {
   const config = toTeamCoreConfig(options.taskSettings, teamStorageBaseDir(options.stateDir))
   const inheritedExtensions = [...new Set(options.memberExtension.inheritedExtensions ?? [])]
-  const extensions = [...new Set([options.memberExtension.entryPath, ...inheritedExtensions])]
+  const extensions = assembleMemberExtensions(options.memberExtension.entryPath, inheritedExtensions)
 
   return async (record: TaskRecord) => {
     const identity = parseTeamMemberTaskName(record.name)

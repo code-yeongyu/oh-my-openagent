@@ -45,6 +45,13 @@ describe("evaluateDreamGates", () => {
     expect(calls).toEqual({ lastDreamAt: 0, unreflectedBytes: 0 })
   })
 
+  test("#given dream disabled #when a pressure origin evaluates #then it is rejected before probing", async () => {
+    const { probe, calls } = gateProbe()
+    const decision = await evaluateDreamGates("pressure", triggerSettings({ enabled: false }), probe)
+    expect(decision).toEqual({ allowed: false, rejection: "disabled" })
+    expect(calls).toEqual({ lastDreamAt: 0, unreflectedBytes: 0 })
+  })
+
   test("#given shutdown_launch disabled #when a shutdown origin evaluates #then it is rejected before probing", async () => {
     const { probe, calls } = gateProbe()
     const decision = await evaluateDreamGates("shutdown", triggerSettings({ shutdownLaunch: false }), probe)
@@ -63,6 +70,20 @@ describe("evaluateDreamGates", () => {
     const { probe } = gateProbe({ lastDreamAtMs: NOW_MS - 24 * 3_600_000 - 1 })
     const decision = await evaluateDreamGates("idle", triggerSettings(), probe)
     expect(decision).toEqual({ allowed: true })
+  })
+
+  test("#given the last dream exactly min_hours_between ago #when pressure evaluates #then spacing rejects without probing volume", async () => {
+    const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS - 24 * 3_600_000, unreflectedBytes: 0 })
+    const decision = await evaluateDreamGates("pressure", triggerSettings(), probe)
+    expect(decision).toEqual({ allowed: false, rejection: "too_soon" })
+    expect(calls).toEqual({ lastDreamAt: 1, unreflectedBytes: 0 })
+  })
+
+  test("#given pressure is past dream spacing #when unreflected volume is zero #then it is allowed without probing volume", async () => {
+    const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS - 24 * 3_600_000 - 1, unreflectedBytes: 0 })
+    const decision = await evaluateDreamGates("pressure", triggerSettings(), probe)
+    expect(decision).toEqual({ allowed: true })
+    expect(calls).toEqual({ lastDreamAt: 1, unreflectedBytes: 0 })
   })
 
   test("#given no recorded dream #when an idle origin evaluates #then the spacing gate passes", async () => {

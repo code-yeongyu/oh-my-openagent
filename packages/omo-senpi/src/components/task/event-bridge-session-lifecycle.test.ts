@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
+import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
 import type { TaskRecord } from "@oh-my-opencode/senpi-task"
-
 import { wireHarness } from "./event-bridge.test-harness"
 
 describe("event-bridge session_start recovery chain", () => {
@@ -59,6 +59,21 @@ describe("event-bridge session_start recovery chain", () => {
     expect(warnings).toHaveLength(0)
   })
 
+  it("#given a terminal child persisted before restart #when reconcile returns no outcome #then session_start still re-observes it for liveness", async () => {
+    const terminal = {
+      task_id: "task-terminal",
+      parent_session_id: "parent-session",
+    } as TaskRecord
+    const { pi, livenessCalls } = wireHarness("parent-session", {
+      outcomes: [],
+      records: { "task-terminal": terminal },
+    })
+
+    await pi.dispatch("session_start", {}, {})
+
+    expect(livenessCalls).toEqual(["task-terminal"])
+  })
+
   it("#given expired records #when session_start fires #then the awaited ttl cleanup runs after notification reconcile and logs deletions", async () => {
     const { pi, order, infos } = wireHarness("parent-session", { cleanupDeleted: ["task-old"] })
 
@@ -68,6 +83,61 @@ describe("event-bridge session_start recovery chain", () => {
     expect(order.indexOf("poll")).toBeGreaterThan(order.indexOf("cleanup:end"))
     expect(infos).toHaveLength(1)
     expect(infos[0]?.message).toContain("ttl cleanup")
+  })
+
+  it("#given only a child session-dir override #when session_start fires #then parent recovery still reconciles", async () => {
+    const previousSessionDir = process.env.SENPI_CODING_AGENT_SESSION_DIR
+    delete process.env[OMO_SENPI_TASK_RPC_CHILD]
+    process.env.SENPI_CODING_AGENT_SESSION_DIR = "/tmp/ordinary-session"
+    try {
+      const { pi, reconcileCalls } = wireHarness("parent-session")
+      await pi.dispatch("session_start", {}, {})
+      expect(reconcileCalls).toEqual(["parent-session"])
+    } finally {
+      if (previousSessionDir === undefined) delete process.env.SENPI_CODING_AGENT_SESSION_DIR
+      else process.env.SENPI_CODING_AGENT_SESSION_DIR = previousSessionDir
+    }
+  })
+
+  it("#given the dedicated marker and a captured child session #when session_start fires #then child recovery still reconciles and redelivers notifications", async () => {
+    const previousMarker = process.env[OMO_SENPI_TASK_RPC_CHILD]
+    process.env[OMO_SENPI_TASK_RPC_CHILD] = "1"
+    try {
+      const { pi, order, reconcileCalls, notifyCalls } = wireHarness("child-session")
+
+      await pi.dispatch("session_start", {}, {})
+
+      expect(reconcileCalls).toEqual(["child-session"])
+      expect(notifyCalls).toEqual([{ sessionId: "child-session", parentState: { kind: "idle" } }])
+      expect(order).toContain("cleanup:start")
+      expect(order).toContain("poll")
+      expect(order).toContain("statusSync")
+    } finally {
+      if (previousMarker === undefined) {
+        delete process.env[OMO_SENPI_TASK_RPC_CHILD]
+      } else {
+        process.env[OMO_SENPI_TASK_RPC_CHILD] = previousMarker
+      }
+    }
+  })
+
+  it("#given the dedicated marker and no captured session #when session_start fires #then parent recovery is skipped", async () => {
+    const previousMarker = process.env[OMO_SENPI_TASK_RPC_CHILD]
+    process.env[OMO_SENPI_TASK_RPC_CHILD] = "1"
+    try {
+      const { pi, order, reconcileCalls } = wireHarness(undefined)
+
+      await pi.dispatch("session_start", {}, {})
+
+      expect(reconcileCalls).toHaveLength(0)
+      expect(order).toEqual(["capture"])
+    } finally {
+      if (previousMarker === undefined) {
+        delete process.env[OMO_SENPI_TASK_RPC_CHILD]
+      } else {
+        process.env[OMO_SENPI_TASK_RPC_CHILD] = previousMarker
+      }
+    }
   })
 })
 

@@ -108,7 +108,7 @@ describe("facts deletion reservation finalization", () => {
     if (foreignIdentity === undefined) throw new Error("foreign directory was not installed")
     expect({ dev: retained.dev, ino: retained.ino }).toEqual(foreignIdentity)
     await expectNoReceipt(repo, recovery.batchId)
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   test("does not overwrite a newer foreign file while restoring a mismatched claim", async () => {
     const { dir, repo } = await fixture()
@@ -156,7 +156,7 @@ describe("facts deletion reservation finalization", () => {
     expect((await repo.pathState.capture(september)).index).toEqual(indexBefore.get(september)?.index ?? null)
     expect(await repo.pathState.capture(september)).toEqual(recovery.paths.find((entry) => entry.path === september)!.pre)
     await expectNoReceipt(repo, recovery.batchId)
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   test("does not overwrite a newer foreign directory while restoring a mismatched claim", async () => {
     const { dir, repo } = await fixture()
@@ -210,7 +210,7 @@ describe("facts deletion reservation finalization", () => {
     expect(await indexIdentity(repo, september)).toBe(septemberIndexBefore)
     expect(await repo.pathState.capture(september)).toEqual(recovery.paths.find((entry) => entry.path === september)!.pre)
     await expectNoReceipt(repo, recovery.batchId)
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   test("preserves a foreign file replacing the verified reservation and returns parent_dirty", async () => {
     const { dir, repo } = await fixture()

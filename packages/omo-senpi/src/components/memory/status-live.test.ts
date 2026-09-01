@@ -57,10 +57,13 @@ describe("memory footer live", () => {
     timers.advance(3)
 
     expect(ui.calls.map((call) => call.key)).toEqual(Array(4).fill(MEMORY_STATUS_KEY))
+    // Literal glyphs, not `MEMORY_REFLECTING_FRAMES[n]`: deriving the expectation from the constant
+    // the code under test indexes would keep this green even if the glyph table were corrupted.
     expect(ui.calls.map((call) => call.text)).toEqual([
-      `mem:agent-test ${MEMORY_REFLECTING_FRAMES[0]} reflecting`,
-      `mem:agent-test ${MEMORY_REFLECTING_FRAMES[1]} reflecting`,
-      `mem:agent-test ${MEMORY_REFLECTING_FRAMES[2]} reflecting`,
+      "mem:agent-test ⠋ reflecting",
+      "mem:agent-test ⠙ reflecting",
+      "mem:agent-test ⠹ reflecting",
+      // Derived on purpose: what is under test here is modulo wrap-around, not glyph identity.
       `mem:agent-test ${MEMORY_REFLECTING_FRAMES[3 % MEMORY_REFLECTING_FRAMES.length]} reflecting`,
     ])
     live.dispose()

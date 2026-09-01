@@ -1,5 +1,6 @@
 export * from "./completion"
 export * from "./health"
+export * from "./health-alert"
 export * from "./remediation"
 export * from "./resolve-model"
 export * from "./runner"

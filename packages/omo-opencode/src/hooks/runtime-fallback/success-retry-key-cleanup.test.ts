@@ -77,7 +77,7 @@ describe("createMessageUpdateHandler retry-key cleanup", () => {
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
     deps.sessionAwaitingFallbackResult.add(sessionID)
-    deps.sessionStatusRetryKeys.set(sessionID, "retry:1")
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["retry:1"]))
     const handler = createMessageUpdateHandler(deps, createHelpers(clearCalls))
 
     // when

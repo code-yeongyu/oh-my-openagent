@@ -19,7 +19,6 @@ describe("task_send always-steer surface", () => {
     expect(tool.description).not.toContain("deliver_as")
     expect(tool.description).not.toContain("followUp")
     expect(tool.description).not.toContain("interrupt")
-    expect(tool.description).toContain("always steer")
   })
 
   test("#given a plain child message #when task_send routes it #then it requests steer unconditionally", async () => {

@@ -1,17 +1,28 @@
-import type { MemoryIdentity, ReflectionOutcome, ReflectionTranscriptState, ReservedRun } from "@oh-my-opencode/memory-core"
+import type {
+  MemoryIdentity,
+  ReflectionOutcome,
+  ReflectionTranscriptState,
+  ReservedRun,
+} from "@oh-my-opencode/memory-core"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiOmoConfigResult } from "../../config-resolution"
 import type { ComponentLogger } from "../../../extension/types"
 import type { ReflectionCompletionRecord, ReflectionLiveSession } from "./completion"
-import type { ReflectionThinkingLevel } from "./resolve-model"
+import type { ResolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
+import type { ReflectionSessionModel, ReflectionThinkingLevel } from "./resolve-model"
 import type { ReflectionSandbox } from "./spawn"
 
+export interface ReflectionReservationLockOptions {
+  readonly waitTimeoutMs?: number
+}
+
 export interface ReflectionReservationPort {
-  readState(): Promise<{ readonly active?: ReservedRun }>
+  readState(options?: ReflectionReservationLockOptions): Promise<{ readonly active?: ReservedRun }>
   complete(
     runId: string,
     outcome: ReflectionOutcome,
+    options?: ReflectionReservationLockOptions,
   ): Promise<{ readonly outcome: ReflectionOutcome; readonly launch?: ReservedRun }>
 }
 
@@ -33,6 +44,10 @@ export interface SenpiSubprocessRunnerOptions {
   readonly reservation: ReflectionReservationPort
   readonly logger?: ComponentLogger
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined
+  readonly resolveSessionModel?: () => ReflectionSessionModel | undefined
+  readonly resolveParentContextTokens?: () => number | undefined
+  readonly resolveParentSessionFile?: () => string | undefined
+  readonly resolveParentCacheReusable?: () => boolean
   readonly loadConfig?: (options?: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly cwd?: string
   readonly env?: NodeJS.ProcessEnv
@@ -44,6 +59,8 @@ export interface SenpiSubprocessRunnerOptions {
   readonly getTranscriptState?: (conversationId: string) => Promise<ReflectionTranscriptState>
   readonly now?: () => Date
   readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
+  readonly resolveAndPreflightLaunch?: ResolveAndPreflightMemoryLaunch
   readonly supervisorPath?: string
   readonly withWriterLock?: <T>(operation: () => Promise<T>) => Promise<T>
 }

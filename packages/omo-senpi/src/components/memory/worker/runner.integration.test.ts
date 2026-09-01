@@ -1,21 +1,46 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, readdir, rm } from "node:fs/promises"
+import { readFile, readdir } from "node:fs/promises"
 import { join } from "node:path"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { REFLECTION_COMPLETION_ENTRY_TYPE, REFLECTION_LAUNCHED_ENTRY_TYPE } from "./completion"
+import { resetModelPreflightCacheForTests } from "./model-preflight"
 import { createRunnerHarness, type RunnerHarness } from "./runner.test-support"
 
 // Each case drives a real supervisor, bootstrap, and model child - three spawned bun processes
 // plus git work. The 5s default is a fast-machine assumption, not a budget those subprocesses
 // fit on a loaded CI runner; the assertions stay event-driven with no sleeps.
-setDefaultTimeout(process.platform === "win32" ? 60_000 : 30_000)
+setDefaultTimeout(60_000)
 
 const harnesses: RunnerHarness[] = []
-afterEach(async () => Promise.all(harnesses.splice(0).map((item) => rm(item.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
+
+// Killed children release their Windows file handles asynchronously, so an unretried removal here
+// stalls into the next test file's budget. Retry generously, and tolerate only the platform's known
+// cleanup races so every other cleanup defect still fails loudly.
+async function removeRoot(root: string): Promise<void> {
+  try {
+    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+  } catch (error) {
+    if (
+      process.platform === "win32"
+      && error instanceof Error
+      && "code" in error
+      && typeof error.code === "string"
+      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
+    ) return
+    throw error
+  }
+}
+
+afterEach(async () => {
+  resetModelPreflightCacheForTests()
+  await Promise.all(harnesses.splice(0).map((item) => removeRoot(item.root)))
+})
 
 async function harness(options: Parameters<typeof createRunnerHarness>[0]): Promise<RunnerHarness> {
   const created = await createRunnerHarness(options)
@@ -54,9 +79,11 @@ describe("SenpiSubprocessRunner integration", () => {
         deep: { model: "override/model", reasoning: "high" },
       },
     }
+    const runStartedAt = Date.now()
     const item = await harness({
       childMode: "commit",
       config,
+      now: () => new Date(runStartedAt),
       models: [
         { provider: "base", id: "model" },
         { provider: "override", id: "model" },
@@ -64,7 +91,6 @@ describe("SenpiSubprocessRunner integration", () => {
     })
 
     // when
-    const startedAt = Date.now()
     const result = await item.runner.launch(item.run)
 
     // then
@@ -76,9 +102,8 @@ describe("SenpiSubprocessRunner integration", () => {
       thinking: "high",
       mergePolicy: "auto",
     })
-    expect(item.spawnCalls[0]?.hardDeadlineAt).toBeGreaterThanOrEqual(startedAt + 59_000)
-    expect(item.spawnCalls[0]?.hardDeadlineAt).toBeLessThanOrEqual(startedAt + 61_000)
-  }, 30_000)
+    expect(item.spawnCalls[0]?.hardDeadlineAt).toBe(runStartedAt + 60_000)
+  }, 60_000)
 
   test("#given a stub child that commits in its reflection worktree #when launched #then it merges records notifies and advances the cursor", async () => {
     // given
@@ -111,10 +136,12 @@ describe("SenpiSubprocessRunner integration", () => {
       }),
     })
     expect(item.api.renderers.map((entry) => entry.customType)).toEqual([
-      REFLECTION_COMPLETION_ENTRY_TYPE,
-      REFLECTION_LAUNCHED_ENTRY_TYPE,
+      "senpi-memory.reflection-completion",
+      "senpi-memory.reflection-launched",
+      "senpi-memory.reflection-summary",
     ])
     expect(item.notifications).toHaveLength(1)
+    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
     expect(item.spawnCalls).toHaveLength(1)
     const spawn = item.spawnCalls[0]
     expect(spawn?.detached).toBe(true)
@@ -169,7 +196,7 @@ describe("SenpiSubprocessRunner integration", () => {
       delivery: { status: "consumed", sessionId: "conversation-a" },
     })
     await assertWorktreesClean(item)
-  }, 30_000)
+  }, 60_000)
 
   test("#given a child sleeping beyond an injected hard deadline #when launched #then the process group times out and cleanup leaves the cursor retryable", async () => {
     // given
@@ -183,7 +210,7 @@ describe("SenpiSubprocessRunner integration", () => {
     expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
     expect((await item.store.readState()).active).toBeUndefined()
     await assertWorktreesClean(item)
-  }, 30_000)
+  }, 60_000)
 
   test("#given an extension-only primary and a child-visible fallback #when the primary is missing in the clean child #then reflection retries and records the fallback", async () => {
     // given
@@ -206,7 +233,48 @@ describe("SenpiSubprocessRunner integration", () => {
       outcome: "merged",
     })
     await assertWorktreesClean(item)
-  }, 30_000)
+  }, 60_000)
+
+  test("#given the primary model's providers are all cooling down #when the child dies with a 503 #then reflection relaunches on the next candidate and merges", async () => {
+    // given
+    const item = await harness({ childMode: "provider-cooldown" })
+
+    // when
+    const result = await item.runner.launch(item.run)
+
+    // then
+    expect(result.outcome).toBe("merged")
+    expect(item.spawnCalls.map((spawn) => spawn.args[spawn.args.indexOf("--model") + 1])).toEqual([
+      "extension-only/primary",
+      "kimi-coding/fallback",
+    ])
+    expect(item.spawnCalls.map((spawn) => spawn.attempt)).toEqual([1, 2])
+    expect(result.completion).toMatchObject({
+      model: "kimi-coding/fallback",
+      thinking: "minimal",
+      outcome: "merged",
+    })
+    await assertWorktreesClean(item)
+  }, 60_000)
+
+  test("#given no candidate is visible #when a fresh probe and then its cached negative are used #then only the fresh verdict fails closed", async () => {
+    // given
+    const item = await harness({
+      childMode: "commit",
+      preflightModels: [{ provider: "other", id: "model" }],
+    })
+
+    // when
+    const fresh = await item.runner.launch(item.run)
+    const cached = await item.runner.launch(await item.reserveAgain())
+
+    // then
+    expect(fresh).toMatchObject({ outcome: "failed", reason: "spawn_failed" })
+    expect(fresh.detail).toContain("No reflection model candidate is visible")
+    expect(cached.outcome).toBe("merged")
+    expect(item.spawnCalls).toHaveLength(1)
+    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
+  }, 60_000)
 
   test("#given every child-visible candidate misses its model or auth #when the chain is exhausted #then the failed outcome fingerprints every attempted cause", async () => {
     // given
@@ -221,7 +289,7 @@ describe("SenpiSubprocessRunner integration", () => {
     expect(result.detail).toContain("auth_missing:kimi-coding")
     expect(result.detail).toContain("attempted:extension-only/primary,kimi-coding/fallback")
     expect(item.spawnCalls).toHaveLength(2)
-  }, 30_000)
+  }, 60_000)
 
   test("#given empty categories and no quick model #when launched twice in one session #then both fail without spawning and only one unsuppressed warning appears", async () => {
     // given
@@ -239,7 +307,7 @@ describe("SenpiSubprocessRunner integration", () => {
     expect(item.notifications).toHaveLength(1)
     expect(item.notifications[0]?.message).toContain('Category "quick"')
     expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
-  }, 30_000)
+  }, 60_000)
 
   test("#given a zero-exit child that modifies linked-worktree git administration #when completion validates #then it fails cleans up and leaves the cursor unmoved", async () => {
     // given
@@ -253,5 +321,5 @@ describe("SenpiSubprocessRunner integration", () => {
     expect(result.detail).toContain("Git administration files were modified")
     expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
     await assertWorktreesClean(item)
-  }, 30_000)
+  }, 60_000)
 })

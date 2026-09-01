@@ -1,0 +1,27 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/e2e-failure.test.ts:
+(pass) DAG failure, crash, and policy end to end > #given two failures whose completion order opposes graph order #when the real engine runs #then siblings and independent branches finish, dependents skip, and graph order selects the primary failure [65.83ms]
+(pass) DAG failure, crash, and policy end to end > #given a crash after an owned task spawns but before task attachment #when a fresh manager resumes #then startOwned recovers the existing task and spawn count remains exactly one [16.89ms]
+(pass) DAG failure, crash, and policy end to end > #given an existing run key #when its prompt changes #then definition_conflict leaves the original checkpoint, events, and task count untouched [18.33ms]
+(pass) DAG failure, crash, and policy end to end > #given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and dag are absent [18.41ms]
+(pass) DAG failure, crash, and policy end to end > #given inherited rpc extensions #when DAG and non-DAG children spawn #then only the DAG child omits the leading omo-senpi entry [23.97ms]
+(pass) DAG failure, crash, and policy end to end > #given a missing requested skill #when the real run starts #then a missing_skill diagnostic is retained and the node still completes [16.35ms]
+(pass) DAG failure, crash, and policy end to end > #given a corrupt trailing JSONL fragment #when the store reopens #then the tail is discarded, diagnosed, and earlier events remain authoritative [19.82ms]
+(pass) DAG failure, crash, and policy end to end > #given a SIGKILL at a randomized fsync-backed mutation boundary #when the store reopens #then the checkpoint is whole and every journaled event replays [235.44ms]
+(pass) DAG failure, crash, and policy end to end > #given a wave wider than residency_max_children #when admission frees slots in batches #then every node completes without a residency failure [55.32ms]
+(pass) DAG failure, crash, and policy end to end > #given expired terminal artifacts and equally old live artifacts #when retention runs #then events, results, and skills are pruned only for the terminal run [4.36ms]
+(pass) DAG retry, amend, and revive end to end > #given a failed node in a completed-upstream run #when retried #then the run completes and every upstream task id is reused untouched [49.92ms]
+(pass) DAG retry, amend, and revive end to end > #given a node that fails twice #when retried twice #then each attempt owns a distinct child and the last one settles the run [39.20ms]
+(pass) DAG retry, amend, and revive end to end > #given a node failed by the residency cap #when retried after the storm clears #then it runs and the run completes [22.98ms]
+(pass) DAG retry, amend, and revive end to end > #given a failed node #when its prompt is amended #then only it and its dependents re-run on re-entry [48.57ms]
+(pass) DAG retry, amend, and revive end to end > #given a settled run #when an amendment adds a node #then the added node executes on re-entry [28.25ms]
+(pass) DAG retry, amend, and revive end to end > #given a live wave with one failed node revived before its sibling settles #when the sibling completes #then the run awaits the revival and schedules their dependent [35.51ms]
+(pass) DAG retry, amend, and revive end to end > #given a failed node whose child is still resident #when send revives it #then the child continues in place and the node reaches completed once [22.79ms]
+
+ 17 pass
+ 0 fail
+ 113 expect() calls
+Ran 17 tests across 1 file. [1377.00ms]
+
+exit_code=0

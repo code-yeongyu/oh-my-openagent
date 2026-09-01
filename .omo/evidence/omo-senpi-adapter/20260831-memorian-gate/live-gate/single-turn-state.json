@@ -1,0 +1,12 @@
+{
+  "sessionFiles": [
+    "2026-09-01T05-41-31-664Z_01a05b6d-0000-7000-8000-00000000000f.jsonl"
+  ],
+  "userTurnCount": 1,
+  "recall": [],
+  "stubInvocations": [],
+  "pending": {
+    "dir": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-qNiadH/memory/agents/project-a1ffae3d/runtime/recall/pending",
+    "files": []
+  }
+}

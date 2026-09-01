@@ -1,6 +1,6 @@
 # What Is Oh My OpenAgent?
 
-Oh My OpenAgent is a multi-model agent orchestration harness for OpenCode. It transforms a single AI agent into a coordinated development team that actually ships code.
+Oh My OpenAgent is a multi-model agent orchestration harness. The OpenCode plugin edition (this guide) is the primary focus; Codex (LazyCodex) and Senpi editions ship separately. It transforms a single AI agent into a coordinated development team that actually ships code.
 
 Not locked to Claude. Not locked to OpenAI. Not locked to anyone.
 
@@ -31,7 +31,7 @@ ultrawork
 
 That's it. The agent figures everything out — explores your codebase, researches patterns, implements the feature, verifies with diagnostics. Keeps working until done.
 
-Want more control? Press **Tab** to enter [Prometheus mode](./orchestration.md) for interview-based planning, then run `/start-work` for full orchestration.
+Want more control? Open the agent selector (Tab) and choose [Prometheus](./orchestration.md) for interview-based planning, then run `/ulw-execute` so Atlas executes the plan.
 
 ---
 
@@ -54,16 +54,17 @@ Instead of one agent doing everything, Oh My OpenAgent uses **specialized agents
 ```
 User Request
     ↓
-[IntentGate] — Classifies what you actually want
+[IntentGate] — Injects mode prompts on ultrawork/ulw, team-mode, hyperplan keywords
     ↓
 [Sisyphus] — Main orchestrator, plans and delegates
     ↓
-    ├─→ [Prometheus] — Strategic planning (interview mode)
-    ├─→ [Atlas] — Todo orchestration and execution
     ├─→ [Oracle] — Architecture consultation
     ├─→ [Librarian] — Documentation/code search
     ├─→ [Explore] — Fast codebase grep
     └─→ [Category-based agents] — Specialized by task type
+
+Planning path (sibling primary agents, not Sisyphus subagents):
+User → Tab or /agent → [Prometheus] (plan) → /ulw-execute → [Atlas] (execute)
 ```
 
 When Sisyphus delegates to a subagent, it doesn't pick a model name. It picks a **category** — `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`. The category automatically maps to the right model. You touch nothing.
@@ -93,7 +94,7 @@ Sisyphus works best on Claude Opus 5, Kimi K3/K2.7, and GLM 5.2. GPT-5.4 has its
 
 Named with intentional irony. Anthropic blocked OpenCode from using their API because of this project. So the team built an autonomous GPT-native agent instead.
 
-Hephaestus prefers GPT-5.6 Sol at medium effort through OpenAI or Vercel, then falls back to GPT-5.6 Sol at medium effort across OpenAI, GitHub Copilot, OpenCode, or Vercel. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
+Hephaestus uses GPT-5.6 Sol at medium effort, trying providers in order: OpenAI, GitHub Copilot, Vercel, OpenCode. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
 
 Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work benefits from a GPT-native autonomous agent.
 
@@ -101,20 +102,20 @@ Use Hephaestus when you need deep architectural reasoning, complex debugging acr
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. Opus 5 for orchestration and visual work. GPT-5.6 Sol for deep reasoning. Kimi high-speed for quick tasks. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` starts with Claude Opus 5 max, then Kimi K3 and GLM 5.2. `ultrabrain` prefers GPT-5.6 Sol xhigh, while `deep` uses GPT-5.6 Sol medium. `artistry` starts with Claude Fable 5, `quick` with Kimi high-speed, `unspecified-low` with GPT-5.6 Luna, and both `unspecified-high` and `writing` with Kimi K3. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` starts with Claude Opus 5 max, then Kimi K3 and GLM 5.2. `ultrabrain` prefers GPT-5.6 Sol max, while `deep` uses GPT-5.6 Sol medium. `artistry` starts with Claude Fable 5, `quick` with Kimi high-speed, `unspecified-low` with Grok 4.6, and both `unspecified-high` and `writing` with Kimi K3. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
 
 Prometheus interviews you like a real engineer. Asks clarifying questions. Identifies scope and ambiguities. Builds a detailed plan before a single line of code is touched.
 
-Press **Tab** to enter Prometheus mode, or type `@plan "your task"` from Sisyphus.
+Open the agent selector (Tab) or run `/agent` and choose Prometheus.
 
 ### Atlas: The Conductor
 
 Atlas executes Prometheus plans. Distributes tasks to specialized subagents. Accumulates learnings across tasks. Verifies completion independently.
 
-Run `/start-work` to activate Atlas on your latest plan.
+Run `/ulw-execute [plan-name] [--worktree <path>] [--make-pr] [--ship]` to hand the session to Atlas. Atlas loads the Prometheus plan, sets a Goal when the Goal tools are enabled, registers every plan task as todos, then executes.
 
 ### Oracle: The Consultant
 
@@ -142,11 +143,11 @@ This is the "just do it" mode. Full automatic. You don't have to think deep beca
 
 ### Prometheus Mode: For the Precise
 
-Press **Tab** to enter Prometheus mode.
+Open the agent selector (Tab) and choose Prometheus, or run `/agent`.
 
 Prometheus interviews you like a real engineer. Asks clarifying questions. Identifies scope and ambiguities. Builds a detailed plan before a single line of code is touched.
 
-Then run `/start-work` and Atlas takes over. Tasks are distributed to specialized subagents. Each completion is verified independently. Learnings accumulate across tasks. Progress tracks across sessions.
+Then run `/ulw-execute` to hand the session to Atlas, which sets a Goal, registers plan todos, and executes (optional `--worktree` / `--make-pr` / `--ship`). Tasks are distributed to specialized subagents. Each completion is verified independently. Learnings accumulate across tasks. Progress tracks across sessions.
 
 Use Prometheus for multi-day projects, critical production changes, complex refactoring, or when you want a documented decision trail.
 
@@ -192,8 +193,8 @@ You can override specific agents or categories in your config:
       "variant": "max",
     },
 
-    // Hard logic and architecture: GPT-5.6 Sol xhigh
-    "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
+    // Hard logic and architecture: GPT-5.6 Sol max
+    "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "max" },
 
     // Autonomous research and execution
     "deep": { "model": "openai/gpt-5.6-sol", "variant": "medium" },
@@ -204,8 +205,8 @@ You can override specific agents or categories in your config:
     // Quick tasks: fast and cheap
     "quick": { "model": "kimi-for-coding/kimi-for-coding-highspeed" },
 
-    // Low-effort fallback: GPT-5.6 Luna
-    "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
+    // Low-effort fallback: Grok 4.6 xhigh
+    "unspecified-low": { "model": "xai/grok-4.6", "variant": "xhigh" },
 
     // High-effort fallback: Kimi K3, then Opus 5
     "unspecified-high": { "model": "kimi-for-coding/kimi-k3", "variant": "max" },
@@ -228,7 +229,7 @@ You can override specific agents or categories in your config:
 
 - GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain`; the `deep` category uses it at medium effort
 - GPT-5.6 Terra — balanced mid-tier; preferred for Momus (high) and available as an explicit override elsewhere
-- GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
+- Grok 4.6 — default for the `unspecified-low` category (xhigh)
 - GPT-5.6 Sol override paths — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
 - GPT 5.6 Luna Fast — fast and cheap utility fallback after the Kimi high-speed quick default
 
@@ -250,7 +251,7 @@ Oh My OpenAgent turns that into a coordinated team:
 
 **Parallel execution.** Claude Code processes one thing at a time. OmO fires background agents in parallel — research, implementation, and verification happening simultaneously. Like having 5 engineers instead of 1.
 
-**Hash-anchored edits.** Claude Code's edit tool fails when the model can't reproduce lines exactly. OmO's `LINE#ID` content hashing validates every edit before applying. Grok Code Fast 1 went from 6.7% to 68.3% success rate just from this change.
+**Hash-anchored edits.** Claude Code's edit tool fails when the model can't reproduce lines exactly. Hash-anchored `LINE#ID` edits are opt-in (`hashline_edit: true`). When enabled, OmO's `LINE#ID` hashing validates every edit before applying.
 
 **IntentGate.** Claude Code takes your prompt and runs. OmO uses regex detectors for explicit mode keywords: `ultrawork`/`ulw`, the Team Mode spellings, `hyperplan`, and the adjacent hyperplan-ultrawork combo. Matching text injects the corresponding mode prompt.
 

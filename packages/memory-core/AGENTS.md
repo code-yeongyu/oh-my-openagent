@@ -17,6 +17,9 @@ The public API is the barrel at `src/index.ts`.
 | `src/memfs/` | Memory-path validation, markdown frontmatter parsing, and hook-script installation. |
 | `src/tools/` | `memory` and `memory_apply_patch` operations, patch parsing, typed tool errors, and auto-commit behavior. |
 | `src/journal/` | Per-conversation transcript cursors, reflection snapshots, and durable journal state. |
+| `src/facts/` | Durable fact pipeline: queue + cursor watermarks, failure backoff/store, payload capping, person routing, recovery, mutation planning. |
+| `src/people/` | People-card grammar: parse/serialize, slug rules, reserved slugs, observations. |
+| `src/soul/` | Soul-file paths and identity-scoped soul-notice watermark consumption. |
 | `src/reflection/` | Trigger evaluation, run reservation, worktree execution, completion validation, and merge outcomes. |
 | `src/compile/` | Compile committed memory revisions into marked system-prompt blocks and cache them by template hash. |
 | `src/search/` | Query parsing, transcript providers, and ranked memory/session search. |
@@ -49,6 +52,14 @@ The public API is the barrel at `src/index.ts`.
 - **Redact before external synchronization.** Remote mirror output must pass
   through the sync redaction layer; never copy secret-bearing raw logs or
   configuration into committed memory.
+- **Facts state is durable and fail-closed.** Queue/cursor/consumed writes
+  publish atomically (`.tmp` + rename, mode `0o600`) under an identity-scoped
+  lock; malformed JSON parses to empty, never blocks. Enqueue/consumed
+  watermarks NEVER regress, and ordering follows canonical journal position /
+  snapshot boundary — never lexical message-ID comparison.
+- **Behavioral patterns are NEVER stored in people cards.** Card lines are
+  limited to the `IDENTITY` / `ATTRIBUTE` / `RELATIONSHIP` / `INSTRUCTION`
+  prefixes with bounded metadata.
 
 ## PUBLIC SURFACES
 
@@ -62,13 +73,15 @@ The public API is the barrel at `src/index.ts`.
   `completeTransition()` form the pure reflection state machine.
 - `compileMemoryBlock()` and `compileMemoryBlockAtRevision()` render the
   committed memory projection injected into a harness prompt.
+- `FactsQueue`, `applyFactsBatch()`, `planFactsMutation()`, and
+  `consumeSoulNoticeDelta()` drive the facts/soul lifecycle from
+  `src/facts/` and `src/soul/`.
 
 ## CONSUMERS
 
 Harness adapters provide identity, lifecycle events, tool registration, and
-sync orchestration. The Senpi adapter lives under
-`packages/omo-senpi/src/components/memory/`; keep adapter-specific behavior
-there rather than importing it back into this package.
+sync orchestration; the Senpi adapter lives in `packages/omo-senpi/src/components/memory/`.
+Keep adapter-specific behavior there, never imported back into this package.
 
 ## QA
 

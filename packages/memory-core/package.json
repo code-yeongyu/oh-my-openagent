@@ -7,6 +7,9 @@
   "exports": {
     ".": {
       "import": "./src/index.ts"
+    },
+    "./fs": {
+      "import": "./src/fs/resilient.ts"
     }
   },
   "scripts": {

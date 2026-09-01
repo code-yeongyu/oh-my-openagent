@@ -8,16 +8,20 @@ import {
   ReflectionReservationStore,
   TranscriptJournal,
   buildIdentityPaths,
+  createLockRecord,
   createReflectionWorktree,
+  reflectionSchedulerLockPath,
+  withLock,
   type MemoryIdentity,
 } from "@oh-my-opencode/memory-core"
 
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { existsSync, realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
 
 async function fixture(trigger: "step-count" | "dream" = "step-count") {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reconcile-")))
@@ -88,6 +92,22 @@ async function commitOrphanWorktree(item: Awaited<ReturnType<typeof fixture>>): 
 }
 
 describe("reflection and dream run reconciliation", () => {
+  test("#given the scheduler lock is held by a sibling bind #when reconciliation starts #then it defers without surfacing contention", async () => {
+    const item = await fixture()
+    const record = await createLockRecord("bind contention test")
+    const lockPath = reflectionSchedulerLockPath(item.identity.paths.locks)
+
+    const result = await withLock(lockPath, record, async () => {
+      return reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        deferOnSchedulerContention: true,
+      })
+    })
+
+    expect(result).toEqual([])
+  })
+
   test("#given an orphaned successful dream worktree #when session-start reconciliation runs #then it merges clears the reservation records completion and publishes final", async () => {
     // given
     const item = await fixture("dream")
@@ -269,7 +289,7 @@ describe("reflection and dream run reconciliation", () => {
   test("#given old pre-launch reservations with unverifiable or reused launcher pids #when reconciled #then only confirmed pid reuse releases the reservation", async () => {
     // given
     const unknown = await fixture()
-    await rm(unknown.runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await rmEfaultTolerant(unknown.runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 
     // when
     const untouched = await reconcileReflectionRuns({

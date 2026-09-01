@@ -62,7 +62,7 @@ describe("createInProcessManagedRunner", () => {
       CreateAgentSessionOptions["modelRuntime"]
     >
     const runner: InProcessRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
       },
@@ -98,14 +98,14 @@ describe("createInProcessManagedRunner", () => {
     const fallbackModels = [
       {
         source: "category",
-        provider: "quotio-openai",
+        provider: "openai-codex",
         model_id: "gpt-5.6-luna-fast",
-        display: "quotio-openai/gpt-5.6-luna-fast",
+        display: "openai-codex/gpt-5.6-luna-fast",
         reasoning_effort: "minimal",
       },
     ] as const
     const runner: InProcessRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
       },
@@ -165,7 +165,7 @@ describe("createRpcManagedRunner", () => {
     // given
     let captured: RpcRunnerSpec | undefined
     const runner: RpcRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return fakeRpcHandle()
       },
@@ -185,7 +185,7 @@ describe("createRpcManagedRunner", () => {
     // given
     let captured: RpcRunnerSpec | undefined
     const runner: RpcRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return fakeRpcHandle()
       },
@@ -205,7 +205,7 @@ describe("variant threading", () => {
     // given
     let captured: RpcRunnerSpec | undefined
     const runner: RpcRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return fakeRpcHandle()
       },
@@ -223,7 +223,7 @@ describe("variant threading", () => {
     // given
     let captured: RpcRunnerSpec | undefined
     const runner: RpcRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return fakeRpcHandle()
       },

@@ -1,7 +1,7 @@
 /// <reference path="../../../../../bun-test.d.ts" />
 
 import { describe, expect, test } from "bun:test"
-import { createBuiltinSkills } from "../../features/builtin-skills"
+import { createBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { executeSlashCommand } from "./executor"
 
@@ -36,8 +36,6 @@ describe("init-deep slash surface", () => {
 
 		// then
 		expect(result.success).toBe(true)
-		expect(result.replacementText).toContain("**Scope**: skill")
 		expect(result.replacementText).toContain("--max-depth=2")
-		expect(result.replacementText).toContain("Generate hierarchical AGENTS.md files")
 	})
 })

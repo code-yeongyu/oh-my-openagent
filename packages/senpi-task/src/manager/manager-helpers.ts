@@ -1,6 +1,6 @@
 import { join } from "node:path"
 
-import { isSpawnSpecV1, type SpawnSpecV1, type TaskRecord, type TaskRecordInput } from "../state"
+import { isSpawnSpecV1, type BackgroundMode, type SpawnSpecV1, type TaskRecord, type TaskRecordInput } from "../state"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan } from "./types"
 import type { ExecutionMode } from "./execution-mode"
 
@@ -13,18 +13,24 @@ export function buildRecordInput(input: {
   readonly plan: ResolvedChildPlan
   readonly name: string
   readonly executionMode: ExecutionMode
+  readonly taskSeq: number
 }): TaskRecordInput {
-  const { spec, plan, name, executionMode } = input
+  const { spec, plan, name, executionMode, taskSeq } = input
   const agentType = spec.subagent_type ?? plan.agentType
   const category = spec.category ?? plan.category
+  const runInBackground = spec.run_in_background === true
   return {
     name,
+    task_seq: taskSeq,
+    // The spawn-time mode. A foreground task later handed off with promoteToBackground becomes
+    // "promoted", which notify_on_terminal alone cannot distinguish from a background spawn.
+    background_mode: runInBackground ? "background" : "foreground",
     parent_session_id: spec.parent_session_id,
     root_session_id: spec.root_session_id ?? spec.parent_session_id,
     depth: spec.depth,
     execution_mode: executionMode,
     model: plan.model,
-    notify_on_terminal: spec.run_in_background === true,
+    notify_on_terminal: runInBackground,
     ...(spec.task_summary !== undefined ? { task_summary: spec.task_summary } : {}),
     ...(spec.description !== undefined ? { description: spec.description } : {}),
     ...(plan.requested_model !== undefined
@@ -39,6 +45,16 @@ export function buildRecordInput(input: {
     ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),
     ...(plan.toolDenylist !== undefined ? { tool_deny: plan.toolDenylist } : {}),
   }
+}
+
+// Background mode after promoteToBackground runs. A task already running in the background keeps
+// that mode - nothing was promoted. Legacy records carry no spawn mode, so the durable background
+// intent (notify_on_terminal) is the only evidence of how they started.
+export function promotedBackgroundMode(record: TaskRecord): BackgroundMode {
+  if (record.background_mode !== undefined) {
+    return record.background_mode === "foreground" ? "promoted" : record.background_mode
+  }
+  return record.notify_on_terminal ? "background" : "promoted"
 }
 
 export function buildManagedSpec(input: {

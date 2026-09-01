@@ -1,7 +1,7 @@
 import { countCompletedSteps, type ReflectionSnapshot, type ReflectionTranscriptState } from "../journal"
 
 export type ReflectionTrigger = "step-count" | "compaction" | "manual" | "dream"
-export type DreamOrigin = "manual" | "idle" | "shutdown"
+export type DreamOrigin = "manual" | "idle" | "shutdown" | "pressure"
 export type ReflectionOutcome =
   | "merged"
   | "no_changes"
@@ -91,6 +91,7 @@ const REFLECTION_PRIORITY: Record<Exclude<ReflectionTrigger, "dream">, number> =
 
 const DREAM_PRIORITY: Record<DreamOrigin, number> = {
   idle: 1.5,
+  pressure: 1.5,
   shutdown: 2.5,
   manual: 3,
 }
