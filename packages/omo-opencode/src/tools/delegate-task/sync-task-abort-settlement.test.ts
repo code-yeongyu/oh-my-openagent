@@ -96,6 +96,7 @@ test("#given a completed foreground child #when handback starts #then abort sett
   const abortReleased = new Promise<void>((resolve) => {
     releaseAbort = resolve
   })
+  let markerPresentWhenAbortStarted = false
   let concurrencyReleaseCount = 0
   const manager = createManager(() => {
     concurrencyReleaseCount += 1
@@ -103,7 +104,7 @@ test("#given a completed foreground child #when handback starts #then abort sett
   const client = unsafeTestValue<ExecutorContext["client"]>({
     session: {
       abort: async () => {
-        expect(handedBackSyncSessions.has(CHILD_SESSION_ID)).toBe(true)
+        markerPresentWhenAbortStarted = handedBackSyncSessions.has(CHILD_SESSION_ID)
         markAbortStarted?.()
         await abortReleased
         return { data: true }
@@ -112,25 +113,34 @@ test("#given a completed foreground child #when handback starts #then abort sett
   })
 
   //#when
+  let handbackSettled = false
   const execution = executeForegroundProbe({
     client,
     manager,
     description: "abort settlement probe",
     messageID: "msg_abort_settlement_parent",
   })
-  await abortStarted
-  let handbackSettled = false
-  void execution.then(() => {
-    handbackSettled = true
-  })
-  await Promise.resolve()
+  const executionSettlement = execution.then(
+    () => {
+      handbackSettled = true
+    },
+    () => undefined,
+  )
+  try {
+    await abortStarted
+    expect(markerPresentWhenAbortStarted).toBe(true)
+    await Promise.resolve()
 
-  //#then
-  expect(handbackSettled).toBe(false)
-  expect(concurrencyReleaseCount).toBe(0)
-  releaseAbort?.()
-  expect(await execution).toContain("done")
-  expect(concurrencyReleaseCount).toBe(1)
+    //#then
+    expect(handbackSettled).toBe(false)
+    expect(concurrencyReleaseCount).toBe(0)
+    releaseAbort?.()
+    expect(await execution).toContain("done")
+    expect(concurrencyReleaseCount).toBe(1)
+  } finally {
+    releaseAbort?.()
+    await executionSettlement
+  }
 })
 
 test("#given a completed foreground child whose abort hangs #when abort cleanup times out #then handback preserves the result and releases cleanup ownership", async () => {
@@ -144,47 +154,19 @@ test("#given a completed foreground child whose abort hangs #when abort cleanup 
   let markAbortStarted: (() => void) | undefined
   let resolveAbort: (() => void) | undefined
   let rejectAbort: ((reason: unknown) => void) | undefined
-  let abortSettled = false
+  let markerPresentWhenAbortStarted = false
   let concurrencyReleaseCount = 0
   let deletionCount = 0
   const abortStarted = new Promise<void>((resolve) => {
     markAbortStarted = resolve
   })
   const abortPending = new Promise<unknown>((resolve, reject) => {
-    resolveAbort = () => {
-      abortSettled = true
-      resolve({ data: true })
-    }
-    rejectAbort = (reason: unknown) => {
-      abortSettled = true
-      reject(reason)
-    }
+    resolveAbort = () => resolve({ data: true })
+    rejectAbort = reject
   })
   const onUnhandledRejection = (reason: unknown): void => {
     unhandledRejections.push(reason)
   }
-  process.on("unhandledRejection", onUnhandledRejection)
-
-  globalThis.setTimeout = unsafeTestValue<typeof setTimeout>((callback: () => void, delay?: number) => {
-    const effectiveDelay = delay ?? 0
-    scheduledDelays.push(effectiveDelay)
-    if (effectiveDelay === 10_000) {
-      abortTimeoutCallback = () => {
-        lifecycle.push("abort-timeout")
-        callback()
-      }
-      const handle = originalSetTimeout(() => {}, 60_000)
-      handle.unref()
-      timerHandles.push(handle)
-      return handle
-    }
-
-    lifecycle.push("deletion-scheduled")
-    const handle = originalSetTimeout(callback, effectiveDelay)
-    timerHandles.push(handle)
-    return handle
-  })
-
   const manager = createManager(() => {
     lifecycle.push("concurrency-released")
     concurrencyReleaseCount += 1
@@ -192,7 +174,7 @@ test("#given a completed foreground child whose abort hangs #when abort cleanup 
   const client = unsafeTestValue<ExecutorContext["client"]>({
     session: {
       abort: async () => {
-        expect(handedBackSyncSessions.has(CHILD_SESSION_ID)).toBe(true)
+        markerPresentWhenAbortStarted = handedBackSyncSessions.has(CHILD_SESSION_ID)
         lifecycle.push("abort-started")
         markAbortStarted?.()
         return await abortPending
@@ -203,20 +185,55 @@ test("#given a completed foreground child whose abort hangs #when abort cleanup 
       },
     },
   })
-  const execution = executeForegroundProbe({
-    client,
-    manager,
-    description: "abort timeout probe",
-    messageID: "msg_abort_timeout_parent",
-  })
+  let executionSettlement: Promise<void> | undefined
 
   try {
-    //#when
-    await abortStarted
-    let handbackSettled = false
-    void execution.then(() => {
-      handbackSettled = true
+    process.on("unhandledRejection", onUnhandledRejection)
+    globalThis.setTimeout = unsafeTestValue<typeof setTimeout>((callback: () => void, delay?: number) => {
+      const effectiveDelay = delay ?? 0
+      scheduledDelays.push(effectiveDelay)
+      if (effectiveDelay === 10_000) {
+        abortTimeoutCallback = () => {
+          lifecycle.push("abort-timeout")
+          callback()
+        }
+        const handle = originalSetTimeout(() => {}, 60_000)
+        handle.unref()
+        timerHandles.push(handle)
+        return handle
+      }
+
+      lifecycle.push("deletion-scheduled")
+      const handle = originalSetTimeout(callback, effectiveDelay)
+      timerHandles.push(handle)
+      return handle
     })
+    let handbackSettled = false
+    const execution = executeForegroundProbe({
+      client,
+      manager,
+      description: "abort timeout probe",
+      messageID: "msg_abort_timeout_parent",
+    })
+    executionSettlement = execution.then(
+      () => {
+        handbackSettled = true
+      },
+      () => undefined,
+    )
+
+    //#when
+    let abortStartBudgetHandle: ReturnType<typeof setTimeout> | undefined
+    const abortStartBudget = new Promise<never>((_resolve, reject) => {
+      abortStartBudgetHandle = originalSetTimeout(
+        () => reject(new Error("Timed out waiting for foreground abort to start")),
+        100,
+      )
+      timerHandles.push(abortStartBudgetHandle)
+    })
+    await Promise.race([abortStarted, abortStartBudget])
+    if (abortStartBudgetHandle) clearTimeout(abortStartBudgetHandle)
+    expect(markerPresentWhenAbortStarted).toBe(true)
     await Promise.resolve()
 
     //#then
@@ -242,11 +259,11 @@ test("#given a completed foreground child whose abort hangs #when abort cleanup 
     await new Promise<void>((resolve) => originalSetTimeout(resolve, 0))
     expect(unhandledRejections).toEqual([])
   } finally {
-    if (!abortSettled) resolveAbort?.()
-    await execution
     process.off("unhandledRejection", onUnhandledRejection)
     globalThis.setTimeout = originalSetTimeout
     cancelSyncSessionDeletion(CHILD_SESSION_ID)
     for (const handle of timerHandles) clearTimeout(handle)
+    resolveAbort?.()
+    await executionSettlement
   }
 })
