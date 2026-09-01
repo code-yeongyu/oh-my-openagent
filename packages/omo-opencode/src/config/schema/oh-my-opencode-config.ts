@@ -27,7 +27,7 @@ import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
 import { TuiConfigSchema } from "./tui"
-import { StartWorkConfigSchema } from "./start-work"
+import { UlwExecuteConfigSchema } from "./ulw-execute"
 import { WebsearchConfigSchema } from "./websearch"
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -100,7 +100,9 @@ export const OhMyOpenCodeConfigSchema = z.object({
   tmux: TmuxConfigSchema.optional(),
   tui: TuiConfigSchema.default({ sidebar: { enabled: true } }).optional(),
   sisyphus: SisyphusConfigSchema.optional(),
-  start_work: StartWorkConfigSchema.optional(),
+  ulw_execute: UlwExecuteConfigSchema.optional(),
+  /** Deprecated compatibility shim. Old \`start_work\` key is parsed and migrated to \`ulw_execute\` in validate.ts. */
+  start_work: UlwExecuteConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, goal) */
   default_mode: DefaultModeConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */

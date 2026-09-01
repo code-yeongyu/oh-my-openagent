@@ -61,7 +61,10 @@ export function chainRungCandidates(options: ChainRungCandidateOptions): readonl
   const rungs: ModelChainCandidate[] = [{ model: options.selectedModel }]
   for (const entry of options.chain.slice(selectedIndex + 1)) {
     for (const provider of entry.providers) {
-      const concrete = `${provider}/${transformModelForProvider(provider, entry.model)}`
+      const modelID = entry.model.startsWith(`${provider}/`)
+        ? entry.model.slice(provider.length + 1)
+        : entry.model
+      const concrete = `${provider}/${transformModelForProvider(provider, modelID)}`
       if (!options.availableModels.has(concrete)) continue
       rungs.push({
         model: concrete,
@@ -88,7 +91,12 @@ function locateSelectedRung(options: ChainRungCandidateOptions): number {
   }
   return chain.findIndex((entry) =>
     entry.providers.some(
-      (provider) => `${provider}/${transformModelForProvider(provider, entry.model)}` === selectedModel,
+      (provider) => {
+        const modelID = entry.model.startsWith(`${provider}/`)
+          ? entry.model.slice(provider.length + 1)
+          : entry.model
+        return `${provider}/${transformModelForProvider(provider, modelID)}` === selectedModel
+      },
     )
   )
 }

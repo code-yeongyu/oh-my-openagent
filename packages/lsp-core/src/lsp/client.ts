@@ -6,6 +6,7 @@ import type { LspClientTimeoutOptions } from "./transport.js";
 import type {
 	Diagnostic,
 	DocumentSymbol,
+	FormattingOptions,
 	Location,
 	LocationLink,
 	PrepareRenameDefaultBehavior,
@@ -13,10 +14,12 @@ import type {
 	Range,
 	ResolvedServer,
 	SymbolInfo,
+	TextEdit,
 	WorkspaceEdit,
 } from "./types.js";
 import { LspRequestTimeoutError } from "./errors.js";
 import { WorkspaceDocumentState } from "./workspace-document-state.js";
+import type { TimerProvider } from "./timer-provider.js";
 import type { LspRenameResult, WorkspaceEditCommitIo } from "./workspace-edit-types.js";
 import { WorkspaceMutationController } from "./workspace-mutation-controller.js";
 
@@ -34,6 +37,7 @@ export interface LspDiagnosticsResult {
 export interface LspClientOptions extends LspClientTimeoutOptions {
 	readonly diagnosticsFreshnessTimeoutMs?: number;
 	readonly versionlessPublishQuiescenceMs?: number;
+	readonly timerProvider?: TimerProvider;
 }
 
 export class LspClient extends LspClientConnection {
@@ -50,6 +54,7 @@ export class LspClient extends LspClientConnection {
 			(method, params) => this.sendNotification(method, params),
 			(uri) => this.diagnosticsStore.delete(uri),
 			{
+				timerProvider: this.timerProvider,
 				versionlessPublishQuiescenceMs:
 					options.versionlessPublishQuiescenceMs ?? VERSIONLESS_PUBLISH_QUIESCENCE_MS,
 			},
@@ -133,6 +138,30 @@ export class LspClient extends LspClientConnection {
 		}, options);
 	}
 
+	/**
+	 * Requests whole-document formatting edits, returning null when the server never advertised the
+	 * capability so callers can report unavailability instead of surfacing a method-not-found error.
+	 */
+	async formatDocument(
+		filePath: string,
+		options: FormattingOptions,
+		signal?: AbortSignal,
+	): Promise<TextEdit[] | null> {
+		if (!this.isDocumentFormattingSupported()) return null;
+		const absPath = this.resolveWorkspacePath(filePath);
+		await this.openFile(absPath);
+		const requestOptions = signal === undefined ? {} : { signal };
+		const edits = await this.sendRequest<TextEdit[] | null>(
+			"textDocument/formatting",
+			{
+				textDocument: { uri: pathToFileURL(absPath).href },
+				options,
+			},
+			requestOptions,
+		);
+		return edits ?? [];
+	}
+
 	async workspaceSymbols(query: string, signal?: AbortSignal): Promise<SymbolInfo[]> {
 		const options = signal === undefined ? {} : { signal };
 		return this.sendRequest<SymbolInfo[]>("workspace/symbol", { query }, options);
@@ -181,7 +210,7 @@ export class LspClient extends LspClientConnection {
 		const absPath = this.resolveWorkspacePath(filePath);
 		const uri = pathToFileURL(absPath).href;
 		await this.openFile(absPath);
-		const deadlineAt = Date.now() + this.diagnosticsFreshnessTimeoutMs;
+		const deadlineAt = this.timerProvider.now() + this.diagnosticsFreshnessTimeoutMs;
 
 		for (;;) {
 			signal?.throwIfAborted();
@@ -194,7 +223,7 @@ export class LspClient extends LspClientConnection {
 			if (!pushFallbackOnly) {
 				const cached = this.documents.getPullCache(snapshot);
 				try {
-					const remainingMs = deadlineAt - Date.now();
+					const remainingMs = deadlineAt - this.timerProvider.now();
 					if (remainingMs <= 0) return this.freshnessTimeout(absPath);
 					const result = await this.sendRequest<{ items?: Diagnostic[]; kind?: string; resultId?: string }>(
 						"textDocument/diagnostic",
@@ -236,7 +265,7 @@ export class LspClient extends LspClientConnection {
 
 			if (!pushFallbackOnly) continue;
 
-			const remainingMs = deadlineAt - Date.now();
+			const remainingMs = deadlineAt - this.timerProvider.now();
 			if (remainingMs <= 0) {
 				// A server that never advertised pull diagnostics (or rejected the pull
 				// method) and has never published for this document stays silent for a

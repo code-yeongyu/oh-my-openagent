@@ -12,11 +12,30 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
   - `launcher.js` — `runLauncher()` dispatch, senpi environment/brand/update routing
   - `agent-dir.js` — `canonicalAgentDir()`, `adoptLegacyFlatState()`, legacy flat-dir migration
   - `setup-detect.js` / `setup-import.js` / `setup-models.js` / `setup-report.js` — harness detection, SQLite read-only import, provider mapping, report rendering
-  - `bun-runtime.js` / `child-process.js` — `maybeReexecUnderBun`, `findBunBinary`, `spawnNode`
-  - `doctor.js`, `package-paths.js`, `provider-map.json`, `legacy-bun-global-migration.js`
+  - `setup-detect-cache.js` / `setup-detect-refresh.js` — the interactive launch's setup-suggestion cache: a
+    synchronous, fail-open read of `harness-detect-cache.json` in the canonical agent dir, fingerprinted over
+    every detection input (`detectedFilePaths`, mtime+size) with a TTL; a stale or missing cache never blocks
+    the engine spawn - it is rebuilt by a detached, unref'd refresh child (`setup-detect-refresh.js`, the only
+    writer) while the launch answers from the cached or empty value. `omo setup` and `omo doctor` always run
+    full live detection and never read the cache.
+  - `bun-runtime.js` / `child-process.js` — `maybeReexecUnderBun`, `findBunBinary`, `spawnNode`/`runChild`.
+    Both spawn layers are ASYNC on purpose: `spawnSync` blocks the event loop, so a signaled launcher
+    dies before any handler runs and orphans the engine. `runChild` forwards `SIGTERM`/`SIGHUP` to the
+    child, waits out a bounded grace window (`OMO_SIGNAL_GRACE_MS`, default 10s) and re-raises the
+    signal on itself if the child ignores it; `SIGINT` is never forwarded (the tty already delivers it
+    to the whole foreground process group) but is still waited out. Never reintroduce `spawnSync` here.
+  - `bun-bin-shim.js` — `ensureBunBinShim`: keeps the user-facing bun-global bin an sh shim that
+    execs bun directly (POSIX only, self-healing across `bun add -g` updates, fail-open)
+  - `doctor.js` — diagnostics plus stale-orphan detection: `classifyEngineProcesses` splits live
+    engines into stale (interactive, PPID 1), attached and managed (`--mode`), and
+    `reapStaleEngines` terminates ONLY explicitly named pids that are still stale at request time.
+    Pattern-killing is forbidden.
+  - `package-paths.js`, `provider-map.json`, `legacy-bun-global-migration.js`
 - **agent state lives in ONE canonical directory: `~/.omo/agent`.** `bin/lib/agent-dir.js` owns that answer (`canonicalAgentDir`), and the launcher, `omo doctor`, `omo setup` and the locally installed launcher (`packages/omo-senpi/src/install/local-launcher.ts`) all resolve it from there - never by composing their own default. An explicit `OMO_CODING_AGENT_DIR` (or legacy `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) still wins, and `adoptLegacyFlatState` carries state left in the pre-unification flat `~/.omo` layout forward once, so unifying the location never reads as another reset.
 - `bin/omo-agent-toolkit.js` - internal delegate to the staged toolkit runtime, NOT an npm bin
-- `test/` - package-contract and launcher tests
+- `test/` - package-contract and launcher tests; `pty-signal-qa.py` is the real-surface QA harness
+  (boots the real chain on a pty whose session leader outlives the launcher, SIGTERMs the launcher,
+  asserts the engine ran its own graceful shutdown and left no survivor)
 
 ## CONVENTIONS
 
@@ -32,6 +51,7 @@ bun run build:omo-native                 # stage plugin payload (repo root)
 bun test packages/omo-native/test        # package tests (repo root)
 bunx tsc -p packages/omo-native/tsconfig.json --noEmit
 node packages/omo-native/bin/omo.js --version   # entry smoke check
+python3 packages/omo-native/test/pty-signal-qa.py packages/omo-native/bin/omo.js /tmp/qa.txt   # launcher signal QA (add OMO_RUNTIME=bun for the bun chain)
 ```
 
 Release mechanics and the beta-channel contract: `docs/reference/omo-ai-publishing.md`.

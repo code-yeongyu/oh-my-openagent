@@ -12,7 +12,7 @@ import type { PluginContext } from "./types"
 import { handleGoalMessage } from "./chat-message/loop-commands"
 import { notifyWhenModelCacheIsMissing } from "./chat-message/model-cache-warning"
 import { recordSessionModel, getStoredMainSessionModel } from "./chat-message/session-model"
-import { runStartWorkHookIfApplicable } from "./chat-message/start-work-message"
+import { runUlwExecuteHookIfApplicable } from "./chat-message/ulw-execute-message"
 import { consumeNativeGoalCommandMarker } from "./command-execute-before"
 import { stopContinuation } from "./stop-continuation"
 import type {
@@ -136,7 +136,7 @@ export function createChatMessageHandler(args: {
       hooks,
       runtimeFallbackEnabled,
     })
-    await runStartWorkHookIfApplicable(hooks, input, output)
+    await runUlwExecuteHookIfApplicable(hooks, input, output)
     notifyWhenModelCacheIsMissing(pluginContext.client.tui)
     handleGoalMessage({
       hooks,

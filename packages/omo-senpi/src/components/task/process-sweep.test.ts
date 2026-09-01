@@ -8,7 +8,8 @@ import { sweepStaleLspDaemonVersions } from "@oh-my-opencode/utils/process-sweep
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { resolveSenpiDaemonRuntime } from "../lsp/daemon-runtime"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
-import { SENPI_RPC_CHILD_MARKER_ENV, wireSessionStartProcessSweep } from "./process-sweep"
+import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
+import { wireSessionStartProcessSweep } from "./process-sweep"
 
 interface RecordedLog {
   level: "info" | "warn" | "error"
@@ -213,7 +214,7 @@ describe("wireSessionStartProcessSweep()", () => {
     const logger = createLogger()
     let sweepCalls = 0
     wireSessionStartProcessSweep(pi, ctxFor(logger), {
-      env: { [SENPI_RPC_CHILD_MARKER_ENV]: "/tmp/child-session" },
+      env: { [OMO_SENPI_TASK_RPC_CHILD]: "1" },
       sweep: async () => {
         sweepCalls += 1
       },
