@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+﻿#!/usr/bin/env bun
 import { spawn, spawnSync } from "node:child_process";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -70,6 +70,7 @@ const nodes: BuildNode[] = [
 	{ id: "codex-install", command: "bun", args: ["run", "build:codex-install"], deps: [] },
 	{ id: "schema", command: "bun", args: ["run", "build:schema"], deps: [] },
 	{ id: "omo-schema", command: "bun", args: ["run", "build:omo-schema"], deps: [] },
+	{ id: "v2-index", command: "node", args: ["script/write-v2-shim.mjs"], deps: ["index"] },
 ];
 
 async function run() {
