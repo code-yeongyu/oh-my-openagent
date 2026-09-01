@@ -1,4 +1,6 @@
+import { extractApplyPatchEdits } from "@oh-my-opencode/comment-checker-core"
 import type { HookInput } from "@oh-my-opencode/comment-checker-core"
+import { resolve } from "node:path"
 
 import type { ToolResultContentBlock, ToolResultContextLike, ToolResultEventLike } from "./types"
 import { getString, isRecord, isUnknownFunction } from "./utils"
@@ -17,6 +19,10 @@ export function toHookInput(event: ToolResultEventLike, ctx: ToolResultContextLi
       isError: event.isError,
     },
   }
+}
+
+export function toApplyPatchHookInputs(event: ToolResultEventLike, ctx: ToolResultContextLike): HookInput[] {
+  return extractApplyPatchEdits(event.details, event.input).map((edit) => toHookInput(event, ctx, resolve(ctx.cwd, edit.filePath)))
 }
 
 function toCoreToolInput(input: Record<string, unknown>, absolutePath: string): HookInput["tool_input"] {

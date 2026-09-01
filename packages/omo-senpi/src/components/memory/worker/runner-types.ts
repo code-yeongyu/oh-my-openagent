@@ -1,4 +1,9 @@
-import type { MemoryIdentity, ReflectionOutcome, ReflectionTranscriptState, ReservedRun } from "@oh-my-opencode/memory-core"
+import type {
+  MemoryIdentity,
+  ReflectionOutcome,
+  ReflectionTranscriptState,
+  ReservedRun,
+} from "@oh-my-opencode/memory-core"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiOmoConfigResult } from "../../config-resolution"
@@ -8,11 +13,16 @@ import type { ResolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
 import type { ReflectionSessionModel, ReflectionThinkingLevel } from "./resolve-model"
 import type { ReflectionSandbox } from "./spawn"
 
+export interface ReflectionReservationLockOptions {
+  readonly waitTimeoutMs?: number
+}
+
 export interface ReflectionReservationPort {
-  readState(): Promise<{ readonly active?: ReservedRun }>
+  readState(options?: ReflectionReservationLockOptions): Promise<{ readonly active?: ReservedRun }>
   complete(
     runId: string,
     outcome: ReflectionOutcome,
+    options?: ReflectionReservationLockOptions,
   ): Promise<{ readonly outcome: ReflectionOutcome; readonly launch?: ReservedRun }>
 }
 

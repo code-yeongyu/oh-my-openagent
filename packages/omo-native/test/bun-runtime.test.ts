@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { join } from "node:path"
+import { posix, win32 } from "node:path"
 import {
   findBunBinary,
   isUnderBunGlobalTree,
@@ -39,7 +39,7 @@ describe("bun runtime re-exec", () => {
     describe("#when the script sits inside the default bun global tree", () => {
       test("#then it is recognized as a bun global install", () => {
         // given
-        const script = bunTreePackage(join(POSIX_HOME, ".bun"))
+        const script = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
         // when
         const under = isUnderBunGlobalTree(script, {
           env: {},
@@ -90,7 +90,7 @@ describe("bun runtime re-exec", () => {
         }
         // when / then
         expect(isUnderBunGlobalTree(bunTreePackage(relocated), options)).toBe(true)
-        expect(isUnderBunGlobalTree(bunTreePackage(join(POSIX_HOME, ".bun")), options)).toBe(false)
+        expect(isUnderBunGlobalTree(bunTreePackage(posix.join(POSIX_HOME, ".bun")), options)).toBe(false)
       })
 
       test("#then redundant separators in BUN_INSTALL still match", () => {
@@ -156,8 +156,8 @@ describe("bun runtime re-exec", () => {
       test("#then that binary wins over the home default", () => {
         // given
         const relocated = "/opt/bunroot"
-        const preferred = join(relocated, "bin", "bun")
-        const fallback = join(POSIX_HOME, ".bun", "bin", "bun")
+        const preferred = posix.join(relocated, "bin", "bun")
+        const fallback = posix.join(POSIX_HOME, ".bun", "bin", "bun")
         // when
         const found = findBunBinary({
           env: { BUN_INSTALL: relocated },
@@ -189,7 +189,7 @@ describe("bun runtime re-exec", () => {
     describe("#when the host is Windows", () => {
       test("#then the .exe spelling is discovered", () => {
         // given
-        const winBun = join(WIN_HOME, ".bun", "bin", "bun.exe")
+        const winBun = win32.join(WIN_HOME, ".bun", "bin", "bun.exe")
         // when
         const found = findBunBinary({
           env: {},
@@ -199,6 +199,20 @@ describe("bun runtime re-exec", () => {
         })
         // then
         expect(found).toBe(winBun)
+      })
+
+      test("#then semicolon-delimited PATH entries are searched", () => {
+        // given
+        const onPath = win32.join("C:\\", "tools", "bun.EXE")
+        // when
+        const found = findBunBinary({
+          env: { PATH: `C:\\nowhere;C:\\tools` },
+          homedir: () => WIN_HOME,
+          platform: "win32",
+          exists: existsOnly(onPath),
+        })
+        // then
+        expect(found).toBe(onPath)
       })
     })
 
@@ -220,8 +234,8 @@ describe("bun runtime re-exec", () => {
   })
 
   describe("#given the re-exec decision table", () => {
-    const bunPath = join(POSIX_HOME, ".bun", "bin", "bun")
-    const treeScript = bunTreePackage(join(POSIX_HOME, ".bun"))
+    const bunPath = posix.join(POSIX_HOME, ".bun", "bin", "bun")
+    const treeScript = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
     const plainScript = "/usr/local/lib/node_modules/omo-ai/bin/omo.js"
 
     function decide(overrides: {
@@ -286,7 +300,7 @@ describe("bun runtime re-exec", () => {
       test("#then a relocated BUN_INSTALL tree is honored", () => {
         // given
         const relocated = "/opt/bunroot"
-        const relocatedBun = join(relocated, "bin", "bun")
+        const relocatedBun = posix.join(relocated, "bin", "bun")
         // when
         const decision = decide({
           scriptPath: bunTreePackage(relocated),
@@ -316,15 +330,15 @@ describe("bun runtime re-exec", () => {
   })
 
   describe("#given the executing re-exec entry point", () => {
-    const bunPath = join(POSIX_HOME, ".bun", "bin", "bun")
-    const treeScript = bunTreePackage(join(POSIX_HOME, ".bun"))
+    const bunPath = posix.join(POSIX_HOME, ".bun", "bin", "bun")
+    const treeScript = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
 
-    test("#then the script and its arguments are handed to bun with inherited stdio", () => {
+    test("#then the script and its arguments are handed to bun with inherited stdio", async () => {
       // given
       const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
       const propagated: Array<Record<string, unknown>> = []
       // when
-      const consumed = maybeReexecUnderBun({
+      const consumed = await maybeReexecUnderBun({
         scriptPath: treeScript,
         argv: ["node", treeScript, "say", "hi"],
         env: {},
@@ -350,11 +364,11 @@ describe("bun runtime re-exec", () => {
       expect(propagated).toEqual([{ status: 0, signal: null }])
     })
 
-    test("#then a stay decision spawns nothing and lets the caller continue", () => {
+    test("#then a stay decision spawns nothing and lets the caller continue", async () => {
       // given
       let spawned = 0
       // when
-      const consumed = maybeReexecUnderBun({
+      const consumed = await maybeReexecUnderBun({
         scriptPath: treeScript,
         argv: ["node", treeScript, "say", "hi"],
         env: { OMO_RUNTIME: "node" },
@@ -374,11 +388,11 @@ describe("bun runtime re-exec", () => {
       expect(spawned).toBe(0)
     })
 
-    test("#then a bun process already running never re-execs itself", () => {
+    test("#then a bun process already running never re-execs itself", async () => {
       // given
       let spawned = 0
       // when
-      const consumed = maybeReexecUnderBun({
+      const consumed = await maybeReexecUnderBun({
         scriptPath: treeScript,
         argv: ["bun", treeScript],
         env: {},

@@ -1,0 +1,11 @@
+Task 3 cleanup receipts (2026-08-25)
+
+Fresh final-doctor QA root:
+/tmp/omo-task3-finaldoctor.ok1G4T
+Fresh real-home receipt:
+/tmp/omo-task3-finaldoctor-real.8RlLpB
+
+Removed after evidence transcription:
+rm -rf /tmp/omo-task3-finaldoctor.ok1G4T /tmp/omo-task3-finaldoctor-real.8RlLpB /tmp/omo-task3-finaldoctor-root /tmp/omo-task3-finaldoctor-receipt
+
+No user-file quarantine attributes were changed. No real agent directory was used as HOME or OMO_CODING_AGENT_DIR.

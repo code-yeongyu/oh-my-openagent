@@ -20,10 +20,12 @@ import {
 
 const SHARED_KEYS = [
   "$process_person_profile",
+  "install_id",
   "package_version",
   "platform",
   "product_name",
   "schema_version",
+  "surface",
 ] as const
 
 function context(sessionId: string): Record<string, unknown> {

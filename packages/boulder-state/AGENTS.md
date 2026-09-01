@@ -1,6 +1,6 @@
 # boulder-state — Work-Tracking State Machine (Core)
 
-**Generated:** 2026-07-17 / 7d664b96b
+**Generated:** 2026-08-24 / f3642fcda
 
 ## OVERVIEW
 
@@ -22,9 +22,9 @@ Every `BoulderState` carries `active_work_id` + a `works` map. The root-level fi
 
 ## CONSUMERS
 
-- **omo-opencode** (`workspace:*`): `features/boulder-state/*` re-exports; hooks `atlas`, `start-work`, `todo-continuation-enforcer`; CLI `boulder` command.
-- **omo-codex** (`file:` dep): `plugin/components/start-work-continuation/boulder-reader.ts`.
-- **omo-senpi** (`workspace:*`): `src/components/start-work-continuation/boulder-eligibility.ts` reads work state with `senpi:`-prefixed session ids.
+- **omo-opencode** (`workspace:*`): `features/boulder-state/*` re-exports; hooks `atlas`, `ulw-execute`, `todo-continuation-enforcer`; CLI `boulder` command.
+- **omo-codex** (`file:` dep): `plugin/components/ulw-execute-continuation/boulder-reader.ts`.
+- **omo-senpi** (`workspace:*`): `src/components/ulw-execute-continuation/boulder-eligibility.ts` reads work state with `senpi:`-prefixed session ids.
 
 ## NOTES
 

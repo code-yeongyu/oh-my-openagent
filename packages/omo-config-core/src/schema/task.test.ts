@@ -11,6 +11,30 @@ import {
 // Infinity (TaskConcurrency.getLimit) and to "admit every child" (residency admission), so the
 // schema must let it through unchanged rather than clamping or rejecting it.
 describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
+  test("#given global concurrency values #when task settings parse #then zero, one, and eight are accepted", () => {
+    expect(OmoTaskSettingsSchema.parse({ global_concurrency: 0 }).global_concurrency).toBe(0)
+    expect(OmoTaskSettingsSchema.parse({ global_concurrency: 1 }).global_concurrency).toBe(1)
+    expect(OmoTaskSettingsSchema.parse({ global_concurrency: 8 }).global_concurrency).toBe(8)
+  })
+
+  test("#given invalid global concurrency values #when task settings parse #then they are rejected", () => {
+    for (const value of [-1, 1.5, "x"]) {
+      expect(OmoTaskSettingsSchema.safeParse({ global_concurrency: value }).success).toBe(false)
+    }
+  })
+
+  test("#given no global concurrency layer override #when layer parses #then no default is injected", () => {
+    expect(OmoTaskSettingsLayerSchema.parse({})).not.toHaveProperty("global_concurrency")
+  })
+
+  test("#given generated schema #when global concurrency values validate #then zero and four pass and negative one fails", async () => {
+    const schemaText = await Bun.file("assets/omo.schema.json").text()
+    expect(schemaText).toContain('"global_concurrency"')
+    expect(schemaText).toContain('"minimum": 0')
+    expect(OmoTaskSettingsSchema.safeParse({ global_concurrency: 4 }).success).toBe(true)
+    expect(OmoTaskSettingsSchema.safeParse({ global_concurrency: -1 }).success).toBe(false)
+  })
+
   test("#given zero concurrency caps #when task settings parse #then zero is preserved as the unbounded sentinel", () => {
     // given
     const input = {
@@ -47,6 +71,10 @@ describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
     expect(parsed.provider_concurrency?.anthropic).toBe(0)
     expect(parsed.model_concurrency?.["anthropic/opus"]).toBe(0)
     expect(parsed.residency_max_children).toBe(0)
+  })
+
+  test("#given parallelism 14 #when settings resolve without a residency override #then the bounded default resolves to 16", () => {
+    expect(resolveOmoTaskSettings({}, () => 14).residency_max_children).toBe(16)
   })
 
   test("#given an explicit zero residency cap #when settings resolve #then the parallelism default never overrides it", () => {

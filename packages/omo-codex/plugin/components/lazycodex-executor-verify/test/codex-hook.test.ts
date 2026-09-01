@@ -374,9 +374,7 @@ describe("tier worker receipt enforcement", () => {
 
 	it("#given both hook manifests #when their matchers are applied #then enforced agents match and read-only roles do not", () => {
 		// given
-		const componentManifest = JSON.parse(
-			readFileSync(new URL("../hooks/hooks.json", import.meta.url), "utf8"),
-		);
+		const componentManifest = JSON.parse(readFileSync(new URL("../hooks/hooks.json", import.meta.url), "utf8"));
 		const rootManifest = JSON.parse(
 			readFileSync(
 				new URL("../../../hooks/subagent-stop-verifying-lazycodex-executor-evidence.json", import.meta.url),
@@ -394,4 +392,3 @@ describe("tier worker receipt enforcement", () => {
 		}
 	});
 });
-

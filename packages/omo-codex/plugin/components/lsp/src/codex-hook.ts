@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import { callDiagnosticsViaDaemon } from "@code-yeongyu/lsp-daemon/client";
 import { collectPostEditDiagnostics, type PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
-import { parseLspRequestContext, type LspRequestContext } from "@oh-my-opencode/lsp-core/request-context";
+import { type LspRequestContext, parseLspRequestContext } from "@oh-my-opencode/lsp-core/request-context";
 
 import { ensureLspDaemonCliEnv } from "./daemon-cli-path.js";
 import {

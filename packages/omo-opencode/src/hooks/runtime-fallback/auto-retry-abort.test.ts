@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
-import { getPromptReservation, setPromptReservation } from "../../shared/prompt-async-gate/reservations"
+import { getPromptReservation, setPromptReservation } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
 import { createAbortSessionRequest } from "./auto-retry-abort"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 

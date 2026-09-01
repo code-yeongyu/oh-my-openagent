@@ -12,13 +12,18 @@ export type DestructionPort = {
 
 // The seam steering consumes from the manager. The manager owns concurrency + live handles + the
 // record store; steering reads through this port so it never forks that state.
+export type ReviveReservation =
+  | { readonly ok: false }
+  | { readonly ok: true; commit(): void; release(): void }
+
 export type SteeringPort = {
   readonly store: TaskRecordStore
+  tryBeginSend?(taskId: string): boolean
+  endSend?(taskId: string): void
+  isEvicting?(taskId: string): boolean
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
-  // Re-account a revived (now-running) child: re-acquire its concurrency slot and re-arm outcome
-  // tracking under the NEW run_epoch so the later release is not swallowed by the release guard.
-  reacquireForRevive(taskId: string): void
+  reserveForRevive(taskId: string): ReviveReservation
   readonly destruction: DestructionPort
   // Snapshot of the manager-owned run-stats accumulator for a live task, attached to the cancel
   // transition steering performs (the manager's later outcome transition is late-transition
@@ -44,6 +49,7 @@ export const DEFAULT_SEND_DELIVERY: SendDelivery = "followUp"
 export type SendOutcome =
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: SendDelivery }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
+  | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
   // One-shot agents (see agents/interaction-policy.ts) refuse task_send in EVERY state; message is
@@ -67,6 +73,7 @@ export type CancelOutcome =
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {
+  hasPendingSends(taskId: string): boolean
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>

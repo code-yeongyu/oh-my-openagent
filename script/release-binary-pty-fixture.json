@@ -1,0 +1,21 @@
+{
+  "$comment": "Generated once from the npm registry listing of @code-yeongyu/senpi-pty. Targets marked ptyAvailable MUST ship native/prebuilds/<prebuildHost>/ (build fails when the prebuild is missing); ptyAvailable=false targets ship without a prebuild and rely on the engine's documented pipe-transport degrade (senpi-pty dist/loader.js).",
+  "ptyPin": "2026.8.24",
+  "packageName": "@code-yeongyu/senpi-pty",
+  "generatedAt": "2026-08-25",
+  "registryEvidence": "npm pack @code-yeongyu/senpi-pty@2026.8.24 -> package/native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node is the ONLY prebuild in the tarball; no platform-split @code-yeongyu/senpi-pty-<platform> packages are published (npm view -> E404).",
+  "targets": {
+    "darwin-arm64": { "ptyAvailable": true, "prebuildHost": "darwin-arm64" },
+    "darwin-x64": { "ptyAvailable": false, "prebuildHost": null },
+    "darwin-x64-baseline": { "ptyAvailable": false, "prebuildHost": null },
+    "linux-x64": { "ptyAvailable": false, "prebuildHost": null },
+    "linux-x64-baseline": { "ptyAvailable": false, "prebuildHost": null },
+    "linux-arm64": { "ptyAvailable": false, "prebuildHost": null },
+    "linux-x64-musl": { "ptyAvailable": false, "prebuildHost": null },
+    "linux-x64-musl-baseline": { "ptyAvailable": false, "prebuildHost": null },
+    "linux-arm64-musl": { "ptyAvailable": false, "prebuildHost": null },
+    "windows-x64": { "ptyAvailable": false, "prebuildHost": null },
+    "windows-x64-baseline": { "ptyAvailable": false, "prebuildHost": null },
+    "windows-arm64": { "ptyAvailable": false, "prebuildHost": null }
+  }
+}

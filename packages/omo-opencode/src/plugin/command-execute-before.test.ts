@@ -21,16 +21,16 @@ function createMockGoal() {
 }
 
 describe("createCommandExecuteBeforeHandler", () => {
-  test("#given stopped session and /start-work #when command.execute.before runs #then clear is called", async () => {
+  test("#given stopped session and /ulw-execute #when command.execute.before runs #then clear is called", async () => {
     // given
     const clear = mock(() => {})
     const isStopped = mock(() => true)
-    const startWorkHook = mock(async () => {})
+    const ulwExecuteHook = mock(async () => {})
     const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
       directory: process.cwd(),
       hooks: {
-        startWork: {
-          "command.execute.before": startWorkHook,
+        ulwExecute: {
+          "command.execute.before": ulwExecuteHook,
         },
         stopContinuationGuard: {
           isStopped,
@@ -42,7 +42,7 @@ describe("createCommandExecuteBeforeHandler", () => {
     // when
     await handler(
       {
-        command: "start-work",
+        command: "ulw-execute",
         sessionID: "ses-stopped",
         arguments: "",
       },
@@ -52,7 +52,7 @@ describe("createCommandExecuteBeforeHandler", () => {
     )
 
     // then
-    expect(startWorkHook).toHaveBeenCalledTimes(1)
+    expect(ulwExecuteHook).toHaveBeenCalledTimes(1)
     expect(isStopped).toHaveBeenCalledWith("ses-stopped")
     expect(clear).toHaveBeenCalledTimes(1)
     expect(clear).toHaveBeenCalledWith("ses-stopped")
