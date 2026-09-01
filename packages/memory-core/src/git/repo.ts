@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { mkdir, writeFile } from "node:fs/promises"
+import { existsSync } from "../fs/resilient"
+import { mkdir, writeFile } from "../fs/resilient"
 import { dirname, join } from "node:path"
 import { withGitLockRetry, withSerializedGitConfigMutation } from "./config-lock"
 import { DirtyRepoError, NoEffectiveChangesError } from "./errors"
@@ -16,13 +16,14 @@ import type {
   GitLogOptions,
   GitMemoryRepoOptions,
   GitMergeOptions,
+  GitTreeSizedEntry,
   InitializeGitRepoOptions,
   MemoryCommit,
 } from "./repo-types"
 
 export type {
   GitCommitAuthor, GitCommitResult, GitLogOptions, GitMemoryRepoOptions,
-  GitMergeOptions, GitSeedFile, InitializeGitRepoOptions, MemoryCommit,
+  GitMergeOptions, GitSeedFile, GitTreeSizedEntry, InitializeGitRepoOptions, MemoryCommit,
 } from "./repo-types"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -52,7 +53,7 @@ export class GitMemoryRepo {
     }
 
     await (options.installHooks ?? this.hookInstaller)(this.dir)
-    await this.ensureIdentity(options.authorName?.trim() || "Omo Agent")
+    await this.ensureIdentity(options.authorName?.trim() || "OmO Agent")
     const currentHead = await this.head()
     if (currentHead) return currentHead
 
@@ -67,7 +68,7 @@ export class GitMemoryRepo {
 
     const author: GitCommitAuthor = {
       agentId: this.agentId,
-      authorName: options.authorName?.trim() || "Omo Agent",
+      authorName: options.authorName?.trim() || "OmO Agent",
     }
     if (paths.length > 0) {
       await this.stage(paths)
@@ -139,6 +140,11 @@ export class GitMemoryRepo {
     const suffix = path ? ["--", path] : []
     const result = await this.git(["ls-tree", "-r", "--name-only", "-z", revision, ...suffix])
     return result.stdout.split("\0").filter(Boolean)
+  }
+
+  async lsTreeSized(revision = "HEAD"): Promise<readonly GitTreeSizedEntry[]> {
+    const result = await this.git(["ls-tree", "-r", "-l", "-z", revision])
+    return parseLsTreeSized(result.stdout)
   }
 
   async show(revision: string, path: string): Promise<string> {
@@ -245,4 +251,22 @@ export class GitMemoryRepo {
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     })
   }
+}
+
+function parseLsTreeSized(stdout: string): GitTreeSizedEntry[] {
+  const entries: GitTreeSizedEntry[] = []
+  for (const record of stdout.split("\0")) {
+    if (record.length === 0) continue
+    const tab = record.indexOf("\t")
+    if (tab === -1) continue
+    const meta = record.slice(0, tab).trim().split(/\s+/)
+    const path = record.slice(tab + 1)
+    if (meta.length < 4 || path.length === 0) continue
+    const size = meta[3]
+    if (size === undefined || size === "-") continue
+    const bytes = Number.parseInt(size, 10)
+    if (!Number.isSafeInteger(bytes) || bytes < 0) continue
+    entries.push({ path, bytes })
+  }
+  return entries
 }

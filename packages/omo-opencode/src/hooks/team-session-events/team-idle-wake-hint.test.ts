@@ -572,7 +572,9 @@ describe("createTeamIdleWakeHint", () => {
 
     const processedEntries = await readdir(path.join(getInboxDir(resolveBaseDir(config), teamRunId, "worker"), "processed"))
     expect(processedEntries.sort()).toEqual(messageIds.map((messageId) => `${messageId}.json`).sort())
-  })
+    // Loaded Windows runners push this past the 5s default; the waits stay event-driven
+    // (~60ms locally), so only the ceiling moves.
+  }, 30_000)
 
   test("acks pending reserved live-delivery messages on idle", async () => {
     // given

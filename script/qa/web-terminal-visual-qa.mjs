@@ -30,6 +30,8 @@ Inputs:
   --from-file <path>     Render an existing raw terminal byte stream through xterm.js (replay; no interaction).
   --input <token>        Scripted interaction, repeatable, applied in order THROUGH the browser terminal.
                          Literal text is typed; {Enter} {Tab} {Escape} {ArrowDown} {Ctrl+C} etc. are pressed as keys.
+                         {WheelUp} and {WheelDown} send real browser mouse-wheel input over the xterm viewport.
+                         {CtrlSlashByte} and {Ctrl7Byte} send their shared exact terminal control byte.
   --cwd <path>           Working directory for --command. Default: current directory.
   --cols <n> / --rows <n>  Terminal geometry. Default: 120 x 32.
   --dwell-ms <n>         Milliseconds to let the TUI settle after input before capture. Default: 1500.

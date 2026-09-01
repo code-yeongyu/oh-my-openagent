@@ -47,12 +47,12 @@ const result = await run.done()
 The dag engine keys idempotency on `key` + graph fingerprint: re-starting the same key with the same graph REUSES the old run instead of running again. So the library treats the stored `key` as a BASE key and rotates it on every load:
 
 - `lib.start("nightly-audit")` → key becomes `nightly-audit-<UTC YYYYMMDD-HHmmss>`: every call is a fresh run. This is the default because wanting a fresh run is the common case.
-- `lib.start("nightly-audit", { suffix: "20260818" })` → key becomes `nightly-audit-20260818`: explicit suffix, so a retry of the same logical run reuses it (idempotent recovery), while a new day gets a new run.
+- `lib.start("nightly-audit", { suffix: "20260818" })` → key becomes `nightly-audit-20260818`: explicit suffix, so re-running the same logical run reuses it (idempotent recovery), while a new day gets a new run. Recovering a FAILED node inside such a run is `retry`/`amend` on that run id, not a new suffix.
 - `lib.start("nightly-audit", { suffix: "" })` → key stays `nightly-audit`: full idempotency; only reach for this when reusing the previous result is exactly what you want.
 
 ## Python cells
 
-Python cannot import the ESM library. Reproduce the same semantics with plain dicts — read the file, rotate the key, fill placeholders, call `tool.dag`:
+Python cannot import the ESM library. Reproduce the same semantics with plain dicts — read the file, rotate the key, fill placeholders, call `tool.workflow`:
 
 ```python
 import json
@@ -61,8 +61,8 @@ defn = json.loads(read(f"{env('HOME')}/.omo/dags/nightly-audit.json"))
 stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 defn["key"] = f"{defn['key']}-{stamp}"
 text = json.dumps(defn).replace("{{key}}", defn["key"]).replace("{{date}}", stamp[:8]).replace("{{datetime}}", stamp)
-run = tool.dag({"action": "start", "definition": json.loads(text)})
-result = tool.dag({"action": "wait", "run_id": run["run_id"]})
+run = tool.workflow({"action": "start", "definition": json.loads(text)})
+result = tool.workflow({"action": "wait", "run_id": run["run_id"], "detach": False})  # detach=False keeps the cell-blocking wait; the bare tool action detaches against a live run
 ```
 
 ## Saving a new definition

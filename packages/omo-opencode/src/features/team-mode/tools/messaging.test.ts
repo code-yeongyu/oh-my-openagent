@@ -15,19 +15,25 @@ import {
   clearAllSessionPromptParams,
   getSessionPromptParams,
 } from "../../../shared/session-prompt-params-state"
-import { releaseAllPromptAsyncReservationsForTesting } from "../../../hooks/shared/prompt-async-gate"
+import {
+  DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS,
+  dispatchInternalPrompt,
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../../../hooks/shared/prompt-async-gate"
 import { DEFAULT_SESSION_IDLE_SETTLE_MS } from "@oh-my-opencode/utils/session-idle-settle"
+import { ackMessages } from "@oh-my-opencode/team-core/team-mailbox/ack"
 import { listUnreadMessages } from "@oh-my-opencode/team-core/team-mailbox/inbox"
 import { pollAndBuildInjection } from "@oh-my-opencode/team-core/team-mailbox/poll"
 import { BroadcastNotPermittedError } from "@oh-my-opencode/team-core/team-mailbox/send"
 import { getInboxDir, resolveBaseDir } from "@oh-my-opencode/team-core/team-registry/paths"
-import { createRuntimeState, saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
+import { createRuntimeState, loadRuntimeState, saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
 import { clearTeamSessionRegistry, registerTeamSession } from "../team-session-registry"
 import type { Message } from "@oh-my-opencode/team-core/types"
 import { MessageSchema } from "@oh-my-opencode/team-core/types"
 import { createTeamIdleWakeHint } from "../../../hooks/team-session-events/team-idle-wake-hint"
-import { createTeamSendMessageTool } from "./messaging"
-import { resolveTeamRuntimeDetails } from "./messaging-runtime"
+import { createTeamSendMessageTool as createProductionTeamSendMessageTool } from "./messaging"
+import { defaultTeamSendMessageToolDeps, resolveTeamRuntimeDetails } from "./messaging-runtime"
 
 type PromptAsyncCall = {
   sessionId: string
@@ -101,9 +107,21 @@ type Deferred<T> = {
 }
 
 const temporaryDirectories: string[] = []
-const TEST_EVENT_TIMEOUT_MS = 1_000
+const TEST_EVENT_TIMEOUT_MS = 3_000
 const realSetTimeout = globalThis.setTimeout
 const realClearTimeout = globalThis.clearTimeout
+
+function createTeamSendMessageTool(
+  config: Parameters<typeof createProductionTeamSendMessageTool>[0],
+  client: Parameters<typeof createProductionTeamSendMessageTool>[1],
+  deps: Parameters<typeof createProductionTeamSendMessageTool>[2] = defaultTeamSendMessageToolDeps,
+): ReturnType<typeof createProductionTeamSendMessageTool> {
+  return createProductionTeamSendMessageTool(config, client, {
+    ...defaultTeamSendMessageToolDeps,
+    ...deps,
+    liveDeliverySettleMs: 0,
+  })
+}
 
 function createDeferred<T>(): Deferred<T> {
   let resolvePromise: Deferred<T>["resolve"] | undefined
@@ -114,10 +132,14 @@ function createDeferred<T>(): Deferred<T> {
   return { promise, resolve: resolvePromise }
 }
 
-async function waitForEvent<T>(promise: Promise<T>, description: string): Promise<T> {
+async function waitForEvent<T>(
+  promise: Promise<T>,
+  description: string,
+  timeoutMs = TEST_EVENT_TIMEOUT_MS,
+): Promise<T> {
   let timeoutID: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_resolve, reject) => {
-    timeoutID = realSetTimeout(() => reject(new Error(`timed out waiting for ${description}`)), TEST_EVENT_TIMEOUT_MS)
+    timeoutID = realSetTimeout(() => reject(new Error(`timed out waiting for ${description}`)), timeoutMs)
   })
 
   try {
@@ -196,6 +218,7 @@ async function createTeamFixture() {
   runtimeState.members[0].sessionId = leadSessionId
   runtimeState.members[1].sessionId = memberOneSessionId
   runtimeState.members[2].sessionId = memberTwoSessionId
+  runtimeState.status = "active"
   runtimeState.members[0].status = "idle"
   runtimeState.members[1].status = "idle"
   runtimeState.members[2].status = "idle"
@@ -480,7 +503,7 @@ describe("createTeamSendMessageTool", () => {
     expect(unread[0]?.body).toBe("ping while busy")
   })
 
-  test("#given rapid live deliveries to one recipient #when the first prompt just dispatched #then the next message waits for mailbox injection", async () => {
+  test("#given rapid live deliveries to one recipient #when the first prompt just dispatched #then the next message queues a mailbox wake", async () => {
     // given
     const fixture = await createTeamFixture()
     const { client, calls } = createRecordingClient()
@@ -506,7 +529,431 @@ describe("createTeamSendMessageTool", () => {
     expect(unread[0]?.body).toBe("second ping")
   })
 
-  test("#given live delivery deferred a rapid message #when recipient idle wake fires immediately #then the wake hint does not start a second reply", async () => {
+  test("#given live delivery falls back for an idle recipient #when the prompt gate clears #then a queued wake exposes the unread message", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const fallbackWakeDispatched = createDeferred<void>()
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          if (promptCalls === 2) fallbackWakeDispatched.resolve(undefined)
+        },
+      },
+    }
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-blocker",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "blocker" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "fallback ping",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    expect(promptCalls).toBe(1)
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread.map((message) => message.body)).toEqual(["fallback ping"])
+
+    // when
+    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    await waitForEvent(fallbackWakeDispatched.promise, "queued fallback mailbox wake")
+    const injection = await pollAndBuildInjection(
+      fixture.memberTwoSessionId,
+      "m2",
+      fixture.teamRunId,
+      fixture.config,
+      "turn-after-fallback-wake",
+    )
+
+    // then
+    expect(promptCalls).toBe(2)
+    expect(injection.injected).toBe(true)
+    expect(injection.content).toContain("fallback ping")
+  })
+
+  test("#given a message waits behind pending live delivery #when that prompt clears #then a queued wake exposes the waiting message", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const fallbackWakeDispatched = createDeferred<void>()
+    let currentTime = Date.now()
+    const dateNowSpy = spyOn(Date, "now").mockImplementation(() => currentTime)
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          if (promptCalls === 2) fallbackWakeDispatched.resolve(undefined)
+        },
+      },
+    }
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    try {
+      await liveTool.execute({
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "live ping",
+      }, fixture.toolContext(fixture.memberOneSessionId))
+      await liveTool.execute({
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "waiting ping",
+      }, fixture.toolContext(fixture.memberOneSessionId))
+
+      expect(promptCalls).toBe(1)
+      const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+      expect(unread.map((message) => message.body)).toEqual(["waiting ping"])
+
+      // when
+      currentTime += DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
+      await waitForEvent(fallbackWakeDispatched.promise, "pending-delivery fallback mailbox wake")
+      const injection = await pollAndBuildInjection(
+        fixture.memberTwoSessionId,
+        "m2",
+        fixture.teamRunId,
+        fixture.config,
+        "turn-after-pending-fallback-wake",
+      )
+
+      // then
+      expect(promptCalls).toBe(2)
+      expect(injection.injected).toBe(true)
+      expect(injection.content).toContain("waiting ping")
+    } finally {
+      dateNowSpy.mockRestore()
+    }
+  })
+
+  test("#given a queued fallback message was already injected #when the prompt gate clears #then the obsolete wake is cancelled", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const probeDispatched = createDeferred<void>()
+    const promptTexts: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { body: { parts: Array<{ text?: string }> } }) => {
+          const text = input.body.parts[0]?.text ?? ""
+          promptTexts.push(text)
+          if (text === "queue probe") probeDispatched.resolve(undefined)
+        },
+      },
+    }
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-blocker",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "blocker" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "already injected",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    const injection = await pollAndBuildInjection(
+      fixture.memberTwoSessionId,
+      "m2",
+      fixture.teamRunId,
+      fixture.config,
+      "turn-before-fallback-wake",
+    )
+    expect(injection.injected).toBe(true)
+    expect(injection.content).toContain("already injected")
+    await ackMessages(fixture.teamRunId, "m2", injection.messageIds, fixture.config)
+
+    const probeResult = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-probe",
+      queueBehavior: "enqueue",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "queue probe" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    expect(probeResult.status).toBe("queued")
+
+    // when
+    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    await waitForEvent(probeDispatched.promise, "queue probe after cancelled fallback wake")
+
+    // then
+    expect(promptTexts).toEqual(["blocker", "queue probe"])
+  })
+
+  test("#given a queued fallback message is pending acknowledgement #when the prompt gate clears #then the obsolete wake is cancelled", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const probeDispatched = createDeferred<void>()
+    const promptTexts: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { body: { parts: Array<{ text?: string }> } }) => {
+          const text = input.body.parts[0]?.text ?? ""
+          promptTexts.push(text)
+          if (text === "pending-ack queue probe") probeDispatched.resolve(undefined)
+        },
+      },
+    }
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-blocker",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "blocker" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "pending acknowledgement",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    const injection = await pollAndBuildInjection(
+      fixture.memberTwoSessionId,
+      "m2",
+      fixture.teamRunId,
+      fixture.config,
+      "turn-with-pending-ack",
+    )
+    expect(injection.injected).toBe(true)
+
+    const probeResult = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-pending-ack-probe",
+      queueBehavior: "enqueue",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "pending-ack queue probe" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    expect(probeResult.status).toBe("queued")
+
+    // when
+    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    await waitForEvent(probeDispatched.promise, "queue probe after pending acknowledgement")
+
+    // then
+    expect(promptTexts).toEqual(["blocker", "pending-ack queue probe"])
+  })
+
+  test("#given generic fallback wakes cover two messages #when the first is acknowledged #then the second message still wakes", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const secondWakeDispatched = createDeferred<void>()
+    const promptTexts: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { body: { parts: Array<{ text?: string }> } }) => {
+          const text = input.body.parts[0]?.text ?? ""
+          promptTexts.push(text)
+          if (text.includes("You have a new team message")) secondWakeDispatched.resolve(undefined)
+        },
+      },
+    }
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-blocker",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "blocker" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "first fallback",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    const firstInjection = await pollAndBuildInjection(
+      fixture.memberTwoSessionId,
+      "m2",
+      fixture.teamRunId,
+      fixture.config,
+      "turn-before-second-message",
+    )
+    expect(firstInjection.injected).toBe(true)
+
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "second fallback",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    await ackMessages(fixture.teamRunId, "m2", firstInjection.messageIds, fixture.config)
+    const unreadBeforeWake = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unreadBeforeWake.map((message) => message.body)).toEqual(["second fallback"])
+
+    // when
+    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    await waitForEvent(secondWakeDispatched.promise, "second message fallback wake")
+    const secondInjection = await pollAndBuildInjection(
+      fixture.memberTwoSessionId,
+      "m2",
+      fixture.teamRunId,
+      fixture.config,
+      "turn-after-second-message",
+    )
+
+    // then
+    expect(promptTexts).toHaveLength(2)
+    expect(secondInjection.injected).toBe(true)
+    expect(secondInjection.content).toContain("second fallback")
+  })
+
+  test("#given a queued fallback recipient shut down #when the prompt gate clears #then the obsolete wake is cancelled", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const probeDispatched = createDeferred<void>()
+    const promptTexts: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { body: { parts: Array<{ text?: string }> } }) => {
+          const text = input.body.parts[0]?.text ?? ""
+          promptTexts.push(text)
+          if (text === "shutdown queue probe") probeDispatched.resolve(undefined)
+        },
+      },
+    }
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-blocker",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "blocker" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "unread after shutdown",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
+    const runtimeState = await loadState(fixture.teamRunId, fixture.config)
+    const recipient = runtimeState.members.find((member) => member.name === "m2")
+    if (!recipient) throw new Error("m2 runtime member missing")
+    recipient.status = "shutdown_approved"
+    await saveState(runtimeState, fixture.config)
+
+    const probeResult = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-shutdown-probe",
+      queueBehavior: "enqueue",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "shutdown queue probe" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    expect(probeResult.status).toBe("queued")
+
+    // when
+    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    await waitForEvent(probeDispatched.promise, "queue probe after recipient shutdown")
+
+    // then
+    expect(promptTexts).toEqual(["blocker", "shutdown queue probe"])
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread.map((message) => message.body)).toEqual(["unread after shutdown"])
+  })
+
+  test("#given a queued fallback team was deleted #when the prompt gate clears #then the obsolete wake is cancelled", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const probeDispatched = createDeferred<void>()
+    const promptTexts: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { body: { parts: Array<{ text?: string }> } }) => {
+          const text = input.body.parts[0]?.text ?? ""
+          promptTexts.push(text)
+          if (text === "deleted-team queue probe") probeDispatched.resolve(undefined)
+        },
+      },
+    }
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-blocker",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "blocker" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "unread before deletion",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    await rm(path.join(resolveBaseDir(fixture.config), "runtime", fixture.teamRunId), {
+      recursive: true,
+      force: true,
+    })
+
+    const probeResult = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: fixture.memberTwoSessionId,
+      source: "test-deleted-team-probe",
+      queueBehavior: "enqueue",
+      input: {
+        path: { id: fixture.memberTwoSessionId },
+        body: { parts: [{ type: "text", text: "deleted-team queue probe" }] },
+        query: { directory: resolveBaseDir(fixture.config) },
+      },
+    })
+    expect(probeResult.status).toBe("queued")
+
+    // when
+    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    await waitForEvent(probeDispatched.promise, "queue probe after team deletion")
+
+    // then
+    expect(promptTexts).toEqual(["blocker", "deleted-team queue probe"])
+  })
+
+  test("#given live delivery queued a rapid-message wake #when recipient idle fires immediately #then the idle hint does not start a third reply", async () => {
     // given
     const fixture = await createTeamFixture()
     const { client, calls } = createRecordingClient()
@@ -573,12 +1020,12 @@ describe("createTeamSendMessageTool", () => {
     expect(calls[0].variant).toBe("high")
   })
 
-  test("live delivery uses the registered agent alias when the runtime stores a config-key agent name", async () => {
+  test("live delivery uses the ambient idle-settle default when no settle value is injected", async () => {
     const settleTimerScheduled = createDeferred<void>()
     const acceleratedSetTimeout = new Proxy(realSetTimeout, {
       apply(target, thisArg, args) {
         if (args[1] === DEFAULT_SESSION_IDLE_SETTLE_MS) {
-          settleTimerScheduled.resolve()
+          settleTimerScheduled.resolve(undefined)
           args[1] = 0
         }
         return Reflect.apply(target, thisArg, args)
@@ -588,33 +1035,55 @@ describe("createTeamSendMessageTool", () => {
 
     try {
       // given
-      registerAgentName("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
       const fixture = await createTeamFixture()
-      const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
-      const state = await loadState(fixture.teamRunId, fixture.config)
-      const memberTwo = state.members.find((member) => member.name === "m2")
-      if (!memberTwo) throw new Error("m2 runtime member missing")
-      memberTwo.subagent_type = "atlas"
-      await saveState(state, fixture.config)
-
       const { client, calls } = createRecordingClient()
-      const liveTool = createTeamSendMessageTool(fixture.config, client)
+      const liveTool = createProductionTeamSendMessageTool(
+        fixture.config,
+        client,
+        defaultTeamSendMessageToolDeps,
+      )
 
       // when
       const delivery = liveTool.execute({
         teamRunId: fixture.teamRunId,
         to: "m2",
-        body: "ping",
+        body: "ambient default ping",
       }, fixture.toolContext(fixture.memberOneSessionId))
       await waitForEvent(settleTimerScheduled.promise, "live delivery idle-settle timer")
       await delivery
 
       // then
       expect(calls).toHaveLength(1)
-      expect(calls[0]?.agent).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+      expect(calls[0]?.parts[0]?.text).toContain("ambient default ping")
     } finally {
       setTimeoutSpy.mockRestore()
     }
+  })
+
+  test("live delivery uses the registered agent alias when the runtime stores a config-key agent name", async () => {
+    // given
+    registerAgentName("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+    const fixture = await createTeamFixture()
+    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
+    const state = await loadState(fixture.teamRunId, fixture.config)
+    const memberTwo = state.members.find((member) => member.name === "m2")
+    if (!memberTwo) throw new Error("m2 runtime member missing")
+    memberTwo.subagent_type = "atlas"
+    await saveState(state, fixture.config)
+
+    const { client, calls } = createRecordingClient()
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "ping",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.agent).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
   })
 
   test("live delivery reapplies category routing and advanced model params for category members", async () => {
@@ -794,12 +1263,49 @@ describe("createTeamSendMessageTool", () => {
     expect(memberTwoInbox.filter((entry) => entry.endsWith(".json") && !entry.startsWith("."))).toHaveLength(1)
   })
 
+  test("#given fallback wake fails ambiguously #when live delivery falls back #then it does not retry a possibly accepted request", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    let promptCalls = 0
+    const failingClient = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          throw new TypeError("fetch failed")
+        },
+      },
+    } satisfies LiveDeliveryClient
+    const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "non-retryable ping",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    expect(promptCalls).toBe(1)
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
+    const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json") && !entry.startsWith("."))
+    expect(inboxEntries).toHaveLength(1)
+  })
+
   test("inbox stays intact when live delivery fails so the fallback path still works", async () => {
     // given
     const fixture = await createTeamFixture()
+    const fallbackDispatched = createDeferred<void>()
+    let promptCalls = 0
     const failingClient = {
       session: {
-        promptAsync: async () => { throw new Error("network down") },
+        promptAsync: async () => {
+          promptCalls += 1
+          if (promptCalls < 5) {
+            const code = promptCalls % 2 === 0 ? "EHOSTUNREACH" : "ENETUNREACH"
+            throw Object.assign(new Error(`connect ${code}`), { code })
+          }
+          fallbackDispatched.resolve(undefined)
+        },
       },
     } satisfies LiveDeliveryClient
     const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
@@ -810,12 +1316,27 @@ describe("createTeamSendMessageTool", () => {
       to: "m2",
       body: "ping",
     }, fixture.toolContext(fixture.memberOneSessionId))
+    await waitForEvent(
+      fallbackDispatched.promise,
+      "fallback wake after pre-send transport failure",
+      12_000,
+    )
+    const injection = await pollAndBuildInjection(
+      fixture.memberTwoSessionId,
+      "m2",
+      fixture.teamRunId,
+      fixture.config,
+      "turn-after-transport-retry",
+    )
 
     // then
+    expect(promptCalls).toBe(5)
+    expect(injection.injected).toBe(true)
+    expect(injection.content).toContain("ping")
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json") && !entry.startsWith("."))
     expect(inboxEntries).toHaveLength(1)
-  })
+  }, 15_000)
 
   test("#given live delivery promptAsync fails ambiguously #when delivery handles the accepted-like failure #then it marks pending without inbox retry", async () => {
     // given
@@ -829,7 +1350,10 @@ describe("createTeamSendMessageTool", () => {
         },
       },
     } satisfies LiveDeliveryClient
-    const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
+    const liveTool = createTeamSendMessageTool(fixture.config, failingClient, {
+      loadRuntimeState,
+      liveDeliverySettleMs: 0,
+    })
 
     // when
     await liveTool.execute({

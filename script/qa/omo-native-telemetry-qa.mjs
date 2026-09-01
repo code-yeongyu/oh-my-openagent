@@ -32,6 +32,8 @@ const expectedNativeEvents = new Set([
   "turn_completed",
   "skill_loaded",
   "delegation_started",
+  "delegation_completed",
+  "category_config",
   "feature_used",
   "parallelism_summary",
 ])

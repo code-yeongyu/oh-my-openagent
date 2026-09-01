@@ -10,9 +10,10 @@ import type {
   RpcTerminalAssistantMessage,
   TerminateOptions,
 } from "../types"
+import { type RpcStreamingBehavior, isBusyChildRejection } from "./delivery-semantics"
 import { RpcCommandError } from "./errors"
 import { classifyChildExit } from "./exit-mapping"
-import type { RpcProtocolClient } from "./protocol-client"
+import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
 import { agentEndOutcome, exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
 
@@ -71,13 +72,17 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   })
 
   const heartbeat = setInterval(() => {
+    if (client.exited || child.stdin?.writableEnded || child.stdin?.destroyed) return
     client
       .send({ type: "get_state" })
       .then((response) => {
         lastSeenAt = now()
         sessionId = readSessionId(response) ?? sessionId
       })
-      .catch((error: unknown) => log("senpi-task heartbeat get_state failed", { taskId, error: String(error) }))
+      .catch((error: unknown) => {
+        if (client.exited || isHarmlessRpcShutdownError(error)) return
+        log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+      })
   }, heartbeatIntervalMs)
   heartbeat.unref?.()
 
@@ -113,15 +118,21 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     turnBaseline = finalText
   }
 
-  const runPrompt = async (text: string, streamingBehavior?: "followUp"): Promise<void> => {
+  // Deliver with explicit queueing semantics, retrying as followUp when the child answers
+  // "busy". Without this a mid-run delivery is rejected outright and aborts the child.
+  const deliverPrompt = async (text: string, streamingBehavior: RpcStreamingBehavior): Promise<void> => {
+    try {
+      await runCommand({ type: "prompt", message: text, streamingBehavior }, "prompt")
+    } catch (error) {
+      if (streamingBehavior === "followUp" || !isBusyChildRejection(error)) throw error
+      await runCommand({ type: "prompt", message: text, streamingBehavior: "followUp" }, "prompt")
+    }
+  }
+
+  const runPrompt = async (text: string, streamingBehavior: RpcStreamingBehavior = "steer"): Promise<void> => {
     beginTurn()
     try {
-      await runCommand(
-        streamingBehavior === undefined
-          ? { type: "prompt", message: text }
-          : { type: "prompt", message: text, streamingBehavior },
-        "prompt",
-      )
+      await deliverPrompt(text, streamingBehavior)
     } catch (error) {
       settleTurn(promptFailureOutcome(error))
       throw error
@@ -136,9 +147,16 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     get pid() {
       return child.pid ?? undefined
     },
-    steer: (text) => {
+    // task_send is documented to ALWAYS steer into the addressed child, so a steer that the
+    // host rejects as busy degrades to followUp queueing rather than failing the delivery.
+    steer: async (text) => {
       beginTurn()
-      return runCommand({ type: "steer", message: text }, "steer")
+      try {
+        await runCommand({ type: "steer", message: text }, "steer")
+      } catch (error) {
+        if (!isBusyChildRejection(error)) throw error
+        await deliverPrompt(text, "followUp")
+      }
     },
     followUp: (text) => runPrompt(text, "followUp"),
     abort: () => {

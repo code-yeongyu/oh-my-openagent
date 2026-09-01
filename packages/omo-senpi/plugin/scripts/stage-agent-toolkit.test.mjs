@@ -17,7 +17,7 @@ async function makeFixture() {
   const directiveEntry = join(root, "built", "directive.md")
   const targetDir = join(root, "staged", "agent-toolkit")
   await mkdir(join(root, "built"), { recursive: true })
-  await writeFile(sourceEntry, "#!/usr/bin/env node\nconsole.log('ulw-loop help')\n", "utf8")
+  await writeFile(sourceEntry, "#!/usr/bin/env node\nconsole.log(process.argv.slice(2).join(' '))\n", "utf8")
   await writeFile(directiveEntry, "# Ultrawork\n", "utf8")
   await chmod(sourceEntry, 0o755)
   return { sourceEntry, directiveEntry, targetDir }
@@ -48,6 +48,24 @@ describe("agent-toolkit runtime staging", () => {
       encoding: "utf8",
     })
     assert.equal(probe.status, 0, probe.stderr)
+  })
+
+  test("#given a staged toolkit #when inspecting the bundle dir #then the omo-senpi surface marker is baked next to the bundle", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
+    const fixture = await makeFixture()
+
+    await stageAgentToolkit({ ...fixture, buildBundle: false })
+
+    const marker = JSON.parse(await readFile(join(fixture.targetDir, "ulw-loop", "surface.json"), "utf8"))
+    assert.deepEqual(marker, { surface: "omo-senpi" })
+    assert.deepEqual((await readdir(join(fixture.targetDir, "ulw-loop"))).sort(), ["cli.js", "surface.json"])
+  })
+
+  test("#given a staged toolkit missing the surface marker #when freshness is checked #then it reports stale", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
+    const fixture = await makeFixture()
+    await stageAgentToolkit({ ...fixture, buildBundle: false })
+    await rm(join(fixture.targetDir, "ulw-loop", "surface.json"))
+
+    await assert.rejects(checkAgentToolkitFresh(fixture), /missing/)
   })
 
   test("#given a staged toolkit #when freshness is checked #then runtime artifacts and source bytes must match", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
@@ -107,6 +125,16 @@ describe("agent-toolkit runtime staging", () => {
       (await readdir(dirname(fixture.targetDir))).some((entry) => entry.startsWith("agent-toolkit.backup-")),
       false,
     )
+  })
+
+  test("#given bare help #when dispatched #then ulw-loop receives help", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
+    const fixture = await makeFixture()
+    await stageAgentToolkit({ ...fixture, buildBundle: false })
+
+    const result = spawnSync(process.execPath, [join(fixture.targetDir, "cli.js"), "help"], { encoding: "utf8" })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout.trim(), "help")
   })
 
   test("#given an unknown component #when dispatched #then it exits one and lists ulw-loop", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {

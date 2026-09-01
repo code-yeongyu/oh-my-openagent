@@ -35,6 +35,9 @@ const EXPECTED_JOURNALED_EVENT_TYPES = [
   "dag.node.transitioned",
   "dag.node.task-attached",
   "dag.node.reused",
+  "dag.node.retried",
+  "dag.node.steered",
+  "dag.definition.amended",
   "dag.diagnostic.added",
   "dag.stream.overflow",
 ] as const
@@ -45,7 +48,7 @@ describe("dag domain types", () => {
     const tags = [...DAG_RUN_EVENT_TYPES]
 
     // then
-    expect(tags).toHaveLength(14)
+    expect(tags).toHaveLength(17)
     expect([...tags].sort()).toEqual([...EXPECTED_JOURNALED_EVENT_TYPES].sort())
     expect(tags).not.toContain("dag.node.activity")
     expectTypeOf<DagRunEventPayload["type"]>().toEqualTypeOf<(typeof DAG_RUN_EVENT_TYPES)[number]>()
@@ -200,6 +203,9 @@ describe("dag domain types", () => {
       { kind: "interrupted" },
       { kind: "lost" },
       { kind: "resumed" },
+      { kind: "retried" },
+      { kind: "amend_invalidated" },
+      { kind: "revived" },
     ])
     const queued: DagNodeTransitionReason = { kind: "task_queued", queuePosition: 3 }
     expect(queued).toEqual({ kind: "task_queued", queuePosition: 3 })

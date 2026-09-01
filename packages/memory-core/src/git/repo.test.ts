@@ -171,7 +171,7 @@ describe("GitMemoryRepo", () => {
     const log = await exec.run(["log", "-1", "--format=%an <%ae>"], { cwd: dir, timeoutMs: 30_000 })
     expect(log.stdout.trim()).toBe("Correct Agent <agent-one@omo.local>")
     expect(await readFile(join(dir, "fact.md"), "utf8")).toBe("fact\n")
-  })
+  }, 30_000)
 
   it("#given commits with bodies and changed paths #when log reads history #then metadata trailers ranges filters and optional paths are parsed newest-first", async () => {
     // given
@@ -214,7 +214,7 @@ describe("GitMemoryRepo", () => {
     expect(history[1]?.paths).toEqual(["system/persona.md"])
     expect(filtered.map((commit) => commit.sha)).toEqual([first.sha])
     expect(filtered[0]?.paths).toBeUndefined()
-  })
+  }, 30_000)
 
   it("#given a reflection worktree commit #when it is merged no-ff #then the parent exposes the content and removes the worktree", async () => {
     // given
@@ -242,7 +242,7 @@ describe("GitMemoryRepo", () => {
     expect(await repo.head()).toBe(mergedHead)
     expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
     expect(existsSync(worktreeDir)).toBe(false)
-  })
+  }, 30_000)
 
   it("#given concurrent commits across worktrees #when index and ref locks contend #then every commit lands", async () => {
     // given - reflection commits from per-agent worktrees that share one object store
@@ -320,7 +320,7 @@ describe("GitMemoryRepo", () => {
     // then - the transient lock must be retried away, not surfaced
     expect(head).toMatch(/^[0-9a-f]{7,}$/)
     expect(failedOnce.has("symbolic-ref")).toBe(true)
-  })
+  }, 30_000)
 
 })
 

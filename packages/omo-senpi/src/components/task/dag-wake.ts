@@ -1,4 +1,4 @@
-import type { ParentState } from "@oh-my-opencode/senpi-task"
+import { DAG_VERIFICATION_DIRECTIVE, type ParentState } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjection } from "../../extension/idle-injection-coordinator"
 
@@ -147,7 +147,12 @@ function buildInjection(
     key: `dag-run:${run.runId}`,
     source: "dag-run",
     customType: DAG_WAKE_MESSAGE_TYPE,
-    content: buildSummary(run.name, status, counts, firstFailure),
+    // Terminal runs are the point where the parent decides the DAG is done, so the run summary
+    // carries the same prove-it-yourself directive the per-node completions do. A pause is not a
+    // completion claim and stays directive-free.
+    content: `${buildSummary(run.name, status, counts, firstFailure)}
+
+${DAG_VERIFICATION_DIRECTIVE}`,
     display: false,
     details: {
       runId: run.runId,

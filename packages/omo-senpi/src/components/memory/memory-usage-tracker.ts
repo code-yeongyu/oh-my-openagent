@@ -22,7 +22,7 @@ export function extractMemoryUsagePath(repoDir: string, rawPath: string): string
   // Exclude system/ (always projected), .git, .tmp
   if (segments[0] === "system" || segments[0] === ".git" || segments[0] === ".tmp") return undefined
   if (segments[0] === ".") return undefined
-  return rel
+  return segments.join("/")
 }
 
 /** Debounces memory-file reads and persists each pending batch under the ledger lock. */

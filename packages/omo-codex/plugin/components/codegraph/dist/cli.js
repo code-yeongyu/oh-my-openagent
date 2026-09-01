@@ -5549,6 +5549,17 @@ var OmoCodegraphSettingsSchema = OmoCodegraphSettingsLayerSchema.extend({
   telemetry: boolean2().default(false)
 }).strict();
 
+// ../../omo-config-core/src/schema/git-master.ts
+var OmoGitMasterSettingsShape = {
+  commit_footer: union([boolean2(), string2()]),
+  include_co_authored_by: boolean2()
+};
+var OmoGitMasterSettingsLayerSchema = object(OmoGitMasterSettingsShape).partial().strict();
+var OmoGitMasterSettingsSchema = OmoGitMasterSettingsLayerSchema.extend({
+  commit_footer: union([boolean2(), string2()]).default(true),
+  include_co_authored_by: boolean2().default(true)
+}).strict();
+
 // ../../omo-config-core/src/schema/memory.ts
 var OmoMemoryReflectionTriggerSchema = object({
   step_count: number2().int().nonnegative().default(25),
@@ -5568,6 +5579,10 @@ var OmoMemorySyncSchema = object({
 }).strict();
 var OmoMemorySearchSchema = object({
   enabled: boolean2().default(true)
+}).strict();
+var OmoMemoryRecallSchema = object({
+  enabled: boolean2().default(true),
+  max_items: number2().int().min(1).max(5).default(2)
 }).strict();
 var OmoMemoryNudgeSchema = object({
   enabled: boolean2().default(true),
@@ -5593,6 +5608,9 @@ var OmoMemoryPeopleSchema = object({
 var OmoMemorySoulSchema = object({
   edit_notice: boolean2().default(true)
 }).strict();
+var OmoMemoryWriteNoticeSchema = object({
+  enabled: boolean2().default(true)
+}).strict();
 var OmoMemoryReflectionTriggerLayerSchema = object({
   step_count: number2().int().nonnegative().optional(),
   on_compaction: boolean2().optional()
@@ -5611,6 +5629,10 @@ var OmoMemorySyncLayerSchema = object({
 }).strict();
 var OmoMemorySearchLayerSchema = object({
   enabled: boolean2().optional()
+}).strict();
+var OmoMemoryRecallLayerSchema = object({
+  enabled: boolean2().optional(),
+  max_items: number2().int().min(1).max(5).optional()
 }).strict();
 var OmoMemoryNudgeLayerSchema = object({
   enabled: boolean2().optional(),
@@ -5636,6 +5658,9 @@ var OmoMemoryPeopleLayerSchema = object({
 var OmoMemorySoulLayerSchema = object({
   edit_notice: boolean2().optional()
 }).strict();
+var OmoMemoryWriteNoticeLayerSchema = object({
+  enabled: boolean2().optional()
+}).strict();
 var OmoMemoryAgentOverridesSchema = object({
   enabled: boolean2().optional(),
   agent: string2().min(1).optional(),
@@ -5645,8 +5670,10 @@ var OmoMemoryAgentOverridesSchema = object({
   dream: OmoMemoryDreamLayerSchema.optional(),
   people: OmoMemoryPeopleLayerSchema.optional(),
   soul: OmoMemorySoulLayerSchema.optional(),
+  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
+  recall: OmoMemoryRecallLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional()
 }).strict();
 var OmoMemorySettingsSchema = object({
@@ -5673,8 +5700,10 @@ var OmoMemorySettingsSchema = object({
   }),
   people: OmoMemoryPeopleSchema.default({ enabled: true, max_entries: 40, max_entry_chars: 200 }),
   soul: OmoMemorySoulSchema.default({ edit_notice: true }),
+  write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
   sync: OmoMemorySyncSchema.default({ enabled: true }),
   search: OmoMemorySearchSchema.default({ enabled: true }),
+  recall: OmoMemoryRecallSchema.default({ enabled: true, max_items: 2 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
@@ -5688,8 +5717,10 @@ var OmoMemorySettingsLayerSchema = object({
   dream: OmoMemoryDreamLayerSchema.optional(),
   people: OmoMemoryPeopleLayerSchema.optional(),
   soul: OmoMemorySoulLayerSchema.optional(),
+  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
+  recall: OmoMemoryRecallLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional(),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
 }).strict();
@@ -5712,7 +5743,8 @@ var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSche
 
 // ../../omo-config-core/src/schema/task.ts
 import { availableParallelism } from "node:os";
-var ResidencyMaxChildrenInputSchema = union([number2().int().positive(), literal("unlimited")]);
+var DEFAULT_RESIDENCY_MAX_CHILDREN = 16;
+var ResidencyMaxChildrenInputSchema = union([number2().int().nonnegative(), literal("unlimited")]);
 var OmoTaskWaitSchema = object({
   min_ms: number2().int().positive().default(5000),
   default_ms: number2().int().positive().default(60000),
@@ -5726,11 +5758,22 @@ var OmoTaskTeamSettingsSchema = object({
 var OmoTaskWarningsSchema = object({
   unavailable_categories: boolean2().default(true)
 }).strict();
+var OmoTaskDagSettingsSchema = object({
+  max_nodes_per_run: number2().int().positive().default(64),
+  max_runs_per_session: number2().int().positive().default(16),
+  subscriber_ring: number2().int().positive().default(1000),
+  heartbeat_ms: number2().int().positive().default(15000),
+  history_default_limit: number2().int().positive().default(256),
+  history_max_limit: number2().int().positive().default(1000),
+  retention_days: number2().int().positive().default(7),
+  max_prompt_bytes: number2().int().positive().default(262144)
+}).strict();
 var OmoTaskSettingsSchema = object({
   default_execution_mode: _enum(["in-process", "process"]).default("in-process"),
-  default_concurrency: number2().int().positive().default(5),
-  provider_concurrency: record(string2(), number2().int().positive()).optional(),
-  model_concurrency: record(string2(), number2().int().positive()).optional(),
+  default_concurrency: number2().int().nonnegative().default(5),
+  global_concurrency: number2().int().nonnegative().default(8),
+  provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+  model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
   max_depth: number2().int().nonnegative().default(1),
   residency_max_children: ResidencyMaxChildrenInputSchema.default(8),
   ttl_ms: number2().int().positive().default(86400000),
@@ -5743,7 +5786,18 @@ var OmoTaskSettingsSchema = object({
     max_members: 8,
     max_parallel_members: 4,
     max_wall_clock_minutes: 120
-  })
+  }),
+  dag: OmoTaskDagSettingsSchema.optional()
+}).strict();
+var OmoTaskDagSettingsLayerSchema = object({
+  max_nodes_per_run: number2().int().positive().optional(),
+  max_runs_per_session: number2().int().positive().optional(),
+  subscriber_ring: number2().int().positive().optional(),
+  heartbeat_ms: number2().int().positive().optional(),
+  history_default_limit: number2().int().positive().optional(),
+  history_max_limit: number2().int().positive().optional(),
+  retention_days: number2().int().positive().optional(),
+  max_prompt_bytes: number2().int().positive().optional()
 }).strict();
 var OmoTaskWaitLayerSchema = object({
   min_ms: number2().int().positive().optional(),
@@ -5760,9 +5814,10 @@ var OmoTaskWarningsLayerSchema = object({
 }).strict();
 var OmoTaskSettingsLayerSchema = object({
   default_execution_mode: _enum(["in-process", "process"]).optional(),
-  default_concurrency: number2().int().positive().optional(),
-  provider_concurrency: record(string2(), number2().int().positive()).optional(),
-  model_concurrency: record(string2(), number2().int().positive()).optional(),
+  default_concurrency: number2().int().nonnegative().optional(),
+  global_concurrency: number2().int().nonnegative().optional(),
+  provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+  model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
   max_depth: number2().int().nonnegative().optional(),
   residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
   ttl_ms: number2().int().positive().optional(),
@@ -5771,13 +5826,15 @@ var OmoTaskSettingsLayerSchema = object({
   resume_children: boolean2().optional(),
   warnings: OmoTaskWarningsLayerSchema.optional(),
   wait: OmoTaskWaitLayerSchema.optional(),
-  team: OmoTaskTeamSettingsLayerSchema.optional()
+  team: OmoTaskTeamSettingsLayerSchema.optional(),
+  dag: OmoTaskDagSettingsLayerSchema.optional()
 }).strict();
 function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism) {
   const record2 = record(string2(), unknown()).parse(input);
   return OmoTaskSettingsSchema.parse({
     ...record2,
-    residency_max_children: record2["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3)
+    residency_max_children: record2["residency_max_children"] ?? Math.min(DEFAULT_RESIDENCY_MAX_CHILDREN, Math.max(8, resolveParallelism() * 2)),
+    global_concurrency: record2["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2)
   });
 }
 
@@ -5837,12 +5894,29 @@ var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
   enabled: boolean2().default(true)
 }).strict();
 
+// ../../omo-config-core/src/schema/format-on-mutation.ts
+var mode = _enum(["off", "best-effort", "required"]);
+var languages = record(string2(), boolean2()).optional();
+var OmoFormatOnMutationLayerSchema = object({
+  mode: mode.optional(),
+  languages,
+  maxFileBytes: number2().int().positive().optional(),
+  timeoutMs: number2().int().positive().optional()
+}).strict();
+var OmoFormatOnMutationSchema = OmoFormatOnMutationLayerSchema.extend({
+  mode: mode.default("best-effort"),
+  maxFileBytes: number2().int().positive().default(1048576),
+  timeoutMs: number2().int().positive().default(3000)
+}).strict();
+
 // ../../omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoTypedHarnessConfigSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -5850,9 +5924,11 @@ var OmoTypedHarnessConfigSchema = object({
   telemetry: OmoTelemetrySettingsLayerSchema.optional()
 }).strict();
 var OmoConfigProfileSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -5863,10 +5939,12 @@ var OmoConfigProfileSchema = object({
   "[codex]": OmoTypedHarnessConfigSchema.optional()
 }).strict();
 var OmoConfigSchema = object({
+  formatOnMutation: OmoFormatOnMutationSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsSchema.optional(),
+  git_master: OmoGitMasterSettingsSchema.optional(),
   task: OmoTaskSettingsSchema.optional(),
   teams: OmoTeamsConfigSchema.optional(),
   models: OmoModelCatalogSchema.optional(),
@@ -5880,10 +5958,12 @@ var OmoConfigSchema = object({
   legacy_migrations: record(string2(), unknown()).optional()
 }).strict();
 var OmoConfigLayerSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -9539,7 +9619,7 @@ function defaultPluginRoot() {
 }
 
 // components/codegraph/src/session-start-cooldown.ts
-import { mkdirSync as mkdirSync4, readFileSync as readFileSync6, rmSync as rmSync2 } from "node:fs";
+import { mkdirSync as mkdirSync4, readFileSync as readFileSync6, rmSync as rmSync3 } from "node:fs";
 
 // ../../utils/src/atomic-write.ts
 import {
@@ -9547,9 +9627,12 @@ import {
   fsyncSync,
   openSync,
   renameSync as renameSync2,
+  rmSync as rmSync2,
   unlinkSync as unlinkSync2,
   writeFileSync as writeFileSync4
 } from "node:fs";
+import { randomUUID as randomUUID2 } from "node:crypto";
+import { dirname as dirname8 } from "node:path";
 var TOLERATED_FSYNC_CODES = new Set([
   "EPERM",
   "EACCES",
@@ -9571,29 +9654,41 @@ function tolerantFsyncSync(fileDescriptor, fsyncImpl) {
   }
 }
 function writeFileAtomically(filePath, content, options = {}) {
-  const tempPath = `${filePath}.tmp`;
-  writeFileSync4(tempPath, content, "utf-8");
-  const tempFileDescriptor = openSync(tempPath, "r+");
+  const platform = options.platform ?? process.platform;
+  const fsyncImpl = options.fsyncSync ?? fsyncSync;
+  const tempPath = `${filePath}.${process.pid}.${randomUUID2()}.tmp`;
   try {
-    tolerantFsyncSync(tempFileDescriptor, options.fsyncSync ?? fsyncSync);
-  } finally {
-    closeSync(tempFileDescriptor);
-  }
-  try {
-    renameSync2(tempPath, filePath);
-  } catch (error) {
-    const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
-    if ((options.platform ?? process.platform) === "win32" && isPermissionError) {
+    writeFileSync4(tempPath, content, "utf-8");
+    const tempFileDescriptor = openSync(tempPath, "r+");
+    try {
+      tolerantFsyncSync(tempFileDescriptor, fsyncImpl);
+    } finally {
+      closeSync(tempFileDescriptor);
+    }
+    try {
+      renameSync2(tempPath, filePath);
+    } catch (error) {
+      const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
+      if (platform !== "win32" || !isPermissionError)
+        throw error;
       unlinkSync2(filePath);
       renameSync2(tempPath, filePath);
-      return;
     }
-    throw error;
+    if (platform === "win32")
+      return;
+    const directoryFileDescriptor = openSync(dirname8(filePath), "r");
+    try {
+      tolerantFsyncSync(directoryFileDescriptor, fsyncImpl);
+    } finally {
+      closeSync(directoryFileDescriptor);
+    }
+  } finally {
+    rmSync2(tempPath, { force: true });
   }
 }
 
 // components/codegraph/src/session-start-paths.ts
-import { basename as basename3, dirname as dirname8, join as join14 } from "node:path";
+import { basename as basename3, dirname as dirname9, join as join14 } from "node:path";
 function resolveSessionStartStatePaths(homeDir, projectRoot) {
   const canonicalProjectRoot = canonicalizeCodegraphPath(projectRoot);
   const workspacePaths = resolveCodegraphWorkspacePaths(canonicalProjectRoot, { homeDir });
@@ -9608,7 +9703,7 @@ function resolveSessionStartStatePaths(homeDir, projectRoot) {
   };
 }
 function stateParent(path) {
-  return dirname8(path);
+  return dirname9(path);
 }
 
 // components/codegraph/src/session-start-cooldown.ts
@@ -9644,7 +9739,7 @@ function recordSessionStartFailure(options) {
 }
 function clearSessionStartCooldown(options) {
   const path = resolveSessionStartStatePaths(options.homeDir, options.projectRoot).cooldownPath;
-  rmSync2(path, { force: true });
+  rmSync3(path, { force: true });
 }
 function cooldownDuration(baseCooldownMs, failureCount, maxCooldownMs) {
   let duration3 = Math.min(baseCooldownMs, maxCooldownMs);
@@ -9712,7 +9807,8 @@ function spawnDetachedSessionStartWorker(invocation) {
   const child = spawn(invocation.command, [...invocation.args], {
     detached: true,
     env: invocation.env,
-    stdio: "ignore"
+    stdio: "ignore",
+    windowsHide: true
   });
   child.unref();
 }
@@ -9727,8 +9823,8 @@ function writeSessionStartNotice(stdout, notice) {
 }
 
 // components/codegraph/src/session-start-lock.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
-import { mkdirSync as mkdirSync5, readFileSync as readFileSync7, rmSync as rmSync3, statSync as statSync3, writeFileSync as writeFileSync5 } from "node:fs";
+import { randomUUID as randomUUID3 } from "node:crypto";
+import { mkdirSync as mkdirSync5, readFileSync as readFileSync7, rmSync as rmSync4, statSync as statSync3, writeFileSync as writeFileSync5 } from "node:fs";
 function acquireSessionStartLock(options) {
   const paths = resolveSessionStartStatePaths(options.homeDir, options.projectRoot);
   const lockPath = paths.lockPath;
@@ -9757,7 +9853,7 @@ function releaseSessionStartLock(lock) {
   if (snapshot.kind !== "present" || snapshot.token !== lock.token)
     return false;
   try {
-    rmSync3(lock.path, { force: true });
+    rmSync4(lock.path, { force: true });
     return true;
   } catch (error) {
     if (error instanceof Error)
@@ -9782,7 +9878,7 @@ function reclaimStaleLock(lockPath, staleSnapshot, options) {
       const changed = current.raw !== staleSnapshot.raw || current.mtimeMs !== staleSnapshot.mtimeMs;
       if (changed || options.nowMs - current.mtimeMs < options.staleMs)
         return { kind: "locked" };
-      rmSync3(lockPath, { force: true });
+      rmSync4(lockPath, { force: true });
     }
     const acquired = tryCreateLock(lockPath, options.projectRoot);
     return acquired.kind === "acquired" ? { ...acquired, recoveredStale: true } : acquired;
@@ -9791,11 +9887,11 @@ function reclaimStaleLock(lockPath, staleSnapshot, options) {
       return { kind: "inconclusive", reason: error.message };
     throw error;
   } finally {
-    rmSync3(reclaimPath, { force: true });
+    rmSync4(reclaimPath, { force: true });
   }
 }
 function tryCreateLock(lockPath, projectRoot) {
-  const token = randomUUID2();
+  const token = randomUUID3();
   try {
     writeFileSync5(lockPath, `${JSON.stringify({ projectRoot, token })}
 `, {
@@ -9814,7 +9910,7 @@ function tryCreateLock(lockPath, projectRoot) {
 }
 function tryCreateMarker(path) {
   try {
-    writeFileSync5(path, `${randomUUID2()}
+    writeFileSync5(path, `${randomUUID3()}
 `, { encoding: "utf8", flag: "wx", mode: 384 });
     return { kind: "acquired" };
   } catch (error) {
@@ -9852,17 +9948,17 @@ function errorCode2(error) {
 
 // components/codegraph/src/session-start-outcome.ts
 import { appendFileSync as appendFileSync2, mkdirSync as mkdirSync6 } from "node:fs";
-import { dirname as dirname9, join as join15 } from "node:path";
+import { dirname as dirname10, join as join15 } from "node:path";
 function appendSessionStartOutcome(homeDir, outcome, nowMs = Date.now()) {
   const path = join15(codegraphDataRoot(homeDir), "session-start.jsonl");
-  mkdirSync6(dirname9(path), { recursive: true });
+  mkdirSync6(dirname10(path), { recursive: true });
   appendFileSync2(path, `${JSON.stringify({ ...outcome, timestamp: new Date(nowMs).toISOString() })}
 `);
 }
 
 // components/codegraph/src/session-start-project.ts
 import { realpathSync as realpathSync7, statSync as statSync4 } from "node:fs";
-import { dirname as dirname10, join as join16 } from "node:path";
+import { dirname as dirname11, join as join16 } from "node:path";
 function probeCodegraphProject(projectRoot, options = {}) {
   const resolved = resolveProjectRoot(projectRoot);
   if (resolved.kind === "inconclusive")
@@ -9894,14 +9990,14 @@ function probeResolvedExactProject(projectRoot, probeDatabase) {
   return { kind: "uninitialized" };
 }
 function probeResolvedAncestors(projectRoot, probeDatabase) {
-  let ancestorRoot = dirname10(projectRoot);
+  let ancestorRoot = dirname11(projectRoot);
   while (ancestorRoot !== projectRoot) {
     const database = probeDatabase(ancestorRoot);
     if (database.kind === "present")
       return { ancestorRoot, kind: "nested-root" };
     if (database.kind === "inconclusive")
       return database;
-    const parent = dirname10(ancestorRoot);
+    const parent = dirname11(ancestorRoot);
     if (parent === ancestorRoot)
       break;
     ancestorRoot = parent;
@@ -10063,7 +10159,7 @@ function parseNodeMajor(version2) {
 }
 
 // ../../utils/src/codegraph/provision.ts
-import { createHash as createHash2, randomUUID as randomUUID3 } from "node:crypto";
+import { createHash as createHash2, randomUUID as randomUUID4 } from "node:crypto";
 import { execFile as execFile2 } from "node:child_process";
 import { chmod, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { existsSync as existsSync9 } from "node:fs";
@@ -10183,7 +10279,7 @@ async function installExtractedBundle(extractDir, installDir, executableName) {
 }
 async function installAsset(layout) {
   const { asset, downloader, installDir, version: version2 } = layout;
-  const stagingDir = join18(installDir, ".staging", randomUUID3());
+  const stagingDir = join18(installDir, ".staging", randomUUID4());
   const archivePath = join18(stagingDir, basename4(asset.url));
   const extractDir = join18(stagingDir, "extract");
   try {
@@ -10246,7 +10342,7 @@ async function ensureCodegraphProvisioned(options) {
 import { existsSync as existsSync10 } from "node:fs";
 import { homedir as homedir10 } from "node:os";
 import { spawnSync } from "node:child_process";
-import { basename as basename5, dirname as dirname11, join as join20 } from "node:path";
+import { basename as basename5, dirname as dirname12, join as join20 } from "node:path";
 import { createRequire } from "node:module";
 
 // ../../utils/src/runtime/which.ts
@@ -10399,7 +10495,7 @@ function defaultProvisionedBin(homeDir, fileExists) {
 function resolveBundledShim(requireResolve, fileExists) {
   try {
     const packageJson = requireResolve(`${CODEGRAPH_PACKAGE}/package.json`);
-    const packageRoot = dirname11(packageJson);
+    const packageRoot = dirname12(packageJson);
     const candidates = [join20(packageRoot, "bin", "codegraph.js"), join20(packageRoot, "npm-shim.js")];
     return candidates.find((candidate) => fileExists(candidate)) ?? null;
   } catch (error) {
@@ -11524,6 +11620,7 @@ async function runJsonRpcStdioServer(config2) {
   const idleTimer = createIdleTimer(idleTimeoutMs, log, () => {
     isClosed = true;
     config2.onIdleTimeout?.();
+    config2.input.destroy();
   });
   const watchdog = createParentWatchdog(config2.parentWatchdog, (parentPid, pollIntervalMs) => {
     isClosed = true;
@@ -11620,7 +11717,11 @@ function createParentWatchdog(config2, onDeadParent) {
   const probeAlive = config2.probeAlive ?? isProcessAlive2;
   let fired = false;
   const timer = setInterval(() => {
-    if (fired || probeAlive(parentPid))
+    if (fired)
+      return;
+    const alive = probeAlive(parentPid);
+    config2.onPoll?.(alive);
+    if (alive)
       return;
     fired = true;
     onDeadParent(parentPid, pollIntervalMs);
@@ -11672,7 +11773,8 @@ async function runBridgedCodegraphProcess(command, args, options) {
   const child = spawn3(invocation.command, invocation.args, {
     cwd: options.cwd,
     env: options.env,
-    stdio: ["pipe", "pipe", "inherit"]
+    stdio: ["pipe", "pipe", "inherit"],
+    windowsHide: true
   });
   const childInput = child.stdin;
   const childOutput = child.stdout;
@@ -11704,8 +11806,8 @@ async function runBridgedCodegraphProcess(command, args, options) {
     destroyChildPipes();
     terminateCodegraphChild(child);
   });
-  const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
-    defaultResponseMode = mode;
+  const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode2) => {
+    defaultResponseMode = mode2;
   }, () => parentWatchdogFired);
   const responseForwardingDone = forwardCodegraphToClient(childOutput, options.output, pendingResponses, () => defaultResponseMode, () => parentWatchdogFired);
   const bridgeDone = Promise.all([clientForwardingDone, responseForwardingDone]);
@@ -11912,7 +12014,9 @@ async function runUnavailableCodegraphMcpServer(options) {
     },
     input: options.input,
     output: options.output,
-    parentWatchdog: options.parentWatchdog ?? {}
+    idleTimeoutMs: 0,
+    parentWatchdog: options.parentWatchdog ?? {},
+    ...options.lifecycleLog === undefined ? {} : { log: options.lifecycleLog }
   });
 }
 async function handleUnavailableCodegraphMcpRequest(input, options) {

@@ -42,7 +42,6 @@ describe("dead-chain category disabling", () => {
         "qwen-token-plan",
         "alibaba-token-plan",
         "bailian-coding-plan",
-        "vercel",
         "opencode-go",
         "xai",
         "anthropic-api",

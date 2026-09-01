@@ -1,4 +1,4 @@
-// allow: SIZE_OK - the admission loop, event reducer, and task outcome folding stay together so the strict barrier cannot be bypassed by callers.
+// allow: SIZE_OK - the admission loop, event reducer, and task outcome folding stay together so dependency-frontier admission cannot be bypassed by callers.
 import { createHash } from "node:crypto"
 import * as fs from "node:fs"
 import { relative } from "node:path"
@@ -6,7 +6,7 @@ import { relative } from "node:path"
 import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
 import { resolveDagNodeExecutionMode, type DagExecutionModeSources } from "./execution-mode"
-import { dagFingerprint } from "./fingerprint"
+import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
 import {
   dagNodeTaskAttachedEvent,
   dagNodeTransitionedEvent,
@@ -17,8 +17,10 @@ import {
   dagWaveCompletedEvent,
   dagWaveStartedEvent,
 } from "./events"
-import { createDagJournal, type DagJournal, type DagJournalListener } from "./journal"
-import type { DagPersistedNode, DagRunRecordV1 } from "./manager"
+import { createDagJournal, subscribeDagJournal, type DagJournal, type DagJournalListener } from "./journal"
+import { applyDagRunMutation, skipDuplicateTerminalTransition, type DagMaterializeSkills, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
+import { retryDagNodes, type DagRetryOptions, type DagRunReentry } from "./node-retry"
+import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { OwnedStartResult } from "./owner"
 import { persistDagNodeResult, readDagNodeResult, type DagNodeResultArtifact } from "./results"
 import type { DagFileStore } from "./store"
@@ -34,12 +36,21 @@ import type {
   DagRunId,
 } from "./types"
 
+// The per-node control verbs live beside the scheduler but keep one public entry point: callers
+// import the whole run surface (run, cancel, retry, send, re-entry) from here.
+export { DAG_NODE_CONTROL_ERROR_CODES, DagNodeControlError } from "./node-control-context"
+export type { DagNodeControlErrorCode } from "./node-control-context"
+export { reenterDagRun } from "./node-retry"
+export type { DagRetryOptions, DagRunReentry } from "./node-retry"
+export type { DagNodeSendResult } from "./node-send"
+
 const TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set([
   "completed",
   "failed",
   "cancelled",
   "skipped",
 ])
+
 
 export type DagSchedulerOptions = {
   readonly store: DagFileStore
@@ -49,6 +60,19 @@ export type DagSchedulerOptions = {
   readonly ancestry?: { readonly depth: number }
   readonly subscriberRing?: number
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
+  /**
+   * Children that are ALREADY running under a durable owner when this scheduler is built - a
+   * session restart reattaches them instead of waiting for them. Each entry is folded into the
+   * live settle loop exactly like an admitted node, so recovery never has to block on a
+   * long-running child before the run leaves `paused`.
+   */
+  readonly preAttachedTasks?: ReadonlyMap<DagNodeId, string>
+  // Skill materialization for a retry that carries a prompt override (it re-runs the amend path).
+  readonly materializeSkills?: DagMaterializeSkills
+  // Lease identity for the control verbs: a run leased by a DIFFERENT live process is not ours to
+  // retry. Defaults to this process and the lifecycle port's signal-0 probe.
+  readonly hostPid?: number
+  readonly isProcessAlive?: (pid: number) => boolean
   readonly now?: () => number
 }
 
@@ -73,6 +97,18 @@ export type DagScheduler = {
   readonly snapshot: () => DagRunRecordV1
   readonly subscribe: (listener: DagJournalListener) => () => void
   readonly whenIdle: () => Promise<void>
+  /**
+   * Returns failed, cancelled, or skipped nodes to a fresh attempt and re-enters the run through a
+   * NEW scheduler. Safe to call on a settled instance: it reads the durable record, not this
+   * instance's spent state machine.
+   */
+  readonly retryNode: (
+    runId: DagRunId,
+    nodeIds?: readonly DagNodeId[],
+    options?: DagRetryOptions,
+  ) => DagRunReentry
+  /** Steers a running child, revives a finished resident one, or refuses with node_not_continuable. */
+  readonly sendToNode: (runId: DagRunId, nodeId: DagNodeId, message: string) => Promise<DagNodeSendResult>
 }
 
 type DagSchedulerObserver = (scheduler: DagScheduler) => void
@@ -96,6 +132,8 @@ type AttachedTaskSettlement =
 type AttachedTask = {
   readonly nodeId: DagNodeId
   readonly settled: Promise<AttachedTaskSettlement>
+  readonly folded: Promise<void>
+  readonly resolveFolded: () => void
 }
 
 type PendingTerminalResult = {
@@ -117,14 +155,31 @@ type SchedulerContext = {
   readonly pendingErrors: Map<DagNodeId, DagNodeError>
   readonly pendingTerminalResults: Map<DagNodeId, PendingTerminalResult>
   readonly attachedTaskIds: Map<DagNodeId, string>
+  readonly attachedTasks: Map<DagNodeId, AttachedTask>
+  readonly settlementChanged: () => Promise<void>
+  readonly resolveSettlementChanged: () => void
   readonly cancellationRequested: Promise<void>
   readonly resolveCancellationRequested: () => void
   readonly cancellationCompleted: Promise<void>
   readonly resolveCancellationCompleted: () => void
   cancellationStarted: boolean
+  // #7412: set by the foreign-commit subscription so a wake that fired while no settle race was
+  // armed is not lost - settleOne consumes it level-triggered.
+  foreignSettlement: boolean
   cancellationOperation?: Promise<void>
   admissionInProgress: boolean
   readonly admissionIdleWaiters: Set<() => void>
+  // Residency-denied nodes waiting for a free slot, in first-denied order: a slot freed by a
+  // settlement is offered to the OLDEST denied admission before any newly ready node.
+  pendingAdmission: DagNodeId[]
+  // Wave events are informational groupings over frontier admission, never barriers: admission
+  // remembers which wave indexes this instance reported so each index completes at most once.
+  readonly emittedWaveAdmissions: Set<number>
+  readonly emittedWaveCompletions: Set<number>
+  // Per-node child subscriptions armed for queued spawns (start returned status "pending"):
+  // waitFor resolves only at terminal, so this watch is the only signal that folds the task
+  // engine's later queue promotion into a scheduled -> running node transition.
+  readonly promotionWatches: Map<DagNodeId, () => void>
 }
 
 export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
@@ -133,6 +188,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
   const pendingTerminalResults = new Map<DagNodeId, PendingTerminalResult>()
   const cancellationRequested = deferredSignal()
   const cancellationCompleted = deferredSignal()
+  const settlementChanged = repeatableSignal()
   const journal = createDagJournal<DagRunRecordV1>({
     store: options.store,
     runId: options.initialRecord.runId,
@@ -145,6 +201,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     ),
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     now,
+    skipDuplicate: skipDuplicateTerminalTransition,
   })
   const context: SchedulerContext = {
     taskManager: options.taskManager,
@@ -157,21 +214,62 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     pendingErrors,
     pendingTerminalResults,
     attachedTaskIds: new Map(),
+    attachedTasks: new Map(),
+    settlementChanged: settlementChanged.wait,
+    resolveSettlementChanged: settlementChanged.resolve,
     cancellationRequested: cancellationRequested.promise,
     resolveCancellationRequested: cancellationRequested.resolve,
     cancellationCompleted: cancellationCompleted.promise,
     resolveCancellationCompleted: cancellationCompleted.resolve,
     cancellationStarted: false,
+    foreignSettlement: false,
     admissionInProgress: false,
     admissionIdleWaiters: new Set(),
+    pendingAdmission: [],
+    emittedWaveAdmissions: new Set<number>(),
+    emittedWaveCompletions: new Set<number>(),
+    promotionWatches: new Map<DagNodeId, () => void>(),
+  }
+  // #7412 defect 1: control verbs (send/revive watchers, retry) commit through their OWN journal
+  // instance, and a journal cache refreshes only on its own appends. Without this subscription a
+  // foreign-journaled completion neither refreshes the live scheduler's snapshot nor wakes its
+  // admission loop - a journaled-completion-but-starved-dependent stall. Foreign commits refresh
+  // the cache; terminal node transitions additionally wake the settle loop. The subscription
+  // retires once the run record is terminal.
+  const unsubscribeCommits = subscribeDagJournal(options.store, options.initialRecord.runId, (event) => {
+    if (event.seq > journal.snapshot().checkpointSeq) {
+      journal.refresh()
+      if (event.type === "dag.node.transitioned" && TERMINAL_NODE_STATES.has(event.to)) {
+        context.foreignSettlement = true
+        context.resolveSettlementChanged()
+      }
+    }
+    const status = journal.snapshot().status
+    if (status === "completed" || status === "failed" || status === "cancelled") unsubscribeCommits()
+  })
+  for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
+    context.attachedTaskIds.set(nodeId, taskId)
+    attachTaskSettlement(context, nodeId, taskId)
   }
 
   const scheduler: DagScheduler = {
-    run: () => runWaves(context),
+    run: () => runFrontier(context),
     cancel: (runId, reason) => cancelRun(context, runId, reason),
     snapshot: journal.snapshot,
     subscribe: journal.subscribe,
     whenIdle: journal.whenIdle,
+    retryNode: (runId, nodeIds, retryOptions) => retryDagNodes(options, runId, nodeIds, retryOptions),
+    sendToNode: (runId, nodeId, message) => sendToDagNode(
+      options,
+      runId,
+      nodeId,
+      message,
+      // Refresh, not snapshot: a control-journal commit may still be a microtask away from the
+      // subscription callback, and routing a revive off a stale status was half of dag_923ad20e.
+      (revivedNodeId, taskId) => context.journal.refresh().status === "running"
+        ? watchRevivedInScheduler(context, revivedNodeId, taskId)
+        : undefined,
+    ),
   }
   for (const observer of schedulerObservers.get(options.taskManager) ?? []) observer(scheduler)
   return scheduler
@@ -260,6 +358,26 @@ export function applyDagSchedulerEvent(
           : node),
         updatedAt: event.at,
       }
+    // Re-entry rearms the run: completedAt is stamped on every terminal status above, so leaving it
+    // in place would report a settle that no longer describes this run through projectSnapshot.
+    case "dag.run.resumed": {
+      const { completedAt: _completedAt, ...running } = record
+      return { ...running, status: "running", generation: event.generation, updatedAt: event.at }
+    }
+    // A revived child runs again on its own session: no new task, no attempt bump, just the node
+    // leaving its terminal state so the revive watcher can fold the new outcome.
+    case "dag.node.steered":
+      if (event.delivery !== "revive") return { ...record, updatedAt: event.at }
+      return {
+        ...record,
+        nodes: record.nodes.map((node) => node.id === event.nodeId ? { ...node, taskId: event.taskId } : node),
+        updatedAt: event.at,
+      }
+    // The retry and amend record mutations live in ONE shared reducer with the manager so a journal
+    // replay through either entry point rebuilds an identical checkpoint.
+    case "dag.node.retried":
+    case "dag.definition.amended":
+      return { ...applyDagRunMutation(record, event), updatedAt: event.at }
     default:
       return { ...record, updatedAt: event.at }
   }
@@ -324,6 +442,8 @@ async function cancelRun(context: SchedulerContext, runId: DagRunId, reason?: st
 async function performCancellation(context: SchedulerContext, reason?: string): Promise<void> {
   try {
     await whenAdmissionIdle(context)
+    // Watches go first so a promotion racing the cancel cannot flip nodes mid-cancellation.
+    for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
     const cancellationResults = await Promise.allSettled([...context.attachedTaskIds.values()].map((taskId) =>
       context.taskManager.cancelTask(taskId, reason, { abort: "skip" }),
     ))
@@ -361,24 +481,36 @@ function resolveAdmissionIdle(context: SchedulerContext): void {
   context.admissionIdleWaiters.clear()
 }
 
-async function runWaves(context: SchedulerContext): Promise<DagRunRecordV1> {
+// Dependency-frontier execution: a node is admitted the moment EVERY node it dependsOn holds a
+// terminal `completed` state and a resident slot is free - never because a wave boundary was
+// reached. Compiled waves survive only as informational event groupings (dag.wave.started is
+// emitted per admission pass, dag.wave.completed when a wave's full membership is terminal), so
+// an unrelated slow sibling can no longer starve ready dependents behind a barrier the tool
+// contract never promised (dag_530ad299).
+async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
   if (context.journal.snapshot().status === "pending") {
     context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
   }
 
-  for (const wave of context.journal.snapshot().waves) {
+  for (;;) {
     if (context.cancellationStarted) return cancelledSnapshot(context)
-    applyDependentSkipCascade(context)
-    const runnable = wave.nodeIds.filter((nodeId) => isRunnable(context.journal.snapshot(), nodeId))
-    if (runnable.length === 0) continue
-
-    for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
-    context.journal.append(dagWaveStartedEvent({ waveIndex: wave.index, nodeIds: runnable }))
-    if (!await admitAndSettleWave(context, runnable)) return cancelledSnapshot(context)
-    context.journal.append(dagWaveCompletedEvent({ waveIndex: wave.index, nodeIds: runnable }))
+    // The skip cascade runs only at frontier quiescence (nothing attached), generalizing the
+    // barrier-era rule that dependents were skipped between waves: a failed node stays revivable
+    // (send -> revive) while any sibling is still mid-flight, and a revived outcome can complete
+    // it, so an eager cascade would strand the dependent as skipped (dag_2d12c2f7 regression).
+    if (context.attachedTasks.size === 0) applyDependentSkipCascade(context)
+    // Completions are reported before the next admission pass so a finishing wave reads as
+    // settled before later-wave nodes it unblocked start interleaving their own events.
+    emitCompletedWaves(context)
+    if (!await admitFrontier(context)) return cancelledSnapshot(context)
+    const current = context.journal.snapshot()
+    if (current.nodes.every((node) => TERMINAL_NODE_STATES.has(node.state))) break
+    if (context.attachedTasks.size === 0) {
+      throw new Error(`DAG run "${current.runId}" cannot terminalize while nodes are active`)
+    }
+    if (!await settleOne(context)) return cancelledSnapshot(context)
   }
 
-  applyDependentSkipCascade(context)
   const snapshot = context.journal.snapshot()
   const failed = primaryFailure(snapshot)
   if (failed !== undefined) {
@@ -390,12 +522,28 @@ async function runWaves(context: SchedulerContext): Promise<DagRunRecordV1> {
   return context.journal.snapshot()
 }
 
-async function admitAndSettleWave(context: SchedulerContext, nodeIds: readonly DagNodeId[]): Promise<boolean> {
-  let awaitingAdmission = [...nodeIds]
-  const attached = new Map<DagNodeId, AttachedTask>()
-
-  while (awaitingAdmission.length > 0) {
+// One admission pass over the frontier: the ordered residency-denied queue first (oldest denial
+// gets the first freed slot), then every newly ready node. startOwned runs as one batch; denials
+// park in the queue and retry after a settlement frees a slot, failing with residency_denied only
+// when no attached task can ever free one. Cancellation aborts the pass without admitting more.
+async function admitFrontier(context: SchedulerContext): Promise<boolean> {
+  for (;;) {
     if (context.cancellationStarted) return false
+    const denied = context.pendingAdmission.splice(0)
+    const deniedIds = new Set(denied)
+    const snapshot = context.journal.snapshot()
+    const runnable = snapshot.nodes
+      .filter((node) =>
+        (node.state === "pending" || node.state === "blocked") &&
+        !deniedIds.has(node.id) &&
+        isRunnable(snapshot, node.id))
+      .map((node) => node.id)
+    if (denied.length === 0 && runnable.length === 0) return true
+
+    for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
+    emitWaveAdmissions(context, runnable)
+
+    const awaitingAdmission = [...denied, ...runnable]
     context.admissionInProgress = true
     let results: PromiseSettledResult<{ readonly nodeId: DagNodeId; readonly result: OwnedStartResult }>[]
     try {
@@ -407,7 +555,7 @@ async function admitAndSettleWave(context: SchedulerContext, nodeIds: readonly D
       context.admissionInProgress = false
       resolveAdmissionIdle(context)
     }
-    const denied: DagNodeId[] = []
+    const nextDenied: DagNodeId[] = []
     for (let index = 0; index < results.length; index += 1) {
       const settled = results[index]
       const nodeId = awaitingAdmission[index]
@@ -418,50 +566,103 @@ async function admitAndSettleWave(context: SchedulerContext, nodeIds: readonly D
       }
       const { result } = settled.value
       if (context.cancellationStarted) {
-        if (result.kind === "started") attachStarted(context, attached, nodeId, result)
+        if (result.kind === "started") attachStarted(context, nodeId, result)
       } else if (result.kind === "residency_denied") {
-        denied.push(nodeId)
+        nextDenied.push(nodeId)
       } else {
-        attachOrFail(context, attached, nodeId, result)
+        attachOrFail(context, nodeId, result)
       }
     }
     if (context.cancellationStarted) return false
-    awaitingAdmission = denied
-    if (awaitingAdmission.length === 0) break
-    if (attached.size === 0) {
-      for (const nodeId of awaitingAdmission) {
+    context.pendingAdmission.push(...nextDenied)
+    if (nextDenied.length === 0) return true
+    if (context.attachedTasks.size === 0) {
+      for (const nodeId of nextDenied) {
         failNode(context, nodeId, "residency_denied", "resident child cap reached and no task can free a slot")
       }
-      awaitingAdmission = []
-      break
+      context.pendingAdmission.length = 0
+      return true
     }
-    await settleOne(context, attached)
+    if (!await settleOne(context)) return false
   }
+}
 
-  while (attached.size > 0) {
-    if (!await settleOne(context, attached)) return false
+// dag.wave.started is informational: one event per wave index touched by this admission pass,
+// listing exactly the nodes the pass scheduled. A wave index can appear in multiple started
+// events across a run when frontier admission staggers its nodes (a slow sibling no longer
+// holds ready dependents back), which is why the grouping never gates execution.
+function emitWaveAdmissions(context: SchedulerContext, scheduled: readonly DagNodeId[]): void {
+  if (scheduled.length === 0) return
+  const waveIndexOf = waveIndexByNodeId(context.journal.snapshot())
+  const groups = new Map<number, DagNodeId[]>()
+  for (const nodeId of scheduled) {
+    const waveIndex = waveIndexOf.get(nodeId)
+    if (waveIndex === undefined) continue
+    const group = groups.get(waveIndex) ?? []
+    group.push(nodeId)
+    groups.set(waveIndex, group)
   }
-  return true
+  for (const waveIndex of [...groups.keys()].sort((a, b) => a - b)) {
+    context.journal.append(dagWaveStartedEvent({ waveIndex, nodeIds: groups.get(waveIndex) ?? [] }))
+    context.emittedWaveAdmissions.add(waveIndex)
+  }
+}
+
+// dag.wave.completed is informational and once per instance per wave index: it fires when EVERY
+// member of the compiled wave holds a terminal state, carrying the full membership (skipped and
+// failed nodes included - the grouping describes the graph, not a success claim). Waves this
+// instance never admitted (fully skipped or fully reused) stay silent, matching the barrier-era
+// vocabulary where a wave event implied this run executed part of it.
+function emitCompletedWaves(context: SchedulerContext): void {
+  if (context.emittedWaveAdmissions.size === 0) return
+  const snapshot = context.journal.snapshot()
+  const states = new Map(snapshot.nodes.map((node) => [node.id as DagNodeId, node.state]))
+  for (const wave of snapshot.waves) {
+    if (!context.emittedWaveAdmissions.has(wave.index) || context.emittedWaveCompletions.has(wave.index)) continue
+    const settled = wave.nodeIds.every((nodeId) => {
+      const state = states.get(nodeId)
+      return state !== undefined && TERMINAL_NODE_STATES.has(state)
+    })
+    if (!settled) continue
+    context.journal.append(dagWaveCompletedEvent({ waveIndex: wave.index, nodeIds: wave.nodeIds }))
+    context.emittedWaveCompletions.add(wave.index)
+  }
+}
+
+function waveIndexByNodeId(record: DagRunRecordV1): ReadonlyMap<DagNodeId, number> {
+  const indexes = new Map<DagNodeId, number>()
+  for (const wave of record.waves) {
+    for (const nodeId of wave.nodeIds) indexes.set(nodeId, wave.index)
+  }
+  return indexes
 }
 
 function attachOrFail(
   context: SchedulerContext,
-  attached: Map<DagNodeId, AttachedTask>,
   nodeId: DagNodeId,
   result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
 ): void {
+  if (result.kind === "owner_conflict") {
+    attachStarted(context, nodeId, {
+      kind: "started",
+      reused: true,
+      task_id: result.task_id,
+      status: "running",
+      name: result.task_id,
+    })
+    return
+  }
   if (result.kind !== "started") {
     const failure = startFailure(result)
     failNode(context, nodeId, failure.code, failure.message)
     return
   }
 
-  attachStarted(context, attached, nodeId, result)
+  attachStarted(context, nodeId, result)
 }
 
 function attachStarted(
   context: SchedulerContext,
-  attached: Map<DagNodeId, AttachedTask>,
   nodeId: DagNodeId,
   result: Extract<OwnedStartResult, { readonly kind: "started" }>,
 ): void {
@@ -478,31 +679,98 @@ function attachStarted(
         reason: { kind: "task_queued", queuePosition: result.queue_position },
       })
     }
+    watchQueuedPromotion(context, nodeId, result.task_id)
   } else if (result.status === "running") {
     transition(context, nodeId, "running", result.reused ? { kind: "resumed" } : { kind: "started" })
   }
   context.attachedTaskIds.set(nodeId, result.task_id)
-  attached.set(nodeId, {
+  attachTaskSettlement(context, nodeId, result.task_id)
+}
+
+// A queued spawn reports status "pending": the concurrency queue will launch the child later, but
+// the scheduler's only other feedback channel (waitFor) resolves at terminal status. Without this
+// watch the node would sit in "scheduled" for its child's whole execution, rendering as "waiting"
+// in the widget while the header undercounts running children. Any child event re-checks the
+// record; the first one observed after the record flips to running folds into the transition.
+function watchQueuedPromotion(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
+  disposePromotionWatch(context, nodeId)
+  const foldPromotion = (): void => {
+    if (context.cancellationStarted) return
+    if (context.taskManager.get(taskId)?.status !== "running") return
+    disposePromotionWatch(context, nodeId)
+    // A task can terminalize straight from the queue (cancelled/errored before launch); by the
+    // time a stray event lands the node may already be folded, and a terminal node must never be
+    // dragged back to running (that path is reserved for explicit revives).
+    if (nodeById(context.journal.snapshot(), nodeId).state !== "scheduled") return
+    transition(context, nodeId, "running", { kind: "started" })
+  }
+  const unsubscribe = context.taskManager.subscribeChild(taskId, foldPromotion)
+  context.promotionWatches.set(nodeId, unsubscribe)
+  // Level-triggered arm check: the queue can grant, launch, and flip the record to running between
+  // startOwned's pending snapshot and this arm point, and a live-handle subscription never replays
+  // missed events - without this a node promoted in that window sits "scheduled" until terminal.
+  foldPromotion()
+}
+
+function disposePromotionWatch(context: SchedulerContext, nodeId: DagNodeId): void {
+  const dispose = context.promotionWatches.get(nodeId)
+  if (dispose === undefined) return
+  context.promotionWatches.delete(nodeId)
+  dispose()
+}
+
+function attachTaskSettlement(context: SchedulerContext, nodeId: DagNodeId, taskId: string): AttachedTask {
+  const folded = deferredSignal()
+  const task: AttachedTask = {
     nodeId,
-    settled: context.taskManager.waitFor(result.task_id).then(
+    settled: context.taskManager.waitFor(taskId).then(
       (record): AttachedTaskSettlement => ({ nodeId, kind: "record", record }),
       (error: unknown): AttachedTaskSettlement => ({ nodeId, kind: "error", error }),
     ),
-  })
+    folded: folded.promise,
+    resolveFolded: folded.resolve,
+  }
+  context.attachedTasks.set(nodeId, task)
+  context.resolveSettlementChanged()
+  return task
 }
 
-async function settleOne(context: SchedulerContext, attached: Map<DagNodeId, AttachedTask>): Promise<boolean> {
+async function watchRevivedInScheduler(
+  context: SchedulerContext,
+  nodeId: DagNodeId,
+  taskId: string,
+): Promise<void> {
+  context.attachedTaskIds.set(nodeId, taskId)
+  const task = attachTaskSettlement(context, nodeId, taskId)
+  await task.folded
+}
+
+async function settleOne(context: SchedulerContext): Promise<boolean> {
+  // #7412: a foreign commit can land while no settle race is armed (repeatableSignal wake-ups are
+  // edge-triggered); consuming the flag first keeps that wake level-triggered.
+  if (context.foreignSettlement) {
+    context.foreignSettlement = false
+    return true
+  }
   const settled = await Promise.race([
-    ...[...attached.values()].map((entry) => entry.settled),
+    ...[...context.attachedTasks.values()].map((entry) => entry.settled),
+    context.settlementChanged().then(() => null),
     context.cancellationRequested.then(() => undefined),
   ])
+  if (settled === null) return true
   if (settled === undefined || context.cancellationStarted) return false
-  attached.delete(settled.nodeId)
+  const task = context.attachedTasks.get(settled.nodeId)
+  context.attachedTasks.delete(settled.nodeId)
   context.attachedTaskIds.delete(settled.nodeId)
-  if (settled.kind === "error") {
-    failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
-  } else {
-    foldTaskOutcome(context, settled.nodeId, settled.record)
+  disposePromotionWatch(context, settled.nodeId)
+  try {
+    if (settled.kind === "error") {
+      failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
+    } else {
+      foldTaskOutcome(context, settled.nodeId, settled.record)
+    }
+  } finally {
+    task?.resolveFolded()
   }
   return true
 }
@@ -602,11 +870,18 @@ function startSpec(context: SchedulerContext, nodeId: DagNodeId): ManagerStartSp
 
 function owner(context: SchedulerContext, nodeId: DagNodeId) {
   const record = context.journal.snapshot()
+  const execAttempt = nodeById(record, nodeId).execAttempt
   return {
     kind: "dag" as const,
     runId: record.runId,
     nodeId,
-    fingerprint: dagFingerprint({ definitionFingerprint: record.definitionFingerprint, nodeId }),
+    // execAttempt (NOT the display attempt) scopes the owner identity: a retried or
+    // amend-invalidated node claims a new one, while an untouched node keeps the legacy value.
+    fingerprint: dagFingerprint(ownerFingerprintInput({
+      definitionFingerprint: record.definitionFingerprint,
+      nodeId,
+      ...(execAttempt === undefined ? {} : { execAttempt }),
+    })),
   }
 }
 
@@ -643,13 +918,30 @@ function taskFailure(status: Exclude<TaskStatus, "completed" | "pending" | "runn
 }
 
 function transitionedNode(node: DagNode, state: DagNodeState, at: string, error?: DagNodeError): DagNode {
+  // Leaving a terminal state for a new execution (a revived child) drops the previous outcome:
+  // error, completion time, and result metadata all describe the attempt that just ended, and the
+  // durable artifact stays readable on disk until the new attempt overwrites it.
+  const base = state === "running" && TERMINAL_NODE_STATES.has(node.state)
+    ? clearedTerminalOutcome(node)
+    : node
   return {
-    ...node,
+    ...base,
     state,
     ...(state === "running" && node.startedAt === undefined ? { startedAt: at } : {}),
     ...(TERMINAL_NODE_STATES.has(state) ? { completedAt: at } : {}),
     ...(error === undefined ? {} : { error }),
   }
+}
+
+function clearedTerminalOutcome(node: DagNode): DagNode {
+  const {
+    error: _error,
+    completedAt: _completedAt,
+    runStats: _runStats,
+    resultArtifact: _resultArtifact,
+    ...cleared
+  } = node as DagNodeWithResult
+  return cleared
 }
 
 function errorMessage(error: unknown): string {
@@ -674,6 +966,18 @@ function nodeById(record: DagRunRecordV1, nodeId: DagNodeId): DagNode {
   const node = record.nodes.find((entry) => entry.id === nodeId)
   if (node === undefined) throw new Error(`unknown DAG node "${nodeId}"`)
   return node
+}
+
+function repeatableSignal(): { readonly wait: () => Promise<void>; readonly resolve: () => void } {
+  let signal = deferredSignal()
+  return {
+    wait: () => signal.promise,
+    resolve: () => {
+      const current = signal
+      signal = deferredSignal()
+      current.resolve()
+    },
+  }
 }
 
 function deferredSignal(): { readonly promise: Promise<void>; readonly resolve: () => void } {

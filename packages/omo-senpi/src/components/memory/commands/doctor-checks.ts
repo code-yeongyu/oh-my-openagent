@@ -2,8 +2,8 @@
 // frontmatter repair, which is the one documented auto-fix (letta parity).
 
 import { createHash } from "node:crypto"
-import { existsSync } from "node:fs"
-import { readdir, readFile } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
@@ -201,8 +201,21 @@ export async function checkAbandonedRuns(reflectionDir: string): Promise<DoctorC
   }
 }
 
-export async function checkReflectionHealth(reflectionDir: string): Promise<DoctorCheck> {
-  const health = await readReflectionHealth(join(reflectionDir, "completions"))
+/**
+ * The streak severity is a function of a clock: `readReflectionHealth` retires a trailing failure
+ * burst once its newest failure is older than REFLECTION_HEALTH_STALE_MS, so `[warn]` decays to
+ * `[ok]` purely with the passage of time. Reading that clock from `deps.now` (the seam `checkFacts`
+ * already uses) keeps the derivation a pure function of its inputs instead of the wall clock, so a
+ * fixture can pin either side of the boundary and stay pinned. Omitting `now` falls back to
+ * `Date.now()`, which is byte-identical to the previous behavior.
+ */
+export async function checkReflectionHealth(
+  reflectionDir: string,
+  options: { readonly now?: number } = {},
+): Promise<DoctorCheck> {
+  const health = await readReflectionHealth(join(reflectionDir, "completions"), {
+    now: options.now ?? Date.now(),
+  })
   const lastSuccess = health.lastSuccessAt ?? "never"
   if (health.streak === 0 && health.pendingCount === 0) {
     return {

@@ -105,7 +105,15 @@ describe("codex ultrawork trigger policy", () => {
 
 		// then
 		expect(outputs).toEqual(["", "", "", "", "", "", ""]);
-		expect(prompts.map((prompt) => isUltraworkPrompt(prompt))).toEqual([false, false, false, false, false, false, false]);
+		expect(prompts.map((prompt) => isUltraworkPrompt(prompt))).toEqual([
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+		]);
 	});
 
 	it("#given prompt contains ultrawork or standalone ulw #when hook runs #then emits directive", () => {

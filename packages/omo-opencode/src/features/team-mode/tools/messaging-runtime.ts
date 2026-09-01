@@ -12,6 +12,7 @@ export type TeamRuntimeDetails = {
 
 export type TeamSendMessageToolDeps = {
   loadRuntimeState: typeof loadRuntimeState
+  liveDeliverySettleMs?: number
 }
 
 export const defaultTeamSendMessageToolDeps: TeamSendMessageToolDeps = {

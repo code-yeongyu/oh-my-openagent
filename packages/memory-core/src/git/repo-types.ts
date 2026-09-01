@@ -51,3 +51,8 @@ export interface GitLogOptions {
   readonly limit?: number
   readonly includePaths?: boolean
 }
+
+export interface GitTreeSizedEntry {
+  readonly path: string
+  readonly bytes: number
+}

@@ -25,7 +25,7 @@
 		"README.md"
 	],
 	"scripts": {
-		"build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && bun build src/cli.ts src/index.ts src/client.ts --outdir dist --target node --format esm && node scripts/stamp-dist-version.mjs",
+		"build": "node scripts/build.mjs",
 		"smoke:client-package": "node scripts/client-package-smoke.mjs",
 		"test": "vitest --run",
 		"test:watch": "vitest",

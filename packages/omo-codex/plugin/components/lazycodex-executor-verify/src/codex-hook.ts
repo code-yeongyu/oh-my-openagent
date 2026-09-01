@@ -6,11 +6,7 @@ import { clearAttemptState, MAX_ATTEMPTS, readAttemptState, writeAttemptState } 
 import type { HookFileSystem, StopHookOutput, SubagentStopInput } from "./types.js";
 import { SUBAGENT_STOP_EVENT } from "./types.js";
 
-const RECEIPT_ENFORCED_AGENTS = new Set([
-	"lazycodex-worker-low",
-	"lazycodex-worker-medium",
-	"lazycodex-worker-high",
-]);
+const RECEIPT_ENFORCED_AGENTS = new Set(["lazycodex-worker-low", "lazycodex-worker-medium", "lazycodex-worker-high"]);
 
 export function runSubagentStopHook(input: unknown, fs: HookFileSystem): string {
 	if (!isSubagentStopInput(input)) return "";

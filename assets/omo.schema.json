@@ -1,10 +1,51 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
-  "title": "Omo Configuration",
+  "title": "OmO Configuration",
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "formatOnMutation": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "default": "best-effort",
+          "type": "string",
+          "enum": [
+            "off",
+            "best-effort",
+            "required"
+          ]
+        },
+        "languages": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "maxFileBytes": {
+          "default": 1048576,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timeoutMs": {
+          "default": 3000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "mode",
+        "maxFileBytes",
+        "timeoutMs"
+      ],
+      "additionalProperties": false
+    },
     "$schema": {
       "type": "string"
     },
@@ -807,6 +848,31 @@
       ],
       "additionalProperties": false
     },
+    "git_master": {
+      "type": "object",
+      "properties": {
+        "commit_footer": {
+          "default": true,
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "include_co_authored_by": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "commit_footer",
+        "include_co_authored_by"
+      ],
+      "additionalProperties": false
+    },
     "task": {
       "type": "object",
       "properties": {
@@ -821,7 +887,13 @@
         "default_concurrency": {
           "default": 5,
           "type": "integer",
-          "exclusiveMinimum": 0,
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "global_concurrency": {
+          "default": 8,
+          "type": "integer",
+          "minimum": 0,
           "maximum": 9007199254740991
         },
         "provider_concurrency": {
@@ -831,7 +903,7 @@
           },
           "additionalProperties": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 0,
             "maximum": 9007199254740991
           }
         },
@@ -842,7 +914,7 @@
           },
           "additionalProperties": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 0,
             "maximum": 9007199254740991
           }
         },
@@ -857,7 +929,7 @@
           "anyOf": [
             {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             {
@@ -1034,6 +1106,7 @@
       "required": [
         "default_execution_mode",
         "default_concurrency",
+        "global_concurrency",
         "max_depth",
         "residency_max_children",
         "ttl_ms",
@@ -1525,6 +1598,22 @@
           ],
           "additionalProperties": false
         },
+        "write_notice": {
+          "default": {
+            "enabled": true
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "additionalProperties": false
+        },
         "sync": {
           "default": {
             "enabled": true
@@ -1558,6 +1647,30 @@
           },
           "required": [
             "enabled"
+          ],
+          "additionalProperties": false
+        },
+        "recall": {
+          "default": {
+            "enabled": true,
+            "max_items": 2
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_items": {
+              "default": 2,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "enabled",
+            "max_items"
           ],
           "additionalProperties": false
         },
@@ -1718,6 +1831,15 @@
                 },
                 "additionalProperties": false
               },
+              "write_notice": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "sync": {
                 "type": "object",
                 "properties": {
@@ -1736,6 +1858,20 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "recall": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
                   }
                 },
                 "additionalProperties": false
@@ -1760,8 +1896,10 @@
         "dream",
         "people",
         "soul",
+        "write_notice",
         "sync",
         "search",
+        "recall",
         "compile_warn_tokens",
         "agents"
       ],
@@ -1843,7 +1981,7 @@
             "enum": [
               "goal",
               "refactor",
-              "start-work",
+              "ulw-execute",
               "stop-continuation",
               "remove-ai-slops",
               "hyperplan"
@@ -10988,7 +11126,7 @@
           "properties": {
             "defaultConcurrency": {
               "type": "number",
-              "minimum": 1
+              "minimum": 0
             },
             "providerConcurrency": {
               "type": "object",
@@ -11013,6 +11151,11 @@
             "maxDepth": {
               "type": "integer",
               "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "maxLiveDescendantsPerRoot": {
+              "type": "integer",
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             "staleTimeoutMs": {
@@ -11672,6 +11815,19 @@
           },
           "additionalProperties": false
         },
+        "ulw_execute": {
+          "type": "object",
+          "properties": {
+            "auto_commit": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "auto_commit"
+          ],
+          "additionalProperties": false
+        },
         "start_work": {
           "type": "object",
           "properties": {
@@ -11718,6 +11874,39 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "formatOnMutation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "best-effort",
+                "required"
+              ]
+            },
+            "languages": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "maxFileBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -12507,6 +12696,25 @@
           },
           "additionalProperties": false
         },
+        "git_master": {
+          "type": "object",
+          "properties": {
+            "commit_footer": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "include_co_authored_by": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "task": {
           "type": "object",
           "properties": {
@@ -12519,7 +12727,12 @@
             },
             "default_concurrency": {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_concurrency": {
+              "type": "integer",
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             "provider_concurrency": {
@@ -12529,7 +12742,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -12540,7 +12753,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -12553,7 +12766,7 @@
               "anyOf": [
                 {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 },
                 {
@@ -13051,6 +13264,15 @@
               },
               "additionalProperties": false
             },
+            "write_notice": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "sync": {
               "type": "object",
               "properties": {
@@ -13069,6 +13291,20 @@
               "properties": {
                 "enabled": {
                   "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "recall": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
                 }
               },
               "additionalProperties": false
@@ -13228,6 +13464,15 @@
                     },
                     "additionalProperties": false
                   },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "sync": {
                     "type": "object",
                     "properties": {
@@ -13246,6 +13491,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -13277,6 +13536,39 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "formatOnMutation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "best-effort",
+                "required"
+              ]
+            },
+            "languages": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "maxFileBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -14066,6 +14358,25 @@
           },
           "additionalProperties": false
         },
+        "git_master": {
+          "type": "object",
+          "properties": {
+            "commit_footer": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "include_co_authored_by": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "task": {
           "type": "object",
           "properties": {
@@ -14078,7 +14389,12 @@
             },
             "default_concurrency": {
               "type": "integer",
-              "exclusiveMinimum": 0,
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_concurrency": {
+              "type": "integer",
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             "provider_concurrency": {
@@ -14088,7 +14404,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -14099,7 +14415,7 @@
               },
               "additionalProperties": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
                 "maximum": 9007199254740991
               }
             },
@@ -14112,7 +14428,7 @@
               "anyOf": [
                 {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 },
                 {
@@ -14610,6 +14926,15 @@
               },
               "additionalProperties": false
             },
+            "write_notice": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "sync": {
               "type": "object",
               "properties": {
@@ -14628,6 +14953,20 @@
               "properties": {
                 "enabled": {
                   "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "recall": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
                 }
               },
               "additionalProperties": false
@@ -14787,6 +15126,15 @@
                     },
                     "additionalProperties": false
                   },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "sync": {
                     "type": "object",
                     "properties": {
@@ -14805,6 +15153,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -14842,6 +15204,39 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "formatOnMutation": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "best-effort",
+                  "required"
+                ]
+              },
+              "languages": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "maxFileBytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
           "categories": {
             "type": "object",
             "propertyNames": {
@@ -15631,6 +16026,25 @@
             },
             "additionalProperties": false
           },
+          "git_master": {
+            "type": "object",
+            "properties": {
+              "commit_footer": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "include_co_authored_by": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "task": {
             "type": "object",
             "properties": {
@@ -15643,7 +16057,12 @@
               },
               "default_concurrency": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "global_concurrency": {
+                "type": "integer",
+                "minimum": 0,
                 "maximum": 9007199254740991
               },
               "provider_concurrency": {
@@ -15653,7 +16072,7 @@
                 },
                 "additionalProperties": {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 }
               },
@@ -15664,7 +16083,7 @@
                 },
                 "additionalProperties": {
                   "type": "integer",
-                  "exclusiveMinimum": 0,
+                  "minimum": 0,
                   "maximum": 9007199254740991
                 }
               },
@@ -15677,7 +16096,7 @@
                 "anyOf": [
                   {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   {
@@ -16175,6 +16594,15 @@
                 },
                 "additionalProperties": false
               },
+              "write_notice": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "sync": {
                 "type": "object",
                 "properties": {
@@ -16193,6 +16621,20 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "recall": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
                   }
                 },
                 "additionalProperties": false
@@ -16352,6 +16794,15 @@
                       },
                       "additionalProperties": false
                     },
+                    "write_notice": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "sync": {
                       "type": "object",
                       "properties": {
@@ -16370,6 +16821,20 @@
                       "properties": {
                         "enabled": {
                           "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "recall": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "max_items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
                         }
                       },
                       "additionalProperties": false
@@ -16458,7 +16923,7 @@
                   "enum": [
                     "goal",
                     "refactor",
-                    "start-work",
+                    "ulw-execute",
                     "stop-continuation",
                     "remove-ai-slops",
                     "hyperplan"
@@ -25603,7 +26068,7 @@
                 "properties": {
                   "defaultConcurrency": {
                     "type": "number",
-                    "minimum": 1
+                    "minimum": 0
                   },
                   "providerConcurrency": {
                     "type": "object",
@@ -25628,6 +26093,11 @@
                   "maxDepth": {
                     "type": "integer",
                     "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "maxLiveDescendantsPerRoot": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "staleTimeoutMs": {
@@ -26287,6 +26757,19 @@
                 },
                 "additionalProperties": false
               },
+              "ulw_execute": {
+                "type": "object",
+                "properties": {
+                  "auto_commit": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "auto_commit"
+                ],
+                "additionalProperties": false
+              },
               "start_work": {
                 "type": "object",
                 "properties": {
@@ -26333,6 +26816,39 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "formatOnMutation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "best-effort",
+                      "required"
+                    ]
+                  },
+                  "languages": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "maxFileBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -27122,6 +27638,25 @@
                 },
                 "additionalProperties": false
               },
+              "git_master": {
+                "type": "object",
+                "properties": {
+                  "commit_footer": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "include_co_authored_by": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "task": {
                 "type": "object",
                 "properties": {
@@ -27134,7 +27669,12 @@
                   },
                   "default_concurrency": {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "global_concurrency": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "provider_concurrency": {
@@ -27144,7 +27684,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -27155,7 +27695,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -27168,7 +27708,7 @@
                     "anyOf": [
                       {
                         "type": "integer",
-                        "exclusiveMinimum": 0,
+                        "minimum": 0,
                         "maximum": 9007199254740991
                       },
                       {
@@ -27666,6 +28206,15 @@
                     },
                     "additionalProperties": false
                   },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "sync": {
                     "type": "object",
                     "properties": {
@@ -27684,6 +28233,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -27843,6 +28406,15 @@
                           },
                           "additionalProperties": false
                         },
+                        "write_notice": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "sync": {
                           "type": "object",
                           "properties": {
@@ -27861,6 +28433,20 @@
                           "properties": {
                             "enabled": {
                               "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "recall": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
                             }
                           },
                           "additionalProperties": false
@@ -27892,6 +28478,39 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "formatOnMutation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "best-effort",
+                      "required"
+                    ]
+                  },
+                  "languages": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "maxFileBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -28681,6 +29300,25 @@
                 },
                 "additionalProperties": false
               },
+              "git_master": {
+                "type": "object",
+                "properties": {
+                  "commit_footer": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "include_co_authored_by": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "task": {
                 "type": "object",
                 "properties": {
@@ -28693,7 +29331,12 @@
                   },
                   "default_concurrency": {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "global_concurrency": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "provider_concurrency": {
@@ -28703,7 +29346,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -28714,7 +29357,7 @@
                     },
                     "additionalProperties": {
                       "type": "integer",
-                      "exclusiveMinimum": 0,
+                      "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
@@ -28727,7 +29370,7 @@
                     "anyOf": [
                       {
                         "type": "integer",
-                        "exclusiveMinimum": 0,
+                        "minimum": 0,
                         "maximum": 9007199254740991
                       },
                       {
@@ -29225,6 +29868,15 @@
                     },
                     "additionalProperties": false
                   },
+                  "write_notice": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "sync": {
                     "type": "object",
                     "properties": {
@@ -29243,6 +29895,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -29402,6 +30068,15 @@
                           },
                           "additionalProperties": false
                         },
+                        "write_notice": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "sync": {
                           "type": "object",
                           "properties": {
@@ -29420,6 +30095,20 @@
                           "properties": {
                             "enabled": {
                               "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "recall": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
                             }
                           },
                           "additionalProperties": false

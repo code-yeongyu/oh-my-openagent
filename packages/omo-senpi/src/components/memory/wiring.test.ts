@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { realpathSync, rmSync } from "node:fs"
+import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
@@ -20,14 +21,37 @@ import {
   type MemoryStatusResult,
   type RefreshMemoryStatusInput,
 } from "./status"
-import { MEMORY_PRESSURE_METADATA_TOKEN } from "./prompt"
+import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./prompt"
+import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { createMemoryWiring } from "./wiring"
 const roots: string[] = []
 
-afterEach(() => {
-  for (const root of roots.splice(0)) {
-    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+// afterBind starts background git pipelines it never exposes a drain handle for
+// (fire-and-forget refreshInitialStatus and the footer recompute parked in
+// MemoryFooterLive.pending). Both spawn `git status` with cwd inside the temp root and can
+// still be running when the awaited reservation resolves. POSIX unlinks a live cwd; Windows
+// returns EBUSY for that child's whole lifetime, which on a loaded runner exceeds the 2s that
+// maxRetries:10/retryDelay:200 buys. Wait for the handles to drain instead of guessing a
+// bigger fixed budget.
+const TEMP_ROOT_RELEASE_TIMEOUT_MS = 30_000
+const TEMP_ROOT_RELEASE_POLL_MS = 50
+
+async function removeWhenReleased(root: string): Promise<void> {
+  const deadline = Date.now() + TEMP_ROOT_RELEASE_TIMEOUT_MS
+  for (;;) {
+    try {
+      await rmEfaultTolerant(root, { recursive: true, force: true })
+      return
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if ((code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY") || Date.now() >= deadline) throw error
+      await new Promise((resolve) => setTimeout(resolve, TEMP_ROOT_RELEASE_POLL_MS))
+    }
   }
+}
+
+afterEach(async () => {
+  for (const root of roots.splice(0)) await removeWhenReleased(root)
 })
 
 describe("memory pressure dream wiring", () => {
@@ -147,6 +171,56 @@ describe("memory pressure compile wiring", () => {
     expect(pressuredPrompt).toContain("100/100")
     expect(pressuredPrompt).toContain("100%")
     expect(pressuredPrompt).toContain("Z".repeat(300))
+  }, 30_000)
+})
+
+describe("memory recall wiring", () => {
+  test("#given a bound session whose memory matches the turn #when before_agent_start dispatches #then no lexical recall message is injected and the projection still lands", async () => {
+    // given
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-recall-wiring-")))
+    roots.push(root)
+    const identity = "recall-wiring-agent"
+    const paths = buildIdentityPaths(root, identity)
+    const repo = new GitMemoryRepo({ dir: paths.repo, agentId: identity })
+    await repo.init({
+      seedFiles: [
+        { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\npersona\n" },
+        {
+          relativePath: "reference/kubernetes-rollouts.md",
+          content: "---\ndescription: How we ship kubernetes rollouts\n---\nDrain kubernetes nodes before a rollout.\n",
+        },
+      ],
+    })
+    const context = createMemoryIdentityContext({
+      identity,
+      identityPaths: paths,
+      binding: { identity, repoPathHash: "hash", boundAt: 1 },
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    createMemoryWiring({
+      sessions: new Map([["session-recall", { context }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      env: {},
+    }).registerStatic(pi, componentContext())
+
+    // when
+    const results = await pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
+      sessionContext("session-recall", undefined, [
+        { type: "message", id: "m1", message: { role: "user", content: [{ type: "text", text: "how do we handle kubernetes rollouts" }] } },
+      ]),
+    )
+
+    // then
+    const messages = results
+      .filter((result): result is { message?: { customType?: string; display?: boolean }; systemPrompt?: string } => result !== undefined)
+    const recall = messages.find((result) => result.message?.customType === RECALL_CUSTOM_TYPE)
+    const notice = messages.find((result) => result.message?.customType === MEMORY_NOTICE_CUSTOM_TYPE)
+    expect(recall).toBeUndefined()
+    expect(pi.entries).toEqual([])
+    expect(notice?.systemPrompt).toContain("persona")
   }, 30_000)
 })
 

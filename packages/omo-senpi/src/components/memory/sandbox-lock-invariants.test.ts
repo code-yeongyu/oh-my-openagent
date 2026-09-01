@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import type { FactsSpawnArgs } from "./worker/spawn"
 import { buildFactsSandboxTransform, SandboxUnavailableError } from "./sandbox"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 const seatbeltTest = test.skipIf(process.platform !== "darwin" || !existsSync("/usr/bin/sandbox-exec"))

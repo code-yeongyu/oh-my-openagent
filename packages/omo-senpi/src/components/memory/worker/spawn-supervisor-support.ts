@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
 import { fileURLToPath } from "node:url"
 
 export function definedEnvironment(env: NodeJS.ProcessEnv): Record<string, string> {

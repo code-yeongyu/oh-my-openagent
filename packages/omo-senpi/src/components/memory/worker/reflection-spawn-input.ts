@@ -22,6 +22,7 @@ type ReflectionSpawnInput = {
   readonly identity: MemoryIdentity
   readonly env: NodeJS.ProcessEnv
   readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
 }
 
 export function prepareReflectionCandidateSpawn(input: ReflectionSpawnInput) {
@@ -62,5 +63,6 @@ export function prepareReflectionCandidateSpawn(input: ReflectionSpawnInput) {
     systemTokenBudget,
     systemTokenTarget: Math.floor(MEMORY_PRESSURE_SOFT_RATIO * systemTokenBudget),
     senpiCommand: input.senpiCommand,
+    senpiPrefixArgs: input.senpiPrefixArgs,
   })
 }

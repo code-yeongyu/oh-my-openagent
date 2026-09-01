@@ -223,12 +223,12 @@ describe("registerDagCommands", () => {
     expect(leftLine).toContain("running")
     expect(leftLine).toContain("agent:reviewer")
     expect(leftLine).toContain("model:opus-4.1-high")
-    expect(leftLine).toContain("attempt 2")
+    expect(leftLine).toContain("x2")
     const seedLine = lines.find((line) => line.includes("collect inputs")) ?? ""
     expect(seedLine).toContain("category:quick")
     expect(seedLine).toContain("2.0s")
     const rightLine = lines.find((line) => line.includes("quick lint")) ?? ""
-    expect(rightLine).toContain("error: lint exited 1")
+    expect(rightLine).toContain("error: task_error lint exited 1")
   })
 
   it("#given a diamond run #when /dag <id> runs #then the critical path and bottleneck are marked", async () => {
@@ -248,6 +248,50 @@ describe("registerDagCommands", () => {
     expect(lines.find((line) => line.includes("quick lint"))).not.toContain("*critical*")
     expect(printed).toContain("critical path: seed -> left -> join")
     expect(printed).toContain("bottleneck: left blocks 1")
+  })
+
+  it("#given a retried run #when /dag <id> runs #then only re-run nodes carry the xN badge and the failure line names its code", async () => {
+    // given left is on attempt 2 after a retry, seed and right never re-ran
+    const pi = new FakeExtensionAPI()
+    registerDagCommands(pi, fakeManager([summary({ runId: "dag_diamond" })], { dag_diamond: diamondSnapshot() }))
+    const { ctx, ui } = commandCtx("session-a")
+
+    // when
+    await invoke(pi, "dag_diamond", ctx)
+
+    // then
+    const lines = ui.notifications.map((entry) => entry.message).join("\n").split("\n")
+    expect(lines.find((line) => line.includes("deep review"))).toContain("x2")
+    expect(lines.find((line) => line.includes("collect inputs"))).not.toContain("x2")
+    expect(lines.find((line) => line.includes("quick lint"))).toContain("error: task_error lint exited 1")
+  })
+
+  it("#given an amended run #when /dag <id> runs #then the header carries an amended xN marker", async () => {
+    // given the definition was amended twice
+    const snapshot = { ...diamondSnapshot(), amendHistory: [{ at: "2026-08-14T00:01:00.000Z" }, { at: "2026-08-14T00:02:00.000Z" }] }
+    const pi = new FakeExtensionAPI()
+    registerDagCommands(pi, fakeManager([summary({ runId: "dag_diamond" })], { dag_diamond: snapshot }))
+    const { ctx, ui } = commandCtx("session-a")
+
+    // when
+    await invoke(pi, "dag_diamond", ctx)
+
+    // then
+    const header = ui.notifications.map((entry) => entry.message).join("\n").split("\n")[0] ?? ""
+    expect(header).toContain("amended x2")
+  })
+
+  it("#given a run that was never amended #when /dag <id> runs #then no amended marker renders", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    registerDagCommands(pi, fakeManager([summary({ runId: "dag_diamond" })], { dag_diamond: { ...diamondSnapshot(), amendHistory: [] } }))
+    const { ctx, ui } = commandCtx("session-a")
+
+    // when
+    await invoke(pi, "dag_diamond", ctx)
+
+    // then
+    expect(ui.notifications.map((entry) => entry.message).join("\n")).not.toContain("amended")
   })
 
   it("#given an unknown run id #when /dag <id> runs #then it notifies instead of throwing", async () => {

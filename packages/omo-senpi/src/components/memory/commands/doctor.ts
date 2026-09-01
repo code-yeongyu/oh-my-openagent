@@ -83,7 +83,7 @@ export function registerDoctorCommand(pi: SenpiExtensionAPI, deps: MemoryCommand
           await checkLocks(deps, identity.identityPaths.locks),
           await checkWorktrees(deps, identity),
           await checkAbandonedRuns(identity.identityPaths.reflection),
-          await checkReflectionHealth(identity.identityPaths.reflection),
+          await checkReflectionHealth(identity.identityPaths.reflection, { now: deps.now?.() ?? Date.now() }),
           await checkTokens(repoDir, warnTokens),
         )
 

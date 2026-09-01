@@ -1,6 +1,6 @@
 import { execFile, spawn, spawnSync, type ChildProcess } from "node:child_process"
-import { readdirSync, watch, writeFileSync } from "node:fs"
-import { readFile } from "node:fs/promises"
+import { readdirSync, watch, writeFileSync } from "@oh-my-opencode/memory-core/fs"
+import { readFile } from "@oh-my-opencode/memory-core/fs"
 
 export type SupervisorRuntimePlatform = "posix" | "win32"
 export type CancelSupervisorDeadline = () => void
@@ -112,11 +112,20 @@ function spawnTerminationCommand(command: readonly string[], args: readonly stri
   const [executable, ...prefix] = command
   if (executable === undefined) throw new TypeError("termination command is required")
   if (synchronous) {
-    const result = spawnSync(executable, [...prefix, ...args], { env: process.env, stdio: "ignore" })
+    const result = spawnSync(executable, [...prefix, ...args], {
+      env: process.env,
+      stdio: "ignore",
+      windowsHide: true,
+    })
     if (result.error !== undefined) throw result.error
     return
   }
-  const child = spawn(executable, [...prefix, ...args], { env: process.env, stdio: "ignore" })
+  // taskkill runs from the console-less supervisor, so it needs the same hidden creation flag.
+  const child = spawn(executable, [...prefix, ...args], {
+    env: process.env,
+    stdio: "ignore",
+    windowsHide: true,
+  })
   child.once("error", (error) => process.stderr.write(`${error.message}\n`))
 }
 

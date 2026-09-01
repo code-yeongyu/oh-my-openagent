@@ -1,3 +1,192 @@
+## 2026-08-29 — Teach "mass ulw research" the mass path
+
+A combined mass + research invocation collected at team scale instead of mass
+scale, and two of its spellings never loaded the research skill at all.
+
+`mass-ulw/references/planning.md` sent every `ulw-research` request to the team
+path and reserved the dag for "independent harvest stages only", so the
+composite invocation could never reach mass fan-out. That routing now splits: a
+plain research request still goes to the team, while a MASS research request
+runs collection as chained dags and keeps a team only for debate rounds. A new
+"Mass research" section states the scale the mode means — a 60+ node opening
+wave covering every angle, routed across `quick` / `unspecified-low` /
+`unspecified-high` / `deep` in one graph, each wave's EXPAND leads defining the
+next wave's nodes until convergence, and a synthesis that reduces through
+several parallel `architect` nodes into one `architect` reducer, with
+`ultrabrain` substituting where the config defines no `architect` category.
+Both `ulw-research` copies (senpi-native and shared) gained the matching branch
+at their Phase 1 roster decision, so the mode is reachable from either skill.
+
+`skill-pointers` extracts the mass alias group into a shared `MASS_ALIAS`
+constant and lets it stand in for the `ulw` half of the research pattern. The
+aliases carrying no literal "ulw" (`mulw`, `meth`) and the reversed `ulw mass`
+previously matched mass-ulw alone, so "mulw research" armed dag orchestration
+with no research doctrine behind it; those spellings now inject both pointers,
+exactly like "mass ulw research". Near-miss guards (`method`, `promethean`,
+`ulw massive`) are unchanged.
+
+## 2026-08-28 — Align the Senpi adapter with 2026.8.28
+
+`packages/omo-senpi/package.json` now requires the exact published
+`@code-yeongyu/senpi` `2026.8.28` release for both its optional peer and
+development dependency, matching the native runtime pin. The engine release
+repairs the beta.23 shared interactive host regressions (thinking-level
+cycling, duplicate user-message rendering, and resume of host-held sessions)
+and restores the compiled eval kernels.
+
+## 2026-08-27 — Align the Senpi adapter with 2026.8.27
+
+`packages/omo-senpi/package.json` now requires the exact published
+`@code-yeongyu/senpi` `2026.8.27` release for both its optional peer and
+development dependency. Keep the peer, dev dependency, root patched-dependency
+key, and generated lockfile aligned with the native runtime pin.
+
+## 2026-08-27 — Allow the mailbox durability stress test to finish on Windows
+
+The mailbox cap-and-restart test now has a 15-second per-test budget. It performs
+128 durable atomic queue writes plus a second byte-cap queue on Windows, where
+filesystem write and rename latency can exceed Bun's default five-second test
+budget even though the queue contract completes correctly. This changes only the
+test deadline; mailbox bounds, ordering, persistence, and production retry
+behavior remain unchanged.
+
+## 2026-08-27 — Preserve the full Windows model-admission test budget
+
+The task RPC model-admission parity tests now pass their calculated timeout
+through Bun's supported timeout option object. This preserves the intended
+`PROBE_TIMEOUT_MS * 3 + 20_000` budget on Windows instead of allowing the
+legacy numeric argument form to be capped by the runner's default test
+deadline. Production probe behavior is unchanged.
+
+## 2026-08-27 — Keep thread persistence and DAP portable on Windows
+
+The thread mailbox and durable receipt stores now use the shared atomic-write
+implementation, which opens a writable temporary file, tolerates the Windows
+filesystem's allowed `fsync` limitations, and avoids directory `fsync` where
+Windows rejects directory handles. The DAP client now distinguishes a real
+`host:port` adapter endpoint from a Windows drive-letter script path, so the
+fixture adapter launches instead of attempting a socket connection to drive
+`C:`. The existing POSIX durability behavior remains unchanged.
+
+## 2026-08-27 — Regenerate both Senpi extension entry points after merge
+
+The generated `omo.js` and `omo-task.js` entry points are refreshed from the
+current source after the post-beta.23 merges. This removes conflict-marker
+content that had remained in `omo-task.js` and keeps both tracked entry points
+aligned with the source component set consumed by the release build.
+
+## 2026-08-26 — Normalize ULW CLI pointer paths across platforms
+
+The ulw-loop skill pointer now normalizes the resolved executable path to
+POSIX separators before embedding it in the machine-consumed command sentence.
+Windows Senpi compatibility therefore receives the same canonical path shape as
+POSIX while the actual executable path remains unchanged.
+
+## 2026-08-25 — Name the executable in the local-launcher brand profile
+
+The sibling-store local launcher now injects `command: "omo"` on the `SENPI_BRAND`
+profile it hands the engine, matching the published omo-ai launcher. Senpi can
+render resume hints with the real executable name instead of guessing; unknown
+fields stay ignored on older engines.
+
+## 2026-08-22 — One exception-free keyword table for every ULW skill pointer
+
+The mass-ulw and ulw-skill-pointers components were the same mechanism written twice, and the
+detectors carried `ulw(?!-)` lookaheads that silently swallowed overlapping mentions: "mass
+ulw-loop" fired neither mass-ulw nor ultrawork. They are replaced by a single `skill-pointers`
+component holding one uniform target table (mass-ulw with its aliases, ulw-plan, ulw-loop,
+ulw-research) with no cross-keyword exceptions — overlapping keywords all fire, each matched
+skill gets its own hidden pointer, and the ultrawork trigger likewise drops `(?!-)` so any
+`ulw` mention arms it. Typing "mass ulw-loop" now loads ultrawork + mass-ulw + ulw-loop
+together; "ulw plan" loads ultrawork + the ulw-plan skill.
+
+CustomTypes stay stable (`omo-mass-ulw:skill-pointer`, `omo-ulw-loop/-research:skill-pointer`;
+new `omo-ulw-plan:skill-pointer`). The per-component flags `omo-senpi-mass-ulw-disabled` and
+`omo-senpi-ulw-skill-pointers-disabled` are replaced by `omo-senpi-skill-pointers-disabled`.
+Only structural dedup remains: extension-source inputs, a raw `/skill:` command for the same
+skill, expanded skill blocks, and the `<ultrawork-mode>` tag-pair guard.
+
+## 2026-08-22 — Load every skill a composite ULW invocation names
+
+"mass ulw loop" armed ultrawork and pointed at the mass-ulw skill, but nothing loaded the
+ulw-loop skill the phrase names; "mass ulw research" had the same gap. The new
+`ulw-skill-pointers` component detects `ulw loop` / `ulw-loop` / `ulwloop` and the research
+equivalents (any case) and injects one hidden skill pointer per matched skill, so a composite
+invocation now loads ultrawork, mass-ulw, and the named skill together.
+
+Suppressions mirror mass-ulw per skill — extension-source inputs, a raw `/skill:` command for
+the same skill, and an already-expanded skill block never re-inject — and queued prompts carry
+the pointers appended inside the one message so the group survives senpi's one-at-a-time queue
+drain. Gated by `omo-senpi-ulw-skill-pointers-disabled`.
+
+## 2026-08-21 — Follow the Senpi 2026.8.21 host contract
+
+The adapter peer and development dependency now require Senpi `2026.8.21`, and the
+task engine's peer and development pins move with it. The 2026.8.21 host carries
+the settings-lock CPU-spin repair that froze the omo TUI at ~100% CPU under
+provider-error storms: contended settings-lock retries sleep through
+`Atomics.wait` instead of busy-waiting, retry-fallback chain canonicalization is
+memoized per error burst, and the `cursor-cli-oauth` / `claude-sdk-oauth` lanes
+cache their settings loads by mtime+size. It also carries the follow-up that
+makes settings reads lock-free: writers publish through a same-directory temp
+file plus rename, so read-only settings loads take no lock and can never observe
+a torn write. Alongside those, the host refreshes hydrated provider catalog data
+(the vercel-ai-gateway Grok vendor slug moved `xai/` -> `spacexai/`, and opencode
+delisted `deepseek-v4-flash-free`).
+
+The bump covers all four manifest surfaces, the workspace lockfile, the
+`senpi-pin` and package-shape test pins, and the provider-map provenance comment
+(re-verified: `packages/ai/src/providers/all.ts`, which defines
+`builtinProviders()`, is byte-identical between `v2026.8.20-2` and `v2026.8.21`,
+so the builtin provider ids are unchanged).
+
+## 2026-08-21 — Add mass-ulw trigger aliases
+
+The mass-ulw keyword detector now also fires on `ulw mass`, `ulwmass`, `mulw`, and
+`meth` (any case, space/hyphen variants), alongside the existing `mass ulw` /
+`massulw` / `mass-ulw` spellings. `MASS_ULW_PATTERN` becomes
+`/\b(?:mass[\s-]*ulw(?!-)|ulw[\s-]*mass|mulw|meth)\b/i`; the `ulw(?!-)` guard,
+all suppressions, and both injection paths are unchanged.
+
+## 2026-08-20 — Render transcript notices in the Senpi notice-box family
+
+Fallback architect announcements, task completion and liveness cards, and memory reflection, health, soul, accepted-turn, and write notices now share the Senpi-canonical padded `customMessageBg` block. Titles retain semantic tone and bold emphasis, body rows stay dim, and diagnostic detail remains expanded-only.
+
+Compact category warnings and normal tool result rows remain unchanged.
+
+## 2026-08-19 — Follow the Senpi 2026.8.19 host contract
+
+**What changed.** The adapter peer and development dependency now require Senpi
+`2026.8.19`, and the task engine's peer and development pins move with it.
+`packages/omo-senpi/package.json`, `packages/senpi-task/package.json`,
+`packages/omo-native/package.json`, the root `package.json` development pin,
+and the workspace `bun.lock` advance together, along with the
+`packages/omo-native/bin/lib/provider-map.json` provenance stamp and the
+`packages/omo-senpi/src/package-shape.test.ts` /
+`packages/omo-native/test/package-shape.test.ts` /
+`packages/omo-native/test/senpi-pin.test.ts` expectations.
+
+**Why.** The 2026.8.19 host stops implicit fallback expansion from routing
+through provider lanes that are guaranteed to refuse: a registered provider can
+declare itself ineligible, and the cursor-cli-oauth lane does so while its
+`--force` acknowledgement is missing or its kill switch is set. It also stops
+auto-compaction from being starved when a provider reports a small context
+while the local transcript keeps growing, and it detects the
+`com.apple.quarantine` attribute on shipped native PTY prebuilds before
+`dlopen()`, so macOS degrades to the pipe fallback instead of blocking the
+process on a Gatekeeper dialog. The release additionally carries the `/loop`
+scheduled-prompt builtin, memory and mass-ulw tip rotation, and the upstream
+`badlogic/pi-mono` main@`59a71b23` sync.
+
+**Why an extension could not handle it.** These are host-version pins. The
+adapter cannot express a required Senpi runtime version from inside an
+extension; the manifests are the contract the installer and the workspace
+resolver read.
+
+**Expected merge conflict zones.** The adapter and task manifests, the
+`omo-native` manifest and its pin tests, the workspace lockfile, package-shape
+expectations, and the provider-map provenance comment.
+
 ## 2026-08-18 — Follow the Senpi 2026.8.18-3 host contract
 
 The adapter peer and development dependency now require Senpi `2026.8.18-3`,

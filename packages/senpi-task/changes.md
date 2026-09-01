@@ -1,3 +1,23 @@
+## 2026-08-28 — Align the task engine with Senpi 2026.8.28
+
+`packages/senpi-task/package.json` now carries the exact published
+`@code-yeongyu/senpi` `2026.8.28` peer and development pins. The task engine
+must remain synchronized with the Senpi adapter and native package so optional
+peer resolution cannot select a stale engine release.
+
+## 2026-08-27 — Align the task engine with Senpi 2026.8.27
+
+`packages/senpi-task/package.json` now carries the exact published
+`@code-yeongyu/senpi` `2026.8.27` peer and development pins. The task engine
+must remain synchronized with the Senpi adapter and native package so optional
+peer resolution cannot select a stale engine release.
+
+## 2026-08-20 — Export the canonical notice-box visual contract
+
+The package now exports one `buildNoticeBox` helper and `NoticeSpec`-shaped types for Senpi-coupled adapters. It reproduces Senpi's canonical `Box(1, 1, customMessageBg)` contract while the pinned host package does not export its own builder.
+
+Keep transcript notices on this helper. Compact task/tool/status rows remain on their purpose-built renderers.
+
 ## 2026-08-18 — Route category selection guidance to the caller
 
 The task tool description now shows the caller-only selection gates for quick and unspecified

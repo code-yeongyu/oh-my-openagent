@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 
@@ -7,13 +7,14 @@ import { buildIdentityPaths, type FactsPayload, type ReflectionWorktree, type Re
 
 import { loadedMemoryConfig, memorySettings } from "../memory.test-support"
 import { prepareReflectionCandidateSpawn } from "./reflection-spawn-input"
-import { prepareFactsSpawn, prepareReflectionSpawn } from "./spawn"
+import { prepareFactsSpawn, prepareReflectionForkSpawn, prepareReflectionSpawn } from "./spawn"
 import { existsSync, realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 function chmodFailure(code: string): NodeJS.ErrnoException {
@@ -209,5 +210,73 @@ describe("worker senpi command resolution", () => {
     })
 
     expect(prepared.command).toBe("/custom/senpi")
+  })
+})
+
+describe("worker senpi prefix args", () => {
+  const PREFIX_MARKER = "<marker>.js"
+
+  function reflectionInput(base: string) {
+    return {
+      run,
+      worktree: {
+        dir: base,
+        commonConfigPath: join(base, "config"),
+      } as unknown as ReflectionWorktree,
+      reflectionSessionsDir: join(base, "sessions"),
+      category: "quick",
+      model: "provider/model",
+      env: {},
+      mergePolicy: "auto" as const,
+      skillsUsageSource: join(base, "skills.json"),
+      memoryUsageSource: join(base, "memory-usage.json"),
+      dreamStateSource: join(base, "dream.json"),
+      peoplePolicy: { enabled: true, max_entries: 40, max_entry_chars: 200 },
+      senpiCommand: "/custom/senpi",
+      senpiPrefixArgs: [PREFIX_MARKER],
+    }
+  }
+
+  test("#given senpiCommand and senpiPrefixArgs #when a reflection spawn is prepared #then the command is preserved and args start with the prefix", async () => {
+    const prepared = await prepareReflectionSpawn(reflectionInput(await root()))
+
+    expect(prepared.command).toBe("/custom/senpi")
+    expect(prepared.args[0]).toBe(PREFIX_MARKER)
+  })
+
+  test("#given senpiCommand and senpiPrefixArgs #when a reflection fork spawn is prepared #then args start with the prefix before -p/--fork", async () => {
+    const base = await root()
+    const prepared = await prepareReflectionForkSpawn({
+      ...reflectionInput(base),
+      parentSessionFile: join(base, "parent.jsonl"),
+    })
+
+    expect(prepared.args[0]).toBe(PREFIX_MARKER)
+    expect(prepared.args.indexOf("-p")).toBeGreaterThan(0)
+    expect(prepared.args.indexOf("--fork")).toBeGreaterThan(prepared.args.indexOf("-p"))
+  })
+
+  test("#given runner-style senpiPrefixArgs #when prepareReflectionCandidateSpawn builds the spawn #then the prefix is forwarded onto args", async () => {
+    const base = await root()
+    const prepared = await prepareReflectionCandidateSpawn({
+      run,
+      worktree: {
+        dir: base,
+        commonConfigPath: join(base, "config"),
+      } as unknown as ReflectionWorktree,
+      mergePolicy: "auto",
+      category: "quick",
+      candidate: { model: "provider/model" },
+      attempt: 1,
+      hardDeadlineAt: Date.now() + 10_000,
+      config: loadedMemoryConfig(memorySettings()).config,
+      identity: { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(base, "agent-test") },
+      env: {},
+      senpiCommand: "/custom/senpi",
+      senpiPrefixArgs: [PREFIX_MARKER],
+    })
+
+    expect(prepared.command).toBe("/custom/senpi")
+    expect(prepared.args[0]).toBe(PREFIX_MARKER)
   })
 })

@@ -1,0 +1,33 @@
+{
+  "title": "OpenCode BTW side conversation",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "isolated OpenCode TUI with local BTW plugin and mock model"
+  },
+  "interaction": [
+    "{Escape}",
+    "Remember ALPHA-CONTEXT-42 and keep working until I ask a side question.",
+    "{Enter}",
+    "/btw what context token is in the main conversation?",
+    "{Enter}"
+  ],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 120,
+    "rows": 32
+  },
+  "cleanup": "pty pid 55120 killed",
+  "files": {
+    "png": "/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/.omo/evidence/20260820-btw-parent-remote-revalidation/web-terminal-side-final/terminal.png",
+    "text": "/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/.omo/evidence/20260820-btw-parent-remote-revalidation/web-terminal-side-final/terminal.txt",
+    "ansi": "/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/.omo/evidence/20260820-btw-parent-remote-revalidation/web-terminal-side-final/terminal-ansi.txt",
+    "metadata": "/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/.omo/evidence/20260820-btw-parent-remote-revalidation/web-terminal-side-final/metadata.json"
+  }
+}

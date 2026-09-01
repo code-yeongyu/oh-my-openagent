@@ -10,6 +10,7 @@ import {
   fakeCommandContext,
   fakeDeps,
   invoke,
+  seedReflectionFailureStreak,
   seededRepo,
   tempIdentity,
   type FakeDeps,
@@ -188,7 +189,9 @@ describe("/doctor", () => {
     const { identity, pi, ctx } = await harness()
     const completions = join(identity.identityPaths.reflection, "completions")
     await mkdir(completions, { recursive: true })
+    const failureBaseMs = Date.now() - 3 * 60 * 60_000
     for (let index = 0; index < 3; index += 1) {
+      const startedAtMs = failureBaseMs + index * 60_000
       await writeFile(join(completions, `run-${index}.json`), `${JSON.stringify({
         schemaVersion: 1,
         runId: `run-${index}`,
@@ -199,8 +202,8 @@ describe("/doctor", () => {
         outcome: "failed",
         reason: "model-not-found",
         detail: "configured model unavailable",
-        startedAt: `2026-08-12T0${index}:00:00.000Z`,
-        finishedAt: `2026-08-12T0${index}:01:00.000Z`,
+        startedAt: new Date(startedAtMs).toISOString(),
+        finishedAt: new Date(startedAtMs + 60_000).toISOString(),
         delivery: { status: index === 2 ? "pending" : "consumed" },
       })}\n`)
     }
@@ -213,6 +216,43 @@ describe("/doctor", () => {
     expect(text).toContain("streak 3")
     expect(text).toContain("pending 1")
     expect(text).toContain("adjust memory.reflection category/model in your omo config")
+  })
+
+  // Fixed-epoch boundary pair pinning BOTH sides of REFLECTION_HEALTH_STALE_MS (7 days), past which
+  // a trailing failure burst retires and [warn] decays to [ok] on the passage of time alone. Each
+  // case carries its OWN epoch, chosen so an implementation reading Date.now() instead of the
+  // injected value lands on the WRONG side of the gate: the warn case is anchored in the past (a
+  // wall clock reads its fresh streak as stale), the ok case in the future (a wall clock reads its
+  // stale streak as fresh). One shared epoch cannot do that - whichever side the wall clock fell
+  // on, one case would pass by calendar coincidence, which is how dev run 32209640837 went green.
+  const WARN_NOW_MS = Date.parse("2026-08-12T05:00:00.000Z")
+  const OK_NOW_MS = Date.parse("2126-08-12T05:00:00.000Z")
+
+  test("#given a failure streak one hour before the injected now #when doctor runs #then reflection health warns with the live streak", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ deps: { now: () => WARN_NOW_MS } })
+    await seedReflectionFailureStreak(identity.identityPaths.reflection, WARN_NOW_MS - 60 * 60_000)
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toContain("[warn] reflection-health")
+    expect(text).toContain("streak 3")
+  })
+
+  test("#given the same streak shifted past the seven-day stale window #when doctor runs #then reflection health reads ok with a retired streak", async () => {
+    // given (identical records, only the offset from the injected now differs)
+    const { identity, pi, ctx } = await harness({ deps: { now: () => OK_NOW_MS } })
+    const eightDaysBefore = OK_NOW_MS - 8 * 24 * 60 * 60_000
+    await seedReflectionFailureStreak(identity.identityPaths.reflection, eightDaysBefore)
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toContain("[ok] reflection-health")
+    expect(text).toContain("streak 0")
   })
 
   test("#given an abandoned reservation run #when doctor runs #then manual-disposal paths are reported", async () => {
