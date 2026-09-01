@@ -7,7 +7,6 @@ import {
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
 const rootConfig = readFileSync(new URL("../bunfig.root.toml", import.meta.url), "utf8")
-const rootParallelConfigPath = new URL("../bunfig.root.parallel.toml", import.meta.url)
 const win2ConfigPath = new URL("../bunfig.win2.toml", import.meta.url)
 const win2ParallelConfigPath = new URL("../bunfig.win2.parallel.toml", import.meta.url)
 
@@ -67,42 +66,47 @@ describe("root test CI partition", () => {
     expect([...job.matchAll(new RegExp(escapeForRegExp(serialCommand), "g"))]).toHaveLength(2)
   })
 
-  test("#given the shared quarantine module #when the parallel bunfigs are read #then each ignores exactly the quarantined files", () => {
-    expect(existsSync(rootParallelConfigPath)).toBe(true)
+  test("#given the shared quarantine module #when the shard-2 bunfig is read #then it ignores exactly the quarantined files", () => {
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
 
-    for (const configPath of [rootParallelConfigPath, win2ParallelConfigPath]) {
-      expect(quarantinedTestPaths(readFileSync(configPath, "utf8"))).toEqual([
-        ...ROOT_TEST_SERIAL_QUARANTINE_PATHS,
-      ])
-    }
+    expect(quarantinedTestPaths(readFileSync(win2ParallelConfigPath, "utf8"))).toEqual([
+      ...ROOT_TEST_SERIAL_QUARANTINE_PATHS,
+    ])
   })
 
-  test("#given bunfig.root.parallel.toml #when the POSIX leg parallelizes #then it keeps every bunfig.root.toml exclusion", () => {
-    const parallelPatterns = quotedPatterns(readFileSync(rootParallelConfigPath, "utf8"))
+  test("#given bunfig.win2.parallel.toml #when a shard-2 leg runs the remainder #then it keeps every bunfig.root.toml exclusion", () => {
+    const parallelPatterns = quotedPatterns(readFileSync(win2ParallelConfigPath, "utf8"))
 
     for (const pattern of quotedPatterns(rootConfig)) {
       expect(parallelPatterns).toContain(pattern)
     }
   })
 
-  test("#given the Linux and macOS legs #when root tests run #then the quarantine precedes the parallel remainder", () => {
+  test("#given the POSIX shard-2 legs #when root tests run #then the quarantine precedes the serial remainder", () => {
     const job = rootTestJob()
     const posixStep = job.slice(
-      job.indexOf("runner.os != 'Windows'"),
-      job.indexOf("matrix.shard == '1/2'"),
+      job.indexOf("runner.os != 'Windows' && matrix.shard == '2/2'"),
+      job.indexOf("runner.os == 'Windows' && matrix.shard == '2/2'"),
     )
 
+    // POSIX shard 2 runs the remainder serially. `bun test --parallel` is not
+    // used on POSIX: --isolate re-ran the heavy preload per file across ~1,550
+    // files and OOM-killed the 7 GB ubuntu runner at ~8 min with every test
+    // passing, and --no-isolate leaked module state between files
+    // (category-routing, coordinator guard, boulder-state failures). Job-level
+    // sharding is the parallelism; each shard is one serial process, the shape
+    // this suite passed with for years.
     expect(posixStep).toContain(serialQuarantineCommand())
-    expect(posixStep).toContain("bun --config=bunfig.root.parallel.toml test --parallel")
+    expect(posixStep).toContain("bun --config=bunfig.win2.parallel.toml test\n")
+    expect(posixStep).not.toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
     expect(posixStep.indexOf(serialQuarantineCommand())).toBeLessThan(
-      posixStep.indexOf("bun --config=bunfig.root.parallel.toml test --parallel"),
+      posixStep.indexOf("bun --config=bunfig.win2.parallel.toml test"),
     )
   })
 
   test("#given the dedicated Senpi compatibility job #when root tests run #then omo-senpi is excluded on every OS", () => {
     expect(quotedPatterns(rootConfig)).toContain("packages/omo-senpi/**")
-    expect(quotedPatterns(readFileSync(rootParallelConfigPath, "utf8"))).toContain(
+    expect(quotedPatterns(readFileSync(win2ParallelConfigPath, "utf8"))).toContain(
       "packages/omo-senpi/**",
     )
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/omo-senpi/**")
@@ -121,9 +125,9 @@ describe("root test CI partition", () => {
     const job = rootTestJob()
     const runBlock = job.slice(job.indexOf("      - name: Run tests"))
 
-    expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows'")
     expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '1/2'")
-    expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '2/2'")
+    expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2'")
+    expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2'")
     expect(runBlock).not.toContain("shell: bash\n        run: |")
     expect(job).toContain("timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}")
   })

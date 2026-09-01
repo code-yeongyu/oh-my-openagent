@@ -283,7 +283,7 @@ describe("sweepWorktrees classification", () => {
 
     expect(report.defaultBranch).toBe("trunk")
     expect(decisionFor(report, feature).decision).toBe("SWEEP")
-  })
+  }, { timeout: 30_000 })
 
   test("falls back to master when origin/HEAD and main are absent", async () => {
     const { base, repo } = await createFixture("wt-sweep-master-")

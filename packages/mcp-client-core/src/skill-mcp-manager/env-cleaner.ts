@@ -40,14 +40,15 @@ function isExcludedEnvKey(key: string): boolean {
 }
 
 export function createCleanMcpEnvironment(
-  customEnv: Record<string, string> = {}
+  customEnv: Record<string, string> = {},
+  ambientEnv: Record<string, string | undefined> = process.env
 ): Record<string, string> {
   const cleanEnv: Record<string, string> = {}
 
   // Apply the blacklist only to inherited ambient environment variables.
   // Skill-configured env entries are explicitly declared and must be passed
   // through as-is so stdio MCP servers can receive required credentials.
-  for (const [key, value] of Object.entries(process.env)) {
+  for (const [key, value] of Object.entries(ambientEnv)) {
     if (value === undefined) continue
     if (isExcludedEnvKey(key)) continue
     cleanEnv[key] = value

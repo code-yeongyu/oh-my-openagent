@@ -1,11 +1,54 @@
 import { writeFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { checkpointUlwLoop } from "../src/checkpoint.js";
 import { ulwLoopBriefPath } from "../src/paths.js";
 import { startNextUlwLoop } from "../src/plan-crud.js";
 import { criterion, expectCode, goal, passGoal, plan, repoWith, snapshot } from "./fixtures/checkpoint-builders.js";
 import { MISSING_ARTIFACT_PATH, qualityGateJson } from "./fixtures/quality-gate-builder.js";
+
+describe("checkpointUlwLoop final story surface resolution", () => {
+	afterEach(() => {
+		delete process.env["OMO_AGENT_TOOLKIT_SURFACE"];
+	});
+
+	it("#given the omo-senpi surface #when the gate names omo-senpi reviewers #then the final story completes", async () => {
+		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G002",
+			status: "complete",
+			evidence: "final work complete and validation passed",
+			codexGoalJson: snapshot("complete"),
+			qualityGateJson: await qualityGateJson(repo, undefined, "G001-finished", "omo-senpi"),
+		});
+
+		expect(result.aggregateCompletion?.status).toBe("complete");
+	});
+
+	it("#given the omo-senpi surface #when the gate names lazycodex reviewers #then the final story is rejected", async () => {
+		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+		const gateJson = await qualityGateJson(repo);
+
+		await expectCode(
+			() =>
+				checkpointUlwLoop(repo, {
+					goalId: "G002",
+					status: "complete",
+					evidence: "final work complete and validation passed",
+					codexGoalJson: snapshot("complete"),
+					qualityGateJson: gateJson,
+				}),
+			"ULW_LOOP_QUALITY_GATE_INVALID",
+		);
+	});
+});
 
 describe("checkpointUlwLoop final story", () => {
 	it("requires quality-gate-json for the final goal complete", async () => {

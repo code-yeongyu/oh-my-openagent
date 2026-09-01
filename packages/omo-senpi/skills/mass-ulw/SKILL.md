@@ -1,17 +1,17 @@
 ---
 name: mass-ulw
-description: Run a dependency graph of child agents in one call with the native dag tool. Use when the user asks for mass-ulw, a DAG of tasks, fan-out/fan-in work, or multi-agent execution where some tasks must wait on others.
+description: Run a dependency graph of child agents in one call with the native workflow tool. Use when the user asks for mass-ulw, a DAG of tasks, fan-out/fan-in work, or multi-agent execution where some tasks must wait on others.
 metadata:
   short-description: Dependency-graph orchestration of child agents
 ---
 
 # mass-ulw
 
-Use this skill when the user asks for `mass-ulw`, a task DAG, staged fan-out, or any multi-agent job where real dependencies exist: task C needs A and B finished first. For fully independent workers, plain parallel `task` spawns are simpler. Reach for `dag` when the ordering itself is the point.
+Use this skill when the user asks for `mass-ulw`, a task DAG, staged fan-out, or any multi-agent job where real dependencies exist: task C needs A and B finished first. For fully independent workers, plain parallel `task` spawns are simpler. Reach for `workflow` when the ordering itself is the point.
 
 ## Planning - MANDATORY first step
 
-Before defining ANY graph, read `references/planning.md` (relative to this skill's own directory) IN FULL. Do not call `sdk.define`, `sdk.start`, or `tool.dag` with `action: "start"` before reading it. It carries the working doctrine this file deliberately omits: how to decompose the request into nodes, how to route each node's `category`, how to keep parallel write scopes disjoint, the node prompt contract, the verification wave, and the failure playbook. A graph defined without it is unplanned work.
+Before defining ANY graph, read `references/planning.md` (relative to this skill's own directory) IN FULL. Do not call `sdk.define`, `sdk.start`, or `tool.workflow` with `action: "start"` before reading it. It carries the working doctrine this file deliberately omits: how to decompose the request into nodes, how to route each node's `category`, how to keep parallel write scopes disjoint, the node prompt contract, the verification wave, and the failure playbook. A graph defined without it is unplanned work.
 
 ## The shape
 
@@ -25,7 +25,7 @@ Every run is goal-bound. Before `start`, register the run's goal (`create_goal`,
 
 ## Running a dag - eval is the default
 
-Build and run every dag INSIDE an eval cell. The eval kernel installs the `tool.dag` proxy and the extension publishes a small JS SDK at `OMO_DAG_SDK_ROOT`; driving runs from a cell is what unlocks the orchestration patterns in `references/planning.md` (data-driven graph construction, multi-run composition, concurrent runs, adaptive retries).
+Build and run every dag INSIDE an eval cell. The eval kernel installs the `tool.workflow` proxy and the extension publishes a small JS SDK at `OMO_DAG_SDK_ROOT`; driving runs from a cell is what unlocks the orchestration patterns in `references/planning.md` (data-driven graph construction, multi-run composition, concurrent runs, adaptive retries).
 
 JS cells import the SDK from the path the extension publishes:
 
@@ -43,7 +43,7 @@ const result = await sdk.wait(run.run_id)
 
 `define` builds the definition and rejects duplicate node ids locally, before anything is started. `start`, `attach`, `snapshot`, `wait`, and `cancel` are the whole surface.
 
-Python cells cannot import the ESM SDK; call `tool.dag({...})` directly with the same payload shape the SDK produces - note the SDK passes `detach: false` on `wait`, so a blocking Python wait is `tool.dag({"action": "wait", "run_id": run_id, "detach": False})`; without it the tool detaches against a live run and returns the current snapshot. Prefer a JS cell whenever the run involves any orchestration beyond a single `start` + `wait`.
+Python cells cannot import the ESM SDK; call `tool.workflow({...})` directly with the same payload shape the SDK produces - note the SDK passes `detach: false` on `wait`, so a blocking Python wait is `tool.workflow({"action": "wait", "run_id": run_id, "detach": False})`; without it the tool detaches against a live run and returns the current snapshot. Prefer a JS cell whenever the run involves any orchestration beyond a single `start` + `wait`.
 
 ## Run lifecycle
 

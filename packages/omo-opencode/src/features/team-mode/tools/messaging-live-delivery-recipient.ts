@@ -7,6 +7,7 @@ import { buildEnvelope } from "@oh-my-opencode/team-core/team-mailbox/poll"
 import { commitDeliveryReservation } from "@oh-my-opencode/team-core/team-mailbox/reservation"
 import type { Message, RuntimeState } from "@oh-my-opencode/team-core/types"
 import type { LiveDeliveryClient } from "./messaging-live-delivery-client"
+import { enqueueFallbackMailboxWake } from "./messaging-fallback-wake"
 import type { DeliveryReservation } from "./messaging-live-delivery-reservation"
 import { releaseReservationSafely } from "./messaging-live-delivery-reservation"
 import { markLiveDeliveryPending } from "./messaging-live-delivery-state"
@@ -37,12 +38,25 @@ export async function deliverLiveToRecipient(input: {
     directory,
   } = input
 
+  const recipientSessionId = recipientMember.sessionId
   if (recipientMember.pendingInjectedMessageIds.length > 0) {
     await releaseReservationSafely(reservation, {
       teamRunId,
       recipient: recipientName,
       messageId: message.messageId,
     })
+    if (recipientSessionId) {
+      await enqueueFallbackMailboxWake({
+        client,
+        recipientMember,
+        recipientSessionId,
+        directory,
+        teamRunId,
+        recipientName,
+        messageId: message.messageId,
+        config,
+      })
+    }
     return
   }
 
@@ -62,7 +76,6 @@ export async function deliverLiveToRecipient(input: {
     return
   }
 
-  const recipientSessionId = recipientMember.sessionId
   if (!recipientSessionId) {
     log("[team-mailbox] live delivery unavailable, falling back to inbox injection", {
       reason: "missing-session-id",
@@ -124,6 +137,16 @@ export async function deliverLiveToRecipient(input: {
         teamRunId,
         recipient: recipientName,
         messageId: message.messageId,
+      })
+      await enqueueFallbackMailboxWake({
+        client,
+        recipientMember,
+        recipientSessionId,
+        directory,
+        teamRunId,
+        recipientName,
+        messageId: message.messageId,
+        config,
       })
       return
     }

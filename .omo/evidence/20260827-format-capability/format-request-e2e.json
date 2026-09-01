@@ -1,0 +1,122 @@
+{
+  "workRoot": "/tmp/fq-YQ1oxH",
+  "localBiome": "/tmp/fq-YQ1oxH/fixture/node_modules/.bin/biome",
+  "daemonVersionDir": "/tmp/fq-YQ1oxH/daemon/vqa-format",
+  "capabilityGate": {
+    "text": "Formatting unavailable for /tmp/fq-YQ1oxH/linter/linted.ts: the language server does not advertise documentFormattingProvider.",
+    "details": {
+      "filePath": "/tmp/fq-YQ1oxH/linter/linted.ts",
+      "status": "unavailable",
+      "reason": "capability_not_advertised",
+      "linesAdded": 0,
+      "linesRemoved": 0
+    },
+    "bytesChanged": false
+  },
+  "firstFormat": {
+    "text": "Formatted /tmp/fq-YQ1oxH/fixture/drifted.css (+6/-3 lines)",
+    "details": {
+      "filePath": "/tmp/fq-YQ1oxH/fixture/drifted.css",
+      "status": "formatted",
+      "linesAdded": 6,
+      "linesRemoved": 3
+    },
+    "before": "a{color:red;background:blue}\n",
+    "after": "a {\n  color: red;\n  background: blue;\n}\n",
+    "bytesChanged": true
+  },
+  "secondFormat": {
+    "text": "Already formatted: /tmp/fq-YQ1oxH/fixture/drifted.css",
+    "details": {
+      "filePath": "/tmp/fq-YQ1oxH/fixture/drifted.css",
+      "status": "unchanged",
+      "linesAdded": 0,
+      "linesRemoved": 0
+    },
+    "bytesChanged": false
+  },
+  "unsupportedFormat": {
+    "text": "No LSP server configured for extension: .txt\n\nAvailable servers: typescript, deno, vue, eslint, oxlint, biome, gopls, ruby-lsp, basedpyright, pyright...\n\nConfigure a custom server in '/private/tmp/fq-YQ1oxH/fixture/.codex/lsp-client.json' or '/tmp/fq-YQ1oxH/fixture/home/lsp-client.json':\n  {\n    \"lsp\": {\n      \"my-server\": {\n        \"command\": [\"my-lsp\", \"--stdio\"],\n        \"extensions\": [\".txt\"]\n      }\n    }\n  }",
+    "details": {
+      "filePath": "/tmp/fq-YQ1oxH/fixture/notes.txt",
+      "status": "unavailable",
+      "reason": "server_unavailable",
+      "linesAdded": 0,
+      "linesRemoved": 0,
+      "error": "No LSP server configured for extension: .txt\n\nAvailable servers: typescript, deno, vue, eslint, oxlint, biome, gopls, ruby-lsp, basedpyright, pyright...\n\nConfigure a custom server in '/private/tmp/fq-YQ1oxH/fixture/.codex/lsp-client.json' or '/tmp/fq-YQ1oxH/fixture/home/lsp-client.json':\n  {\n    \"lsp\": {\n      \"my-server\": {\n        \"command\": [\"my-lsp\", \"--stdio\"],\n        \"extensions\": [\".txt\"]\n      }\n    }\n  }",
+      "errorKind": "missing_dependency",
+      "availability": {
+        "kind": "not_configured",
+        "extension": ".txt",
+        "availableServers": [
+          "typescript",
+          "deno",
+          "vue",
+          "eslint",
+          "oxlint",
+          "biome",
+          "gopls",
+          "ruby-lsp",
+          "basedpyright",
+          "pyright",
+          "ty",
+          "ruff",
+          "elixir-ls",
+          "zls",
+          "csharp",
+          "fsharp",
+          "sourcekit-lsp",
+          "rust",
+          "clangd",
+          "svelte",
+          "astro",
+          "bash",
+          "bash-ls",
+          "jdtls",
+          "yaml-ls",
+          "lua-ls",
+          "php",
+          "dart",
+          "terraform",
+          "terraform-ls",
+          "prisma",
+          "ocaml-lsp",
+          "texlab",
+          "dockerfile",
+          "gleam",
+          "clojure-lsp",
+          "nixd",
+          "tinymist",
+          "haskell-language-server",
+          "kotlin-ls",
+          "julials",
+          "razor"
+        ],
+        "projectConfigPaths": [
+          "/private/tmp/fq-YQ1oxH/fixture/.codex/lsp-client.json"
+        ],
+        "userConfigPath": "/tmp/fq-YQ1oxH/fixture/home/lsp-client.json",
+        "installDecisionTool": true
+      }
+    },
+    "bytesChanged": false
+  },
+  "residency": {
+    "residentBiome": 4,
+    "residentDaemons": 1
+  },
+  "daemonLogTail": "",
+  "checks": {
+    "firstFormatRewroteFile": true,
+    "firstFormatStatusFormatted": true,
+    "firstFormatReportsLineDeltas": true,
+    "secondFormatUnchanged": true,
+    "secondFormatLeftBytes": true,
+    "unsupportedLeftBytes": true,
+    "unsupportedNotFormatted": true,
+    "oneResidentDaemon": true,
+    "capabilityGateUnavailable": true,
+    "capabilityGateLeftBytes": true
+  },
+  "verdict": "PASS"
+}

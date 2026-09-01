@@ -146,6 +146,26 @@ describe("applySpawnGuards gate-artifact guard", () => {
 		expect(parsed.permissionDecisionReason).toContain("g1-code-review.md");
 	});
 
+	it("#given an omo-senpi gate spawn by agent_type without artifacts #when guarded #then denies naming the missing path", () => {
+		writeGoals();
+
+		const output = applySpawnGuards(
+			payload("collaborationspawn_agent", { agent_type: "omo-senpi-gate-reviewer", message: "audit the artifacts" }),
+		);
+
+		const parsed = deny(output);
+		expect(parsed.permissionDecision).toBe("deny");
+		expect(parsed.permissionDecisionReason).toContain("g1-code-review.md");
+	});
+
+	it("#given an omo-senpi gate reviewer named in the message #when guarded #then still denies", () => {
+		writeGoals();
+
+		const output = applySpawnGuards(payload("spawn_agent", { message: "spawn omo-senpi-gate-reviewer now" }));
+
+		expect(deny(output).permissionDecision).toBe("deny");
+	});
+
 	it("#given a gate spawn identified by message only #when guarded #then still denies", () => {
 		writeGoals();
 

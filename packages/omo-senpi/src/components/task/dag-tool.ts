@@ -1,6 +1,7 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 
 import { lintDagDefinitionNodes } from "./dag-lint"
+import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { DagManagerError, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 // The per-node control verbs are not on the package's dag barrel; the runtime already reaches the
 // scheduler module by path for the same reason, and both resolve to the same source file, so the
@@ -20,7 +21,7 @@ import {
 } from "./dag-tool-contract"
 import { DagToolParams, type DagToolInput } from "./dag-tool-params"
 
-export const DAG_TOOL_NAME = "dag"
+export const WORKFLOW_TOOL_NAME = "workflow"
 
 // The schema and the wire contract live beside this module and are re-exported so the tool keeps
 // ONE public import surface.
@@ -38,7 +39,8 @@ export type {
 } from "./dag-tool-contract"
 
 const DESCRIPTION = [
-  "Run a dependency graph of child tasks in one call: a node starts only after every node it dependsOn has finished, and unrelated nodes run in parallel up to the resident-child cap.",
+  "Dependency-graph execution for child tasks. COMPOSE THE SPEC PROGRAMMATICALLY INSIDE AN eval CELL - the kernel exposes this tool as `tool.workflow` alongside a JS SDK, so build the graph as code: partition the work into logically distinct steps, name one node per step, and wire the ordering as data. A graph is a program; write it as one instead of hand-authoring a call.",
+  "A node starts only after every node it dependsOn has finished, and unrelated nodes run in parallel up to the resident-child cap.",
   "dependsOn is ordering ONLY - no upstream output is substituted into a downstream prompt, so each prompt must stand alone.",
   "Each node targets EITHER category OR subagent_type, never both; model is an explicit override valid only alongside subagent_type.",
   "start is idempotent per definition key: re-starting the same key with the same graph reuses the run instead of duplicating it.",
@@ -76,6 +78,9 @@ async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<Dag
   const nodeErrors = validateNodeTargets(input.nodes)
   if (nodeErrors.length > 0) return invalidNodeTargets(nodeErrors)
   const warnings = lintDagDefinitionNodes(input.nodes)
+  // Dag skill materialization discovers skills synchronously through the senpi barrel. Warm the
+  // lazy boundary at this async tool entry point before the manager reaches that hook.
+  await loadSenpiBarrel()
   const result = await deps.manager.start({
     definition: toDefinition(input),
     parentSessionId: deps.parentSessionId(),
@@ -192,8 +197,8 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
 
 export function createDagTool(deps: DagToolDeps): ToolDefinition<typeof DagToolParams, DagToolDetails> {
   return {
-    name: DAG_TOOL_NAME,
-    label: "Dag",
+    name: WORKFLOW_TOOL_NAME,
+    label: "Workflow",
     description: DESCRIPTION,
     parameters: DagToolParams,
     execute: (_toolCallId, params) => runDagTool(deps, params),

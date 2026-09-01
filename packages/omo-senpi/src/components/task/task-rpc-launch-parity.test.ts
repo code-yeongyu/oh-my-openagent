@@ -102,7 +102,7 @@ describe("task RPC launch profile parity", () => {
 
     // then
     expect(await admission).toBeUndefined()
-  }, ADMISSION_TEST_TIMEOUT_MS)
+  }, { timeout: ADMISSION_TEST_TIMEOUT_MS })
 
   test("#given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch", async () => {
     // given
@@ -118,5 +118,5 @@ describe("task RPC launch profile parity", () => {
         message: expect.stringMatching(/omo-mock\/mock-1.*probed catalog has/),
       },
     })
-  }, ADMISSION_TEST_TIMEOUT_MS)
+  }, { timeout: ADMISSION_TEST_TIMEOUT_MS })
 })

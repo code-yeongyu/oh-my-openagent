@@ -5,6 +5,8 @@ import { mkdir, mkdtemp, rename, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { shouldUseShellForCommand } from "./build-command.mjs"
+
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
 const distDir = process.env.OMO_LSP_DAEMON_DIST ?? join(packageRoot, "dist")
 const tempParent = await mkdtemp(join(dirname(distDir), ".tmp-lsp-daemon-build-"))
@@ -12,7 +14,11 @@ const tempDist = join(tempParent, "dist")
 const backupDist = `${distDir}.backup-${process.pid}`
 
 function run(command, args) {
-  const result = spawnSync(command, args, { cwd: packageRoot, stdio: "inherit", shell: process.platform === "win32" })
+  const result = spawnSync(command, args, {
+    cwd: packageRoot,
+    stdio: "inherit",
+    shell: shouldUseShellForCommand(command),
+  })
   if (result.error) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
 }

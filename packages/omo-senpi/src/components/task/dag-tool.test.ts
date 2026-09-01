@@ -9,7 +9,7 @@ import { createDagFileStore, createDagManager, DagManagerError, type DagManager,
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 
-import { DAG_TOOL_NAME, createDagTool, runDagTool, type DagToolDefinitionInput } from "./dag-tool"
+import { WORKFLOW_TOOL_NAME, createDagTool, runDagTool, type DagToolDefinitionInput } from "./dag-tool"
 
 const parentSessionId = "ses_parent"
 const rootSessionId = "ses_root"
@@ -67,7 +67,7 @@ function deps(manager: DagManager) {
 }
 
 describe("dag tool registration", () => {
-  test("#given the dag tool factory #when a tool is created #then it registers exactly one tool named dag", () => {
+  test("#given the workflow tool factory #when a tool is created #then it registers exactly one tool named workflow", () => {
     // given
     const { manager } = fixture()
 
@@ -75,8 +75,8 @@ describe("dag tool registration", () => {
     const tool = createDagTool(deps(manager))
 
     // then
-    expect(tool.name).toBe("dag")
-    expect(DAG_TOOL_NAME).toBe("dag")
+    expect(tool.name).toBe("workflow")
+    expect(WORKFLOW_TOOL_NAME).toBe("workflow")
   })
 })
 

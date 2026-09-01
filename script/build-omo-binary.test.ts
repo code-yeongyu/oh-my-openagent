@@ -7,6 +7,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -374,6 +375,22 @@ describe("plugin staging isolation guard", () => {
 })
 
 describe("engine graph bundling", () => {
+  test("#given the compiled OMO entry #when its engine imports are inspected #then both retain the standard patched engine literal", () => {
+    // given
+    const compileEntrySource = readFileSync(
+      join(repoRoot, "packages", "omo-native", "compile-entry.ts"),
+      "utf8",
+    )
+
+    // when
+    const engineImports = compileEntrySource.match(
+      /import\("\.\.\/\.\.\/node_modules\/@code-yeongyu\/senpi\/dist\/cli\.js"\)/g,
+    )
+
+    // then
+    expect(engineImports).toHaveLength(2)
+  })
+
   test("#given real bun build output #when parsed #then the module count is extracted", () => {
     // given
     const output = "\n [447ms]  bundle  3995 modules\n\n [132ms]  compile  /tmp/x\n"

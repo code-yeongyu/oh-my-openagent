@@ -9,6 +9,7 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor, resolveMemoryConfig } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
 import { MEMORY_WRITE_UPDATED_ENTRY_TYPE } from "./memory-notice-wiring"
+import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
 
 const roots: string[] = []
@@ -139,6 +140,7 @@ describe("createMemoryComponent", () => {
       "senpi-memory.health",
       SOUL_UPDATED_ENTRY_TYPE,
       MEMORY_WRITE_UPDATED_ENTRY_TYPE,
+      RECALL_CUSTOM_TYPE,
       MEMORY_BINDING_CUSTOM_TYPE,
     ])
     // Direct registration is the default surface so memory always works; the exposure-search MCP

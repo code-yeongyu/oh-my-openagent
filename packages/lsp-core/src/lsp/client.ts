@@ -6,6 +6,7 @@ import type { LspClientTimeoutOptions } from "./transport.js";
 import type {
 	Diagnostic,
 	DocumentSymbol,
+	FormattingOptions,
 	Location,
 	LocationLink,
 	PrepareRenameDefaultBehavior,
@@ -13,6 +14,7 @@ import type {
 	Range,
 	ResolvedServer,
 	SymbolInfo,
+	TextEdit,
 	WorkspaceEdit,
 } from "./types.js";
 import { LspRequestTimeoutError } from "./errors.js";
@@ -131,6 +133,30 @@ export class LspClient extends LspClientConnection {
 		return this.sendRequest<Array<DocumentSymbol | SymbolInfo>>("textDocument/documentSymbol", {
 			textDocument: { uri: pathToFileURL(absPath).href },
 		}, options);
+	}
+
+	/**
+	 * Requests whole-document formatting edits, returning null when the server never advertised the
+	 * capability so callers can report unavailability instead of surfacing a method-not-found error.
+	 */
+	async formatDocument(
+		filePath: string,
+		options: FormattingOptions,
+		signal?: AbortSignal,
+	): Promise<TextEdit[] | null> {
+		if (!this.isDocumentFormattingSupported()) return null;
+		const absPath = this.resolveWorkspacePath(filePath);
+		await this.openFile(absPath);
+		const requestOptions = signal === undefined ? {} : { signal };
+		const edits = await this.sendRequest<TextEdit[] | null>(
+			"textDocument/formatting",
+			{
+				textDocument: { uri: pathToFileURL(absPath).href },
+				options,
+			},
+			requestOptions,
+		);
+		return edits ?? [];
 	}
 
 	async workspaceSymbols(query: string, signal?: AbortSignal): Promise<SymbolInfo[]> {
