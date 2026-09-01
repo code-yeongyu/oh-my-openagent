@@ -123,7 +123,33 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
     }
   })
 
-  test("#given a completion parent wake is queued #when dispatch accepts it #then the marker returns idle", async () => {
+  test("#given a task is terminal but still tracked in pendingByParent #when refreshing the run marker #then the marker stays active", () => {
+    // given
+    const directory = createTestDirectory()
+    const parentSessionID = "parent-terminal-pending"
+    const manager = createManager(directory)
+    const internals = unsafeTestValue<BackgroundManagerMarkerInternals>(manager)
+    const task = createRunningTask({
+      id: "task-terminal-pending",
+      parentSessionId: parentSessionID,
+      status: "completed",
+    })
+    internals.tasks.set(task.id, task)
+    internals.pendingByParent.set(parentSessionID, new Set([task.id]))
+
+    try {
+      // when
+      internals.updateBackgroundTaskMarker(parentSessionID)
+
+      // then
+      const marker = readContinuationMarker(directory, parentSessionID)
+      expect(marker?.sources["background-task"]?.state).toBe("active")
+    } finally {
+      manager.shutdown()
+    }
+  })
+
+  test("#given a completion parent wake is queued #when dispatch accepts it #then the marker stays active until the reply is consumed", async () => {
     // given
     const directory = createTestDirectory()
     const parentSessionID = "parent-queued-wake"
@@ -143,9 +169,12 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       // when
       await internals.flushPendingParentWake(parentSessionID)
 
-      // then
+      // then: a reply-required wake is retained pending until the parent
+      // consumes it (retainPendingWake = shouldReply), so the run marker must
+      // stay active — the allComplete reply is still owed (#6546 round 5).
       const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
-      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("active")
+      expect(dispatchedMarker?.sources["background-task"]?.reason).toBe(BACKGROUND_COMPLETION_WAKE_PENDING_REASON)
     } finally {
       manager.shutdown()
     }
@@ -178,7 +207,7 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
     }
   })
 
-  test("#given a completion parent wake is queued on the scheduled timer #when the timer flush accepts it #then the marker returns idle", async () => {
+  test("#given a completion parent wake is queued on the scheduled timer #when the timer flush accepts it #then the marker stays active until the reply is consumed", async () => {
     // given
     const directory = createTestDirectory()
     const parentSessionID = "parent-timer-wake"
@@ -189,11 +218,15 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
     try {
       // when
       internals.queuePendingParentWake(parentSessionID, notification, {}, true, 0)
-      await waitForBackgroundTaskMarkerState(directory, parentSessionID, "idle")
+
+      // then: the reply-required wake is retained pending after the timer
+      // flush (retainPendingWake = shouldReply), so the marker must stay
+      // active until the parent consumes the reply (#6546 round 5).
+      await waitForBackgroundTaskMarkerState(directory, parentSessionID, "active")
 
       // then
       const marker = readContinuationMarker(directory, parentSessionID)
-      expect(marker?.sources["background-task"]?.state).toBe("idle")
+      expect(marker?.sources["background-task"]?.state).toBe("active")
     } finally {
       manager.shutdown()
     }
@@ -211,7 +244,9 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       internals.queuePendingParentWake(parentSessionID, notification, {}, true, 10_000)
       await internals.flushPendingParentWake(parentSessionID)
       const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
-      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+      // A reply-required wake is retained pending until consumed, so the
+      // marker stays active even after the dispatch is accepted (#6546 round 5).
+      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("active")
 
       // when
       const requeued = await internals.parentWakeNotifier.requeueDispatchedParentWake(
@@ -241,7 +276,9 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       internals.queuePendingParentWake(parentSessionID, notification, {}, true, 10_000)
       await internals.flushPendingParentWake(parentSessionID)
       const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
-      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+      // A reply-required wake is retained pending until consumed, so the
+      // marker stays active even after the dispatch is accepted (#6546 round 5).
+      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("active")
 
       // when
       const requeued = internals.parentWakeNotifier.requeueDispatchedParentWakeAfterEmptyAssistantTurn(parentSessionID)
