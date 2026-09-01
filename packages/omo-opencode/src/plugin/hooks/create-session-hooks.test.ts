@@ -143,4 +143,90 @@ describe("createSessionHooks", () => {
     // then
     expect(result.codegraphBootstrap).not.toBeNull()
   })
+
+  describe("preemptiveCompaction opt-out gating", () => {
+    it("creates the hook when experimental.preemptive_compaction is left unset", () => {
+      // given
+      const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({})
+
+      // when
+      const result = createSessionHooks({
+        ctx: mockContext,
+        pluginConfig,
+        modelCacheState: mockModelCacheState,
+        backgroundManager: mockBackgroundManager,
+        isHookEnabled: (hookName) => hookName === "preemptive-compaction",
+        safeHookEnabled: true,
+      })
+
+      // then
+      expect(result.preemptiveCompaction).not.toBeNull()
+    })
+
+    it("creates the hook when experimental.preemptive_compaction is explicitly true", () => {
+      // given
+      const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
+        experimental: {
+          preemptive_compaction: true,
+        },
+      })
+
+      // when
+      const result = createSessionHooks({
+        ctx: mockContext,
+        pluginConfig,
+        modelCacheState: mockModelCacheState,
+        backgroundManager: mockBackgroundManager,
+        isHookEnabled: (hookName) => hookName === "preemptive-compaction",
+        safeHookEnabled: true,
+      })
+
+      // then
+      expect(result.preemptiveCompaction).not.toBeNull()
+    })
+
+    it("skips the hook when experimental.preemptive_compaction is explicitly false", () => {
+      // given
+      const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
+        experimental: {
+          preemptive_compaction: false,
+        },
+      })
+
+      // when
+      const result = createSessionHooks({
+        ctx: mockContext,
+        pluginConfig,
+        modelCacheState: mockModelCacheState,
+        backgroundManager: mockBackgroundManager,
+        isHookEnabled: (hookName) => hookName === "preemptive-compaction",
+        safeHookEnabled: true,
+      })
+
+      // then
+      expect(result.preemptiveCompaction).toBeNull()
+    })
+
+    it("skips the hook when disabled_hooks excludes preemptive-compaction, regardless of the experimental flag", () => {
+      // given
+      const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
+        experimental: {
+          preemptive_compaction: true,
+        },
+      })
+
+      // when
+      const result = createSessionHooks({
+        ctx: mockContext,
+        pluginConfig,
+        modelCacheState: mockModelCacheState,
+        backgroundManager: mockBackgroundManager,
+        isHookEnabled: (hookName) => hookName !== "preemptive-compaction",
+        safeHookEnabled: true,
+      })
+
+      // then
+      expect(result.preemptiveCompaction).toBeNull()
+    })
+  })
 })
