@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as configManager from "./config-manager"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as codegraphInstall from "./install-codegraph"
 import * as codexInstaller from "./install-codex"
 import { runCliInstaller } from "./cli-installer"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
@@ -23,6 +24,7 @@ describe("runCliInstaller", () => {
     mockConsoleLog.mockClear()
     mockConsoleError.mockClear()
     spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+    spyOn(codegraphInstall, "installCodegraphForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {

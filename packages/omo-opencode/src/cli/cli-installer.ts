@@ -30,6 +30,7 @@ import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as codegraphInstall from "./install-codegraph"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -126,6 +127,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
     printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
     await astGrepInstall.installAstGrepForOpenCode({ log: printWarning })
+    await codegraphInstall.installCodegraphForOpenCode({ log: printWarning })
   }
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")

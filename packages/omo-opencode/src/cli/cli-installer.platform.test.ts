@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:
 import { runCliInstaller } from "./cli-installer"
 import * as configManager from "./config-manager"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as codegraphInstall from "./install-codegraph"
 import * as codexInstaller from "./install-codex"
 import * as senpiInstaller from "./install-senpi"
 import type { CodexInstallResult } from "./install-codex"
@@ -86,6 +87,7 @@ describe("runCliInstaller platform branching", () => {
     consoleLogMock.mockClear()
     console.log = consoleLogMock
     spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+    spyOn(codegraphInstall, "installCodegraphForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {

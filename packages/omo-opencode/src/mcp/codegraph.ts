@@ -1,5 +1,11 @@
 import { existsSync } from "node:fs"
-import { buildCodegraphEnv, resolveCodegraphCommand, resolveCodegraphNodeSupport, shouldExcludeCodegraphProject } from "@oh-my-opencode/utils"
+import {
+  buildCodegraphEnv,
+  codegraphCommandRequiresSupportedLocalNode,
+  resolveCodegraphCommand,
+  resolveCodegraphNodeSupport,
+  shouldExcludeCodegraphProject,
+} from "@oh-my-opencode/utils"
 import { resolvePinnedCodegraphBin } from "@oh-my-opencode/utils/codegraph"
 import type { ResolveCodegraphCommandOptions } from "@oh-my-opencode/utils"
 import type { CodegraphConfig } from "../config/schema/codegraph"
@@ -69,7 +75,7 @@ export function createCodegraphMcpConfig(options: CodegraphMcpConfigOptions = {}
   const enabled =
     !isProjectExcluded(options.config, options)
     && resolvedCommand.exists
-    && (resolvedCommand.source === "bundled" || resolvedCommand.source === "env" || nodeSupport.supported)
+    && (!codegraphCommandRequiresSupportedLocalNode(resolvedCommand) || nodeSupport.supported)
 
   return {
     type: "local",

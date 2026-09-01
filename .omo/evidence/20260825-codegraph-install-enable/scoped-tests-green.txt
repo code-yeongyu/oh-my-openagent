@@ -1,0 +1,65 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/cli-installer.telemetry.test.ts:
+
+ oMoMoMoMo... Install 
+
+[1/4] Checking OpenCode installation...
+[OK] OpenCode 1.4.0 detected
+[2/4] Adding oh-my-openagent plugin...
+[OK] Plugin added -> /tmp/opencode.jsonc
+[3/4] Writing oh-my-openagent configuration...
+[OK] Config written -> /tmp/omo.jsonc
+
+┌─ Installation Complete ───────────────────────────────────────────────────────────────────┐
+│ Configuration Summary                                                                      │
+│                                                                                            │
+│   [i] Platform: opencode                                                                   │
+│                                                                                            │
+│   ○ Claude                                                                                 │
+│   [OK] OpenAI/ChatGPT (GPT-5.6 Sol for Oracle)                                             │
+│   ○ Gemini                                                                                 │
+│   [OK] GitHub Copilot (fallback)                                                           │
+│   ○ OpenCode Zen (opencode/ models)                                                        │
+│   ○ Z.ai Coding Plan (GLM fallbacks)                                                       │
+│   ○ Kimi For Coding (Sisyphus/Prometheus fallback)                                         │
+│   ○ Bailian Coding Plan (Qwen/GLM/Kimi fallback)                                           │
+│   ○ MiniMax Coding Plan (minimaxi.com) (MiniMax-M3 fallback)                               │
+│   ○ MiniMax Coding Plan (minimax.io) (MiniMax-M3 fallback)                                 │
+│   ○ Vercel AI Gateway (universal proxy)                                                    │
+│                                                                                            │
+│ ────────────────────────────────────────                                                   │
+│                                                                                            │
+│ Model Assignment                                                                           │
+│                                                                                            │
+│   [i] Models auto-configured based on provider priority                                    │
+│   * Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel   │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+
+[i] Note: Sisyphus agent performs best with Claude Opus 5. Other models work but may have reduced orchestration quality.
+* Installation complete!
+  Run opencode to start!
+
+[i] Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.
+[i] Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md
+
+
+┌─ The Magic Word ─────────────────────────────────────────────────┐
+│ Pro Tip: Include ultrawork (or ulw) in your prompt.               │
+│ All features work like magic-parallel agents, background tasks,   │
+│ deep exploration, and relentless execution until completion.      │
+└───────────────────────────────────────────────────────────────────┘
+
+oMoMoMoMo... Enjoy!
+
+
+┌─ Authenticate Your Providers ──────────────────────┐
+│ Run opencode auth login and select your provider:   │
+│   * GitHub → Copilot                                │
+└─────────────────────────────────────────────────────┘
+
+
+ 46 pass
+ 0 fail
+ 120 expect() calls
+Ran 46 tests across 8 files. [1.54s]

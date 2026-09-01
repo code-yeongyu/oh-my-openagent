@@ -94,6 +94,39 @@ describe("createCodegraphMcpConfig", () => {
     expect(config.enabled).toBe(false)
   })
 
+  it("#given only a provisioned binary and an unsupported host Node #when creating the MCP config #then it enables the provisioned command", () => {
+    // given
+    const installDir = mkdtempSync(join(tmpdir(), "omo-codegraph-provisioned-"))
+    const provisionedPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph")
+    const markerPath = join(installDir, ".provisioned", `codegraph-${CODEGRAPH_PINNED_VERSION}.json`)
+    const nodePath = "/opt/node26/bin/node"
+    mkdirSync(join(installDir, "bin"), { recursive: true })
+    mkdirSync(join(installDir, ".provisioned"), { recursive: true })
+    writeFileSync(provisionedPath, "")
+    writeFileSync(markerPath, `${JSON.stringify({ binPath: provisionedPath, version: CODEGRAPH_PINNED_VERSION })}\n`)
+
+    try {
+      // when
+      const config = createCodegraphMcpConfig({
+        cwd: "/workspace/project",
+        config: { enabled: true, install_dir: installDir },
+        env: {},
+        homeDir: "/tmp/omo-codegraph-test-home",
+        nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "26.3.0" : "0.0.0"),
+        requireResolve: () => {
+          throw new Error("bundled package absent")
+        },
+        resolveExecutable: createResolver({ node: nodePath }),
+      })
+
+      // then
+      expect(config.command).toEqual([provisionedPath, "serve", "--mcp"])
+      expect(config.enabled).toBe(true)
+    } finally {
+      rmSync(installDir, { force: true, recursive: true })
+    }
+  })
+
   it("#given OMO_CODEGRAPH_BIN points at an explicit command #when host Node is unsupported #then the MCP stays enabled", () => {
     // given
     const codegraphPath = "/opt/codegraph-node22/bin/codegraph"

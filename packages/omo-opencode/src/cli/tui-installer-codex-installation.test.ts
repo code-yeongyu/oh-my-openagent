@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import * as p from "@clack/prompts"
 import * as configManager from "./config-manager"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as codegraphInstall from "./install-codegraph"
 import * as codexInstaller from "./install-codex"
 import * as tuiConfig from "./config-manager/add-tui-plugin-to-tui-config"
 import * as tuiInstallPrompts from "./tui-install-prompts"
@@ -174,6 +175,7 @@ describe("runTuiInstaller Codex install failure exit status", () => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true })
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true })
     spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+    spyOn(codegraphInstall, "installCodegraphForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {

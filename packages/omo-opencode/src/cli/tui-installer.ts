@@ -18,6 +18,7 @@ import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as codegraphInstall from "./install-codegraph"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -108,6 +109,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     }
     spinner.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
     await astGrepInstall.installAstGrepForOpenCode({ log: p.log.warn })
+    await codegraphInstall.installCodegraphForOpenCode({ log: p.log.warn })
   }
 
   if (config.hasOpenCode && !config.hasClaude) {

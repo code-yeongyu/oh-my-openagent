@@ -3,6 +3,7 @@ import * as p from "@clack/prompts"
 
 import * as configManager from "./config-manager"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as codegraphInstall from "./install-codegraph"
 import * as senpiInstaller from "./install-senpi"
 import * as tuiInstallPrompts from "./tui-install-prompts"
 import { runTuiInstaller } from "./tui-installer"
@@ -27,6 +28,7 @@ describe("runTuiInstaller Senpi platform", () => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true })
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true })
     spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+    spyOn(codegraphInstall, "installCodegraphForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {
