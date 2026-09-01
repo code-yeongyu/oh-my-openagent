@@ -1,0 +1,26 @@
+# root `bun test` (trimmed to failures + summary; full run on 2026-07-19, worktree). Failures are pre-existing/environmental, reproduce identically on origin/dev (see dev-fails.txt vs wt-fails.txt).
+(fail) #given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version [1.89ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 19 roots exist with valid names [0.36ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [0.16ms]
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.13ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill tree #when inspected #then no codex-only display metadata is packaged [0.33ms]
+(fail) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.18ms]
+(fail) dist bundle prompt content > #given dist bundle #when scanned #then markdown prompt signatures are inlined [3.50ms]
+(fail) omo-senpi ultrawork component > #given synced senpi skill artifact #when description is read #then documents inline injection instead of inviting a re-read [0.17ms]
+(fail) readOpencodeConfigAgents > returns empty record when no opencode.json exists [1.28ms]
+(fail) readOpencodeConfigAgents > handles malformed opencode.json gracefully [1.13ms]
+(fail) #given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version [1.89ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 19 roots exist with valid names [0.36ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [0.16ms]
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.13ms]
+(fail) OMO Senpi scoped skill sync > #given synced skill tree #when inspected #then no codex-only display metadata is packaged [0.33ms]
+(fail) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.18ms]
+(fail) dist bundle prompt content > #given dist bundle #when scanned #then markdown prompt signatures are inlined [3.50ms]
+(fail) omo-senpi ultrawork component > #given synced senpi skill artifact #when description is read #then documents inline injection instead of inviting a re-read [0.17ms]
+(fail) readOpencodeConfigAgents > returns empty record when no opencode.json exists [1.28ms]
+(fail) readOpencodeConfigAgents > handles malformed opencode.json gracefully [1.13ms]
+ 11745 pass
+ 3 skip
+ 10 fail
+ 2 snapshots, 28922 expect() calls
+Ran 11758 tests across 1509 files. [141.34s]

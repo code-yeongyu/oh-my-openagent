@@ -1,23 +1,20 @@
 import { describe, expect, test } from "bun:test"
 
-import { completedTeamTaskUpdates } from "./team-e2e-analysis.mjs"
+import { teamMessageEnqueues } from "./team-e2e-analysis.mjs"
 
-describe("completedTeamTaskUpdates", () => {
-  test("#given claimed and nonterminal updates #when completed updates are counted #then only concrete completed task states count", () => {
+describe("teamMessageEnqueues", () => {
+  test("#given member and lead delivery results #when injection sends are analyzed #then only lead-to-member mail is returned", () => {
     // given
-    const updates = [
-      { details: { kind: "claimed", task: { status: "claimed" } } },
-      { details: { kind: "claimed", task: { status: "completed" } } },
-      { details: { kind: "updated", task: { status: "in_progress" } } },
-      { details: { kind: "updated" } },
-      { details: { kind: "updated", task: { status: "completed" } } },
+    const sends = [
+      { details: { kind: "team_message", team: { kind: "to_members", message_id: "m1", recipients: ["quick"] } } },
+      { details: { kind: "team_message", team: { kind: "to_lead", message_id: "m2" } } },
+      { details: { kind: "other" } },
     ]
 
     // when
-    const completed = completedTeamTaskUpdates(updates)
+    const enqueues = teamMessageEnqueues(sends)
 
     // then
-    expect(completed).toHaveLength(1)
-    expect(completed[0]?.details?.task?.status).toBe("completed")
+    expect(enqueues).toEqual([{ messageId: "m1", recipients: ["quick"] }])
   })
 })

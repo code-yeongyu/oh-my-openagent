@@ -1,10 +1,11 @@
+import { statSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import {
 	callDiagnosticsViaDaemon as callDiagnosticsViaDaemonInternal,
+	callFormatViaDaemon as callFormatViaDaemonInternal,
 	callToolViaDaemon as callToolViaDaemonInternal,
 	currentRequestContext as currentRequestContextInternal,
 } from "./daemon-client.js";
-import { statSync } from "node:fs";
-import { isAbsolute } from "node:path";
 
 export const OMO_LSP_DAEMON_DIR = "OMO_LSP_DAEMON_DIR";
 export const OMO_LSP_DAEMON_CLI = "OMO_LSP_DAEMON_CLI";
@@ -173,6 +174,16 @@ export type LspPrepareRenameDetails = {
 	readonly errorKind?: "missing_dependency";
 };
 
+export type LspFormatDetails = {
+	readonly filePath: string;
+	readonly status: "formatted" | "unchanged" | "unavailable";
+	readonly reason?: "capability_not_advertised" | "server_unavailable";
+	readonly linesAdded: number;
+	readonly linesRemoved: number;
+	readonly error?: string;
+	readonly errorKind?: "missing_dependency";
+};
+
 export type LspRenameDetails = {
 	readonly filePath: string;
 	readonly line: number;
@@ -192,11 +203,12 @@ export function callToolViaDaemon(
 	return callToolViaDaemonInternal(name, args, options);
 }
 
-export function callDiagnosticsViaDaemon(
-	filePath: string,
-	options: CallToolOptions,
-): Promise<ToolExecutionResult> {
+export function callDiagnosticsViaDaemon(filePath: string, options: CallToolOptions): Promise<ToolExecutionResult> {
 	return callDiagnosticsViaDaemonInternal(filePath, options);
+}
+
+export function callFormatViaDaemon(filePath: string, options: CallToolOptions): Promise<ToolExecutionResult> {
+	return callFormatViaDaemonInternal(filePath, options);
 }
 
 export function currentRequestContext(env: Record<string, string | undefined> = process.env): DaemonToolContext {

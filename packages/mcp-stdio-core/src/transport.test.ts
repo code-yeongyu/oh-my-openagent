@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { PassThrough } from "node:stream"
+import { PassThrough, Writable } from "node:stream"
 import { readStdioJsonRpcMessages, writeStdioJsonRpcResponse } from "./transport.js"
 
 describe("stdio JSON-RPC transport", () => {
@@ -34,14 +34,30 @@ describe("stdio JSON-RPC transport", () => {
     ])
   })
 
-  test("#given response mode #when written #then framing bytes are stable", () => {
+  test("#given response mode #when written #then framing bytes are stable", async () => {
     const output = new PassThrough()
     const chunks: string[] = []
     output.on("data", (chunk: Buffer | string) => chunks.push(String(chunk)))
 
-    writeStdioJsonRpcResponse(output, { jsonrpc: "2.0", id: 1, result: {} }, "framed")
+    await writeStdioJsonRpcResponse(output, { jsonrpc: "2.0", id: 1, result: {} }, "framed")
 
     expect(chunks.join("")).toBe('Content-Length: 36\r\n\r\n{"jsonrpc":"2.0","id":1,"result":{}}')
+  })
+
+  test("#given a destroyed output with callback-only failure #when a response write rejects #then the error listener is removed", async () => {
+    const output = new Writable({
+      write(_chunk, _encoding, callback) {
+        callback()
+      },
+    })
+    output.destroy()
+
+    await expect(writeStdioJsonRpcResponse(output, { jsonrpc: "2.0", id: 1, result: {} }, "line")).rejects.toMatchObject({
+      code: "ERR_STREAM_DESTROYED",
+    })
+    await Promise.resolve()
+
+    expect(output.listenerCount("error")).toBe(0)
   })
 })
 

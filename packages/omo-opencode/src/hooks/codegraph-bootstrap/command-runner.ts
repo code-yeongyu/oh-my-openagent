@@ -1,6 +1,7 @@
 import { extname } from "node:path"
 import { execPath as processExecPath } from "node:process"
 import { buildCodegraphChildEnv } from "@oh-my-opencode/utils"
+import { runProcessWithTreeTimeout } from "@oh-my-opencode/utils/process-tree"
 
 export interface CodegraphCommandResult {
   readonly exitCode: number
@@ -11,6 +12,7 @@ export interface CodegraphCommandResult {
 
 export interface RunCodegraphCommandOptions {
   readonly env: Record<string, string>
+  readonly timeoutSignal?: AbortSignal
   readonly timeoutMs: number
 }
 
@@ -22,54 +24,23 @@ export interface CodegraphCommandInvocation {
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"])
 const WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"])
 
-function toOutputText(value: string | Buffer): string {
-  return Buffer.isBuffer(value) ? value.toString("utf8") : value
-}
-
-function resolveExitCode(error: Error): number {
-  if ("code" in error) {
-    const code = error.code
-    if (typeof code === "number") return code
-  }
-  return 1
-}
-
 export async function runCodegraphCommand(
   projectRoot: string,
   command: string,
   args: readonly string[],
   options: RunCodegraphCommandOptions,
 ): Promise<CodegraphCommandResult> {
-  const { execFile } = await import("node:child_process")
   const invocation = resolveCodegraphCommandInvocation(command, args)
 
-  return new Promise((resolve) => {
-    execFile(
-      invocation.command,
-      [...invocation.args],
-      {
-        cwd: projectRoot,
-        encoding: "utf8",
-        env: buildCodegraphChildEnv({ ambientEnv: process.env, codegraphEnv: options.env }),
-        maxBuffer: 1024 * 1024,
-        timeout: options.timeoutMs,
-        windowsHide: true,
-      },
-      (error, stdout, stderr) => {
-        if (error === null) {
-          resolve({ exitCode: 0, stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: false })
-          return
-        }
-
-        resolve({
-          exitCode: resolveExitCode(error),
-          stderr: toOutputText(stderr),
-          stdout: toOutputText(stdout),
-          timedOut: error.killed === true,
-        })
-      },
-    )
-  })
+  return runProcessWithTreeTimeout({
+    args: invocation.args,
+    command: invocation.command,
+    cwd: projectRoot,
+    env: buildCodegraphChildEnv({ ambientEnv: process.env, codegraphEnv: options.env }),
+    maxBuffer: 1024 * 1024,
+    ...(options.timeoutSignal === undefined ? {} : { timeoutSignal: options.timeoutSignal }),
+    timeoutMs: options.timeoutMs,
+  }).then(({ exitCode, stderr, stdout, timedOut }) => ({ exitCode, stderr, stdout, timedOut }))
 }
 
 export function resolveCodegraphCommandInvocation(

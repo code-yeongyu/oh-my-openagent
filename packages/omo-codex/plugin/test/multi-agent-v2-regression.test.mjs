@@ -22,7 +22,7 @@ test("#given relative model_catalog_json declares gpt-5.6 model as v1 #when migr
 			"",
 			"[features.multi_agent_v2]",
 			"enabled = false",
-			"max_concurrent_threads_per_session = 1000",
+			"max_concurrent_threads_per_session = 6",
 			"",
 		].join("\n"),
 	);
@@ -54,7 +54,7 @@ test("#given no SessionStart model and root gpt-5.6 model without catalog #when 
 			"",
 			"[features.multi_agent_v2]",
 			"enabled = false",
-			"max_concurrent_threads_per_session = 1000",
+			"max_concurrent_threads_per_session = 6",
 			"",
 		].join("\n"),
 	);
@@ -67,5 +67,5 @@ test("#given no SessionStart model and root gpt-5.6 model without catalog #when 
 	const content = await readFile(configPath, "utf8");
 	assert.doesNotMatch(content, /^\s*enabled\s*=\s*false/m);
 	assert.doesNotMatch(content, /^\s*max_threads\s*=/m);
-	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /max_concurrent_threads_per_session = 6/);
 });

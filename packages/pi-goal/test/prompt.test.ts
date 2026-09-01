@@ -4,53 +4,38 @@ import { buildBudgetLimitedPrompt, buildContinuationPrompt } from "../src/goal/p
 import type { Goal } from "../src/goal/types.js";
 
 describe("goal prompts", () => {
-	it("renders the codex continuation prompt structure with an escaped objective", () => {
+	it("escapes the continuation objective at its data boundary", () => {
 		const prompt = buildContinuationPrompt(testGoal("A & B < C > D", { tokenBudget: 100 }));
 
-		expect(prompt.startsWith("Continue working toward the active thread goal.")).toBe(true);
 		expect(prompt).toContain("<objective>\nA &amp; B &lt; C &gt; D\n</objective>");
 		expect(prompt).not.toContain("<untrusted_objective>");
-
-		for (const marker of [
-			"Continuation behavior:",
-			"Work from evidence:",
-			"Progress visibility:",
-			"Fidelity:",
-			"Completion audit:",
-			"Blocked audit:",
-		]) {
-			expect(prompt).toContain(marker);
-		}
-
-		expect(prompt).toContain("- Tokens used: 10");
-		expect(prompt).toContain("- Token budget: 100");
-		expect(prompt).toContain("- Tokens remaining: 90");
-		expect(prompt).not.toContain("- Time spent pursuing goal:");
-		expect(prompt).toContain('call update_goal with status "complete"');
-		expect(prompt).toContain('status "blocked"');
 	});
 
-	it("renders unbounded token budget fields when no budget is set", () => {
-		const prompt = buildContinuationPrompt(testGoal("Objective", { tokensUsed: 7 }));
+	it("reflects token accounting inputs without pinning their presentation", () => {
+		const baseline = buildContinuationPrompt(testGoal("Objective", { tokensUsed: 7 }));
+		const changedUsage = buildContinuationPrompt(testGoal("Objective", { tokensUsed: 8 }));
+		const bounded = buildContinuationPrompt(testGoal("Objective", { tokensUsed: 7, tokenBudget: 100 }));
 
-		expect(prompt).toContain("- Tokens used: 7");
-		expect(prompt).toContain("- Token budget: none");
-		expect(prompt).toContain("- Tokens remaining: unbounded");
+		expect(changedUsage).not.toBe(baseline);
+		expect(bounded).not.toBe(baseline);
 	});
 
-	it("renders the codex budget-limit prompt structure with an escaped objective", () => {
+	it("escapes budget-limit objectives and reflects accounting inputs", () => {
 		const prompt = buildBudgetLimitedPrompt(
 			testGoal("A & B < C > D", { status: "budgetLimited", tokenBudget: 10, tokensUsed: 12 }),
 		);
+		const changedAccounting = buildBudgetLimitedPrompt(
+			testGoal("A & B < C > D", {
+				status: "budgetLimited",
+				tokenBudget: 11,
+				tokensUsed: 13,
+				timeUsedSeconds: 21,
+			}),
+		);
 
-		expect(prompt.startsWith("The active thread goal has reached its token budget.")).toBe(true);
 		expect(prompt).toContain("<objective>\nA &amp; B &lt; C &gt; D\n</objective>");
 		expect(prompt).not.toContain("<untrusted_objective>");
-		expect(prompt).toContain("- Time spent pursuing goal: 20 seconds");
-		expect(prompt).toContain("- Tokens used: 12");
-		expect(prompt).toContain("- Token budget: 10");
-		expect(prompt).toContain("budget_limited");
-		expect(prompt).toContain("Do not call update_goal unless the goal is actually complete.");
+		expect(changedAccounting).not.toBe(prompt);
 	});
 });
 

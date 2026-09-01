@@ -303,15 +303,15 @@ Use nested command.
     expect(nestedCommand?.scope).toBe("opencode-project")
   })
 
-  it("keeps builtin start-work routed to Atlas during static discovery", () => {
+  it("keeps builtin ulw-execute routed to Atlas during static discovery", () => {
     // given
 
     // when
     const commands = discoverCommandsSync(projectDir)
-    const startWorkCommand = commands.find((command) => command.name === "start-work")
+    const ulwExecuteCommand = commands.find((command) => command.name === "ulw-execute")
 
     // then
-    expect(startWorkCommand?.metadata.agent).toBe("atlas")
+    expect(ulwExecuteCommand?.metadata.agent).toBe("atlas")
   })
 })
 

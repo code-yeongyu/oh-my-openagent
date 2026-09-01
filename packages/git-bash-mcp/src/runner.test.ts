@@ -22,27 +22,34 @@ describe("Git Bash runner", () => {
   it("#given fake bash executable #when command runs #then invokes bash with -lc and command payload", async () => {
     const directory = createTemporaryDirectory("omo-git-bash-runner-");
     const argvPath = join(directory, "argv.txt");
-    const fakeBashPath = process.platform === "win32" ? join(directory, "bash.cmd") : join(directory, "bash");
-    const fakeBashScript = process.platform === "win32"
-      ? [
-        "@echo off",
-        ">\"%FAKE_BASH_ARGV_PATH%\" echo(%~1",
-        ">>\"%FAKE_BASH_ARGV_PATH%\" echo(%~2",
-        "echo fake stdout",
-        ">&2 echo(fake stderr",
-        "exit /b 7",
-        "",
-      ].join("\r\n")
-      : [
-        "#!/bin/sh",
-        "printf '%s\\n' \"$@\" > \"$FAKE_BASH_ARGV_PATH\"",
-        "printf 'fake stdout\\n'",
-        "printf 'fake stderr\\n' >&2",
-        "exit 7",
-        "",
-      ].join("\n");
-    writeFileSync(fakeBashPath, fakeBashScript);
-    if (process.platform !== "win32") {
+    const fakeBashPath = join(directory, process.platform === "win32" ? "bash.exe" : "bash");
+    if (process.platform === "win32") {
+      const fixturePath = join(directory, "fake-bash.ts");
+      writeFileSync(
+        fixturePath,
+        [
+          'import { writeFileSync } from "node:fs";',
+          'writeFileSync(process.env.FAKE_BASH_ARGV_PATH!, process.argv.slice(2).join("\\r\\n") + "\\r\\n");',
+          'process.stdout.write("fake stdout\\r\\n");',
+          'process.stderr.write("fake stderr\\r\\n");',
+          "process.exit(7);",
+          "",
+        ].join("\n"),
+      );
+      const build = await Bun.build({ entrypoints: [fixturePath], compile: { outfile: fakeBashPath } });
+      if (!build.success) throw new Error(build.logs.map((log) => log.message).join("\n"));
+    } else {
+      writeFileSync(
+        fakeBashPath,
+        [
+          "#!/bin/sh",
+          "printf '%s\\n' \"$@\" > \"$FAKE_BASH_ARGV_PATH\"",
+          "printf 'fake stdout\\n'",
+          "printf 'fake stderr\\n' >&2",
+          "exit 7",
+          "",
+        ].join("\n"),
+      );
       chmodSync(fakeBashPath, 0o755);
     }
 

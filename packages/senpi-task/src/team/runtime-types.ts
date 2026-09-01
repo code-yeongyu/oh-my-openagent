@@ -1,11 +1,13 @@
 import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 
+import type { TaskLifecycle } from "../lifecycle"
 import type { ManagerStartSpec, StartResult } from "../manager"
-import type { TaskRecord } from "../state"
+import type { ResolvedModelRecord, TaskRecord } from "../state"
 import type { CancelOutcome } from "../steering"
 import type { StateDirConfig } from "../store"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import type { MemberTaskMap } from "./member-map"
+import type { RuntimeMemberStatus } from "./member-projection"
 
 export type SenpiTeamRuntimeErrorCode =
   | "bounds_exceeded"
@@ -62,13 +64,34 @@ export type CreateTeamDeps = {
   readonly writeMemberMap?: (runtimeDir: string, map: MemberTaskMap) => Promise<void>
 }
 
+export type CreatedMemberRole =
+  | { readonly kind: "category"; readonly category: string }
+  | { readonly kind: "subagent_type"; readonly subagentType: string }
+
+// Caller-facing view of one spawned member: identity and live status from the runtime state, the
+// role from the spec, the resolved model captured at spawn, and a bounded prompt excerpt.
+export type CreatedMemberInfo = {
+  readonly name: string
+  readonly taskId: string
+  readonly status: RuntimeMemberStatus
+  readonly role: CreatedMemberRole
+  readonly model?: ResolvedModelRecord
+  readonly promptExcerpt?: string
+  readonly taskSummary?: string
+}
+
 export type CreateTeamResult = {
   readonly runtimeState: RuntimeState
   readonly memberTaskIds: MemberTaskMap
+  readonly members: readonly CreatedMemberInfo[]
 }
 
 export type DeleteTeamDeps = {
-  readonly manager: Pick<TeamRuntimeManagerPort, "cancelTask">
+  readonly manager: Pick<TeamRuntimeManagerPort, "cancelTask" | "get">
+  // Lifecycle single-writer destruction port. Team deletion routes terminal-resident members
+  // through it directly because terminal `cancelTask` is an intentional noop (completed residents
+  // stay revivable outside deletion).
+  readonly destruction: Pick<TaskLifecycle, "destroyResidentTask">
   readonly stateDir: StateDirConfig
   readonly taskSettings: OmoTaskSettings
 }

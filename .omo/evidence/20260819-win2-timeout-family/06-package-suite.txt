@@ -1,0 +1,25 @@
+packages/senpi-task/src/tools/output/transcript/read-bounded.test.ts:
+(pass) readBoundedFileText > #given a transcript larger than the source budget #when read #then memory is capped while head and tail survive [1.78ms]
+
+packages/senpi-task/src/tools/output/transcript/session-jsonl.test.ts:
+(pass) parseSessionTranscript > #given a v1 linear session #when parsed #then only assistant text entries are extracted in order [0.38ms]
+(pass) parseSessionTranscript > #given a v2 tree session with a model_change and toolResult #when parsed #then user/tool/non-message entries are skipped [0.21ms]
+(pass) parseSessionTranscript > #given a v3 session with custom, custom_message, and an unknown future entry #when parsed #then unknown types are tolerated and only assistant text survives [0.19ms]
+(pass) parseSessionTranscript > #given malformed lines mixed with valid ones #when parsed #then broken lines are skipped without throwing [0.09ms]
+(pass) parseSessionTranscript > #given an assistant message with multiple text blocks #when parsed #then the blocks are concatenated [0.06ms]
+
+packages/senpi-task/src/tools/output/transcript/session-dir.test.ts:
+(pass) readSessionDirTranscriptResult > #given more than two child session files #when read #then only bounded edge files are parsed [0.68ms]
+
+packages/senpi-task/src/tools/output/transcript/event-log.test.ts:
+(pass) readEventLogTranscript > #given a log with assistant, tool, and child_error events #when read #then all three are lifted in order [0.33ms]
+(pass) readEventLogTranscript > #given a large event log #when read #then head and tail events survive with source truncation [1.11ms]
+
+1 tests skipped:
+(skip) #given a console-less parent #when the default RPC child starts #then windowsHide suppresses its console
+
+ 1619 pass
+ 1 skip
+ 0 fail
+ 5059 expect() calls
+Ran 1620 tests across 235 files. [26.13s]

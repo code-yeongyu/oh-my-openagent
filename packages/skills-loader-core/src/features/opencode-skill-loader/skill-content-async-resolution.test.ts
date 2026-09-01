@@ -4,13 +4,8 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import {
-	clearSkillCache,
-	resolveSkillContent,
-	resolveMultipleSkills,
-	resolveSkillContentAsync,
-	resolveMultipleSkillsAsync,
-} from "./skill-content"
+import { gitMasterSkill } from "../builtin-skills/skills/index"
+import { clearSkillCache, resolveSkillContentAsync } from "./skill-content"
 import { getAllSkills } from "./skill-discovery"
 import { matchSkillByName } from "../../tools/skill/skill-matcher"
 import type { LoadedSkill } from "./types"
@@ -58,15 +53,21 @@ afterEach(() => {
 
 describe("resolveSkillContentAsync", () => {
 	it("should return template for builtin skill async", async () => {
-		// given: builtin skill 'frontend'
+		// given: builtin git-master with runtime transformations disabled
+		const options = {
+			directory: testConfigDir,
+			gitMasterConfig: {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "",
+			},
+		}
+
 		// when: resolving content async
-		const options = { disabledSkills: new Set(["frontend"]) }
 		const result = await resolveSkillContentAsync("git-master", options)
 
-		// then: returns template string
-		expect(result).not.toBeNull()
-		expect(typeof result).toBe("string")
-		expect(result).toContain("Git Master Agent")
+		// then: returns the git-master source template
+		expect(result === gitMasterSkill.template).toBe(true)
 	})
 
 	it("should return null for disabled skill async", async () => {
@@ -80,9 +81,9 @@ describe("resolveSkillContentAsync", () => {
 		expect(result).toBeNull()
 	})
 
-	it("#given the shared ulw-plan canonical alias is disabled #when resolving it async #then it does not fall back to the plain shared alias", async () => {
-		// given
-		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+	it("#given the shared/ulw-plan canonical alias is requested #when resolving it async #then it no longer resolves", async () => {
+		// given: shared/ prefix aliases have been removed
+		const options = { directory: testConfigDir }
 
 		// when
 		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
@@ -91,16 +92,32 @@ describe("resolveSkillContentAsync", () => {
 		expect(result).toBeNull()
 	})
 
-	it("#given the shared ulw-plan canonical alias is disabled #when matching against all skills #then no shared fallback match remains", async () => {
+	it("#given a stale shared/ulw-plan disabled entry exists #when resolving the plain ulw-plan name #then it still resolves", async () => {
 		// given
+		const localSkillDir = join(testConfigDir, ".opencode", "skills", "ulw-plan")
+		mkdirSync(localSkillDir, { recursive: true })
+		writeFileSync(
+			join(localSkillDir, "SKILL.md"),
+			"---\nname: ulw-plan\ndescription: Local ulw-plan override\n---\nlocal ulw-plan body"
+		)
 		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
 
 		// when
-		const skills = await getAllSkills(options)
-		const matchedSkill = matchSkillByName(skills, "shared/ulw-plan")
+		const result = await resolveSkillContentAsync("ulw-plan", options)
+
+		// then: stale shared/ prefix disable entry is inert
+		expect(result).toBe("local ulw-plan body")
+	})
+
+	it("#given the plain ulw-plan name is disabled #when resolving ulw-plan #then it is disabled", async () => {
+		// given
+		const options = { directory: testConfigDir, disabledSkills: new Set(["ulw-plan"]) }
+
+		// when
+		const result = await resolveSkillContentAsync("ulw-plan", options)
 
 		// then
-		expect(matchedSkill).toBeUndefined()
+		expect(result).toBeNull()
 	})
 
 	it("#given a project skill whose literal name starts with shared slash #when matching by exact name #then the project skill remains reachable", () => {
@@ -115,44 +132,16 @@ describe("resolveSkillContentAsync", () => {
 		expect(matchedSkill?.name).toBe("shared/custom")
 	})
 
-	it("#given a local ulw-plan override exists #when only the shared canonical alias is disabled #then the local plain override still resolves", async () => {
-		// given
-		const localSkillDir = join(testConfigDir, ".opencode", "skills", "ulw-plan")
-		mkdirSync(localSkillDir, { recursive: true })
-		writeFileSync(
-			join(localSkillDir, "SKILL.md"),
-			"---\nname: ulw-plan\ndescription: Local ulw-plan override\n---\nlocal ulw-plan body"
-		)
-		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
-
-		// when
-		const result = await resolveSkillContentAsync("ulw-plan", options)
-
-		// then
-		expect(result).toBe("local ulw-plan body")
-	})
-
-	it("#given the plain ulw-plan name is disabled #when resolving the shared canonical alias #then the shared alias is disabled too", async () => {
-		// given
-		const options = { directory: testConfigDir, disabledSkills: new Set(["ulw-plan"]) }
-
-		// when
-		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
-
-		// then
-		expect(result).toBeNull()
-	})
-
 	it("resolves nested skill by unique short name async", async () => {
 		// given: a discovered nested skill toolkit/systematic-debugging
-		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "Short name test content")
+		const expectedTemplate = "FIXTURE_SHORT_NAME_TEMPLATE"
+		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", expectedTemplate)
 
 		// when: resolving by short name
 		const result = await resolveSkillContentAsync("systematic-debugging")
 
-		// then: finds the nested skill
-		expect(result).not.toBeNull()
-		expect(result).toContain("Short name test content")
+		// then: returns the nested fixture template exactly
+		expect(result === expectedTemplate).toBe(true)
 	})
 
 	it("returns null for ambiguous short name async", async () => {
@@ -169,30 +158,30 @@ describe("resolveSkillContentAsync", () => {
 
 	it("prefers exact match over short name match async", async () => {
 		// given: an exact skill name "debugging" and a nested "toolkit/debugging"
-		createNestedSkill(testConfigDir, "toolkit", "debugging", "nested debugging")
+		createNestedSkill(testConfigDir, "toolkit", "debugging", "FIXTURE_NESTED_DEBUGGING_TEMPLATE")
 		// Exact match as a non-namespaced dir with SKILL.md
+		const exactTemplate = "FIXTURE_EXACT_DEBUGGING_TEMPLATE"
 		const exactDir = join(testConfigDir, "skills", "debugging")
 		mkdirSync(exactDir, { recursive: true })
-		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
+		writeFileSync(join(exactDir, "SKILL.md"), `---\nname: debugging\ndescription: exact debugging\n---\n${exactTemplate}`)
 
 		// when: resolving by name "debugging"
 		const result = await resolveSkillContentAsync("debugging")
 
-		// then: prefers exact match over the nested one
-		expect(result).not.toBeNull()
-		expect(result).toContain("exact match content")
+		// then: returns the exact-match fixture rather than the nested fixture
+		expect(result === exactTemplate).toBe(true)
 	})
 
 	it("is case-insensitive for short name matching async", async () => {
 		// given: a nested skill with lowercase name
-		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "case insensitive match")
+		const expectedTemplate = "FIXTURE_CASE_INSENSITIVE_TEMPLATE"
+		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", expectedTemplate)
 
 		// when: resolving by uppercase short name
 		const result = await resolveSkillContentAsync("Systematic-Debugging")
 
-		// then: finds it case-insensitively
-		expect(result).not.toBeNull()
-		expect(result).toContain("case insensitive match")
+		// then: returns the lowercase-named fixture exactly
+		expect(result === expectedTemplate).toBe(true)
 	})
 
 	it("#given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources", async () => {

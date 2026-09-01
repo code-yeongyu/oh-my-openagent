@@ -1,0 +1,6 @@
+$ bun test packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint.test.ts packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-delivering-loss.test.ts packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-leader.test.ts packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts
+bun test v1.3.14
+67 pass
+0 fail
+217 expect() calls
+Ran 68 tests across 5 files. [30.27s]

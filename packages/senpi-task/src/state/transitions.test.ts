@@ -11,6 +11,7 @@ function pendingRecord(): TaskRecord {
     depth: 0,
     execution_mode: "direct",
     model: "gpt-5.2",
+    notify_on_terminal: false,
   })
 }
 
@@ -343,5 +344,122 @@ describe("transitionTaskRecord cancel-from-pending", () => {
     expect(result.applied).toBe(true)
     expect(result.record.status).toBe("cancelled")
     expect(result.record.error_message).toBe("cancelled while queued")
+  })
+})
+
+describe("transitionTaskRecord suspension residency", () => {
+  test("#given a running record with host and child pids #when persist_only arrives #then status and run epoch survive while both pids clear", () => {
+    // given
+    const started = transitionTaskRecord(pendingRecord(), {
+      type: "start",
+      timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 4321,
+    }).record
+    const running: TaskRecord = {
+      ...started,
+      host_pid: 777,
+      notification: { run_epoch: 3, notified_epoch: 1 },
+    }
+
+    // when
+    const result = transitionTaskRecord(running, {
+      type: "persist_only",
+      timestamp: "2026-07-06T00:00:01.000Z",
+    })
+
+    // then
+    expect(result.applied).toBe(true)
+    expect(result.record.status).toBe("running")
+    expect(result.record.residency_state).toBe("persisted_only")
+    expect(result.record.host_pid).toBeUndefined()
+    expect("host_pid" in result.record).toBe(false)
+    expect(result.record.pid).toBeUndefined()
+    expect("pid" in result.record).toBe(false)
+    expect(result.record.notification).toEqual({ run_epoch: 3, notified_epoch: 1 })
+  })
+
+  test("#given a running rpc record #when detach_rpc arrives #then the last pid is retained for orphan detection while host ownership clears", () => {
+    // given
+    const started = transitionTaskRecord(pendingRecord(), {
+      type: "start",
+      timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 4321,
+    }).record
+    const running: TaskRecord = { ...started, host_pid: 777 }
+
+    // when
+    const result = transitionTaskRecord(running, {
+      type: "detach_rpc",
+      timestamp: "2026-07-06T00:00:01.000Z",
+    })
+
+    // then
+    expect(result.applied).toBe(true)
+    expect(result.record.status).toBe("running")
+    expect(result.record.residency_state).toBe("rpc_detached")
+    expect(result.record.host_pid).toBeUndefined()
+    expect("host_pid" in result.record).toBe(false)
+    expect(result.record.pid).toBe(4321)
+  })
+
+  test("#given a completed record with terminal fields and run stats #when persist_only arrives #then every terminal fact survives", () => {
+    // given
+    const runStats = { runtime_ms: 1200, turns: 2, tool_calls: 3, output_tokens: 10 }
+    const running = transitionTaskRecord(pendingRecord(), {
+      type: "start",
+      timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 4321,
+    }).record
+    const completed: TaskRecord = {
+      ...transitionTaskRecord(running, {
+        type: "complete",
+        timestamp: "2026-07-06T00:00:01.000Z",
+        final_response: "shipped",
+        run_stats: runStats,
+      }).record,
+      host_pid: 777,
+    }
+
+    // when
+    const result = transitionTaskRecord(completed, {
+      type: "persist_only",
+      timestamp: "2026-07-06T00:00:02.000Z",
+    })
+
+    // then
+    expect(result.applied).toBe(true)
+    expect(result.record.status).toBe("completed")
+    expect(result.record.residency_state).toBe("persisted_only")
+    expect(result.record.final_response).toBe("shipped")
+    expect(result.record.run_stats).toEqual(runStats)
+    expect(result.record.host_pid).toBeUndefined()
+  })
+
+  test("#given a suspended running record #when a late complete arrives #then terminal fields still land and residency stays suspended", () => {
+    // given
+    const running = transitionTaskRecord(pendingRecord(), {
+      type: "start",
+      timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 4321,
+    }).record
+    const suspended = transitionTaskRecord(
+      { ...running, host_pid: 777 },
+      { type: "persist_only", timestamp: "2026-07-06T00:00:01.000Z" },
+    ).record
+
+    // when
+    const lateComplete = transitionTaskRecord(suspended, {
+      type: "complete",
+      timestamp: "2026-07-06T00:00:02.000Z",
+      final_response: "finished while suspended",
+      run_stats: { runtime_ms: 50, turns: 1, tool_calls: 0 },
+    })
+
+    // then
+    expect(lateComplete.applied).toBe(true)
+    expect(lateComplete.record.status).toBe("completed")
+    expect(lateComplete.record.residency_state).toBe("persisted_only")
+    expect(lateComplete.record.final_response).toBe("finished while suspended")
+    expect(lateComplete.record.run_stats).toEqual({ runtime_ms: 50, turns: 1, tool_calls: 0 })
   })
 })

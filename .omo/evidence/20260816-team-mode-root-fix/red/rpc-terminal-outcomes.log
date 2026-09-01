@@ -1,0 +1,34 @@
+Command:
+  bun test packages/senpi-task/src/manager/rpc-terminal-outcome.test.ts
+
+Result:
+  RED (exit 1) before RPC terminalization production changes.
+
+Observed failure 1 — prompt preflight:
+  Expected manager start result:
+    kind = "start_failed"
+
+  Received:
+    kind = "started"
+
+  This proves the RPC prompt response rejection was logged and detached instead of being awaited
+  by the runner start boundary.
+
+Observed failure 2 — provider turn failure:
+  Expected durable terminal status:
+    error
+
+  Received:
+    completed
+
+  This proves a terminal `agent_end` carrying an assistant error was reduced to idle plus an empty
+  successful response instead of a typed `child-turn-failed` outcome.
+
+Aggregate:
+  0 pass
+  2 fail
+
+Why this is valid RED:
+  Both tests drove the real RpcProcessRunner, RpcProtocolClient, manager adapter, durable task store,
+  and scripted newline-delimited RPC child. The failures were behavioral assertions, not syntax,
+  imports, timing, dependency setup, or process crashes.

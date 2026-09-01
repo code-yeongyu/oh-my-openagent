@@ -7,6 +7,8 @@ import { RpcCommandError } from "./errors"
 import { tailStderr } from "./exit-mapping"
 import { buildAutoUiResponse } from "./ui-auto-answer"
 
+const STDERR_BUFFER_CAP = 16_384
+
 export type MalformedLineHandler = (line: string, error: unknown) => void
 
 export type RpcProtocolClientOptions = {
@@ -59,14 +61,20 @@ export class RpcProtocolClient {
     return tailStderr(this.stderrBuffer)
   }
 
+  /** Length of the raw stderr buffer, exposed for tests/diagnostics. */
+  get stderrBufferLength(): number {
+    return this.stderrBuffer.length
+  }
+
   send(command: RpcCommand): Promise<RpcResponse> {
-    if (this.isExited) {
+    const stdin = this.child.stdin
+    if (this.isExited || stdin === null || stdin === undefined || stdin.writableEnded || stdin.destroyed) {
       return Promise.reject(new Error(`RPC process is not running. Stderr: ${this.stderrTail}`))
     }
     const id = command.id ?? `senpi-task_${++this.nextRequestId}`
     return new Promise<RpcResponse>((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
-      this.child.stdin?.write(`${JSON.stringify({ ...command, id })}\n`, (error) => {
+      stdin.write(`${JSON.stringify({ ...command, id })}\n`, (error) => {
         if (!error) {
           return
         }
@@ -113,10 +121,17 @@ export class RpcProtocolClient {
     this.child.stdout?.on("data", (chunk: string) => this.ingest(chunk))
     this.child.stderr?.setEncoding("utf8")
     this.child.stderr?.on("data", (chunk: string) => {
-      this.stderrBuffer += chunk
+      this.stderrBuffer = (this.stderrBuffer + chunk).slice(-STDERR_BUFFER_CAP)
+    })
+    this.child.stdin?.on("error", (error) => {
+      if (isHarmlessRpcShutdownError(error)) {
+        this.finalize()
+        return
+      }
+      this.finalize(error)
     })
     this.child.once("error", (error) => this.finalize(error))
-    this.child.once("exit", () => this.finalize())
+    this.child.once("close", () => this.finalize())
   }
 
   private ingest(chunk: string): void {
@@ -191,6 +206,13 @@ export class RpcProtocolClient {
       listener(error)
     }
   }
+}
+
+export function isHarmlessRpcShutdownError(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error)) return false
+  return error.code === "EPIPE"
+    || error.code === "ERR_STREAM_DESTROYED"
+    || error.code === "ERR_STREAM_WRITE_AFTER_END"
 }
 
 function commandError(response: RpcResponse, expectedCommand: string): RpcCommandError {

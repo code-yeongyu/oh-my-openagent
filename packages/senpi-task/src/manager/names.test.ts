@@ -65,4 +65,46 @@ describe("NameRegistry", () => {
     // then
     expect(first.name).not.toBe(second.name)
   })
+
+  test("#given a registered name #when released and re-registered #then the bare name is available", () => {
+    // given
+    const registry = new NameRegistry()
+    registry.register("parent-a", "reviewer")
+
+    // when
+    registry.release("parent-a", "reviewer")
+    const result = registry.register("parent-a", "reviewer")
+
+    // then
+    expect(result.name).toBe("reviewer")
+    expect(result.warning).toBeUndefined()
+  })
+
+  test("#given an unknown name #when released #then registration is unchanged", () => {
+    // given
+    const registry = new NameRegistry()
+
+    // when
+    registry.release("parent-a", "reviewer")
+    const result = registry.register("parent-a", "reviewer")
+
+    // then
+    expect(result.name).toBe("reviewer")
+    expect(result.warning).toBeUndefined()
+  })
+
+  test("#given names in separate parents #when one is released #then the other remains reserved", () => {
+    // given
+    const registry = new NameRegistry()
+    registry.register("parent-a", "reviewer")
+    registry.register("parent-b", "reviewer")
+
+    // when
+    registry.release("parent-a", "reviewer")
+    const result = registry.register("parent-b", "reviewer")
+
+    // then
+    expect(result.name).toBe("reviewer-2")
+    expect(result.warning).toContain("reviewer")
+  })
 })

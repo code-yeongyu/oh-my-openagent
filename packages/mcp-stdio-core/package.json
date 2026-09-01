@@ -36,6 +36,6 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "devDependencies": {
-    "bun-types": "1.3.12"
+    "bun-types": "1.4.0"
   }
 }

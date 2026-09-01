@@ -14,7 +14,7 @@ import { normalizeModelToCanonicalString } from "./normalize-model"
 export function createSessionStatusHandler(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
-  sessionStatusRetryKeys: Map<string, string>,
+  sessionStatusRetryKeys: Map<string, Set<string>>,
 ) {
   const {
     pluginConfig,
@@ -54,11 +54,14 @@ export function createSessionStatusHandler(
       }
     }
 
-    const retryKey = `${extractRetryAttempt(status.attempt, retryMessage)}:${normalizeRetryStatusMessage(retryMessage)}`
-    if (sessionStatusRetryKeys.get(sessionID) === retryKey) {
+    const retryModel = model ?? "unknown"
+    const retryKey = `${retryModel}:${extractRetryAttempt(status.attempt, retryMessage)}:${normalizeRetryStatusMessage(retryMessage)}`
+    const seenRetryKeys = sessionStatusRetryKeys.get(sessionID) ?? new Set<string>()
+    if (seenRetryKeys.has(retryKey)) {
       return
     }
-    sessionStatusRetryKeys.set(sessionID, retryKey)
+    seenRetryKeys.add(retryKey)
+    sessionStatusRetryKeys.set(sessionID, seenRetryKeys)
 
     if (sessionRetryInFlight.has(sessionID)) {
       if (timeoutEnabled) {
@@ -70,6 +73,10 @@ export function createSessionStatusHandler(
         sessionRetryInFlight.delete(sessionID)
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
+        seenRetryKeys?.delete(retryKey)
+        if (seenRetryKeys?.size === 0) {
+          sessionStatusRetryKeys.delete(sessionID)
+        }
         return
       }
     }

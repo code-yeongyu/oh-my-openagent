@@ -1,0 +1,145 @@
+# Post-implementation review ledger
+
+## Security review
+
+Verdict: PASS
+
+Highest severity: LOW, non-blocking
+
+Blocking issues: none
+
+Reviewed:
+
+- canonical hashed lock path;
+- atomic `wx` creation and `0600` permissions;
+- stale PID handling;
+- symlink/path attack surface;
+- fixed command arguments and cwd;
+- environment/secret exposure;
+- timer/watcher/server/process cleanup;
+- evidence redaction;
+- dependency and production-surface changes.
+
+Non-blocking observation:
+
+A hostile user on a shared machine could precreate the predictable temp lock
+with a live PID and delay tests until the bounded timeout. Impact is limited
+to local/CI test availability; it cannot redirect writes or reach shipped
+runtime behavior.
+
+Reviewer task: `review-security` (`st_01a01093`)
+
+## Context review
+
+Verdict: PASS
+
+Blocking issues: none
+
+Sources checked:
+
+- per-file git history and blame;
+- PRs #6925, #6931, and #6950;
+- live branch-protection ruleset;
+- open PR/issue overlap;
+- code cross-references;
+- focused Bun 1.3.12 tests.
+
+Coordination notes for the PR body:
+
+1. Open PR #6957 addresses the same Windows required-check failure at the
+   workflow-shell layer. PR1 fixes the test fixture itself. The two changes
+   have no file conflict and are complementary; the PR body must say so.
+2. Open PR #6911 also edits `test-setup.ts` and will create a textual rebase
+   conflict for whichever PR merges second.
+3. Link issues #6938 and #6843 because PR1 advances their test-isolation and
+   reliability acceptance criteria.
+
+No onboarding, IC-8, or LSP-lock duplicate implementation was found.
+
+Reviewer task: `review-context` (`st_01a01095`)
+
+## Code-quality review
+
+Verdict: FAIL
+
+Blocking findings:
+
+1. An LSP build waiter cannot recover when the lock owner dies after the
+   waiter subscribes. The stale lock remains and no event returns control to
+   acquisition.
+2. IC-8 cleanup can hang after a connected model child survives its supervisor:
+   server close waits on the socket, the timeout is cleared, and only the
+   supervisor PID is killed instead of the detached process group.
+3. The LSP waiter lacks watcher error handling and one aggregate operation
+   deadline. Spawn timeout/error details are collapsed into exit code 1.
+
+Required regression coverage:
+
+- real owner process dies after waiter subscription, waiter takes ownership
+  and builds;
+- watcher failure and absolute deadline behavior;
+- connected IC-8 failure terminates supervisor/bootstrap/model process group,
+  destroys accepted sockets, settles close/promise state, and clears
+  registries.
+
+Non-blocking:
+
+- onboarding ordering and cleanup passed;
+- pure-LOC and type-safety passed;
+- README evidence has a trailing blank line that must be removed.
+
+Reviewer task: `review-code` (`st_01a01092`)
+
+## Second review wave
+
+Security: PASS, no blockers.
+
+Context: PASS, no blockers.
+
+Hands-on QA: PASS 9/9.
+
+Goal and code-quality reviews reproduced:
+
+- stale LSP owner not reclaimed after waiter subscription;
+- connected IC-8 cleanup could false-green while the process group survived;
+- ledger/kill errors could skip later cleanup;
+- unconnected promises could remain pending;
+- evidence and full-gate totals were stale.
+
+## Review blocker resolution
+
+LSP:
+
+- real owner-death regression added;
+- waiter rechecks owner PID and returns to acquisition;
+- one aggregate deadline covers wait/install/build;
+- watch creation/runtime errors fall back to bounded state rechecks;
+- spawn errors and terminating signals remain visible;
+- seven LSP lock tests pass.
+
+IC-8:
+
+- connected cleanup regression captures the prior 25-second hang and live
+  process group;
+- cleanup reads ledger process-group IDs, validates positivity, and terminates
+  groups with POSIX negative PID or Windows taskkill tree semantics;
+- taskkill nonzero status fails closed;
+- accepted sockets and exact close signals are tracked;
+- cleanup asserts process-group death and reports forced socket fallback;
+- ledger/kill errors no longer skip socket/server/root cleanup;
+- unconnected accepted/exit promises reject explicitly during cleanup;
+- process-group, exit-resource, harness, and scenario code is split below 250
+  pure LOC;
+- portable module paths pass the shipped-source audit;
+- nine IC-8 tests pass.
+
+Final exact-head gates:
+
+- build pass;
+- targeted 43/43;
+- typecheck pass;
+- Senpi 1884/1884 pass, one filtered platform skip;
+- root 13902/13902 pass;
+- Codex all component/package suites pass;
+- generated diff zero;
+- final LSP diagnostics zero.

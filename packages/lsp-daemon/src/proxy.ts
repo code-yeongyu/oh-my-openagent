@@ -1,10 +1,10 @@
-import type { Readable, Writable } from "node:stream";
 import { existsSync, realpathSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute } from "node:path";
-import { jsonRpcId, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
-import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
+import type { Readable, Writable } from "node:stream";
 import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
 import { createStandaloneMcpRequestContext, runWithRequestContext } from "@oh-my-opencode/lsp-core/request-context";
+import { jsonRpcId, type ParentWatchdogConfig, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
+import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
 
 import { type CallToolOptions, callToolViaDaemon, type DaemonToolContext } from "./daemon-client.js";
 import { type DaemonPaths, daemonPaths } from "./paths.js";
@@ -12,13 +12,22 @@ import { type DaemonPaths, daemonPaths } from "./paths.js";
 export interface ProxyOptions {
 	input?: Readable;
 	output?: Writable;
+	stderr?: Writable;
 	paths?: DaemonPaths;
 	context?: DaemonToolContext;
 	cwd?: string;
 	env?: Record<string, string | undefined>;
 	homeDir?: string;
 	ensure?: CallToolOptions["ensure"];
+	startupTimeoutMs?: number;
+	// Test seam: production callers leave this unset so the watchdog uses its
+	// defaults (parentPid = process.ppid, 30s poll). The watchdog is a third,
+	// independent exit path next to idle timeout and stdin end/close: it saves
+	// us when the parent dies while holding the proxy's stdin open.
+	parentWatchdog?: ParentWatchdogConfig;
 }
+
+const DEFAULT_STARTUP_TIMEOUT_MS = 10_000;
 
 interface ToolCall {
 	id: JsonRpcId;
@@ -29,29 +38,80 @@ interface ToolCall {
 export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void> {
 	const input = options.input ?? process.stdin;
 	const output = options.output ?? process.stdout;
-	const paths = options.paths ?? daemonPaths();
-	const env = options.env ?? process.env;
-	const cwd = options.cwd ?? inferOpenCodeProjectCwd(env["LSP_TOOLS_MCP_PROJECT_CONFIG"]);
-	const contextEnv = cwd === undefined ? env : canonicalizeContextEnv(env);
-	const contextInput = {
-		env: contextEnv,
-		...(cwd === undefined ? {} : { cwd }),
-		...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
+	const stderr = options.stderr ?? process.stderr;
+	const startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
+	const lifecycleController = new AbortController();
+	const abortFromInput = (): void => lifecycleController.abort();
+	let startupExpired = false;
+	let startupTimer: ReturnType<typeof setTimeout> | undefined;
+	const clearStartupWatchdog = (): void => {
+		if (startupTimer === undefined) return;
+		clearTimeout(startupTimer);
+		startupTimer = undefined;
 	};
-	const context = options.context ?? createStandaloneMcpRequestContext(contextInput);
-	const callOptions: CallToolOptions = { paths, context, ...(options.ensure ? { ensure: options.ensure } : {}) };
+	input.once("end", abortFromInput);
+	input.once("close", abortFromInput);
+	if (startupTimeoutMs > 0) {
+		startupTimer = setTimeout(() => {
+			startupExpired = true;
+			input.destroy();
+			try {
+				stderr.write(`[lsp-daemon] no MCP request received within ${startupTimeoutMs}ms; exiting\n`);
+			} catch (error) {
+				if (stderr !== process.stderr) {
+					process.stderr.write(
+						`[lsp-daemon] startup diagnostic failed: ${error instanceof Error ? error.message : String(error)}\n`,
+					);
+				}
+			}
+		}, startupTimeoutMs);
+	}
 
-	await runJsonRpcStdioServer({
+	try {
+		const paths = options.paths ?? daemonPaths();
+		const env = options.env ?? process.env;
+		const cwd = options.cwd ?? inferOpenCodeProjectCwd(env["LSP_TOOLS_MCP_PROJECT_CONFIG"]);
+		const contextEnv = cwd === undefined ? env : canonicalizeContextEnv(env);
+		const contextInput = {
+			env: contextEnv,
+			...(cwd === undefined ? {} : { cwd }),
+			...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
+		};
+		const context = options.context ?? createStandaloneMcpRequestContext(contextInput);
+		const callOptions: CallToolOptions = {
+			paths,
+			context,
+			...(options.ensure ? { ensure: options.ensure } : {}),
+			signal: lifecycleController.signal,
+		};
+		await runJsonRpcStdioServer({
 			input,
 			output,
+			// Idle stays disabled: the opencode host does not respawn a stdio MCP
+			// server that exits — transport close marks it failed until a user
+			// reconnects via /mcp — so an idle kill would strand a live session.
 			idleTimeoutMs: 0,
-			handler: (request, requestOptions) =>
-				runWithRequestContext(context, () => handleProxyRequest(request, requestOptions)),
+			parentWatchdog: options.parentWatchdog ?? {},
+			handler: (request, requestOptions) => {
+				clearStartupWatchdog();
+				return runWithRequestContext(context, () => handleProxyRequest(request, requestOptions));
+			},
 			handlerOptions: callOptions,
-		onHandlerError: (error: unknown) => {
-			process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
-		},
-	});
+			onHandlerError: (error: unknown) => {
+				stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
+			},
+		});
+	} catch (error) {
+		if (!startupExpired || !isPrematureCloseError(error)) throw error;
+	} finally {
+		if (startupTimer !== undefined) clearTimeout(startupTimer);
+		input.removeListener("end", abortFromInput);
+		input.removeListener("close", abortFromInput);
+	}
+}
+
+function isPrematureCloseError(error: unknown): boolean {
+	return error instanceof Error && Reflect.get(error, "code") === "ERR_STREAM_PREMATURE_CLOSE";
 }
 
 async function handleProxyRequest(parsed: unknown, callOptions: CallToolOptions): Promise<JsonRpcResponse | undefined> {
@@ -59,7 +119,11 @@ async function handleProxyRequest(parsed: unknown, callOptions: CallToolOptions)
 	if (!toolCall) return handleLspMcpRequest(parsed);
 
 	const result = await callToolViaDaemon(toolCall.name, toolCall.args, callOptions);
-	return successResponse(toolCall.id, { content: result.content, isError: result.isError ?? false, details: result.details });
+	return successResponse(toolCall.id, {
+		content: result.content,
+		isError: result.isError ?? false,
+		details: result.details,
+	});
 }
 
 function asToolCall(parsed: unknown): ToolCall | null {
