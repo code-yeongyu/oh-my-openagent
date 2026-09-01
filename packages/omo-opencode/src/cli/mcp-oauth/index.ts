@@ -1,7 +1,7 @@
 import { Command } from "commander"
 import { login } from "./login"
 import { logout } from "./logout"
-import { status } from "./status"
+import { status, type StatusOptions } from "./status"
 
 export function createMcpOAuthCommand(): Command {
   const mcp = new Command("mcp").description("MCP server management")
@@ -31,8 +31,9 @@ export function createMcpOAuthCommand(): Command {
   oauth
     .command("status [server-name]")
     .description("Show OAuth token status for MCP servers")
-    .action(async (serverName: string | undefined) => {
-      const exitCode = await status(serverName)
+    .option("--server-url <url>", "OAuth server URL (use if server name differs from URL)")
+    .action(async (serverName: string | undefined, options: StatusOptions) => {
+      const exitCode = await status(serverName, options)
       process.exit(exitCode)
     })
 
