@@ -63,7 +63,7 @@ async function createPlan(brief = "- Goal A\n- Goal B"): Promise<Record<string, 
 describe("ulwLoopCommand help", () => {
 	it("prints usage when no subcommand", async () => {
 		expect(await ulwLoopCommand([])).toBe(0);
-		expect(out.join("")).toContain("omo ulw-loop");
+		expect(out.join("")).toContain("omo-agent-toolkit ulw-loop");
 	});
 });
 
@@ -191,7 +191,7 @@ describe("ulwLoopCommand add-goal", () => {
 describe("ulwLoopCommand unknown", () => {
 	it("returns 1 + prints help on unknown subcommand", async () => {
 		expect(await ulwLoopCommand(["wat"])).toBe(1);
-		expect(out.join("")).toContain("omo ulw-loop");
+		expect(out.join("")).toContain("omo-agent-toolkit ulw-loop");
 	});
 });
 

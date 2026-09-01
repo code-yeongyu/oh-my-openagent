@@ -1,11 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { callToolViaDaemon } from "../src/daemon-client.js";
+import { callToolViaDaemon, currentRequestContext } from "../src/daemon-client.js";
 import { type DaemonServerHandle, startDaemonServer } from "../src/daemon-server.js";
-import { type DaemonPaths, daemonPaths } from "../src/paths.js";
+import type { DaemonPaths } from "../src/paths.js";
+import { daemonTestPaths } from "./daemon-path-fixture.js";
 
 const tempDirectories: string[] = [];
 const servers: DaemonServerHandle[] = [];
@@ -18,10 +19,14 @@ afterEach(async () => {
 function tempPaths(): DaemonPaths {
 	const dir = mkdtempSync(join(tmpdir(), "lsp-daemon-rt-"));
 	tempDirectories.push(dir);
-	return daemonPaths({ CODEX_LSP_DAEMON_DIR: dir }, "test");
+	return daemonTestPaths(dir);
 }
 
 const noSpawn = (): Promise<void> => Promise.resolve();
+
+function defaultContext() {
+	return currentRequestContext();
+}
 
 function firstBuiltinServerId(statusText: string): string {
 	for (const line of statusText.split("\n")) {
@@ -37,7 +42,7 @@ describe("daemon roundtrip", () => {
 		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
 		servers.push(server);
 
-		const result = await callToolViaDaemon("status", {}, { paths, ensure: noSpawn });
+		const result = await callToolViaDaemon("status", {}, { paths, ensure: noSpawn, context: defaultContext() });
 
 		expect(result.content[0]?.type).toBe("text");
 		expect(result.content[0]?.text).toContain("Configured LSP servers");
@@ -49,8 +54,8 @@ describe("daemon roundtrip", () => {
 		servers.push(server);
 
 		const [a, b] = await Promise.all([
-			callToolViaDaemon("status", {}, { paths, ensure: noSpawn }),
-			callToolViaDaemon("status", {}, { paths, ensure: noSpawn }),
+			callToolViaDaemon("status", {}, { paths, ensure: noSpawn, context: defaultContext() }),
+			callToolViaDaemon("status", {}, { paths, ensure: noSpawn, context: defaultContext() }),
 		]);
 
 		expect(a.content[0]?.text).toContain("Configured LSP servers");
@@ -61,7 +66,7 @@ describe("daemon roundtrip", () => {
 		const paths = tempPaths();
 		const failingEnsure = (): Promise<void> => Promise.reject(new Error("spawn disabled in test"));
 
-		const result = await callToolViaDaemon("status", {}, { paths, ensure: failingEnsure });
+		const result = await callToolViaDaemon("status", {}, { paths, ensure: failingEnsure, context: defaultContext() });
 
 		expect(result.isError).toBe(true);
 		const message = result.content[0]?.text ?? "";
@@ -76,10 +81,11 @@ describe("daemon roundtrip", () => {
 		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
 		servers.push(server);
 
-		const baseline = await callToolViaDaemon("status", {}, { paths, ensure: noSpawn });
+		const baseline = await callToolViaDaemon("status", {}, { paths, ensure: noSpawn, context: defaultContext() });
 		const builtinId = firstBuiltinServerId(baseline.content[0]?.text ?? "");
-		const projectDir = tempPaths().dir;
-		mkdirSync(projectDir, { recursive: true });
+		const projectRoot = tempPaths().dir;
+		mkdirSync(projectRoot, { recursive: true });
+		const projectDir = realpathSync(projectRoot);
 		const configPath = join(projectDir, "lsp.json");
 		writeFileSync(configPath, JSON.stringify({ lsp: { [builtinId]: { disabled: true } } }));
 
@@ -89,13 +95,19 @@ describe("daemon roundtrip", () => {
 			{
 				paths,
 				ensure: noSpawn,
-				context: { cwd: projectDir, env: { LSP_TOOLS_MCP_PROJECT_CONFIG: configPath } },
+				context: {
+					cwd: projectDir,
+					projectConfigPaths: [configPath],
+					userConfigPath: join(projectDir, "user-lsp.json"),
+					installDecisionsPath: join(projectDir, "lsp-install-decisions.json"),
+					capabilities: { installDecisionTool: true },
+				},
 			},
 		);
 
 		const scopedText = scoped.content[0]?.text ?? "";
 		expect(scopedText).toContain(`- ${builtinId}: disabled`);
-		const unscoped = await callToolViaDaemon("status", {}, { paths, ensure: noSpawn });
+		const unscoped = await callToolViaDaemon("status", {}, { paths, ensure: noSpawn, context: defaultContext() });
 		expect(unscoped.content[0]?.text ?? "").toContain(`- ${builtinId}: `);
 		expect(unscoped.content[0]?.text ?? "").not.toContain(`- ${builtinId}: disabled`);
 	});

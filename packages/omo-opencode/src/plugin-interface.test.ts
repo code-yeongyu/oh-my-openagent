@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { createPluginInterface } from "./plugin-interface"
 import { createAutoSlashCommandHook } from "./hooks/auto-slash-command"
-import { createStartWorkHook } from "./hooks/start-work"
+import { createUlwExecuteHook } from "./hooks/ulw-execute"
 import { readBoulderState } from "./features/boulder-state"
 import {
   _resetForTesting,
@@ -19,7 +19,7 @@ describe("createPluginInterface - command.execute.before", () => {
   let testDir = ""
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `plugin-interface-start-work-${randomUUID()}`)
+    testDir = join(tmpdir(), `plugin-interface-ulw-execute-${randomUUID()}`)
     mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
     writeFileSync(join(testDir, ".omo", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
     _resetForTesting()
@@ -32,7 +32,7 @@ describe("createPluginInterface - command.execute.before", () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
-  test("executes start-work side effects for native command execution", async () => {
+  test("executes ulw-execute side effects for native command execution", async () => {
     // given
     updateSessionAgent("ses-command-before", "prometheus")
     const pluginInterface = createPluginInterface({
@@ -50,7 +50,7 @@ describe("createPluginInterface - command.execute.before", () => {
       managers: {} as never,
       hooks: {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
-        startWork: createStartWorkHook({
+        ulwExecute: createUlwExecuteHook({
           directory: testDir,
           client: { tui: { showToast: async () => {} } },
         } as never),
@@ -64,7 +64,7 @@ describe("createPluginInterface - command.execute.before", () => {
     // when
     await pluginInterface["command.execute.before"]?.(
       {
-        command: "start-work",
+        command: "ulw-execute",
         sessionID: "ses-command-before",
         arguments: "",
       },
@@ -73,13 +73,13 @@ describe("createPluginInterface - command.execute.before", () => {
 
     // then
     expect(pluginInterface["command.execute.before"]).toBeDefined()
-    expect(output.parts[0]?.text).toContain("Auto-Selected Plan")
-    expect(output.parts[0]?.text).toContain("boulder.json has been created")
+    expect(output.parts[0]?.text).toContain("<!-- omo-ulw-execute-context -->")
     expect(getSessionAgent("ses-command-before")).toBe("sisyphus")
     expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
+    expect(readBoulderState(testDir)?.plan_name).toBe("worker-plan")
   })
 
-  test("does not run start-work side effects for other native commands with session context", async () => {
+  test("does not run ulw-execute side effects for other native commands with session context", async () => {
     // given
     updateSessionAgent("ses-handoff", "prometheus")
     const pluginInterface = createPluginInterface({
@@ -97,7 +97,7 @@ describe("createPluginInterface - command.execute.before", () => {
       managers: {} as never,
       hooks: {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
-        startWork: createStartWorkHook({
+        ulwExecute: createUlwExecuteHook({
           directory: testDir,
           client: { tui: { showToast: async () => {} } },
         } as never),
@@ -119,12 +119,11 @@ describe("createPluginInterface - command.execute.before", () => {
     )
 
     // then
-    expect(output.parts[0]?.text).toContain("HANDOFF CONTEXT")
     expect(readBoulderState(testDir)).toBeNull()
     expect(getSessionAgent("ses-handoff")).toBe("prometheus")
   })
 
-  test("switches native start-work to Atlas when Atlas is registered in config", async () => {
+  test("switches native ulw-execute to Atlas when Atlas is registered in config", async () => {
     // given
     registerAgentName("atlas")
     updateSessionAgent("ses-command-atlas", "prometheus")
@@ -143,7 +142,7 @@ describe("createPluginInterface - command.execute.before", () => {
       managers: {} as never,
       hooks: {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
-        startWork: createStartWorkHook({
+        ulwExecute: createUlwExecuteHook({
           directory: testDir,
           client: { tui: { showToast: async () => {} } },
         } as never),
@@ -152,7 +151,7 @@ describe("createPluginInterface - command.execute.before", () => {
     })
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "/start-work" }],
+      parts: [{ type: "text", text: "/ulw-execute" }],
     }
 
     // when
@@ -171,11 +170,11 @@ describe("createPluginInterface - command.execute.before", () => {
   })
 })
 
-describe("createPluginInterface - ulw-loop native command smoke", () => {
+describe("createPluginInterface - goal native command smoke", () => {
   let testDir = ""
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `plugin-interface-ulw-loop-${randomUUID()}`)
+    testDir = join(tmpdir(), `plugin-interface-goal-${randomUUID()}`)
     mkdirSync(testDir, { recursive: true })
     _resetForTesting()
     registerAgentName("sisyphus")
@@ -186,13 +185,9 @@ describe("createPluginInterface - ulw-loop native command smoke", () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
-  test("starts the ultrawork loop from the native command flow with parsed arguments intact", async () => {
+  test("starts the goal from the native command flow with parsed arguments intact", async () => {
     // given
-    const startLoopCalls: Array<{
-      sessionID: string
-      prompt: string
-      options: Record<string, unknown>
-    }> = []
+    const setGoalCalls: Array<{ sessionID: string; objective: string }> = []
     const pluginInterface = createPluginInterface({
       ctx: {
         directory: testDir,
@@ -208,13 +203,17 @@ describe("createPluginInterface - ulw-loop native command smoke", () => {
       managers: {} as never,
       hooks: {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
-        ralphLoop: {
-          startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
-            startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
-            return true
+        goal: {
+          setGoal: (sessionID: string, objective: string) => {
+            setGoalCalls.push({ sessionID, objective })
+            return { id: "goal-1", sessionID, objective, status: "active" } as never
           },
-          cancelLoop: () => true,
-          getState: () => null,
+          getGoal: () => null,
+          pauseGoal: () => null,
+          resumeGoal: () => null,
+          clearGoal: () => false,
+          markComplete: () => null,
+          event: async () => {},
         },
       } as never,
       tools: {},
@@ -227,32 +226,25 @@ describe("createPluginInterface - ulw-loop native command smoke", () => {
     // when
     await pluginInterface["command.execute.before"]?.(
       {
-        command: "ulw-loop",
-        sessionID: "ses-ulw-native",
-        arguments: '"Ship feature" --strategy=continue',
+        command: "goal",
+        sessionID: "ses-goal-native",
+        arguments: "Ship feature",
       },
       output as never,
     )
     await pluginInterface["chat.message"]?.(
       {
-        sessionID: "ses-ulw-native",
+        sessionID: "ses-goal-native",
         agent: "sisyphus",
       } as never,
       output as never,
     )
 
     // then
-    expect(output.parts[0]?.text).toContain("/ulw-loop Command")
-    expect(startLoopCalls).toEqual([
+    expect(setGoalCalls).toEqual([
       {
-        sessionID: "ses-ulw-native",
-        prompt: "Ship feature",
-        options: {
-          ultrawork: true,
-          maxIterations: undefined,
-          completionPromise: undefined,
-          strategy: "continue",
-        },
+        sessionID: "ses-goal-native",
+        objective: "Ship feature",
       },
     ])
   })

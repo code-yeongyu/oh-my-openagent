@@ -1,7 +1,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 
-import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
+import { getOpenCodeConfigDirs } from "../../shared/opencode-config-dir"
 import { parseJsoncSafe } from "../../shared/jsonc-parser"
 import { parseToolsConfig } from "../../shared/parse-tools-config"
 import { resolveAgentDefinitionPaths } from "../../shared/resolve-agent-definition-paths"
@@ -16,15 +16,15 @@ interface OpencodeConfigWithAgents {
 }
 
 function getConfigPaths(directory: string): string[] {
-  const globalConfigDir = getOpenCodeConfigDir({ binary: "opencode" })
-  const paths = [
+  const globalConfigDirs = getOpenCodeConfigDirs({ binary: "opencode" })
+  return [
     path.join(directory, ".opencode", "opencode.json"),
     path.join(directory, ".opencode", "opencode.jsonc"),
-    path.join(globalConfigDir, "opencode.json"),
-    path.join(globalConfigDir, "opencode.jsonc"),
+    ...globalConfigDirs.flatMap((dir) => [
+      path.join(dir, "opencode.json"),
+      path.join(dir, "opencode.jsonc"),
+    ]),
   ]
-
-  return paths
 }
 
 function convertInlineAgent(agentData: unknown): ClaudeCodeAgentConfig | null {

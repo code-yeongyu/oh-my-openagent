@@ -1,0 +1,25 @@
+RED:
+- `bun test packages/omo-config-core`
+- initial failure: `top-level-senpi-config-characterization.test.ts` expected the final resolved config without `task.warnings`, but the new schema default now includes `task.warnings.unavailable_categories: true`.
+
+GREEN:
+- `bun test packages/omo-config-core` after updating schema + characterization test: pass
+- `bun run build:omo-schema`: regenerated `assets/omo.schema.json`
+
+Schema diff stat:
+- `git diff --stat -- assets/omo.schema.json` => `assets/omo.schema.json | 80 ++++++++++++++++++++++++++++++++++++++++++++++++++`
+- diff contains only the two requested keys: `task.warnings.unavailable_categories` and `categories.*.warn_unavailable`
+
+What:
+- Added `task.warnings.unavailable_categories` to both the full task settings schema and the layer schema, with default `true` on the full schema.
+- Added `category.warn_unavailable` as an optional boolean.
+- Added schema tests for defaulting, explicit override, and type rejection.
+- Updated the characterization test to match the new resolved default.
+
+Why:
+- This gives config authors a global + per-category suppression surface for unavailable-category warnings while keeping existing merge/strict behavior intact.
+
+Why enough:
+- The package test suite passes.
+- The generated schema artifact reflects only the two requested additions.
+- LSP diagnostics are clean on all touched schema/test files.

@@ -1,5 +1,0 @@
-$ awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' packages/omo-codex/plugin/components/codegraph/src/hook.ts | wc -l
-     269
-
-$ wc -l packages/omo-codex/plugin/components/codegraph/src/hook.ts
-     313 packages/omo-codex/plugin/components/codegraph/src/hook.ts

@@ -15,6 +15,7 @@ export interface UserPromptSubmitPayload {
 
 export interface UserPromptSubmitHookOptions {
 	readonly includeUltraworkDirective?: boolean;
+	readonly ultraworkSkillFilePath?: string | null;
 }
 
 export interface PreToolUsePayload {
@@ -74,7 +75,10 @@ export async function applyUserPromptUlwLoopSteering(
 		const proposal = parseUlwLoopSteeringDirective(payload.prompt);
 		if (proposal === null) {
 			if (hasSteeringDirectiveMarker(payload.prompt)) return "";
-			return options.includeUltraworkDirective ? buildUltraworkDirectiveOutput(payload) : "";
+			if (!options.includeUltraworkDirective) return "";
+			return options.ultraworkSkillFilePath === undefined
+				? buildUltraworkDirectiveOutput(payload)
+				: buildUltraworkDirectiveOutput(payload, { skillFilePath: options.ultraworkSkillFilePath });
 		}
 		const result = await steerUlwLoop(payload.cwd, proposal, payloadScope(payload));
 		if (!result.accepted) return "";
@@ -91,7 +95,9 @@ export async function applyUserPromptUlwLoopSteering(
 }
 
 function hasSteeringDirectiveMarker(prompt: string): boolean {
-	return /(?:^|\s)(?:OMO_ULW_LOOP_STEER|omo\.ulw-loop\.steer|omo ulw-loop steer):/u.test(prompt);
+	return /(?:^|\s)(?:OMO_ULW_LOOP_STEER|omo\.ulw-loop\.steer|omo ulw-loop steer|omo-agent-toolkit ulw-loop steer):/u.test(
+		prompt,
+	);
 }
 
 function payloadScope(payload: UserPromptSubmitPayload): UlwLoopScope {

@@ -1,0 +1,7 @@
+$ bun run script/sync-lazycodex-marketplace.ts "$REPO" <dest> --previous-payload   # FIXED bundle
+exit=0
+
+$ grep -o '"\.\./\.\./skills/"' <dest>/plugins/omo/dist/cli/index.js | wc -l
+1
+$ ls <dest>/plugins/omo/skills/ast-grep/install.sh
+/tmp/omo-6395-sync-yPTvbH/fixed/plugins/omo/skills/ast-grep/install.sh

@@ -1,3 +1,0 @@
-$ node -e "const j=require(\047./packages/omo-codex/plugin/.mcp.json\047); console.log(j.mcpServers.codegraph.required===false)"
-true
-exit=0

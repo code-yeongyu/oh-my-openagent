@@ -1,0 +1,8 @@
+=== GREEN 3: memory-core full package suite (one run) ===
+$ bun test src/   (cwd packages/memory-core)
+(pass) reflection persona asset > #given the documented example commit message #when matched against the reflection-commit regex #then it matches [0.06ms]
+
+ 375 pass
+ 0 fail
+ 2585 expect() calls
+Ran 375 tests across 39 files. [40.81s]

@@ -1,0 +1,25 @@
+git_suite
+(pass) git lock error classification > #given a ref lock failure #when classified #then it is a retryable lock error [0.05ms]
+(pass) git lock error classification > #given the config.lock message #when classified #then it stays a retryable lock error [0.05ms]
+(pass) git lock error classification > #given an unrelated git failure #when classified #then it is NOT retryable [0.04ms]
+
+ 48 pass
+ 0 fail
+ 117 expect() calls
+Ran 48 tests across 4 files. [6.10s]
+
+concurrency
+(pass) one memory identity across real Bun processes > #given a writer SIGKILLed while holding the shared lock #when its peer continues #then liveness takeover completes twenty clean commits [2306.56ms]
+
+ 3 pass
+ 0 fail
+ 19 expect() calls
+Ran 3 tests across 1 file. [4.63s]
+
+reflection
+(pass) reflection persona asset > #given the documented example commit message #when matched against the reflection-commit regex #then it matches [0.10ms]
+
+ 46 pass
+ 0 fail
+ 811 expect() calls
+Ran 46 tests across 6 files. [10.38s]

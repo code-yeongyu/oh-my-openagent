@@ -1,12 +1,15 @@
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
-import { isSameOrChildPath, toPosixPath, uniqueStrings } from "./path-utils.js";
-import { createRuleDiscoveryCache, findRuleCandidates } from "@oh-my-opencode/rules-engine/engine";
-import { hashContent } from "@oh-my-opencode/rules-engine/engine";
-import { sortCandidates } from "@oh-my-opencode/rules-engine/engine";
-import { findProjectRoot } from "@oh-my-opencode/rules-engine/engine";
-import { disabledSourcesFromConfig } from "@oh-my-opencode/rules-engine/engine";
 import type { PiRulesConfig, RuleCandidate } from "@oh-my-opencode/rules-engine/engine";
+import {
+	createRuleDiscoveryCache,
+	disabledSourcesFromConfig,
+	findProjectRoot,
+	findRuleCandidates,
+	hashContent,
+	sortCandidates,
+} from "@oh-my-opencode/rules-engine/engine";
+import { isSameOrChildPath, toPosixPath, uniqueStrings } from "./path-utils.js";
 
 export interface DynamicTargetFingerprint {
 	targetPath: string;
@@ -18,6 +21,7 @@ export function fingerprintDynamicTargets(
 	cwd: string,
 	targetPaths: ReadonlyArray<string>,
 	config: PiRulesConfig,
+	model?: string,
 ): DynamicTargetFingerprint[] {
 	const disabledSources = disabledSourcesFromConfig(config);
 	const discoveryCache = createRuleDiscoveryCache();
@@ -34,6 +38,7 @@ export function fingerprintDynamicTargets(
 			targetFile: string;
 			disabledSources?: ReadonlySet<string>;
 			cache: ReturnType<typeof createRuleDiscoveryCache>;
+			model?: string;
 		} = {
 			projectRoot,
 			targetFile: targetPath,
@@ -41,6 +46,9 @@ export function fingerprintDynamicTargets(
 		};
 		if (disabledSources !== undefined) {
 			findOptions.disabledSources = disabledSources;
+		}
+		if (model !== undefined) {
+			findOptions.model = model;
 		}
 		const candidates = findRuleCandidates(findOptions);
 		const candidateFingerprint = sortCandidates(candidates).map(fingerprintCandidate).join("\u0001");
@@ -52,6 +60,7 @@ export function fingerprintDynamicTargets(
 				[
 					"v1",
 					config.enabledSources === "auto" ? "auto" : config.enabledSources.join(","),
+					model ?? "",
 					projectRoot ?? "",
 					cacheKey,
 					candidateFingerprint,

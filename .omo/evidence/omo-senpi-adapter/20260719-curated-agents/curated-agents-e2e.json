@@ -1,0 +1,39 @@
+{
+  "result": "PASS",
+  "checks": {
+    "record_agent_type": "PASS",
+    "record_tool_allow": "PASS",
+    "record_model_source": "PASS",
+    "explore_persona_prompt": "PASS",
+    "sentinel_prompt": "PASS",
+    "lsp_visible": "PASS",
+    "mutation_tools_hidden": "PASS",
+    "lsp_invoked": "PASS",
+    "bash_read_succeeded": "PASS",
+    "bash_mutation_rejected": "PASS",
+    "mutation_calls_rejected": "PASS",
+    "unknown_target_agents": "PASS",
+    "unknown_target_categories": "PASS",
+    "senpi_exit": "PASS",
+    "probe_unchanged": "PASS",
+    "direct_forbidden_file_absent": "PASS",
+    "bash_forbidden_file_absent": "PASS",
+    "real_senpi_untouched": "PASS"
+  },
+  "taskId": "st_019f7aa7",
+  "sandboxAgentDir": "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-tS82Sq/agent",
+  "sandboxCwd": "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-tS82Sq/project",
+  "stateDir": "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-tS82Sq/project/.omo/senpi-task",
+  "childContextCaptures": 6,
+  "realSenpiChangedPaths": [],
+  "concurrentRealSenpiChangedPaths": [
+    "sessions/--Users-yeongyu-local-workspaces-mario-omo-native-k3--/2026-07-19T10-48-16-322Z_019f79fd-aec2-797a-85c4-5d91f313439b.jsonl"
+  ],
+  "allRealSenpiChangedPaths": [
+    "sessions/--Users-yeongyu-local-workspaces-mario-omo-native-k3--/2026-07-19T10-48-16-322Z_019f79fd-aec2-797a-85c4-5d91f313439b.jsonl"
+  ],
+  "realSenpiDigestUnchanged": false,
+  "providedAgentDir": "unset",
+  "senpiExit": 0,
+  "senpiSignal": null
+}

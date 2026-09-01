@@ -61,6 +61,10 @@
       "types": "./src/internal-initiator-marker.ts",
       "import": "./src/internal-initiator-marker.ts"
     },
+    "./skill-path-resolver": {
+      "types": "./src/skill-path-resolver.ts",
+      "import": "./src/skill-path-resolver.ts"
+    },
     "./migration": {
       "types": "./src/migration.ts",
       "import": "./src/migration.ts"
@@ -69,9 +73,17 @@
       "types": "./src/migration/*.ts",
       "import": "./src/migration/*.ts"
     },
+    "./process-sweep": {
+      "types": "./src/process-sweep/index.ts",
+      "import": "./src/process-sweep/index.ts"
+    },
     "./process-stream-reader": {
       "types": "./src/process-stream-reader.ts",
       "import": "./src/process-stream-reader.ts"
+    },
+    "./process-tree": {
+      "types": "./src/process-tree.ts",
+      "import": "./src/process-tree.ts"
     },
     "./prompt-async-gate": {
       "types": "./src/prompt-async-gate.ts",
@@ -104,7 +116,11 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
-    "js-yaml": "^4.1.1",
+    "@oh-my-opencode/omo-config-core": "workspace:*",
+    "js-yaml": "^5.0.0",
     "jsonc-parser": "^3.3.1"
-  }
+  },
+  "sideEffects": [
+    "./src/prompt-async-gate/queue.ts"
+  ]
 }

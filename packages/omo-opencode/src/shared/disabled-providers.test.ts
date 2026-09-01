@@ -91,7 +91,7 @@ describe("applyDisabledProviders", () => {
       agents: {
         hephaestus: {
           model: "github-copilot/gpt-5.5",
-          fallback_models: ["github-copilot/gpt-5.4-mini", "openai/gpt-5.5"],
+          fallback_models: ["github-copilot/gpt-5.6-luna-fast", "openai/gpt-5.5"],
         },
       },
     } as unknown as OhMyOpenCodeConfig
@@ -99,7 +99,7 @@ describe("applyDisabledProviders", () => {
     applyDisabledProviders(config)
     const agents = config.agents as Record<string, { model?: string; fallback_models?: unknown }>
     expect(agents.hephaestus.model).toBe("github-copilot/gpt-5.5")
-    expect(agents.hephaestus.fallback_models).toEqual(["github-copilot/gpt-5.4-mini", "openai/gpt-5.5"])
+    expect(agents.hephaestus.fallback_models).toEqual(["github-copilot/gpt-5.6-luna-fast", "openai/gpt-5.5"])
   })
 
   test("filters fallback chain and substitutes primary from the first allowed entry", () => {
@@ -109,7 +109,7 @@ describe("applyDisabledProviders", () => {
         hephaestus: {
           model: "github-copilot/gpt-5.5",
           fallback_models: [
-            "github-copilot/gpt-5.4-mini",
+            "github-copilot/gpt-5.6-luna-fast",
             { model: "openai/gpt-5.5", variant: "medium" },
             { model: "vercel/openai/gpt-5.5", variant: "medium" },
             "opencode/gpt-5.5",
@@ -141,7 +141,7 @@ describe("applyDisabledProviders", () => {
       agents: {
         oracle: {
           model: "github-copilot/gpt-5.5",
-          fallback_models: ["github-copilot/gpt-5.4-mini", { model: "github-copilot/gemini-3" }],
+          fallback_models: ["github-copilot/gpt-5.6-luna-fast", { model: "github-copilot/gemini-3" }],
         },
       },
     } as unknown as OhMyOpenCodeConfig
@@ -168,7 +168,7 @@ describe("applyDisabledProviders", () => {
         hephaestus: {
           model: "github-copilot/gpt-5.5",
           fallback_models: [
-            "GITHUB-COPILOT/gpt-5.4-mini",
+            "GITHUB-COPILOT/gpt-5.6-luna-fast",
             "openai/gpt-5.5",
           ],
         },

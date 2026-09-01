@@ -1,45 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { loadOmoConfig } from "./model-resolution-config"
 
 describe("model-resolution-config", () => {
-  let originalConfigDir: string | undefined
+  let originalHome: string | undefined
+  let temporaryDirectory = ""
 
   beforeEach(() => {
-    originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    originalHome = process.env.HOME
+    temporaryDirectory = mkdtempSync(join(tmpdir(), "omo-model-resolution-config-"))
+    process.env.HOME = temporaryDirectory
   })
 
   afterEach(() => {
-    if (originalConfigDir === undefined) {
-      delete process.env.OPENCODE_CONFIG_DIR
-    } else {
-      process.env.OPENCODE_CONFIG_DIR = originalConfigDir
-    }
+    rmSync(temporaryDirectory, { recursive: true, force: true })
+    if (originalHome === undefined) delete process.env.HOME
+    else process.env.HOME = originalHome
   })
 
-  it("respects OPENCODE_CONFIG_DIR even when the env var changes after module import", () => {
-    const testConfigDir = join(
-      tmpdir(),
-      `omo-model-resolution-config-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    )
+  it("#given a user omo config #when loading model settings #then reads its opencode view", () => {
+    const path = join(temporaryDirectory, ".omo", "omo.jsonc")
+    mkdirSync(join(path, ".."), { recursive: true })
+    writeFileSync(path, JSON.stringify({
+      "[opencode]": { agents: { atlas: { model: "opencode-go/kimi-k2.6" } } },
+    }) + "\n")
 
-    try {
-      mkdirSync(testConfigDir, { recursive: true })
-      process.env.OPENCODE_CONFIG_DIR = testConfigDir
-      writeFileSync(
-        join(testConfigDir, "oh-my-openagent.json"),
-        JSON.stringify({ agents: { atlas: { model: "opencode-go/kimi-k2.6" } } }, null, 2) + "\n",
-        "utf-8",
-      )
-
-      const config = loadOmoConfig()
-
-      expect(config?.agents?.atlas?.model).toBe("opencode-go/kimi-k2.6")
-    } finally {
-      rmSync(testConfigDir, { recursive: true, force: true })
-    }
+    expect(loadOmoConfig().agents?.atlas?.model).toBe("opencode-go/kimi-k2.6")
   })
 })

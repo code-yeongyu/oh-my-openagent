@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-17 files (~1976 LOC). The `atlasHook` — Continuation Tier hook that monitors session.idle events and forces continuation when boulder sessions (ralph-loop, task-spawned agents) have incomplete work. Also enforces write/edit policies for subagent sessions.
+~60 files (~14k LOC incl. tests; 34 production modules). The `atlasHook` — Continuation Tier hook that monitors session.idle events and forces continuation when boulder sessions (ralph-loop, task-spawned agents) have incomplete work. Also enforces write/edit policies for subagent sessions and runs a first-prompt watchdog (90s default) for sessions that never produce output.
 
 ## WHAT ATLAS DOES
 
@@ -55,7 +55,7 @@ interface SessionState {
 }
 ```
 
-Max consecutive failures before 5min pause: 5 (exponential backoff in todo-continuation-enforcer).
+Max consecutive failures before backoff pause: 10 (`MAX_CONSECUTIVE_PROMPT_FAILURES` in `idle-constants.ts`), then `FAILURE_BACKOFF_MS` = 5 min.
 
 ## RELATIONSHIP TO OTHER HOOKS
 

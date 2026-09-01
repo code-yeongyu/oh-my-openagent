@@ -9,7 +9,7 @@ import * as builtinCommands from "../features/builtin-commands"
 import * as skillLoader from "../features/opencode-skill-loader"
 import * as agentLoader from "../features/claude-code-agent-loader"
 import * as mcpLoader from "../features/claude-code-mcp-loader"
-import * as pluginLoader from "../features/claude-code-plugin-loader"
+import * as pluginLoader from "@oh-my-opencode/claude-code-compat-core/claude-code-plugin-loader"
 import * as mcpModule from "../mcp"
 import * as shared from "../shared"
 import { getAgentListDisplayName } from "../shared/agent-display-names"
@@ -83,7 +83,7 @@ beforeEach(async () => {
     configJson: "/tmp/.config/opencode/opencode.json",
     configJsonc: "/tmp/.config/opencode/opencode.jsonc",
     packageJson: "/tmp/.config/opencode/package.json",
-    omoConfig: "/tmp/.config/opencode/oh-my-opencode.jsonc",
+    omoConfig: "/tmp/.config/opencode/omo.jsonc",
   })
   spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation((config: Record<string, unknown>) => config)
 

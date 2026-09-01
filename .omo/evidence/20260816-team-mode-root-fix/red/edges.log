@@ -1,0 +1,53 @@
+RED — boundary, malformed/inherited state, and regression safety (criterion 2)
+
+Command:
+  bun test packages/senpi-task/src/team packages/senpi-task/src/runners/rpc packages/omo-senpi/src/components/task
+
+Each edge below is proven by reverting its production guard in isolation and observing the named test
+fail, then restoring the tree byte-identically.
+
+1. A member process must expose ONLY its scoped task_send.
+   Revert: the isTeamMemberProcess() early return.
+   (fail) omo-senpi task component wiring > #given an explicit team member process #when the task
+          component registers #then no lead task surface is wired
+   The assertion pins toolNames/commands/messageRenderers/handlers all empty, so the member keeps only
+   omo-member.js's scoped task_send.
+
+2. Generic RPC descendants must NOT inherit member identity or omo-member.js.
+   Revert: the MEMBER_PROCESS_ENV_NAMES strip.
+   (fail) buildRpcSpawn spawn strategy > #given a generic child spawned by a member #when building
+          #then member identity and extension do not leak
+
+3. Explicit member launches must STILL receive fresh identity/config (positive control, unmutated).
+   (pass) buildRpcSpawn spawn strategy > #given member extension env w2mem #when building #then
+          identity config and task id reach the child without overriding isolation
+
+4. Failure/exit paths must reach a terminal non-running status.
+   Revert: terminal outcome classification.
+   (fail) RpcProcessRunner > #given prior assistant text #when a revived turn produces no output
+          #then the stale text cannot become a fresh success
+   (fail) rpc turn outcome user abort classification (3 cases)
+
+5. Malformed inherited wire state must not crash the host.
+   Revert: the Array.isArray guard on the untrusted agent_end.messages.
+   (fail) agentEndOutcome hostile wire payloads (4 cases)
+   Unguarded, this threw TypeError out of the onEvent listener into the Node stream data handler,
+   i.e. an uncaught exception in the PARENT host process.
+
+6. Curated read-only output bounded without changing normal output.
+   Shipped and merged separately in PR #6879 (packages/senpi-task/src/runners/in-process/
+   curated-readonly-bash.ts); inherited here from dev untouched and still green in this suite.
+
+GREEN after fixes (unmutated): 478 pass / 0 fail across 86 files.
+
+Typecheck gates:
+  bunx tsgo --noEmit -p packages/senpi-task/tsconfig.json   -> exit 0
+  bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json    -> exit 0
+  bunx tsgo --noEmit -p packages/utils/tsconfig.json        -> exit 0
+
+LSP diagnostics (all severities, via the branch-synced mirror worktree at head 0360dae3d):
+  packages/senpi-task/src/runners/rpc/handle.ts          -> No diagnostics found
+  packages/senpi-task/src/runners/rpc/turn-outcome.ts    -> No diagnostics found
+  packages/senpi-task/src/manager/child-handle.ts        -> No diagnostics found
+  packages/omo-senpi/src/components/task/index.ts        -> No diagnostics found
+  packages/utils/src/codegraph-provision-upgrade.test.ts -> No diagnostics found

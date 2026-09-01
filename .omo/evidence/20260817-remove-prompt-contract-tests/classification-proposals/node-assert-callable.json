@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "domain": "node-assert-callable",
+  "rule": "Allow callable Node assert candidates only when they verify machine-consumed hook commands and manifest paths, package-layout behavior, metadata-file presence, or parser structure without pinning authored prose.",
+  "candidate_occurrence_count": 18,
+  "candidate_fingerprint_count": 18,
+  "allowed": [
+    {
+      "fingerprint": "b7078b2b2e070ce55d3491f67a496d34b27bd6e48b145ba8750c381c1e0d7c7e",
+      "category": "machine-sentinel",
+      "rationale": "Verifies that the aggregate hook manifest contains the executable ultrawork user-prompt-submit command consumed by the Codex hook runner; the assertion targets command wiring, not guidance copy.",
+      "path": "packages/omo-codex/plugin/test/aggregate-hooks.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "6adcf4b2ca7f1d8a1d00d42c213598ceaaf40486948b3a25a6b4912b2f2289b0",
+      "category": "machine-sentinel",
+      "rationale": "Pins the exact executable command string read from the aggregate hook manifest, including the runtime CLI path and hook event token; it is machine-consumed configuration rather than prose.",
+      "path": "packages/omo-codex/plugin/test/aggregate-hooks.test.mjs",
+      "expected": "node \"${PLUGIN_ROOT}/components/ultrawork/dist/cli.js\" hook user-prompt-submit"
+    },
+    {
+      "fingerprint": "c79d6018a13354b18d3eb74a39b6abee150fc6a0cb0012c4aa8b3695f0bde5e8",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that every ulw-loop user-prompt hook omits the legacy --with-ultrawork execution flag, protecting current hook routing behavior without inspecting prompt content.",
+      "path": "packages/omo-codex/plugin/test/aggregate-hooks.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "bb511c4673dc2d7bbd87936b5570dad60704f1b0589d8c08bc4236e07b0b4e9d",
+      "category": "machine-sentinel",
+      "rationale": "Checks absence of the command-line flag token that selects the retired aggregate execution path; the token is parsed by the CLI and is not authored guidance.",
+      "path": "packages/omo-codex/plugin/test/aggregate-hooks.test.mjs",
+      "expected": "--with-ultrawork"
+    },
+    {
+      "fingerprint": "6c94a4940c442ab6d6cfe71b502172763f01f25461a56b002a503c1d1c6a1f3c",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that the aggregate manifest no longer registers the removed workflow-selection hook, an observable hook-routing invariant independent of any hook output wording.",
+      "path": "packages/omo-codex/plugin/test/aggregate-manifest.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "3b9e4e4eab669c02a0beeed0cfc03e0fb63527407ebc44322098d79941b89880",
+      "category": "machine-sentinel",
+      "rationale": "Pins the removed hook manifest path solely as the machine-consumed registry key whose absence proves cleanup; no file contents or prose are asserted.",
+      "path": "packages/omo-codex/plugin/test/aggregate-manifest.test.mjs",
+      "expected": "./hooks/user-prompt-submit-selecting-lazycodex-workflow.json"
+    },
+    {
+      "fingerprint": "736c968df5bbcdf5d359587bbfc51c7acb00e6e958c531fc495a79eeae131edf",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that aggregation ships at least one top-level SKILL.md payload through filesystem path structure; it checks package composition without reading skill prose.",
+      "path": "packages/omo-codex/plugin/test/aggregate.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "ab6a5064d5a2db2b28e242dd759b3ee07202936eced8afcaa8a282e6f78c3db1",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that aggregation includes component-owned SKILL.md payloads at the expected package-layout boundary; only paths are inspected, not authored skill text.",
+      "path": "packages/omo-codex/plugin/test/aggregate.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "c14cea626cc8207e087087ddf8a7dff09ccdfb0fee76995057e227ee30e33839",
+      "category": "machine-sentinel",
+      "rationale": "Uses the /skills/ directory segment as a filesystem layout sentinel for component-owned skill payloads; it does not constrain any skill wording.",
+      "path": "packages/omo-codex/plugin/test/aggregate.test.mjs",
+      "expected": "/skills/"
+    },
+    {
+      "fingerprint": "c00fa453752f5f660f17ea8c67f9a9a1edbcad0d120e799159fb73becfde05f1",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that aggregation includes the Hephaestus bundled-rule markdown files required by runtime packaging; the assertion checks path presence and never reads rule prose.",
+      "path": "packages/omo-codex/plugin/test/aggregate.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "54d9a0d0f311cdefa85dd32291026e00aa572e2cc49fac0247e168566abaefce",
+      "category": "parser-fixture",
+      "rationale": "Exercises the frontmatter-envelope regular expression used while extracting a synthetic skill name; the regex defines parser structure and does not require any production prose value.",
+      "path": "packages/omo-codex/plugin/test/display-metadata.test.mjs",
+      "expected": "/^---\\n(?<body>[\\s\\S]*?)\\n---\\n/"
+    },
+    {
+      "fingerprint": "5975268204025ac4e7a3e75eac3a35caa2f489a65046313246a8081eaec8bac6",
+      "category": "parser-fixture",
+      "rationale": "Verifies capture of the synthetic YAML frontmatter body using the parser's envelope expression; only frontmatter boundaries and capture structure are contracted.",
+      "path": "packages/omo-codex/plugin/test/display-metadata.test.mjs",
+      "expected": "/^---\\n(?<body>[\\s\\S]*?)\\n---\\n/"
+    },
+    {
+      "fingerprint": "df4214c7b11538698ad695b2769a24ea6f8f878a6e082fd439167a5ebb4958af",
+      "category": "parser-fixture",
+      "rationale": "Checks that the synthetic SKILL.md fixture yields a captured frontmatter body before field parsing; it asserts parser success rather than frontmatter prose.",
+      "path": "packages/omo-codex/plugin/test/display-metadata.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "43b35fd1aa9e36b75af2924c27dfe66c2421cc361c150ddbf13c556e388ba130",
+      "category": "parser-fixture",
+      "rationale": "Exercises the YAML name-field parser expression against synthetic frontmatter; the pattern contracts field syntax while permitting arbitrary name values.",
+      "path": "packages/omo-codex/plugin/test/display-metadata.test.mjs",
+      "expected": "/^name:\\s*\"?([^\"\\n]+)\"?\\s*$/m"
+    },
+    {
+      "fingerprint": "00fbdb5b887fc9dd6d3ddf247c0418c8c55570f73b8329603e443a363d0b7b90",
+      "category": "parser-fixture",
+      "rationale": "Checks that the synthetic SKILL.md frontmatter produces a parsed name field; it requires parser output presence without pinning the field's authored value.",
+      "path": "packages/omo-codex/plugin/test/display-metadata.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "16ce892a2b56ee03eeaf225e0faed8df85a1f4f7e1af073fe175bbffc55ea878",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that aggregation materializes the component metadata file consumed by plugin discovery; this is packaged-file presence with no metadata prose assertion.",
+      "path": "packages/omo-codex/plugin/test/display-metadata.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "9e9c74e050523e66564a5eff10c213b91f21f382373d7e0783845868c69abbf4",
+      "category": "parser-fixture",
+      "rationale": "Exercises the display_name field parser expression against synthetic plugin metadata; the pattern contracts machine-readable field syntax, not the display label value.",
+      "path": "packages/omo-codex/plugin/test/display-metadata.test.mjs",
+      "expected": "/^\\s*display_name:\\s*\"?([^\"\\n]+)\"?\\s*$/m"
+    },
+    {
+      "fingerprint": "d5a4f993b9a7cf7f894fe16904f400d16e47d3fcdd34c8894ede24220413a387",
+      "category": "parser-fixture",
+      "rationale": "Checks that synthetic plugin metadata yields a parsed display_name field; it requires parser output presence while allowing unrestricted label wording.",
+      "path": "packages/omo-codex/plugin/test/display-metadata.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    }
+  ],
+  "forbidden": []
+}

@@ -63,7 +63,7 @@ export function designpowersMaterializeMap() {
 		},
 	};
 	for (const name of includedDesignpowersSkills) {
-		map[`references/designpowers/vendor/skills/${name}/SKILL.md`] = {
+		map[`references/designpowers/vendor/skills/${name}/reference.md`] = {
 			upstream: designpowersUpstreamName,
 			source: `skills/${name}/SKILL.md`,
 		};

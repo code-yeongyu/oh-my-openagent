@@ -1,0 +1,86 @@
+{
+  "result": "FAIL",
+  "checks": {
+    "spawn_background": "PASS",
+    "unconditional_wake": "FAIL",
+    "followup_revive": "FAIL",
+    "task_output_peek": "FAIL",
+    "jsonl_sequence": "FAIL",
+    "extension_suppression": "PASS",
+    "batch_fanout_two_children": "FAIL",
+    "sync_inline_no_notification": "FAIL",
+    "negative_category_error": "PASS",
+    "real_senpi_untouched": "FAIL",
+    "no_leaked_pids": "PASS"
+  },
+  "leakedPids": 0,
+  "spawnedPids": [
+    59966,
+    60427,
+    61214,
+    61876
+  ],
+  "realSenpiUntouched": false,
+  "realSenpiChangedPaths": [
+    "extensions/diff.js",
+    "extensions/files.js",
+    "extensions/prompt-url-widget.js",
+    "extensions/tps.js",
+    "logs/config-reload.log",
+    "logs/mcp/codegraph.log"
+  ],
+  "concurrentRealSenpiChangedPaths": [
+    "sessions/--Users-yeongyu-local-workspaces-bunshin--/2026-07-27T07-33-41-922Z_019fa27e-6ba2-7ab0-8d9b-5a231627807d.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-omo--/2026-07-27T08-35-22-068Z_019fa2b6-e153-7c44-a3c7-9c422ba924dc.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-omo--/2026-07-27T09-25-15-959Z_019fa2e4-9037-79c3-af3e-4753dcc6a411.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-omo--/extensions/goal/019fa2b6-e153-7c44-a3c7-9c422ba924dc.json",
+    "sessions/--Users-yeongyu-local-workspaces-omo-desktop-app--/2026-07-27T05-28-12-881Z_019fa20b-8951-72ea-8069-c0093e76b1d7.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-27T06-53-34-691Z_019fa259-b063-7d32-b8c1-7000d1592dcd.jsonl",
+    "sessions/--Users-yeongyu-sionicai--/2026-07-27T07-03-19-249Z_019fa262-9bd1-7440-bd53-092e86705dcf.jsonl"
+  ],
+  "allRealSenpiChangedPaths": [
+    "extensions/diff.js",
+    "extensions/files.js",
+    "extensions/prompt-url-widget.js",
+    "extensions/tps.js",
+    "logs/config-reload.log",
+    "logs/mcp/codegraph.log",
+    "sessions/--Users-yeongyu-local-workspaces-bunshin--/2026-07-27T07-33-41-922Z_019fa27e-6ba2-7ab0-8d9b-5a231627807d.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-omo--/2026-07-27T08-35-22-068Z_019fa2b6-e153-7c44-a3c7-9c422ba924dc.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-omo--/2026-07-27T09-25-15-959Z_019fa2e4-9037-79c3-af3e-4753dcc6a411.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-omo--/extensions/goal/019fa2b6-e153-7c44-a3c7-9c422ba924dc.json",
+    "sessions/--Users-yeongyu-local-workspaces-omo-desktop-app--/2026-07-27T05-28-12-881Z_019fa20b-8951-72ea-8069-c0093e76b1d7.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-27T06-53-34-691Z_019fa259-b063-7d32-b8c1-7000d1592dcd.jsonl",
+    "sessions/--Users-yeongyu-sionicai--/2026-07-27T07-03-19-249Z_019fa262-9bd1-7440-bd53-092e86705dcf.jsonl"
+  ],
+  "realSenpiDigestUnchanged": false,
+  "providedAgentDir": "unset",
+  "sandboxAgentDirs": [
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-xXrHho/agent",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-HD652P/agent",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-WEZWSd/agent",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-clDJdI/agent"
+  ],
+  "sandboxCwds": [
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-xXrHho/project",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-HD652P/project",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-WEZWSd/project",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-clDJdI/project"
+  ],
+  "sandboxTokens": [
+    "omo-senpi-qa-xXrHho",
+    "omo-senpi-qa-HD652P",
+    "omo-senpi-qa-WEZWSd",
+    "omo-senpi-qa-clDJdI"
+  ],
+  "markerChildExtensions": 1,
+  "mainTaskId": "st_019fa2e8",
+  "mainSignatures": [
+    "running/resident",
+    "child_error",
+    "running/disposed",
+    "destroyed",
+    "cancelled/disposed"
+  ],
+  "mainExit": 0
+}

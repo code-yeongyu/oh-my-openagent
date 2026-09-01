@@ -1,0 +1,50 @@
+omo-senpi codegraph skipped: running inside a senpi-task RPC child { component: [32m'codegraph'[39m }
+
+[1m[38;2;138;190;183mPrompt preset: fallback (senpi-current)
+[0m [38;2;102;102;102mTip: Use shift+tab to cycle the model's thinking level.[39m                                                      
+
+[38;2;240;198;116m[Skills][39m                                               
+[38;2;102;102;102m  ast-grep, coding-agent-sessions, debugging, frontend, git-master, give-me-tips, hyperplan, init-deep, lsp-setup, programming, refactor, remove-ai-slops, review-work, start-work, ultimate-browsing, ultrawork, ulw-loop, 
+ulw-plan, ulw-research, visual-qa[39m                      
+
+[38;2;240;198;116m[Extensions][39m                                           
+[38;2;102;102;102m  anthropic-bash, anthropic-web-search, bash-timeout, btw, claude-agent-sdk, compaction, config-reload, diff.js, fallback-architect-mock-provider.ts, files.js, goal, gpt-apply-patch, help, history-search, hooks,         
+import-repro, look-at, mcp, model-fallback, nested-agents-md, omo.js, openai-web-search, permission-system, prompt-preset, prompt-url-widget.js, redraws, rules, service-tier, src, terminal, todo, tool-pair-guard, tps.js,
+video-in, webfetch, websearch[39m                          
+
+[48;2;52;53;65m                                                                                                                                                                                                                            
+ [38;2;212;212;212mdesign a caching layer for the fixture service[39m                                                                                                                                                                             
+                                                                                                                                                                                                                            
+
+[49m [38;2;204;102;102mError: mock classifier refusal[39m                        
+
+ [38;2;102;102;102mSystem prompt: fallback (senpi-current)[39m               
+
+ [38;2;255;255;0mWarning: Model fallback: omo-mock/claude-fable-5 -> omo-mock/mock-weak (refusal)[39m                             
+
+[38;2;102;102;102mTip: Fable 5 refused, but its refusals should not wear you down: omo-mock/mock-weak picks up the refused question and reasons through its essence anyway.
+Fable-5-grade depth stays reachable through the architect task category, which routes the hard parts back to omo-mock/claude-fable-5.
+Curious how this works? Ask about it with the give-me-tips skill.
+
+[39m fallback model answered                               
+
+ [38;2;102;102;102mFallback model omo-mock/mock-weak responded[39m           
+
+[38;2;80;80;80m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[7m[39m [0m                                                      
+[38;2;80;80;80m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;2;181;189;104m(🏴‍☠️ OmO Native)[38;2;80;80;80m • [38;2;138;190;183m/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tip-tui-omo-fallback-IQYhIG/work[38;2;80;80;80m • [38;2;128;128;128m787/200K (0.4%) (auto)[39m                                                                    [38;2;128;128;128m(omo-mock) [38;2;138;190;183mmock-weak
+[39mfallback: omo-mock/mock-weak
+
+
+
+
+
+
+
+
+
+
+
+
+

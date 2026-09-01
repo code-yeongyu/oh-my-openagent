@@ -1,2 +1,0 @@
-tmux_session=task12-codex-sot-clean-88495
-status=killed

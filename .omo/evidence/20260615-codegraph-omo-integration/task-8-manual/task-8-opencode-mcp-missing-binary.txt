@@ -1,2 +1,0 @@
-{"present":true,"cmd":["codegraph","serve","--mcp"],"enabled":false,"env":{"CODEGRAPH_INSTALL_DIR":"/tmp/omo-codegraph-missing-home/.omo/codegraph","CODEGRAPH_NO_DOWNLOAD":"1","CODEGRAPH_TELEMETRY":"0","DO_NOT_TRACK":"1"}}
-EXIT:0

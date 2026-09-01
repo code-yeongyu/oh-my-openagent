@@ -1,1 +1,0 @@
-PASS: git diff --check reported no whitespace errors

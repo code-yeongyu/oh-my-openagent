@@ -1,9 +1,0 @@
-PR-B codex install-verify landing proof:
-PASS: plugin cache present (4.12.1)
-PASS: config.toml enables omo@sisyphuslabs
-PASS: component bins linked in sandbox (9 bins)
-PASS: agent TOMLs linked in sandbox
-PASS: real ~/.codex/config.toml unchanged (c6bbf449ccf554f4db591f35a5a9a799779f6582)
-PASS: install-verify
-INSTALLED ultraresearch SKILL.md: claim ledger=2, ultimate-browsing=1, fivetaku=1
-SHA before==after: c6bbf449... unchanged (real ~/.codex untouched)

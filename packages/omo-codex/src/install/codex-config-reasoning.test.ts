@@ -8,6 +8,69 @@ import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
 import { readCodexModelCatalog } from "./codex-model-catalog"
 
+describe("codex-config-reasoning unified reasoning override", () => {
+  test("#given reasoning override #when updating config #then override wins over catalog default", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-reasoning-override-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+      reasoning: "xhigh",
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('model_reasoning_effort = "xhigh"')
+    expect(content).not.toContain('model_reasoning_effort = "high"')
+  })
+
+  test("#given off reasoning override #when updating config #then maps to codex wire spelling none", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-reasoning-off-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+      reasoning: "off",
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('model_reasoning_effort = "none"')
+  })
+
+  test("#given unknown reasoning token #when updating config #then catalog default is kept", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-reasoning-unknown-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+      reasoning: "ultrathink",
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('model_reasoning_effort = "high"')
+  })
+})
+
 describe("codex-config-reasoning", () => {
   test("#given empty Codex config #when updating config #then sets worker model and reasoning defaults", async () => {
     // given
@@ -25,8 +88,8 @@ describe("codex-config-reasoning", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain('model = "gpt-5.5"')
-    expect(content).toContain("model_context_window = 400000")
+    expect(content).toContain('model = "gpt-5.6-sol"')
+    expect(content).toContain("model_context_window = 650000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
   })
@@ -64,8 +127,8 @@ describe("codex-config-reasoning", () => {
     expect(content.match(/^model_context_window\s*=/gm)).toHaveLength(1)
     expect(content.match(/^model_reasoning_effort\s*=/gm)).toHaveLength(1)
     expect(content.match(/^plan_mode_reasoning_effort\s*=/gm)).toHaveLength(1)
-    expect(content).toContain('model = "gpt-5.5"')
-    expect(content).toContain("model_context_window = 400000")
+    expect(content).toContain('model = "gpt-5.6-sol"')
+    expect(content).toContain("model_context_window = 650000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
     expect(content).not.toContain("model_context_window = 272000")
@@ -152,7 +215,7 @@ describe("codex-config-reasoning", () => {
     const catalog = await readCodexModelCatalog(root)
 
     // then
-    expect(catalog.current.model).toBe("gpt-5.5")
+    expect(catalog.current.model).toBe("gpt-5.6-sol")
     expect(catalog.managedProfiles.map(profile => profile.model)).not.toContain("gpt-5.4")
   })
 })

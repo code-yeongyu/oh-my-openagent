@@ -1,8 +1,0 @@
-COMMAND: node packages/omo-codex/plugin/components/codegraph/dist/serve.js
-STATUS: 0
-STDERR: ""
-FRAME_COUNT: 2
-TOOL_NAMES: codegraph_search,codegraph_node,codegraph_explore,codegraph_callers
-CHILD_LOG: cwd=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-codegraph-manual-qa-z9mvii/project
-EXPECTED_PROJECT_CWD: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-codegraph-manual-qa-z9mvii/project
-RESULT: PASS framed MCP initialize + tools/list bridged to newline JSON child and served from project cwd

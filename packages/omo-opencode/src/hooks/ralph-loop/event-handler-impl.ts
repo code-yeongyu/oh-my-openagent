@@ -33,7 +33,9 @@ export function createRalphLoopEventHandlerImpl(
 		const runtimeRetryActivitySessionID = getRuntimeRetryActivitySessionID(event.type, props)
 		if (runtimeRetryActivitySessionID) {
 			runtime.runtimeErrorRetriedSessions.delete(runtimeRetryActivitySessionID)
-			releasePromptAsyncReservation(runtimeRetryActivitySessionID, "ralph-loop")
+			releasePromptAsyncReservation(runtimeRetryActivitySessionID, "ralph-loop", {
+				supersedeTransientRetryOwners: true,
+			})
 			runtime.recentHandledSyntheticIdleAt.delete(runtimeRetryActivitySessionID)
 		}
 

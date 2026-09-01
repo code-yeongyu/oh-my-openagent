@@ -70,12 +70,14 @@ describe("resolveRoster", () => {
     withIsolatedConfig("overrides", (root) => {
       // given
       const project = join(root, "project")
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
-        agents: {
-          sisyphus: { model: "provider/family/model-leaf" },
-        },
-        categories: {
-          deep: { model: "simple-model" },
+      writeJson(join(project, ".omo", "omo.jsonc"), {
+        "[opencode]": {
+          agents: {
+            sisyphus: { model: "provider/family/model-leaf" },
+          },
+          categories: {
+            deep: { model: "simple-model" },
+          },
         },
       })
 
@@ -93,7 +95,7 @@ describe("resolveRoster", () => {
     withIsolatedConfig("malformed", (root) => {
       // given
       const project = join(root, "project")
-      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
+      writeJson(join(project, ".opencode", "omo.json"), {
         agents: { sisyphus: { model: 123 } },
       })
 

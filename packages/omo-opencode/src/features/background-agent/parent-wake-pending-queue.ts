@@ -48,9 +48,11 @@ export class ParentWakePendingQueue {
     promptContext: ParentWakePromptContext,
     shouldReply: boolean,
   ): void {
+    const now = Date.now()
     const resolvedPromptContext = resolveParentWakePromptContext(promptContext)
     const pendingWake = this.pendingParentWakes.get(sessionID)
     if (pendingWake) {
+      pendingWake.queuedAt ??= now
       const mergedNotifications = mergeParentWakeNotifications(pendingWake.notifications, notification)
       const notificationsChanged = mergedNotifications.length !== pendingWake.notifications.length
         || mergedNotifications.some((merged, index) => merged !== pendingWake.notifications[index])
@@ -68,12 +70,17 @@ export class ParentWakePendingQueue {
       promptContext: resolvedPromptContext,
       notifications: [notification],
       shouldReply,
+      queuedAt: now,
     })
   }
 
   requeueWake(sessionID: string, latestWake: PendingParentWake): void {
+    const now = Date.now()
     const pendingWake = this.pendingParentWakes.get(sessionID)
     if (pendingWake) {
+      const existingQueuedAt = pendingWake.queuedAt ?? now
+      const latestQueuedAt = latestWake.queuedAt ?? now
+      pendingWake.queuedAt = Math.min(existingQueuedAt, latestQueuedAt)
       pendingWake.notifications = pendingWake.notifications.reduce(
         (notifications, notification) => mergeParentWakeNotifications(notifications, notification),
         [...latestWake.notifications],
@@ -92,7 +99,9 @@ export class ParentWakePendingQueue {
       }
       return
     }
-    this.pendingParentWakes.set(sessionID, cloneParentWake(latestWake))
+    const clonedWake = cloneParentWake(latestWake)
+    clonedWake.queuedAt ??= now
+    this.pendingParentWakes.set(sessionID, clonedWake)
   }
 
   scheduleFlush(sessionID: string, operation: () => Promise<void>, delayMs?: number): void {

@@ -1,9 +1,11 @@
+// biome-ignore-all format: long agent-facing instruction strings are intentionally stable.
 import {
 	codexGoalMode,
 	expectedCodexObjective,
 	isEssentialCriterion,
 	isFinalRunCompletionCandidate,
 } from "./goal-status.js";
+import { resolveToolkitSurface, reviewerRolesFor, type UlwLoopToolkitSurface } from "./surface.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 
 export interface CodexCreateGoalPayload {
@@ -19,11 +21,13 @@ export function buildCodexGoalInstruction(args: {
 	readonly plan: UlwLoopPlan;
 	readonly goal: UlwLoopItem;
 	readonly isFinal?: boolean;
+	readonly surface?: UlwLoopToolkitSurface;
 }): UlwLoopGoalInstruction {
 	const mode = codexGoalMode(args.plan);
 	const createGoal = buildCreateGoalPayload(args.plan, args.goal);
 	const isFinal = args.isFinal ?? isFinalRunCompletionCandidate(args.plan, args.goal);
-	return { text: buildText(mode, args.plan, args.goal, createGoal, isFinal), json: createGoal };
+	const surface = args.surface ?? resolveToolkitSurface();
+	return { text: buildText(mode, args.plan, args.goal, createGoal, isFinal, surface), json: createGoal };
 }
 
 function buildCreateGoalPayload(plan: UlwLoopPlan, goal: UlwLoopItem): CodexCreateGoalPayload {
@@ -36,6 +40,7 @@ function buildText(
 	goal: UlwLoopItem,
 	createGoal: CodexCreateGoalPayload,
 	isFinal: boolean,
+	surface: UlwLoopToolkitSurface,
 ): string {
 	return joinLines([
 		mode === "aggregate" ? "UlwLoop aggregate-goal handoff" : "UlwLoop active-goal handoff",
@@ -52,7 +57,8 @@ function buildText(
 		"- Use the create_goal payload exactly as rendered: objective only.",
 		"- Goals are unlimited. Do not add numeric limits.",
 		...modeConstraintLines(mode, isFinal),
-		finalSection(plan, goal, isFinal, mode === "aggregate"),
+		...evidenceLayoutLines(plan),
+		finalSection(plan, goal, isFinal, mode === "aggregate", surface),
 		...checkpointLines(plan, mode),
 		"",
 		"create_goal payload:",
@@ -69,7 +75,7 @@ function modeConstraintLines(mode: UlwLoopCodexGoalMode, isFinal: boolean): read
 		];
 	}
 	return [
-		"- Codex goal = the whole omo ulw-loop run; OMO G001/G002/etc. = ledger stories.",
+		"- Codex goal = the whole omo-agent-toolkit ulw-loop run; OMO G001/G002/etc. = ledger stories.",
 		"- First call get_goal. If no active goal exists, call create_goal with the aggregate payload below.",
 		"- If get_goal reports the same aggregate objective as active, continue this OMO story without creating a new Codex goal.",
 		"- If a different active or incomplete Codex goal exists, finish/checkpoint that goal before starting this ulw-loop.",
@@ -103,24 +109,59 @@ function formatCriterionLine(criterion: UlwLoopSuccessCriterion): string {
 	return `-${remainingWork} [${criterion.id}] [${marker}] (${criterion.userModel}) ${criterion.scenario} — expect: ${criterion.expectedEvidence} — status: ${criterion.status}`;
 }
 
-function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, aggregate: boolean): string {
+function evidenceLayoutLines(plan: UlwLoopPlan): string[] {
+	if (plan.evidenceLayoutVersion !== 2) return [];
+	return [
+		"- Evidence layout v2: write every artifact for the active goal (QA matrix, review reports, receipts) under the current attempt directory — read currentAttemptDir from `omo-agent-toolkit ulw-loop status --json` (.omo/evidence/ulw/<session>/<goalId>/a<attempt>). The final checkpoint rejects quality-gate artifacts outside that directory.",
+	];
+}
+
+function finalSection(
+	plan: UlwLoopPlan,
+	goal: UlwLoopItem,
+	isFinal: boolean,
+	aggregate: boolean,
+	surface: UlwLoopToolkitSurface,
+): string {
+	const roles = reviewerRolesFor(surface);
 	if (!isFinal)
 		return "- This is not the final ulw-loop story; do not run the final reviewer/manual-QA/gate-review quality gate yet.";
 	const option = sessionOption(plan);
-	const blockerCommand = `omo ulw-loop record-review-blockers${option} --goal-id ${goal.id} --title "Resolve final code-review blockers" --objective "<blocker-resolution objective>" --evidence "<review findings>" --codex-goal-json "<active get_goal JSON or path>"`;
-	const checkpointCommand = `omo ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<targeted verification/manualQa/gateReview evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "<quality gate JSON or path>"`;
+	if (surface === "omo-senpi") return senpiFinalSection(plan, goal, aggregate);
+	const blockerCommand = `omo-agent-toolkit ulw-loop record-review-blockers${option} --goal-id ${goal.id} --title "Resolve final code-review blockers" --objective "<blocker-resolution objective>" --evidence "<review findings>" --codex-goal-json "<active get_goal JSON or path>"`;
+	const checkpointCommand = `omo-agent-toolkit ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<targeted verification/manualQa/gateReview evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "<quality gate JSON or path>"`;
 	return joinLines([
 		"Final story — run mandatory quality gate before update_goal:",
 		"- Run targeted verification for changed behavior.",
 		"- Confirm every manualQa artifact path exists and has non-zero size.",
-		"- Spawn final reviewers with fork_context=false: lazycodex-code-reviewer, lazycodex-qa-executor, and lazycodex-gate-reviewer. Include the original brief, goal objectives, desired user-visible outcome, diff, and evidence.",
+		`- First spawn ${roles.codeReview} and ${roles.manualQa} in parallel (fork_context: false on the v1 surface; fork_turns: "none" on v2). Include the original brief, goal objectives, desired user-visible outcome, diff, and evidence; wait for BOTH to return and confirm their report artifacts exist on disk (code-review report + manualQa matrix).`,
+		`- Only then spawn ${roles.gateReview} (same fork settings), passing those artifact paths.`,
 		"- Require clean codeReview, manualQa, gateReview, iteration, and criteriaCoverage. criteriaCoverage must summarize originalIntent, desiredOutcome, and userOutcomeReview; counts alone are not approval.",
+		"- On a reviewer REJECT, fix only the cited blockers, rerun the affected verification/Manual-QA, and re-review the delta at most TWICE; if blockers remain, record them and surface to the user.",
+		"- If codeQualityStatus is WATCH, include the WATCH notes verbatim in your final user-facing message.",
 		"- If any reviewer is blocked/inconclusive or the quality gate is not clean, do not call update_goal. Record blocker work first:",
 		`  ${blockerCommand}`,
 		aggregate
 			? '- If the quality gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint the aggregate story:'
 			: '- If the quality gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint:',
 		`  ${checkpointCommand}`,
+	]);
+}
+
+function senpiFinalSection(plan: UlwLoopPlan, goal: UlwLoopItem, aggregate: boolean): string {
+	const option = sessionOption(plan);
+	const checkpointCommand = `omo-agent-toolkit ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<manualQa/gateReview evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "$(omo-agent-toolkit ulw-loop checkpoint${option} --print-template)"`;
+	return joinLines([
+		"Final story — run the single-reviewer quality gate before update_goal:",
+		"- Run manual QA yourself and write the non-empty artifact under currentAttemptDir; set manualQa.by to \"main-session\".",
+		'- Spawn exactly one gate reviewer with task(category: "deep").',
+		"- If that task fails with any model_unavailable failure, retry with category:unspecified-high, then category:unspecified-low.",
+		'- Set gateReview.by to the exact category:<name> literal used for the successful task.',
+		'- Build the gate JSON with omo-agent-toolkit ulw-loop checkpoint --print-template, then fill manualQa, gateReview, iteration, and criteriaCoverage.',
+		'- Require passed manualQa, approved gateReview, passed iteration, and complete criteriaCoverage before update_goal({status: "complete"}).',
+		aggregate
+			? `- If the gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint the aggregate story: ${checkpointCommand}`
+			: `- If the gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint: ${checkpointCommand}`,
 	]);
 }
 

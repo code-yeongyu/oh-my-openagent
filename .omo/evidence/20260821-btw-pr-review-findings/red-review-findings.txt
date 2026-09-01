@@ -1,0 +1,14 @@
+RED REVIEW FINDINGS
+
+Command:
+bun test ./packages/omo-opencode/src/features/btw-side/tui-wiring.test.ts \
+  ./packages/omo-opencode/src/features/btw-side/tui-escape-return.test.ts
+
+Observed:
+- newer draft expected "new draft typed while loading", received ""
+- New BTW expected parent_session_id "ses_parent", received "ses_other"
+- Escape regression failed to compile because createBtwEscapeReturn had no
+  injected `now` dependency
+
+The failures reproduce all three behavior findings from the automated review
+on merged PR #7086.
