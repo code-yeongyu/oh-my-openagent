@@ -1,0 +1,21 @@
+Command:
+  bun test packages/senpi-task/src/tools/task/renderers-run-stats.test.ts
+
+Working directory:
+  /Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/senpi-task-hide-zero-cost
+
+Observed:
+  7 pass
+  0 fail
+  20 expect() calls
+
+Key passing cases:
+  - zero cost omits both `cost:` and `$0`
+  - non-zero cost remains `cost:$0.4213`
+  - malformed cost/cache values remain omitted
+
+Exit code:
+  0
+
+Why this is GREEN:
+  The same test that failed against the unchanged formatter now passes after the one-line production condition, while the adjacent non-zero rendering contract remains green.

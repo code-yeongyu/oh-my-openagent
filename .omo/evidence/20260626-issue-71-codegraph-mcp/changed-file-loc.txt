@@ -1,5 +1,0 @@
-packages/omo-codex/plugin/components/codegraph/src/serve.ts      203
-packages/omo-codex/plugin/components/codegraph/src/mcp-bridge.ts      105
-packages/omo-codex/plugin/components/codegraph/src/serve-invocation.ts       23
-packages/omo-codex/plugin/components/codegraph/test/serve.test.ts      235
-packages/omo-codex/plugin/components/codegraph/test/serve-mcp-bridge.test.ts      134

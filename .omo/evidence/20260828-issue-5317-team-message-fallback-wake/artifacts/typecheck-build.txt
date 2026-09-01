@@ -1,0 +1,12 @@
+$ bun run typecheck
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+TYPECHECK_EXIT=0
+
+$ bun run build
+$ bun run script/build.ts
+Bundled 956 modules
+index.js  3.36 MB  (entry point)
+build: all steps completed
+BUILD_EXIT=0

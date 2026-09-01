@@ -1,8 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
+import { dirname } from "node:path";
 
-import { contextEnv } from "../request-context.js";
+import { lspRequestContext } from "../request-context.js";
 
 export type InstallDecision = "declined" | "allowed";
 
@@ -14,9 +13,7 @@ export interface InstallDecisionRecord {
 type InstallDecisions = Record<string, InstallDecisionRecord>;
 
 export function getInstallDecisionsPath(): string {
-	const override = contextEnv("LSP_TOOLS_MCP_INSTALL_DECISIONS");
-	if (!override) return join(homedir(), ".codex", "lsp-install-decisions.json");
-	return isAbsolute(override) ? override : join(homedir(), override);
+	return lspRequestContext().installDecisionsPath;
 }
 
 export function loadInstallDecisions(): InstallDecisions {

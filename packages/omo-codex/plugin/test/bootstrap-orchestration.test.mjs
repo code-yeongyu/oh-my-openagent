@@ -321,7 +321,7 @@ test("#given a completed marker #when the worker runs with --once #then the mark
 	});
 });
 
-test("#given --only sg #when the worker runs #then only the matching step executes", async () => {
+test("#given --only names an injected custom step #when the worker runs #then only the matching step executes", async () => {
 	await withFixture(async (fixture) => {
 		const ran = [];
 		const step = (name) => ({
@@ -333,13 +333,45 @@ test("#given --only sg #when the worker runs #then only the matching step execut
 		});
 
 		const result = await runBootstrapWorker({
-			argv: ["--only", "sg"],
+			argv: ["--only", "custom"],
 			env: fixture.env,
-			steps: [step("setup"), step("sg")],
+			steps: [step("other"), step("custom")],
 		});
 
 		assert.equal(result.ran, true);
-		assert.deepEqual(ran, ["sg"]);
+		assert.deepEqual(ran, ["custom"]);
+	});
+});
+
+test("#given an unknown --only value #when the worker starts #then it rejects before steps or bootstrap artifacts", async () => {
+	await withFixture(async (fixture) => {
+		let stepRuns = 0;
+
+		await assert.rejects(
+			() =>
+				runBootstrapWorker({
+					argv: ["--only", "bogus"],
+					env: fixture.env,
+					steps: [
+						{
+							name: "custom",
+							run: async () => {
+								stepRuns += 1;
+								return { degraded: [] };
+							},
+						},
+					],
+				}),
+			/unknown --only flag value: bogus/,
+		);
+		assert.equal(stepRuns, 0);
+		await assert.rejects(() => stat(join(fixture.pluginData, "bootstrap")));
+		await Promise.all([
+			assert.rejects(() => stat(join(fixture.pluginData, "bootstrap", "state.json"))),
+			assert.rejects(() => stat(join(fixture.pluginData, "bootstrap", "bootstrap.log"))),
+			assert.rejects(() => stat(join(fixture.pluginData, "bootstrap", "state.json.lock"))),
+			assert.rejects(() => stat(join(fixture.pluginData, "auto-update.json.lock"))),
+		]);
 	});
 });
 

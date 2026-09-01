@@ -1,0 +1,22 @@
+Command:
+  bun test packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts \
+    -t 'persisted before restart'
+
+Result:
+  RED (exit 1).
+
+Expected:
+  session_start re-observes `task-terminal` for team-member liveness even when lifecycle reconciliation
+  has no outcome for a task whose terminal transition was already persisted by the prior process.
+
+Received:
+  no liveness observation.
+
+Root cause:
+  event-bridge only re-observed task IDs returned in `reconcileOnSessionStart().outcomes`.
+  Reconciliation skips already-terminal same-session records, so a member that became terminal before
+  the old lead died had no outcome in the restarted lead and could never produce the liveness wake.
+
+This matches the real Team E2E artifact:
+  crash recovery, reservation reclaim, replacement delivery, and restart exit all passed, while the
+  structured liveness message was absent from the restarted lead transcript.

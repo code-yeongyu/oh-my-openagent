@@ -1,19 +1,9 @@
 import { composeOmoSenpiExtension } from "./compose"
-import type { OmoSenpiComponent } from "./types"
-import { createCommentCheckerComponent } from "../components/comment-checker"
-import { createLspComponent } from "../components/lsp"
-import { createSenpiTelemetryComponent } from "../components/telemetry"
-import { createUltraworkComponent } from "../components/ultrawork"
-import { createUlwLoopComponent } from "../components/ulw-loop"
+import { createOmoSenpiComponents } from "./component-list"
+import { createTaskComponent } from "../components/task"
 
-const components: OmoSenpiComponent[] = [
-  createUltraworkComponent(),
-  createUlwLoopComponent(),
-  createCommentCheckerComponent(),
-  createSenpiTelemetryComponent(),
-  createLspComponent(),
-]
+export const omoSenpiComponents = createOmoSenpiComponents(createTaskComponent())
 
-export default composeOmoSenpiExtension(components)
+export default composeOmoSenpiExtension(omoSenpiComponents)
 export { composeOmoSenpiExtension }
 export type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"

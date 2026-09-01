@@ -45,7 +45,7 @@ fi
 log "bun $(bun --version) / node $(node --version) / $(git --version)"
 
 # Warn (do not fail) when the local toolchain drifts from the CI-pinned versions.
-expected_bun="1.3.12"
+expected_bun="1.4.0"
 expected_node_major="24"
 bun_version="$(bun --version 2>/dev/null || echo unknown)"
 node_major="$(node --version 2>/dev/null | sed -E 's/^v?([0-9]+).*/\1/')"

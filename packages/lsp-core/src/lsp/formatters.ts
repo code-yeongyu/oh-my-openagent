@@ -127,6 +127,9 @@ export function formatApplyResult(result: ApplyResult): string {
 		for (const file of result.filesModified) {
 			lines.push(`  - ${file}`);
 		}
+		if (result.lateAbort) {
+			lines.push("Cancellation arrived after the filesystem commit began; the committed edit completed.");
+		}
 	} else {
 		lines.push("Failed to apply some changes:");
 		for (const err of result.errors) {

@@ -1,0 +1,46 @@
+{
+  "label": "baseline",
+  "runDir": "C:\\Users\\USER\\AppData\\Local\\Temp\\omo-console-qa-Ug1Bm1",
+  "conhostBefore": 32,
+  "conhostAfter": 32,
+  "processes": [
+    {
+      "pid": 4392,
+      "name": "supervisor",
+      "console": {
+        "attached": false,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    },
+    {
+      "name": "bun.exe",
+      "pid": 32824,
+      "console": {
+        "attached": false,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    },
+    {
+      "name": "node.exe",
+      "pid": 4396,
+      "console": {
+        "attached": false,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    },
+    {
+      "name": "conhost.exe",
+      "pid": 22592,
+      "console": {
+        "attached": false,
+        "windowHandle": 0,
+        "windowVisible": false
+      }
+    }
+  ],
+  "processesWithConsoleWindow": 0,
+  "processesWithVisibleConsoleWindow": 0
+}

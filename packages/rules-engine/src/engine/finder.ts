@@ -37,6 +37,8 @@ export interface FinderOptions {
 	/** Plugin root directory. Defaults to PLUGIN_ROOT env or this package root. */
 	pluginRoot?: string;
 	platform?: NodeJS.Platform;
+	/** Active model slug (e.g. "gpt-5.6-codex"). Selects model-gated bundled rule variants. */
+	model?: string;
 	cache?: RuleDiscoveryCache;
 }
 
@@ -45,9 +47,15 @@ interface PluginBundledFinderOptions {
 	readonly cache?: RuleDiscoveryCache;
 	readonly pluginRoot?: string;
 	readonly platform?: NodeJS.Platform;
+	readonly model?: string;
 }
 
 const WINDOWS_GIT_BASH_BUNDLED_RULE_PATH = "bundled-rules/windows-git-bash.md";
+const HEPHAESTUS_BUNDLED_RULE_PREFIX = "bundled-rules/hephaestus/";
+const HEPHAESTUS_DEFAULT_VARIANT_FILE = "gpt-5.5.md";
+const HEPHAESTUS_MODEL_VARIANT_FILES: ReadonlyArray<readonly [family: string, file: string]> = [
+	["gpt-5.6", "gpt-5.6.md"],
+];
 
 export function findRuleCandidates(options: FinderOptions): RuleCandidate[] {
 	const skipUserHome = options.skipUserHome ?? false;
@@ -66,6 +74,7 @@ export function findRuleCandidates(options: FinderOptions): RuleCandidate[] {
 		...(options.cache === undefined ? {} : { cache: options.cache }),
 		...(options.pluginRoot === undefined ? {} : { pluginRoot: options.pluginRoot }),
 		...(options.platform === undefined ? {} : { platform: options.platform }),
+		...(options.model === undefined ? {} : { model: options.model }),
 	};
 	candidates.push(...findPluginBundledCandidates(pluginBundledOptions));
 
@@ -95,15 +104,31 @@ export function findPluginBundledCandidates(options: PluginBundledFinderOptions 
 			isSingleFile: false,
 			relativePath: toRelativePath(pluginRoot, scannedFile.path),
 		};
-		if (isPluginBundledCandidateEnabled(candidate, platform)) {
+		if (isPluginBundledCandidateEnabled(candidate, platform, options.model)) {
 			candidates.push(candidate);
 		}
 	}
 	return candidates;
 }
 
-function isPluginBundledCandidateEnabled(candidate: RuleCandidate, platform: NodeJS.Platform): boolean {
-	return candidate.relativePath !== WINDOWS_GIT_BASH_BUNDLED_RULE_PATH || platform === "win32";
+function isPluginBundledCandidateEnabled(
+	candidate: RuleCandidate,
+	platform: NodeJS.Platform,
+	model: string | undefined,
+): boolean {
+	if (candidate.relativePath === WINDOWS_GIT_BASH_BUNDLED_RULE_PATH) {
+		return platform === "win32";
+	}
+	if (candidate.relativePath.startsWith(HEPHAESTUS_BUNDLED_RULE_PREFIX)) {
+		return candidate.relativePath === `${HEPHAESTUS_BUNDLED_RULE_PREFIX}${hephaestusVariantFileForModel(model)}`;
+	}
+	return true;
+}
+
+function hephaestusVariantFileForModel(model: string | undefined): string {
+	const normalizedModel = (model ?? "").toLowerCase();
+	const matched = HEPHAESTUS_MODEL_VARIANT_FILES.find(([family]) => normalizedModel.includes(family));
+	return matched === undefined ? HEPHAESTUS_DEFAULT_VARIANT_FILE : matched[1];
 }
 
 function findProjectCandidates(

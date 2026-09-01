@@ -1,0 +1,512 @@
+{
+  "version": 1,
+  "domain": "node-assert-codex",
+  "rule": "Allow only Node assert candidates that cover machine sentinels or parsed fields, equality between real shipped artifacts, or observable parser, packaging, routing, dispatch, security, and runtime behavior; authored prompt prose remains excluded.",
+  "allowed": [
+    {
+      "fingerprint": "8954adf3dcb3c8b82c878bde549dcb986650501424157d1a9fdc64a83bb47ee4",
+      "category": "parser-fixture",
+      "rationale": "Checks the required developer_instructions TOML schema field and multiline value delimiter, not the authored instruction contents.",
+      "path": "packages/omo-codex/plugin/test/aggregate-agents.test.mjs",
+      "expected": "/^developer_instructions\\s*=\\s*\"\"\"/m"
+    },
+    {
+      "fingerprint": "37be401c977a0b0fce8b02c14cf2cbf8118d90c734cc110b01f38f0ecdde4589",
+      "category": "parser-fixture",
+      "rationale": "Extracts top-level TOML keys so generated agent files can be validated against the supported Codex agent schema.",
+      "path": "packages/omo-codex/plugin/test/aggregate-agents.test.mjs",
+      "expected": "/^([a-z_]+)\\s*=/gm"
+    },
+    {
+      "fingerprint": "cc170d282c718bddb794635de5a8828a7b5a6b594e12da2c50c653623655efee",
+      "category": "security-boundary",
+      "rationale": "Rejects unsupported keys in generated agent TOMLs, enforcing the accepted configuration boundary rather than prompt wording.",
+      "path": "packages/omo-codex/plugin/test/aggregate-agents.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "6858c83a727b58657650ae5a0b0456ab4d05d1ba8967a59cfc02758f73b1e797",
+      "category": "runtime-behavior",
+      "rationale": "Pins executable package build metadata whose ordered commands generate and assemble the shipped aggregate plugin.",
+      "path": "packages/omo-codex/plugin/test/aggregate-build.test.mjs",
+      "expected": "node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs"
+    },
+    {
+      "fingerprint": "88b0baa1ba89ab479cf0a2cbe48e5ee1156f71e5d54d8a0351b8f2a02787ec22",
+      "category": "runtime-behavior",
+      "rationale": "Ensures shared upstream materialization executes before skill synchronization consumes those generated resources.",
+      "path": "packages/omo-codex/plugin/test/aggregate-build.test.mjs",
+      "expected": "/materialize-shared-upstreams\\.mjs --strict && node scripts\\/sync-skills\\.mjs/"
+    },
+    {
+      "fingerprint": "491ed919b6ba373bb03208e6db404d42bca3d3e4be463f3cc4630bad4c1d098e",
+      "category": "machine-sentinel",
+      "rationale": "Checks the Codex plugin manifest skills path consumed by runtime skill discovery.",
+      "path": "packages/omo-codex/plugin/test/aggregate-manifest.test.mjs",
+      "expected": "./skills/"
+    },
+    {
+      "fingerprint": "a68c5ed7b20c2a7a151ef6496ba92fd0715fabbec74ec83d9ad8cfe798cf8214",
+      "category": "runtime-behavior",
+      "rationale": "Verifies aggregate package dependency metadata contains only the local shared-skills runtime dependency.",
+      "path": "packages/omo-codex/plugin/test/aggregate-mcp.test.mjs",
+      "expected": "<expression:{ \"@oh-my-opencode/shared-skills\": \"file:../../shared-skills\" }>"
+    },
+    {
+      "fingerprint": "bae7610e49be98b16084c564bd6b0a31aed4c0acdadc6c753c2eef953cfc96f2",
+      "category": "runtime-behavior",
+      "rationale": "Confirms built component CLIs have no non-Node imports and remain self-contained hook executables.",
+      "path": "packages/omo-codex/plugin/test/component-bundled-cli.test.mjs",
+      "expected": "<expression:[]>"
+    },
+    {
+      "fingerprint": "ebd6b7c40aff6e7a301c92d5fa57ad6f765eb64d7ad0d56bac7ce38b65dcc889",
+      "category": "runtime-behavior",
+      "rationale": "Confirms every installed command hook has a recognized formatter-derived status label with no runtime mismatches.",
+      "path": "packages/omo-codex/plugin/test/hook-status-message.test.mjs",
+      "expected": "<expression:[]>"
+    },
+    {
+      "fingerprint": "fafb112e299171d174208110c13ca8ed07f01781d9edc3610dd333d34fb577cb",
+      "category": "runtime-behavior",
+      "rationale": "Checks the production transform inserts its canonical compatibility artifact between parsed frontmatter and source content.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<expression:`${frontmatter}${codexHarnessToolCompatibility}${opencodeExample}`>"
+    },
+    {
+      "fingerprint": "859d1f99667d99f872b958f2b9b0b5b81fc02d00c7df6500ab161c627ef04982",
+      "category": "parser-fixture",
+      "rationale": "Verifies compatibility insertion occurs before the detected OpenCode tool token in transformed skill content.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "feb8ce0c115af214e62d06d2a122f9edba73676da5323b3c457d7f1c76105212",
+      "category": "runtime-behavior",
+      "rationale": "Checks compatibility-guidance transformation idempotence by comparing the second result with the first.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<expression:once>"
+    },
+    {
+      "fingerprint": "534152014d387d9b06153ba462a99af6faea79481cd15fd98e925f6875186b9e",
+      "category": "machine-sentinel",
+      "rationale": "Uses fixture-only stale generated content to prove obsolete compatibility blocks are removed during replacement.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "STALE_GENERATED_SENTINEL"
+    },
+    {
+      "fingerprint": "501832abd43e758eb7f2895080ef176aa5336688b49039598d09d2e81321e2a1",
+      "category": "runtime-behavior",
+      "rationale": "Establishes that the deliberately mutated stale artifact differs from the canonical production artifact before replacement.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<expression:codexHarnessToolCompatibility>"
+    },
+    {
+      "fingerprint": "e2e0e771e30866eba5fc3542ad418ae9f750a45da5e6747fb64557b716606ebc",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the stale fixture sentinel is absent after the compatibility replacement transform.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<expression:false>"
+    },
+    {
+      "fingerprint": "330833b65ed52b34ff8ad30d3a7a0cd7fbb1e195bf69fe057c7ccacfdcb12ec6",
+      "category": "runtime-behavior",
+      "rationale": "Verifies a custom compatibility block is preserved byte-for-byte rather than overwritten as generated content.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<expression:input>"
+    },
+    {
+      "fingerprint": "89d93fc85ec705b6f83a43339eb19a6822ddd89d7da9170fa2e0e9c4f8eb897c",
+      "category": "runtime-behavior",
+      "rationale": "Checks wrapper bytes survive compatibility insertion when the source has no frontmatter.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<expression:`${codexHarnessToolCompatibility}${templateWrapper}`>"
+    },
+    {
+      "fingerprint": "12d25747723b38b93c92690150a238a377d5e5ca0c27115eba1b8ef888334402",
+      "category": "runtime-behavior",
+      "rationale": "Requires each generated skill needing translation to contain exactly one canonical compatibility block.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<expression:1>"
+    },
+    {
+      "fingerprint": "108a83dc36ab894441a67c1ecf97f9188ee2645a3dcdc13bd13784877cf068c6",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the canonical compatibility block is present in every generated skill that requires translation.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "ffa81fa0d58c77b3025034a43b45aff6846e3c9b173288c213bfbeb821b4e15b",
+      "category": "runtime-behavior",
+      "rationale": "Confirms no remaining OpenCode tool token appears before the inserted compatibility block.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "46bf70a83a5d7eb11b68dc6fc7ce536a8a9c4692248439b0e4eb9d120a11b897",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the generated compatibility block contains the translated tool seam before subsequent source tokens.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "e4562d520a1f28b4ee8a06e668c0a0869a3e2ac30112ba3ffa9bf682fcd0ea40",
+      "category": "runtime-behavior",
+      "rationale": "Guards the synchronization pipeline ordering that applies compatibility insertion before Codex-specific overlays.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "/applyCodexSkillOverlays\\(\\s*skillName,\\s*insertCodexCompatibilityGuidance\\(content\\),?\\s*\\)/"
+    },
+    {
+      "fingerprint": "5a3cb0a98aef1a8600f674c1f71f02ee877baae9caf8faf4c680f3943d3896d7",
+      "category": "runtime-behavior",
+      "rationale": "Guards synchronization orchestration so each selected skill executes the Codex adaptation stage.",
+      "path": "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs",
+      "expected": "/await adaptSkillForCodex\\(skillName\\)/"
+    },
+    {
+      "fingerprint": "c7bdd1a4ee8d4f2e7fadefbd5d2fcd435deee48194edaa805850730f5ba0700b",
+      "category": "runtime-behavior",
+      "rationale": "Ensures the retired ultraresearch machine-facing alias is absent from packaged skill discovery inputs.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/ultraresearch/i"
+    },
+    {
+      "fingerprint": "b8aed253f150bbd84486dc3e08b7c40a9f23483e57dfc0f10e18b52404ac47b8",
+      "category": "runtime-behavior",
+      "rationale": "Compares generated skill directory identities with the authoritative expected package set.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:expectedSkills>"
+    },
+    {
+      "fingerprint": "0db0a4f02fec129c299d92ae6f3b94df9f3bab1505e41fbc514d1eff226739a8",
+      "category": "parser-fixture",
+      "rationale": "Ensures synchronized SKILL.md files retain the YAML frontmatter opener required by skill loading.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/^---\\r?\\n/"
+    },
+    {
+      "fingerprint": "4aa3373ea09e44863fcdf43925139776b0f7449a45ccfecda29ac6976c47044a",
+      "category": "runtime-behavior",
+      "rationale": "Confirms reference-only nested SKILL.md files are excluded from the generated package.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:[]>"
+    },
+    {
+      "fingerprint": "eab4aa4291e6e0342b3ef81a4fda8883394b5489506672d85e5f83f3f1dfd558",
+      "category": "runtime-behavior",
+      "rationale": "Checks the expected designpowers reference resource count survives synchronization.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:27>"
+    },
+    {
+      "fingerprint": "b727eb6ceee6abb8921723fec75e1f8db16e57a22f3ca778565a9fdebbacf33b",
+      "category": "machine-sentinel",
+      "rationale": "Verifies the shared-skills package export map consumed by Node module resolution.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:{ types: \"./index.d.ts\", import: \"./index.mjs\", }>"
+    },
+    {
+      "fingerprint": "d17f2cbc820233e90e2de54d928610509ff5b7ae4f9799b67df61f6244852026",
+      "category": "machine-sentinel",
+      "rationale": "Checks the skills payload key in machine-consumed npm package metadata.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "skills"
+    },
+    {
+      "fingerprint": "93fc691704bfb25e848eadbfc304f0a3c850ff485cccbb6da151972ae2cc9737",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the shared package includes its skills directory in the npm payload.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "2881fe77fdf2f288025f130b3d12977c5e7745a6a2cf5bd616d3a1e5927ab142",
+      "category": "machine-sentinel",
+      "rationale": "Checks the shared-skills package manifest path in the root npm payload list.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "packages/shared-skills/package.json"
+    },
+    {
+      "fingerprint": "cdfde0fc1ccc078264073b311082391f84ad931001e15b15406b97a7da910566",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the root npm payload includes the shared-skills package manifest.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "651e6cfaa1fc303b0a2640a87cf2aebaec4a95999cef6bd5af4aae81b655f699",
+      "category": "machine-sentinel",
+      "rationale": "Checks the shared-skills runtime entrypoint path in the root npm payload list.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "packages/shared-skills/index.mjs"
+    },
+    {
+      "fingerprint": "002dccf3873da3f41459fa64305a8e766d0646f89a5239450968b0c8764f9eb0",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the root npm payload includes the shared-skills runtime entrypoint.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "354072a1b818e987c8b93fcaa653083d308564e17a9780b5578e7e5740d34764",
+      "category": "machine-sentinel",
+      "rationale": "Checks the shared skill-resource path in the root npm payload list.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "packages/shared-skills/skills"
+    },
+    {
+      "fingerprint": "13187aa512b8bdcbe57a3dc1a72a13bdae3446488967ac2ff5cd5de5bedac33f",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the root npm payload includes shared skill resources.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "30277fdc98f39a73450b378f425b71ce4b3ae25718184eee92627daec377f255",
+      "category": "machine-sentinel",
+      "rationale": "Verifies the local shared-skills package dependency specifier consumed during installation and build.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "file:../../shared-skills"
+    },
+    {
+      "fingerprint": "ad54219dc67fd54723b21982e12cfce0d26363ffb0bab09f8daa01ee099b0c1a",
+      "category": "runtime-behavior",
+      "rationale": "Ensures synchronization imports shared skills through the package API.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/from \"@oh-my-opencode\\/shared-skills\"/"
+    },
+    {
+      "fingerprint": "09e344b4a03f6e341f38d29a6f6eea8225bac3f17630352e12ee394ec590b912",
+      "category": "runtime-behavior",
+      "rationale": "Prevents synchronization from bypassing the package API through a repository-relative resource path.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/shared-skills\",\\s*\"skills\"/"
+    },
+    {
+      "fingerprint": "4fdb7901b8fa812bd2a739d378229451f77ef03f6f0e425ecaf2feb58c7732e4",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares each generated shared skill with its real canonical shared-skills artifact after generated overlays are removed.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:removeCodexCompatibilityGuidance(sharedContent)>"
+    },
+    {
+      "fingerprint": "a5bc6594d3a78c88c062702887c8f4a0670dc1bbce03e3abaad52425adcdc655",
+      "category": "runtime-behavior",
+      "rationale": "Establishes component-source precedence when a shared skill name collides with a component-owned skill.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:removeCodexCompatibilityGuidance(sharedSkill)>"
+    },
+    {
+      "fingerprint": "b16130245477cb6eb34f22ba4c9590589b319ec2f6d88c3419937ba84c8b1510",
+      "category": "shipped-copy-equality",
+      "rationale": "Confirms the packaged collision winner equals the real component-owned skill artifact.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:removeCodexCompatibilityGuidance(componentSkill)>"
+    },
+    {
+      "fingerprint": "9354d023e1f75a9be3f22d048950adc69fd7ffd84028c67feadff99814e2c049",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares each packaged component skill resource set with its actual component source set.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:sourceFiles>"
+    },
+    {
+      "fingerprint": "7c63db3f0665938d879859edb7ea9f1df1a3a1cd4ca8d222e15febc4f6629c45",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares every packaged component resource with its real source artifact after generated overlays are removed.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "<expression:removeCodexCompatibilityGuidance(sourceContent)>"
+    },
+    {
+      "fingerprint": "318458d2fc3689f5d41bb398fb0057930c6163e8e15f01ed5cdb150f8242f5e0",
+      "category": "parser-fixture",
+      "rationale": "Checks the ulw-loop name frontmatter field consumed by Codex skill discovery.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/^---\\r?\\nname: ulw-loop\\r?\\n/m"
+    },
+    {
+      "fingerprint": "06b6ee86499bb8071718af6720bda954a8a94cc2adb10685c8f29a17827da917",
+      "category": "machine-sentinel",
+      "rationale": "Checks the Codex interface display_name metadata identifying the surfaced ulw-loop skill.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/display_name: \"\\(OmO\\) ulw-loop\"/"
+    },
+    {
+      "fingerprint": "c528d8f527e300d7782255d40b344d4430836bd6869568c638a5a904045c9ac8",
+      "category": "parser-fixture",
+      "rationale": "Checks that loader-consumed Codex interface metadata retains a non-empty default_prompt field without pinning its authored wording.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/^\\s*default_prompt:\\s*\".+\"$/m"
+    },
+    {
+      "fingerprint": "4daf3b262d2a58efd134c94d8e765b3bdce2f56a36b16badb6db3dce3c187170",
+      "category": "parser-fixture",
+      "rationale": "Checks the search_terms metadata field consumed by Codex skill discovery.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/search_terms:/"
+    },
+    {
+      "fingerprint": "0edfc235886dc67eae0deaca58e98885d2740af242769fb05070e1b516d402e1",
+      "category": "machine-sentinel",
+      "rationale": "Checks the canonical ulw-loop search alias consumed by skill discovery.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/- \"ulw-loop\"/"
+    },
+    {
+      "fingerprint": "b71b9e61b859ee53dbba2f7caca1b61764600088acf28c179a99337b8f90c90f",
+      "category": "parser-fixture",
+      "rationale": "Checks the git-master name frontmatter field consumed by Codex skill discovery.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/^---\\r?\\nname: git-master\\r?\\n/m"
+    },
+    {
+      "fingerprint": "457ae8ac52e3ac7568f1a891df9b4afc718963cf062b3190f47d16a35421dbb4",
+      "category": "machine-sentinel",
+      "rationale": "Checks the Codex interface display_name metadata identifying the surfaced git-master skill.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/display_name: \"\\(OmO\\) git-master\"/"
+    },
+    {
+      "fingerprint": "f1d2fdbe17d7c1613cec739362c7e3a703e3693ac4504ad7a6de6cc4c5a2a89f",
+      "category": "machine-sentinel",
+      "rationale": "Checks the git commit search token consumed to route matching requests to git-master.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/- \"git commit\"/"
+    },
+    {
+      "fingerprint": "ba64319df8831d84f9b1bc8ba49d29e066c773269f6fe9a0c2f037e61d463dd8",
+      "category": "machine-sentinel",
+      "rationale": "Checks the history search token consumed to route matching requests to git-master.",
+      "path": "packages/omo-codex/plugin/test/sync-skills.test.mjs",
+      "expected": "/- \"history search\"/"
+    },
+    {
+      "fingerprint": "9e65f976809d88b683cfc90620cba79481db8d435d96a78e593bbaef68e4545e",
+      "category": "machine-sentinel",
+      "rationale": "Checks the exact codex_app cross-thread messaging tool identifier exposed for member dispatch.",
+      "path": "packages/omo-codex/plugin/test/teammode-communication.test.mjs",
+      "expected": "/codex_app\\.send_message_to_thread/"
+    },
+    {
+      "fingerprint": "2a93a6ab569491fcc4336bdbb9c99f20417aa44767873a6839fa8b4bf6c72145",
+      "category": "runtime-behavior",
+      "rationale": "Verifies a dynamically bound thread ID propagates into generated guide, status, and bootstrap deep links.",
+      "path": "packages/omo-codex/plugin/test/teammode-thread-links.test.mjs",
+      "expected": "/codex:\\/\\/threads\\/019ef350-ee78-72a3-bd5e-e40cebc3d814/"
+    },
+    {
+      "fingerprint": "9451855d37c1ef38117fc2021e218ce16067fa70226ebc3bf7fcde776cad6fd5",
+      "category": "runtime-behavior",
+      "rationale": "Verifies a dynamically bound worktree path propagates into the member bootstrap output.",
+      "path": "packages/omo-codex/plugin/test/teammode-thread-links.test.mjs",
+      "expected": "/\\/tmp\\/review-worktree/"
+    },
+    {
+      "fingerprint": "d14838bf928abf1d348938029bb6089ad88a1033fc15f8b92e489229f106df9f",
+      "category": "runtime-behavior",
+      "rationale": "Verifies MultiAgentV2 derives the leader message target from structured leader.agentPath state.",
+      "path": "packages/omo-codex/plugin/test/teammode-transport.test.mjs",
+      "expected": "/target `\\/root`/"
+    },
+    {
+      "fingerprint": "68bd5aaf9db8eee80560b926fb9181182d00f762c6d40449483e127945fc0beb",
+      "category": "machine-sentinel",
+      "rationale": "Checks the exact MultiAgentV2 send_message dispatch tool identifier.",
+      "path": "packages/omo-codex/plugin/test/teammode-transport.test.mjs",
+      "expected": "/send_message/"
+    },
+    {
+      "fingerprint": "b79c5310b0418cd6544320194eb6bcf0bc1a1a91fec7179116f53ff95bfa0044",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the MultiAgentV2 branch omits codex_app thread-link concepts from generated member output.",
+      "path": "packages/omo-codex/plugin/test/teammode-transport.test.mjs",
+      "expected": "/thread title|codex:\\/\\/threads\\//i"
+    },
+    {
+      "fingerprint": "585fbaf53416807bdd7f8bd29616883559ccaab7e1a1eb0dd61e6bc15c7b8920",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the synchronized ultrawork skill artifact exists in the aggregate package.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "1fe85739f03c8f65da041075b1ddd2f76c571c51c0beb95cc110f22832c0f0a3",
+      "category": "parser-fixture",
+      "rationale": "Checks the ultrawork name frontmatter field consumed by the skill loader.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "/^---\\nname: ultrawork\\n/"
+    },
+    {
+      "fingerprint": "2f73e4e02a159012a323472d6f4b63042d9ee289860afe316e9466cbdf6e10cd",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies the packaged ultrawork skill ends with the real component directive.md bytes.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "9aed589e62657ce54c043226c885cbfb6db923d4887808786deb664b026cf421",
+      "category": "runtime-behavior",
+      "rationale": "Confirms the real built UserPromptSubmit CLI dispatches successfully and exits zero.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "<expression:0>"
+    },
+    {
+      "fingerprint": "1cb2db8628a417fbd63ccb60b36912d8ed81936a8855902e256c3c360956244e",
+      "category": "machine-sentinel",
+      "rationale": "Checks the ultrawork-mode marker that the hook runtime searches to suppress duplicate injection.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "/^<ultrawork-mode>/"
+    },
+    {
+      "fingerprint": "4a393d3612dc47619cf74ed499884441444f8532cf71a6949337dff6d98d6313",
+      "category": "machine-sentinel",
+      "rationale": "Checks the exact registered create_goal tool identifier required by the compact bootstrap.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "/create_goal/"
+    },
+    {
+      "fingerprint": "391229e678e2a095bc99890c4d8bbd3ea117693c67845e85694b54bbbda6d99a",
+      "category": "runtime-behavior",
+      "rationale": "Verifies the runtime-resolved absolute skill path propagates into hook output.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "105a5f7b0b9005f0267a530273a8cb308415089b5361206de7d779eb4aeafcfd",
+      "category": "security-boundary",
+      "rationale": "Enforces the pointer byte-size ceiling so Codex App truncation cannot remove required bootstrap data.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "<expression:true>"
+    },
+    {
+      "fingerprint": "30aa6e78f3f029322d6792f19145b095b7c698550b1f2c2f49b87c8df055e6a0",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares real ultrawork and ulw-loop CLI pointer outputs byte-for-byte to prevent duplicate runtime drift.",
+      "path": "packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs",
+      "expected": "<expression:ultrawork.hookSpecificOutput.additionalContext>"
+    },
+    {
+      "fingerprint": "92e79631c4b4e6abaf9fafa230cad0e793637ee78f02681172af9ace884aaf8e",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the packaged ulw-plan SKILL.md with its real component-owned source artifact.",
+      "path": "packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs",
+      "expected": "<expression:component>"
+    },
+    {
+      "fingerprint": "a4ceee7503d7f0cc693c91503c838b15bd0196ea55da2a4278ad23b5bad6a5f6",
+      "category": "parser-fixture",
+      "rationale": "Checks the ulw-plan name frontmatter field consumed by the skill loader.",
+      "path": "packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs",
+      "expected": "/^name: ulw-plan$/m"
+    },
+    {
+      "fingerprint": "b5f86c72c8e78c2abd850701c3a104936e5484465bfbccd9dc4dcd9f2db6b88e",
+      "category": "security-boundary",
+      "rationale": "Verifies installer TOML contains the canonical hook-state trust key derived from plugin, manifest, event, group, and hook indices.",
+      "path": "packages/omo-codex/scripts/install-local.test.mjs",
+      "expected": "/\\[hooks\\.state\\.\"alpha@debug-marketplace:hooks\\/hooks\\.json:user_prompt_submit:0:0\"\\]/"
+    }
+  ],
+  "forbidden": []
+}

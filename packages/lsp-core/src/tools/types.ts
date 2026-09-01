@@ -49,7 +49,8 @@ export interface LspDiagnosticsDetails {
 	totalDiagnostics: number;
 	truncated: boolean;
 	error?: string;
-	errorKind?: "missing_dependency" | "no_files" | "invalid_path";
+	errorKind?: "freshness_timeout" | "missing_dependency" | "no_files" | "invalid_path";
+	fileFailures?: Array<{ file: string; error: string }>;
 }
 
 export interface LspGotoDefinitionDetails {
@@ -88,6 +89,16 @@ export interface LspPrepareRenameDetails {
 	line: number;
 	character: number;
 	result: PrepareRenameResult | PrepareRenameDefaultBehavior | Range | null;
+	error?: string;
+	errorKind?: "missing_dependency";
+}
+
+export interface LspFormatDetails {
+	filePath: string;
+	status: "formatted" | "unchanged" | "unavailable";
+	reason?: "capability_not_advertised" | "server_unavailable";
+	linesAdded: number;
+	linesRemoved: number;
 	error?: string;
 	errorKind?: "missing_dependency";
 }

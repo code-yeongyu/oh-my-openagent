@@ -1,0 +1,3 @@
+omo-senpi codegraph skipped: running inside a senpi-task RPC child { component: 'codegraph' }
+omo-senpi process sweep skipped: running inside a senpi-task RPC child undefined
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }

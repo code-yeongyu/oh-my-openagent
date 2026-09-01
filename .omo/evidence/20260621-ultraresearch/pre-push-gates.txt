@@ -1,6 +1,0 @@
-PR-B pre-push gates (all green):
-- bun run typecheck -> exit 0
-- bun test -> 10091 pass, 0 fail, 2 skip
-- bun run build -> dist + schema built; ultraresearch synced into dist/skills
-- bun run test:codex -> 363 pass, 0 fail (3 new ultraresearch contract assertions: claim-ledger exists, workers-never-write-ledger, ultimate-browsing escalation)
-Cross-harness landing: codex install-verify lands ultraresearch SKILL.md with claim ledger + ultimate-browsing + fivetaku credit; real ~/.codex/config.toml SHA unchanged.

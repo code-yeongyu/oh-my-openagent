@@ -1,0 +1,56 @@
+### live-surface capture for issue #6376
+### surface: the BUILT omo CLI bundles under dist/
+### index.mjs diff vs upstream/dev at capture time:
+### (empty above == unmodified base; non-empty == fix applied)
+
+=== 1. asset asymmetry (the precondition of the bug) ===
+  dist/skills/ast-grep/install.sh          : EXISTS
+  dist/cli/skills/ast-grep/install.sh      : MISSING
+  dist/cli-node/skills/ast-grep/install.sh : MISSING
+
+=== 2. literals inlined into the SHIPPED bundles ===
+  dist/index.js            sibling "./skills/"=1  parent "../skills/"=0
+  dist/cli/index.js        sibling "./skills/"=1  parent "../skills/"=0
+  dist/cli-node/index.js   sibling "./skills/"=1  parent "../skills/"=0
+
+=== 3. resolution AT each real bundle location ===
+  bundle dir dist           -> C:\Users\pss\.omo-contrib\work\omo\dist\skills\
+      dir exists            : true
+      ast-grep/install.sh   : FOUND
+  bundle dir dist/cli       -> C:\Users\pss\.omo-contrib\work\omo\dist\cli\skills\
+      dir exists            : false
+      ast-grep/install.sh   : MISSING
+  bundle dir dist/cli-node  -> C:\Users\pss\.omo-contrib\work\omo\dist\cli-node\skills\
+      dir exists            : false
+      ast-grep/install.sh   : MISSING
+
+=== 4. real omo CLI in the isolated sandbox ===
+$ node dist/cli-node/index.js doctor
+
+[45m[37m oMoMoMoMo Doctor [39m[49m
+
+ [33m[33m⚠[33m[39m 3 issues found:
+
+1. [31moh-my-openagent is not registered[39m
+   [2mPlugin entry is missing from OpenCode configuration.[22m
+   [36mFix:[39m [2mRun: bunx oh-my-openagent install[22m
+   [36mAffects:[39m [2mall agents[22m
+
+2. [33mLoaded plugin is outdated[39m
+   [2mLoaded 4.19.3, latest 4.19.4.[22m
+   [36mFix:[39m [2mUpdate: cd "C:\Users\pss\AppData\Local\Temp\omo-6376-Axpash\home\.config\opencode" && bun add oh-my-openagent@latest
+If Bun reports blocked postinstalls, inspect them: cd "C:\Users\pss\AppData\Local\Temp\omo-6376-Axpash\home\.config\opencode" && bun pm untrusted
+Then trust only OMO-related packages from that list: cd "C:\Users\pss\AppData\Local\Temp\omo-6376-Axpash\home\.config\opencode" && bun pm trust oh-my-openagent @code-yeongyu/comment-checker[22m
+   [36mAffects:[39m [2mplugin features[22m
+
+3. [33mModel cache not found[39m
+   [2mOpenCode model cache is missing, so model availability cannot be validated.[22m
+   [36mFix:[39m [2mRun: opencode models --refresh[22m
+   [36mAffects:[39m [2mmodel resolution[22m
+
+EXIT=1
+DRIVER-FAIL: a shipped bundle resolved a skills root without ast-grep/install.sh
+
+=== driver verdict ===
+  DRIVER_FAILED=1
+  RESULT: FAIL

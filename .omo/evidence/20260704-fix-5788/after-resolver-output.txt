@@ -1,2 +1,0 @@
-anthropic/claude-sonnet-5 actualLimit=1000000
-exit_code=0

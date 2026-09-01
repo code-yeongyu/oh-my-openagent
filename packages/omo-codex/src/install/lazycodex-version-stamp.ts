@@ -26,7 +26,12 @@ export function resolveLazyCodexPluginVersion(input: {
   readonly marketplaceName: string
   readonly pluginName: string
   readonly distributionManifest?: DistributionManifest
+  readonly versionOverride?: string
 }): string {
+  const override = input.versionOverride?.trim()
+  if (override !== undefined && override.length > 0) {
+    return override
+  }
   if (input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo" && input.distributionManifest !== undefined) {
     return input.distributionManifest.version
   }
@@ -136,7 +141,14 @@ function stampHookGroups(hooks: unknown, version: string): void {
 }
 
 function stampHookStatusMessage(hook: unknown, version: string): void {
-  void version
   if (!isPlainRecord(hook) || typeof hook.statusMessage !== "string") return
-  hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):\s*/, "(OmO) ")
+  hook.statusMessage = hook.statusMessage.replace(
+    /^(?:LazyCodex\([^)]+\):|\(OmO(?:\s+[^)]+)?\))\s*/,
+    `(OmO ${normalizeHookStatusVersion(version)}) `,
+  )
+}
+
+function normalizeHookStatusVersion(version: string): string {
+  const normalized = version.trim()
+  return normalized.length === 0 ? "local" : normalized
 }

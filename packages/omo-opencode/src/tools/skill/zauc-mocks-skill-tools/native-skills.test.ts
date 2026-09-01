@@ -31,31 +31,9 @@ describe("skill tool - nativeSkills integration", () => {
     expect(tool.description).toContain("native-visible-skill")
   })
 
-  it("keeps OpenCode-injected native skills in the description while suppressing shared path aliases", () => {
-    const sharedDebuggingSkill: LoadedSkill = {
-      name: "shared/debugging",
-      path: "/repo/packages/shared-skills/skills/debugging/SKILL.md",
-      resolvedPath: "/repo/packages/shared-skills/skills/debugging",
-      definition: {
-        name: "shared/debugging",
-        description: "Full shared debugging instructions",
-        template: "Full shared debugging body",
-      },
-      scope: "shared",
-    }
-    const bareDebuggingAlias: LoadedSkill = {
-      name: "debugging",
-      path: "/repo/packages/shared-skills/skills/debugging",
-      resolvedPath: "/repo/packages/shared-skills/skills/debugging",
-      definition: {
-        name: "debugging",
-        description: "Short debugging wrapper",
-        template: "Short debugging body",
-      },
-      scope: "builtin",
-    }
+  it("keeps OpenCode-injected native skills in the description after the shared/ prefix cutover", () => {
     const tool = createSkillTool({
-      skills: [sharedDebuggingSkill, bareDebuggingAlias],
+      skills: [],
       includeSkillsInDescription: true,
       nativeSkills: {
         all() {
@@ -81,8 +59,6 @@ describe("skill tool - nativeSkills integration", () => {
 
     const description = tool.description
 
-    expect(description).toContain("<name>/shared/debugging</name>")
-    expect(description).not.toContain("\n    <name>/debugging</name>")
     expect(description).toContain("<name>/customize-opencode</name>")
     expect(description).toContain("Customize OpenCode")
   })

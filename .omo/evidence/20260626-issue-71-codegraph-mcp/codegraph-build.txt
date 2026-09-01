@@ -1,8 +1,0 @@
-$ node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
-Bundled 31 modules in 4ms
-
-  serve.js  77.0 KB  (entry point)
-
-Bundled 34 modules in 4ms
-
-  cli.js  99.71 KB  (entry point)

@@ -1,1 +1,0 @@
-$ tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json

@@ -1,71 +1,33 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, extname, join } from "node:path";
+import { dirname, join } from "node:path";
+
+import type { PostEditNotConfiguredCache } from "@oh-my-opencode/lsp-core/post-edit";
 
 interface LspSessionState {
-	readonly unavailableExtensions: readonly string[];
-	readonly postCompactProbePending?: boolean;
-}
-
-export interface DiagnosticsObservation {
-	readonly filePath: string;
-	readonly unavailable: boolean;
+	readonly notConfiguredExtensions: readonly string[];
 }
 
 export function sessionIdFrom(input: { readonly session_id?: unknown }): string | undefined {
 	return typeof input.session_id === "string" && input.session_id.length > 0 ? input.session_id : undefined;
 }
 
-export function shouldSkipUnavailableLspDiagnostics(filePath: string, sessionId: string | undefined): boolean {
-	if (sessionId === undefined) return false;
+export function readLspPostEditCache(sessionId: string | undefined): PostEditNotConfiguredCache {
+	if (sessionId === undefined) return { notConfiguredExtensions: new Set() };
 	const state = readSessionState(sessionStatePath(sessionId));
-	const extension = extensionKey(filePath);
-	return (
-		extension !== undefined &&
-		state.postCompactProbePending !== true &&
-		state.unavailableExtensions.includes(extension)
-	);
+	return { notConfiguredExtensions: new Set(state.notConfiguredExtensions) };
 }
 
-export function recordLspDiagnosticsObservations(
-	sessionId: string | undefined,
-	observations: readonly DiagnosticsObservation[],
-): void {
-	if (sessionId === undefined || observations.length === 0) return;
-	const state = readSessionState(sessionStatePath(sessionId));
-	const unavailableExtensions = new Set(state.unavailableExtensions);
-
-	for (const observation of observations) {
-		const extension = extensionKey(observation.filePath);
-		if (extension === undefined) continue;
-		if (observation.unavailable) {
-			unavailableExtensions.add(extension);
-		} else {
-			unavailableExtensions.delete(extension);
-		}
-	}
-
-	writeSessionState(sessionStatePath(sessionId), { unavailableExtensions: [...unavailableExtensions].sort() });
+export function writeLspPostEditCache(sessionId: string | undefined, cache: PostEditNotConfiguredCache): void {
+	if (sessionId === undefined) return;
+	writeSessionState(sessionStatePath(sessionId), {
+		notConfiguredExtensions: [...cache.notConfiguredExtensions].sort(),
+	});
 }
 
 export function markLspSessionCompacted(sessionId: string | undefined): void {
 	if (sessionId === undefined) return;
-	const state = readSessionState(sessionStatePath(sessionId));
-	if (state.unavailableExtensions.length === 0) return;
-	writeSessionState(sessionStatePath(sessionId), {
-		unavailableExtensions: state.unavailableExtensions,
-		postCompactProbePending: true,
-	});
-}
-
-export function isUnavailableLspDiagnostics(diagnostics: string): boolean {
-	const normalized = diagnostics.trim();
-	return (
-		normalized.includes("LSP request timeout (method: initialize)") ||
-		normalized.includes("LSP server is still initializing") ||
-		normalized.includes("NOT INSTALLED") ||
-		normalized.includes("Command not found:")
-	);
+	writeSessionState(sessionStatePath(sessionId), emptyState());
 }
 
 export function isLspDaemonUnreachableDiagnostics(diagnostics: string): boolean {
@@ -80,7 +42,7 @@ function sessionStatePath(sessionId: string): string {
 function readSessionState(path: string): LspSessionState {
 	try {
 		const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-		if (isLspSessionState(parsed)) return parsed;
+		if (isRecord(parsed) && isLspSessionState(parsed)) return normalizeSessionState(parsed);
 		return emptyState();
 	} catch (error) {
 		if (error instanceof SyntaxError || (isRecord(error) && error["code"] === "ENOENT")) return emptyState();
@@ -94,25 +56,25 @@ function writeSessionState(path: string, state: LspSessionState): void {
 }
 
 function emptyState(): LspSessionState {
-	return { unavailableExtensions: [] };
-}
-
-function extensionKey(filePath: string): string | undefined {
-	const extension = extname(filePath).toLowerCase();
-	return extension.length === 0 ? undefined : extension;
+	return { notConfiguredExtensions: [] };
 }
 
 function safePathSegment(value: string): string {
 	return value.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120) || "unknown-session";
 }
 
-function isLspSessionState(value: unknown): value is LspSessionState {
-	if (!isRecord(value) || !Array.isArray(value["unavailableExtensions"])) return false;
-	const postCompactProbePending = value["postCompactProbePending"];
-	return (
-		value["unavailableExtensions"].every((item) => typeof item === "string") &&
-		(postCompactProbePending === undefined || typeof postCompactProbePending === "boolean")
-	);
+function isLspSessionState(value: Record<string, unknown>): boolean {
+	const notConfiguredExtensions = value["notConfiguredExtensions"] ?? value["unavailableExtensions"];
+	return Array.isArray(notConfiguredExtensions) && notConfiguredExtensions.every((item) => typeof item === "string");
+}
+
+function normalizeSessionState(value: Record<string, unknown>): LspSessionState {
+	const notConfiguredExtensions = value["notConfiguredExtensions"] ?? value["unavailableExtensions"];
+	return {
+		notConfiguredExtensions: Array.isArray(notConfiguredExtensions)
+			? notConfiguredExtensions.filter((item) => typeof item === "string").sort()
+			: [],
+	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

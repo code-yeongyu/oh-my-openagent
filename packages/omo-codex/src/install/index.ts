@@ -20,6 +20,7 @@ export {
   resolveCodexPluginCacheRoot,
   resolveDefaultCodexHome,
 } from "./codex-cache-paths"
+export { posixRuntimeWrapper, RUNTIME_WRAPPER_MARKER, windowsRuntimeWrapper } from "./codex-cache-runtime-wrapper"
 export { updateCodexConfig } from "./codex-config-toml"
 export { trustedHookStatesForPlugin } from "./codex-hook-trust"
 export { assertHookCommandTargets, findMissingHookCommandTargets } from "./codex-hook-targets"
