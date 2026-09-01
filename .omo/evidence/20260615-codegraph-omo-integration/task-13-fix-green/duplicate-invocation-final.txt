@@ -1,8 +1,0 @@
-tmpdir=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MCJdb8abSg
-serve_exit=0
-serve_count=1
-serve_args=["serve","--mcp"]
-cli_exit=0
-cli_count=1
-cli_args=["serve","--mcp"]
-cleanup_removed=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MCJdb8abSg

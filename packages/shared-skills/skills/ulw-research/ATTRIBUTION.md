@@ -7,9 +7,9 @@ is adapted into this skill's prompt contract.
 
 ---
 
-## 1. insane-research (fivetaku) — inspiration for the claim-ledger verification gate
+## 1. insane-research (fivetaku) — inspiration for the claim-graph verification gate
 
-The non-code claim-ledger verification gate (Phase 3b: a data-flow-lock where the
+The non-code claim-graph verification gate (Phase 3b: a data-flow-lock where the
 synthesis may assert a high-risk non-code claim only after it clears `>= 2 independent
 source domains + 1 counter-search + a primary source`, otherwise it is abstained to an
 unresolved/refuted annex) is inspired by the data-flow-lock verification design in

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-23 files. The `call_omo_agent` tool — direct invocation of named agents (explore, librarian only). Distinct from `delegate-task`: no category system, no skill loading, no model selection. Fixed agent set, same execution modes (background/sync).
+27 files. The `call_omo_agent` tool — direct invocation of named agents (explore, librarian only). Distinct from `delegate-task`: no category system, no skill loading, no model selection. Fixed agent set, same execution modes (background/sync).
 
 ## DISTINCTION FROM delegate-task
 
@@ -21,11 +21,11 @@ Only `explore` and `librarian` — enforced via `ALLOWED_AGENTS` constant in `co
 
 ## EXECUTION MODES
 
-Same two modes as delegate-task:
+Same two modes as delegate-task, routed by `tools.ts`:
 
 | Mode | File | Description |
 |------|------|-------------|
-| **Background** | `background-agent-executor.ts` | Async via `BackgroundManager` |
+| **Background** | `background-executor.ts` | Async via `BackgroundManager` |
 | **Sync** | `sync-executor.ts` | Create session → wait for idle → return result |
 
 ## KEY FILES
@@ -33,8 +33,7 @@ Same two modes as delegate-task:
 | File | Purpose |
 |------|---------|
 | `tools.ts` | `createCallOmoAgent()` factory — validates agent, routes to executor |
-| `background-executor.ts` | Routes to background or sync based on `run_in_background` |
-| `background-agent-executor.ts` | Launch via `BackgroundManager.launch()` |
+| `background-executor.ts` | Launch background work via `BackgroundManager.launch()` |
 | `sync-executor.ts` | Synchronous session: create → send prompt → poll → fetch result |
 | `session-creator.ts` | Create OpenCode session for sync execution |
 | `subagent-session-creator.ts` | Create session with agent-specific config |

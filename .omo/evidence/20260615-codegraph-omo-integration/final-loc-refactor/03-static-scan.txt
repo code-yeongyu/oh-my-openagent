@@ -1,1 +1,0 @@
-$ rg -n 'as any|as unknown|@ts-ignore|@ts-expect-error|catch \([^)]*\) \{\s*\}' packages/omo-codex/plugin/components/codegraph/src || true

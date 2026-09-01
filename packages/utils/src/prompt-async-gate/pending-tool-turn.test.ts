@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - pending tool-turn tests share one prompt-gate state machine fixture; this release adds narrow regressions and future edits should split by gate state.
+
 import { describe, expect, test } from "bun:test"
 import {
   OMO_INTERNAL_INITIATOR_MARKER,

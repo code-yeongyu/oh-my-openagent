@@ -87,4 +87,63 @@ describe("createTodoContinuationHandler", () => {
     expect(state.stagnationCount).toBe(0)
     expect(state.consecutiveFailures).toBe(0)
   })
+
+  test("#given a compaction request rejected as non-retryable #when the session error arrives #then it marks the session unrecoverable and cancels the countdown", async () => {
+    // given
+    const sessionID = "ses_compaction_tool_pair_400"
+    const { cancelCalls, state, store } = createRecordingStateStore()
+    const handler = createTodoContinuationHandler({
+      ctx: {} as never,
+      sessionStateStore: store,
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "APIError",
+            data: {
+              message:
+                "messages.2: `tool_use` ids were found without `tool_result` blocks immediately after: toolu_01PCXjcagoMAca32awicQHce.",
+              statusCode: 400,
+              isRetryable: false,
+            },
+          },
+        },
+      },
+    })
+
+    // then
+    expect(state.unrecoverableErrorDetected).toBe(true)
+    expect(state.tokenLimitDetected).toBeUndefined()
+    expect(cancelCalls).toEqual([sessionID])
+  })
+
+  test("#given a retryable provider error #when the session error arrives #then the session is not marked unrecoverable", async () => {
+    // given
+    const sessionID = "ses_retryable_provider_error"
+    const { cancelCalls, state, store } = createRecordingStateStore()
+    const handler = createTodoContinuationHandler({
+      ctx: {} as never,
+      sessionStateStore: store,
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "APIError", data: { message: "overloaded", statusCode: 529, isRetryable: true } },
+        },
+      },
+    })
+
+    // then
+    expect(state.unrecoverableErrorDetected).toBeUndefined()
+    expect(cancelCalls).toEqual([])
+  })
 })

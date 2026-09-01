@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// omo-codex-install:819e258f7485f9ccdcbb64a54ac0097bf81cd8e2980d7f907017f224b1f99b98:2c6b840fadcd993447fd3e4c1b3e0965718c343ab68ad16a4972970dd0b828e7
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -46,9 +47,12 @@ import {
   fsyncSync,
   openSync,
   renameSync,
+  rmSync,
   unlinkSync,
   writeFileSync
 } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { dirname as dirname10 } from "node:path";
 function isToleratedFsyncError(error) {
   if (!(error instanceof Error))
     return false;
@@ -64,24 +68,36 @@ function tolerantFsyncSync(fileDescriptor, fsyncImpl) {
   }
 }
 function writeFileAtomically(filePath, content, options = {}) {
-  const tempPath = `${filePath}.tmp`;
-  writeFileSync(tempPath, content, "utf-8");
-  const tempFileDescriptor = openSync(tempPath, "r+");
+  const platform = options.platform ?? process.platform;
+  const fsyncImpl = options.fsyncSync ?? fsyncSync;
+  const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    tolerantFsyncSync(tempFileDescriptor, options.fsyncSync ?? fsyncSync);
-  } finally {
-    closeSync(tempFileDescriptor);
-  }
-  try {
-    renameSync(tempPath, filePath);
-  } catch (error) {
-    const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
-    if ((options.platform ?? process.platform) === "win32" && isPermissionError) {
+    writeFileSync(tempPath, content, "utf-8");
+    const tempFileDescriptor = openSync(tempPath, "r+");
+    try {
+      tolerantFsyncSync(tempFileDescriptor, fsyncImpl);
+    } finally {
+      closeSync(tempFileDescriptor);
+    }
+    try {
+      renameSync(tempPath, filePath);
+    } catch (error) {
+      const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
+      if (platform !== "win32" || !isPermissionError)
+        throw error;
       unlinkSync(filePath);
       renameSync(tempPath, filePath);
-      return;
     }
-    throw error;
+    if (platform === "win32")
+      return;
+    const directoryFileDescriptor = openSync(dirname10(filePath), "r");
+    try {
+      tolerantFsyncSync(directoryFileDescriptor, fsyncImpl);
+    } finally {
+      closeSync(directoryFileDescriptor);
+    }
+  } finally {
+    rmSync(tempPath, { force: true });
   }
 }
 var TOLERATED_FSYNC_CODES;
@@ -95,21 +111,21 @@ var init_atomic_write = __esm(() => {
 });
 
 // packages/telemetry-core/src/activity-state.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
-import { basename as basename6, join as join29 } from "node:path";
+import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
+import { basename as basename7, join as join34 } from "node:path";
 function resolveTelemetryStateDir(product, options = {}) {
   const dataDir = resolveXdgDataDir(product.cacheDirName, {
     env: options.env,
     osProvider: options.osProvider
   });
-  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join29(options.env.XDG_DATA_HOME, product.cacheDirName);
-  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename6(dataDir) === product.cacheDirName) {
+  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join34(options.env.XDG_DATA_HOME, product.cacheDirName);
+  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename7(dataDir) === product.cacheDirName) {
     return dataDir;
   }
-  return join29(dataDir, product.cacheDirName);
+  return join34(dataDir, product.cacheDirName);
 }
 function getTelemetryActivityStateFilePath(stateDir) {
-  return join29(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
+  return join34(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
 }
 function getDailyActiveCaptureState(input) {
   const state = readPostHogActivityState(input.stateDir, input.diagnostics);
@@ -138,7 +154,7 @@ function readPostHogActivityState(stateDir, diagnostics) {
     return {};
   }
   try {
-    const stateContent = readFileSync(stateFilePath, "utf-8");
+    const stateContent = readFileSync2(stateFilePath, "utf-8");
     const stateJson = JSON.parse(stateContent);
     if (!isPostHogActivityState(stateJson)) {
       return {};
@@ -176,13 +192,13 @@ var init_activity_state = __esm(() => {
 });
 
 // packages/telemetry-core/src/constants.ts
-var DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
+var DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74", UNCONFIGURED_POSTHOG_API_KEY = "phc_REPLACE_ME_OMO_NATIVE";
 
 // packages/telemetry-core/src/diagnostics.ts
-import { appendFileSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
-import { join as join30 } from "node:path";
+import { appendFileSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
+import { join as join35 } from "node:path";
 function getTelemetryDiagnosticsFilePath(diagnosticsDir) {
-  return join30(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
+  return join35(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
 }
 function writeTelemetryDiagnostic(input, options) {
   const now = options.now ?? new Date;
@@ -205,7 +221,7 @@ function cleanupTelemetryDiagnostics(options) {
   }
   try {
     const cutoffMs = (options.now ?? new Date).getTime() - DIAGNOSTICS_RETENTION_MS;
-    const retainedLines = trimToMaxBytes(readFileSync2(diagnosticsFilePath, "utf-8").split(`
+    const retainedLines = trimToMaxBytes(readFileSync3(diagnosticsFilePath, "utf-8").split(`
 `).filter((line) => shouldRetainLine(line, cutoffMs)));
     writeFileAtomically(diagnosticsFilePath, retainedLines.length === 0 ? "" : `${retainedLines.join(`
 `)}
@@ -311,24 +327,34 @@ function isSendOptOutFlag(value) {
   return includesValue(SEND_OPT_OUT_VALUES, value);
 }
 function shouldDisableTelemetry(input) {
-  const env2 = input.env ?? process.env;
+  const env = input.env ?? process.env;
   const globalPrefix = input.globalEnvPrefix ?? "OMO";
   const prefixes = Array.from(new Set([globalPrefix, input.productEnvPrefix]));
+  if (isDisableFlag(env["DO_NOT_TRACK"])) {
+    return true;
+  }
   for (const prefix of prefixes) {
-    if (isDisableFlag(env2[`${prefix}_DISABLE_POSTHOG`])) {
+    if (isDisableFlag(env[`${prefix}_DISABLE_POSTHOG`])) {
       return true;
     }
-    if (isSendOptOutFlag(env2[`${prefix}_SEND_ANONYMOUS_TELEMETRY`])) {
+    if (isSendOptOutFlag(env[`${prefix}_SEND_ANONYMOUS_TELEMETRY`])) {
       return true;
     }
   }
   return false;
 }
-function getTelemetryApiKey(env2 = process.env, defaultApiKey = DEFAULT_POSTHOG_API_KEY) {
-  return env2["POSTHOG_API_KEY"]?.trim() ?? defaultApiKey;
+function getTelemetryApiKey(env = process.env, defaultApiKey = DEFAULT_POSTHOG_API_KEY) {
+  return env["POSTHOG_API_KEY"]?.trim() ?? defaultApiKey;
 }
-function getTelemetryHost(env2 = process.env, defaultHost = DEFAULT_POSTHOG_HOST) {
-  return env2["POSTHOG_HOST"]?.trim() || defaultHost;
+function isConfiguredTelemetryApiKey(apiKey) {
+  const normalized = apiKey.trim();
+  return normalized.length > 0 && normalized !== UNCONFIGURED_POSTHOG_API_KEY;
+}
+function hasTelemetryApiKey(env, defaultApiKey) {
+  return isConfiguredTelemetryApiKey(getTelemetryApiKey(env, defaultApiKey));
+}
+function getTelemetryHost(env = process.env, defaultHost = DEFAULT_POSTHOG_HOST) {
+  return env["POSTHOG_HOST"]?.trim() || defaultHost;
 }
 var TRUTHY_DISABLE_VALUES, SEND_OPT_OUT_VALUES;
 var init_env = __esm(() => {
@@ -336,19 +362,8 @@ var init_env = __esm(() => {
   SEND_OPT_OUT_VALUES = ["0", "false", "no", "yes"];
 });
 
-// packages/telemetry-core/src/machine-id.ts
-import { createHash as createHash2 } from "node:crypto";
-import os2 from "node:os";
-function getDefaultTelemetryOsProvider() {
-  return os2;
-}
-function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetryOsProvider()) {
-  return createHash2("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
-}
-var init_machine_id = () => {};
-
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
-import { dirname as dirname8, posix, sep as sep7 } from "node:path";
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
+import { dirname as dirname11, posix as posix2, sep as sep7 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
   return async (frames) => {
@@ -357,16 +372,16 @@ function createModulerModifier() {
     return frames;
   };
 }
-function createGetModuleFromFilename(basePath = process.argv[1] ? dirname8(process.argv[1]) : process.cwd(), isWindows = sep7 === "\\") {
+function createGetModuleFromFilename(basePath = process.argv[1] ? dirname11(process.argv[1]) : process.cwd(), isWindows = sep7 === "\\") {
   const normalizedBase = isWindows ? normalizeWindowsPath(basePath) : basePath;
   return (filename) => {
     if (!filename)
       return;
     const normalizedFilename = isWindows ? normalizeWindowsPath(filename) : filename;
-    let { dir, base: file2, ext } = posix.parse(normalizedFilename);
+    let { dir, base: file, ext } = posix2.parse(normalizedFilename);
     if (ext === ".js" || ext === ".mjs" || ext === ".cjs")
-      file2 = file2.slice(0, -1 * ext.length);
-    const decodedFile = decodeURIComponent(file2);
+      file = file.slice(0, -1 * ext.length);
+    const decodedFile = decodeURIComponent(file);
     if (!dir)
       dir = ".";
     const n = dir.lastIndexOf("/node_modules");
@@ -384,7 +399,7 @@ function normalizeWindowsPath(path2) {
 }
 var init_module_node = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/featureFlagUtils.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/featureFlagUtils.mjs
 function getFlagDetailFromFlagAndPayload(key, value, payload) {
   return {
     key,
@@ -449,10 +464,71 @@ var normalizeFlagsResponse = (flagsResponse) => {
   } catch {
     return response;
   }
+}, MINIMAL_FLAG_CALLED_EVENT_CAMPAIGN_PROPERTIES, MINIMAL_FLAG_CALLED_EVENT_PROPERTIES, minimizeFlagCalledEventProperties = (properties, transportKeys = []) => {
+  const minimal = {};
+  const copyKey = (key) => {
+    if (properties[key] !== undefined)
+      minimal[key] = properties[key];
+  };
+  MINIMAL_FLAG_CALLED_EVENT_PROPERTIES.forEach(copyKey);
+  transportKeys.forEach(copyKey);
+  return minimal;
 };
-var init_featureFlagUtils = () => {};
+var init_featureFlagUtils = __esm(() => {
+  MINIMAL_FLAG_CALLED_EVENT_CAMPAIGN_PROPERTIES = [
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_content",
+    "utm_term",
+    "gad_source",
+    "mc_cid",
+    "gclid",
+    "gclsrc",
+    "dclid",
+    "gbraid",
+    "wbraid",
+    "fbclid",
+    "msclkid",
+    "twclid",
+    "li_fat_id",
+    "igshid",
+    "ttclid",
+    "rdt_cid",
+    "epik",
+    "qclid",
+    "sccid",
+    "irclid",
+    "_kx"
+  ];
+  MINIMAL_FLAG_CALLED_EVENT_PROPERTIES = [
+    "$feature_flag",
+    "$feature_flag_response",
+    "$feature_flag_has_experiment",
+    "$feature_flag_id",
+    "$feature_flag_version",
+    "$feature_flag_reason",
+    "$feature_flag_request_id",
+    "$feature_flag_evaluated_at",
+    "$feature_flag_error",
+    "locally_evaluated",
+    "$groups",
+    "$process_person_profile",
+    "$geoip_disable",
+    "$current_url",
+    "$pathname",
+    "$referring_domain",
+    ...MINIMAL_FLAG_CALLED_EVENT_CAMPAIGN_PROPERTIES,
+    "$session_id",
+    "$window_id",
+    "$lib",
+    "$lib_version",
+    "$device_id",
+    "$is_server"
+  ];
+});
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/types.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/types.mjs
 var types_PostHogPersistedProperty;
 var init_types = __esm(() => {
   types_PostHogPersistedProperty = /* @__PURE__ */ function(PostHogPersistedProperty) {
@@ -469,6 +545,8 @@ var init_types = __esm(() => {
     PostHogPersistedProperty["BootstrapFeatureFlagPayloads"] = "bootstrap_feature_flag_payloads";
     PostHogPersistedProperty["OverrideFeatureFlags"] = "override_feature_flags";
     PostHogPersistedProperty["Queue"] = "queue";
+    PostHogPersistedProperty["AiQueue"] = "ai_queue";
+    PostHogPersistedProperty["AiCaptureQueue"] = "ai_capture_queue";
     PostHogPersistedProperty["LogsQueue"] = "logs_queue";
     PostHogPersistedProperty["OptedOut"] = "opted_out";
     PostHogPersistedProperty["SessionId"] = "session_id";
@@ -479,6 +557,8 @@ var init_types = __esm(() => {
     PostHogPersistedProperty["InstalledAppBuild"] = "installed_app_build";
     PostHogPersistedProperty["InstalledAppVersion"] = "installed_app_version";
     PostHogPersistedProperty["SessionReplay"] = "session_replay";
+    PostHogPersistedProperty["PushRegistered"] = "push_registered";
+    PostHogPersistedProperty["SessionReplayEventTriggerActivatedSession"] = "session_replay_event_trigger_activated_session";
     PostHogPersistedProperty["SurveyLastSeenDate"] = "survey_last_seen_date";
     PostHogPersistedProperty["SurveysSeen"] = "surveys_seen";
     PostHogPersistedProperty["Surveys"] = "surveys";
@@ -489,14 +569,14 @@ var init_types = __esm(() => {
   }({});
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/gzip.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/gzip.mjs
 function isGzipSupported() {
   return "CompressionStream" in globalThis && "TextEncoder" in globalThis && "Response" in globalThis && typeof Response.prototype.blob == "function";
 }
 async function gzipCompress(input, isDebug = true, options) {
   try {
     const inputBytes = new TextEncoder().encode(input);
-    const compressedStream = new CompressionStream("gzip");
+    const compressedStream = new globalThis.CompressionStream("gzip");
     const writer = compressedStream.writable.getWriter();
     const writePromise = writer.write(inputBytes).then(() => writer.close()).catch(async (err) => {
       try {
@@ -557,7 +637,30 @@ var init_gzip = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bot-detection.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/json-utils.mjs
+function sanitizeString(value) {
+  let output = "";
+  for (let index = 0;index < value.length; index++) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 55296 && codeUnit <= 56319) {
+      const nextCodeUnit = value.charCodeAt(index + 1);
+      if (nextCodeUnit >= 56320 && nextCodeUnit <= 57343) {
+        output += value[index] + value[index + 1];
+        index++;
+      } else
+        output += "�";
+    } else
+      output += codeUnit >= 56320 && codeUnit <= 57343 ? "�" : value[index];
+  }
+  return output;
+}
+var MAX_JSON_SAFE_VALUE_DEPTH = 20, MAX_JSON_SAFE_VALUE_ITEMS = 1000, MAX_JSON_SAFE_VALUE_NODES = 1e4, CIRCULAR_VALUE = "[Circular]", TRUNCATED_VALUE = "[Truncated]", UNSERIALIZABLE_VALUE = "[Unserializable]", FUNCTION_VALUE = "[Function]", dateGetTime, dateToISOString;
+var init_json_utils = __esm(() => {
+  dateGetTime = Date.prototype.getTime;
+  dateToISOString = Date.prototype.toISOString;
+});
+
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/bot-detection.mjs
 var DEFAULT_BLOCKED_UA_STRS, isBlockedUA = function(ua, customBlockedUserAgents = []) {
   if (!ua)
     return false;
@@ -649,15 +752,55 @@ var init_bot_detection = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/string-utils.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/string-utils.mjs
+function safeJsonStringify(value) {
+  const ancestors = [];
+  return JSON.stringify(value, function(_key, replacementValue) {
+    if (typeof replacementValue == "bigint")
+      return replacementValue.toString();
+    if (typeof replacementValue == "function" || typeof replacementValue == "symbol")
+      return;
+    if (replacementValue instanceof Error)
+      return {
+        name: replacementValue.name,
+        message: replacementValue.message,
+        stack: replacementValue.stack
+      };
+    if (replacementValue && typeof replacementValue == "object") {
+      while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this)
+        ancestors.pop();
+      if (ancestors.includes(replacementValue))
+        return "[Circular]";
+      ancestors.push(replacementValue);
+    }
+    return replacementValue;
+  }) ?? "null";
+}
 var init_string_utils = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/type-utils.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/browser-utils.mjs
+var init_browser_utils = __esm(() => {
+  init_string_utils();
+});
+
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/type-utils.mjs
 function isPrimitive(value) {
   return value === null || typeof value != "object";
 }
 function isBuiltin(candidate, className) {
   return Object.prototype.toString.call(candidate) === `[object ${className}]`;
+}
+function isError(candidate) {
+  switch (Object.prototype.toString.call(candidate)) {
+    case "[object Error]":
+    case "[object Exception]":
+    case "[object DOMException]":
+    case "[object DOMError]":
+    case "[object WebAssembly.Exception]":
+      return true;
+    default:
+      return isInstanceOf(candidate, Error);
+  }
 }
 function isErrorEvent(event) {
   return isBuiltin(event, "ErrorEvent");
@@ -665,7 +808,7 @@ function isErrorEvent(event) {
 function isEvent(candidate) {
   return typeof Event != "undefined" && isInstanceOf(candidate, Event);
 }
-function isPlainObject2(candidate) {
+function isPlainObject(candidate) {
   return isBuiltin(candidate, "Object");
 }
 function isInstanceOf(candidate, base) {
@@ -675,7 +818,7 @@ function isInstanceOf(candidate, base) {
     return false;
   }
 }
-var nativeIsArray, ObjProto, type_utils_hasOwnProperty, type_utils_toString, isArray, isObject = (x) => x === Object(x) && !isArray(x), isUndefined = (x) => x === undefined, isString = (x) => type_utils_toString.call(x) == "[object String]", isEmptyString = (x) => isString(x) && x.trim().length === 0, isNumber = (x) => type_utils_toString.call(x) == "[object Number]" && x === x, isPlainError = (x) => x instanceof Error;
+var nativeIsArray, ObjProto, type_utils_hasOwnProperty, type_utils_toString, isArray, isObject = (x) => x === Object(x) && !isArray(x), isUndefined = (x) => x === undefined, isString = (x) => type_utils_toString.call(x) == "[object String]", isEmptyString = (x) => isString(x) && x.trim().length === 0, isNull = (x) => x === null, isNullish = (x) => isUndefined(x) || isNull(x), isNumber = (x) => type_utils_toString.call(x) == "[object Number]" && x === x, isBoolean = (x) => type_utils_toString.call(x) === "[object Boolean]";
 var init_type_utils = __esm(() => {
   init_types();
   init_string_utils();
@@ -688,30 +831,37 @@ var init_type_utils = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/number-utils.mjs
-function clampToRange(value, min, max, logger3, fallbackValue) {
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/number-utils.mjs
+function clampToRange(value, min, max, logger, fallbackValue) {
   if (min > max) {
-    logger3.warn("min cannot be greater than max.");
+    logger.warn("min cannot be greater than max.");
     min = max;
   }
   if (isNumber(value))
     if (value > max) {
-      logger3.warn(" cannot be  greater than max: " + max + ". Using max value instead.");
+      logger.warn(" cannot be  greater than max: " + max + ". Using max value instead.");
       return max;
     } else {
       if (!(value < min))
         return value;
-      logger3.warn(" cannot be less than min: " + min + ". Using min value instead.");
+      logger.warn(" cannot be less than min: " + min + ". Using min value instead.");
       return min;
     }
-  logger3.warn(" must be a number. using max or fallback. max: " + max + ", fallback: " + fallbackValue);
-  return clampToRange(fallbackValue || max, min, max, logger3);
+  logger.warn(" must be a number. using max or fallback. max: " + max + ", fallback: " + fallbackValue);
+  return clampToRange(fallbackValue || max, min, max, logger);
 }
 var init_number_utils = __esm(() => {
   init_type_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bucketed-rate-limiter.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/bucketed-rate-limiter.mjs
+function resolveExceptionRateLimiterConfig(config = {}) {
+  return {
+    refillRate: config.exceptionRateLimiterRefillRate ?? config.__exceptionRateLimiterRefillRate ?? DEFAULT_EXCEPTION_RATE_LIMITER_REFILL_RATE,
+    bucketSize: config.exceptionRateLimiterBucketSize ?? config.__exceptionRateLimiterBucketSize ?? DEFAULT_EXCEPTION_RATE_LIMITER_BUCKET_SIZE
+  };
+}
+
 class BucketedRateLimiter {
   constructor(options) {
     this._buckets = {};
@@ -753,12 +903,12 @@ class BucketedRateLimiter {
     this._buckets = {};
   }
 }
-var ONE_DAY_IN_MS = 86400000;
+var ONE_DAY_IN_MS = 86400000, DEFAULT_EXCEPTION_RATE_LIMITER_REFILL_RATE = 1, DEFAULT_EXCEPTION_RATE_LIMITER_BUCKET_SIZE = 10;
 var init_bucketed_rate_limiter = __esm(() => {
   init_number_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/vendor/uuidv7.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/vendor/uuidv7.mjs
 class UUID {
   constructor(bytes) {
     this.bytes = bytes;
@@ -933,37 +1083,49 @@ var init_uuidv7 = __esm(() => {
   /*! For license information please see uuidv7.mjs.LICENSE.txt */
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/promise-queue.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/promise-queue.mjs
 class PromiseQueue {
   add(promise) {
     const promiseUUID = uuidv7();
-    this.promiseByIds[promiseUUID] = promise;
+    const id = ++this.nextId;
+    this.promiseByIds[promiseUUID] = {
+      id,
+      promise
+    };
     promise.catch(() => {}).finally(() => {
       delete this.promiseByIds[promiseUUID];
     });
     return promise;
   }
   async join() {
-    let promises = Object.values(this.promiseByIds);
+    let promises = Object.values(this.promiseByIds).map((item) => item.promise);
     let length = promises.length;
     while (length > 0) {
       await Promise.all(promises);
-      promises = Object.values(this.promiseByIds);
+      promises = Object.values(this.promiseByIds).map((item) => item.promise);
       length = promises.length;
     }
+  }
+  getPromises(ignoredPromises = [], maxId = this.nextId) {
+    const ignoredPromiseSet = new Set(ignoredPromises);
+    return Object.values(this.promiseByIds).filter((item) => item.id <= maxId && !ignoredPromiseSet.has(item.promise)).map((item) => item.promise);
+  }
+  get maxId() {
+    return this.nextId;
   }
   get length() {
     return Object.keys(this.promiseByIds).length;
   }
   constructor() {
     this.promiseByIds = {};
+    this.nextId = 0;
   }
 }
 var init_promise_queue = __esm(() => {
   init_uuidv7();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/logger.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/logger.mjs
 function createConsole(consoleLike = console) {
   const lockedMethods = {
     log: consoleLike.log.bind(consoleLike),
@@ -983,7 +1145,7 @@ var _createLogger = (prefix, maybeCall, consoleLike) => {
       consoleMethod(prefix, ...args);
     });
   }
-  const logger3 = {
+  const logger = {
     debug: (...args) => {
       _log("debug", ...args);
     },
@@ -1001,12 +1163,12 @@ var _createLogger = (prefix, maybeCall, consoleLike) => {
     },
     createLogger: (additionalPrefix) => _createLogger(`${prefix} ${additionalPrefix}`, maybeCall, consoleLike)
   };
-  return logger3;
+  return logger;
 }, passThrough = (fn) => fn();
 var init_logger = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/user-agent-utils.mjs
-var MOBILE = "Mobile", IOS = "iOS", ANDROID = "Android", TABLET = "Tablet", ANDROID_TABLET, APPLE = "Apple", APPLE_WATCH, SAFARI = "Safari", BLACKBERRY = "BlackBerry", SAMSUNG = "Samsung", SAMSUNG_BROWSER, SAMSUNG_INTERNET, CHROME = "Chrome", CHROME_OS, CHROME_IOS, INTERNET_EXPLORER = "Internet Explorer", INTERNET_EXPLORER_MOBILE, OPERA = "Opera", OPERA_MINI, EDGE = "Edge", MICROSOFT_EDGE, FIREFOX = "Firefox", FIREFOX_IOS, NINTENDO = "Nintendo", PLAYSTATION = "PlayStation", XBOX = "Xbox", ANDROID_MOBILE, MOBILE_SAFARI, WINDOWS = "Windows", WINDOWS_PHONE, GENERIC = "Generic", GENERIC_MOBILE, GENERIC_TABLET, KONQUEROR = "Konqueror", OCULUS_BROWSER = "Oculus Browser", VIVALDI = "Vivaldi", YANDEX = "Yandex", WHALE = "Whale", DUCKDUCKGO = "DuckDuckGo", PALE_MOON = "Pale Moon", WATERFOX = "Waterfox", BRAVE = "Brave", BROWSER_VERSION_REGEX_SUFFIX = "(\\d+(\\.\\d+)?)", DEFAULT_BROWSER_VERSION_REGEX, XBOX_REGEX, PLAYSTATION_REGEX, NINTENDO_REGEX, BLACKBERRY_REGEX, windowsVersionMap, versionRegexes, osMatchers;
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/user-agent-utils.mjs
+var MOBILE = "Mobile", IOS = "iOS", ANDROID = "Android", TABLET = "Tablet", ANDROID_TABLET, APPLE = "Apple", APPLE_WATCH, SAFARI = "Safari", BLACKBERRY = "BlackBerry", SAMSUNG = "Samsung", SAMSUNG_BROWSER, SAMSUNG_INTERNET, CHROME = "Chrome", CHROME_OS, CHROME_IOS, INTERNET_EXPLORER = "Internet Explorer", INTERNET_EXPLORER_MOBILE, OPERA = "Opera", OPERA_MINI, EDGE = "Edge", MICROSOFT_EDGE, FIREFOX = "Firefox", FIREFOX_IOS, NINTENDO = "Nintendo", PLAYSTATION = "PlayStation", XBOX = "Xbox", ANDROID_MOBILE, MOBILE_SAFARI, WINDOWS = "Windows", WINDOWS_PHONE, GENERIC = "Generic", GENERIC_MOBILE, GENERIC_TABLET, KONQUEROR = "Konqueror", OCULUS_BROWSER = "Oculus Browser", VIVALDI = "Vivaldi", YANDEX = "Yandex", WHALE = "Whale", DUCKDUCKGO = "DuckDuckGo", PALE_MOON = "Pale Moon", WATERFOX = "Waterfox", BRAVE = "Brave", GOOGLE_SEARCH_APP = "Google Search App", BROWSER_VERSION_REGEX_SUFFIX = "(\\d+(\\.\\d+)?)", DEFAULT_BROWSER_VERSION_REGEX, XBOX_REGEX, PLAYSTATION_REGEX, NINTENDO_REGEX, BLACKBERRY_REGEX, windowsVersionMap, versionRegexes, osMatchers;
 var init_user_agent_utils = __esm(() => {
   init_string_utils();
   init_type_utils();
@@ -1110,6 +1272,9 @@ var init_user_agent_utils = __esm(() => {
     ],
     [WATERFOX]: [
       new RegExp(WATERFOX + "\\/" + BROWSER_VERSION_REGEX_SUFFIX)
+    ],
+    [GOOGLE_SEARCH_APP]: [
+      new RegExp("GSA\\/" + BROWSER_VERSION_REGEX_SUFFIX)
     ],
     [INTERNET_EXPLORER]: [
       new RegExp("(rv:|MSIE )" + BROWSER_VERSION_REGEX_SUFFIX)
@@ -1271,7 +1436,13 @@ var init_user_agent_utils = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/index.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/utils/index.mjs
+function isValidUUID(value) {
+  return typeof value == "string" && UUID_REGEX.test(value);
+}
+function getEventUuid(uuid, generateUuid) {
+  return isValidUUID(uuid) ? uuid : generateUuid();
+}
 function removeTrailingSlash(url) {
   return url?.replace(/\/+$/, "");
 }
@@ -1299,6 +1470,26 @@ function safeSetTimeout(fn, timeout) {
   t?.unref && t?.unref();
   return t;
 }
+async function raceWithTimeout(promise, timeoutMs, onTimeout) {
+  let timeoutHandle;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve9, reject) => {
+        timeoutHandle = safeSetTimeout(() => {
+          try {
+            onTimeout?.();
+            resolve9();
+          } catch (error) {
+            reject(error);
+          }
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
 function allSettled(promises) {
   return Promise.all(promises.map((p) => (p ?? Promise.resolve()).then((value) => ({
     status: "fulfilled",
@@ -1308,9 +1499,11 @@ function allSettled(promises) {
     reason
   }))));
 }
-var STRING_FORMAT = "utf8", isError = (x) => x instanceof Error;
+var STRING_FORMAT = "utf8", UUID_REGEX;
 var init_utils = __esm(() => {
+  init_json_utils();
   init_bot_detection();
+  init_browser_utils();
   init_bucketed_rate_limiter();
   init_number_utils();
   init_string_utils();
@@ -1318,12 +1511,168 @@ var init_utils = __esm(() => {
   init_promise_queue();
   init_logger();
   init_user_agent_utils();
+  UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/logs-utils.mjs
-var OTLP_SEVERITY_MAP, DEFAULT_OTLP_SEVERITY;
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/logs/logs-utils.mjs
+function newState() {
+  return {
+    ancestors: new WeakSet,
+    remainingNodes: MAX_JSON_SAFE_VALUE_NODES
+  };
+}
+function toOtlpKeyValueList(attrs, logger2) {
+  try {
+    return encodeKeyValueList(attrs, logger2, newState(), 0);
+  } catch {
+    return [];
+  }
+}
+function encodeAnyValue(value, logger2, state, depth) {
+  if (state.remainingNodes <= 0)
+    return {
+      stringValue: TRUNCATED_VALUE
+    };
+  state.remainingNodes--;
+  if (isBoolean(value))
+    return {
+      boolValue: value
+    };
+  if (typeof value == "number") {
+    if (!Number.isFinite(value))
+      return {
+        stringValue: String(value)
+      };
+    if (Number.isInteger(value)) {
+      if (Number.isSafeInteger(value))
+        return {
+          intValue: String(value)
+        };
+      if (typeof BigInt == "undefined")
+        return {
+          stringValue: String(value)
+        };
+      const decimal = BigInt(value).toString();
+      if (value >= INT64_RANGE_LIMIT || value < -INT64_RANGE_LIMIT) {
+        logger2?.debug(`Attribute ${decimal} is outside the int64 range; encoding it as a string`);
+        return {
+          stringValue: decimal
+        };
+      }
+      return {
+        intValue: decimal
+      };
+    }
+    return {
+      doubleValue: value
+    };
+  }
+  if (typeof value == "string")
+    return {
+      stringValue: sanitizeString(value)
+    };
+  if (typeof value == "function")
+    return {
+      stringValue: FUNCTION_VALUE
+    };
+  if (typeof value == "symbol")
+    return {
+      stringValue: String(value)
+    };
+  if (typeof value == "object" && value !== null) {
+    if (state.ancestors.has(value))
+      return {
+        stringValue: CIRCULAR_VALUE
+      };
+    if (depth >= MAX_JSON_SAFE_VALUE_DEPTH)
+      return {
+        stringValue: TRUNCATED_VALUE
+      };
+    if (value instanceof Date) {
+      const time = value.getTime();
+      const iso = Number.isFinite(time) ? value.toISOString() : String(value);
+      return {
+        stringValue: typeof iso == "string" ? sanitizeString(iso) : String(iso)
+      };
+    }
+    state.ancestors.add(value);
+    try {
+      try {
+        const toJSON = value.toJSON;
+        if (typeof toJSON == "function")
+          return encodeAnyValue(toJSON.call(value), logger2, state, depth + 1);
+      } catch {}
+      if (isArray(value))
+        return {
+          arrayValue: {
+            values: encodeArrayValues(value, logger2, state, depth + 1)
+          }
+        };
+      return {
+        kvlistValue: {
+          values: encodeKeyValueList(value, logger2, state, depth + 1)
+        }
+      };
+    } finally {
+      state.ancestors.delete(value);
+    }
+  }
+  return {
+    stringValue: sanitizeString(String(value))
+  };
+}
+function encodeArrayValues(values, logger2, state, depth) {
+  const result = [];
+  const itemCount = Math.min(values.length, MAX_JSON_SAFE_VALUE_ITEMS);
+  let index = 0;
+  for (;index < itemCount && state.remainingNodes > 0; index++)
+    try {
+      const element = index in values ? values[index] : undefined;
+      if (isNullish(element))
+        continue;
+      result.push(encodeAnyValue(element, logger2, state, depth));
+    } catch {
+      result.push({
+        stringValue: UNSERIALIZABLE_VALUE
+      });
+    }
+  if (values.length > index)
+    result.push({
+      stringValue: TRUNCATED_VALUE
+    });
+  return result;
+}
+function encodeKeyValueList(attrs, logger2, state, depth) {
+  const result = [];
+  for (const key in attrs)
+    if (propertyIsEnumerable.call(attrs, key)) {
+      if (result.length >= MAX_JSON_SAFE_VALUE_ITEMS || state.remainingNodes <= 0) {
+        logger2?.debug("Attributes truncated: the value exceeds the OTLP encoder budget");
+        break;
+      }
+      try {
+        const value = attrs[key];
+        if (isNull(value) || isUndefined(value))
+          continue;
+        result.push({
+          key: sanitizeString(key),
+          value: encodeAnyValue(value, logger2, state, depth)
+        });
+      } catch {
+        result.push({
+          key: sanitizeString(key),
+          value: {
+            stringValue: UNSERIALIZABLE_VALUE
+          }
+        });
+      }
+    }
+  return result;
+}
+var OTLP_SEVERITY_MAP, DEFAULT_OTLP_SEVERITY, INT64_RANGE_LIMIT = 9223372036854776000, propertyIsEnumerable;
 var init_logs_utils = __esm(() => {
   init_utils();
+  init_json_utils();
   OTLP_SEVERITY_MAP = {
     trace: {
       text: "TRACE",
@@ -1351,27 +1700,444 @@ var init_logs_utils = __esm(() => {
     }
   };
   DEFAULT_OTLP_SEVERITY = OTLP_SEVERITY_MAP.info;
+  propertyIsEnumerable = Object.prototype.propertyIsEnumerable;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/index.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/logs/index.mjs
 var init_logs = __esm(() => {
   init_logs_utils();
   init_types();
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/surveys/validation.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/metrics/metrics-utils.mjs
+function msToUnixNano(ms) {
+  return String(ms) + "000000";
+}
+function seriesKey(type, name, unit, attributes) {
+  let attrsKey = "";
+  if (attributes) {
+    const keys = Object.keys(attributes).sort();
+    attrsKey = keys.map((k) => `${JSON.stringify(k)}:${JSON.stringify(attributes[k])}`).join(",");
+  }
+  return `${type}\x00${name}\x00${unit ?? ""}\x00${attrsKey}`;
+}
+function bucketIndexFor(value, bounds) {
+  for (let i = 0;i < bounds.length; i++)
+    if (value <= bounds[i])
+      return i;
+  return bounds.length;
+}
+function buildMetricsResourceAttributes(config, scopeName, scopeVersion) {
+  return {
+    ...config.resourceAttributes,
+    "service.name": config.serviceName || "unknown_service",
+    ...config.environment && {
+      "deployment.environment": config.environment
+    },
+    ...config.serviceVersion && {
+      "service.version": config.serviceVersion
+    },
+    "telemetry.sdk.name": scopeName,
+    "telemetry.sdk.version": scopeVersion
+  };
+}
+function buildOtlpMetricsPayload(metrics, resourceAttributes, scopeName, scopeVersion) {
+  return {
+    resourceMetrics: [
+      {
+        resource: {
+          attributes: toOtlpKeyValueList(resourceAttributes)
+        },
+        scopeMetrics: [
+          {
+            scope: {
+              name: scopeName,
+              version: scopeVersion
+            },
+            metrics
+          }
+        ]
+      }
+    ]
+  };
+}
+var DEFAULT_HISTOGRAM_BOUNDS;
+var init_metrics_utils = __esm(() => {
+  init_logs_utils();
+  DEFAULT_HISTOGRAM_BOUNDS = [
+    0,
+    5,
+    10,
+    25,
+    50,
+    75,
+    100,
+    250,
+    500,
+    750,
+    1000,
+    2500,
+    5000,
+    7500,
+    1e4
+  ];
+});
+
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/metrics/config.mjs
+function resolveMetricsConfig(config) {
+  const resourceAttributes = config?.resourceAttributes;
+  return {
+    serviceName: resourceAttributes?.["service.name"] ?? config?.serviceName,
+    serviceVersion: resourceAttributes?.["service.version"] ?? config?.serviceVersion,
+    environment: resourceAttributes?.["deployment.environment"] ?? config?.environment,
+    resourceAttributes,
+    beforeSend: config?.beforeSend,
+    flushIntervalMs: config?.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS,
+    maxSeriesPerFlush: config?.maxSeriesPerFlush ?? DEFAULT_MAX_SERIES_PER_FLUSH
+  };
+}
+var DEFAULT_FLUSH_INTERVAL_MS = 1e4, DEFAULT_MAX_SERIES_PER_FLUSH = 1000;
+var init_config = () => {};
+
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/metrics/index.mjs
+class PostHogMetrics {
+  constructor(_instance, _config, _logger) {
+    this._instance = _instance;
+    this._config = _config;
+    this._logger = _logger;
+    this._series = new Map;
+    this._flushPromise = null;
+    this._seriesCapWarned = false;
+    this._typeByName = new Map;
+    this._typeCollisionWarned = new Set;
+    this._generation = 0;
+  }
+  count(name, value = 1, options) {
+    this._capture({
+      name,
+      type: "count",
+      value,
+      unit: options?.unit,
+      attributes: options?.attributes
+    });
+  }
+  gauge(name, value, options) {
+    this._capture({
+      name,
+      type: "gauge",
+      value,
+      unit: options?.unit,
+      attributes: options?.attributes
+    });
+  }
+  histogram(name, value, options) {
+    this._capture({
+      name,
+      type: "histogram",
+      value,
+      unit: options?.unit,
+      attributes: options?.attributes
+    });
+  }
+  flush() {
+    const prev = this._flushPromise;
+    const run = async () => {
+      if (prev)
+        await prev.catch(() => {});
+      await this._doFlush();
+    };
+    const p = run().finally(() => {
+      if (this._flushPromise === p)
+        this._flushPromise = null;
+    });
+    this._flushPromise = p;
+    return p;
+  }
+  drainWindow() {
+    if (this._series.size === 0)
+      return null;
+    const window = this._series;
+    this._series = new Map;
+    this._seriesCapWarned = false;
+    this._typeByName = new Map;
+    this._typeCollisionWarned = new Set;
+    return this._buildPayload(window);
+  }
+  reset() {
+    this._generation++;
+    this._clearFlushTimer();
+    this._series = new Map;
+    this._flushPromise = null;
+    this._seriesCapWarned = false;
+    this._typeByName = new Map;
+    this._typeCollisionWarned = new Set;
+  }
+  _capture(sample) {
+    if (this._instance.isDisabled || this._instance.optedOut)
+      return;
+    const filtered = this._runBeforeSend(sample);
+    if (filtered === null)
+      return;
+    if (!filtered.name || typeof filtered.name != "string")
+      return void this._logger.warn("Dropping metric with empty name");
+    if (typeof filtered.value != "number" || !Number.isFinite(filtered.value))
+      return void this._logger.warn(`Dropping metric '${filtered.name}': value must be a finite number`);
+    if (filtered.type === "count" && filtered.value < 0)
+      return void this._logger.warn(`Dropping count '${filtered.name}': counters are monotonic, value must be >= 0`);
+    let attributes;
+    let key;
+    try {
+      attributes = filtered.attributes ? {
+        ...filtered.attributes
+      } : undefined;
+      key = seriesKey(filtered.type, filtered.name, filtered.unit, attributes);
+    } catch (e) {
+      this._logger.warn(`Dropping metric '${filtered.name}': attributes could not be serialized`, e);
+      return;
+    }
+    let state = this._series.get(key);
+    if (!state) {
+      if (!this._admitNewSeries())
+        return;
+      state = {
+        name: filtered.name,
+        type: filtered.type,
+        unit: filtered.unit,
+        attributes,
+        windowStartMs: Date.now()
+      };
+      this._series.set(key, state);
+    }
+    const seenType = this._typeByName.get(filtered.name);
+    if (seenType === undefined)
+      this._typeByName.set(filtered.name, filtered.type);
+    else if (seenType !== filtered.type && !this._typeCollisionWarned.has(filtered.name)) {
+      this._typeCollisionWarned.add(filtered.name);
+      this._logger.warn(`Metric name '${filtered.name}' is already used as a ${seenType}; recording it as a ${filtered.type} too will blend both series in charts. Use a distinct name.`);
+    }
+    this._fold(state, filtered.value);
+    this._armFlushTimer();
+  }
+  _admitNewSeries() {
+    if (this._series.size < this._config.maxSeriesPerFlush)
+      return true;
+    if (!this._seriesCapWarned) {
+      this._seriesCapWarned = true;
+      this._logger.warn(`Metric series cap reached (${this._config.maxSeriesPerFlush} per flush window); dropping new series until the next flush. Reduce attribute cardinality.`);
+    }
+    return false;
+  }
+  _fold(state, value) {
+    switch (state.type) {
+      case "count":
+        state.total = (state.total ?? 0) + value;
+        break;
+      case "gauge":
+        state.last = value;
+        break;
+      case "histogram": {
+        if (!state.hist)
+          state.hist = {
+            count: 0,
+            sum: 0,
+            min: value,
+            max: value,
+            bucketCounts: new Array(DEFAULT_HISTOGRAM_BOUNDS.length + 1).fill(0)
+          };
+        const hist = state.hist;
+        hist.count += 1;
+        hist.sum += value;
+        hist.min = Math.min(hist.min, value);
+        hist.max = Math.max(hist.max, value);
+        hist.bucketCounts[bucketIndexFor(value, DEFAULT_HISTOGRAM_BOUNDS)] += 1;
+        break;
+      }
+    }
+  }
+  _runBeforeSend(sample) {
+    const beforeSend = this._config.beforeSend;
+    if (!beforeSend)
+      return sample;
+    const fns = isArray(beforeSend) ? beforeSend : [
+      beforeSend
+    ];
+    let result = sample;
+    for (const fn of fns)
+      try {
+        const next = fn(result);
+        if (!next) {
+          this._logger.info("Metric was rejected in beforeSend function");
+          return null;
+        }
+        result = next;
+      } catch (e) {
+        this._logger.error("Error in beforeSend function for metric:", e);
+        return null;
+      }
+    return result;
+  }
+  _armFlushTimer() {
+    if (this._flushTimer)
+      return;
+    this._flushTimer = safeSetTimeout(() => {
+      this._flushTimer = undefined;
+      this.flush().catch((e) => {
+        this._logger.error("Metrics flush failed:", e);
+      });
+    }, this._config.flushIntervalMs);
+  }
+  _clearFlushTimer() {
+    if (this._flushTimer) {
+      clearTimeout(this._flushTimer);
+      this._flushTimer = undefined;
+    }
+  }
+  async _doFlush() {
+    if (this._series.size === 0)
+      return;
+    const window = this._series;
+    this._series = new Map;
+    this._seriesCapWarned = false;
+    this._typeByName = new Map;
+    this._typeCollisionWarned = new Set;
+    const generation = this._generation;
+    const outcome = await this._instance._sendMetricsBatch(this._buildPayload(window));
+    if (generation !== this._generation)
+      return;
+    switch (outcome.kind) {
+      case "ok":
+        return;
+      case "retry-later":
+        this._mergeWindowBack(window);
+        this._armFlushTimer();
+        return;
+      case "too-large":
+        this._logger.warn("Metrics batch exceeded the server size limit and was dropped");
+        return;
+      case "fatal":
+        this._logger.error("Failed to send metrics batch:", outcome.error);
+        return;
+    }
+  }
+  _buildPayload(window) {
+    return buildOtlpMetricsPayload(this._buildMetrics(window), buildMetricsResourceAttributes(this._config, this._instance.getLibraryId(), this._instance.getLibraryVersion()), this._instance.getLibraryId(), this._instance.getLibraryVersion());
+  }
+  _buildMetrics(window) {
+    const nowNano = msToUnixNano(Date.now());
+    const byMetric = new Map;
+    for (const state of window.values()) {
+      const metricKey = seriesKey(state.type, state.name, state.unit, undefined);
+      let metric = byMetric.get(metricKey);
+      if (!metric) {
+        metric = {
+          name: state.name,
+          ...state.unit && {
+            unit: state.unit
+          }
+        };
+        if (state.type === "count")
+          metric.sum = {
+            aggregationTemporality: OTLP_TEMPORALITY_DELTA,
+            isMonotonic: true,
+            dataPoints: []
+          };
+        else if (state.type === "gauge")
+          metric.gauge = {
+            dataPoints: []
+          };
+        else
+          metric.histogram = {
+            aggregationTemporality: OTLP_TEMPORALITY_DELTA,
+            dataPoints: []
+          };
+        byMetric.set(metricKey, metric);
+      }
+      const attributes = toOtlpKeyValueList(state.attributes ?? {}, this._logger);
+      const startNano = msToUnixNano(state.windowStartMs);
+      if (state.type === "count") {
+        const dp = {
+          attributes,
+          startTimeUnixNano: startNano,
+          timeUnixNano: nowNano,
+          asDouble: state.total ?? 0
+        };
+        metric.sum.dataPoints.push(dp);
+      } else if (state.type === "gauge") {
+        const dp = {
+          attributes,
+          timeUnixNano: nowNano,
+          asDouble: state.last ?? 0
+        };
+        metric.gauge.dataPoints.push(dp);
+      } else if (state.hist) {
+        const dp = {
+          attributes,
+          startTimeUnixNano: startNano,
+          timeUnixNano: nowNano,
+          count: state.hist.count,
+          sum: state.hist.sum,
+          min: state.hist.min,
+          max: state.hist.max,
+          bucketCounts: state.hist.bucketCounts,
+          explicitBounds: DEFAULT_HISTOGRAM_BOUNDS
+        };
+        metric.histogram.dataPoints.push(dp);
+      }
+    }
+    return Array.from(byMetric.values());
+  }
+  _mergeWindowBack(window) {
+    for (const [key, old] of window) {
+      const current = this._series.get(key);
+      if (!current) {
+        if (this._admitNewSeries())
+          this._series.set(key, old);
+        continue;
+      }
+      current.windowStartMs = Math.min(current.windowStartMs, old.windowStartMs);
+      switch (current.type) {
+        case "count":
+          current.total = (current.total ?? 0) + (old.total ?? 0);
+          break;
+        case "gauge":
+          break;
+        case "histogram":
+          if (old.hist)
+            if (current.hist) {
+              current.hist.count += old.hist.count;
+              current.hist.sum += old.hist.sum;
+              current.hist.min = Math.min(current.hist.min, old.hist.min);
+              current.hist.max = Math.max(current.hist.max, old.hist.max);
+              for (let i = 0;i < current.hist.bucketCounts.length; i++)
+                current.hist.bucketCounts[i] += old.hist.bucketCounts[i];
+            } else
+              current.hist = old.hist;
+          break;
+      }
+    }
+  }
+}
+var OTLP_TEMPORALITY_DELTA = 1;
+var init_metrics = __esm(() => {
+  init_utils();
+  init_logs_utils();
+  init_metrics_utils();
+  init_config();
+});
+
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/surveys/validation.mjs
 var init_validation = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/cookie.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/cookie.mjs
 var init_cookie = __esm(() => {
   init_utils();
   init_uuidv7();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/eventemitter.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/eventemitter.mjs
 class SimpleEventEmitter {
   constructor() {
     this.events = {};
@@ -1394,7 +2160,7 @@ class SimpleEventEmitter {
 }
 var init_eventemitter = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/chunk-ids.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/chunk-ids.mjs
 function getFilenameToChunkIdMap(stackParser) {
   const chunkIdMap = globalThis._posthogChunkIds;
   if (!chunkIdMap)
@@ -1432,7 +2198,7 @@ function getFilenameToChunkIdMap(stackParser) {
 var parsedStackResults, lastKeysCount, cachedFilenameChunkIds;
 var init_chunk_ids = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/error-properties-builder.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/error-properties-builder.mjs
 class ErrorPropertiesBuilder {
   constructor(coercers, stackParser, modifiers = []) {
     this.coercers = coercers;
@@ -1558,13 +2324,13 @@ var init_error_properties_builder = __esm(() => {
   init_chunk_ids();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/base.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/base.mjs
 function createFrame(platform, filename, func, lineno, colno) {
   const frame = {
     platform,
     filename,
     function: func === "<anonymous>" ? UNKNOWN_FUNCTION : func,
-    in_app: true
+    in_app: !filename?.startsWith(MASKED_URL_PREFIX) && filename !== ANONYMOUS_FILENAME
   };
   if (!isUndefined(lineno))
     frame.lineno = lineno;
@@ -1572,12 +2338,12 @@ function createFrame(platform, filename, func, lineno, colno) {
     frame.colno = colno;
   return frame;
 }
-var UNKNOWN_FUNCTION = "?";
+var UNKNOWN_FUNCTION = "?", MASKED_URL_PREFIX = "webkit-masked-url://", ANONYMOUS_FILENAME = "<anonymous>";
 var init_base = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/safari.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/safari.mjs
 var extractSafariExtensionDetails = (func, filename) => {
   const isSafariExtension = func.indexOf("safari-extension") !== -1;
   const isSafariWebExtension = func.indexOf("safari-web-extension") !== -1;
@@ -1593,7 +2359,7 @@ var init_safari = __esm(() => {
   init_base();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/chrome.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/chrome.mjs
 var chromeRegexNoFnName, chromeRegex, chromeEvalRegex, chromeStackLineParser = (line, platform) => {
   const noFnParts = chromeRegexNoFnName.exec(line);
   if (noFnParts) {
@@ -1623,7 +2389,7 @@ var init_chrome = __esm(() => {
   chromeEvalRegex = /\((\S*)(?::(\d+))(?::(\d+))\)/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/gecko.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/gecko.mjs
 var geckoREgex, geckoEvalRegex, geckoStackLineParser = (line, platform) => {
   const parts = geckoREgex.exec(line);
   if (parts) {
@@ -1650,7 +2416,7 @@ var init_gecko = __esm(() => {
   geckoEvalRegex = /(\S+) line (\d+)(?: > eval line \d+)* > eval/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/winjs.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/winjs.mjs
 var winjsRegex, winjsStackLineParser = (line, platform) => {
   const parts = winjsRegex.exec(line);
   return parts ? createFrame(platform, parts[2], parts[1] || UNKNOWN_FUNCTION, +parts[3], parts[4] ? +parts[4] : undefined) : undefined;
@@ -1660,7 +2426,7 @@ var init_winjs = __esm(() => {
   winjsRegex = /^\s*at (?:((?:\[object object\])?.+) )?\(?((?:[-a-z]+):.*?):(\d+)(?::(\d+))?\)?\s*$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/opera.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/opera.mjs
 var opera10Regex, opera10StackLineParser = (line, platform) => {
   const parts = opera10Regex.exec(line);
   return parts ? createFrame(platform, parts[2], parts[3] || UNKNOWN_FUNCTION, +parts[1]) : undefined;
@@ -1674,7 +2440,7 @@ var init_opera = __esm(() => {
   opera11Regex = / line (\d+), column (\d+)\s*(?:in (?:<anonymous function: ([^>]+)>|([^)]+))\(.*\))? in (.*):\s*$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/node.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/node.mjs
 function filenameIsInApp(filename, isNative = false) {
   const isInternal = isNative || filename && !filename.startsWith("/") && !filename.match(/^[A-Z]:/) && !filename.startsWith(".") && !filename.match(/^[a-zA-Z]([a-zA-Z0-9.\-+])*:\/\//);
   return !isInternal && filename !== undefined && !filename.includes("node_modules/");
@@ -1682,7 +2448,7 @@ function filenameIsInApp(filename, isNative = false) {
 function _parseIntOrUndefined(input) {
   return parseInt(input || "", 10) || undefined;
 }
-var FILENAME_MATCH, FULL_MATCH, nodeStackLineParser = (line, platform) => {
+var FILENAME_MATCH, FULL_MATCH, PROMISE_COMBINATOR, PROMISE_INDEX, PROMISE_FRAME_FILENAME = "node:internal/promise", nodeStackLineParser = (line, platform) => {
   const lineMatch = line.match(FULL_MATCH);
   if (lineMatch) {
     let object;
@@ -1724,6 +2490,8 @@ var FILENAME_MATCH, FULL_MATCH, nodeStackLineParser = (line, platform) => {
       filename = filename.slice(1);
     if (!filename && lineMatch[5] && !isNative)
       filename = lineMatch[5];
+    if (PROMISE_COMBINATOR.test(functionName) && PROMISE_INDEX.test(filename || ""))
+      filename = PROMISE_FRAME_FILENAME;
     return {
       filename: filename ? decodeURI(filename) : undefined,
       module: undefined,
@@ -1744,9 +2512,11 @@ var init_node = __esm(() => {
   init_base();
   FILENAME_MATCH = /^\s*[-]{4,}$/;
   FULL_MATCH = /at (?:async )?(?:(.+?)\s+\()?(?:(.+):(\d+):(\d+)?|([^)]+))\)?/;
+  PROMISE_COMBINATOR = /^Promise\.(?:all|any)$/;
+  PROMISE_INDEX = /^index \d+$/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/index.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/index.mjs
 function reverseAndStripFrames(stack) {
   if (!stack.length)
     return [];
@@ -1800,7 +2570,7 @@ var init_parsers = __esm(() => {
   WEBPACK_ERROR_REGEXP = /\(error: (.*)\)/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/dom-exception-coercer.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/dom-exception-coercer.mjs
 class DOMExceptionCoercer {
   match(err) {
     return this.isDOMException(err) || this.isDOMError(err);
@@ -1834,18 +2604,20 @@ var init_dom_exception_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-coercer.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/error-coercer.mjs
 class ErrorCoercer {
   match(err) {
-    return isPlainError(err);
+    return isError(err);
   }
   coerce(err, ctx) {
+    const stack = this.getStack(err);
+    const synthetic = stack === undefined;
     return {
       type: this.getType(err),
       value: this.getMessage(err, ctx),
-      stack: this.getStack(err),
+      stack: stack ?? ctx.syntheticException?.stack,
       cause: err.cause ? ctx.next(err.cause) : undefined,
-      synthetic: false
+      synthetic
     };
   }
   getType(err) {
@@ -1862,32 +2634,48 @@ class ErrorCoercer {
   }
 }
 var init_error_coercer = __esm(() => {
-  init_utils();
+  init_type_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-event-coercer.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/error-event-coercer.mjs
 class ErrorEventCoercer {
   constructor() {}
   match(err) {
-    return isErrorEvent(err) && err.error != null;
+    if (!isErrorEvent(err))
+      return false;
+    const errorEvent = err;
+    return errorEvent.error != null || this._hasUsableMessage(errorEvent);
   }
   coerce(err, ctx) {
-    const exceptionLike = ctx.apply(err.error);
-    if (!exceptionLike)
-      return {
-        type: "ErrorEvent",
-        value: err.message,
-        stack: ctx.syntheticException?.stack,
-        synthetic: true
-      };
-    return exceptionLike;
+    if (err.error != null)
+      return ctx.apply(err.error);
+    const exceptionLike = ctx.apply(err.message);
+    return {
+      ...exceptionLike,
+      stack: this._buildLocationStack(err) ?? exceptionLike.stack,
+      synthetic: true
+    };
+  }
+  _hasUsableMessage(err) {
+    return isString(err.message) && err.message.length > 0;
+  }
+  _buildLocationStack(err) {
+    const location = err;
+    const lineno = location.lineno ?? 0;
+    const colno = location.colno ?? 0;
+    if (!isString(location.filename) || location.filename.length === 0)
+      return;
+    if (lineno === 0)
+      return;
+    return `Error
+    at ${location.filename}:${lineno}:${colno}`;
   }
 }
 var init_error_event_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/string-coercer.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/string-coercer.mjs
 class StringCoercer {
   match(input) {
     return typeof input == "string";
@@ -1920,7 +2708,7 @@ var init_string_coercer = __esm(() => {
   ERROR_TYPES_PATTERN = /^(?:[Uu]ncaught (?:exception: )?)?(?:((?:Eval|Internal|Range|Reference|Syntax|Type|URI|)Error): )?(.*)$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/types.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/types.mjs
 var severityLevels;
 var init_types2 = __esm(() => {
   severityLevels = [
@@ -1933,7 +2721,7 @@ var init_types2 = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/utils.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/utils.mjs
 function extractExceptionKeysForMessage(err, maxLength = 40) {
   const keys = Object.keys(err);
   keys.sort();
@@ -1951,7 +2739,7 @@ function extractExceptionKeysForMessage(err, maxLength = 40) {
 }
 var init_utils2 = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/object-coercer.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/object-coercer.mjs
 class ObjectCoercer {
   match(candidate) {
     return typeof candidate == "object" && candidate !== null;
@@ -1963,13 +2751,16 @@ class ObjectCoercer {
     return {
       type: this.getType(candidate),
       value: this.getValue(candidate),
-      stack: ctx.syntheticException?.stack,
+      stack: this.getStack(candidate) ?? ctx.syntheticException?.stack,
       level: this.isSeverityLevel(candidate.level) ? candidate.level : "error",
       synthetic: true
     };
   }
   getType(err) {
-    return isEvent(err) ? err.constructor.name : "Error";
+    if (isEvent(err))
+      return err.constructor.name;
+    const name = "name" in err ? err.name : undefined;
+    return isString(name) && !isEmptyString(name) ? name : "Error";
   }
   getValue(err) {
     if ("name" in err && typeof err.name == "string") {
@@ -1986,6 +2777,15 @@ class ObjectCoercer {
   }
   isSeverityLevel(x) {
     return isString(x) && !isEmptyString(x) && severityLevels.indexOf(x) >= 0;
+  }
+  getStack(candidate) {
+    try {
+      if (isString(candidate.stacktrace) && candidate.stacktrace.length > 0)
+        return candidate.stacktrace;
+      return isString(candidate.stack) && candidate.stack.length > 0 ? candidate.stack : undefined;
+    } catch {
+      return;
+    }
   }
   getErrorPropertyFromObject(obj) {
     for (const prop in obj)
@@ -2010,7 +2810,7 @@ var init_object_coercer = __esm(() => {
   init_utils2();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/event-coercer.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/event-coercer.mjs
 class EventCoercer {
   match(err) {
     return isEvent(err);
@@ -2030,7 +2830,7 @@ var init_event_coercer = __esm(() => {
   init_utils2();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/primitive-coercer.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/primitive-coercer.mjs
 class PrimitiveCoercer {
   match(candidate) {
     return isPrimitive(candidate);
@@ -2048,7 +2848,7 @@ var init_primitive_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/promise-rejection-event.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/promise-rejection-event.mjs
 class PromiseRejectionEventCoercer {
   match(err) {
     return isBuiltin(err, "PromiseRejectionEvent") || this.isCustomEventWrappingRejection(err);
@@ -2088,7 +2888,7 @@ var init_promise_rejection_event = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/index.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/index.mjs
 var init_coercers = __esm(() => {
   init_dom_exception_coercer();
   init_error_coercer();
@@ -2100,7 +2900,7 @@ var init_coercers = __esm(() => {
   init_promise_rejection_event();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/utils.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/utils.mjs
 class ReduceableCache {
   constructor(_maxSize) {
     this._maxSize = _maxSize;
@@ -2127,7 +2927,7 @@ class ReduceableCache {
 }
 var init_utils3 = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/exception-steps.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/exception-steps.mjs
 function resolveExceptionStepsConfig(config) {
   if (!config)
     return {
@@ -2210,9 +3010,12 @@ function normalizePositiveInteger(input, fallback) {
   return normalized;
 }
 function normalizeAndSerializeStep(step) {
-  const json = safeStringify(step);
-  if (!json)
+  let json;
+  try {
+    json = safeJsonStringify(step);
+  } catch {
     return;
+  }
   try {
     const parsed = JSON.parse(json);
     if (!isObject(parsed))
@@ -2228,33 +3031,6 @@ function normalizeAndSerializeStep(step) {
       step: parsedStep,
       json
     };
-  } catch {
-    return;
-  }
-}
-function safeStringify(value) {
-  const seen = new WeakSet;
-  try {
-    return JSON.stringify(value, (_key, replacementValue) => {
-      if (typeof replacementValue == "bigint")
-        return replacementValue.toString();
-      if (typeof replacementValue == "function" || typeof replacementValue == "symbol")
-        return;
-      if (replacementValue instanceof Date)
-        return replacementValue.toISOString();
-      if (replacementValue instanceof Error)
-        return {
-          name: replacementValue.name,
-          message: replacementValue.message,
-          stack: replacementValue.stack
-        };
-      if (replacementValue && typeof replacementValue == "object") {
-        if (seen.has(replacementValue))
-          return "[Circular]";
-        seen.add(replacementValue);
-      }
-      return replacementValue;
-    });
   } catch {
     return;
   }
@@ -2289,34 +3065,42 @@ var init_exception_steps = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/index.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/release.mjs
+function getInjectedReleaseId() {
+  const injected = globalThis._posthogReleaseId;
+  return typeof injected == "string" && injected.length > 0 ? injected : undefined;
+}
+var init_release = () => {};
+
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/index.mjs
 var exports_error_tracking = {};
 __export(exports_error_tracking, {
-  winjsStackLineParser: () => winjsStackLineParser,
-  stripReservedExceptionStepFields: () => stripReservedExceptionStepFields,
-  reverseAndStripFrames: () => reverseAndStripFrames,
-  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
-  opera11StackLineParser: () => opera11StackLineParser,
-  opera10StackLineParser: () => opera10StackLineParser,
-  nodeStackLineParser: () => nodeStackLineParser,
-  getUtf8ByteLength: () => getUtf8ByteLength,
-  geckoStackLineParser: () => geckoStackLineParser,
-  createStackParser: () => createStackParser,
-  createDefaultStackParser: () => createDefaultStackParser,
-  chromeStackLineParser: () => chromeStackLineParser,
-  StringCoercer: () => StringCoercer,
-  ReduceableCache: () => ReduceableCache,
-  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
-  PrimitiveCoercer: () => PrimitiveCoercer,
-  ObjectCoercer: () => ObjectCoercer,
-  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
-  EventCoercer: () => EventCoercer,
-  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
-  ErrorEventCoercer: () => ErrorEventCoercer,
-  ErrorCoercer: () => ErrorCoercer,
-  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
+  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG,
   DOMExceptionCoercer: () => DOMExceptionCoercer,
-  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG
+  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
+  ErrorCoercer: () => ErrorCoercer,
+  ErrorEventCoercer: () => ErrorEventCoercer,
+  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
+  EventCoercer: () => EventCoercer,
+  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
+  ObjectCoercer: () => ObjectCoercer,
+  PrimitiveCoercer: () => PrimitiveCoercer,
+  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
+  ReduceableCache: () => ReduceableCache,
+  StringCoercer: () => StringCoercer,
+  chromeStackLineParser: () => chromeStackLineParser,
+  createDefaultStackParser: () => createDefaultStackParser,
+  createStackParser: () => createStackParser,
+  geckoStackLineParser: () => geckoStackLineParser,
+  getInjectedReleaseId: () => getInjectedReleaseId,
+  getUtf8ByteLength: () => getUtf8ByteLength,
+  nodeStackLineParser: () => nodeStackLineParser,
+  opera10StackLineParser: () => opera10StackLineParser,
+  opera11StackLineParser: () => opera11StackLineParser,
+  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
+  reverseAndStripFrames: () => reverseAndStripFrames,
+  stripReservedExceptionStepFields: () => stripReservedExceptionStepFields,
+  winjsStackLineParser: () => winjsStackLineParser
 });
 var init_error_tracking = __esm(() => {
   init_error_properties_builder();
@@ -2324,15 +3108,19 @@ var init_error_tracking = __esm(() => {
   init_coercers();
   init_utils3();
   init_exception_steps();
+  init_release();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core-stateless.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/posthog-core-stateless.mjs
 async function logFlushError(err) {
   if (err instanceof PostHogFetchHttpError) {
     let text = "";
     try {
       text = await err.text;
-    } catch {}
+    } catch {
+      if (err.bodyReadTimedOut)
+        text = "<response body read timed out>";
+    }
     console.error(`Error while flushing PostHog: message=${err.message}, response body=${text}`, err);
   } else
     console.error("Error while flushing PostHog", err);
@@ -2344,8 +3132,25 @@ function isPostHogFetchError(err) {
 function isPostHogFetchNetworkError(err) {
   return err instanceof PostHogFetchNetworkError;
 }
+function isRetryableFlagsFetchError(err) {
+  if (err instanceof PostHogFetchHttpError)
+    return err.status === 502 || err.status === 504;
+  if (!(err instanceof PostHogFetchNetworkError))
+    return false;
+  const cause = err.error;
+  const code = cause?.code ?? cause?.cause?.code;
+  return code !== "ECONNREFUSED";
+}
 function isPostHogFetchContentTooLargeError(err) {
   return typeof err == "object" && err instanceof PostHogFetchHttpError && err.status === 413;
+}
+function isPostHogFetchRetryableError(err) {
+  if (err instanceof PostHogFetchHttpError)
+    return err.status === 408 || err.status === 429 || err.status >= 500;
+  return isPostHogFetchNetworkError(err);
+}
+function isPostHogEventProperties(value) {
+  return value !== null && typeof value == "object" && !Array.isArray(value);
 }
 
 class PostHogCoreStateless {
@@ -2364,6 +3169,9 @@ class PostHogCoreStateless {
   }
   constructor(apiKey, options = {}) {
     this.flushPromise = null;
+    this.pendingFlushPromise = null;
+    this.flushPromises = new Set;
+    this._dequeuedMessagesCount = 0;
     this.shutdownPromise = null;
     this.promiseQueue = new PromiseQueue;
     this._events = new SimpleEventEmitter;
@@ -2386,10 +3194,11 @@ class PostHogCoreStateless {
     this._retryOptions = {
       retryCount: options.fetchRetryCount ?? 3,
       retryDelay: options.fetchRetryDelay ?? 3000,
-      retryCheck: isPostHogFetchError
+      retryCheck: isPostHogFetchRetryableError
     };
     this.requestTimeout = options.requestTimeout ?? 1e4;
     this.featureFlagsRequestTimeoutMs = options.featureFlagsRequestTimeoutMs ?? 3000;
+    this.featureFlagsRequestMaxRetries = options.featureFlagsRequestMaxRetries ?? 1;
     this.remoteConfigRequestTimeoutMs = options.remoteConfigRequestTimeoutMs ?? 3000;
     this.disableGeoip = options.disableGeoip ?? true;
     this.disabled = (options.disabled ?? false) || missingApiKey;
@@ -2451,14 +3260,22 @@ class PostHogCoreStateless {
     return this.disabled;
   }
   buildPayload(payload) {
+    const userProperties = payload.properties || {};
+    let properties = {
+      ...userProperties,
+      ...this.getCommonEventProperties()
+    };
+    applyCallerFeatureFlagOverrides(properties, userProperties);
+    if (payload.event === "$feature_flag_called" && properties.$feature_flag_has_experiment === false && this.isMinimalFlagCalledEventsEnabled())
+      properties = minimizeFlagCalledEventProperties(properties);
     return {
       distinct_id: payload.distinct_id,
       event: payload.event,
-      properties: {
-        ...payload.properties || {},
-        ...this.getCommonEventProperties()
-      }
+      properties
     };
+  }
+  isMinimalFlagCalledEventsEnabled() {
+    return false;
   }
   addPendingPromise(promise) {
     return this.promiseQueue.add(promise);
@@ -2544,6 +3361,19 @@ class PostHogCoreStateless {
       this.enqueue("capture", payload, options);
     });
   }
+  async groupIdentifyStatelessImmediate(groupType, groupKey, groupProperties, options, distinctId, eventProperties) {
+    const payload = this.buildPayload({
+      distinct_id: distinctId || `$${groupType}_${groupKey}`,
+      event: "$groupidentify",
+      properties: {
+        $group_type: groupType,
+        $group_key: groupKey,
+        $group_set: groupProperties || {},
+        ...eventProperties || {}
+      }
+    });
+    await this.sendImmediate("capture", payload, options);
+  }
   async getRemoteConfig() {
     await this._initPromise;
     let host = this.host;
@@ -2560,8 +3390,11 @@ class PostHogCoreStateless {
       }
     };
     return this.fetchWithRetry(url, fetchOptions, {
+      type: "required",
+      consume: (response) => response.json()
+    }, {
       retryCount: 0
-    }, this.remoteConfigRequestTimeoutMs).then((response) => response.json()).catch((error) => {
+    }, this.remoteConfigRequestTimeoutMs).catch((error) => {
       this._logger.error("Remote config could not be loaded", error);
       this._events.emit("error", error);
     });
@@ -2592,8 +3425,12 @@ class PostHogCoreStateless {
     };
     this._logger.info("Flags URL", url);
     return this.fetchWithRetry(url, fetchOptions, {
-      retryCount: 0
-    }, this.featureFlagsRequestTimeoutMs).then((response) => response.json()).then((response) => ({
+      type: "required",
+      consume: (response) => response.json()
+    }, {
+      retryCount: this.featureFlagsRequestMaxRetries,
+      retryCheck: isRetryableFlagsFetchError
+    }, this.featureFlagsRequestTimeoutMs).then((response) => ({
       success: true,
       response: normalizeFlagsResponse(response)
     })).catch((error) => {
@@ -2693,9 +3530,9 @@ class PostHogCoreStateless {
   }
   async getFeatureFlagDetailsStateless(distinctId, groups = {}, personProperties = {}, groupProperties = {}, disableGeoip, flagKeysToEvaluate) {
     await this._initPromise;
-    const extraPayload = {};
-    if (disableGeoip ?? this.disableGeoip)
-      extraPayload["geoip_disable"] = true;
+    const extraPayload = {
+      geoip_disable: disableGeoip ?? this.disableGeoip
+    };
     if (flagKeysToEvaluate)
       extraPayload["flag_keys_to_evaluate"] = flagKeysToEvaluate;
     const result = await this.getFlags(distinctId, groups, personProperties, groupProperties, extraPayload);
@@ -2732,15 +3569,18 @@ class PostHogCoreStateless {
         "Content-Type": "application/json"
       }
     };
-    const response = await this.fetchWithRetry(url, fetchOptions).then((response2) => {
-      if (response2.status !== 200 || !response2.json) {
-        const msg = `Surveys API could not be loaded: ${response2.status}`;
-        const error = new Error(msg);
-        this._logger.error(error);
-        this._events.emit("error", new Error(msg));
-        return;
+    const response = await this.fetchWithRetry(url, fetchOptions, {
+      type: "required",
+      consume: (response2) => {
+        if (response2.status !== 200 || !response2.json) {
+          const msg = `Surveys API could not be loaded: ${response2.status}`;
+          const error = new Error(msg);
+          this._logger.error(error);
+          this._events.emit("error", new Error(msg));
+          return Promise.resolve(undefined);
+        }
+        return response2.json();
       }
-      return response2.json();
     }).catch((error) => {
       this._logger.error("Surveys API could not be loaded", error);
       this._events.emit("error", error);
@@ -2777,23 +3617,39 @@ class PostHogCoreStateless {
     return message;
   }
   async flushStorage() {}
-  enqueue(type, _message, options) {
+  getQueueRouteKey(_message) {
+    return DEFAULT_QUEUE_ROUTE;
+  }
+  persistedQueueKeyForRoute(_route) {
+    return types_PostHogPersistedProperty.Queue;
+  }
+  getActiveQueueRoutes() {
+    return [
+      DEFAULT_QUEUE_ROUTE
+    ];
+  }
+  getRouteQueue(route) {
+    return this.getPersistedProperty(this.persistedQueueKeyForRoute(route)) || [];
+  }
+  enqueue(type, _message, options, explicitRoute) {
     this.wrap(() => {
       if (this.optedOut)
         return void this._events.emit(type, "Library is disabled. Not sending event. To re-enable, call posthog.optIn()");
-      let message = this.prepareMessage(type, _message, options);
+      let message = this.prepareMessage(_message, options);
       message = this.processBeforeEnqueue(message);
       if (message === null)
         return;
-      const queue = this.getPersistedProperty(types_PostHogPersistedProperty.Queue) || [];
+      message = this.normalizeMessage(message);
+      const queueKey = this.persistedQueueKeyForRoute(explicitRoute ?? this.getQueueRouteKey(message));
+      const queue = this.getPersistedProperty(queueKey) || [];
       if (queue.length >= this.maxQueueSize) {
         queue.shift();
-        this._logger.info("Queue is full, the oldest event is dropped.");
+        this._logger.warn("Queue is full, the oldest event is dropped.");
       }
       queue.push({
         message
       });
-      this.setPersistedProperty(types_PostHogPersistedProperty.Queue, queue);
+      this.setPersistedProperty(queueKey, queue);
       this._events.emit(type, message);
       if (queue.length >= this.flushAt)
         this.flushBackground();
@@ -2801,61 +3657,63 @@ class PostHogCoreStateless {
         this._flushTimer = safeSetTimeout(() => this.flushBackground(), this.flushInterval);
     });
   }
-  async sendImmediate(type, _message, options) {
+  async sendImmediate(type, _message, options, explicitRoute) {
     if (this.disabled)
       return void this._logger.warn("The client is disabled");
     if (!this._isInitialized)
       await this._initPromise;
     if (this.optedOut)
       return void this._events.emit(type, "Library is disabled. Not sending event. To re-enable, call posthog.optIn()");
-    let message = this.prepareMessage(type, _message, options);
+    let message = this.prepareMessage(_message, options);
     message = this.processBeforeEnqueue(message);
     if (message === null)
       return;
-    const data = {
-      api_key: this.apiKey,
-      batch: [
-        message
-      ],
-      sent_at: currentISOTime()
-    };
-    if (this.historicalMigration)
-      data.historical_migration = true;
-    const payload = JSON.stringify(data);
-    const url = `${this.host}/batch/`;
-    const gzippedPayload = this.disableCompression ? null : await gzipCompress(payload, this.isDebug);
-    const fetchOptions = {
-      method: "POST",
-      headers: {
-        ...this.getCustomHeaders(),
-        "Content-Type": "application/json",
-        ...gzippedPayload !== null && {
-          "Content-Encoding": "gzip"
-        }
-      },
-      body: gzippedPayload || payload
-    };
+    message = this.normalizeMessage(message);
     try {
-      const response = await this.fetchWithRetry(url, fetchOptions);
-      await response.body?.cancel()?.catch(() => {});
+      await this.sendBatch([
+        message
+      ], undefined, explicitRoute ?? this.getQueueRouteKey(message));
     } catch (err) {
       this._events.emit("error", err);
     }
   }
-  prepareMessage(type, _message, options) {
+  normalizeMessage(message) {
+    const { type: _type, library, library_version, ...sanitizedMessage } = message;
+    let properties = isPostHogEventProperties(sanitizedMessage.properties) ? sanitizedMessage.properties : undefined;
+    if (library !== undefined && properties?.$lib === undefined)
+      properties = {
+        ...properties || {},
+        $lib: library
+      };
+    if (library_version !== undefined && properties?.$lib_version === undefined)
+      properties = {
+        ...properties || {},
+        $lib_version: library_version
+      };
+    if (properties)
+      sanitizedMessage.properties = properties;
+    sanitizedMessage.uuid = getEventUuid(sanitizedMessage.uuid, uuidv7);
+    return sanitizedMessage;
+  }
+  normalizeTimestampForWire(timestamp) {
+    const parsedTimestamp = timestamp instanceof Date ? timestamp : typeof timestamp == "string" ? new Date(timestamp) : null;
+    if (!parsedTimestamp || Number.isNaN(parsedTimestamp.getTime()))
+      return timestamp;
+    const normalized = parsedTimestamp.toISOString();
+    const fractionalSeconds = typeof timestamp == "string" ? timestamp.match(/\.(\d+)(?:Z|[+-]\d{2}:?\d{2})?$/i)?.[1] : undefined;
+    return fractionalSeconds && fractionalSeconds.length > 3 ? normalized.replace(/\.\d{3}Z$/, `.${fractionalSeconds}Z`) : normalized;
+  }
+  prepareMessage(_message, options) {
     const message = {
       ..._message,
-      type,
-      library: this.getLibraryId(),
-      library_version: this.getLibraryVersion(),
       timestamp: options?.timestamp ? options?.timestamp : currentISOTime(),
-      uuid: options?.uuid ? options.uuid : uuidv7()
+      uuid: getEventUuid(options?.uuid, uuidv7)
     };
     const addGeoipDisableProperty = options?.disableGeoip ?? this.disableGeoip;
     if (addGeoipDisableProperty) {
-      if (!message.properties)
+      if (!isPostHogEventProperties(message.properties))
         message.properties = {};
-      message["properties"]["$geoip_disable"] = true;
+      message.properties["$geoip_disable"] = true;
     }
     if (message.distinctId) {
       message.distinct_id = message.distinctId;
@@ -2870,21 +3728,64 @@ class PostHogCoreStateless {
     }
   }
   flushBackground() {
+    if (this.pendingFlushPromise)
+      return;
     this.flush().catch(async (err) => {
       await logFlushError(err);
     });
   }
-  async flush() {
+  async waitForPendingPromises(maxPromiseId, ignoredPromises = []) {
+    const ignoredPendingPromises = ignoredPromises.filter((promise) => !!promise);
+    let iteration = 0;
+    while (true) {
+      const promises = this.promiseQueue.getPromises([
+        ...ignoredPendingPromises,
+        ...this.flushPromises
+      ], maxPromiseId);
+      if (promises.length === 0)
+        return;
+      if (iteration > 0)
+        this._logger.debug(`flush() re-checking ${promises.length} pending promise(s) before flushing`);
+      await Promise.all(promises.map((promise) => promise.catch(() => {})));
+      iteration++;
+    }
+  }
+  flushWithPendingPromises() {
+    return this.flushInternal(true);
+  }
+  flush() {
+    return this.flushInternal(false);
+  }
+  flushInternal(waitForPendingPromises) {
     if (this.disabled)
-      return;
-    const nextFlushPromise = allSettled([
-      this.flushPromise
-    ]).then(() => this._flush());
+      return Promise.resolve();
+    if (!waitForPendingPromises && this.pendingFlushPromise)
+      return this.pendingFlushPromise;
+    const previousFlushPromise = this.flushPromise;
+    const maxPromiseId = this.promiseQueue.maxId;
+    const nextFlushPromise = Promise.resolve().then(() => {
+      if (waitForPendingPromises)
+        return this.waitForPendingPromises(maxPromiseId, [
+          previousFlushPromise,
+          nextFlushPromise
+        ]);
+    }).then(() => allSettled([
+      previousFlushPromise
+    ])).then(() => {
+      if (this.pendingFlushPromise === nextFlushPromise)
+        this.pendingFlushPromise = null;
+      return this._flush();
+    });
+    this.pendingFlushPromise = nextFlushPromise;
     this.flushPromise = nextFlushPromise;
+    this.flushPromises.add(nextFlushPromise);
     this.addPendingPromise(nextFlushPromise);
     allSettled([
       nextFlushPromise
     ]).then(() => {
+      this.flushPromises.delete(nextFlushPromise);
+      if (this.pendingFlushPromise === nextFlushPromise)
+        this.pendingFlushPromise = null;
       if (this.flushPromise === nextFlushPromise)
         this.flushPromise = null;
     });
@@ -2897,55 +3798,102 @@ class PostHogCoreStateless {
       headers["User-Agent"] = customUserAgent;
     return headers;
   }
+  compressPayload(payload) {
+    return gzipCompress(payload, this.isDebug);
+  }
+  getBatchEndpointPath(_route) {
+    return "/batch/";
+  }
+  async sendBatch(batchMessages, retryOptions, route = DEFAULT_QUEUE_ROUTE) {
+    const data = {
+      api_key: this.apiKey,
+      batch: batchMessages.map((message) => {
+        if (!message)
+          return message;
+        const timestamp = this.normalizeTimestampForWire(message.timestamp);
+        return timestamp === message.timestamp ? message : {
+          ...message,
+          timestamp
+        };
+      }),
+      sent_at: currentISOTime()
+    };
+    if (this.historicalMigration)
+      data.historical_migration = true;
+    const payload = safeJsonStringify(data);
+    const url = `${this.host}${this.getBatchEndpointPath(route)}`;
+    const gzippedPayload = this.disableCompression ? null : await this.compressPayload(payload);
+    const fetchOptions = {
+      method: "POST",
+      headers: {
+        ...this.getCustomHeaders(),
+        "Content-Type": "application/json",
+        ...gzippedPayload !== null && {
+          "Content-Encoding": "gzip"
+        }
+      },
+      body: gzippedPayload || payload
+    };
+    await this.fetchWithRetry(url, fetchOptions, {
+      type: "successful-write"
+    }, retryOptions);
+  }
   async _flush() {
     this.clearFlushTimer();
     await this._initPromise;
-    let queue = this.getPersistedProperty(types_PostHogPersistedProperty.Queue) || [];
-    if (!queue.length)
+    const routes = this.getActiveQueueRoutes();
+    if (!routes.some((route) => this.getRouteQueue(route).length > 0))
       return;
     const sentMessages = [];
+    let firstError;
+    for (const route of routes)
+      try {
+        await this._flushRoute(route, sentMessages);
+      } catch (err) {
+        if (firstError === undefined)
+          firstError = err;
+      }
+    if (firstError !== undefined)
+      throw firstError;
+    this._events.emit("flush", sentMessages);
+  }
+  async _flushRoute(route, sentMessages) {
+    const queueKey = this.persistedQueueKeyForRoute(route);
+    let queue = this.getPersistedProperty(queueKey) || [];
+    if (!queue.length)
+      return;
     const originalQueueLength = queue.length;
-    while (queue.length > 0 && sentMessages.length < originalQueueLength) {
+    let sentFromRoute = 0;
+    while (queue.length > 0 && sentFromRoute < originalQueueLength) {
       const batchItems = queue.slice(0, this.maxBatchSize);
-      const batchMessages = batchItems.map((item) => item.message);
+      const batchMessages = batchItems.map((item) => item.message === undefined ? item.message : this.normalizeMessage(item.message));
       const persistQueueChange = async () => {
-        const refreshedQueue = this.getPersistedProperty(types_PostHogPersistedProperty.Queue) || [];
-        const newQueue = refreshedQueue.slice(batchItems.length);
-        this.setPersistedProperty(types_PostHogPersistedProperty.Queue, newQueue);
+        const refreshedQueue = this.getPersistedProperty(queueKey) || [];
+        const remainingBatchItems = [
+          ...batchItems
+        ];
+        const newQueue = refreshedQueue.filter((item) => {
+          const itemUuid = item.message?.uuid;
+          const batchItemIndex = remainingBatchItems.findIndex((batchItem) => batchItem === item || typeof itemUuid == "string" && itemUuid.length > 0 && batchItem.message?.uuid === itemUuid);
+          if (batchItemIndex === -1)
+            return true;
+          remainingBatchItems.splice(batchItemIndex, 1);
+          return false;
+        });
+        this.setPersistedProperty(queueKey, newQueue);
         queue = newQueue;
+        this._dequeuedMessagesCount += batchItems.length;
         await this.flushStorage();
-      };
-      const data = {
-        api_key: this.apiKey,
-        batch: batchMessages,
-        sent_at: currentISOTime()
-      };
-      if (this.historicalMigration)
-        data.historical_migration = true;
-      const payload = JSON.stringify(data);
-      const url = `${this.host}/batch/`;
-      const gzippedPayload = this.disableCompression ? null : await gzipCompress(payload, this.isDebug);
-      const fetchOptions = {
-        method: "POST",
-        headers: {
-          ...this.getCustomHeaders(),
-          "Content-Type": "application/json",
-          ...gzippedPayload !== null && {
-            "Content-Encoding": "gzip"
-          }
-        },
-        body: gzippedPayload || payload
       };
       const retryOptions = {
         retryCheck: (err) => {
           if (isPostHogFetchContentTooLargeError(err))
             return false;
-          return isPostHogFetchError(err);
+          return isPostHogFetchRetryableError(err);
         }
       };
       try {
-        const response = await this.fetchWithRetry(url, fetchOptions, retryOptions);
-        await response.body?.cancel()?.catch(() => {});
+        await this.sendBatch(batchMessages, retryOptions, route);
       } catch (err) {
         if (isPostHogFetchContentTooLargeError(err) && batchMessages.length > 1) {
           this.maxBatchSize = Math.max(1, Math.floor(batchMessages.length / 2));
@@ -2959,8 +3907,8 @@ class PostHogCoreStateless {
       }
       await persistQueueChange();
       sentMessages.push(...batchMessages);
+      sentFromRoute += batchMessages.length;
     }
-    this._events.emit("flush", sentMessages);
   }
   async _sendLogsBatch(payload) {
     if (this.disabled)
@@ -2970,7 +3918,7 @@ class PostHogCoreStateless {
       };
     const serialized = JSON.stringify(payload);
     const url = `${this.host}/i/v1/logs?token=${encodeURIComponent(this.apiKey)}`;
-    const gzippedPayload = this.disableCompression ? null : await gzipCompress(serialized, this.isDebug);
+    const gzippedPayload = this.disableCompression ? null : await this.compressPayload(serialized);
     const fetchOptions = {
       method: "POST",
       headers: {
@@ -2984,10 +3932,12 @@ class PostHogCoreStateless {
     };
     try {
       await this.fetchWithRetry(url, fetchOptions, {
+        type: "successful-write"
+      }, {
         retryCheck: (err) => {
           if (isPostHogFetchContentTooLargeError(err))
             return false;
-          return isPostHogFetchError(err);
+          return isPostHogFetchRetryableError(err);
         }
       });
       return {
@@ -3009,41 +3959,155 @@ class PostHogCoreStateless {
       };
     }
   }
-  async fetchWithRetry(url, options, retryOptions, requestTimeout) {
+  async _sendMetricsBatch(payload) {
+    if (this.disabled)
+      return {
+        kind: "fatal",
+        error: new Error("The client is disabled")
+      };
+    const serialized = JSON.stringify(payload);
+    const url = `${this.host}/i/v1/metrics?token=${encodeURIComponent(this.apiKey)}`;
+    const gzippedPayload = this.disableCompression ? null : await this.compressPayload(serialized);
+    const fetchOptions = {
+      method: "POST",
+      headers: {
+        ...this.getCustomHeaders(),
+        "Content-Type": "application/json",
+        ...gzippedPayload !== null && {
+          "Content-Encoding": "gzip"
+        }
+      },
+      body: gzippedPayload || serialized
+    };
+    try {
+      await this.fetchWithRetry(url, fetchOptions, {
+        type: "successful-write"
+      }, {
+        retryCheck: (err) => {
+          if (isPostHogFetchContentTooLargeError(err))
+            return false;
+          return isPostHogFetchRetryableError(err);
+        }
+      });
+      return {
+        kind: "ok"
+      };
+    } catch (err) {
+      if (isPostHogFetchContentTooLargeError(err))
+        return {
+          kind: "too-large"
+        };
+      if (isPostHogFetchRetryableError(err))
+        return {
+          kind: "retry-later",
+          error: err
+        };
+      return {
+        kind: "fatal",
+        error: err
+      };
+    }
+  }
+  async fetchWithRetry(url, options, responseHandling, retryOptions, requestTimeout) {
     const body = options.body ? options.body : "";
     let reqByteLength = -1;
     try {
-      reqByteLength = body instanceof Blob ? body.size : Buffer.byteLength(body, STRING_FORMAT);
+      reqByteLength = body instanceof Blob ? body.size : body instanceof Uint8Array ? body.byteLength : Buffer.byteLength(body, STRING_FORMAT);
     } catch {
       if (body instanceof Blob)
         reqByteLength = body.size;
+      else if (body instanceof Uint8Array)
+        reqByteLength = body.byteLength;
       else {
         const encoded = new TextEncoder().encode(body);
         reqByteLength = encoded.length;
       }
     }
-    return await retriable(async () => {
-      const ctrl = new AbortController;
-      const timeoutMs = requestTimeout ?? this.requestTimeout;
-      const timer = safeSetTimeout(() => ctrl.abort(), timeoutMs);
-      let res = null;
-      try {
-        res = await this.fetch(url, {
-          signal: ctrl.signal,
-          ...options
-        });
-      } catch (e) {
-        throw new PostHogFetchNetworkError(e);
-      } finally {
-        clearTimeout(timer);
-      }
-      const isNoCors = options.mode === "no-cors";
-      if (!isNoCors && (res.status < 200 || res.status >= 400))
-        throw new PostHogFetchHttpError(res, reqByteLength);
-      return res;
-    }, {
+    const retriableOptions = {
       ...this._retryOptions,
       ...retryOptions
+    };
+    let attempt = 0;
+    return await retriable(async () => {
+      attempt++;
+      const ctrl = new AbortController;
+      const timeoutMs = requestTimeout ?? this.requestTimeout;
+      const requestDeadline = Date.now() + timeoutMs;
+      let timer;
+      const deadline = new Promise((_resolve, reject) => {
+        timer = safeSetTimeout(() => {
+          const timeoutError = new Error(`Request timed out after ${timeoutMs}ms`);
+          timeoutError.name = "AbortError";
+          reject(timeoutError);
+          ctrl.abort(timeoutError);
+        }, timeoutMs);
+      });
+      let res;
+      let responseAccepted = false;
+      let cancellation;
+      const cancelBody = () => cancellation ??= (async () => {
+        try {
+          await res?.body?.cancel();
+        } catch {}
+      })();
+      try {
+        let fetchPromise;
+        try {
+          fetchPromise = this.fetch(url, {
+            signal: ctrl.signal,
+            ...options
+          });
+        } catch (e) {
+          throw new PostHogFetchNetworkError(e);
+        }
+        fetchPromise.then((lateResponse) => {
+          if (ctrl.signal.aborted && !responseAccepted)
+            Promise.resolve(lateResponse.body?.cancel()).catch(() => {});
+        }).catch(() => {});
+        try {
+          res = await Promise.race([
+            fetchPromise,
+            deadline
+          ]);
+          responseAccepted = true;
+        } catch (e) {
+          throw new PostHogFetchNetworkError(e);
+        }
+        const isNoCors = options.mode === "no-cors";
+        if (!isNoCors && (res.status < 200 || res.status >= 400))
+          throw new PostHogFetchHttpError(res, reqByteLength, requestDeadline, ctrl);
+        if (responseHandling.type === "successful-write") {
+          try {
+            await Promise.race([
+              cancelBody(),
+              deadline
+            ]);
+          } catch {}
+          return;
+        }
+        try {
+          return await Promise.race([
+            responseHandling.consume(res),
+            deadline
+          ]);
+        } catch (e) {
+          if (ctrl.signal.aborted)
+            throw new PostHogFetchNetworkError(e);
+          throw e;
+        }
+      } finally {
+        clearTimeout(timer);
+        if (ctrl.signal.aborted && res)
+          cancelBody();
+      }
+    }, {
+      ...retriableOptions,
+      retryCheck: (error) => {
+        const shouldRetry = retriableOptions.retryCheck(error);
+        if (shouldRetry && attempt <= retriableOptions.retryCount && error instanceof PostHogFetchHttpError)
+          error.cancelResponseBody();
+        return shouldRetry;
+      }
     });
   }
   async _shutdown(shutdownTimeoutMs = 30000) {
@@ -3056,12 +4120,17 @@ class PostHogCoreStateless {
       try {
         await this.promiseQueue.join();
         while (true) {
-          const queue = this.getPersistedProperty(types_PostHogPersistedProperty.Queue) || [];
-          if (queue.length === 0)
+          const hasQueuedEvents = this.getActiveQueueRoutes().some((route) => this.getRouteQueue(route).length > 0);
+          if (!hasQueuedEvents)
             break;
+          const dequeuedBeforeFlush = this._dequeuedMessagesCount;
           await this.flush();
           if (hasTimedOut)
             break;
+          if (this._dequeuedMessagesCount === dequeuedBeforeFlush) {
+            this._logger.warn("Shutdown flush completed but did not send any queued events. Stopping drain to avoid a loop.");
+            break;
+          }
         }
       } catch (e) {
         if (!isPostHogFetchError(e))
@@ -3069,21 +4138,12 @@ class PostHogCoreStateless {
         await logFlushError(e);
       }
     };
-    let timeoutHandle;
-    try {
-      return await Promise.race([
-        new Promise((_, reject) => {
-          timeoutHandle = safeSetTimeout(() => {
-            this._logger.error("Timed out while shutting down PostHog");
-            hasTimedOut = true;
-            reject("Timeout while shutting down PostHog. Some events may not have been sent.");
-          }, shutdownTimeoutMs);
-        }),
-        doShutdown()
-      ]);
-    } finally {
-      clearTimeout(timeoutHandle);
-    }
+    return raceWithTimeout(doShutdown(), shutdownTimeoutMs, () => {
+      this._logger.critical("Timeout while shutting down PostHog. Some events may not have been sent.", {
+        shutdownTimeoutMs
+      });
+      hasTimedOut = true;
+    });
   }
   async shutdown(shutdownTimeoutMs = 30000) {
     if (this.shutdownPromise)
@@ -3095,7 +4155,11 @@ class PostHogCoreStateless {
     return this.shutdownPromise;
   }
 }
-var PostHogFetchHttpError, PostHogFetchNetworkError;
+var PostHogFetchHttpError, PostHogFetchNetworkError, applyCallerFeatureFlagOverrides = (target, callerProperties) => {
+  for (const key of Object.keys(callerProperties))
+    if (key.startsWith("$feature/") || key === "$active_feature_flags")
+      target[key] = callerProperties[key];
+}, DEFAULT_QUEUE_ROUTE = "default";
 var init_posthog_core_stateless = __esm(() => {
   init_eventemitter();
   init_featureFlagUtils();
@@ -3105,17 +4169,58 @@ var init_posthog_core_stateless = __esm(() => {
   init_uuidv7();
   init_error_tracking();
   PostHogFetchHttpError = class PostHogFetchHttpError extends Error {
-    constructor(response, reqByteLength) {
-      super("HTTP error while fetching PostHog: status=" + response.status + ", reqByteLength=" + reqByteLength), this.response = response, this.reqByteLength = reqByteLength, this.name = "PostHogFetchHttpError";
+    constructor(response, reqByteLength, responseBodyDeadline, abortController) {
+      super("HTTP error while fetching PostHog: status=" + response.status + ", reqByteLength=" + reqByteLength), this.response = response, this.reqByteLength = reqByteLength, this.responseBodyDeadline = responseBodyDeadline, this.abortController = abortController, this.name = "PostHogFetchHttpError", this._bodyReadTimedOut = false;
     }
     get status() {
       return this.response.status;
     }
+    get bodyReadTimedOut() {
+      return this._bodyReadTimedOut;
+    }
     get text() {
-      return this.response.text();
+      if (!this.responseBodyTextPromise)
+        if (Date.now() >= this.responseBodyDeadline) {
+          this._bodyReadTimedOut = true;
+          const timeoutError = new Error("Response body read timed out");
+          timeoutError.name = "AbortError";
+          this.cancelResponseBody(timeoutError);
+          this.responseBodyTextPromise = Promise.reject(timeoutError);
+        } else {
+          const responseBodyTimeout = new Promise((_resolve, reject) => {
+            this.responseBodyTimer = safeSetTimeout(() => {
+              this._bodyReadTimedOut = true;
+              const timeoutError = new Error("Response body read timed out");
+              timeoutError.name = "AbortError";
+              reject(timeoutError);
+              this.cancelResponseBody(timeoutError);
+            }, this.responseBodyDeadline - Date.now());
+          });
+          let responseBodyText;
+          try {
+            responseBodyText = Promise.resolve(this.response.text());
+          } catch (error) {
+            responseBodyText = Promise.reject(error);
+          }
+          this.responseBodyTextPromise = Promise.race([
+            responseBodyText,
+            responseBodyTimeout
+          ]).finally(() => clearTimeout(this.responseBodyTimer));
+        }
+      return this.responseBodyTextPromise;
     }
     get json() {
-      return this.response.json();
+      return this.text.then((text) => JSON.parse(text));
+    }
+    cancelResponseBody(reason) {
+      clearTimeout(this.responseBodyTimer);
+      if (!this.abortController.signal.aborted)
+        this.abortController.abort(reason);
+      (async () => {
+        try {
+          await this.response.body?.cancel();
+        } catch {}
+      })();
     }
   };
   PostHogFetchNetworkError = class PostHogFetchNetworkError extends Error {
@@ -3127,7 +4232,7 @@ var init_posthog_core_stateless = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/posthog-core.mjs
 var init_posthog_core = __esm(() => {
   init_featureFlagUtils();
   init_types();
@@ -3136,17 +4241,18 @@ var init_posthog_core = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/tracing-headers.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/tracing-headers.mjs
 var init_tracing_headers = __esm(() => {
   init_type_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/index.mjs
+// node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/index.mjs
 var init_dist = __esm(() => {
   init_featureFlagUtils();
   init_gzip();
   init_logs_utils();
   init_logs();
+  init_metrics();
   init_uuidv7();
   init_validation();
   init_error_tracking();
@@ -3158,15 +4264,23 @@ var init_dist = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/context-lines.node.mjs
-import { createReadStream } from "node:fs";
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/context-lines.node.mjs
+import { constants as constants3 } from "node:fs";
+import { open as promises_open } from "node:fs/promises";
+import { isAbsolute as isAbsolute7 } from "node:path";
 import { createInterface } from "node:readline";
-async function addSourceContext(frames) {
+async function addSourceContext(frames, openSourceFile = promises_open, logger2) {
   const filesToLines = {};
+  let basePath;
+  try {
+    basePath = process.cwd();
+  } catch {}
   for (let i = frames.length - 1;i >= 0; i--) {
     const frame = frames[i];
     const filename = frame?.filename;
     if (!frame || typeof filename != "string" || typeof frame.lineno != "number" || shouldSkipContextLinesForFile(filename) || shouldSkipContextLinesForFrame(frame))
+      continue;
+    if (!isAbsolute7(filename) && basePath === undefined)
       continue;
     const filesToLinesOutput = filesToLines[filename];
     if (!filesToLinesOutput)
@@ -3177,51 +4291,99 @@ async function addSourceContext(frames) {
   if (files.length == 0)
     return frames;
   const readlinePromises = [];
-  for (const file2 of files) {
-    if (LRU_FILE_CONTENTS_FS_READ_FAILED.get(file2))
+  for (const file of files) {
+    const cacheKey = makeSourceCacheKey(file, basePath);
+    if (cacheKey === undefined)
       continue;
-    const filesToLineRanges = filesToLines[file2];
+    if (LRU_FILE_CONTENTS_FS_READ_FAILED.get(cacheKey))
+      continue;
+    const filesToLineRanges = filesToLines[file];
     if (!filesToLineRanges)
       continue;
     filesToLineRanges.sort((a, b) => a - b);
     const ranges = makeLineReaderRanges(filesToLineRanges);
-    if (ranges.every((r) => rangeExistsInContentCache(file2, r)))
+    if (ranges.every((r) => rangeExistsInContentCache(cacheKey, r)))
       continue;
-    const cache = emplace(LRU_FILE_CONTENTS_CACHE, file2, {});
-    readlinePromises.push(getContextLinesFromFile(file2, ranges, cache));
+    const cache = emplace(LRU_FILE_CONTENTS_CACHE, cacheKey, {});
+    readlinePromises.push(getContextLinesFromFile(file, ranges, cache, cacheKey, openSourceFile, logger2));
   }
   await Promise.all(readlinePromises).catch(() => {});
   if (frames && frames.length > 0)
-    addSourceContextToFrames(frames, LRU_FILE_CONTENTS_CACHE);
+    addSourceContextToFrames(frames, LRU_FILE_CONTENTS_CACHE, basePath);
   LRU_FILE_CONTENTS_CACHE.reduce();
   return frames;
 }
-function getContextLinesFromFile(path2, ranges, output) {
-  return new Promise((resolve10) => {
-    const stream = createReadStream(path2);
-    const lineReaded = createInterface({
-      input: stream
-    });
-    function destroyStreamAndResolve() {
-      stream.destroy();
-      resolve10();
+async function openRegularSourceFile(path2, openSourceFile, logger2) {
+  let fileHandle;
+  let isValid = false;
+  try {
+    fileHandle = await openSourceFile(path2, constants3.O_RDONLY | constants3.O_NONBLOCK);
+    const fileStat = await fileHandle.stat();
+    if (!fileStat.isFile())
+      return;
+    if (fileStat.size > MAX_CONTEXTLINES_FILE_SIZE)
+      return void logger2?.debug(`Skipping source context for oversized file ${path2}: ${fileStat.size} bytes exceeds ${MAX_CONTEXTLINES_FILE_SIZE}`);
+    isValid = true;
+    return fileHandle;
+  } catch {
+    return;
+  } finally {
+    if (fileHandle && !isValid)
+      await fileHandle.close().catch(() => {});
+  }
+}
+async function getContextLinesFromFile(path2, ranges, output, cacheKey, openSourceFile, logger2) {
+  const fileHandle = await openRegularSourceFile(path2, openSourceFile, logger2);
+  if (fileHandle === undefined)
+    return void LRU_FILE_CONTENTS_FS_READ_FAILED.set(cacheKey, 1);
+  const openedFileHandle = fileHandle;
+  return new Promise((resolve9) => {
+    let finished = false;
+    function destroyStreamAndResolve(stream2) {
+      if (finished)
+        return;
+      finished = true;
+      stream2?.destroy();
+      openedFileHandle.close().then(resolve9, resolve9);
+    }
+    let stream;
+    try {
+      stream = openedFileHandle.createReadStream({
+        autoClose: false,
+        start: 0,
+        end: MAX_CONTEXTLINES_FILE_SIZE - 1
+      });
+    } catch {
+      LRU_FILE_CONTENTS_FS_READ_FAILED.set(cacheKey, 1);
+      destroyStreamAndResolve();
+      return;
+    }
+    let lineReaded;
+    try {
+      lineReaded = createInterface({
+        input: stream
+      });
+    } catch {
+      LRU_FILE_CONTENTS_FS_READ_FAILED.set(cacheKey, 1);
+      destroyStreamAndResolve(stream);
+      return;
     }
     let lineNumber = 0;
     let currentRangeIndex = 0;
     const range = ranges[currentRangeIndex];
     if (range === undefined)
-      return void destroyStreamAndResolve();
+      return void destroyStreamAndResolve(stream);
     let rangeStart = range[0];
     let rangeEnd = range[1];
     function onStreamError() {
-      LRU_FILE_CONTENTS_FS_READ_FAILED.set(path2, 1);
+      LRU_FILE_CONTENTS_FS_READ_FAILED.set(cacheKey, 1);
       lineReaded.close();
       lineReaded.removeAllListeners();
-      destroyStreamAndResolve();
+      destroyStreamAndResolve(stream);
     }
     stream.on("error", onStreamError);
     lineReaded.on("error", onStreamError);
-    lineReaded.on("close", destroyStreamAndResolve);
+    lineReaded.on("close", () => destroyStreamAndResolve(stream));
     lineReaded.on("line", (line) => {
       lineNumber++;
       if (lineNumber < rangeStart)
@@ -3246,10 +4408,11 @@ function getContextLinesFromFile(path2, ranges, output) {
     });
   });
 }
-function addSourceContextToFrames(frames, cache) {
+function addSourceContextToFrames(frames, cache, basePath) {
   for (const frame of frames)
     if (frame.filename && frame.context_line === undefined && typeof frame.lineno == "number") {
-      const contents = cache.get(frame.filename);
+      const cacheKey = makeSourceCacheKey(frame.filename, basePath);
+      const contents = cacheKey === undefined ? undefined : cache.get(cacheKey);
       if (contents === undefined)
         continue;
       addContextToFrame(frame.lineno, frame, contents);
@@ -3292,8 +4455,19 @@ function shouldSkipContextLinesForFrame(frame) {
     return true;
   return false;
 }
-function rangeExistsInContentCache(file2, range) {
-  const contents = LRU_FILE_CONTENTS_CACHE.get(file2);
+function makeSourceCacheKey(path2, basePath) {
+  if (isAbsolute7(path2))
+    return JSON.stringify([
+      null,
+      path2
+    ]);
+  return basePath === undefined ? undefined : JSON.stringify([
+    basePath,
+    path2
+  ]);
+}
+function rangeExistsInContentCache(cacheKey, range) {
+  const contents = LRU_FILE_CONTENTS_CACHE.get(cacheKey);
   if (contents === undefined)
     return false;
   for (let i = range[0];i <= range[1]; i++)
@@ -3370,15 +4544,15 @@ function snipLine(line, colno) {
     newLine += "...";
   return newLine;
 }
-var LRU_FILE_CONTENTS_CACHE, LRU_FILE_CONTENTS_FS_READ_FAILED, DEFAULT_LINES_OF_CONTEXT = 7, MAX_CONTEXTLINES_COLNO = 1000, MAX_CONTEXTLINES_LINENO = 1e4;
+var LRU_FILE_CONTENTS_CACHE, LRU_FILE_CONTENTS_FS_READ_FAILED, DEFAULT_LINES_OF_CONTEXT = 7, MAX_CONTEXTLINES_COLNO = 1000, MAX_CONTEXTLINES_LINENO = 1e4, MAX_CONTEXTLINES_FILE_SIZE = 10485760;
 var init_context_lines_node = __esm(() => {
   init_dist();
   LRU_FILE_CONTENTS_CACHE = new exports_error_tracking.ReduceableCache(25);
   LRU_FILE_CONTENTS_FS_READ_FAILED = new exports_error_tracking.ReduceableCache(20);
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
-import { isAbsolute as isAbsolute5, relative as relative4, sep as sep8 } from "node:path";
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
+import { isAbsolute as isAbsolute8, relative as relative4, sep as sep8 } from "node:path";
 function createRelativePathModifier(basePath = process.cwd()) {
   const isWindows = sep8 === "\\";
   const toUnix = (p) => isWindows ? p.replace(/\\/g, "/") : p;
@@ -3386,7 +4560,7 @@ function createRelativePathModifier(basePath = process.cwd()) {
   return async (frames) => {
     for (const frame of frames)
       if (!(!frame.filename || frame.filename.startsWith("node:") || frame.filename.startsWith("data:"))) {
-        if (isAbsolute5(frame.filename))
+        if (isAbsolute8(frame.filename))
           frame.filename = toUnix(relative4(normalizedBase, toUnix(frame.filename)));
       }
     return frames;
@@ -3394,11 +4568,11 @@ function createRelativePathModifier(basePath = process.cwd()) {
 }
 var init_relative_path_node = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/version.mjs
-var version = "5.35.12";
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/version.mjs
+var version = "5.51.1";
 var init_version = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/types.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/types.mjs
 var FeatureFlagError2;
 var init_types3 = __esm(() => {
   FeatureFlagError2 = {
@@ -3409,7 +4583,7 @@ var init_types3 = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/feature-flag-evaluations.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/feature-flag-evaluations.mjs
 class FeatureFlagEvaluations {
   constructor(init) {
     this._host = init.host;
@@ -3425,10 +4599,10 @@ class FeatureFlagEvaluations {
     this._accessed = init.accessed ?? new Set;
     this._isSlice = init.isSlice ?? false;
   }
-  isEnabled(key) {
+  isEnabled(key, options = {}) {
     const flag = this._flags[key];
     this._recordAccess(key);
-    return flag?.enabled ?? false;
+    return flag?.enabled ?? options.defaultValue ?? false;
   }
   getFlag(key) {
     const flag = this._flags[key];
@@ -3518,6 +4692,8 @@ class FeatureFlagEvaluations {
       $feature_flag_request_id: this._requestId,
       $feature_flag_evaluated_at: flag?.locallyEvaluated ? Date.now() : this._evaluatedAt
     };
+    if (flag?.hasExperiment !== undefined)
+      properties.$feature_flag_has_experiment = flag.hasExperiment;
     if (flag?.locallyEvaluated && this._flagDefinitionsLoadedAt !== undefined)
       properties.$feature_flag_definitions_loaded_at = this._flagDefinitionsLoadedAt;
     const errors = [];
@@ -3543,7 +4719,7 @@ var init_feature_flag_evaluations = __esm(() => {
   init_types3();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/crypto.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/feature-flags/crypto.mjs
 async function hashSHA1(text) {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle)
@@ -3554,12 +4730,19 @@ async function hashSHA1(text) {
 }
 var init_crypto = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/feature-flags.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/feature-flags/feature-flags.mjs
+function setCustomErrorPrototype(error, constructor) {
+  error.name = constructor.name;
+  Error.captureStackTrace(error, constructor);
+  Object.setPrototypeOf(error, constructor.prototype);
+}
+
 class FeatureFlagsPoller {
   constructor({ pollingInterval, personalApiKey, projectApiKey, timeout, host, customHeaders, ...options }) {
     this.debugMode = false;
     this.shouldBeginExponentialBackoff = false;
     this.backOffCount = 0;
+    this.pollerStopped = false;
     this.pollingInterval = pollingInterval;
     this.personalApiKey = personalApiKey;
     this.featureFlags = [];
@@ -3575,6 +4758,7 @@ class FeatureFlagsPoller {
     this.onError = options.onError;
     this.customHeaders = customHeaders;
     this.onLoad = options.onLoad;
+    this.onMinimalFlagCalledEvents = options.onMinimalFlagCalledEvents;
     this.cacheProvider = options.cacheProvider;
     this.strictLocalEvaluation = options.strictLocalEvaluation ?? false;
     this.loadFeatureFlags();
@@ -3772,6 +4956,7 @@ class FeatureFlagsPoller {
     const flagFilters = flag.filters || {};
     const flagConditions = flagFilters.groups || [];
     const flagAggregation = flagFilters.aggregation_group_type_index;
+    const earlyExitEnabled = flagFilters.early_exit ?? false;
     const { groups, groupProperties } = evaluationContext;
     let isInconclusive = false;
     let result;
@@ -3795,12 +4980,15 @@ class FeatureFlagsPoller {
             effectiveBucketingValue = groups[groupName];
           }
         }
-        if (await this.isConditionMatch(flag, effectiveBucketingValue, condition, effectiveProperties, evaluationContext)) {
+        const matchResult = await this.isConditionMatch(flag, effectiveBucketingValue, condition, effectiveProperties, evaluationContext);
+        if (matchResult === "match") {
           const variantOverride = condition.variant;
           const flagVariants = flagFilters.multivariate?.variants || [];
           result = variantOverride && flagVariants.some((variant) => variant.key === variantOverride) ? variantOverride : await this.getMatchingVariant(flag, effectiveBucketingValue) || true;
           break;
         }
+        if (earlyExitEnabled && matchResult === "out_of_rollout_bound")
+          return false;
       } catch (e) {
         if (e instanceof RequiresServerEvaluation)
           throw e;
@@ -3824,16 +5012,20 @@ class FeatureFlagsPoller {
       for (const prop of condition.properties) {
         const propertyType = prop.type;
         let matches = false;
-        matches = propertyType === "cohort" ? await matchCohort(prop, properties, this.cohorts, this.debugMode, (depProp) => this.evaluateFlagDependency(depProp, properties, evaluationContext)) : propertyType === "flag" ? await this.evaluateFlagDependency(prop, properties, evaluationContext) : matchProperty(prop, properties, warnFunction);
+        if (propertyType === "cohort") {
+          const inCohort = await matchCohort(prop, properties, this.cohorts, this.debugMode, (depProp) => this.evaluateFlagDependency(depProp, properties, evaluationContext));
+          matches = prop.operator === "not_in" ? !inCohort : inCohort;
+        } else
+          matches = propertyType === "flag" ? await this.evaluateFlagDependency(prop, properties, evaluationContext) : matchProperty(prop, properties, warnFunction);
         if (!matches)
-          return false;
+          return "no_match";
       }
       if (rolloutPercentage == undefined)
-        return true;
+        return "match";
     }
     if (rolloutPercentage != null && await _hash(flag.key, bucketingValue) > rolloutPercentage / 100)
-      return false;
-    return true;
+      return "out_of_rollout_bound";
+    return "match";
   }
   async getMatchingVariant(flag, bucketingValue) {
     const hashValue = await _hash(flag.key, bucketingValue, "variant");
@@ -3864,6 +5056,7 @@ class FeatureFlagsPoller {
     this.groupTypeMapping = flagData.groupTypeMapping;
     this.cohorts = flagData.cohorts;
     this.loadedSuccessfullyOnce = true;
+    this.onMinimalFlagCalledEvents?.(flagData.minimalFlagCalledEvents === true);
   }
   warnAboutExperienceContinuityFlags(flags) {
     if (this.strictLocalEvaluation)
@@ -3927,7 +5120,6 @@ class FeatureFlagsPoller {
       clearTimeout(this.poller);
       this.poller = undefined;
     }
-    this.poller = setTimeout(() => this.loadFeatureFlags(true), this.getPollingInterval());
     try {
       let shouldFetch = true;
       if (this.cacheProvider)
@@ -3955,17 +5147,18 @@ class FeatureFlagsPoller {
           return;
         case 401:
           this.beginBackoff();
-          throw new ClientError(`Your project key or personal API key is invalid. Setting next polling interval to ${this.getPollingInterval()}ms. More information: https://posthog.com/docs/api#rate-limiting`);
+          throw new ClientError(`Your project key or secret key is invalid. Setting next polling interval to ${this.getPollingInterval()}ms. More information: https://posthog.com/docs/api#rate-limiting`);
         case 402:
           console.warn("[FEATURE FLAGS] Feature flags quota limit exceeded - unsetting all local flags. Learn more about billing limits at https://posthog.com/docs/billing/limits-alerts");
           this.featureFlags = [];
           this.featureFlagsByKey = {};
           this.groupTypeMapping = {};
           this.cohorts = {};
+          this.onMinimalFlagCalledEvents?.(false);
           return;
         case 403:
           this.beginBackoff();
-          throw new ClientError(`Your personal API key does not have permission to fetch feature flag definitions for local evaluation. Setting next polling interval to ${this.getPollingInterval()}ms. Are you sure you're using the correct personal and Project API key pair? More information: https://posthog.com/docs/api/overview`);
+          throw new ClientError(`Your secret key does not have permission to fetch feature flag definitions for local evaluation. Setting next polling interval to ${this.getPollingInterval()}ms. Are you sure you're using the correct secret and Project API key pair? More information: https://posthog.com/docs/api/overview`);
         case 429:
           this.beginBackoff();
           throw new ClientError(`You are being rate limited. Setting next polling interval to ${this.getPollingInterval()}ms. More information: https://posthog.com/docs/api#rate-limiting`);
@@ -3977,7 +5170,8 @@ class FeatureFlagsPoller {
           const flagData = {
             flags: responseJson.flags ?? [],
             groupTypeMapping: responseJson.group_type_mapping || {},
-            cohorts: responseJson.cohorts || {}
+            cohorts: responseJson.cohorts || {},
+            minimalFlagCalledEvents: responseJson.minimal_flag_called_events === true
           };
           this.updateFlagState(flagData);
           this.flagDefinitionsLoadedAt = Date.now();
@@ -3998,6 +5192,9 @@ class FeatureFlagsPoller {
     } catch (err) {
       if (err instanceof ClientError)
         this.onError?.(err);
+    } finally {
+      if (!this.pollerStopped)
+        this.poller = setTimeout(() => this.loadFeatureFlags(true), this.getPollingInterval());
     }
   }
   getPersonalApiKeyRequestOptions(method = "GET", etag) {
@@ -4013,7 +5210,7 @@ class FeatureFlagsPoller {
       headers
     };
   }
-  _requestFeatureFlagDefinitions() {
+  async _requestFeatureFlagDefinitions() {
     const url = `${this.host}/flags/definitions?token=${this.projectApiKey}&send_cohorts`;
     const options = this.getPersonalApiKeyRequestOptions("GET", this.flagsEtag);
     let abortTimeout = null;
@@ -4024,23 +5221,49 @@ class FeatureFlagsPoller {
       }, this.timeout);
       options.signal = controller.signal;
     }
+    const clearAbortTimeout = () => clearTimeout(abortTimeout);
     try {
       const fetch1 = this.fetch;
-      return fetch1(url, options);
-    } finally {
-      clearTimeout(abortTimeout);
+      const res = await fetch1(url, options);
+      if (res.status !== 200) {
+        clearAbortTimeout();
+        return res;
+      }
+      return {
+        status: res.status,
+        headers: res.headers,
+        body: res.body,
+        text: async () => {
+          try {
+            return await res.text();
+          } finally {
+            clearAbortTimeout();
+          }
+        },
+        json: async () => {
+          try {
+            return await res.json();
+          } finally {
+            clearAbortTimeout();
+          }
+        }
+      };
+    } catch (err) {
+      clearAbortTimeout();
+      throw err;
     }
   }
   async stopPoller(timeoutMs = 30000) {
+    this.pollerStopped = true;
     clearTimeout(this.poller);
+    this.poller = undefined;
     if (this.cacheProvider)
       try {
         const shutdownResult = this.cacheProvider.shutdown();
         if (shutdownResult instanceof Promise)
-          await Promise.race([
-            shutdownResult,
-            new Promise((_, reject) => setTimeout(() => reject(new Error(`Cache shutdown timeout after ${timeoutMs}ms`)), timeoutMs))
-          ]);
+          await raceWithTimeout(shutdownResult, timeoutMs, () => {
+            throw new Error(`Cache shutdown timeout after ${timeoutMs}ms`);
+          });
       } catch (err) {
         this.onError?.(new Error(`Error during cache shutdown: ${err}`));
       }
@@ -4095,6 +5318,14 @@ function matchProperty(property, propertyValues, warnFunction) {
       return String(overrideValue).toLowerCase().includes(String(value).toLowerCase());
     case "not_icontains":
       return !String(overrideValue).toLowerCase().includes(String(value).toLowerCase());
+    case "starts_with":
+      return String(overrideValue).toLowerCase().startsWith(String(value).toLowerCase());
+    case "not_starts_with":
+      return !String(overrideValue).toLowerCase().startsWith(String(value).toLowerCase());
+    case "ends_with":
+      return String(overrideValue).toLowerCase().endsWith(String(value).toLowerCase());
+    case "not_ends_with":
+      return !String(overrideValue).toLowerCase().endsWith(String(value).toLowerCase());
     case "regex":
       return isValidRegex(String(value)) && String(overrideValue).match(String(value)) !== null;
     case "not_regex":
@@ -4440,34 +5671,70 @@ var init_feature_flags = __esm(() => {
   InconclusiveMatchError = class InconclusiveMatchError extends Error {
     constructor(message) {
       super(message);
-      this.name = this.constructor.name;
-      Error.captureStackTrace(this, this.constructor);
-      Object.setPrototypeOf(this, InconclusiveMatchError.prototype);
+      setCustomErrorPrototype(this, InconclusiveMatchError);
     }
   };
   RequiresServerEvaluation = class RequiresServerEvaluation extends Error {
     constructor(message) {
       super(message);
-      this.name = this.constructor.name;
-      Error.captureStackTrace(this, this.constructor);
-      Object.setPrototypeOf(this, RequiresServerEvaluation.prototype);
+      setCustomErrorPrototype(this, RequiresServerEvaluation);
     }
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/autocapture.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/error-tracking/autocapture.mjs
+function splitNodeOptions(nodeOptions) {
+  const args = [];
+  let current = "";
+  let isInString = false;
+  for (let index = 0;index < nodeOptions.length; index++) {
+    const character = nodeOptions[index];
+    if (character === "\\" && isInString && index + 1 < nodeOptions.length)
+      current += nodeOptions[++index];
+    else if (character !== " " || isInString)
+      if (character === '"')
+        isInString = !isInString;
+      else
+        current += character;
+    else if (current) {
+      args.push(current);
+      current = "";
+    }
+  }
+  if (current)
+    args.push(current);
+  return args;
+}
+function findUnhandledRejectionMode(args) {
+  let mode;
+  for (let index = 0;index < args.length; index++) {
+    const argument = args[index];
+    const optionName = UNHANDLED_REJECTION_OPTION_NAMES.find((name) => argument === name || argument.startsWith(`${name}=`));
+    if (!optionName)
+      continue;
+    const value = argument === optionName ? args[++index] : argument.slice(optionName.length + 1);
+    if (UNHANDLED_REJECTION_MODES.has(value))
+      mode = value;
+  }
+  return mode;
+}
+function getUnhandledRejectionMode(execArgv = STARTUP_EXEC_ARGV, nodeOptions = STARTUP_NODE_OPTIONS) {
+  return findUnhandledRejectionMode(execArgv) ?? findUnhandledRejectionMode(splitNodeOptions(nodeOptions ?? "")) ?? "throw";
+}
+function captureUncaughtException(captureFn, error, origin) {
+  captureFn(error, {
+    mechanism: {
+      type: origin === "unhandledRejection" ? "onunhandledrejection" : "onuncaughtexception",
+      handled: false
+    }
+  });
+}
 function makeUncaughtExceptionHandler(captureFn, onFatalFn) {
   let calledFatalError = false;
-  return Object.assign((error) => {
+  return Object.assign((error, origin) => {
     const userProvidedListenersCount = global.process.listeners("uncaughtException").filter((listener) => listener.name !== "domainUncaughtExceptionClear" && listener._posthogErrorHandler !== true).length;
-    const processWouldExit = userProvidedListenersCount === 0;
-    captureFn(error, {
-      mechanism: {
-        type: "onuncaughtexception",
-        handled: false
-      }
-    });
-    if (!calledFatalError && processWouldExit) {
+    captureUncaughtException(captureFn, error, origin);
+    if (!calledFatalError && userProvidedListenersCount === 0) {
       calledFatalError = true;
       onFatalFn(error);
     }
@@ -4475,28 +5742,55 @@ function makeUncaughtExceptionHandler(captureFn, onFatalFn) {
     _posthogErrorHandler: true
   });
 }
-function addUncaughtExceptionListener(captureFn, onFatalFn) {
-  globalThis.process?.on("uncaughtException", makeUncaughtExceptionHandler(captureFn, onFatalFn));
+function addUncaughtExceptionListener(captureFn, onFatalFn, mode = STARTUP_UNHANDLED_REJECTION_MODE) {
+  const process2 = globalThis.process;
+  if (!process2)
+    return;
+  if (mode === "strict")
+    return void process2.on("uncaughtExceptionMonitor", (error, origin) => captureUncaughtException(captureFn, error, origin));
+  process2.on("uncaughtException", makeUncaughtExceptionHandler(captureFn, onFatalFn));
 }
-function addUnhandledRejectionListener(captureFn) {
-  globalThis.process?.on("unhandledRejection", (reason) => captureFn(reason, {
-    mechanism: {
-      type: "onunhandledrejection",
-      handled: false
-    }
-  }));
+function addUnhandledRejectionListener(captureFn, mode = STARTUP_UNHANDLED_REJECTION_MODE) {
+  const process2 = globalThis.process;
+  if (!process2 || mode === "throw" || mode === "strict" || mode === "warn-with-error-code")
+    return;
+  process2.on("unhandledRejection", (reason) => {
+    captureFn(reason, {
+      mechanism: {
+        type: "onunhandledrejection",
+        handled: false
+      }
+    });
+  });
 }
-var init_autocapture = () => {};
+var UNHANDLED_REJECTION_OPTION_NAMES, UNHANDLED_REJECTION_MODES, STARTUP_EXEC_ARGV, STARTUP_NODE_OPTIONS, STARTUP_UNHANDLED_REJECTION_MODE;
+var init_autocapture = __esm(() => {
+  UNHANDLED_REJECTION_OPTION_NAMES = [
+    "--unhandled-rejections",
+    "--unhandled_rejections"
+  ];
+  UNHANDLED_REJECTION_MODES = new Set([
+    "throw",
+    "strict",
+    "warn",
+    "warn-with-error-code",
+    "none"
+  ]);
+  STARTUP_EXEC_ARGV = [
+    ...globalThis.process?.execArgv ?? []
+  ];
+  STARTUP_NODE_OPTIONS = globalThis.process?.env?.NODE_OPTIONS;
+  STARTUP_UNHANDLED_REJECTION_MODE = getUnhandledRejectionMode();
+});
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/index.mjs
-class ErrorTracking {
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/error-tracking/index.mjs
+class error_tracking_ErrorTracking {
   constructor(client, options, _logger) {
     this.client = client;
     this._exceptionAutocaptureEnabled = options.enableExceptionAutocapture || false;
     this._logger = _logger;
     this._rateLimiter = new BucketedRateLimiter({
-      refillRate: 1,
-      bucketSize: 10,
+      ...resolveExceptionRateLimiterConfig(options),
       refillInterval: 1e4,
       _logger: this._logger
     });
@@ -4511,6 +5805,9 @@ class ErrorTracking {
     };
     const exceptionProperties = builder.buildFromUnknown(error, hint);
     exceptionProperties.$exception_list = await builder.modifyFrames(exceptionProperties.$exception_list);
+    const injectedReleaseId = exports_error_tracking.getInjectedReleaseId();
+    if (injectedReleaseId)
+      properties.$release_id = injectedReleaseId;
     return {
       event: "$exception",
       distinctId,
@@ -4529,8 +5826,8 @@ class ErrorTracking {
   }
   onException(exception, hint) {
     this.client.addPendingPromise((async () => {
-      if (!ErrorTracking.isPreviouslyCapturedError(exception)) {
-        const eventMessage = await ErrorTracking.buildEventMessage(this.client.getErrorPropertiesBuilder(), exception, hint);
+      if (!error_tracking_ErrorTracking.isPreviouslyCapturedError(exception)) {
+        const eventMessage = await error_tracking_ErrorTracking.buildEventMessage(this.client.getErrorPropertiesBuilder(), exception, hint);
         const exceptionProperties = eventMessage.properties;
         const exceptionType = exceptionProperties?.$exception_list[0]?.type ?? "Exception";
         const isRateLimited = this._rateLimiter.consumeRateLimit(exceptionType);
@@ -4538,14 +5835,14 @@ class ErrorTracking {
           return void this._logger.info("Skipping exception capture because of client rate limiting.", {
             exception: exceptionType
           });
-        return this.client.capture(eventMessage);
+        return this.client._capturePreparedEvent(eventMessage, false);
       }
     })());
   }
   async onFatalError(exception) {
     console.error(exception);
     await this.client.shutdown(SHUTDOWN_TIMEOUT);
-    process.exit(1);
+    globalThis.process.exit(1);
   }
   isEnabled() {
     return !this.client.isDisabled && this._exceptionAutocaptureEnabled;
@@ -4560,7 +5857,7 @@ var init_error_tracking2 = __esm(() => {
   init_dist();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/storage-memory.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/storage-memory.mjs
 class PostHogMemoryStorage {
   getProperty(key) {
     return this._memoryStorage[key];
@@ -4574,7 +5871,464 @@ class PostHogMemoryStorage {
 }
 var init_storage_memory = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/client.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/capture-v1/config.mjs
+function isCaptureMode(value) {
+  return value === "v0" || value === "v1";
+}
+function resolveCaptureMode() {
+  const envMode = typeof process != "undefined" ? process.env?.POSTHOG_CAPTURE_MODE : undefined;
+  return isCaptureMode(envMode) ? envMode : "v0";
+}
+var init_config2 = () => {};
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/capture-v1/routing.mjs
+function isLegacyOnlyEvent(message) {
+  return typeof message.event == "string" && message.event.startsWith(AI_EVENT_PREFIX);
+}
+var AI_EVENT_PREFIX = "$ai_", ANALYTICS_ROUTE = "analytics", AI_ROUTE = "ai";
+var init_routing = () => {};
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/capture-v1/errors.mjs
+var CaptureV1Error;
+var init_errors = __esm(() => {
+  CaptureV1Error = class CaptureV1Error extends Error {
+    constructor({ requestId, drops, retryExhausted, cause }) {
+      super(CaptureV1Error.buildMessage(requestId, drops, retryExhausted, cause)), this.name = "CaptureV1Error";
+      this.requestId = requestId;
+      this.drops = drops;
+      this.retryExhausted = retryExhausted;
+      this.cause = cause;
+    }
+    static buildMessage(requestId, drops, retryExhausted, cause) {
+      let message = `Capture V1 batch ${requestId} did not fully deliver: ${drops.length} dropped, ${retryExhausted.length} undelivered`;
+      if (cause instanceof Error)
+        message += ` (${cause.message})`;
+      return message;
+    }
+  };
+});
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/capture-v1/transform.mjs
+function coerceBool(value) {
+  if (typeof value == "boolean")
+    return value;
+  if (typeof value == "number")
+    return value !== 0;
+  if (typeof value == "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1")
+      return true;
+    if (normalized === "false" || normalized === "0")
+      return false;
+  }
+}
+function coerceString(value) {
+  return typeof value == "string" ? value : undefined;
+}
+function isRecord3(value) {
+  return typeof value == "object" && value !== null && !Array.isArray(value);
+}
+function toRfc3339(timestamp) {
+  if (typeof timestamp == "string") {
+    const asDate2 = new Date(timestamp);
+    if (Number.isNaN(asDate2.getTime()))
+      return new Date().toISOString();
+    const normalized = asDate2.toISOString();
+    const fractionalSeconds = timestamp.match(/\.(\d+)(?:Z|[+-]\d{2}:?\d{2})?$/i)?.[1];
+    return fractionalSeconds && fractionalSeconds.length > 3 ? normalized.replace(/\.\d{3}Z$/, `.${fractionalSeconds}Z`) : normalized;
+  }
+  if (timestamp instanceof Date)
+    return Number.isNaN(timestamp.getTime()) ? new Date().toISOString() : timestamp.toISOString();
+  const asDate = timestamp == null ? new Date : new Date(timestamp);
+  return Number.isNaN(asDate.getTime()) ? new Date().toISOString() : asDate.toISOString();
+}
+function relocateInto(properties, key, value) {
+  if (value !== undefined && !(key in properties))
+    properties[key] = value;
+}
+function buildV1Event(message) {
+  const sourceProperties = isRecord3(message.properties) ? message.properties : {};
+  const properties = {
+    ...sourceProperties
+  };
+  const options = {};
+  for (const { property, optionKey, coerce } of OPTION_SENTINELS)
+    if (property in properties) {
+      const coerced = coerce(properties[property]);
+      if (coerced !== undefined)
+        options[optionKey] = coerced;
+      delete properties[property];
+    }
+  const topLevel = {};
+  for (const { property, field } of TOPLEVEL_SENTINELS)
+    if (property in properties) {
+      const value = properties[property];
+      if (typeof value == "string")
+        topLevel[field] = value;
+      delete properties[property];
+    }
+  delete properties.$lib;
+  delete properties.$lib_version;
+  relocateInto(properties, "$set", message.$set);
+  relocateInto(properties, "$set_once", message.$set_once);
+  return {
+    event: String(message.event ?? ""),
+    uuid: String(message.uuid ?? ""),
+    distinct_id: String(message.distinct_id ?? ""),
+    timestamp: toRfc3339(message.timestamp),
+    ...topLevel,
+    options,
+    properties
+  };
+}
+function buildV1Batch(messages, { createdAt, historicalMigration }) {
+  const batch = {
+    created_at: createdAt,
+    batch: messages.map(buildV1Event)
+  };
+  if (historicalMigration)
+    batch.historical_migration = true;
+  return batch;
+}
+var OPTION_SENTINELS, TOPLEVEL_SENTINELS;
+var init_transform = __esm(() => {
+  OPTION_SENTINELS = [
+    {
+      property: "$cookieless_mode",
+      optionKey: "cookieless_mode",
+      coerce: coerceBool
+    },
+    {
+      property: "$ignore_sent_at",
+      optionKey: "disable_skew_correction",
+      coerce: coerceBool
+    },
+    {
+      property: "$process_person_profile",
+      optionKey: "process_person_profile",
+      coerce: coerceBool
+    },
+    {
+      property: "$product_tour_id",
+      optionKey: "product_tour_id",
+      coerce: coerceString
+    }
+  ];
+  TOPLEVEL_SENTINELS = [
+    {
+      property: "$session_id",
+      field: "session_id"
+    },
+    {
+      property: "$window_id",
+      field: "window_id"
+    }
+  ];
+});
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/capture-v1/sender.mjs
+class V1CaptureSender {
+  constructor(config, hooks) {
+    this.config = config;
+    this.maxBackoffMs = config.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
+    this.fetchFn = hooks.fetch;
+    this.onError = hooks.onError;
+    this.now = hooks.now ?? Date.now;
+    this.sleep = hooks.sleep ?? ((ms) => new Promise((resolve9) => safeSetTimeout(resolve9, ms)));
+    this.generateRequestId = hooks.generateRequestId ?? uuidv7;
+    this.compress = hooks.compress ?? gzipCompress;
+  }
+  async sendV1Batch(messages) {
+    if (messages.length === 0)
+      return;
+    const requestId = this.generateRequestId();
+    const createdAt = new Date(this.now()).toISOString();
+    const { batch } = buildV1Batch(messages, {
+      createdAt,
+      historicalMigration: this.config.historicalMigration
+    });
+    const url = `${this.config.host}${V1_ANALYTICS_PATH}`;
+    const drops = [];
+    let pending = batch;
+    const maxAttempts = Math.max(1, this.config.maxAttempts);
+    for (let attempt = 1;attempt <= maxAttempts; attempt++) {
+      const isLastAttempt = attempt === maxAttempts;
+      const payload = safeJsonStringify({
+        created_at: createdAt,
+        ...this.config.historicalMigration ? {
+          historical_migration: true
+        } : {},
+        batch: pending
+      });
+      let captureAttempt;
+      let retryDelayMs;
+      try {
+        captureAttempt = await this.sendOnce(url, payload, attempt, requestId);
+        const { response, signal } = captureAttempt;
+        const { status } = response;
+        if (status < 200 || status >= 300)
+          if (!isLastAttempt && RETRYABLE_STATUSES.has(status)) {
+            const retryAfterMs = this.parseRetryAfter(response);
+            await captureAttempt.waitFor(captureAttempt.cancelBody()).catch(() => {});
+            retryDelayMs = this.backoffDelay(attempt, retryAfterMs);
+          } else {
+            const httpError = await this.buildHttpError(response, status, captureAttempt.waitFor);
+            return this.surfaceBatchFailure(requestId, drops, pending, httpError);
+          }
+        else {
+          let parsed;
+          try {
+            parsed = await captureAttempt.waitFor(this.parseResponse(response));
+          } catch (error) {
+            if (signal.aborted)
+              throw error;
+            return this.surfaceBatchFailure(requestId, drops, pending, new Error(`Capture V1 returned an unparseable ${status} response body`));
+          }
+          const retryable = this.classify(pending, parsed, drops);
+          if (retryable.length === 0)
+            return this.surfacePartialDrops(requestId, drops);
+          if (isLastAttempt)
+            return void this.onError(new CaptureV1Error({
+              requestId,
+              drops,
+              retryExhausted: retryable.map((event) => event.uuid)
+            }));
+          pending = retryable;
+          const retryAfterMs = this.parseRetryAfter(response);
+          retryDelayMs = this.backoffDelay(attempt, retryAfterMs);
+        }
+      } catch (transportError) {
+        if (captureAttempt && !captureAttempt.signal.aborted)
+          throw transportError;
+        if (isLastAttempt)
+          return this.surfaceBatchFailure(requestId, drops, pending, transportError);
+        retryDelayMs = this.backoffDelay(attempt);
+      } finally {
+        captureAttempt?.cleanup();
+      }
+      if (retryDelayMs !== undefined)
+        await this.sleep(retryDelayMs);
+    }
+  }
+  async sendOnce(url, payload, attempt, requestId) {
+    const headers = this.buildHeaders(attempt, requestId);
+    let body = payload;
+    if (this.config.compressionEnabled) {
+      const compressed = await this.compress(payload, this.config.isDebug);
+      if (compressed !== null) {
+        body = compressed;
+        headers["Content-Encoding"] = "gzip";
+      }
+    }
+    const controller = new AbortController;
+    let timeoutPhase = "waiting for response headers";
+    let timer;
+    const deadline = new Promise((_resolve, reject) => {
+      timer = safeSetTimeout(() => {
+        const timeoutError = new Error(`Capture V1 request timed out ${timeoutPhase} after ${this.config.requestTimeoutMs}ms`);
+        timeoutError.name = "AbortError";
+        reject(timeoutError);
+        controller.abort(timeoutError);
+      }, this.config.requestTimeoutMs);
+    });
+    try {
+      const fetchPromise = this.fetchFn(url, {
+        method: "POST",
+        headers,
+        body,
+        signal: controller.signal
+      });
+      let responseAccepted = false;
+      fetchPromise.then((lateResponse) => {
+        if (controller.signal.aborted && !responseAccepted)
+          this.cancelBody(lateResponse);
+      }).catch(() => {});
+      const response = await Promise.race([
+        fetchPromise,
+        deadline
+      ]);
+      responseAccepted = true;
+      timeoutPhase = "while reading the response body";
+      let cleanedUp = false;
+      let cancellation;
+      const cancelBody = () => cancellation ??= this.cancelBody(response);
+      return {
+        response,
+        signal: controller.signal,
+        waitFor: (operation) => Promise.race([
+          operation,
+          deadline
+        ]),
+        cancelBody,
+        cleanup: () => {
+          if (cleanedUp)
+            return;
+          cleanedUp = true;
+          clearTimeout(timer);
+          if (controller.signal.aborted)
+            cancelBody();
+        }
+      };
+    } catch (error) {
+      clearTimeout(timer);
+      throw error;
+    }
+  }
+  buildHeaders(attempt, requestId) {
+    const sdkInfo = `${this.config.libraryId}/${this.config.libraryVersion}`;
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${this.config.apiKey}`,
+      "PostHog-Sdk-Info": sdkInfo,
+      "PostHog-Attempt": String(attempt),
+      "PostHog-Request-Id": requestId,
+      "PostHog-Request-Timestamp": new Date(this.now()).toISOString()
+    };
+    if (this.config.userAgent)
+      headers["User-Agent"] = this.config.userAgent;
+    return headers;
+  }
+  classify(pending, parsed, drops) {
+    const results = parsed.results ?? {};
+    const retryable = [];
+    for (const event of pending) {
+      const result = results[event.uuid];
+      if (result) {
+        if (result.result === "drop")
+          drops.push({
+            uuid: event.uuid,
+            details: result.details ?? undefined
+          });
+        else if (result.result === "retry")
+          retryable.push(event);
+      }
+    }
+    return retryable;
+  }
+  backoffDelay(attempt, retryAfterMs) {
+    const exponential = Math.min(this.config.initialRetryDelayMs * 2 ** (attempt - 1), this.maxBackoffMs);
+    if (retryAfterMs === undefined)
+      return exponential;
+    return Math.max(exponential, Math.min(retryAfterMs, this.maxBackoffMs));
+  }
+  parseRetryAfter(response) {
+    const raw = response.headers?.get("Retry-After");
+    if (!raw)
+      return;
+    const trimmed = raw.trim();
+    if (/^\d+$/.test(trimmed)) {
+      const seconds = parseInt(trimmed, 10);
+      return Number.isFinite(seconds) && seconds > 0 ? 1000 * seconds : undefined;
+    }
+    const dateMs = Date.parse(trimmed);
+    if (Number.isNaN(dateMs))
+      return;
+    const delta = dateMs - this.now();
+    return delta > 0 ? delta : undefined;
+  }
+  async parseResponse(response) {
+    const text = await response.text();
+    const parsed = JSON.parse(text);
+    if (typeof parsed != "object" || parsed === null || Array.isArray(parsed))
+      throw new Error("unexpected response shape");
+    const results = parsed.results;
+    if (results !== undefined && (typeof results != "object" || results === null || Array.isArray(results)))
+      throw new Error("unexpected results shape");
+    return {
+      results: results ?? {}
+    };
+  }
+  async buildHttpError(response, status, waitFor) {
+    let bodyText = "";
+    try {
+      bodyText = (await waitFor(response.text())).slice(0, 512);
+    } catch {}
+    const suffix = bodyText ? `: ${bodyText}` : "";
+    return new Error(`Capture V1 request failed with HTTP ${status}${suffix}`);
+  }
+  surfaceBatchFailure(requestId, drops, pending, cause) {
+    this.onError(new CaptureV1Error({
+      requestId,
+      drops,
+      retryExhausted: pending.map((event) => event.uuid),
+      cause
+    }));
+  }
+  surfacePartialDrops(requestId, drops) {
+    if (drops.length > 0)
+      this.onError(new CaptureV1Error({
+        requestId,
+        drops,
+        retryExhausted: []
+      }));
+  }
+  async cancelBody(response) {
+    try {
+      await response.body?.cancel();
+    } catch {}
+  }
+}
+var V1_ANALYTICS_PATH = "/i/v1/analytics/events", DEFAULT_MAX_BACKOFF_MS = 30000, RETRYABLE_STATUSES;
+var init_sender = __esm(() => {
+  init_dist();
+  init_errors();
+  init_transform();
+  RETRYABLE_STATUSES = new Set([
+    408,
+    500,
+    502,
+    503,
+    504
+  ]);
+});
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/ai-capture/routing.mjs
+var AI_CAPTURE_ROUTE = "ai-capture", AI_CAPTURE_ENDPOINT_PATH = "/i/v0/ai/batch/", AI_MAX_EVENT_BYTES = 8388608, AI_BATCH_TARGET_BYTES = 5242880;
+var init_routing2 = () => {};
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/ai-capture/batching.mjs
+function eventByteSize(message) {
+  return encoder.encode(safeJsonStringify(message)).length;
+}
+function partitionAiBatch(messages, maxEventBytes = AI_MAX_EVENT_BYTES, targetBatchBytes = AI_BATCH_TARGET_BYTES) {
+  const batches = [];
+  const dropped = [];
+  let current = [];
+  let currentBytes = 0;
+  for (const message of messages) {
+    if (message === undefined)
+      continue;
+    const bytes = eventByteSize(message);
+    if (bytes > maxEventBytes) {
+      dropped.push({
+        event: typeof message.event == "string" ? message.event : "unknown",
+        bytes
+      });
+      continue;
+    }
+    if (current.length > 0 && currentBytes + bytes > targetBatchBytes) {
+      batches.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(message);
+    currentBytes += bytes;
+  }
+  if (current.length > 0)
+    batches.push(current);
+  return {
+    batches,
+    dropped
+  };
+}
+var encoder;
+var init_batching = __esm(() => {
+  init_dist();
+  init_routing2();
+  encoder = new TextEncoder;
+});
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/client.mjs
 function emitDeprecationWarningOnce(id, message) {
   if (_emittedDeprecations.has(id))
     return;
@@ -4591,6 +6345,12 @@ function normalizePersonalApiKey(value) {
 function normalizeHost(value) {
   const normalizedValue = typeof value == "string" ? value.trim() : "";
   return normalizedValue || DEFAULT_NODE_HOST;
+}
+function normalizeUnsetPersonProperties(value) {
+  const propertyNames = Array.isArray(value) ? value : [
+    value
+  ];
+  return propertyNames.filter((propertyName) => typeof propertyName == "string" && propertyName.trim().length > 0);
 }
 function buildFlagEventProperties(flagValues) {
   if (!flagValues)
@@ -4612,17 +6372,26 @@ var init_client = __esm(() => {
   init_feature_flags();
   init_error_tracking2();
   init_storage_memory();
+  init_config2();
+  init_routing();
+  init_sender();
+  init_batching();
+  init_routing2();
   _emittedDeprecations = new Set;
   PostHogBackendClient = class PostHogBackendClient extends PostHogCoreStateless {
     constructor(apiKey, options = {}) {
       const normalizedApiKey = normalizeApiKey(apiKey);
       const normalizedOptions = {
         ...options,
+        maxQueueSize: options.maxQueueSize ?? 1e4,
+        flushInterval: options.flushInterval ?? 5000,
         host: normalizeHost(options.host),
-        personalApiKey: normalizePersonalApiKey(options.personalApiKey)
+        personalApiKey: normalizePersonalApiKey(options.secretKey ?? options.personalApiKey)
       };
-      super(normalizedApiKey, normalizedOptions), this._memoryStorage = new PostHogMemoryStorage;
+      super(normalizedApiKey, normalizedOptions), this._memoryStorage = new PostHogMemoryStorage, this._aiCaptureRouteActive = false, this._minimalFlagCalledEvents = false;
       this.options = normalizedOptions;
+      this.captureMode = resolveCaptureMode();
+      this.enableFullAiCapture = normalizedOptions.enableFullAiCapture === true;
       this.context = this.initializeContext();
       this.options.featureFlagsPollingInterval = typeof normalizedOptions.featureFlagsPollingInterval == "number" ? Math.max(normalizedOptions.featureFlagsPollingInterval, MINIMUM_POLLING_INTERVAL) : THIRTY_SECONDS;
       if (typeof normalizedOptions.waitUntilDebounceMs == "number")
@@ -4647,21 +6416,24 @@ var init_client = __esm(() => {
             onLoad: (count) => {
               this._events.emit("localEvaluationFlagsLoaded", count);
             },
+            onMinimalFlagCalledEvents: (enabled) => {
+              this._minimalFlagCalledEvents = enabled;
+            },
             customHeaders: this.getCustomHeaders(),
             cacheProvider: normalizedOptions.flagDefinitionCacheProvider,
             strictLocalEvaluation: normalizedOptions.strictLocalEvaluation
           });
       }
-      this.errorTracking = new ErrorTracking(this, normalizedOptions, this._logger);
+      this.errorTracking = new error_tracking_ErrorTracking(this, normalizedOptions, this._logger);
       this.distinctIdHasSentFlagCalls = {};
       this.maxCacheSize = normalizedOptions.maxCacheSize || MAX_CACHE_SIZE;
     }
-    enqueue(type, message, options) {
-      super.enqueue(type, message, options);
+    enqueue(type, message, options, explicitRoute) {
+      super.enqueue(type, message, options, explicitRoute);
       this.scheduleDebouncedFlush();
     }
     async flush() {
-      const flushPromise = super.flush();
+      const flushPromise = this.flushWithPendingPromises();
       const waitUntil = this.options.waitUntil;
       if (waitUntil && !this._waitUntilCycle)
         try {
@@ -4676,9 +6448,9 @@ var init_client = __esm(() => {
       if (this.disabled || this.optedOut)
         return;
       if (!this._waitUntilCycle) {
-        let resolve10;
+        let resolve9;
         const promise = new Promise((r) => {
-          resolve10 = r;
+          resolve9 = r;
         });
         try {
           waitUntil(promise);
@@ -4686,7 +6458,7 @@ var init_client = __esm(() => {
           return;
         }
         this._waitUntilCycle = {
-          resolve: resolve10,
+          resolve: resolve9,
           startedAt: Date.now(),
           timer: undefined
         };
@@ -4712,11 +6484,11 @@ var init_client = __esm(() => {
       return cycle?.resolve;
     }
     async resolveWaitUntilFlush() {
-      const resolve10 = this._consumeWaitUntilCycle();
+      const resolve9 = this._consumeWaitUntilCycle();
       try {
-        await super.flush();
+        await this.flushWithPendingPromises();
       } catch {} finally {
-        resolve10?.();
+        resolve9?.();
       }
     }
     getPersistedProperty(key) {
@@ -4728,11 +6500,102 @@ var init_client = __esm(() => {
     fetch(url, options) {
       return this.options.fetch ? this.options.fetch(url, options) : fetch(url, options);
     }
+    getQueueRouteKey(message) {
+      return this.captureMode === "v1" && isLegacyOnlyEvent(message) ? AI_ROUTE : ANALYTICS_ROUTE;
+    }
+    persistedQueueKeyForRoute(route) {
+      if (route === AI_CAPTURE_ROUTE)
+        return types_PostHogPersistedProperty.AiCaptureQueue;
+      return route === AI_ROUTE ? types_PostHogPersistedProperty.AiQueue : types_PostHogPersistedProperty.Queue;
+    }
+    getActiveQueueRoutes() {
+      const routes = this.captureMode === "v1" ? [
+        ANALYTICS_ROUTE,
+        AI_ROUTE
+      ] : [
+        ANALYTICS_ROUTE
+      ];
+      if (this._aiCaptureRouteActive)
+        routes.push(AI_CAPTURE_ROUTE);
+      return routes;
+    }
+    getBatchEndpointPath(route) {
+      return route === AI_CAPTURE_ROUTE ? AI_CAPTURE_ENDPOINT_PATH : super.getBatchEndpointPath(route);
+    }
+    async sendBatch(batchMessages, retryOptions, route = ANALYTICS_ROUTE) {
+      if (route === AI_CAPTURE_ROUTE)
+        return this.sendAiCaptureBatch(batchMessages, retryOptions);
+      if (this.captureMode !== "v1" || route === AI_ROUTE)
+        return super.sendBatch(batchMessages, retryOptions, route);
+      const v1Events = batchMessages.filter((message) => message !== undefined);
+      await this.getV1Sender().sendV1Batch(v1Events);
+    }
+    async sendAiCaptureBatch(batchMessages, retryOptions) {
+      const { batches, dropped } = partitionAiBatch(batchMessages);
+      for (const { event, bytes } of dropped) {
+        const message = `Event ${event} (${bytes} bytes) exceeds the ${AI_MAX_EVENT_BYTES / 1048576}MiB limit for ${AI_CAPTURE_ENDPOINT_PATH}, dropping.`;
+        this._logger.error(message);
+        this._events.emit("error", new Error(message));
+      }
+      for (const batch of batches)
+        await this.sendAiSubBatch(batch, retryOptions);
+    }
+    async sendAiSubBatch(batch, retryOptions) {
+      try {
+        await super.sendBatch(batch, retryOptions, AI_CAPTURE_ROUTE);
+      } catch (err) {
+        if (!isPostHogFetchContentTooLargeError(err))
+          throw err;
+        if (batch.length === 1) {
+          const [event] = batch;
+          const eventName = typeof event.event == "string" ? event.event : "unknown";
+          const message = `Event ${eventName} (${eventByteSize(event)} bytes) was rejected with 413 by ${AI_CAPTURE_ENDPOINT_PATH} on its own, dropping.`;
+          this._logger.error(message);
+          this._events.emit("error", new Error(message));
+          return;
+        }
+        const mid = Math.ceil(batch.length / 2);
+        await this.sendAiSubBatch(batch.slice(0, mid), retryOptions);
+        await this.sendAiSubBatch(batch.slice(mid), retryOptions);
+      }
+    }
+    getV1Sender() {
+      if (!this._v1Sender)
+        this._v1Sender = new V1CaptureSender({
+          host: this.host,
+          apiKey: this.apiKey,
+          libraryId: this.getLibraryId(),
+          libraryVersion: this.getLibraryVersion(),
+          userAgent: this.getCustomUserAgent() || undefined,
+          historicalMigration: this.historicalMigration,
+          compressionEnabled: !this.disableCompression,
+          requestTimeoutMs: this.requestTimeout,
+          maxAttempts: (this.options.fetchRetryCount ?? 3) + 1,
+          initialRetryDelayMs: this.options.fetchRetryDelay ?? 3000,
+          isDebug: this.isDebug
+        }, {
+          fetch: (url, fetchOptions) => this.fetch(url, fetchOptions),
+          onError: (error) => this._events.emit("error", error),
+          compress: (payload) => this.compressPayload(payload)
+        });
+      return this._v1Sender;
+    }
     getLibraryVersion() {
       return version;
     }
+    get metrics() {
+      if (!this._metrics)
+        this._metrics = new PostHogMetrics(this, resolveMetricsConfig(this.options.metrics), this._logger);
+      return this._metrics;
+    }
     getCustomUserAgent() {
       return `${this.getLibraryId()}/${this.getLibraryVersion()}`;
+    }
+    getCommonEventProperties() {
+      const commonProperties = super.getCommonEventProperties();
+      if (this.options.isServer ?? true)
+        commonProperties.$is_server = true;
+      return commonProperties;
     }
     enable() {
       return super.optIn();
@@ -4744,33 +6607,69 @@ var init_client = __esm(() => {
       super.debug(enabled);
       this.featureFlagsPoller?.debug(enabled);
     }
-    capture(props) {
+    _warnIfInvalidCapture(props, stringArgumentWarning, exceptionCaptureWarning) {
       if (typeof props == "string")
-        this._logger.warn("Called capture() with a string as the first argument when an object was expected.");
+        this._logger.warn(stringArgumentWarning);
       if (props.event === "$exception" && !props._originatedFromCaptureException)
-        this._logger.warn("Using `posthog.capture('$exception')` is unreliable because it does not attach required metadata. Use `posthog.captureException(error)` instead, which attaches required metadata automatically.");
-      this.addPendingPromise(this.prepareEventMessage(props).then(({ distinctId, event, properties, options }) => super.captureStateless(distinctId, event, properties, {
-        timestamp: options.timestamp,
-        disableGeoip: options.disableGeoip,
-        uuid: options.uuid
-      })).catch((err) => {
+        this._logger.warn(exceptionCaptureWarning);
+    }
+    _sendPreparedEvent(type, props, immediate, prepareOptions, explicitRoute) {
+      return this.addPendingPromise(this._prepareEventMessage(props, prepareOptions).then(({ distinctId, event, properties, options }) => {
+        const captureOptions = {
+          timestamp: options.timestamp,
+          disableGeoip: options.disableGeoip,
+          uuid: options.uuid
+        };
+        const message = {
+          distinctId,
+          event,
+          properties: {
+            ...properties,
+            ...this.getCommonEventProperties()
+          }
+        };
+        return immediate ? this.sendImmediate(type, message, captureOptions, explicitRoute) : this.enqueue(type, message, captureOptions, explicitRoute);
+      }).catch((err) => {
         if (err)
           console.error(err);
       }));
     }
+    _capturePreparedEvent(props, immediate) {
+      return this._sendPreparedEvent("capture", props, immediate);
+    }
+    capture(props) {
+      this._warnIfInvalidCapture(props, "Called capture() with a string as the first argument when an object was expected.", "Using `posthog.capture('$exception')` is unreliable because it does not attach required metadata. Use `posthog.captureException(error)` instead, which attaches required metadata automatically.");
+      this._capturePreparedEvent(props, false);
+    }
     async captureImmediate(props) {
-      if (typeof props == "string")
-        this._logger.warn("Called captureImmediate() with a string as the first argument when an object was expected.");
-      if (props.event === "$exception" && !props._originatedFromCaptureException)
-        this._logger.warn("Capturing a `$exception` event via `posthog.captureImmediate('$exception')` is unreliable because it does not attach required metadata. Use `posthog.captureExceptionImmediate(error)` instead, which attaches this metadata by default.");
-      return this.addPendingPromise(this.prepareEventMessage(props).then(({ distinctId, event, properties, options }) => super.captureStatelessImmediate(distinctId, event, properties, {
-        timestamp: options.timestamp,
-        disableGeoip: options.disableGeoip,
-        uuid: options.uuid
-      })).catch((err) => {
-        if (err)
-          console.error(err);
-      }));
+      this._warnIfInvalidCapture(props, "Called captureImmediate() with a string as the first argument when an object was expected.", "Capturing a `$exception` event via `posthog.captureImmediate('$exception')` is unreliable because it does not attach required metadata. Use `posthog.captureExceptionImmediate(error)` instead, which attaches this metadata by default.");
+      return this._capturePreparedEvent(props, true);
+    }
+    captureAi(props) {
+      if (this.disabled)
+        return;
+      const uuid = getEventUuid(props.uuid, uuidv7);
+      this._sendPreparedAiEvent({
+        ...props,
+        uuid
+      }, false);
+      return uuid;
+    }
+    async captureAiImmediate(props) {
+      if (this.disabled)
+        return;
+      const uuid = getEventUuid(props.uuid, uuidv7);
+      await this._sendPreparedAiEvent({
+        ...props,
+        uuid
+      }, true);
+      return uuid;
+    }
+    _sendPreparedAiEvent(props, immediate) {
+      if (typeof props?.event == "string" && !props.event.startsWith("$ai_"))
+        this._logger.debug(`captureAi called with non-AI event ${props.event}; routing it to the AI endpoint anyway.`);
+      this._aiCaptureRouteActive = true;
+      return this._sendPreparedEvent("capture", props, immediate, undefined, AI_CAPTURE_ROUTE);
     }
     identify({ distinctId, properties = {}, disableGeoip }) {
       const { $set, $set_once, $anon_distinct_id, ...rest } = properties;
@@ -4781,8 +6680,13 @@ var init_client = __esm(() => {
         $set_once: setOnceProps,
         $anon_distinct_id: $anon_distinct_id ?? undefined
       };
-      super.identifyStateless(distinctId, eventProperties, {
+      this._sendPreparedEvent("identify", {
+        distinctId,
+        event: "$identify",
+        properties: eventProperties,
         disableGeoip
+      }, false, {
+        includeContextProperties: false
       });
     }
     async identifyImmediate({ distinctId, properties = {}, disableGeoip }) {
@@ -4794,18 +6698,65 @@ var init_client = __esm(() => {
         $set_once: setOnceProps,
         $anon_distinct_id: $anon_distinct_id ?? undefined
       };
-      await super.identifyStatelessImmediate(distinctId, eventProperties, {
+      await this._sendPreparedEvent("identify", {
+        distinctId,
+        event: "$identify",
+        properties: eventProperties,
         disableGeoip
+      }, true, {
+        includeContextProperties: false
+      });
+    }
+    setPersonProperties({ distinctId, properties = {}, propertiesOnce = {} }) {
+      if (Object.keys(properties).length === 0 && Object.keys(propertiesOnce).length === 0)
+        return;
+      const eventProperties = {};
+      if (Object.keys(properties).length > 0)
+        eventProperties.$set = properties;
+      if (Object.keys(propertiesOnce).length > 0)
+        eventProperties.$set_once = propertiesOnce;
+      this.capture({
+        distinctId,
+        event: "$set",
+        properties: eventProperties
+      });
+    }
+    unsetPersonProperties({ distinctId, properties }) {
+      const propertyNames = normalizeUnsetPersonProperties(properties);
+      if (propertyNames.length === 0)
+        return;
+      this.capture({
+        distinctId,
+        event: "$set",
+        properties: {
+          $unset: propertyNames
+        }
       });
     }
     alias(data) {
-      super.aliasStateless(data.alias, data.distinctId, undefined, {
+      this._sendPreparedEvent("alias", {
+        distinctId: data.distinctId,
+        event: "$create_alias",
+        properties: {
+          distinct_id: data.distinctId,
+          alias: data.alias
+        },
         disableGeoip: data.disableGeoip
+      }, false, {
+        includeContextProperties: false
       });
     }
     async aliasImmediate(data) {
-      await super.aliasStatelessImmediate(data.alias, data.distinctId, undefined, {
+      await this._sendPreparedEvent("alias", {
+        distinctId: data.distinctId,
+        event: "$create_alias",
+        properties: {
+          distinct_id: data.distinctId,
+          alias: data.alias
+        },
         disableGeoip: data.disableGeoip
+      }, true, {
+        includeContextProperties: false
       });
     }
     isLocalEvaluationReady() {
@@ -4816,15 +6767,15 @@ var init_client = __esm(() => {
         return true;
       if (this.featureFlagsPoller === undefined)
         return false;
-      return new Promise((resolve10) => {
+      return new Promise((resolve9) => {
         const timeout = setTimeout(() => {
           cleanup();
-          resolve10(false);
+          resolve9(false);
         }, timeoutMs);
         const cleanup = this._events.on("localEvaluationFlagsLoaded", (count) => {
           clearTimeout(timeout);
           cleanup();
-          resolve10(count > 0);
+          resolve9(count > 0);
         });
       });
     }
@@ -4860,7 +6811,7 @@ var init_client = __esm(() => {
       const adjustedProperties = this.addLocalPersonAndGroupProperties(distinctId, groups, personProperties, groupProperties);
       personProperties = adjustedProperties.allPersonProperties;
       groupProperties = adjustedProperties.allGroupProperties;
-      const evaluationContext = this.createFeatureFlagEvaluationContext(distinctId, groups, personProperties, groupProperties);
+      const evaluationContext = this.createFeatureFlagEvaluationContext(distinctId, groups, this.personPropertiesForLocalEvaluation(distinctId, personProperties), groupProperties);
       if (onlyEvaluateLocally == undefined)
         onlyEvaluateLocally = this.options.strictLocalEvaluation ?? false;
       let result;
@@ -4871,6 +6822,7 @@ var init_client = __esm(() => {
       let flagId;
       let flagVersion;
       let flagReason;
+      let flagHasExperiment;
       const localEvaluationEnabled = this.featureFlagsPoller !== undefined;
       if (localEvaluationEnabled) {
         await this.featureFlagsPoller?.loadFeatureFlags();
@@ -4885,6 +6837,7 @@ var init_client = __esm(() => {
               const value = localResult.value;
               flagId = flag.id;
               flagReason = "Evaluated locally";
+              flagHasExperiment = flag.has_experiment;
               result = {
                 key,
                 enabled: value !== false,
@@ -4900,12 +6853,13 @@ var init_client = __esm(() => {
           }
       }
       if (!flagWasLocallyEvaluated && !onlyEvaluateLocally) {
-        const flagsResponse = await super.getFeatureFlagDetailsStateless(evaluationContext.distinctId, evaluationContext.groups, evaluationContext.personProperties, evaluationContext.groupProperties, disableGeoip, [
+        const flagsResponse = await super.getFeatureFlagDetailsStateless(evaluationContext.distinctId, evaluationContext.groups, personProperties, groupProperties, disableGeoip, [
           key
         ]);
         if (flagsResponse === undefined)
           featureFlagError = FeatureFlagError2.UNKNOWN_ERROR;
         else {
+          this._minimalFlagCalledEvents = flagsResponse.minimalFlagCalledEvents === true;
           requestId = flagsResponse.requestId;
           evaluatedAt = flagsResponse.evaluatedAt;
           const errors = [];
@@ -4920,6 +6874,7 @@ var init_client = __esm(() => {
             flagId = flagDetail.metadata?.id;
             flagVersion = flagDetail.metadata?.version;
             flagReason = flagDetail.reason?.description ?? flagDetail.reason?.code;
+            flagHasExperiment = flagDetail.metadata?.has_experiment;
             let parsedPayload;
             if (flagDetail.metadata?.payload !== undefined)
               try {
@@ -4930,7 +6885,7 @@ var init_client = __esm(() => {
             result = {
               key,
               enabled: flagDetail.enabled,
-              variant: flagDetail.variant,
+              variant: flagDetail.variant ?? undefined,
               payload: parsedPayload
             };
           }
@@ -4951,6 +6906,8 @@ var init_client = __esm(() => {
           $feature_flag_request_id: requestId,
           $feature_flag_evaluated_at: flagWasLocallyEvaluated ? Date.now() : evaluatedAt
         };
+        if (flagHasExperiment !== undefined)
+          properties.$feature_flag_has_experiment = flagHasExperiment;
         if (flagWasLocallyEvaluated && this.featureFlagsPoller) {
           const flagDefinitionsLoadedAt = this.featureFlagsPoller.getFlagDefinitionsLoadedAt();
           if (flagDefinitionsLoadedAt !== undefined)
@@ -5065,7 +7022,7 @@ var init_client = __esm(() => {
       const adjustedProperties = this.addLocalPersonAndGroupProperties(resolvedDistinctId, groups, personProperties, groupProperties);
       personProperties = adjustedProperties.allPersonProperties;
       groupProperties = adjustedProperties.allGroupProperties;
-      const evaluationContext = this.createFeatureFlagEvaluationContext(resolvedDistinctId, groups, personProperties, groupProperties);
+      const evaluationContext = this.createFeatureFlagEvaluationContext(resolvedDistinctId, groups, this.personPropertiesForLocalEvaluation(resolvedDistinctId, personProperties), groupProperties);
       if (onlyEvaluateLocally == undefined)
         onlyEvaluateLocally = this.options.strictLocalEvaluation ?? false;
       const localEvaluationResult = await this.featureFlagsPoller?.getAllFlagsAndPayloads(evaluationContext, flagKeys);
@@ -5078,7 +7035,7 @@ var init_client = __esm(() => {
         fallbackToFlags = localEvaluationResult.fallbackToFlags;
       }
       if (fallbackToFlags && !onlyEvaluateLocally) {
-        const remoteEvaluationResult = await super.getFeatureFlagsAndPayloadsStateless(evaluationContext.distinctId, evaluationContext.groups, evaluationContext.personProperties, evaluationContext.groupProperties, disableGeoip, flagKeys);
+        const remoteEvaluationResult = await super.getFeatureFlagsAndPayloadsStateless(evaluationContext.distinctId, evaluationContext.groups, personProperties, groupProperties, disableGeoip, flagKeys);
         featureFlags = {
           ...featureFlags,
           ...remoteEvaluationResult.flags || {}
@@ -5126,9 +7083,10 @@ var init_client = __esm(() => {
       const adjustedProperties = this.addLocalPersonAndGroupProperties(resolvedDistinctId, groups, personProperties, groupProperties);
       personProperties = adjustedProperties.allPersonProperties;
       groupProperties = adjustedProperties.allGroupProperties;
-      const evaluationContext = this.createFeatureFlagEvaluationContext(resolvedDistinctId, groups, personProperties, groupProperties);
+      const evaluationContext = this.createFeatureFlagEvaluationContext(resolvedDistinctId, groups, this.personPropertiesForLocalEvaluation(resolvedDistinctId, personProperties), groupProperties);
       if (onlyEvaluateLocally == undefined)
         onlyEvaluateLocally = this.options.strictLocalEvaluation ?? false;
+      const requestedFlagKeys = flagKeys ? new Set(flagKeys) : undefined;
       const records = {};
       let requestId;
       let evaluatedAt;
@@ -5147,14 +7105,17 @@ var init_client = __esm(() => {
             id: flagDef?.id,
             version: undefined,
             reason: "Evaluated locally",
-            locallyEvaluated: true
+            locallyEvaluated: true,
+            hasExperiment: flagDef?.has_experiment
           };
           locallyEvaluatedKeys.add(key);
         }
-      const fallbackToFlags = localResult ? localResult.fallbackToFlags : true;
+      const requestedFlagMissingLocally = requestedFlagKeys !== undefined && Array.from(requestedFlagKeys).some((key) => this.featureFlagsPoller?.featureFlagsByKey[key] === undefined);
+      const fallbackToFlags = localResult ? localResult.fallbackToFlags || requestedFlagMissingLocally : true;
       if (fallbackToFlags && !onlyEvaluateLocally) {
-        const details = await super.getFeatureFlagDetailsStateless(evaluationContext.distinctId, evaluationContext.groups, evaluationContext.personProperties, evaluationContext.groupProperties, disableGeoip, flagKeys);
+        const details = await super.getFeatureFlagDetailsStateless(evaluationContext.distinctId, evaluationContext.groups, personProperties, groupProperties, disableGeoip, flagKeys);
         if (details) {
+          this._minimalFlagCalledEvents = details.minimalFlagCalledEvents === true;
           requestId = details.requestId;
           evaluatedAt = details.evaluatedAt;
           errorsWhileComputing = Boolean(details.errorsWhileComputingFlags);
@@ -5177,7 +7138,8 @@ var init_client = __esm(() => {
               id: detail.metadata?.id,
               version: detail.metadata?.version,
               reason: detail.reason?.description ?? detail.reason?.code,
-              locallyEvaluated: false
+              locallyEvaluated: false,
+              hasExperiment: detail.metadata?.has_experiment
             };
           }
         }
@@ -5197,7 +7159,8 @@ var init_client = __esm(() => {
             id: existing?.id,
             version: existing?.version,
             reason: existing?.reason,
-            locallyEvaluated: existing?.locallyEvaluated ?? false
+            locallyEvaluated: existing?.locallyEvaluated ?? false,
+            hasExperiment: existing?.hasExperiment
           };
         }
       if (this._payloadOverrides !== undefined)
@@ -5209,6 +7172,11 @@ var init_client = __esm(() => {
               payload
             };
         }
+      if (requestedFlagKeys !== undefined) {
+        for (const key of Object.keys(records))
+          if (!requestedFlagKeys.has(key))
+            delete records[key];
+      }
       return new FeatureFlagEvaluations({
         host: this._getFeatureFlagEvaluationsHost(),
         distinctId: resolvedDistinctId,
@@ -5221,6 +7189,9 @@ var init_client = __esm(() => {
         errorsWhileComputing,
         quotaLimited
       });
+    }
+    _shouldSendMinimalFlagCalledEvent(event, properties) {
+      return event === "$feature_flag_called" && this._minimalFlagCalledEvents && properties.$feature_flag_has_experiment === false;
     }
     _captureFlagCalledEventIfNeeded(params) {
       const { distinctId, key, response, groups, disableGeoip, properties } = params;
@@ -5256,9 +7227,32 @@ var init_client = __esm(() => {
       return this._featureFlagEvaluationsHost;
     }
     groupIdentify({ groupType, groupKey, properties, distinctId, disableGeoip }) {
-      super.groupIdentifyStateless(groupType, groupKey, properties, {
+      this._sendPreparedEvent("capture", {
+        distinctId: distinctId || `$${groupType}_${groupKey}`,
+        event: "$groupidentify",
+        properties: {
+          $group_type: groupType,
+          $group_key: groupKey,
+          $group_set: properties || {}
+        },
         disableGeoip
-      }, distinctId);
+      }, false, {
+        includeContextProperties: false
+      });
+    }
+    async groupIdentifyImmediate({ groupType, groupKey, properties, distinctId, disableGeoip }) {
+      await this._sendPreparedEvent("capture", {
+        distinctId: distinctId || `$${groupType}_${groupKey}`,
+        event: "$groupidentify",
+        properties: {
+          $group_type: groupType,
+          $group_key: groupKey,
+          $group_set: properties || {}
+        },
+        disableGeoip
+      }, true, {
+        includeContextProperties: false
+      });
     }
     async reloadFeatureFlags() {
       await this.featureFlagsPoller?.loadFeatureFlags(true);
@@ -5330,13 +7324,19 @@ var init_client = __esm(() => {
       this.context?.enter(data, options);
     }
     async _shutdown(shutdownTimeoutMs) {
-      const resolve10 = this._consumeWaitUntilCycle();
+      const shutdownDeadlineMs = Date.now() + (shutdownTimeoutMs ?? 30000);
+      const resolve9 = this._consumeWaitUntilCycle();
       await this.featureFlagsPoller?.stopPoller(shutdownTimeoutMs);
       this.errorTracking.shutdown();
+      if (this._metrics) {
+        await raceWithTimeout(this._metrics.flush().catch(() => {}), Math.max(0, shutdownDeadlineMs - Date.now()));
+        this._metrics.reset();
+      }
       try {
-        return await super._shutdown(shutdownTimeoutMs);
+        return await super._shutdown(Math.max(0, shutdownDeadlineMs - Date.now()));
       } finally {
-        resolve10?.();
+        this.distinctIdHasSentFlagCalls = {};
+        resolve9?.();
       }
     }
     async _requestRemoteConfigPayload(flagKey) {
@@ -5378,7 +7378,7 @@ var init_client = __esm(() => {
       const personProperties = {};
       const groupProperties = {};
       for (const [key, value] of Object.entries(eventProperties))
-        if (isPlainObject2(value) && groups && key in groups) {
+        if (isPlainObject(value) && groups && key in groups) {
           const groupProps = {};
           for (const [groupKey, groupValue] of Object.entries(value))
             groupProps[String(groupKey)] = String(groupValue);
@@ -5430,7 +7430,6 @@ var init_client = __esm(() => {
     }
     addLocalPersonAndGroupProperties(distinctId, groups, personProperties, groupProperties) {
       const allPersonProperties = {
-        distinct_id: distinctId,
         ...personProperties || {}
       };
       const allGroupProperties = {};
@@ -5445,6 +7444,12 @@ var init_client = __esm(() => {
         allGroupProperties
       };
     }
+    personPropertiesForLocalEvaluation(distinctId, personProperties) {
+      return {
+        distinct_id: distinctId,
+        ...personProperties || {}
+      };
+    }
     createFeatureFlagEvaluationContext(distinctId, groups, personProperties, groupProperties) {
       return {
         distinctId,
@@ -5455,21 +7460,21 @@ var init_client = __esm(() => {
       };
     }
     captureException(error, distinctId, additionalProperties, uuid, flags) {
-      if (!ErrorTracking.isPreviouslyCapturedError(error)) {
+      if (!error_tracking_ErrorTracking.isPreviouslyCapturedError(error)) {
         const syntheticException = new Error("PostHog syntheticException");
-        this.addPendingPromise(ErrorTracking.buildEventMessage(this.getErrorPropertiesBuilder(), error, {
+        this.addPendingPromise(error_tracking_ErrorTracking.buildEventMessage(this.getErrorPropertiesBuilder(), error, {
           syntheticException
-        }, distinctId, additionalProperties).then((msg) => this.capture({
+        }, distinctId, additionalProperties).then((msg) => this._capturePreparedEvent({
           ...msg,
           uuid,
           flags
-        })));
+        }, false)));
       }
     }
     async captureExceptionImmediate(error, distinctId, additionalProperties, flags) {
-      if (!ErrorTracking.isPreviouslyCapturedError(error)) {
+      if (!error_tracking_ErrorTracking.isPreviouslyCapturedError(error)) {
         const syntheticException = new Error("PostHog syntheticException");
-        return this.addPendingPromise(ErrorTracking.buildEventMessage(this.getErrorPropertiesBuilder(), error, {
+        return this.addPendingPromise(error_tracking_ErrorTracking.buildEventMessage(this.getErrorPropertiesBuilder(), error, {
           syntheticException
         }, distinctId, additionalProperties).then((msg) => this.captureImmediate({
           ...msg,
@@ -5478,24 +7483,31 @@ var init_client = __esm(() => {
       }
     }
     async prepareEventMessage(props) {
+      return this._prepareEventMessage(props);
+    }
+    async _prepareEventMessage(props, options = {}) {
       const { distinctId, event, properties, groups, flags, sendFeatureFlags, timestamp, disableGeoip, uuid } = props;
       const contextData = this.context?.get();
+      const includeContextProperties = options.includeContextProperties ?? true;
       let mergedDistinctId = distinctId || contextData?.distinctId;
-      const mergedProperties = {
+      const mergedProperties = includeContextProperties ? {
         ...this.props,
         ...contextData?.properties || {},
+        ...properties || {}
+      } : {
         ...properties || {}
       };
       if (!mergedDistinctId) {
         mergedDistinctId = uuidv7();
         mergedProperties.$process_person_profile = false;
       }
-      if (contextData?.sessionId && !mergedProperties.$session_id)
+      if (includeContextProperties && contextData?.sessionId && !mergedProperties.$session_id)
         mergedProperties.$session_id = contextData.sessionId;
+      const finalProperties = this._shouldSendMinimalFlagCalledEvent(event, mergedProperties) ? minimizeFlagCalledEventProperties(mergedProperties) : mergedProperties;
       const eventMessage = this._runBeforeSend({
         distinctId: mergedDistinctId,
         event,
-        properties: mergedProperties,
+        properties: finalProperties,
         groups,
         flags,
         sendFeatureFlags,
@@ -5519,12 +7531,14 @@ var init_client = __esm(() => {
         }
         return {};
       }).catch(() => ({})).then((additionalProperties) => {
-        const props2 = {
+        const resolvedGroups = eventMessage.groups || groups;
+        return {
           ...additionalProperties,
           ...eventMessage.properties || {},
-          $groups: eventMessage.groups || groups
+          ...resolvedGroups !== undefined && Object.keys(resolvedGroups).length > 0 ? {
+            $groups: resolvedGroups
+          } : {}
         };
-        return props2;
       });
       if (eventMessage.event === "$pageview" && this.options.__preview_capture_bot_pageviews && typeof eventProperties.$raw_user_agent == "string") {
         if (isBlockedUA(eventProperties.$raw_user_agent, this.options.custom_blocked_useragents || [])) {
@@ -5551,23 +7565,27 @@ var init_client = __esm(() => {
         beforeSend
       ];
       let result = eventMessage;
-      for (const fn of fns) {
-        result = fn(result);
-        if (!result) {
-          this._logger.info(`Event '${eventMessage.event}' was rejected in beforeSend function`);
+      for (const fn of fns)
+        try {
+          result = fn(result);
+          if (!result) {
+            this._logger.info(`Event '${eventMessage.event}' was rejected in beforeSend function`);
+            return null;
+          }
+          if (!result.properties || Object.keys(result.properties).length === 0) {
+            const message = `Event '${result.event}' has no properties after beforeSend function, this is likely an error.`;
+            this._logger.warn(message);
+          }
+        } catch (error) {
+          this._logger.error(`Error in before_send function for event '${eventMessage.event}':`, error);
           return null;
         }
-        if (!result.properties || Object.keys(result.properties).length === 0) {
-          const message = `Event '${result.event}' has no properties after beforeSend function, this is likely an error.`;
-          this._logger.warn(message);
-        }
-      }
       return result;
     }
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/context/context.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/context/context.mjs
 import { AsyncLocalStorage } from "node:async_hooks";
 
 class PostHogContext {
@@ -5599,7 +7617,25 @@ class PostHogContext {
 }
 var init_context = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/sentry-integration.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/gzip.node.mjs
+import { gzip } from "node:zlib";
+import { promisify } from "node:util";
+async function gzipCompress2(input, isDebug = true) {
+  try {
+    const compressed = await gzipAsync(input);
+    return new Uint8Array(compressed);
+  } catch (error) {
+    if (isDebug)
+      console.error("Failed to gzip compress data", error);
+    return null;
+  }
+}
+var gzipAsync;
+var init_gzip_node = __esm(() => {
+  gzipAsync = promisify(gzip);
+});
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/sentry-integration.mjs
 function createEventProcessor(_posthog, { organization, projectId, prefix, severityAllowList = [
   "error"
 ], sendExceptionsToPostHog = true } = {}) {
@@ -5638,6 +7674,9 @@ function createEventProcessor(_posthog, { organization, projectId, prefix, sever
       $sentry_exception_type: exceptions[0]?.type,
       $sentry_tags: event.tags
     };
+    const injectedReleaseId = exports_error_tracking.getInjectedReleaseId();
+    if (injectedReleaseId)
+      properties.$release_id = injectedReleaseId;
     if (organization && projectId)
       properties["$sentry_url"] = (prefix || "https://sentry.io/organizations/") + organization + "/issues/?project=" + projectId + "&query=" + event.event_id;
     if (sendExceptionsToPostHog)
@@ -5651,6 +7690,7 @@ function createEventProcessor(_posthog, { organization, projectId, prefix, sever
 }
 var NAME = "posthog-node", PostHogSentryIntegration;
 var init_sentry_integration = __esm(() => {
+  init_dist();
   PostHogSentryIntegration = class PostHogSentryIntegration {
     static #_ = this.POSTHOG_ID_TAG = "posthog_distinct_id";
     constructor(_posthog, organization, prefix, severityAllowList, sendExceptionsToPostHog) {
@@ -5670,16 +7710,22 @@ var init_sentry_integration = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/tracing-headers.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/tracing-headers.mjs
 var init_tracing_headers2 = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/express.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/url-utils.mjs
+var init_url_utils = __esm(() => {
+  init_dist();
+});
+
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/express.mjs
 var init_express = __esm(() => {
   init_error_tracking2();
   init_tracing_headers2();
+  init_url_utils();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/exports.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/exports.mjs
 var init_exports = __esm(() => {
   init_feature_flag_evaluations();
   init_dist();
@@ -5688,7 +7734,7 @@ var init_exports = __esm(() => {
   init_types3();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/entrypoints/index.node.mjs
+// node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/entrypoints/index.node.mjs
 var PostHog;
 var init_index_node = __esm(() => {
   init_module_node();
@@ -5697,10 +7743,14 @@ var init_index_node = __esm(() => {
   init_client();
   init_dist();
   init_context();
+  init_gzip_node();
   init_exports();
   PostHog = class PostHog extends PostHogBackendClient {
     getLibraryId() {
       return "posthog-node";
+    }
+    compressPayload(payload) {
+      return gzipCompress2(payload, this.isDebug);
     }
     initializeContext() {
       return new PostHogContext;
@@ -5714,12 +7764,23 @@ var init_index_node = __esm(() => {
         new exports_error_tracking.PrimitiveCoercer
       ], exports_error_tracking.createStackParser("node:javascript", exports_error_tracking.nodeStackLineParser), [
         createModulerModifier(),
-        addSourceContext,
+        (frames) => addSourceContext(frames, undefined, this._logger),
         createRelativePathModifier()
       ]);
     }
   };
 });
+
+// packages/telemetry-core/src/machine-id.ts
+import { createHash as createHash3 } from "node:crypto";
+import os2 from "node:os";
+function getDefaultTelemetryOsProvider() {
+  return os2;
+}
+function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetryOsProvider()) {
+  return createHash3("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
+}
+var init_machine_id = () => {};
 
 // packages/telemetry-core/src/posthog-client.ts
 class PostHogTelemetryTransport {
@@ -5741,8 +7802,8 @@ function createDefaultPostHogTransport(apiKey, options) {
   return new PostHogTelemetryTransport(apiKey, options);
 }
 function isTelemetryClientEnabled(input) {
-  const env2 = input.env ?? process.env;
-  return !shouldDisableTelemetry({ env: env2, productEnvPrefix: input.product.productEnvPrefix }) && getTelemetryApiKey(env2, input.product.defaultApiKey).length > 0;
+  const env = input.env ?? process.env;
+  return !shouldDisableTelemetry({ env, productEnvPrefix: input.product.productEnvPrefix }) && hasTelemetryApiKey(env, input.product.defaultApiKey);
 }
 function createTelemetryClient(input) {
   if (!isTelemetryClientEnabled(input)) {
@@ -5797,18 +7858,19 @@ function createTelemetryClient(input) {
   };
 }
 function createTransport(input) {
-  const env2 = input.env ?? process.env;
+  const env = input.env ?? process.env;
   const factory = input.transportFactory ?? createDefaultPostHogTransport;
   try {
-    return factory(getTelemetryApiKey(env2, input.product.defaultApiKey), {
+    return factory(getTelemetryApiKey(env, input.product.defaultApiKey), {
       enableExceptionAutocapture: false,
       enableLocalEvaluation: false,
       strictLocalEvaluation: true,
       disableRemoteConfig: true,
       flushAt: 1,
       flushInterval: 0,
-      host: getTelemetryHost(env2, input.product.defaultHost),
-      disableGeoip: false
+      host: getTelemetryHost(env, input.product.defaultHost),
+      disableGeoip: input.product.disableGeoip ?? false,
+      ...input.product.transportOptions
     });
   } catch (error) {
     input.diagnostics?.({
@@ -5885,18 +7947,26 @@ var init_posthog_client = __esm(() => {
   };
 });
 
-// packages/telemetry-core/src/record-daily-active.ts
-var init_record_daily_active = __esm(() => {
-  init_activity_state();
-  init_posthog_client();
-  init_machine_id();
+// packages/telemetry-core/src/events.ts
+var ALLOWED_DOLLAR_KEYS;
+var init_events = __esm(() => {
+  ALLOWED_DOLLAR_KEYS = new Set([
+    "$os",
+    "$os_version",
+    "$process_person_profile",
+    "$session_id"
+  ]);
 });
+
+// packages/telemetry-core/src/record-daily-active.ts
+var init_record_daily_active = () => {};
 
 // packages/telemetry-core/src/index.ts
 var init_src = __esm(() => {
   init_activity_state();
   init_diagnostics();
   init_env();
+  init_events();
   init_machine_id();
   init_posthog_client();
   init_record_daily_active();
@@ -5907,7 +7977,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.13.0",
+    version: "5.0.0-beta.31",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -5941,7 +8011,7 @@ var init_package = __esm(() => {
       "@oh-my-opencode/utils": "workspace:*"
     },
     devDependencies: {
-      "bun-types": "1.3.14"
+      "bun-types": "1.4.0"
     }
   };
 });
@@ -6112,22 +8182,22 @@ var init_posthog = __esm(() => {
 // packages/omo-codex/src/telemetry/index.ts
 var exports_telemetry = {};
 __export(exports_telemetry, {
-  getPostHogDistinctId: () => getPostHogDistinctId,
-  createPluginPostHog: () => createPluginPostHog,
-  createInstallPostHog: () => createInstallPostHog,
-  createCliPostHog: () => createCliPostHog,
-  __setOsProviderForTesting: () => __setOsProviderForTesting,
-  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
+  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting,
   __resetOsProviderForTesting: () => __resetOsProviderForTesting,
-  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting
+  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
+  __setOsProviderForTesting: () => __setOsProviderForTesting,
+  createCliPostHog: () => createCliPostHog,
+  createInstallPostHog: () => createInstallPostHog,
+  createPluginPostHog: () => createPluginPostHog,
+  getPostHogDistinctId: () => getPostHogDistinctId
 });
 var init_telemetry = __esm(() => {
   init_posthog();
 });
 
 // packages/omo-codex/src/install/install-local-cli.ts
-import { readFile as readFile19 } from "node:fs/promises";
-import { dirname as dirname10, join as join35, resolve as resolve11 } from "node:path";
+import { readFile as readFile23 } from "node:fs/promises";
+import { dirname as dirname13, join as join40, resolve as resolve10 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // packages/utils/src/runtime/spawn.ts
@@ -6284,6 +8354,7 @@ function spawn(cmdOrOpts, opts) {
     throw new Error("spawn requires a command");
   return wrapNodeProcess(nodeSpawn(bin, args, createNodeSpawnOptions(options)));
 }
+
 // packages/utils/src/runtime/which.ts
 import { accessSync, constants } from "node:fs";
 import { delimiter, join } from "node:path";
@@ -6348,6 +8419,7 @@ function bunWhich(commandName) {
   }
   return null;
 }
+
 // packages/utils/src/runtime/git-bash.ts
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -6431,7 +8503,7 @@ function whereCommand(command) {
   }
 }
 // packages/omo-codex/src/install/codex-process.ts
-var WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"]);
+var WINDOWS_CMD_SHIM_COMMANDS = new Set(["codex", "npm", "npx"]);
 function resolveRunCommandInvocation(command, args, platform = process.platform) {
   if (platform !== "win32" || !WINDOWS_CMD_SHIM_COMMANDS.has(command.toLowerCase())) {
     return { command, args: [...args] };
@@ -6458,13 +8530,13 @@ var defaultRunCommand = async (command, args, options) => {
 };
 
 // packages/omo-codex/src/install/install-codex.ts
-import { join as join31, resolve as resolve10 } from "node:path";
+import { join as join36, resolve as resolve9 } from "node:path";
 import { existsSync as existsSync7 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 
 // packages/omo-codex/src/install/codex-cache-bins.ts
-import { chmod, lstat as lstat3, mkdir, readFile as readFile2, readdir, readlink as readlink2, rm as rm2, stat, symlink, writeFile } from "node:fs/promises";
-import { basename, isAbsolute, join as join4, relative, resolve, sep } from "node:path";
+import { chmod, lstat as lstat4, mkdir, readFile as readFile3, readdir as readdir2, readlink as readlink3, rm as rm3, stat as stat2, symlink, writeFile } from "node:fs/promises";
+import { basename, isAbsolute as isAbsolute2, join as join5, relative, resolve as resolve2, sep } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-command-shim.ts
 var COMMAND_SHIM_MARKER = ":: generated by oh-my-openagent Codex installer";
@@ -6507,6 +8579,10 @@ function windowsCommandShim(targetPath) {
 `);
 }
 
+// packages/omo-codex/src/install/codex-cache-dangling-bins.ts
+import { lstat as lstat2, readFile, readdir, readlink, rm, stat } from "node:fs/promises";
+import { dirname, isAbsolute, join as join2, resolve } from "node:path";
+
 // packages/omo-codex/src/install/codex-cache-fs.ts
 import { lstat } from "node:fs/promises";
 async function fileExistsStrict(path) {
@@ -6526,40 +8602,128 @@ function isNodeErrorWithCode(error) {
   return typeof error === "object" && error !== null && "code" in error;
 }
 
+// packages/omo-codex/src/install/codex-cache-dangling-bins.ts
+async function removeDanglingManagedComponentBins(binDir, platform, managedBinNames) {
+  const entries = await readdir(binDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const binName = managedBinNameForEntry(entry.name, platform);
+    if (binName === null || !managedBinNames.has(binName))
+      continue;
+    const linkPath = join2(binDir, entry.name);
+    if (platform === "win32") {
+      await removeDanglingGeneratedCommandShim(linkPath);
+      continue;
+    }
+    await removeDanglingManagedSymlink(linkPath);
+  }
+}
+function managedBinNameForEntry(name, platform) {
+  if (platform === "win32")
+    return name.endsWith(".cmd") ? name.slice(0, -4) : null;
+  return name;
+}
+async function removeDanglingManagedSymlink(linkPath) {
+  try {
+    const linkStat = await lstat2(linkPath);
+    if (!linkStat.isSymbolicLink())
+      return;
+    const linkTarget = await readlink(linkPath);
+    const target = isAbsolute(linkTarget) ? linkTarget : resolve(dirname(linkPath), linkTarget);
+    if (!await isFileSystemEntry(target) && isManagedComponentBinTarget(target))
+      await rm(linkPath, { force: true });
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT")
+      return;
+    throw error;
+  }
+}
+async function removeDanglingGeneratedCommandShim(linkPath) {
+  try {
+    const linkStat = await lstat2(linkPath);
+    if (!linkStat.isFile())
+      return;
+    const content = await readFile(linkPath, "utf8");
+    if (!content.includes(COMMAND_SHIM_MARKER))
+      return;
+    const target = extractCommandShimTarget(content);
+    if (target !== null && !await isFileSystemEntry(target) && isManagedComponentBinTarget(target))
+      await rm(linkPath, { force: true });
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT")
+      return;
+    throw error;
+  }
+}
+async function isFileSystemEntry(path) {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT")
+      return false;
+    throw error;
+  }
+}
+function extractCommandShimTarget(content) {
+  const match = /"([^"\r\n]+components[\\/][^"\r\n]+[\\/]dist[\\/]cli\.js)" %\*/.exec(content);
+  return match?.[1] ?? null;
+}
+function isManagedComponentBinTarget(target) {
+  const parts = target.split(/[\\/]+/);
+  const suffix = parts.slice(-4);
+  return suffix[0] === "components" && suffix[2] === "dist" && suffix[3] === "cli.js" && (hasOmoPluginCachePrefix(parts, parts.length - 4) || hasOmoCodexPluginPrefix(parts, parts.length - 4));
+}
+function hasOmoPluginCachePrefix(parts, endExclusive) {
+  for (let index = 0;index < endExclusive - 4; index += 1) {
+    if (parts[index] === "plugins" && parts[index + 1] === "cache" && parts[index + 2] === "sisyphuslabs" && parts[index + 3] === "omo") {
+      return index + 4 < endExclusive;
+    }
+  }
+  return false;
+}
+function hasOmoCodexPluginPrefix(parts, endExclusive) {
+  for (let index = 0;index <= endExclusive - 3; index += 1) {
+    if (parts[index] === "packages" && parts[index + 1] === "omo-codex" && parts[index + 2] === "plugin")
+      return true;
+  }
+  return false;
+}
+
 // packages/omo-codex/src/install/codex-cache-legacy-bins.ts
-import { lstat as lstat2, readFile, readlink, rm } from "node:fs/promises";
-import { join as join2 } from "node:path";
+import { lstat as lstat3, readFile as readFile2, readlink as readlink2, rm as rm2 } from "node:fs/promises";
+import { join as join3 } from "node:path";
 var LEGACY_CODEX_COMPONENT_BINS = [
   { name: "omo", component: "ulw-loop" },
   { name: "codex-comment-checker", component: "comment-checker" },
   { name: "codex-lsp", component: "lsp" },
   { name: "codex-rules", component: "rules" },
-  { name: "codex-start-work-continuation", component: "start-work-continuation" },
   { name: "codex-telemetry", component: "telemetry" },
-  { name: "codex-ultrawork", component: "ultrawork" }
+  { name: "codex-ultrawork", component: "ultrawork" },
+  { name: "codex-ulw-execute-continuation", component: "ulw-execute-continuation" }
 ];
+var LEGACY_CODEX_COMPONENT_BIN_NAMES = LEGACY_CODEX_COMPONENT_BINS.map((entry) => entry.name);
 async function removeLegacyCodexComponentBins(binDir, platform) {
   for (const entry of LEGACY_CODEX_COMPONENT_BINS) {
-    const linkPath = join2(binDir, platform === "win32" ? `${entry.name}.cmd` : entry.name);
+    const linkPath = join3(binDir, platform === "win32" ? `${entry.name}.cmd` : entry.name);
     await removeLegacyCodexComponentBin(linkPath, entry.component, platform);
   }
 }
 async function removeLegacyCodexComponentBin(linkPath, component, platform) {
   try {
-    const stat = await lstat2(linkPath);
+    const stat2 = await lstat3(linkPath);
     if (platform !== "win32") {
-      if (!stat.isSymbolicLink())
+      if (!stat2.isSymbolicLink())
         return;
-      const target = await readlink(linkPath);
+      const target = await readlink2(linkPath);
       if (isManagedLegacyComponentTarget(target, component))
-        await rm(linkPath, { force: true });
+        await rm2(linkPath, { force: true });
       return;
     }
-    if (!stat.isFile())
+    if (!stat2.isFile())
       return;
-    const content = await readFile(linkPath, "utf8");
+    const content = await readFile2(linkPath, "utf8");
     if (content.includes(COMMAND_SHIM_MARKER))
-      await rm(linkPath, { force: true });
+      await rm2(linkPath, { force: true });
   } catch (error) {
     if (isNodeErrorWithCode2(error) && error.code === "ENOENT")
       return;
@@ -6570,7 +8734,7 @@ function isManagedLegacyComponentTarget(target, component) {
   const parts = target.split(/[\\/]+/);
   const suffixStart = parts.length - 4;
   const suffix = parts.slice(-4);
-  return suffix[0] === "components" && suffix[1] === component && suffix[2] === "dist" && suffix[3] === "cli.js" && (hasPluginCachePrefix(parts, suffixStart) || hasOmoCodexPluginPrefix(parts, suffixStart));
+  return suffix[0] === "components" && suffix[1] === component && suffix[2] === "dist" && suffix[3] === "cli.js" && (hasPluginCachePrefix(parts, suffixStart) || hasOmoCodexPluginPrefix2(parts, suffixStart));
 }
 function hasPluginCachePrefix(parts, endExclusive) {
   for (let index = 0;index < endExclusive - 1; index += 1) {
@@ -6579,7 +8743,7 @@ function hasPluginCachePrefix(parts, endExclusive) {
   }
   return false;
 }
-function hasOmoCodexPluginPrefix(parts, endExclusive) {
+function hasOmoCodexPluginPrefix2(parts, endExclusive) {
   for (let index = 0;index <= endExclusive - 3; index += 1) {
     if (parts[index] === "packages" && parts[index + 1] === "omo-codex" && parts[index + 2] === "plugin")
       return true;
@@ -6591,10 +8755,10 @@ function isNodeErrorWithCode2(error) {
 }
 
 // packages/omo-codex/src/install/codex-cache-runtime-wrapper.ts
-import { join as join3 } from "node:path";
+import { join as join4 } from "node:path";
 var RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER";
-function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
-  const ulwLoopBin = toPosixPath(join3(binDir, "omo-ulw-loop"));
+function posixRuntimeWrapper(binName, cliPath, codexHome, binDir, nodeCliPath) {
+  const ulwLoopBin = toPosixPath(join4(binDir, "omo-ulw-loop"));
   const nodeCli = escapePosixDoubleQuoted(toPosixPath(nodeCliPath));
   const escapedCliPath = escapePosixDoubleQuoted(toPosixPath(cliPath));
   const escapedCodexHome = escapePosixDoubleQuoted(toPosixPath(codexHome));
@@ -6603,10 +8767,11 @@ function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
     "#!/bin/sh",
     `# ${RUNTIME_WRAPPER_MARKER}`,
     `export CODEX_HOME="\${CODEX_HOME:-${escapedCodexHome}}"`,
-    'export OMO_SPARKSHELL_APP_SERVER_SOCKET="${OMO_SPARKSHELL_APP_SERVER_SOCKET:-$CODEX_HOME/app-server-control/app-server-control.sock}"',
+    `export OMO_INVOCATION_NAME=${binName}`,
+    "export OMO_EDITION=codex",
     'if [ "$1" = "ulw-loop" ] && [ -x "' + escapedUlwLoopBin + '" ]; then',
     "  shift",
-    '  exec "' + escapedUlwLoopBin + '" "$@"',
+    '  exec "' + escapedUlwLoopBin + '" ulw-loop "$@"',
     "fi",
     `if [ "\${OMO_RUNTIME:-}" = "node" ] && [ -f "${nodeCli}" ]; then`,
     `  exec node "${nodeCli}" "$@"`,
@@ -6627,11 +8792,11 @@ function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
     `  if [ -f "${nodeCli}" ] && command -v node >/dev/null 2>&1; then`,
     `    exec node "${nodeCli}" "$@"`,
     "  fi",
-    `  echo "omo: bun runtime not found (checked PATH, ~/.bun/bin, /opt/homebrew/bin, /usr/local/bin) and the node fallback CLI is missing at ${nodeCli}; install bun from https://bun.sh, or reinstall omo and force the fallback with OMO_RUNTIME=node" >&2`,
+    `  echo "${binName}: bun runtime not found (checked PATH, ~/.bun/bin, /opt/homebrew/bin, /usr/local/bin) and the node fallback CLI is missing at ${nodeCli}; install bun from https://bun.sh, or reinstall ${binName} and force the fallback with OMO_RUNTIME=node" >&2`,
     "  exit 127",
     "fi",
     `if [ ! -f "${escapedCliPath}" ]; then`,
-    `  echo "omo: runtime target missing at ${escapedCliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui" >&2`,
+    `  echo "${binName}: runtime target missing at ${escapedCliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui" >&2`,
     "  exit 1",
     "fi",
     `exec "$BUN_BINARY" "${escapedCliPath}" "$@"`,
@@ -6639,17 +8804,18 @@ function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
   ].join(`
 `);
 }
-function windowsRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
-  const ulwLoopBin = join3(binDir, "omo-ulw-loop.cmd");
+function windowsRuntimeWrapper(binName, cliPath, codexHome, binDir, nodeCliPath) {
+  const ulwLoopBin = join4(binDir, "omo-ulw-loop.cmd");
   return [
     "@echo off",
     `rem ${RUNTIME_WRAPPER_MARKER}`,
     `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
-    'if not defined OMO_SPARKSHELL_APP_SERVER_SOCKET set "OMO_SPARKSHELL_APP_SERVER_SOCKET=%CODEX_HOME%\\app-server-control\\app-server-control.sock"',
+    `set "OMO_INVOCATION_NAME=${binName}"`,
+    'set "OMO_EDITION=codex"',
     ...windowsNodeDiscoveryLines(),
     `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
     "  shift /1",
-    `  "${ulwLoopBin}" %*`,
+    `  "${ulwLoopBin}" ulw-loop %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
     `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
@@ -6663,11 +8829,11 @@ function windowsRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
     `    "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
     "    exit /b %ERRORLEVEL%",
     "  )",
-    `  echo omo: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
+    `  echo ${binName}: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
     "  exit /b 127",
     ")",
     `if not exist "${cliPath}" (`,
-    `  echo omo: runtime target missing at ${cliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
+    `  echo ${binName}: runtime target missing at ${cliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
     "  exit /b 1",
     ")",
     `"%BUN_BINARY%" "${cliPath}" %*`,
@@ -6683,12 +8849,20 @@ function escapePosixDoubleQuoted(value) {
 }
 
 // packages/omo-codex/src/install/codex-cache-bins.ts
-var RESERVED_NESTED_BIN_NAMES = new Set(["omo", "lazycodex", "lazycodex-ai", "oh-my-opencode", "oh-my-openagent"]);
+var RESERVED_NESTED_BIN_NAMES = new Set([
+  "omo",
+  "omo-agent-toolkit",
+  "lazycodex",
+  "lazycodex-ai",
+  "oh-my-opencode",
+  "oh-my-openagent"
+]);
 async function linkCachedPluginBins(input) {
   const binLinks = await discoverPackageBins(input.pluginRoot);
   const platform = input.platform ?? process.platform;
   await mkdir(input.binDir, { recursive: true });
   await removeLegacyCodexComponentBins(input.binDir, platform);
+  await removeDanglingManagedComponentBins(input.binDir, platform, new Set(binLinks.map((link) => link.name)));
   const linked = [];
   for (const link of binLinks) {
     const linkPath = await linkCachedPluginBin(input.binDir, link, platform);
@@ -6700,55 +8874,61 @@ async function removeCachedManagedNpmBinShims(pluginRoot) {
   const binLinks = await discoverPackageBins(pluginRoot);
   if (binLinks.length === 0)
     return;
-  const npmBinDir = join4(pluginRoot, "node_modules", ".bin");
-  if (!await isFileSystemEntry(npmBinDir))
+  const npmBinDir = join5(pluginRoot, "node_modules", ".bin");
+  if (!await isFileSystemEntry2(npmBinDir))
     return;
   const managedBinNames = new Set(binLinks.map((link) => link.name));
   for (const name of managedBinNames) {
     for (const suffix of ["", ".cmd", ".ps1"]) {
-      await rm2(join4(npmBinDir, `${name}${suffix}`), { force: true });
+      await rm3(join5(npmBinDir, `${name}${suffix}`), { force: true });
     }
   }
 }
 async function linkRootRuntimeBin(input) {
-  const cliPath = join4(input.repoRoot, "dist", "cli", "index.js");
-  if (!await isFile(cliPath))
-    return null;
-  const nodeCliPath = join4(input.repoRoot, "dist", "cli-node", "index.js");
+  const cliPath = join5(input.repoRoot, "dist", "cli", "index.js");
   const platform = input.platform ?? process.platform;
+  const legacyPath = join5(input.binDir, platform === "win32" ? "omo.cmd" : "omo");
+  if (!await isFile(cliPath)) {
+    await removeGeneratedRuntimeWrapper(legacyPath);
+    return null;
+  }
+  const binName = "omo-agent-toolkit";
+  const nodeCliPath = join5(input.repoRoot, "dist", "cli-node", "index.js");
   await mkdir(input.binDir, { recursive: true });
   if (platform === "win32") {
-    const linkPath2 = join4(input.binDir, "omo.cmd");
-    await replaceRuntimeWrapper(linkPath2, windowsRuntimeWrapper(cliPath, input.codexHome, input.binDir, nodeCliPath));
-    return { name: "omo", path: linkPath2, target: cliPath };
+    const linkPath2 = join5(input.binDir, `${binName}.cmd`);
+    await replaceRuntimeWrapper(linkPath2, windowsRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath));
+    await removeGeneratedRuntimeWrapper(legacyPath);
+    return { name: binName, path: linkPath2, target: cliPath };
   }
-  const linkPath = join4(input.binDir, "omo");
-  await replaceRuntimeWrapper(linkPath, posixRuntimeWrapper(cliPath, input.codexHome, input.binDir, nodeCliPath));
+  const linkPath = join5(input.binDir, binName);
+  await replaceRuntimeWrapper(linkPath, posixRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath));
   await chmod(linkPath, 493);
-  return { name: "omo", path: linkPath, target: cliPath };
+  await removeGeneratedRuntimeWrapper(legacyPath);
+  return { name: binName, path: linkPath, target: cliPath };
 }
 async function linkCachedPluginBin(binDir, link, platform) {
   if (platform === "win32") {
-    const linkPath2 = join4(binDir, `${link.name}.cmd`);
+    const linkPath2 = join5(binDir, `${link.name}.cmd`);
     await replaceCommandShim(linkPath2, link.target);
     return linkPath2;
   }
-  const linkPath = join4(binDir, link.name);
+  const linkPath = join5(binDir, link.name);
   await replaceSymlink(linkPath, link.target);
   return linkPath;
 }
 async function isFile(path) {
   try {
-    return (await stat(path)).isFile();
+    return (await stat2(path)).isFile();
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
       return false;
     throw error;
   }
 }
-async function isFileSystemEntry(path) {
+async function isFileSystemEntry2(path) {
   try {
-    await stat(path);
+    await stat2(path);
     return true;
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
@@ -6762,23 +8942,23 @@ async function discoverPackageBins(root) {
   return links;
 }
 async function collectPackageBins(directory, root, links) {
-  const entries = await readdir(directory, { withFileTypes: true });
+  const entries = await readdir2(directory, { withFileTypes: true });
   if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
-    await appendPackageBinLinks(join4(directory, "package.json"), directory, root, links);
+    await appendPackageBinLinks(join5(directory, "package.json"), directory, root, links);
   }
   for (const entry of entries) {
     if (!entry.isDirectory())
       continue;
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist")
       continue;
-    const childPath = join4(directory, entry.name);
+    const childPath = join5(directory, entry.name);
     if (!childPath.startsWith(root))
       continue;
     await collectPackageBins(childPath, root, links);
   }
 }
 async function appendPackageBinLinks(packageJsonPath, packageRoot, root, links) {
-  const packageJson = JSON.parse(await readFile2(packageJsonPath, "utf8"));
+  const packageJson = JSON.parse(await readFile3(packageJsonPath, "utf8"));
   if (!isPlainRecord(packageJson))
     return;
   const packageName = packageJson.name;
@@ -6813,10 +8993,10 @@ function isReservedNestedBinName(name, packageRoot, root) {
 function resolvePackageBinTarget(packageRoot, target) {
   if (target.includes("\x00"))
     throw new Error("Package bin target must stay inside package root");
-  const root = resolve(packageRoot);
-  const resolvedTarget = resolve(root, target);
+  const root = resolve2(packageRoot);
+  const resolvedTarget = resolve2(root, target);
   const relativeTarget = relative(root, resolvedTarget);
-  if (relativeTarget === "" || relativeTarget !== ".." && !relativeTarget.startsWith(`..${sep}`) && !isAbsolute(relativeTarget)) {
+  if (relativeTarget === "" || relativeTarget !== ".." && !relativeTarget.startsWith(`..${sep}`) && !isAbsolute2(relativeTarget)) {
     return resolvedTarget;
   }
   throw new Error("Package bin target must stay inside package root");
@@ -6824,7 +9004,7 @@ function resolvePackageBinTarget(packageRoot, target) {
 async function replaceSymlink(linkPath, targetPath) {
   if (await existingNonSymlink(linkPath))
     throw new Error(`${linkPath} already exists and is not a symlink`);
-  await rm2(linkPath, { force: true });
+  await rm3(linkPath, { force: true });
   await symlink(targetPath, linkPath);
 }
 async function replaceCommandShim(linkPath, targetPath) {
@@ -6835,17 +9015,40 @@ async function replaceCommandShim(linkPath, targetPath) {
 async function replaceRuntimeWrapper(linkPath, content) {
   if (await existingNonRuntimeWrapper(linkPath))
     throw new Error(`${linkPath} already exists and is not a generated OMO runtime wrapper`);
-  await rm2(linkPath, { force: true });
+  await rm3(linkPath, { force: true });
   await writeFile(linkPath, content);
+}
+async function removeGeneratedRuntimeWrapper(path) {
+  try {
+    const entry = await lstat4(path);
+    if (!entry.isFile() && !entry.isSymbolicLink())
+      return;
+    const content = await readGeneratedWrapperContent(path);
+    if (content.includes(RUNTIME_WRAPPER_MARKER))
+      await rm3(path, { force: true });
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT")
+      return;
+    throw error;
+  }
+}
+async function readGeneratedWrapperContent(path) {
+  try {
+    return await readFile3(path, "utf8");
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && (error.code === "ENOENT" || error.code === "EISDIR"))
+      return "";
+    throw error;
+  }
 }
 async function existingNonRuntimeWrapper(path) {
   try {
-    const stat2 = await lstat3(path);
-    if (stat2.isSymbolicLink())
+    const stat3 = await lstat4(path);
+    if (stat3.isSymbolicLink())
       return false;
-    if (!stat2.isFile())
+    if (!stat3.isFile())
       return true;
-    const content = await readFile2(path, "utf8");
+    const content = await readFile3(path, "utf8");
     return !content.includes(RUNTIME_WRAPPER_MARKER);
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
@@ -6855,10 +9058,10 @@ async function existingNonRuntimeWrapper(path) {
 }
 async function existingNonShim(path) {
   try {
-    const stat2 = await lstat3(path);
-    if (!stat2.isFile())
+    const stat3 = await lstat4(path);
+    if (!stat3.isFile())
       return true;
-    const content = await readFile2(path, "utf8");
+    const content = await readFile3(path, "utf8");
     if (content.includes(COMMAND_SHIM_MARKER))
       return false;
     throw new Error(`${path} already exists and is not a generated command shim`);
@@ -6870,10 +9073,10 @@ async function existingNonShim(path) {
 }
 async function existingNonSymlink(path) {
   try {
-    const stat2 = await lstat3(path);
-    if (!stat2.isSymbolicLink())
+    const stat3 = await lstat4(path);
+    if (!stat3.isSymbolicLink())
       return true;
-    await readlink2(path);
+    await readlink3(path);
     return false;
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
@@ -6882,12 +9085,12 @@ async function existingNonSymlink(path) {
   }
 }
 // packages/omo-codex/src/install/codex-cache-install.ts
-import { cp as cp2, mkdir as mkdir3, readFile as readFile7, rename, rm as rm3 } from "node:fs/promises";
-import { basename as basename3, dirname as dirname4, join as join11, sep as sep5 } from "node:path";
+import { cp as cp2, mkdir as mkdir3, readFile as readFile8, readdir as readdir4, rename, rm as rm4 } from "node:fs/promises";
+import { basename as basename3, dirname as dirname5, join as join12, sep as sep5 } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-bundled-mcps.ts
-import { cp, mkdir as mkdir2, readFile as readFile3, stat as stat2 } from "node:fs/promises";
-import { dirname, join as join5, resolve as resolve2 } from "node:path";
+import { cp, mkdir as mkdir2, readFile as readFile4, stat as stat3 } from "node:fs/promises";
+import { dirname as dirname2, join as join6, resolve as resolve3 } from "node:path";
 var BUNDLED_MCP_RUNTIMES = [
   {
     label: "Git Bash MCP",
@@ -6905,7 +9108,7 @@ var BUNDLED_MCP_RUNTIMES = [
   }
 ];
 async function copyBundledMcpRuntimeDists(input) {
-  const sourceArgs = await readSourceMcpArgs(join5(input.sourceRoot, ".mcp.json"));
+  const sourceArgs = await readSourceMcpArgs(join6(input.sourceRoot, ".mcp.json"));
   for (const runtime3 of BUNDLED_MCP_RUNTIMES) {
     if (!sourceArgs.has(runtime3.sourceArg))
       continue;
@@ -6914,21 +9117,21 @@ async function copyBundledMcpRuntimeDists(input) {
 }
 function resolveBundledMcpRuntimeArg(pluginRoot, arg) {
   const runtime3 = BUNDLED_MCP_RUNTIMES.find((candidate) => candidate.sourceArg === arg);
-  return runtime3 ? join5(pluginRoot, runtime3.destinationArg) : null;
+  return runtime3 ? join6(pluginRoot, runtime3.destinationArg) : null;
 }
 async function copyBundledMcpRuntimeDist(pluginRoot, sourceRoot, runtime3) {
-  const sourcePath = resolve2(sourceRoot, runtime3.sourceDistFromPlugin);
+  const sourcePath = resolve3(sourceRoot, runtime3.sourceDistFromPlugin);
   if (!await isDirectory(sourcePath)) {
     throw new Error(`missing built ${runtime3.label} dist at ${sourcePath}`);
   }
-  const destinationPath = join5(pluginRoot, runtime3.destinationDistFromPlugin);
-  await mkdir2(dirname(destinationPath), { recursive: true });
+  const destinationPath = join6(pluginRoot, runtime3.destinationDistFromPlugin);
+  await mkdir2(dirname2(destinationPath), { recursive: true });
   await cp(sourcePath, destinationPath, { recursive: true });
 }
 async function readSourceMcpArgs(path) {
   let parsed;
   try {
-    parsed = JSON.parse(await readFile3(path, "utf8"));
+    parsed = JSON.parse(await readFile4(path, "utf8"));
   } catch (error) {
     if (error instanceof Error)
       return new Set;
@@ -6949,7 +9152,7 @@ async function readSourceMcpArgs(path) {
 }
 async function isDirectory(path) {
   try {
-    return (await stat2(path)).isDirectory();
+    return (await stat3(path)).isDirectory();
   } catch (error) {
     if (error instanceof Error)
       return false;
@@ -6959,20 +9162,20 @@ async function isDirectory(path) {
 
 // packages/omo-codex/src/install/codex-cache-local-dependencies.ts
 import { realpathSync } from "node:fs";
-import { readFile as readFile4, readdir as readdir2, writeFile as writeFile2 } from "node:fs/promises";
-import { dirname as dirname2, isAbsolute as isAbsolute3, join as join7, relative as relative3, resolve as resolve4, sep as sep2 } from "node:path";
+import { readFile as readFile5, readdir as readdir3, writeFile as writeFile2 } from "node:fs/promises";
+import { dirname as dirname3, isAbsolute as isAbsolute4, join as join8, relative as relative3, resolve as resolve5, sep as sep2 } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-paths.ts
-import { isAbsolute as isAbsolute2, join as join6, relative as relative2, resolve as resolve3 } from "node:path";
+import { isAbsolute as isAbsolute3, join as join7, relative as relative2, resolve as resolve4 } from "node:path";
 function resolveCachedRuntimePath(pluginRoot, sourceRoot, runtimePath) {
-  const targetPath = resolve3(pluginRoot, runtimePath);
+  const targetPath = resolve4(pluginRoot, runtimePath);
   if (isPathInside(targetPath, pluginRoot))
     return targetPath;
-  return resolve3(sourceRoot, runtimePath);
+  return resolve4(sourceRoot, runtimePath);
 }
 function isPathInside(candidatePath, rootPath) {
   const pathFromRoot = relative2(rootPath, candidatePath);
-  return pathFromRoot === "" || !pathFromRoot.startsWith("..") && !isAbsolute2(pathFromRoot);
+  return pathFromRoot === "" || !pathFromRoot.startsWith("..") && !isAbsolute3(pathFromRoot);
 }
 
 // packages/omo-codex/src/install/codex-cache-local-dependencies.ts
@@ -6980,13 +9183,14 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
   const packageJsonPaths = [];
   await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths);
   const packageLock = await readPackageLock(pluginRoot);
+  let rewroteAnyPackageJson = false;
   for (const packageJsonPath of packageJsonPaths) {
-    const raw = await readFile4(packageJsonPath, "utf8");
+    const raw = await readFile5(packageJsonPath, "utf8");
     const parsed = JSON.parse(raw);
     if (!isPlainRecord(parsed))
       continue;
-    const packageDir = dirname2(packageJsonPath);
-    const sourcePackageDir = join7(sourceRoot, relative3(pluginRoot, packageDir));
+    const packageDir = dirname3(packageJsonPath);
+    const sourcePackageDir = join8(sourceRoot, relative3(pluginRoot, packageDir));
     let changed = false;
     for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
       const dependencies = parsed[field];
@@ -6996,12 +9200,12 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
         if (typeof specifier !== "string" || !specifier.startsWith("file:"))
           continue;
         const filePath = specifier.slice("file:".length);
-        if (filePath.length === 0 || isAbsolute3(filePath))
+        if (filePath.length === 0 || isAbsolute4(filePath))
           continue;
-        const targetPath = resolve4(packageDir, filePath);
+        const targetPath = resolve5(packageDir, filePath);
         if (isPathInside(targetPath, pluginRoot))
           continue;
-        const sourceTargetPath = resolve4(sourcePackageDir, filePath);
+        const sourceTargetPath = resolve5(sourcePackageDir, filePath);
         dependencies[name] = `file:${sourceTargetPath}`;
         rewritePackageLockFileDependency({
           dependencyName: name,
@@ -7015,18 +9219,21 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
         changed = true;
       }
     }
-    if (changed)
+    if (changed) {
       await writeFile2(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}
 `);
+      rewroteAnyPackageJson = true;
+    }
   }
   if (packageLock.changed)
     await writeFile2(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}
 `);
+  return rewroteAnyPackageJson;
 }
 async function readPackageLock(pluginRoot) {
-  const path = join7(pluginRoot, "package-lock.json");
+  const path = join8(pluginRoot, "package-lock.json");
   try {
-    const parsed = JSON.parse(await readFile4(path, "utf8"));
+    const parsed = JSON.parse(await readFile5(path, "utf8"));
     return { path, value: isPlainRecord(parsed) ? parsed : null, changed: false };
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
@@ -7083,16 +9290,16 @@ function canonicalizeExistingPath(path) {
   }
 }
 async function collectPackageJsonPaths(directory, root, paths) {
-  const entries = await readdir2(directory, { withFileTypes: true });
+  const entries = await readdir3(directory, { withFileTypes: true });
   if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
-    paths.push(join7(directory, "package.json"));
+    paths.push(join8(directory, "package.json"));
   }
   for (const entry of entries) {
     if (!entry.isDirectory())
       continue;
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist")
       continue;
-    const childPath = join7(directory, entry.name);
+    const childPath = join8(directory, entry.name);
     if (!isPathInside(childPath, root))
       continue;
     await collectPackageJsonPaths(childPath, root, paths);
@@ -7100,13 +9307,13 @@ async function collectPackageJsonPaths(directory, root, paths) {
 }
 
 // packages/omo-codex/src/install/codex-cache-mcp-manifest.ts
-import { readFile as readFile5, writeFile as writeFile3 } from "node:fs/promises";
-import { join as join9, sep as sep3 } from "node:path";
+import { readFile as readFile6, writeFile as writeFile3 } from "node:fs/promises";
+import { join as join10, sep as sep3 } from "node:path";
 
 // packages/utils/src/codegraph/resolve.ts
 import { existsSync as existsSync2 } from "node:fs";
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { basename as basename2, dirname as dirname3, join as join8 } from "node:path";
+import { basename as basename2, dirname as dirname4, join as join9 } from "node:path";
 import { createRequire } from "node:module";
 
 // packages/utils/src/codegraph/node-support.ts
@@ -7171,10 +9378,10 @@ function isNodeExecutableName(filePath) {
 function looksLikePath(command) {
   return command.includes("/") || command.includes("\\") || /^[a-zA-Z]:/.test(command);
 }
-function resolveConfiguredNodeRuntime(configured, fileExists, which2) {
+function resolveConfiguredNodeRuntime(configured, fileExists, which) {
   if (looksLikePath(configured))
     return fileExists(configured) ? configured : null;
-  return which2(configured);
+  return which(configured);
 }
 function supportsCodegraphNodeRuntime(nodePath, env, nodeVersion) {
   const version = nodeVersion(nodePath);
@@ -7182,15 +9389,15 @@ function supportsCodegraphNodeRuntime(nodePath, env, nodeVersion) {
     return false;
   return evaluateCodegraphNodeSupport({ env, nodeVersion: version }).supported;
 }
-function defaultNodeRuntime(env, fileExists, which2, nodeVersion) {
+function defaultNodeRuntime(env, fileExists, which, nodeVersion) {
   const configured = env[CODEGRAPH_NODE_BIN_ENV]?.trim();
   if (configured !== undefined && configured.length > 0) {
-    const resolved = resolveConfiguredNodeRuntime(configured, fileExists, which2);
+    const resolved = resolveConfiguredNodeRuntime(configured, fileExists, which);
     return resolved !== null && supportsCodegraphNodeRuntime(resolved, env, nodeVersion) ? resolved : null;
   }
   const candidates = [
     ...isNodeExecutableName(process.execPath) ? [process.execPath] : [],
-    ...CODEGRAPH_NODE_CANDIDATES.map((commandName) => which2(commandName)).filter((candidate) => candidate !== null),
+    ...CODEGRAPH_NODE_CANDIDATES.map((commandName) => which(commandName)).filter((candidate) => candidate !== null),
     ...CODEGRAPH_NODE_PATH_CANDIDATES.filter((candidate) => fileExists(candidate))
   ];
   const seen = new Set;
@@ -7221,10 +9428,10 @@ function resolveCodegraphNodeSupport(options = {}) {
 var CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
 var CONTEXT7_API_KEY_ENV = "CONTEXT7_API_KEY";
 async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot, options = {}) {
-  const manifestPath = join9(pluginRoot, ".mcp.json");
+  const manifestPath = join10(pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return;
-  const raw = await readFile5(manifestPath, "utf8");
+  const raw = await readFile6(manifestPath, "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed.mcpServers))
     return;
@@ -7245,7 +9452,7 @@ async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot, opt
         if (bundledMcpRuntimeArg !== null)
           return bundledMcpRuntimeArg;
         if (CODEGRAPH_RELATIVE_ARGS.has(arg))
-          return join9(pluginRoot, "components", "codegraph", "dist", "serve.js");
+          return join10(pluginRoot, "components", "codegraph", "dist", "serve.js");
         if (arg.startsWith("./") || arg.startsWith("../"))
           return resolveCachedRuntimePath(pluginRoot, sourceRoot, arg);
         return arg;
@@ -7325,10 +9532,10 @@ function isPlaceholderContext7ApiKey(value) {
   return normalized.length === 0 || normalized === "your api key";
 }
 async function rewriteCachedManifestRoot(pluginRoot, fromRoot, toRoot) {
-  const manifestPath = join9(pluginRoot, ".mcp.json");
+  const manifestPath = join10(pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return;
-  const raw = await readFile5(manifestPath, "utf8");
+  const raw = await readFile6(manifestPath, "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed.mcpServers))
     return;
@@ -7360,15 +9567,15 @@ async function rewriteCachedManifestRoot(pluginRoot, fromRoot, toRoot) {
 }
 
 // packages/omo-codex/src/install/codex-hook-targets.ts
-import { readFile as readFile6 } from "node:fs/promises";
-import { join as join10, sep as sep4 } from "node:path";
+import { readFile as readFile7 } from "node:fs/promises";
+import { join as join11, sep as sep4 } from "node:path";
 var PLUGIN_ROOT_TARGET_PATTERN = /\$\{PLUGIN_ROOT\}[\\/]+([^"']+)/g;
 async function findMissingHookCommandTargets(pluginRoot) {
   const commands = [];
   for (const manifestPath of await hookManifestPaths(pluginRoot)) {
     if (!await fileExistsStrict(manifestPath))
       continue;
-    const parsed = JSON.parse(await readFile6(manifestPath, "utf8"));
+    const parsed = JSON.parse(await readFile7(manifestPath, "utf8"));
     collectCommands(parsed, commands);
   }
   const missing = [];
@@ -7378,7 +9585,7 @@ async function findMissingHookCommandTargets(pluginRoot) {
       const targetSuffix = match[1];
       if (targetSuffix === undefined)
         continue;
-      const target = join10(pluginRoot, ...targetSuffix.split(/[\\/]+/));
+      const target = join11(pluginRoot, ...targetSuffix.split(/[\\/]+/));
       if (seen.has(target))
         continue;
       seen.add(target);
@@ -7389,17 +9596,17 @@ async function findMissingHookCommandTargets(pluginRoot) {
   return missing;
 }
 async function hookManifestPaths(pluginRoot) {
-  const pluginManifestPath = join10(pluginRoot, ".codex-plugin", "plugin.json");
+  const pluginManifestPath = join11(pluginRoot, ".codex-plugin", "plugin.json");
   if (!await fileExistsStrict(pluginManifestPath))
-    return [join10(pluginRoot, "hooks", "hooks.json")];
-  const parsed = JSON.parse(await readFile6(pluginManifestPath, "utf8"));
+    return [join11(pluginRoot, "hooks", "hooks.json")];
+  const parsed = JSON.parse(await readFile7(pluginManifestPath, "utf8"));
   if (!isPlainRecord(parsed))
     return [];
   if (typeof parsed.hooks === "string" && parsed.hooks.trim() !== "") {
-    return [join10(pluginRoot, stripDotSlash(parsed.hooks))];
+    return [join11(pluginRoot, stripDotSlash(parsed.hooks))];
   }
   if (Array.isArray(parsed.hooks)) {
-    return parsed.hooks.filter((hookPath) => typeof hookPath === "string" && hookPath.trim() !== "").map((hookPath) => join10(pluginRoot, stripDotSlash(hookPath)));
+    return parsed.hooks.filter((hookPath) => typeof hookPath === "string" && hookPath.trim() !== "").map((hookPath) => join11(pluginRoot, stripDotSlash(hookPath)));
   }
   return [];
 }
@@ -7431,71 +9638,79 @@ function collectCommands(value, commands) {
 
 // packages/omo-codex/src/install/codex-cache-install.ts
 async function installCachedPlugin(input) {
+  const env = input.env ?? process.env;
+  const npmInstallEnv = sanitizeNpmInstallEnv(env);
   if (input.buildSource !== false) {
-    await maybeRunNpmInstall(input.sourcePath, input.runCommand);
-    await maybeRunNpmBuild(input.sourcePath, input.runCommand);
+    await maybeRunNpmInstall(input.sourcePath, input.runCommand, npmInstallEnv);
+    await maybeRunNpmBuild(input.sourcePath, input.runCommand, env);
   }
-  const targetPath = join11(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version);
+  const targetPath = join12(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version);
   const tempPath = createTempSiblingPath(targetPath);
-  await rm3(tempPath, { recursive: true, force: true });
+  await rm4(tempPath, { recursive: true, force: true });
   try {
     await copyDirectory(input.sourcePath, tempPath);
-    await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
+    const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
-    await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"]);
+    await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
+    const installArgs = rewroteLocalFileDependencies ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"];
+    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
-      await maybeRunNpmSyncSkills(tempPath, input.runCommand);
+      await maybeRunNpmSyncSkills(tempPath, input.runCommand, env);
+    await assertNoRemovedSparkshellPromptReferences(tempPath);
     await rewriteCachedMcpManifest(tempPath, input.sourcePath);
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
     await assertHookCommandTargets(tempPath);
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename);
   } catch (error) {
-    await rm3(tempPath, { recursive: true, force: true });
+    await rm4(tempPath, { recursive: true, force: true });
     throw error;
   }
   return { name: input.name, version: input.version, path: targetPath };
 }
-async function maybeRunNpmInstall(cwd, runCommand, args = ["install"]) {
-  if (!await fileExistsStrict(join11(cwd, "package.json")))
+async function maybeRunNpmInstall(cwd, runCommand, env, args = ["install"]) {
+  if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
-  await runCommand("npm", args, { cwd });
+  await runCommand("npm", args, { cwd, env });
 }
-async function maybeRunNpmBuild(cwd, runCommand) {
-  if (!await fileExistsStrict(join11(cwd, "package.json")))
+async function maybeRunNpmBuild(cwd, runCommand, env) {
+  if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
-  const packageJson = JSON.parse(await readFile7(join11(cwd, "package.json"), "utf8"));
+  const packageJson = JSON.parse(await readFile8(join12(cwd, "package.json"), "utf8"));
   if (!isPlainRecord(packageJson))
     return;
   const scripts = packageJson.scripts;
   if (!isPlainRecord(scripts) || typeof scripts.build !== "string")
     return;
-  await runCommand("npm", ["run", "build"], { cwd });
+  await runCommand("npm", ["run", "build"], { cwd, env });
 }
-async function maybeRunNpmSyncSkills(cwd, runCommand) {
-  if (!await fileExistsStrict(join11(cwd, "package.json")))
+async function maybeRunNpmSyncSkills(cwd, runCommand, env) {
+  if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
-  const packageJson = JSON.parse(await readFile7(join11(cwd, "package.json"), "utf8"));
+  const packageJson = JSON.parse(await readFile8(join12(cwd, "package.json"), "utf8"));
   if (!isPlainRecord(packageJson))
     return;
   const scripts = packageJson.scripts;
   if (!isPlainRecord(scripts) || typeof scripts["sync:skills"] !== "string")
     return;
-  await runCommand("npm", ["run", "sync:skills"], { cwd });
+  await runCommand("npm", ["run", "sync:skills"], { cwd, env });
+}
+function sanitizeNpmInstallEnv(env) {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== "npm_config_allow_scripts"));
 }
 function createTempSiblingPath(targetPath) {
-  return join11(dirname4(targetPath), `.tmp-${basename3(targetPath)}-${process.pid}-${Date.now()}`);
+  return join12(dirname5(targetPath), `.tmp-${basename3(targetPath)}-${process.pid}-${Date.now()}`);
 }
 function createBackupSiblingPath(targetPath) {
-  return join11(dirname4(targetPath), `.backup-${basename3(targetPath)}-${process.pid}-${Date.now()}`);
+  return join12(dirname5(targetPath), `.backup-${basename3(targetPath)}-${process.pid}-${Date.now()}`);
 }
 async function copyDirectory(sourcePath, targetPath) {
-  await mkdir3(dirname4(targetPath), { recursive: true });
+  await mkdir3(dirname5(targetPath), { recursive: true });
   await cp2(sourcePath, targetPath, { recursive: true, filter: (source) => shouldCopyPluginPath(source, sourcePath) });
 }
 async function promoteDirectory(tempPath, targetPath, renameDirectory) {
   const backupPath = createBackupSiblingPath(targetPath);
-  await rm3(backupPath, { recursive: true, force: true });
+  await rm4(backupPath, { recursive: true, force: true });
   let backupMoved = false;
   try {
     if (await fileExistsStrict(targetPath)) {
@@ -7509,12 +9724,12 @@ async function promoteDirectory(tempPath, targetPath, renameDirectory) {
     throw error;
   }
   if (backupMoved)
-    await rm3(backupPath, { recursive: true, force: true });
+    await rm4(backupPath, { recursive: true, force: true });
 }
 async function restoreBackupDirectory(backupPath, targetPath, renameDirectory) {
   if (!await fileExistsStrict(backupPath))
     return;
-  await rm3(targetPath, { recursive: true, force: true });
+  await rm4(targetPath, { recursive: true, force: true });
   await renameDirectory(backupPath, targetPath);
 }
 function shouldCopyPluginPath(path, root) {
@@ -7522,13 +9737,93 @@ function shouldCopyPluginPath(path, root) {
   if (relative4 === "")
     return true;
   const parts = relative4.split(sep5);
-  return !parts.some((part) => part === ".git" || part === "node_modules");
+  if (parts.some((part) => part === ".git" || part === "node_modules"))
+    return false;
+  return !isNestedComponentMcpManifest(parts);
+}
+function isNestedComponentMcpManifest(parts) {
+  return parts.length > 1 && parts.at(-1) === ".mcp.json";
+}
+var removedSparkshellReferencePattern = /\b(?:sparkshell|spark[-_\s]+shell)\b/i;
+var removedSparkshellPromptSurfaceDirs = new Set([".codex-plugin", "agents", "bundled-rules", "hooks", "skills"]);
+var removedSparkshellPromptSurfaceFiles = new Set(["directive.md", "plugin.json"]);
+var removedSparkshellTextFilePattern = /\.(?:json|md|toml|ya?ml)$/i;
+async function assertNoRemovedSparkshellPromptReferences(pluginRoot) {
+  for (const filePath of await listRemovedSparkshellPromptSurfaceFiles(pluginRoot, "")) {
+    const content = await readFile8(join12(pluginRoot, filePath), "utf8");
+    if (!removedSparkshellReferencePattern.test(content))
+      continue;
+    throw new Error(`removed sparkshell reference found in Codex plugin prompt surface: ${filePath}`);
+  }
+}
+async function listRemovedSparkshellPromptSurfaceFiles(pluginRoot, relativeDirectory) {
+  const directory = relativeDirectory === "" ? pluginRoot : join12(pluginRoot, relativeDirectory);
+  const entries = await readdir4(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const relativePath = relativeDirectory === "" ? entry.name : join12(relativeDirectory, entry.name);
+    if (entry.isDirectory()) {
+      if (shouldDescendIntoRemovedSparkshellPromptSurface(relativePath)) {
+        files.push(...await listRemovedSparkshellPromptSurfaceFiles(pluginRoot, relativePath));
+      }
+      continue;
+    }
+    if (shouldCheckRemovedSparkshellPromptFile(relativePath))
+      files.push(relativePath);
+  }
+  return files.sort();
+}
+function shouldDescendIntoRemovedSparkshellPromptSurface(relativePath) {
+  const parts = relativePath.split(sep5);
+  if (parts.some((part) => part === ".git" || part === "dist" || part === "node_modules"))
+    return false;
+  if (parts[0] === "components") {
+    if (parts.length <= 2)
+      return true;
+    return removedSparkshellPromptSurfaceDirs.has(parts[2]);
+  }
+  return removedSparkshellPromptSurfaceDirs.has(parts[0]);
+}
+function shouldCheckRemovedSparkshellPromptFile(relativePath) {
+  if (!removedSparkshellTextFilePattern.test(relativePath))
+    return false;
+  const parts = relativePath.split(sep5);
+  const fileName = parts.at(-1) ?? "";
+  if (parts[0] === "components") {
+    if (parts.length === 3)
+      return removedSparkshellPromptSurfaceFiles.has(fileName);
+    return parts.length > 3 && removedSparkshellPromptSurfaceDirs.has(parts[2]);
+  }
+  return removedSparkshellPromptSurfaceDirs.has(parts[0]);
+}
+async function copyRootRuntimeDists(input) {
+  const repoRoot = repoRootForCodexPluginSource(input.sourcePath);
+  if (repoRoot === null)
+    return;
+  for (const runtimePath of ["dist/cli", "dist/cli-node"]) {
+    const sourcePath = join12(repoRoot, runtimePath);
+    if (!await fileExistsStrict(join12(sourcePath, "index.js")))
+      continue;
+    await mkdir3(dirname5(join12(input.pluginRoot, runtimePath)), { recursive: true });
+    await cp2(sourcePath, join12(input.pluginRoot, runtimePath), { recursive: true });
+  }
+}
+function repoRootForCodexPluginSource(sourcePath) {
+  const codexPackageRoot = dirname5(sourcePath);
+  const packagesRoot = dirname5(codexPackageRoot);
+  if (basename3(sourcePath) !== "plugin")
+    return null;
+  if (basename3(codexPackageRoot) !== "omo-codex")
+    return null;
+  if (basename3(packagesRoot) !== "packages")
+    return null;
+  return dirname5(packagesRoot);
 }
 // packages/omo-codex/src/install/codex-cache-prune.ts
-import { lstat as lstat4, readdir as readdir3, rm as rm4, stat as stat3 } from "node:fs/promises";
-import { join as join12 } from "node:path";
+import { lstat as lstat5, readdir as readdir5, rm as rm5, stat as stat4 } from "node:fs/promises";
+import { join as join13 } from "node:path";
 async function pruneMarketplaceCache(input) {
-  const cacheRoot = join12(input.codexHome, "plugins", "cache", input.marketplaceName);
+  const cacheRoot = join13(input.codexHome, "plugins", "cache", input.marketplaceName);
   if (!await fileExistsStrict(cacheRoot))
     return;
   const keep = new Set(input.keepPluginNames);
@@ -7536,28 +9831,28 @@ async function pruneMarketplaceCache(input) {
   for (const entry of entries) {
     if (!entry.isDirectory() || keep.has(entry.name))
       continue;
-    await rm4(join12(cacheRoot, entry.name), { recursive: true, force: true });
+    await rm5(join13(cacheRoot, entry.name), { recursive: true, force: true });
   }
 }
 async function pruneMarketplacePluginCaches(input) {
-  const cacheRoot = join12(input.codexHome, "plugins", "cache", input.marketplaceName);
+  const cacheRoot = join13(input.codexHome, "plugins", "cache", input.marketplaceName);
   if (!await fileExistsStrict(cacheRoot))
     return;
   for (const pluginName of input.pluginNames) {
-    await rm4(join12(cacheRoot, pluginName), { recursive: true, force: true });
+    await rm5(join13(cacheRoot, pluginName), { recursive: true, force: true });
   }
   const remainingEntries = await readCacheEntryNames(cacheRoot);
   if (remainingEntries.length === 0) {
-    await rm4(cacheRoot, { recursive: true, force: true });
+    await rm5(cacheRoot, { recursive: true, force: true });
   }
 }
 async function readCacheEntries(path) {
   const emptyEntries = [];
-  return readCacheRoot(path, () => readdir3(path, { withFileTypes: true }), emptyEntries);
+  return readCacheRoot(path, () => readdir5(path, { withFileTypes: true }), emptyEntries);
 }
 async function readCacheEntryNames(path) {
   const emptyNames = [];
-  return readCacheRoot(path, () => readdir3(path), emptyNames);
+  return readCacheRoot(path, () => readdir5(path), emptyNames);
 }
 async function readCacheRoot(path, readEntries, fallback) {
   try {
@@ -7572,7 +9867,7 @@ async function readCacheRoot(path, readEntries, fallback) {
 }
 async function isBrokenCacheSymlink(path) {
   try {
-    const entry = await lstat4(path);
+    const entry = await lstat5(path);
     if (!entry.isSymbolicLink())
       return false;
   } catch (error) {
@@ -7581,7 +9876,7 @@ async function isBrokenCacheSymlink(path) {
     throw error;
   }
   try {
-    await stat3(path);
+    await stat4(path);
     return false;
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
@@ -7590,25 +9885,47 @@ async function isBrokenCacheSymlink(path) {
   }
 }
 // packages/omo-codex/src/install/codex-cached-marketplace-manifest.ts
-import { mkdir as mkdir4, writeFile as writeFile4 } from "node:fs/promises";
-import { join as join13 } from "node:path";
+import { mkdir as mkdir4, rename as rename2, rm as rm6, stat as stat5, writeFile as writeFile4 } from "node:fs/promises";
+import { join as join14 } from "node:path";
 async function writeCachedMarketplaceManifest(input) {
-  const marketplaceDir = join13(input.marketplaceRoot, ".agents", "plugins");
+  const marketplaceDir = join14(input.marketplaceRoot, ".agents", "plugins");
   await mkdir4(marketplaceDir, { recursive: true });
-  await writeFile4(join13(marketplaceDir, "marketplace.json"), `${JSON.stringify({
-    name: input.marketplaceName,
-    plugins: input.plugins.map((plugin) => ({
-      name: plugin.name,
-      source: { source: "local", path: `./${plugin.name}/${plugin.version}` }
-    }))
-  }, null, "\t")}
+  for (const plugin of input.plugins) {
+    const pluginPath = join14(input.marketplaceRoot, plugin.name, plugin.version);
+    if (!await isDirectory2(pluginPath))
+      throw new Error(`Cannot write cached marketplace manifest: ${pluginPath} does not exist`);
+  }
+  const manifestPath = join14(marketplaceDir, "marketplace.json");
+  const tempPath = join14(marketplaceDir, `.marketplace.json.tmp-${process.pid}-${Date.now()}`);
+  try {
+    await writeFile4(tempPath, `${JSON.stringify({
+      name: input.marketplaceName,
+      plugins: input.plugins.map((plugin) => ({
+        name: plugin.name,
+        source: { source: "local", path: `./${plugin.name}/${plugin.version}` }
+      }))
+    }, null, "\t")}
 `);
+    await rename2(tempPath, manifestPath);
+  } catch (error) {
+    await rm6(tempPath, { force: true });
+    throw error;
+  }
+}
+async function isDirectory2(path) {
+  try {
+    return (await stat5(path)).isDirectory();
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT")
+      return false;
+    throw error;
+  }
 }
 
 // packages/omo-codex/src/install/codex-package-layout.ts
 import { existsSync as existsSync3 } from "node:fs";
-import { readFile as readFile8 } from "node:fs/promises";
-import { join as join14 } from "node:path";
+import { readFile as readFile9 } from "node:fs/promises";
+import { join as join15 } from "node:path";
 var PACKAGED_CODEX_INSTALLER_NAMES = new Set([
   "@code-yeongyu/lazycodex",
   "@code-yeongyu/lazycodex-ai",
@@ -7618,20 +9935,20 @@ var PACKAGED_CODEX_INSTALLER_NAMES = new Set([
   "oh-my-openagent"
 ]);
 async function shouldBuildSourcePackages(repoRoot) {
-  if (existsSync3(join14(repoRoot, "packages", "omo-opencode", "src", "index.ts")))
+  if (existsSync3(join15(repoRoot, "packages", "omo-opencode", "src", "index.ts")))
     return true;
-  const packageJsonPath = join14(repoRoot, "package.json");
+  const packageJsonPath = join15(repoRoot, "package.json");
   if (!existsSync3(packageJsonPath))
     return true;
-  const packageJson = JSON.parse(await readFile8(packageJsonPath, "utf8"));
+  const packageJson = JSON.parse(await readFile9(packageJsonPath, "utf8"));
   if (!isPlainRecord(packageJson) || typeof packageJson.name !== "string")
     return true;
   return !PACKAGED_CODEX_INSTALLER_NAMES.has(packageJson.name);
 }
 
 // packages/omo-codex/src/install/codex-config-toml.ts
-import { mkdir as mkdir5, readFile as readFile10 } from "node:fs/promises";
-import { dirname as dirname6 } from "node:path";
+import { mkdir as mkdir5, readFile as readFile11 } from "node:fs/promises";
+import { dirname as dirname8 } from "node:path";
 
 // packages/omo-codex/src/install/toml-section-editor.ts
 function findTomlSection(config, header) {
@@ -7640,9 +9957,16 @@ function findTomlSection(config, header) {
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
   let start = -1;
+  let multilineQuote = null;
   for (const line of lines) {
     if (line.length === 0)
       break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
     const trimmed = line.trim();
     if (start === -1) {
       if (tomlTableHeaderMatches(trimmed, headerLine, targetHeaderPath))
@@ -7657,8 +9981,37 @@ function findTomlSection(config, header) {
   return { start, end: config.length, text: config.slice(start) };
 }
 function replaceOrInsertSetting(config, section, key, value) {
-  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`, "m");
-  const replacement = linePattern.test(section.text) ? section.text.replace(linePattern, `${key} = ${value}`) : insertSetting(section.text, key, value);
+  const targetPath = parseTomlDottedKey(key);
+  if (!targetPath)
+    return config;
+  const lines = section.text.match(/[^\n]*\n?|$/g) ?? [];
+  let offset = 0;
+  let multilineQuote = null;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
+    const assignmentIndex = findUnquotedAssignment(line);
+    if (assignmentIndex < 0) {
+      offset += line.length;
+      continue;
+    }
+    const settingPath = parseTomlDottedKey(line.slice(0, assignmentIndex).trim());
+    if (!settingPath || !tomlPathMatches(settingPath, targetPath)) {
+      offset += line.length;
+      continue;
+    }
+    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(section.text, offset + line.length, multilineScan.nextQuote) : offset + line.length;
+    const sectionReplacement = section.text.slice(0, offset) + replacement2 + section.text.slice(assignmentEnd);
+    return config.slice(0, section.start) + sectionReplacement + config.slice(section.end);
+  }
+  const replacement = insertSetting(section.text, key, value);
   return config.slice(0, section.start) + replacement + config.slice(section.end);
 }
 function removeSetting(config, section, key) {
@@ -7680,6 +10033,50 @@ function replaceOrInsertRootSetting(config, key, value) {
 
 ${suffix.trimStart()}`;
 }
+function replaceOrInsertRootDottedSetting(config, keyPath, value) {
+  const targetPath = parseTomlDottedKey(keyPath);
+  if (!targetPath)
+    return config;
+  const lines = config.match(/[^\n]*\n?|$/g) ?? [];
+  let offset = 0;
+  let multilineQuote = null;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
+    if (isTomlTableHeaderLine(line))
+      break;
+    const assignmentIndex = findUnquotedAssignment(line);
+    if (assignmentIndex < 0) {
+      offset += line.length;
+      continue;
+    }
+    const settingPath = parseTomlDottedKey(line.slice(0, assignmentIndex).trim());
+    if (!settingPath || !tomlPathMatches(settingPath, targetPath)) {
+      offset += line.length;
+      continue;
+    }
+    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(config, offset + line.length, multilineScan.nextQuote) : offset + line.length;
+    return config.slice(0, offset) + replacement2 + config.slice(assignmentEnd);
+  }
+  const sectionStart = findFirstTableStart(config);
+  const root = config.slice(0, sectionStart).trimEnd();
+  const suffix = config.slice(sectionStart);
+  const replacement = `${root}${root.length > 0 ? `
+` : ""}${keyPath} = ${value}
+`;
+  if (suffix.length === 0)
+    return replacement;
+  return `${replacement.trimEnd()}
+
+${suffix.trimStart()}`;
+}
 function appendBlock(config, block) {
   const prefix = config.trimEnd();
   return `${prefix}${prefix.length > 0 ? `
@@ -7690,9 +10087,16 @@ function appendBlock(config, block) {
 function findFirstTableStart(config) {
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
+  let multilineQuote = null;
   for (const line of lines) {
     if (line.length === 0)
       break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
     if (isTomlTableHeaderLine(line))
       return offset;
     offset += line.length;
@@ -7729,6 +10133,131 @@ function parseTomlTableHeader(line) {
 function isTomlTableHeaderLine(line) {
   const normalizedLine = stripUnquotedInlineComment(line).trim();
   return normalizedLine.startsWith("[") && normalizedLine.endsWith("]");
+}
+function scanTomlMultilineLine(line, currentQuote) {
+  if (currentQuote) {
+    return {
+      wasInside: true,
+      nextQuote: findTomlMultilineDelimiter(line, currentQuote, 0) === -1 ? currentQuote : null
+    };
+  }
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === "#")
+      break;
+    const delimiter2 = line.startsWith('"""', index) ? '"""' : line.startsWith("'''", index) ? "'''" : null;
+    if (delimiter2) {
+      const closingIndex = findTomlMultilineDelimiter(line, delimiter2, index + delimiter2.length);
+      return { wasInside: false, nextQuote: closingIndex === -1 ? delimiter2 : null };
+    }
+    if (char === '"' || char === "'")
+      quote = char;
+    index += 1;
+  }
+  return { wasInside: false, nextQuote: null };
+}
+function findTomlMultilineDelimiter(line, delimiter2, startIndex) {
+  let index = line.indexOf(delimiter2, startIndex);
+  while (index !== -1) {
+    if (delimiter2 === "'''" || countPrecedingBackslashes(line, index) % 2 === 0)
+      return index;
+    index = line.indexOf(delimiter2, index + 1);
+  }
+  return -1;
+}
+function countPrecedingBackslashes(line, index) {
+  let count = 0;
+  let cursor = index - 1;
+  while (cursor >= 0 && line[cursor] === "\\") {
+    count += 1;
+    cursor -= 1;
+  }
+  return count;
+}
+function findUnquotedAssignment(line) {
+  return findUnquotedCharacter(line, "=", 0);
+}
+function findUnquotedComment(line, startIndex) {
+  return findUnquotedCharacter(line, "#", startIndex);
+}
+function findUnquotedCharacter(line, target, startIndex) {
+  let quote = null;
+  let index = startIndex;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === target)
+      return index;
+    if (char === "#")
+      return -1;
+    index += 1;
+  }
+  return -1;
+}
+function tomlPathMatches(candidate, target) {
+  return candidate.length === target.length && candidate.every((part, index) => part === target[index]);
+}
+function replaceTomlAssignmentValue(line, assignmentIndex, value) {
+  const newline = line.endsWith(`
+`) ? `
+` : "";
+  const lineBody = newline ? line.slice(0, -1) : line;
+  const commentIndex = findUnquotedComment(lineBody, assignmentIndex + 1);
+  const comment = commentIndex === -1 ? "" : ` ${lineBody.slice(commentIndex).trimStart()}`;
+  return `${lineBody.slice(0, assignmentIndex + 1)} ${value}${comment}${newline}`;
+}
+function findTomlMultilineValueEnd(text, startOffset, quote) {
+  const lines = text.slice(startOffset).match(/[^\n]*\n?|$/g) ?? [];
+  let offset = startOffset;
+  let currentQuote = quote;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const scan = scanTomlMultilineLine(line, currentQuote);
+    currentQuote = scan.nextQuote;
+    offset += line.length;
+    if (currentQuote === null)
+      return offset;
+  }
+  return text.length;
 }
 function stripUnquotedInlineComment(line) {
   let quote = null;
@@ -7903,6 +10432,14 @@ function parseAgentHeaderName(header) {
   const path = parseTomlDottedKey(header);
   return path?.[0] === "agents" ? path[1] ?? null : null;
 }
+function parseJsonString(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 function parseHookStateHeaderKey(header) {
   const path = parseTomlDottedKey(header);
   if (path?.[0] !== "hooks" || path[1] !== "state")
@@ -7952,6 +10489,9 @@ function stripTomlLineComment(line) {
 var LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE = ["codex-ultrawork-reviewer"];
 var CURRENT_MANAGED_CODEX_AGENT_NAMES = [
   "explorer",
+  "lazycodex-worker-high",
+  "lazycodex-worker-low",
+  "lazycodex-worker-medium",
   "librarian",
   "metis",
   "momus",
@@ -7989,13 +10529,13 @@ function tomlKeySegment(value) {
 }
 
 // packages/omo-codex/src/install/codex-config-atomic-write.ts
-import { lstat as lstat5, readlink as readlink3, realpath, rename as rename2, unlink, writeFile as writeFile5 } from "node:fs/promises";
-import { basename as basename4, dirname as dirname5, isAbsolute as isAbsolute4, join as join15, resolve as resolve5 } from "node:path";
+import { lstat as lstat6, readlink as readlink4, realpath, rename as rename3, unlink, writeFile as writeFile5 } from "node:fs/promises";
+import { basename as basename4, dirname as dirname6, isAbsolute as isAbsolute5, join as join16, resolve as resolve6 } from "node:path";
 var RENAME_RETRY_DELAYS_MS = [10, 25, 50];
 var RETRIABLE_RENAME_CODES = new Set(["EPERM", "EBUSY"]);
 async function writeFileAtomic(targetPath, data) {
   const writeTarget = await resolveSymlinkTarget(targetPath);
-  const temporaryPath = join15(dirname5(writeTarget), `.tmp-${basename4(writeTarget)}-${process.pid}-${Date.now()}`);
+  const temporaryPath = join16(dirname6(writeTarget), `.tmp-${basename4(writeTarget)}-${process.pid}-${Date.now()}`);
   await writeFile5(temporaryPath, data);
   try {
     await renameWithRetry(temporaryPath, writeTarget);
@@ -8010,7 +10550,7 @@ async function writeFileAtomic(targetPath, data) {
 }
 async function resolveSymlinkTarget(targetPath) {
   try {
-    const linkStats = await lstat5(targetPath);
+    const linkStats = await lstat6(targetPath);
     if (!linkStats.isSymbolicLink())
       return targetPath;
   } catch (error) {
@@ -8023,14 +10563,14 @@ async function resolveSymlinkTarget(targetPath) {
   } catch (error) {
     if (!(error instanceof Error))
       throw error;
-    const linkValue = await readlink3(targetPath);
-    return isAbsolute4(linkValue) ? linkValue : resolve5(dirname5(targetPath), linkValue);
+    const linkValue = await readlink4(targetPath);
+    return isAbsolute5(linkValue) ? linkValue : resolve6(dirname6(targetPath), linkValue);
   }
 }
 async function renameWithRetry(fromPath, toPath) {
   for (let attempt = 0;; attempt += 1) {
     try {
-      await rename2(fromPath, toPath);
+      await rename3(fromPath, toPath);
       return;
     } catch (error) {
       if (!isRetriableRenameError(error) || attempt >= RENAME_RETRY_DELAYS_MS.length) {
@@ -8049,13 +10589,137 @@ function delay(milliseconds) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+// packages/omo-codex/src/install/toml-setting-reader.ts
+function hasTomlSetting(config, keyPath) {
+  const targetPath = parseTomlDottedKey(keyPath);
+  if (!targetPath)
+    return false;
+  return hasTomlAssignment(config, (tablePath, settingPath) => {
+    const fullPath = [...tablePath, ...settingPath];
+    return fullPath.length === targetPath.length && fullPath.every((part, index) => part === targetPath[index]);
+  });
+}
+function hasTomlRootDottedKeyPrefix(config, rootKey) {
+  return hasTomlAssignment(config, (tablePath, settingPath) => tablePath.length === 0 && settingPath.length > 1 && settingPath[0] === rootKey);
+}
+function hasTomlAssignment(config, predicate) {
+  let tablePath = [];
+  let multilineQuote = null;
+  for (const line of config.split(`
+`)) {
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside)
+      continue;
+    const normalizedLine = stripUnquotedInlineComment2(line).trim();
+    if (normalizedLine.length === 0)
+      continue;
+    const headerPath = parseTomlTableHeader2(normalizedLine);
+    if (headerPath) {
+      tablePath = headerPath;
+      continue;
+    }
+    if (isTomlTableHeaderLine2(normalizedLine)) {
+      tablePath = null;
+      continue;
+    }
+    if (!tablePath)
+      continue;
+    const assignmentIndex = findUnquotedAssignment2(normalizedLine);
+    if (assignmentIndex < 0)
+      continue;
+    const settingPath = parseTomlDottedKey(normalizedLine.slice(0, assignmentIndex).trim());
+    if (!settingPath)
+      continue;
+    if (predicate(tablePath, settingPath))
+      return true;
+  }
+  return false;
+}
+function parseTomlTableHeader2(line) {
+  if (!line.startsWith("[") || !line.endsWith("]") || line.startsWith("[["))
+    return null;
+  return parseTomlDottedKey(line.slice(1, -1).trim());
+}
+function isTomlTableHeaderLine2(line) {
+  return line.startsWith("[") && line.endsWith("]");
+}
+function stripUnquotedInlineComment2(line) {
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === "#")
+      return line.slice(0, index);
+    index += 1;
+  }
+  return line;
+}
+function findUnquotedAssignment2(line) {
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === "=")
+      return index;
+    index += 1;
+  }
+  return -1;
+}
+
 // packages/omo-codex/src/install/codex-config-features.ts
 function ensureFeatureEnabled(config, featureName) {
   const section = findTomlSection(config, "features");
-  if (!section)
+  if (!section) {
+    if (hasTomlRootDottedKeyPrefix(config, "features")) {
+      return replaceOrInsertRootDottedSetting(config, `features.${featureName}`, "true");
+    }
     return appendBlock(config, `[features]
 ${featureName} = true
 `);
+  }
   return replaceOrInsertSetting(config, section, featureName, "true");
 }
 
@@ -8117,13 +10781,13 @@ function ensureMarketplaceBlock(config, marketplaceName, source) {
 }
 
 // packages/omo-codex/src/install/codex-config-permissions.ts
-var AUTONOMOUS_FEATURES = ["multi_agent", "child_agents_md", "unified_exec", "goals"];
+var AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"];
 function ensureAutonomousPermissions(config) {
   let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"));
   next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"));
   next = replaceOrInsertRootSetting(next, "network_access", JSON.stringify("enabled"));
   for (const featureName of AUTONOMOUS_FEATURES) {
-    next = ensureFeatureEnabled2(next, featureName);
+    next = ensureFeatureEnabled(next, featureName);
   }
   next = removeWindowsSandboxSetting(next);
   next = ensureNoticeEnabled(next, "hide_full_access_warning");
@@ -8139,14 +10803,6 @@ function ensureNoticeEnabled(config, key) {
   const section = findTomlSection(config, "notice");
   if (section === null)
     return appendNoticeBlock(config, key);
-  return replaceOrInsertSetting(config, section, key, "true");
-}
-function ensureFeatureEnabled2(config, key) {
-  const section = findTomlSection(config, "features");
-  if (section === null)
-    return appendBlock(config, `[features]
-${key} = true
-`);
   return replaceOrInsertSetting(config, section, key, "true");
 }
 function appendNoticeBlock(config, key) {
@@ -8220,7 +10876,7 @@ function readStringArraySetting(sectionText, key) {
     const assignmentIndex = line.indexOf("=");
     if (assignmentIndex === -1)
       return null;
-    return parseTomlStringArray(stripUnquotedInlineComment2(line.slice(assignmentIndex + 1)).trim());
+    return parseTomlStringArray(stripUnquotedInlineComment3(line.slice(assignmentIndex + 1)).trim());
   }
   return null;
 }
@@ -8264,7 +10920,7 @@ function parseTomlString(input, startIndex) {
   }
   return null;
 }
-function stripUnquotedInlineComment2(line) {
+function stripUnquotedInlineComment3(line) {
   let quote = null;
   let index = 0;
   while (index < line.length) {
@@ -8299,6 +10955,24 @@ function stripUnquotedInlineComment2(line) {
 
 // packages/omo-codex/src/install/codex-config-reasoning.ts
 var MANAGED_KEYS = ["model", "model_context_window", "model_reasoning_effort", "plan_mode_reasoning_effort"];
+var CODEX_REASONING_BY_UNIFIED_LEVEL = {
+  off: "none",
+  none: "none",
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: "max"
+};
+function applyReasoningOverride(catalog, reasoning) {
+  if (reasoning === undefined)
+    return catalog;
+  const wireEffort = CODEX_REASONING_BY_UNIFIED_LEVEL[reasoning.trim().toLowerCase()];
+  if (wireEffort === undefined)
+    return catalog;
+  return { ...catalog, current: { ...catalog.current, modelReasoningEffort: wireEffort } };
+}
 function ensureCodexReasoningConfig(config, catalog) {
   const current = readRootReasoningSettings(config);
   if (Object.keys(current).length > 0 && !matchesProfile(current, catalog.current) && !catalog.managedProfiles.some((profile) => matchesProfile(current, profile))) {
@@ -8365,16 +11039,22 @@ function isRootSetting(line, key) {
 }
 
 // packages/omo-codex/src/install/codex-model-catalog.ts
-import { readFile as readFile9 } from "node:fs/promises";
-import { join as join16 } from "node:path";
+import { readFile as readFile10 } from "node:fs/promises";
+import { join as join17 } from "node:path";
 var FALLBACK_CODEX_MODEL_CATALOG = {
   current: {
-    model: "gpt-5.5",
-    modelContextWindow: 400000,
+    model: "gpt-5.6-sol",
+    modelContextWindow: 650000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh"
   },
   managedProfiles: [
+    {
+      model: "gpt-5.5",
+      modelContextWindow: 650000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh"
+    },
     {
       model: "gpt-5.5",
       modelContextWindow: 1e6,
@@ -8385,9 +11065,9 @@ var FALLBACK_CODEX_MODEL_CATALOG = {
   ]
 };
 async function readCodexModelCatalog(codexPackageRoot) {
-  const catalogPath = join16(codexPackageRoot, "plugin", "model-catalog.json");
+  const catalogPath = join17(codexPackageRoot, "plugin", "model-catalog.json");
   try {
-    const parsed = JSON.parse(await readFile9(catalogPath, "utf8"));
+    const parsed = JSON.parse(await readFile10(catalogPath, "utf8"));
     return parseCodexModelCatalog(parsed) ?? FALLBACK_CODEX_MODEL_CATALOG;
   } catch (error) {
     if (error instanceof Error)
@@ -8468,30 +11148,90 @@ function isRootSetting2(line, key) {
 }
 
 // packages/omo-codex/src/install/codex-multi-agent-v2-config.ts
+import { readFileSync } from "node:fs";
+import { dirname as dirname7, isAbsolute as isAbsolute6, join as join18 } from "node:path";
 var CODEX_AGENTS_HEADER = "agents";
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY = `${CODEX_MULTI_AGENT_V2_HEADER}.max_concurrent_threads_per_session`;
 var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
-function ensureCodexMultiAgentV2Config(config) {
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT = 16;
+function ensureCodexMultiAgentV2Config(config, options = {}) {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
-  const agentsConfig = ensureAgentsMaxThreads(featureFlag.config);
-  const section = findTomlSection(agentsConfig, CODEX_MULTI_AGENT_V2_HEADER);
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
+  const v2Preferred = options.multiAgentVersion === "v2";
+  const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
+  const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config) : raiseExistingAgentsMaxThreads(featureFlag.config);
+  const preserveDisable = featureFlag.value === false && !v2Preferred;
+  const featureConfig = preserveDisable ? setMultiAgentV2Disable(agentsConfig) : v2Preferred ? removeMultiAgentV2Disable(agentsConfig) : agentsConfig;
+  if (hasTomlSetting(featureConfig, CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY))
+    return featureConfig;
+  const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER);
   if (!section) {
-    const enabledSetting = featureFlag.value === false ? `enabled = false
+    const enabledSetting = preserveDisable ? `enabled = false
 ` : "";
-    return appendBlock(agentsConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
-${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}
+    return appendBlock(featureConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
+${enabledSetting}max_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_THREAD_LIMIT}
 `);
   }
-  const withPreservedDisable = featureFlag.value === false ? replaceOrInsertSetting(agentsConfig, section, "enabled", "false") : agentsConfig;
-  const updatedSection = featureFlag.value === false ? findTomlSection(withPreservedDisable, CODEX_MULTI_AGENT_V2_HEADER) : section;
-  if (!updatedSection) {
-    return appendBlock(withPreservedDisable, `[${CODEX_MULTI_AGENT_V2_HEADER}]
-enabled = false
-max_concurrent_threads_per_session = ${maxThreadsValue}
-`);
+  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", CODEX_MULTI_AGENT_V2_THREAD_LIMIT.toString());
+}
+function resolveCodexMultiAgentVersion(config, configPath) {
+  const model = readRootModel(config);
+  if (model === null)
+    return null;
+  const catalogPath = resolveCatalogPath(readRootModelCatalogPath(config), configPath);
+  const catalogVersion = readCatalogMultiAgentVersion(model, catalogPath);
+  if (catalogVersion !== null)
+    return catalogVersion;
+  return /^gpt-5\.6\b/i.test(model) ? "v2" : null;
+}
+function resolveCatalogPath(configuredPath, configPath) {
+  if (configuredPath === null)
+    return join18(dirname7(configPath), "models_cache.json");
+  return isAbsolute6(configuredPath) ? configuredPath : join18(dirname7(configPath), configuredPath);
+}
+function readCatalogMultiAgentVersion(model, cachePath) {
+  let raw;
+  try {
+    raw = readFileSync(cachePath, "utf8");
+  } catch {
+    return null;
   }
-  return replaceOrInsertSetting(withPreservedDisable, updatedSection, "max_concurrent_threads_per_session", maxThreadsValue);
+  let cache;
+  try {
+    cache = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isRecord(cache) || !Array.isArray(cache.models))
+    return null;
+  for (const entry of cache.models) {
+    if (!isRecord(entry))
+      continue;
+    if (entry.slug !== model && entry.id !== model)
+      continue;
+    const version = entry.multi_agent_version;
+    if (version === "v1" || version === "v2")
+      return version;
+    return null;
+  }
+  return null;
+}
+function readRootModel(config) {
+  const double = config.match(/^\s*model\s*=\s*"([^"]+)"/m);
+  if (double !== null)
+    return double[1] ?? null;
+  const single = config.match(/^\s*model\s*=\s*'([^']+)'/m);
+  return single?.[1] ?? null;
+}
+function readRootModelCatalogPath(config) {
+  const double = config.match(/^\s*model_catalog_json\s*=\s*"([^"]+)"/m);
+  if (double !== null)
+    return double[1] ?? null;
+  const single = config.match(/^\s*model_catalog_json\s*=\s*'([^']+)'/m);
+  return single?.[1] ?? null;
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function removeFeatureFlagSetting(config, featureName) {
   const section = findTomlSection(config, "features");
@@ -8512,6 +11252,36 @@ max_threads = ${maxThreadsValue}
   }
   return replaceOrInsertSetting(config, section, "max_threads", maxThreadsValue);
 }
+function removeAgentsMaxThreads(config) {
+  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
+  if (!section)
+    return config;
+  if (!/^\s*max_threads\s*=/m.test(section.text))
+    return config;
+  return removeSetting(config, section, "max_threads");
+}
+function removeMultiAgentV2Disable(config) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+  if (!section)
+    return config;
+  if (!/^\s*enabled\s*=\s*false(?:\s*#.*)?$/m.test(section.text))
+    return config;
+  return removeSetting(config, section, "enabled");
+}
+function setMultiAgentV2Disable(config) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+  if (!section)
+    return config;
+  return replaceOrInsertSetting(config, section, "enabled", "false");
+}
+function raiseExistingAgentsMaxThreads(config) {
+  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
+  if (!section)
+    return config;
+  if (!/^\s*max_threads\s*=/m.test(section.text))
+    return config;
+  return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT.toString());
+}
 function readBooleanSetting(sectionText, key) {
   const match = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*(true|false)\\s*(?:#.*)?$`, "m").exec(sectionText);
   if (!match)
@@ -8521,10 +11291,15 @@ function readBooleanSetting(sectionText, key) {
 
 // packages/omo-codex/src/install/codex-config-toml.ts
 async function updateCodexConfig(input) {
-  await mkdir5(dirname6(input.configPath), { recursive: true });
-  let config = "";
-  if (await exists(input.configPath))
-    config = await readFile10(input.configPath, "utf8");
+  await mkdir5(dirname8(input.configPath), { recursive: true });
+  let config;
+  try {
+    config = await readFile11(input.configPath, "utf8");
+  } catch (error) {
+    if (!isMissingFileError(error))
+      throw error;
+    config = "";
+  }
   const pluginSet = new Set(input.pluginNames);
   for (const legacyMarketplaceName of legacyMarketplaceNames(input.marketplaceName)) {
     config = removeMarketplaceBlock(config, legacyMarketplaceName);
@@ -8537,10 +11312,11 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "plugins");
   config = ensureFeatureEnabled(config, "plugin_hooks");
   config = ensureFeatureEnabled(config, "multi_agent");
-  config = ensureFeatureEnabled(config, "child_agents_md");
   config = removeUnsupportedCodexMultiAgentModeConfig(config);
-  config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
-  config = ensureCodexMultiAgentV2Config(config);
+  config = ensureCodexReasoningConfig(config, applyReasoningOverride(await readCodexModelCatalog(input.repoRoot), input.reasoning));
+  config = ensureCodexMultiAgentV2Config(config, {
+    multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath)
+  });
   if (input.autonomousPermissions === true)
     config = ensureAutonomousPermissions(config);
   if (!(input.preserveMarketplaceSource === true && hasMarketplaceBlock(config, input.marketplaceName))) {
@@ -8559,21 +11335,14 @@ async function updateCodexConfig(input) {
   await writeFileAtomic(input.configPath, `${config.trimEnd()}
 `);
 }
-async function exists(path) {
-  try {
-    await readFile10(path, "utf8");
-    return true;
-  } catch (error) {
-    if (error instanceof Error)
-      return false;
-    return false;
-  }
+function isMissingFileError(error) {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 // packages/omo-codex/src/install/codex-hook-trust.ts
 import { createHash } from "node:crypto";
-import { readFile as readFile11 } from "node:fs/promises";
-import { join as join17 } from "node:path";
+import { readFile as readFile12 } from "node:fs/promises";
+import { join as join19 } from "node:path";
 var EVENT_LABELS = new Map([
   ["PreToolUse", "pre_tool_use"],
   ["PermissionRequest", "permission_request"],
@@ -8587,23 +11356,24 @@ var EVENT_LABELS = new Map([
   ["Stop", "stop"]
 ]);
 async function trustedHookStatesForPlugin(input) {
-  const manifestPath = join17(input.pluginRoot, ".codex-plugin", "plugin.json");
-  if (!await exists2(manifestPath))
+  const manifestPath = join19(input.pluginRoot, ".codex-plugin", "plugin.json");
+  if (!await exists(manifestPath))
     return [];
-  const manifest = JSON.parse(await readFile11(manifestPath, "utf8"));
+  const manifest = JSON.parse(await readFile12(manifestPath, "utf8"));
   if (!isPlainRecord(manifest))
     return [];
   const states = [];
   for (const hookPath of hookManifestPaths2(manifest.hooks)) {
-    const hooksPath = join17(input.pluginRoot, hookPath);
-    if (!await exists2(hooksPath))
+    const hooksPath = join19(input.pluginRoot, hookPath);
+    if (!await exists(hooksPath))
       continue;
-    const parsed = JSON.parse(await readFile11(hooksPath, "utf8"));
+    const parsed = JSON.parse(await readFile12(hooksPath, "utf8"));
     if (!isPlainRecord(parsed) || !isPlainRecord(parsed.hooks))
       continue;
     states.push(...trustedHookStatesForHooksFile({
       keySource: `${input.pluginName}@${input.marketplaceName}:${hookPath}`,
-      hooks: parsed.hooks
+      hooks: parsed.hooks,
+      platform: input.platform ?? process.platform
     }));
   }
   return states;
@@ -8631,20 +11401,28 @@ function trustedHookStatesForHooksFile(input) {
           continue;
         if (handler.async === true)
           continue;
-        if (typeof handler.command !== "string" || handler.command.trim() === "")
+        const command = commandForPlatform(handler, input.platform);
+        if (command === undefined || command.trim() === "")
           continue;
         const key = `${input.keySource}:${eventLabel}:${groupIndex}:${handlerIndex}`;
-        states.push({ key, trustedHash: commandHookHash(eventLabel, group.matcher, handler) });
+        states.push({ key, trustedHash: commandHookHash(eventLabel, group.matcher, handler, command) });
       }
     }
   }
   return states;
 }
-function commandHookHash(eventName, matcher, handler) {
+function commandForPlatform(handler, platform) {
+  if (typeof handler.command !== "string")
+    return;
+  if (platform === "win32" && typeof handler.commandWindows === "string")
+    return handler.commandWindows;
+  return handler.command;
+}
+function commandHookHash(eventName, matcher, handler, command) {
   const timeout = Math.max(Number(handler.timeout ?? 600), 1);
   const normalizedHandler = {
     type: "command",
-    command: handler.command,
+    command,
     timeout,
     async: false
   };
@@ -8670,9 +11448,9 @@ function canonicalJson(value) {
 function stripDotSlash2(value) {
   return value.startsWith("./") ? value.slice(2) : value;
 }
-async function exists2(path) {
+async function exists(path) {
   try {
-    await readFile11(path, "utf8");
+    await readFile12(path, "utf8");
     return true;
   } catch (error) {
     if (error instanceof Error)
@@ -8686,8 +11464,8 @@ var resolveGitBashForCurrentProcess2 = (input = {}) => {
   return toCodexResolution(resolveGitBashForCurrentProcess(input));
 };
 async function prepareGitBashForInstall(input) {
-  const resolve6 = input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess2({ platform: input.platform, env: input.env }));
-  const initialResolution = resolve6();
+  const resolve7 = input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess2({ platform: input.platform, env: input.env }));
+  const initialResolution = resolve7();
   return initialResolution;
 }
 function toCodexResolution(resolution) {
@@ -8711,133 +11489,200 @@ function toCodexResolution(resolution) {
 }
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
-import { copyFile, lstat as lstat7, mkdir as mkdir6, readFile as readFile13, readdir as readdir4, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
-import { basename as basename5, join as join19 } from "node:path";
+import { copyFile, lstat as lstat9, mkdir as mkdir6, readdir as readdir7, rm as rm8, writeFile as writeFile7 } from "node:fs/promises";
+import { basename as basename5, join as join22 } from "node:path";
 
-// packages/omo-codex/src/install/retired-managed-agent-purge.ts
-import { lstat as lstat6, readFile as readFile12, rm as rm5 } from "node:fs/promises";
-import { join as join18 } from "node:path";
-var RETIRED_MANAGED_AGENT_FILES = [
-  {
-    fileName: "codex-ultrawork-reviewer.toml",
-    requiredMarkers: [
-      'name = "codex-ultrawork-reviewer"',
-      'description = "Strict ultrawork verification reviewer.',
-      'developer_instructions = """You are the ultrawork verification reviewer.'
+// packages/omo-codex/src/install/preserved-agent-settings.ts
+import { lstat as lstat7, readFile as readFile13, readdir as readdir6, writeFile as writeFile6 } from "node:fs/promises";
+import { join as join20 } from "node:path";
+
+// packages/omo-codex/src/install/managed-agent-reasoning-defaults.ts
+var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
+  [
+    "explorer",
+    [
+      {
+        previous: { model: "gpt-5.6-luna-fast", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      },
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "low" }
+      }
     ]
+  ],
+  [
+    "librarian",
+    [
+      {
+        previous: { model: "gpt-5.6-luna-fast", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      },
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "low" }
+      }
+    ]
+  ],
+  [
+    "momus",
+    [
+      {
+        previous: { model: "gpt-5.5", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "ultra" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "ultra" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "plan",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-worker-medium",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-luna", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "max" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-worker-high",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "medium" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-code-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-clone-fidelity-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-qa-executor",
+    [
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-gate-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "high" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-sol", effort: "low" }
+      }
+    ]
+  ]
+]);
+function resolveManagedAgentReasoning(input) {
+  const steps = MANAGED_REASONING_DEFAULT_UPGRADES.get(input.agentName);
+  if (steps === undefined)
+    return input.preserved.effort;
+  const latest = steps[steps.length - 1];
+  if (latest === undefined)
+    return input.preserved.effort;
+  if (input.bundledModel !== latest.current.model || input.bundledEffort !== latest.current.effort) {
+    return input.preserved.effort;
   }
-];
-async function purgeRetiredManagedAgentFiles(input) {
-  const agentsDir = join18(input.codexHome, "agents");
-  if (!await exists3(agentsDir))
-    return;
-  for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
-    const agentPath = join18(agentsDir, retiredAgent.fileName);
-    if (!await exists3(agentPath))
-      continue;
-    const agentStat = await lstat6(agentPath);
-    if (agentStat.isDirectory() && !agentStat.isSymbolicLink())
-      continue;
-    const content = await readTextIfExists(agentPath);
-    if (content === null || !hasRequiredMarkers(content, retiredAgent.requiredMarkers))
-      continue;
-    await rm5(agentPath, { force: true });
-  }
-}
-function hasRequiredMarkers(content, markers) {
-  return markers.every((marker) => content.includes(marker));
-}
-async function readTextIfExists(path) {
-  try {
-    return await readFile12(path, "utf8");
-  } catch (error) {
-    if (nodeErrorCode(error) === "ENOENT")
-      return null;
-    throw error;
-  }
-}
-async function exists3(path) {
-  try {
-    await lstat6(path);
-    return true;
-  } catch (error) {
-    if (nodeErrorCode(error) !== "ENOENT")
-      throw error;
-    return false;
-  }
-}
-function nodeErrorCode(error) {
-  if (!(error instanceof Error) || !("code" in error))
-    return null;
-  return typeof error.code === "string" ? error.code : null;
+  const preservedMatchesAnyStep = steps.some((step) => input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort);
+  return preservedMatchesAnyStep ? latest.current.effort : input.preserved.effort;
 }
 
-// packages/omo-codex/src/install/link-cached-plugin-agents.ts
-var MANIFEST_FILE = ".installed-agents.json";
+// packages/omo-codex/src/install/preserved-agent-settings.ts
 async function capturePreservedAgentReasoning(input) {
-  const agentsDir = join19(input.codexHome, "agents");
-  if (!await exists4(agentsDir))
+  const agentsDir = join20(input.codexHome, "agents");
+  if (!await exists2(agentsDir))
     return new Map;
   const preserved = new Map;
-  const agentEntries = await readdir4(agentsDir, { withFileTypes: true });
+  const agentEntries = await readdir6(agentsDir, { withFileTypes: true });
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
-    const content = await readTextIfExists2(join19(agentsDir, entry.name));
+    const content = await readTextIfExists(join20(agentsDir, entry.name));
     if (content === null)
       continue;
     const effort = extractReasoningEffort(content);
-    if (effort !== null)
-      preserved.set(agentNameFromToml(entry.name), effort);
+    if (effort !== null) {
+      preserved.set(agentNameFromToml(entry.name), {
+        model: extractModel(content),
+        effort
+      });
+    }
   }
   return preserved;
 }
 async function capturePreservedAgentServiceTier(input) {
-  const agentsDir = join19(input.codexHome, "agents");
-  if (!await exists4(agentsDir))
+  const agentsDir = join20(input.codexHome, "agents");
+  if (!await exists2(agentsDir))
     return new Map;
   const preserved = new Map;
-  const agentEntries = await readdir4(agentsDir, { withFileTypes: true });
+  const agentEntries = await readdir6(agentsDir, { withFileTypes: true });
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
-    const content = await readTextIfExists2(join19(agentsDir, entry.name));
+    const content = await readTextIfExists(join20(agentsDir, entry.name));
     if (content === null)
       continue;
     preserved.set(agentNameFromToml(entry.name), extractServiceTier(content));
   }
   return preserved;
 }
-async function linkCachedPluginAgents(input) {
-  const bundledAgents = await discoverBundledAgents(input.pluginRoot);
-  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome });
-  if (bundledAgents.length === 0) {
-    await writeManifest(input.pluginRoot, []);
-    return [];
-  }
-  const agentsDir = join19(input.codexHome, "agents");
-  await mkdir6(agentsDir, { recursive: true });
-  const linked = [];
-  for (const agentPath of bundledAgents) {
-    const agentFileName = basename5(agentPath);
-    const agentName = agentNameFromToml(agentFileName);
-    const linkPath = join19(agentsDir, agentFileName);
-    await replaceWithCopy(linkPath, agentPath);
-    await restorePreservedReasoning({
-      agentName,
-      linkPath,
-      target: agentPath,
-      value: input.preservedReasoning?.get(agentName)
-    });
-    await restorePreservedServiceTier({
-      linkPath,
-      preserved: input.preservedServiceTier?.has(agentName) ?? false,
-      value: input.preservedServiceTier?.get(agentName) ?? null
-    });
-    linked.push({ name: agentFileName, path: linkPath, target: agentPath });
-  }
-  await writeManifest(input.pluginRoot, linked.map((entry) => entry.path));
-  return linked;
+async function restorePreservedReasoning(input) {
+  if (input.value === undefined)
+    return;
+  const content = await readFile13(input.target, "utf8");
+  const bundledEffort = extractReasoningEffort(content);
+  const effort = resolveManagedAgentReasoning({
+    agentName: input.agentName,
+    bundledModel: extractModel(content),
+    bundledEffort,
+    preserved: input.value
+  });
+  if (bundledEffort === effort)
+    return;
+  const replacement = replaceTopLevelStringSetting(content, "model_reasoning_effort", effort, { insertIfMissing: false });
+  if (!replacement.replaced)
+    return;
+  await writeFile6(input.linkPath, replacement.content);
 }
 async function restorePreservedServiceTier(input) {
   if (!input.preserved)
@@ -8845,72 +11690,22 @@ async function restorePreservedServiceTier(input) {
   const content = await readFile13(input.linkPath, "utf8");
   if (extractServiceTier(content) === input.value)
     return;
-  const replacement = replaceServiceTier(content, input.value);
+  const replacement = replaceTopLevelStringSetting(content, "service_tier", input.value, { insertIfMissing: true });
   if (!replacement.replaced)
     return;
   await writeFile6(input.linkPath, replacement.content);
 }
-async function discoverBundledAgents(pluginRoot) {
-  const componentsRoot = join19(pluginRoot, "components");
-  if (!await exists4(componentsRoot))
-    return [];
-  const componentEntries = await readdir4(componentsRoot, { withFileTypes: true });
-  const agents = [];
-  for (const entry of componentEntries) {
-    if (!entry.isDirectory())
-      continue;
-    const agentsRoot = join19(componentsRoot, entry.name, "agents");
-    if (!await exists4(agentsRoot))
-      continue;
-    const agentEntries = await readdir4(agentsRoot, { withFileTypes: true });
-    for (const file2 of agentEntries) {
-      if (!file2.isFile() || !file2.name.endsWith(".toml"))
-        continue;
-      agents.push(join19(agentsRoot, file2.name));
-    }
-  }
-  agents.sort();
-  return agents;
-}
-async function replaceWithCopy(linkPath, target) {
-  await prepareReplacement(linkPath);
-  await copyFile(target, linkPath);
-}
-async function prepareReplacement(linkPath) {
-  if (!await exists4(linkPath))
-    return;
-  const entryStat = await lstat7(linkPath);
-  if (entryStat.isDirectory() && !entryStat.isSymbolicLink()) {
-    throw new Error(`${linkPath} already exists and is a directory; refusing to replace`);
-  }
-  await rm6(linkPath, { force: true });
-}
-async function writeManifest(pluginRoot, agentPaths) {
-  const manifestPath = join19(pluginRoot, MANIFEST_FILE);
-  const payload = { agents: [...agentPaths].sort() };
-  await writeFile6(manifestPath, `${JSON.stringify(payload, null, "\t")}
-`);
-}
-async function restorePreservedReasoning(input) {
-  if (input.value === undefined)
-    return;
-  const content = await readFile13(input.target, "utf8");
-  const bundledEffort = extractReasoningEffort(content);
-  if (bundledEffort === input.value)
-    return;
-  const replacement = replaceReasoningEffort(content, input.value);
-  if (!replacement.replaced)
-    return;
-  await writeFile6(input.linkPath, replacement.content);
-}
-async function readTextIfExists2(path) {
+async function readTextIfExists(path) {
   try {
     return await readFile13(path, "utf8");
   } catch (error) {
-    if (nodeErrorCode2(error) === "ENOENT")
+    if (nodeErrorCode(error) === "ENOENT")
       return null;
     throw error;
   }
+}
+function extractModel(content) {
+  return extractTopLevelStringSetting(content, "model");
 }
 function extractReasoningEffort(content) {
   return extractTopLevelStringSetting(content, "model_reasoning_effort");
@@ -8930,12 +11725,6 @@ function extractTopLevelStringSetting(content, key) {
       return parsed;
   }
   return null;
-}
-function replaceReasoningEffort(content, value) {
-  return replaceTopLevelStringSetting(content, "model_reasoning_effort", value, { insertIfMissing: false });
-}
-function replaceServiceTier(content, value) {
-  return replaceTopLevelStringSetting(content, "service_tier", value, { insertIfMissing: true });
 }
 function replaceTopLevelStringSetting(content, key, value, options) {
   const lines = content.split(/\n/);
@@ -8986,19 +11775,67 @@ function isSectionHeader3(line) {
 function agentNameFromToml(fileName) {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
 }
-function parseJsonString(value) {
-  try {
-    const parsed = JSON.parse(value);
-    return typeof parsed === "string" ? parsed : null;
-  } catch (error) {
-    if (error instanceof Error)
-      return null;
-    return null;
-  }
-}
-async function exists4(path) {
+async function exists2(path) {
   try {
     await lstat7(path);
+    return true;
+  } catch (error) {
+    if (nodeErrorCode(error) !== "ENOENT")
+      throw error;
+    return false;
+  }
+}
+function nodeErrorCode(error) {
+  if (!(error instanceof Error) || !("code" in error))
+    return null;
+  return typeof error.code === "string" ? error.code : null;
+}
+
+// packages/omo-codex/src/install/retired-managed-agent-purge.ts
+import { lstat as lstat8, readFile as readFile14, rm as rm7 } from "node:fs/promises";
+import { join as join21 } from "node:path";
+var RETIRED_MANAGED_AGENT_FILES = [
+  {
+    fileName: "codex-ultrawork-reviewer.toml",
+    requiredMarkers: [
+      'name = "codex-ultrawork-reviewer"',
+      'description = "Strict ultrawork verification reviewer.',
+      'developer_instructions = """You are the ultrawork verification reviewer.'
+    ]
+  }
+];
+async function purgeRetiredManagedAgentFiles(input) {
+  const agentsDir = join21(input.codexHome, "agents");
+  if (!await exists3(agentsDir))
+    return;
+  for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
+    const agentPath = join21(agentsDir, retiredAgent.fileName);
+    if (!await exists3(agentPath))
+      continue;
+    const agentStat = await lstat8(agentPath);
+    if (agentStat.isDirectory() && !agentStat.isSymbolicLink())
+      continue;
+    const content = await readTextIfExists2(agentPath);
+    if (content === null || !hasRequiredMarkers(content, retiredAgent.requiredMarkers))
+      continue;
+    await rm7(agentPath, { force: true });
+  }
+}
+function hasRequiredMarkers(content, markers) {
+  return markers.every((marker) => content.includes(marker));
+}
+async function readTextIfExists2(path) {
+  try {
+    return await readFile14(path, "utf8");
+  } catch (error) {
+    if (nodeErrorCode2(error) === "ENOENT")
+      return null;
+    throw error;
+  }
+}
+async function exists3(path) {
+  try {
+    await lstat8(path);
     return true;
   } catch (error) {
     if (nodeErrorCode2(error) !== "ENOENT")
@@ -9012,13 +11849,106 @@ function nodeErrorCode2(error) {
   return typeof error.code === "string" ? error.code : null;
 }
 
+// packages/omo-codex/src/install/link-cached-plugin-agents.ts
+var MANIFEST_FILE = ".installed-agents.json";
+async function linkCachedPluginAgents(input) {
+  const bundledAgents = await discoverBundledAgents(input.pluginRoot);
+  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome });
+  if (bundledAgents.length === 0) {
+    await writeManifest(input.pluginRoot, []);
+    return [];
+  }
+  const agentsDir = join22(input.codexHome, "agents");
+  await mkdir6(agentsDir, { recursive: true });
+  const linked = [];
+  for (const agentPath of bundledAgents) {
+    const agentFileName = basename5(agentPath);
+    const agentName = agentNameFromToml2(agentFileName);
+    const linkPath = join22(agentsDir, agentFileName);
+    await replaceWithCopy(linkPath, agentPath);
+    await restorePreservedReasoning({
+      agentName,
+      linkPath,
+      target: agentPath,
+      value: input.preservedReasoning?.get(agentName)
+    });
+    await restorePreservedServiceTier({
+      linkPath,
+      preserved: input.preservedServiceTier?.has(agentName) ?? false,
+      value: input.preservedServiceTier?.get(agentName) ?? null
+    });
+    linked.push({ name: agentFileName, path: linkPath, target: agentPath });
+  }
+  await writeManifest(input.pluginRoot, linked.map((entry) => entry.path));
+  return linked;
+}
+async function discoverBundledAgents(pluginRoot) {
+  const componentsRoot = join22(pluginRoot, "components");
+  if (!await exists4(componentsRoot))
+    return [];
+  const componentEntries = await readdir7(componentsRoot, { withFileTypes: true });
+  const agents = [];
+  for (const entry of componentEntries) {
+    if (!entry.isDirectory())
+      continue;
+    const agentsRoot = join22(componentsRoot, entry.name, "agents");
+    if (!await exists4(agentsRoot))
+      continue;
+    const agentEntries = await readdir7(agentsRoot, { withFileTypes: true });
+    for (const file of agentEntries) {
+      if (!file.isFile() || !file.name.endsWith(".toml"))
+        continue;
+      agents.push(join22(agentsRoot, file.name));
+    }
+  }
+  agents.sort();
+  return agents;
+}
+async function replaceWithCopy(linkPath, target) {
+  await prepareReplacement(linkPath);
+  await copyFile(target, linkPath);
+}
+async function prepareReplacement(linkPath) {
+  if (!await exists4(linkPath))
+    return;
+  const entryStat = await lstat9(linkPath);
+  if (entryStat.isDirectory() && !entryStat.isSymbolicLink()) {
+    throw new Error(`${linkPath} already exists and is a directory; refusing to replace`);
+  }
+  await rm8(linkPath, { force: true });
+}
+async function writeManifest(pluginRoot, agentPaths) {
+  const manifestPath = join22(pluginRoot, MANIFEST_FILE);
+  const payload = { agents: [...agentPaths].sort() };
+  await writeFile7(manifestPath, `${JSON.stringify(payload, null, "\t")}
+`);
+}
+function agentNameFromToml2(fileName) {
+  return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
+}
+async function exists4(path) {
+  try {
+    await lstat9(path);
+    return true;
+  } catch (error) {
+    if (nodeErrorCode3(error) !== "ENOENT")
+      throw error;
+    return false;
+  }
+}
+function nodeErrorCode3(error) {
+  if (!(error instanceof Error) || !("code" in error))
+    return null;
+  return typeof error.code === "string" ? error.code : null;
+}
+
 // packages/omo-codex/src/install/codex-marketplace.ts
-import { readFile as readFile14 } from "node:fs/promises";
-import { join as join20 } from "node:path";
+import { readFile as readFile15 } from "node:fs/promises";
+import { join as join23 } from "node:path";
 var DEFAULT_MARKETPLACE_PATH = "packages/omo-codex/marketplace.json";
 async function readMarketplace(repoRoot, options) {
-  const marketplacePath = options?.marketplacePath ?? join20(repoRoot, DEFAULT_MARKETPLACE_PATH);
-  const raw = await readFile14(marketplacePath, "utf8");
+  const marketplacePath = options?.marketplacePath ?? join23(repoRoot, DEFAULT_MARKETPLACE_PATH);
+  const raw = await readFile15(marketplacePath, "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
     throw new Error("marketplace.json must be an object");
@@ -9036,10 +11966,10 @@ async function readMarketplace(repoRoot, options) {
 function resolvePluginSource(repoRoot, plugin, options) {
   const sourcePath = localSourcePath(options?.pathOverride ?? plugin.source);
   const relativePath = sourcePath.slice(2);
-  return join20(repoRoot, ...relativePath.split(/[\\/]/));
+  return join23(repoRoot, ...relativePath.split(/[\\/]/));
 }
 async function readPluginManifest(pluginRoot) {
-  const raw = await readFile14(join20(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
+  const raw = await readFile15(join23(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
     throw new Error(`${pluginRoot} plugin.json must be an object`);
@@ -9120,8 +12050,8 @@ function validateLocalSourcePath(path) {
 }
 
 // packages/omo-codex/src/install/codex-marketplace-snapshot.ts
-import { cp as cp3, mkdir as mkdir7, rename as rename3, rm as rm7, writeFile as writeFile7 } from "node:fs/promises";
-import { join as join21, sep as sep6 } from "node:path";
+import { cp as cp3, mkdir as mkdir7, rename as rename4, rm as rm9, writeFile as writeFile8 } from "node:fs/promises";
+import { join as join24, sep as sep6 } from "node:path";
 var INSTALLED_MARKETPLACES_DIR = ".tmp/marketplaces";
 async function writeInstalledMarketplaceSnapshot(input) {
   const marketplaceRoot = installedMarketplaceRoot(input.codexHome, input.marketplace.name);
@@ -9134,29 +12064,29 @@ async function writeInstalledMarketplaceSnapshot(input) {
   return snapshotPlugins;
 }
 function installedMarketplaceRoot(codexHome, marketplaceName) {
-  return join21(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
+  return join24(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
 }
 async function writeMarketplaceManifest(marketplaceRoot, marketplace) {
-  const manifestDir = join21(marketplaceRoot, ".agents", "plugins");
+  const manifestDir = join24(marketplaceRoot, ".agents", "plugins");
   await mkdir7(manifestDir, { recursive: true });
-  const tempPath = join21(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
-  await writeFile7(tempPath, `${JSON.stringify(marketplace, null, "\t")}
+  const tempPath = join24(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
+  await writeFile8(tempPath, `${JSON.stringify(marketplace, null, "\t")}
 `);
-  await rename3(tempPath, join21(manifestDir, "marketplace.json"));
+  await rename4(tempPath, join24(manifestDir, "marketplace.json"));
 }
 async function writeSnapshotPlugin(marketplaceRoot, plugin) {
-  const pluginsDir = join21(marketplaceRoot, "plugins");
+  const pluginsDir = join24(marketplaceRoot, "plugins");
   await mkdir7(pluginsDir, { recursive: true });
-  const targetPath = join21(pluginsDir, plugin.name);
-  const tempPath = join21(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
-  await rm7(tempPath, { recursive: true, force: true });
+  const targetPath = join24(pluginsDir, plugin.name);
+  const tempPath = join24(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
+  await rm9(tempPath, { recursive: true, force: true });
   await cp3(plugin.sourcePath, tempPath, {
     recursive: true,
     filter: (source) => shouldCopyMarketplaceSourcePath(source, plugin.sourcePath)
   });
   await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: plugin.sourcePath });
-  await rm7(targetPath, { recursive: true, force: true });
-  await rename3(tempPath, targetPath);
+  await rm9(targetPath, { recursive: true, force: true });
+  await rename4(tempPath, targetPath);
   await rewriteCachedMcpManifest(targetPath, plugin.sourcePath);
   return { name: plugin.name, path: targetPath };
 }
@@ -9169,11 +12099,11 @@ function shouldCopyMarketplaceSourcePath(path, root) {
 }
 
 // packages/omo-codex/src/install/lazycodex-version-stamp.ts
-import { readdir as readdir5, readFile as readFile15, writeFile as writeFile8 } from "node:fs/promises";
-import { join as join22 } from "node:path";
+import { readdir as readdir8, readFile as readFile16, writeFile as writeFile9 } from "node:fs/promises";
+import { join as join25 } from "node:path";
 async function readDistributionManifest(repoRoot) {
   try {
-    const parsed = JSON.parse(await readFile15(join22(repoRoot, "package.json"), "utf8"));
+    const parsed = JSON.parse(await readFile16(join25(repoRoot, "package.json"), "utf8"));
     if (!isPlainRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0)
       return;
     return {
@@ -9187,25 +12117,29 @@ async function readDistributionManifest(repoRoot) {
   }
 }
 function resolveLazyCodexPluginVersion(input) {
+  const override = input.versionOverride?.trim();
+  if (override !== undefined && override.length > 0) {
+    return override;
+  }
   if (input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo" && input.distributionManifest !== undefined) {
     return input.distributionManifest.version;
   }
   return input.manifestVersion ?? "local";
 }
 async function stampLazyCodexPluginVersion(input) {
-  const manifestPath = join22(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = join25(input.pluginRoot, ".codex-plugin", "plugin.json");
   const hookPaths = await readPluginHookPaths(manifestPath);
   await stampJsonVersion(manifestPath, input.version);
-  await stampJsonVersion(join22(input.pluginRoot, "package.json"), input.version);
+  await stampJsonVersion(join25(input.pluginRoot, "package.json"), input.version);
   for (const hookPath of hookPaths) {
-    await stampHookStatusMessages(join22(input.pluginRoot, hookPath), input.version);
+    await stampHookStatusMessages(join25(input.pluginRoot, hookPath), input.version);
   }
   await stampComponentVersions(input);
 }
 async function writeLazyCodexInstallSnapshot(input) {
   if (input.distributionManifest === undefined)
     return;
-  await writeFile8(join22(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
+  await writeFile9(join25(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
     packageName: input.distributionManifest.name,
     version: input.distributionManifest.version
   }, null, "\t")}
@@ -9213,11 +12147,11 @@ async function writeLazyCodexInstallSnapshot(input) {
 }
 async function stampJsonVersion(path, version) {
   try {
-    const parsed = JSON.parse(await readFile15(path, "utf8"));
+    const parsed = JSON.parse(await readFile16(path, "utf8"));
     if (!isPlainRecord(parsed))
       return;
     parsed.version = version;
-    await writeFile8(path, `${JSON.stringify(parsed, null, "\t")}
+    await writeFile9(path, `${JSON.stringify(parsed, null, "\t")}
 `);
   } catch (error) {
     if (error instanceof Error)
@@ -9227,7 +12161,7 @@ async function stampJsonVersion(path, version) {
 }
 async function readPluginHookPaths(manifestPath) {
   try {
-    const parsed = JSON.parse(await readFile15(manifestPath, "utf8"));
+    const parsed = JSON.parse(await readFile16(manifestPath, "utf8"));
     if (!isPlainRecord(parsed))
       return [];
     if (typeof parsed.hooks === "string" && parsed.hooks.trim().length > 0)
@@ -9247,11 +12181,11 @@ function stripDotSlash3(path) {
 }
 async function stampHookStatusMessages(path, version) {
   try {
-    const parsed = JSON.parse(await readFile15(path, "utf8"));
+    const parsed = JSON.parse(await readFile16(path, "utf8"));
     if (!isPlainRecord(parsed))
       return;
     stampHookGroups(parsed.hooks, version);
-    await writeFile8(path, `${JSON.stringify(parsed, null, "\t")}
+    await writeFile9(path, `${JSON.stringify(parsed, null, "\t")}
 `);
   } catch (error) {
     if (error instanceof Error)
@@ -9262,16 +12196,16 @@ async function stampHookStatusMessages(path, version) {
 async function stampComponentVersions(input) {
   let entries;
   try {
-    entries = await readdir5(join22(input.pluginRoot, "components"));
+    entries = await readdir8(join25(input.pluginRoot, "components"));
   } catch (error) {
     if (error instanceof Error)
       return;
     throw error;
   }
   for (const entry of entries) {
-    const componentRoot = join22(input.pluginRoot, "components", entry);
-    await stampJsonVersion(join22(componentRoot, "package.json"), input.version);
-    await stampHookStatusMessages(join22(componentRoot, "hooks", "hooks.json"), input.version);
+    const componentRoot = join25(input.pluginRoot, "components", entry);
+    await stampJsonVersion(join25(componentRoot, "package.json"), input.version);
+    await stampHookStatusMessages(join25(componentRoot, "hooks", "hooks.json"), input.version);
   }
 }
 function stampHookGroups(hooks, version) {
@@ -9292,12 +12226,16 @@ function stampHookGroups(hooks, version) {
 function stampHookStatusMessage(hook, version) {
   if (!isPlainRecord(hook) || typeof hook.statusMessage !== "string")
     return;
-  hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):\s*/, "(OmO) ");
+  hook.statusMessage = hook.statusMessage.replace(/^(?:LazyCodex\([^)]+\):|\(OmO(?:\s+[^)]+)?\))\s*/, `(OmO ${normalizeHookStatusVersion(version)}) `);
+}
+function normalizeHookStatusVersion(version) {
+  const normalized = version.trim();
+  return normalized.length === 0 ? "local" : normalized;
 }
 
 // packages/omo-codex/src/install/codex-project-local-cleanup.ts
-import { copyFile as copyFile2, lstat as lstat8, readFile as readFile16, writeFile as writeFile9 } from "node:fs/promises";
-import { dirname as dirname7, join as join23, resolve as resolve6 } from "node:path";
+import { copyFile as copyFile2, lstat as lstat10, readFile as readFile17, writeFile as writeFile10 } from "node:fs/promises";
+import { dirname as dirname9, join as join26, resolve as resolve7 } from "node:path";
 var LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
 var PROJECT_LOCAL_ARTIFACT_PATHS = [
   ".codex/hooks.json",
@@ -9316,7 +12254,7 @@ async function repairNearestProjectLocalCodexArtifacts(input) {
   const artifacts = await collectProjectLocalArtifacts(project.artifactRoots);
   const configs = [];
   for (const configPath of project.configPaths) {
-    const original = await readFile16(configPath, "utf8");
+    const original = await readFile17(configPath, "utf8");
     const repair = repairProjectLocalCodexConfigText(original);
     if (!repair.changed) {
       configs.push({
@@ -9329,7 +12267,7 @@ async function repairNearestProjectLocalCodexArtifacts(input) {
     }
     const backupPath = `${configPath}.backup-${formatBackupTimestamp(input.now?.() ?? new Date)}`;
     await copyFile2(configPath, backupPath);
-    await writeFile9(configPath, `${repair.config.trimEnd()}
+    await writeFile10(configPath, `${repair.config.trimEnd()}
 `);
     configs.push({
       projectRoot: project.projectRoot,
@@ -9400,37 +12338,37 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
   if (startDirectoryStat !== null && !startDirectoryStat.isDirectory()) {
     throw new ProjectLocalCleanupStartDirectoryError(startDirectory);
   }
-  const codexHomeConfigPath = codexHome === undefined ? null : join23(resolve6(codexHome), "config.toml");
-  let current = resolve6(startDirectory);
+  const codexHomeConfigPath = codexHome === undefined ? null : join26(resolve7(codexHome), "config.toml");
+  let current = resolve7(startDirectory);
   const configPathsFromCwd = [];
   while (true) {
-    const configPath = join23(current, ".codex", "config.toml");
+    const configPath = join26(current, ".codex", "config.toml");
     if (await isRegularProjectLocalConfig(current, configPath)) {
-      if (codexHomeConfigPath === null || resolve6(configPath) !== codexHomeConfigPath) {
+      if (codexHomeConfigPath === null || resolve7(configPath) !== codexHomeConfigPath) {
         configPathsFromCwd.push(configPath);
       }
     }
-    if (await exists5(join23(current, ".git"))) {
+    if (await exists5(join26(current, ".git"))) {
       return configPathsFromCwd.length === 0 ? null : {
         projectRoot: current,
         configPaths: [...configPathsFromCwd].reverse(),
         artifactRoots: artifactRootsForConfigPaths(configPathsFromCwd)
       };
     }
-    const parent = dirname7(current);
+    const parent = dirname9(current);
     if (parent === current) {
       const nearestConfigPath = configPathsFromCwd[0];
       return nearestConfigPath === undefined ? null : {
-        projectRoot: dirname7(dirname7(nearestConfigPath)),
+        projectRoot: dirname9(dirname9(nearestConfigPath)),
         configPaths: [nearestConfigPath],
-        artifactRoots: [dirname7(dirname7(nearestConfigPath))]
+        artifactRoots: [dirname9(dirname9(nearestConfigPath))]
       };
     }
     current = parent;
   }
 }
 async function isRegularProjectLocalConfig(directory, configPath) {
-  const codexDirStat = await maybeLstat(join23(directory, ".codex"));
+  const codexDirStat = await maybeLstat(join26(directory, ".codex"));
   if (codexDirStat === null || !codexDirStat.isDirectory() || codexDirStat.isSymbolicLink())
     return false;
   const configStat = await maybeLstat(configPath);
@@ -9439,7 +12377,7 @@ async function isRegularProjectLocalConfig(directory, configPath) {
 function artifactRootsForConfigPaths(configPaths) {
   const roots = [];
   for (const configPath of configPaths) {
-    const root = dirname7(dirname7(configPath));
+    const root = dirname9(dirname9(configPath));
     if (!roots.includes(root))
       roots.push(root);
   }
@@ -9450,7 +12388,7 @@ async function collectProjectLocalArtifacts(projectRoots) {
   const seenPaths = new Set;
   for (const projectRoot of projectRoots) {
     for (const relativePath of PROJECT_LOCAL_ARTIFACT_PATHS) {
-      const artifactPath = join23(projectRoot, relativePath);
+      const artifactPath = join26(projectRoot, relativePath);
       if (seenPaths.has(artifactPath))
         continue;
       const entryStat = await maybeLstat(artifactPath);
@@ -9484,9 +12422,9 @@ function formatBackupTimestamp(date) {
 }
 async function maybeLstat(path) {
   try {
-    return await lstat8(path);
+    return await lstat10(path);
   } catch (error) {
-    if (nodeErrorCode3(error) === "ENOENT")
+    if (nodeErrorCode4(error) === "ENOENT")
       return null;
     throw error;
   }
@@ -9494,7 +12432,7 @@ async function maybeLstat(path) {
 async function exists5(path) {
   return await maybeLstat(path) !== null;
 }
-function nodeErrorCode3(error) {
+function nodeErrorCode4(error) {
   if (!(error instanceof Error) || !("code" in error))
     return null;
   return typeof error.code === "string" ? error.code : null;
@@ -9525,65 +12463,297 @@ function formatUnknownError(error) {
 }
 
 // packages/omo-codex/src/install/lsp-daemon-reaper.ts
-import { readFile as readFile17, readdir as readdir6, rm as rm8 } from "node:fs/promises";
+import { createHash as createHash2 } from "node:crypto";
+import { lstat as lstat11, readFile as readFile19, readdir as readdir10, rm as rm10 } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join as join27, posix } from "node:path";
+
+// packages/omo-codex/src/install/lsp-daemon-reaper-attestation.ts
+import { execFile } from "node:child_process";
+import { readFile as readFile18, readdir as readdir9, readlink as readlink5 } from "node:fs/promises";
 import { connect } from "node:net";
-import { join as join24 } from "node:path";
-async function reapLspDaemons(codexHome, deps = {}) {
-  const killProcess = deps.killProcess ?? sendSigterm;
-  const isDaemonLive = deps.isDaemonLive ?? probeSocketLive;
-  const daemonRoot = join24(codexHome, "codex-lsp", "daemon");
-  const reaped = [];
-  let entries;
-  try {
-    entries = await readdir6(daemonRoot);
-  } catch {
-    return reaped;
-  }
-  for (const entry of entries) {
-    const versionDir = join24(daemonRoot, entry);
-    const pid = await readPidFile(join24(versionDir, "daemon.pid"));
-    const socketPath = await readEndpointFile(join24(versionDir, "daemon.endpoint"));
-    if (pid !== null && socketPath !== null && await isDaemonLive(socketPath) && killProcess(pid)) {
-      reaped.push(pid);
-    }
-    await rm8(versionDir, { recursive: true, force: true });
-  }
-  return reaped;
-}
-async function readEndpointFile(path) {
-  try {
-    const content = (await readFile17(path, "utf8")).trim();
-    return content.length > 0 ? content : null;
-  } catch {
-    return null;
-  }
-}
-async function readPidFile(path) {
-  try {
-    const pid = Number.parseInt((await readFile17(path, "utf8")).trim(), 10);
-    return Number.isInteger(pid) && pid > 0 ? pid : null;
-  } catch {
-    return null;
-  }
-}
-function probeSocketLive(socketPath, timeoutMs = 500) {
-  return new Promise((resolve7) => {
-    const socket = connect(socketPath);
-    const done = (ok) => {
+import { basename as basename6 } from "node:path";
+var PROBE_TIMEOUT_MS = 500;
+async function probeLegacyJsonRpcEndpoint(endpoint, timeoutMs = PROBE_TIMEOUT_MS) {
+  return await new Promise((resolve8) => {
+    const socket = connect(endpoint);
+    let settled = false;
+    let buffer = "";
+    const finish = (value) => {
+      if (settled)
+        return;
+      settled = true;
+      clearTimeout(timer);
       socket.destroy();
-      resolve7(ok);
+      resolve8(value);
     };
-    const timer = setTimeout(() => done(false), timeoutMs);
-    timer.unref();
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    timer.unref?.();
     socket.once("connect", () => {
-      clearTimeout(timer);
-      done(true);
+      socket.write(`${JSON.stringify(legacyStatusRequest())}
+`);
     });
-    socket.once("error", () => {
-      clearTimeout(timer);
-      done(false);
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      const newlineIndex = buffer.indexOf(`
+`);
+      if (newlineIndex < 0)
+        return;
+      finish(isJsonRpcResponse(buffer.slice(0, newlineIndex).trim()));
+    });
+    socket.once("error", () => finish(false));
+  });
+}
+async function attestLegacyDaemonOwnership(input, deps = {}) {
+  if (input.platform === "linux")
+    return await attestLinuxOwnership(input, deps);
+  if (input.platform === "darwin")
+    return await attestMacOwnership(input, deps);
+  return false;
+}
+async function attestLinuxOwnership(input, deps) {
+  const readFileImpl = deps.readFile ?? readFile18;
+  const readDirImpl = deps.readDir ?? readdir9;
+  const readLinkImpl = deps.readLink ?? readlink5;
+  const procNetUnix = await readText(readFileImpl, "/proc/net/unix");
+  if (procNetUnix === null)
+    return false;
+  const inode = inodeForEndpoint(procNetUnix, input.endpoint);
+  if (inode === null)
+    return false;
+  const fdEntries = await readDirImpl(`/proc/${input.pid}/fd`).catch(() => null);
+  if (fdEntries === null)
+    return false;
+  let ownsEndpoint = false;
+  for (const fdEntry of fdEntries) {
+    const target = await readLinkImpl(`/proc/${input.pid}/fd/${fdEntry}`).catch(() => null);
+    if (target !== `socket:[${inode}]`)
+      continue;
+    ownsEndpoint = true;
+    break;
+  }
+  if (!ownsEndpoint)
+    return false;
+  const cmdline = await readBinary(readFileImpl, `/proc/${input.pid}/cmdline`);
+  if (cmdline === null)
+    return false;
+  return isNodeCliDaemonArgv(splitCmdline(cmdline));
+}
+async function attestMacOwnership(input, deps) {
+  const executeFileImpl = deps.executeFile ?? execFile;
+  const filteredLsofOutput = await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+    "-a",
+    "-n",
+    "-P",
+    "-p",
+    String(input.pid),
+    "-U",
+    "-Fn",
+    "--",
+    input.endpoint
+  ]);
+  const lsofOutput = filteredLsofOutput ?? await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+    "-a",
+    "-n",
+    "-P",
+    "-p",
+    String(input.pid),
+    "-U",
+    "-Fn"
+  ]);
+  if (lsofOutput === null || !lsofShowsUnixEndpoint(lsofOutput, input.pid, input.endpoint))
+    return false;
+  const commandOutput = await executeForStdout(executeFileImpl, "/bin/ps", ["-p", String(input.pid), "-o", "command="]);
+  if (commandOutput === null)
+    return false;
+  return isNodeCliDaemonCommand(commandOutput.trim());
+}
+function legacyStatusRequest() {
+  return {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: { name: "status", arguments: {} }
+  };
+}
+function isJsonRpcResponse(line) {
+  if (line.length === 0)
+    return false;
+  try {
+    const parsed = JSON.parse(line);
+    return parsed.jsonrpc === "2.0" && parsed.id === 1 && (Object.hasOwn(parsed, "result") || Object.hasOwn(parsed, "error"));
+  } catch {
+    return false;
+  }
+}
+function inodeForEndpoint(procNetUnix, endpoint) {
+  for (const line of procNetUnix.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0 || trimmed.startsWith("Num"))
+      continue;
+    const fields = trimmed.split(/\s+/);
+    if (fields.length < 8 || fields[7] !== endpoint)
+      continue;
+    return fields[6] ?? null;
+  }
+  return null;
+}
+function splitCmdline(buffer) {
+  return buffer.toString("utf8").split("\x00").filter((value) => value.length > 0);
+}
+function isNodeCliDaemonArgv(argv) {
+  if (argv.length < 2 || !argv.includes("daemon"))
+    return false;
+  const executable = basename6(argv[0] ?? "");
+  if (!/^node(?:\.exe)?$/i.test(executable))
+    return false;
+  return argv.some((value) => value === "cli.js" || value.endsWith("/cli.js") || value.endsWith("\\cli.js"));
+}
+function lsofShowsUnixEndpoint(output, pid, endpoint) {
+  const lines = output.split(/\r?\n/).filter((line) => line.length > 0);
+  const endpointName = basename6(endpoint);
+  return lines.includes(`p${pid}`) && lines.some((line) => line === `n${endpoint}` || line === `n${endpointName}`);
+}
+function isNodeCliDaemonCommand(command) {
+  return /\bnode(?:\.exe)?\b/i.test(command) && /\bcli\.js\b/.test(command) && /\bdaemon\b/.test(command);
+}
+async function executeForStdout(executeFileImpl, file, args) {
+  return await new Promise((resolve8) => {
+    executeFileImpl(file, [...args], { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1000 }, (error, stdout) => {
+      if (error !== null) {
+        resolve8(null);
+        return;
+      }
+      resolve8(stdout);
     });
   });
+}
+async function readText(readFileImpl, path) {
+  return await readFileImpl(path, "utf8").catch(() => null);
+}
+async function readBinary(readFileImpl, path) {
+  return await readFileImpl(path).catch(() => null);
+}
+
+// packages/omo-codex/src/install/lsp-daemon-reaper.ts
+var LEGACY_EXIT_WAIT_TIMEOUT_MS = 5000;
+var LEGACY_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
+async function reapLspDaemons(codexHome, deps = {}) {
+  const daemonRoot = join27(codexHome, "codex-lsp", "daemon");
+  const platform = deps.platform ?? process.platform;
+  const tmpDir = deps.tmpDir ?? tmpdir();
+  const probe = deps.probeLegacyJsonRpc ?? probeLegacyJsonRpcEndpoint;
+  const attest = deps.attestLegacyDaemonOwnership ?? ((input) => attestLegacyDaemonOwnership(input));
+  const killProcess = deps.killProcess ?? sendSigterm;
+  const waitForProcessExit = deps.waitForProcessExit ?? defaultWaitForProcessExit;
+  const entries = await readdir10(daemonRoot, { withFileTypes: true }).catch(() => []);
+  const results = [];
+  for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name))) {
+    const versionPath = join27(daemonRoot, entry.name);
+    const parsedVersion = parseVersionEntry(entry.name);
+    if (parsedVersion === null || !entry.isDirectory()) {
+      await removeVersionDir(versionPath);
+      results.push(removed(entry.name, "removed invalid legacy version entry"));
+      continue;
+    }
+    const metadata = await readLegacyMetadata({ versionPath, version: parsedVersion, codexHome, platform, tmpDir });
+    if (metadata.kind === "remove") {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, metadata.reason));
+      continue;
+    }
+    if (!await probe(metadata.endpoint)) {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, "removed stale legacy daemon state"));
+      continue;
+    }
+    if (platform === "win32") {
+      results.push(deferred(parsedVersion, "legacy named pipe responded but Windows cannot prove pid ownership safely"));
+      continue;
+    }
+    const owned = await attest({ pid: metadata.pid, endpoint: metadata.endpoint, platform });
+    if (!owned) {
+      results.push(deferred(parsedVersion, "legacy endpoint responded but pid ownership was not proven"));
+      continue;
+    }
+    if (!killProcess(metadata.pid)) {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, "removed stale legacy daemon state"));
+      continue;
+    }
+    if (!await waitForProcessExit(metadata.pid, LEGACY_EXIT_WAIT_TIMEOUT_MS)) {
+      results.push(deferred(parsedVersion, `timed out waiting ${LEGACY_EXIT_WAIT_TIMEOUT_MS}ms for the proven legacy daemon to exit`));
+      continue;
+    }
+    await removeVersionDir(versionPath);
+    results.push(terminated(parsedVersion, "terminated proven owned legacy daemon"));
+  }
+  return results;
+}
+function parseVersionEntry(entryName) {
+  if (!entryName.startsWith("v"))
+    return null;
+  const version = entryName.slice(1);
+  return LEGACY_VERSION_PATTERN.test(version) ? version : null;
+}
+async function readLegacyMetadata(input) {
+  const pidText = await readRegularTrimmedFile(join27(input.versionPath, "daemon.pid"));
+  if (pidText === "non_regular")
+    return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
+  if (pidText === null)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const pid = Number.parseInt(pidText, 10);
+  if (!Number.isInteger(pid) || pid <= 0)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const endpointText = await readRegularTrimmedFile(join27(input.versionPath, "daemon.endpoint"));
+  if (endpointText === "non_regular")
+    return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
+  if (endpointText === null)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const allowedEndpoints = legacyEndpointCandidates({
+    version: input.version,
+    versionPath: input.versionPath,
+    platform: input.platform,
+    tmpDir: input.tmpDir
+  });
+  if (!allowedEndpoints.includes(endpointText)) {
+    return { kind: "remove", reason: "removed legacy daemon state with an endpoint outside the frozen vectors" };
+  }
+  return { kind: "valid", pid, endpoint: endpointText };
+}
+function legacyEndpointCandidates(input) {
+  if (input.platform === "win32") {
+    const normalizedVersionPath = input.versionPath.replaceAll("/", "\\");
+    const digest = shortDigest(normalizedVersionPath);
+    return [`\\\\.\\pipe\\omo-lsp-${input.version}-${digest}`];
+  }
+  const natural = posix.join(input.versionPath, "daemon.sock");
+  const hashed = posix.join(input.tmpDir, `omo-lsp-${input.version}-${shortDigest(input.versionPath)}.sock`);
+  return [natural, hashed];
+}
+async function readRegularTrimmedFile(path) {
+  const stats = await lstat11(path).catch(() => null);
+  if (stats === null)
+    return null;
+  if (!stats.isFile())
+    return "non_regular";
+  const content = (await readFile19(path, "utf8")).trim();
+  return content.length > 0 ? content : null;
+}
+function shortDigest(value) {
+  return createHash2("sha256").update(value).digest("hex").slice(0, 16);
+}
+async function removeVersionDir(path) {
+  await rm10(path, { recursive: true, force: true });
+}
+function removed(version, reason) {
+  return { version, status: "removed", reason };
+}
+function terminated(version, reason) {
+  return { version, status: "terminated", reason };
+}
+function deferred(version, reason) {
+  return { version, status: "deferred", reason };
 }
 function sendSigterm(pid) {
   try {
@@ -9593,27 +12763,75 @@ function sendSigterm(pid) {
     return false;
   }
 }
+async function defaultWaitForProcessExit(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  for (;; ) {
+    if (!processIsRunning(pid))
+      return true;
+    if (Date.now() >= deadline)
+      return false;
+    await new Promise((resolve8) => setTimeout(resolve8, 100));
+  }
+}
+function processIsRunning(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // packages/omo-codex/src/install/codex-installer-bin-dir.ts
 import { homedir } from "node:os";
-import { join as join25, resolve as resolve7 } from "node:path";
+import { join as join28, resolve as resolve8 } from "node:path";
 function resolveCodexInstallerBinDir(input) {
   const explicitBinDir = input.binDir ?? input.env?.CODEX_LOCAL_BIN_DIR;
   if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0)
-    return resolve7(explicitBinDir.trim());
+    return resolve8(explicitBinDir.trim());
   const homeDir = input.homeDir ?? homedir();
-  const defaultCodexHome = resolve7(homeDir, ".codex");
-  const resolvedCodexHome = resolve7(input.codexHome);
+  const defaultCodexHome = resolve8(homeDir, ".codex");
+  const resolvedCodexHome = resolve8(input.codexHome);
   if (resolvedCodexHome !== defaultCodexHome)
-    return join25(resolvedCodexHome, "bin");
-  return resolve7(homeDir, ".local", "bin");
+    return join28(resolvedCodexHome, "bin");
+  return resolve8(homeDir, ".local", "bin");
+}
+
+// packages/omo-codex/src/install/codex-installed-bin-dir.ts
+import { readFile as readFile20, readdir as readdir11, writeFile as writeFile11 } from "node:fs/promises";
+import { join as join29 } from "node:path";
+var INSTALLED_BIN_DIR_MANIFEST = ".installed-bin-dir.json";
+async function writeInstalledCodexBinDir(input) {
+  await writeFile11(join29(input.pluginRoot, INSTALLED_BIN_DIR_MANIFEST), `${JSON.stringify({ binDir: input.binDir }, null, 2)}
+`);
+}
+
+// packages/omo-codex/src/install/codex-git-bash-hooks.ts
+import { readFile as readFile21, writeFile as writeFile12 } from "node:fs/promises";
+import { join as join30 } from "node:path";
+var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
+  "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
+  "./hooks/post-compact-resetting-git-bash-mcp-reminder.json"
+]);
+async function removeGitBashHooksOffWindows(input) {
+  if (input.platform === "win32")
+    return;
+  const manifestPath = join30(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const parsed = JSON.parse(await readFile21(manifestPath, "utf8"));
+  if (!isPlainRecord(parsed) || !Array.isArray(parsed.hooks))
+    return;
+  const hooks = parsed.hooks.filter((hook) => typeof hook !== "string" || !WINDOWS_ONLY_GIT_BASH_HOOKS.has(hook));
+  if (hooks.length === parsed.hooks.length)
+    return;
+  await writeFile12(manifestPath, `${JSON.stringify({ ...parsed, hooks }, null, "\t")}
+`);
 }
 
 // packages/omo-codex/src/install/omo-sot-migration.ts
-import { join as join26 } from "node:path";
+import { join as join31 } from "node:path";
 async function seedAndMigrateOmoSot(input) {
   const commandEnv = { ...input.env };
-  const scriptPath = join26(input.repoRoot, "packages", "omo-codex", "plugin", "scripts", "migrate-omo-sot.mjs");
+  const scriptPath = join31(input.repoRoot, "packages", "omo-codex", "plugin", "scripts", "migrate-omo-sot.mjs");
   try {
     await input.runCommand(process.execPath, [scriptPath, "--seed"], {
       cwd: input.repoRoot,
@@ -9627,2961 +12845,13 @@ async function seedAndMigrateOmoSot(input) {
 }
 
 // packages/omo-codex/src/install/install-ast-grep-sg.ts
-import { join as join28 } from "node:path";
+import { join as join33 } from "node:path";
 
-// packages/utils/src/deep-merge.ts
-var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-// packages/utils/src/record-type-guard.ts
-function isRecord(value) {
-  return typeof value === "object" && value !== null;
-}
-// node_modules/.bun/js-yaml@4.2.0/node_modules/js-yaml/dist/js-yaml.mjs
-/*! js-yaml 4.2.0 https://github.com/nodeca/js-yaml @license MIT */
-var __create = Object.create;
-var __defProp2 = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function")
-    for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key;i < n; i++) {
-      key = keys[i];
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp2(to, key, {
-          get: ((k) => from[k]).bind(null, key),
-          enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
-        });
-    }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule ? __defProp2(target, "default", {
-  value: mod,
-  enumerable: true
-}) : target, mod));
-var require_common = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  function isNothing(subject) {
-    return typeof subject === "undefined" || subject === null;
-  }
-  function isObject(subject) {
-    return typeof subject === "object" && subject !== null;
-  }
-  function toArray(sequence) {
-    if (Array.isArray(sequence))
-      return sequence;
-    else if (isNothing(sequence))
-      return [];
-    return [sequence];
-  }
-  function extend(target, source) {
-    if (source) {
-      const sourceKeys = Object.keys(source);
-      for (let index = 0, length = sourceKeys.length;index < length; index += 1) {
-        const key = sourceKeys[index];
-        target[key] = source[key];
-      }
-    }
-    return target;
-  }
-  function repeat(string, count) {
-    let result = "";
-    for (let cycle = 0;cycle < count; cycle += 1)
-      result += string;
-    return result;
-  }
-  function isNegativeZero(number) {
-    return number === 0 && Number.NEGATIVE_INFINITY === 1 / number;
-  }
-  module.exports.isNothing = isNothing;
-  module.exports.isObject = isObject;
-  module.exports.toArray = toArray;
-  module.exports.repeat = repeat;
-  module.exports.isNegativeZero = isNegativeZero;
-  module.exports.extend = extend;
-});
-var require_exception = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  function formatError(exception, compact) {
-    let where = "";
-    const message = exception.reason || "(unknown reason)";
-    if (!exception.mark)
-      return message;
-    if (exception.mark.name)
-      where += 'in "' + exception.mark.name + '" ';
-    where += "(" + (exception.mark.line + 1) + ":" + (exception.mark.column + 1) + ")";
-    if (!compact && exception.mark.snippet)
-      where += `
+// packages/utils/src/ast-grep/install-script.ts
+import { spawn as spawn2 } from "node:child_process";
+import { existsSync as existsSync4 } from "node:fs";
+import { join as join32 } from "node:path";
 
-` + exception.mark.snippet;
-    return message + " " + where;
-  }
-  function YAMLException(reason, mark) {
-    Error.call(this);
-    this.name = "YAMLException";
-    this.reason = reason;
-    this.mark = mark;
-    this.message = formatError(this, false);
-    if (Error.captureStackTrace)
-      Error.captureStackTrace(this, this.constructor);
-    else
-      this.stack = (/* @__PURE__ */ new Error()).stack || "";
-  }
-  YAMLException.prototype = Object.create(Error.prototype);
-  YAMLException.prototype.constructor = YAMLException;
-  YAMLException.prototype.toString = function toString(compact) {
-    return this.name + ": " + formatError(this, compact);
-  };
-  module.exports = YAMLException;
-});
-var require_snippet = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var common = require_common();
-  function getLine(buffer, lineStart, lineEnd, position, maxLineLength) {
-    let head = "";
-    let tail = "";
-    const maxHalfLength = Math.floor(maxLineLength / 2) - 1;
-    if (position - lineStart > maxHalfLength) {
-      head = " ... ";
-      lineStart = position - maxHalfLength + head.length;
-    }
-    if (lineEnd - position > maxHalfLength) {
-      tail = " ...";
-      lineEnd = position + maxHalfLength - tail.length;
-    }
-    return {
-      str: head + buffer.slice(lineStart, lineEnd).replace(/\t/g, "→") + tail,
-      pos: position - lineStart + head.length
-    };
-  }
-  function padStart(string, max) {
-    return common.repeat(" ", max - string.length) + string;
-  }
-  function makeSnippet(mark, options) {
-    options = Object.create(options || null);
-    if (!mark.buffer)
-      return null;
-    if (!options.maxLength)
-      options.maxLength = 79;
-    if (typeof options.indent !== "number")
-      options.indent = 1;
-    if (typeof options.linesBefore !== "number")
-      options.linesBefore = 3;
-    if (typeof options.linesAfter !== "number")
-      options.linesAfter = 2;
-    const re = /\r?\n|\r|\0/g;
-    const lineStarts = [0];
-    const lineEnds = [];
-    let match;
-    let foundLineNo = -1;
-    while (match = re.exec(mark.buffer)) {
-      lineEnds.push(match.index);
-      lineStarts.push(match.index + match[0].length);
-      if (mark.position <= match.index && foundLineNo < 0)
-        foundLineNo = lineStarts.length - 2;
-    }
-    if (foundLineNo < 0)
-      foundLineNo = lineStarts.length - 1;
-    let result = "";
-    const lineNoLength = Math.min(mark.line + options.linesAfter, lineEnds.length).toString().length;
-    const maxLineLength = options.maxLength - (options.indent + lineNoLength + 3);
-    for (let i = 1;i <= options.linesBefore; i++) {
-      if (foundLineNo - i < 0)
-        break;
-      const line2 = getLine(mark.buffer, lineStarts[foundLineNo - i], lineEnds[foundLineNo - i], mark.position - (lineStarts[foundLineNo] - lineStarts[foundLineNo - i]), maxLineLength);
-      result = common.repeat(" ", options.indent) + padStart((mark.line - i + 1).toString(), lineNoLength) + " | " + line2.str + `
-` + result;
-    }
-    const line = getLine(mark.buffer, lineStarts[foundLineNo], lineEnds[foundLineNo], mark.position, maxLineLength);
-    result += common.repeat(" ", options.indent) + padStart((mark.line + 1).toString(), lineNoLength) + " | " + line.str + `
-`;
-    result += common.repeat("-", options.indent + lineNoLength + 3 + line.pos) + `^
-`;
-    for (let i = 1;i <= options.linesAfter; i++) {
-      if (foundLineNo + i >= lineEnds.length)
-        break;
-      const line2 = getLine(mark.buffer, lineStarts[foundLineNo + i], lineEnds[foundLineNo + i], mark.position - (lineStarts[foundLineNo] - lineStarts[foundLineNo + i]), maxLineLength);
-      result += common.repeat(" ", options.indent) + padStart((mark.line + i + 1).toString(), lineNoLength) + " | " + line2.str + `
-`;
-    }
-    return result.replace(/\n$/, "");
-  }
-  module.exports = makeSnippet;
-});
-var require_type = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var YAMLException = require_exception();
-  var TYPE_CONSTRUCTOR_OPTIONS = [
-    "kind",
-    "multi",
-    "resolve",
-    "construct",
-    "instanceOf",
-    "predicate",
-    "represent",
-    "representName",
-    "defaultStyle",
-    "styleAliases"
-  ];
-  var YAML_NODE_KINDS = [
-    "scalar",
-    "sequence",
-    "mapping"
-  ];
-  function compileStyleAliases(map) {
-    const result = {};
-    if (map !== null)
-      Object.keys(map).forEach(function(style) {
-        map[style].forEach(function(alias) {
-          result[String(alias)] = style;
-        });
-      });
-    return result;
-  }
-  function Type(tag, options) {
-    options = options || {};
-    Object.keys(options).forEach(function(name) {
-      if (TYPE_CONSTRUCTOR_OPTIONS.indexOf(name) === -1)
-        throw new YAMLException('Unknown option "' + name + '" is met in definition of "' + tag + '" YAML type.');
-    });
-    this.options = options;
-    this.tag = tag;
-    this.kind = options["kind"] || null;
-    this.resolve = options["resolve"] || function() {
-      return true;
-    };
-    this.construct = options["construct"] || function(data) {
-      return data;
-    };
-    this.instanceOf = options["instanceOf"] || null;
-    this.predicate = options["predicate"] || null;
-    this.represent = options["represent"] || null;
-    this.representName = options["representName"] || null;
-    this.defaultStyle = options["defaultStyle"] || null;
-    this.multi = options["multi"] || false;
-    this.styleAliases = compileStyleAliases(options["styleAliases"] || null);
-    if (YAML_NODE_KINDS.indexOf(this.kind) === -1)
-      throw new YAMLException('Unknown kind "' + this.kind + '" is specified for "' + tag + '" YAML type.');
-  }
-  module.exports = Type;
-});
-var require_schema = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var YAMLException = require_exception();
-  var Type = require_type();
-  function compileList(schema, name) {
-    const result = [];
-    schema[name].forEach(function(currentType) {
-      let newIndex = result.length;
-      result.forEach(function(previousType, previousIndex) {
-        if (previousType.tag === currentType.tag && previousType.kind === currentType.kind && previousType.multi === currentType.multi)
-          newIndex = previousIndex;
-      });
-      result[newIndex] = currentType;
-    });
-    return result;
-  }
-  function compileMap() {
-    const result = {
-      scalar: {},
-      sequence: {},
-      mapping: {},
-      fallback: {},
-      multi: {
-        scalar: [],
-        sequence: [],
-        mapping: [],
-        fallback: []
-      }
-    };
-    function collectType(type) {
-      if (type.multi) {
-        result.multi[type.kind].push(type);
-        result.multi["fallback"].push(type);
-      } else
-        result[type.kind][type.tag] = result["fallback"][type.tag] = type;
-    }
-    for (let index = 0, length = arguments.length;index < length; index += 1)
-      arguments[index].forEach(collectType);
-    return result;
-  }
-  function Schema(definition) {
-    return this.extend(definition);
-  }
-  Schema.prototype.extend = function extend(definition) {
-    let implicit = [];
-    let explicit = [];
-    if (definition instanceof Type)
-      explicit.push(definition);
-    else if (Array.isArray(definition))
-      explicit = explicit.concat(definition);
-    else if (definition && (Array.isArray(definition.implicit) || Array.isArray(definition.explicit))) {
-      if (definition.implicit)
-        implicit = implicit.concat(definition.implicit);
-      if (definition.explicit)
-        explicit = explicit.concat(definition.explicit);
-    } else
-      throw new YAMLException("Schema.extend argument should be a Type, [ Type ], or a schema definition ({ implicit: [...], explicit: [...] })");
-    implicit.forEach(function(type) {
-      if (!(type instanceof Type))
-        throw new YAMLException("Specified list of YAML types (or a single Type object) contains a non-Type object.");
-      if (type.loadKind && type.loadKind !== "scalar")
-        throw new YAMLException("There is a non-scalar type in the implicit list of a schema. Implicit resolving of such types is not supported.");
-      if (type.multi)
-        throw new YAMLException("There is a multi type in the implicit list of a schema. Multi tags can only be listed as explicit.");
-    });
-    explicit.forEach(function(type) {
-      if (!(type instanceof Type))
-        throw new YAMLException("Specified list of YAML types (or a single Type object) contains a non-Type object.");
-    });
-    const result = Object.create(Schema.prototype);
-    result.implicit = (this.implicit || []).concat(implicit);
-    result.explicit = (this.explicit || []).concat(explicit);
-    result.compiledImplicit = compileList(result, "implicit");
-    result.compiledExplicit = compileList(result, "explicit");
-    result.compiledTypeMap = compileMap(result.compiledImplicit, result.compiledExplicit);
-    return result;
-  };
-  module.exports = Schema;
-});
-var require_str = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  module.exports = new (require_type())("tag:yaml.org,2002:str", {
-    kind: "scalar",
-    construct: function(data) {
-      return data !== null ? data : "";
-    }
-  });
-});
-var require_seq = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  module.exports = new (require_type())("tag:yaml.org,2002:seq", {
-    kind: "sequence",
-    construct: function(data) {
-      return data !== null ? data : [];
-    }
-  });
-});
-var require_map = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  module.exports = new (require_type())("tag:yaml.org,2002:map", {
-    kind: "mapping",
-    construct: function(data) {
-      return data !== null ? data : {};
-    }
-  });
-});
-var require_failsafe = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  module.exports = new (require_schema())({ explicit: [
-    require_str(),
-    require_seq(),
-    require_map()
-  ] });
-});
-var require_null = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var Type = require_type();
-  function resolveYamlNull(data) {
-    if (data === null)
-      return true;
-    const max = data.length;
-    return max === 1 && data === "~" || max === 4 && (data === "null" || data === "Null" || data === "NULL");
-  }
-  function constructYamlNull() {
-    return null;
-  }
-  function isNull(object) {
-    return object === null;
-  }
-  module.exports = new Type("tag:yaml.org,2002:null", {
-    kind: "scalar",
-    resolve: resolveYamlNull,
-    construct: constructYamlNull,
-    predicate: isNull,
-    represent: {
-      canonical: function() {
-        return "~";
-      },
-      lowercase: function() {
-        return "null";
-      },
-      uppercase: function() {
-        return "NULL";
-      },
-      camelcase: function() {
-        return "Null";
-      },
-      empty: function() {
-        return "";
-      }
-    },
-    defaultStyle: "lowercase"
-  });
-});
-var require_bool = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var Type = require_type();
-  function resolveYamlBoolean(data) {
-    if (data === null)
-      return false;
-    const max = data.length;
-    return max === 4 && (data === "true" || data === "True" || data === "TRUE") || max === 5 && (data === "false" || data === "False" || data === "FALSE");
-  }
-  function constructYamlBoolean(data) {
-    return data === "true" || data === "True" || data === "TRUE";
-  }
-  function isBoolean(object) {
-    return Object.prototype.toString.call(object) === "[object Boolean]";
-  }
-  module.exports = new Type("tag:yaml.org,2002:bool", {
-    kind: "scalar",
-    resolve: resolveYamlBoolean,
-    construct: constructYamlBoolean,
-    predicate: isBoolean,
-    represent: {
-      lowercase: function(object) {
-        return object ? "true" : "false";
-      },
-      uppercase: function(object) {
-        return object ? "TRUE" : "FALSE";
-      },
-      camelcase: function(object) {
-        return object ? "True" : "False";
-      }
-    },
-    defaultStyle: "lowercase"
-  });
-});
-var require_int = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var common = require_common();
-  var Type = require_type();
-  function isHexCode(c) {
-    return c >= 48 && c <= 57 || c >= 65 && c <= 70 || c >= 97 && c <= 102;
-  }
-  function isOctCode(c) {
-    return c >= 48 && c <= 55;
-  }
-  function isDecCode(c) {
-    return c >= 48 && c <= 57;
-  }
-  function resolveYamlInteger(data) {
-    if (data === null)
-      return false;
-    const max = data.length;
-    let index = 0;
-    let hasDigits = false;
-    if (!max)
-      return false;
-    let ch = data[index];
-    if (ch === "-" || ch === "+")
-      ch = data[++index];
-    if (ch === "0") {
-      if (index + 1 === max)
-        return true;
-      ch = data[++index];
-      if (ch === "b") {
-        index++;
-        for (;index < max; index++) {
-          ch = data[index];
-          if (ch !== "0" && ch !== "1")
-            return false;
-          hasDigits = true;
-        }
-        return hasDigits && Number.isFinite(parseYamlInteger(data));
-      }
-      if (ch === "x") {
-        index++;
-        for (;index < max; index++) {
-          if (!isHexCode(data.charCodeAt(index)))
-            return false;
-          hasDigits = true;
-        }
-        return hasDigits && Number.isFinite(parseYamlInteger(data));
-      }
-      if (ch === "o") {
-        index++;
-        for (;index < max; index++) {
-          if (!isOctCode(data.charCodeAt(index)))
-            return false;
-          hasDigits = true;
-        }
-        return hasDigits && Number.isFinite(parseYamlInteger(data));
-      }
-    }
-    for (;index < max; index++) {
-      if (!isDecCode(data.charCodeAt(index)))
-        return false;
-      hasDigits = true;
-    }
-    if (!hasDigits)
-      return false;
-    return Number.isFinite(parseYamlInteger(data));
-  }
-  function parseYamlInteger(data) {
-    let value = data;
-    let sign = 1;
-    let ch = value[0];
-    if (ch === "-" || ch === "+") {
-      if (ch === "-")
-        sign = -1;
-      value = value.slice(1);
-      ch = value[0];
-    }
-    if (value === "0")
-      return 0;
-    if (ch === "0") {
-      if (value[1] === "b")
-        return sign * parseInt(value.slice(2), 2);
-      if (value[1] === "x")
-        return sign * parseInt(value.slice(2), 16);
-      if (value[1] === "o")
-        return sign * parseInt(value.slice(2), 8);
-    }
-    return sign * parseInt(value, 10);
-  }
-  function constructYamlInteger(data) {
-    return parseYamlInteger(data);
-  }
-  function isInteger(object) {
-    return Object.prototype.toString.call(object) === "[object Number]" && object % 1 === 0 && !common.isNegativeZero(object);
-  }
-  module.exports = new Type("tag:yaml.org,2002:int", {
-    kind: "scalar",
-    resolve: resolveYamlInteger,
-    construct: constructYamlInteger,
-    predicate: isInteger,
-    represent: {
-      binary: function(obj) {
-        return obj >= 0 ? "0b" + obj.toString(2) : "-0b" + obj.toString(2).slice(1);
-      },
-      octal: function(obj) {
-        return obj >= 0 ? "0o" + obj.toString(8) : "-0o" + obj.toString(8).slice(1);
-      },
-      decimal: function(obj) {
-        return obj.toString(10);
-      },
-      hexadecimal: function(obj) {
-        return obj >= 0 ? "0x" + obj.toString(16).toUpperCase() : "-0x" + obj.toString(16).toUpperCase().slice(1);
-      }
-    },
-    defaultStyle: "decimal",
-    styleAliases: {
-      binary: [2, "bin"],
-      octal: [8, "oct"],
-      decimal: [10, "dec"],
-      hexadecimal: [16, "hex"]
-    }
-  });
-});
-var require_float = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var common = require_common();
-  var Type = require_type();
-  var YAML_FLOAT_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?(?:[0-9]+)(?:\\.[0-9]*)?(?:[eE][-+]?[0-9]+)?|\\.[0-9]+(?:[eE][-+]?[0-9]+)?|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
-  var YAML_FLOAT_SPECIAL_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
-  function resolveYamlFloat(data) {
-    if (data === null)
-      return false;
-    if (!YAML_FLOAT_PATTERN.test(data))
-      return false;
-    if (Number.isFinite(parseFloat(data, 10)))
-      return true;
-    return YAML_FLOAT_SPECIAL_PATTERN.test(data);
-  }
-  function constructYamlFloat(data) {
-    let value = data.toLowerCase();
-    const sign = value[0] === "-" ? -1 : 1;
-    if ("+-".indexOf(value[0]) >= 0)
-      value = value.slice(1);
-    if (value === ".inf")
-      return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
-    else if (value === ".nan")
-      return NaN;
-    return sign * parseFloat(value, 10);
-  }
-  var SCIENTIFIC_WITHOUT_DOT = /^[-+]?[0-9]+e/;
-  function representYamlFloat(object, style) {
-    if (isNaN(object))
-      switch (style) {
-        case "lowercase":
-          return ".nan";
-        case "uppercase":
-          return ".NAN";
-        case "camelcase":
-          return ".NaN";
-      }
-    else if (Number.POSITIVE_INFINITY === object)
-      switch (style) {
-        case "lowercase":
-          return ".inf";
-        case "uppercase":
-          return ".INF";
-        case "camelcase":
-          return ".Inf";
-      }
-    else if (Number.NEGATIVE_INFINITY === object)
-      switch (style) {
-        case "lowercase":
-          return "-.inf";
-        case "uppercase":
-          return "-.INF";
-        case "camelcase":
-          return "-.Inf";
-      }
-    else if (common.isNegativeZero(object))
-      return "-0.0";
-    const res = object.toString(10);
-    return SCIENTIFIC_WITHOUT_DOT.test(res) ? res.replace("e", ".e") : res;
-  }
-  function isFloat(object) {
-    return Object.prototype.toString.call(object) === "[object Number]" && (object % 1 !== 0 || common.isNegativeZero(object));
-  }
-  module.exports = new Type("tag:yaml.org,2002:float", {
-    kind: "scalar",
-    resolve: resolveYamlFloat,
-    construct: constructYamlFloat,
-    predicate: isFloat,
-    represent: representYamlFloat,
-    defaultStyle: "lowercase"
-  });
-});
-var require_json = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  module.exports = require_failsafe().extend({ implicit: [
-    require_null(),
-    require_bool(),
-    require_int(),
-    require_float()
-  ] });
-});
-var require_core = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  module.exports = require_json();
-});
-var require_timestamp = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var Type = require_type();
-  var YAML_DATE_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])$");
-  var YAML_TIMESTAMP_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)(?:[Tt]|[ \\t]+)([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(?:\\.([0-9]*))?(?:[ \\t]*(Z|([-+])([0-9][0-9]?)(?::([0-9][0-9]))?))?$");
-  function resolveYamlTimestamp(data) {
-    if (data === null)
-      return false;
-    if (YAML_DATE_REGEXP.exec(data) !== null)
-      return true;
-    if (YAML_TIMESTAMP_REGEXP.exec(data) !== null)
-      return true;
-    return false;
-  }
-  function constructYamlTimestamp(data) {
-    let fraction = 0;
-    let delta = null;
-    let match = YAML_DATE_REGEXP.exec(data);
-    if (match === null)
-      match = YAML_TIMESTAMP_REGEXP.exec(data);
-    if (match === null)
-      throw new Error("Date resolve error");
-    const year = +match[1];
-    const month = +match[2] - 1;
-    const day = +match[3];
-    if (!match[4])
-      return new Date(Date.UTC(year, month, day));
-    const hour = +match[4];
-    const minute = +match[5];
-    const second = +match[6];
-    if (match[7]) {
-      fraction = match[7].slice(0, 3);
-      while (fraction.length < 3)
-        fraction += "0";
-      fraction = +fraction;
-    }
-    if (match[9]) {
-      const tzHour = +match[10];
-      const tzMinute = +(match[11] || 0);
-      delta = (tzHour * 60 + tzMinute) * 60000;
-      if (match[9] === "-")
-        delta = -delta;
-    }
-    const date = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
-    if (delta)
-      date.setTime(date.getTime() - delta);
-    return date;
-  }
-  function representYamlTimestamp(object) {
-    return object.toISOString();
-  }
-  module.exports = new Type("tag:yaml.org,2002:timestamp", {
-    kind: "scalar",
-    resolve: resolveYamlTimestamp,
-    construct: constructYamlTimestamp,
-    instanceOf: Date,
-    represent: representYamlTimestamp
-  });
-});
-var require_merge = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var Type = require_type();
-  function resolveYamlMerge(data) {
-    return data === "<<" || data === null;
-  }
-  module.exports = new Type("tag:yaml.org,2002:merge", {
-    kind: "scalar",
-    resolve: resolveYamlMerge
-  });
-});
-var require_binary = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var Type = require_type();
-  var BASE64_MAP = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=
-\r`;
-  function resolveYamlBinary(data) {
-    if (data === null)
-      return false;
-    let bitlen = 0;
-    const max = data.length;
-    const map = BASE64_MAP;
-    for (let idx = 0;idx < max; idx++) {
-      const code = map.indexOf(data.charAt(idx));
-      if (code > 64)
-        continue;
-      if (code < 0)
-        return false;
-      bitlen += 6;
-    }
-    return bitlen % 8 === 0;
-  }
-  function constructYamlBinary(data) {
-    const input = data.replace(/[\r\n=]/g, "");
-    const max = input.length;
-    const map = BASE64_MAP;
-    let bits = 0;
-    const result = [];
-    for (let idx = 0;idx < max; idx++) {
-      if (idx % 4 === 0 && idx) {
-        result.push(bits >> 16 & 255);
-        result.push(bits >> 8 & 255);
-        result.push(bits & 255);
-      }
-      bits = bits << 6 | map.indexOf(input.charAt(idx));
-    }
-    const tailbits = max % 4 * 6;
-    if (tailbits === 0) {
-      result.push(bits >> 16 & 255);
-      result.push(bits >> 8 & 255);
-      result.push(bits & 255);
-    } else if (tailbits === 18) {
-      result.push(bits >> 10 & 255);
-      result.push(bits >> 2 & 255);
-    } else if (tailbits === 12)
-      result.push(bits >> 4 & 255);
-    return new Uint8Array(result);
-  }
-  function representYamlBinary(object) {
-    let result = "";
-    let bits = 0;
-    const max = object.length;
-    const map = BASE64_MAP;
-    for (let idx = 0;idx < max; idx++) {
-      if (idx % 3 === 0 && idx) {
-        result += map[bits >> 18 & 63];
-        result += map[bits >> 12 & 63];
-        result += map[bits >> 6 & 63];
-        result += map[bits & 63];
-      }
-      bits = (bits << 8) + object[idx];
-    }
-    const tail = max % 3;
-    if (tail === 0) {
-      result += map[bits >> 18 & 63];
-      result += map[bits >> 12 & 63];
-      result += map[bits >> 6 & 63];
-      result += map[bits & 63];
-    } else if (tail === 2) {
-      result += map[bits >> 10 & 63];
-      result += map[bits >> 4 & 63];
-      result += map[bits << 2 & 63];
-      result += map[64];
-    } else if (tail === 1) {
-      result += map[bits >> 2 & 63];
-      result += map[bits << 4 & 63];
-      result += map[64];
-      result += map[64];
-    }
-    return result;
-  }
-  function isBinary(obj) {
-    return Object.prototype.toString.call(obj) === "[object Uint8Array]";
-  }
-  module.exports = new Type("tag:yaml.org,2002:binary", {
-    kind: "scalar",
-    resolve: resolveYamlBinary,
-    construct: constructYamlBinary,
-    predicate: isBinary,
-    represent: representYamlBinary
-  });
-});
-var require_omap = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var Type = require_type();
-  var _hasOwnProperty = Object.prototype.hasOwnProperty;
-  var _toString = Object.prototype.toString;
-  function resolveYamlOmap(data) {
-    if (data === null)
-      return true;
-    const objectKeys = [];
-    const object = data;
-    for (let index = 0, length = object.length;index < length; index += 1) {
-      const pair = object[index];
-      let pairHasKey = false;
-      if (_toString.call(pair) !== "[object Object]")
-        return false;
-      let pairKey;
-      for (pairKey in pair)
-        if (_hasOwnProperty.call(pair, pairKey))
-          if (!pairHasKey)
-            pairHasKey = true;
-          else
-            return false;
-      if (!pairHasKey)
-        return false;
-      if (objectKeys.indexOf(pairKey) === -1)
-        objectKeys.push(pairKey);
-      else
-        return false;
-    }
-    return true;
-  }
-  function constructYamlOmap(data) {
-    return data !== null ? data : [];
-  }
-  module.exports = new Type("tag:yaml.org,2002:omap", {
-    kind: "sequence",
-    resolve: resolveYamlOmap,
-    construct: constructYamlOmap
-  });
-});
-var require_pairs = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var Type = require_type();
-  var _toString = Object.prototype.toString;
-  function resolveYamlPairs(data) {
-    if (data === null)
-      return true;
-    const object = data;
-    const result = new Array(object.length);
-    for (let index = 0, length = object.length;index < length; index += 1) {
-      const pair = object[index];
-      if (_toString.call(pair) !== "[object Object]")
-        return false;
-      const keys = Object.keys(pair);
-      if (keys.length !== 1)
-        return false;
-      result[index] = [keys[0], pair[keys[0]]];
-    }
-    return true;
-  }
-  function constructYamlPairs(data) {
-    if (data === null)
-      return [];
-    const object = data;
-    const result = new Array(object.length);
-    for (let index = 0, length = object.length;index < length; index += 1) {
-      const pair = object[index];
-      const keys = Object.keys(pair);
-      result[index] = [keys[0], pair[keys[0]]];
-    }
-    return result;
-  }
-  module.exports = new Type("tag:yaml.org,2002:pairs", {
-    kind: "sequence",
-    resolve: resolveYamlPairs,
-    construct: constructYamlPairs
-  });
-});
-var require_set = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var Type = require_type();
-  var _hasOwnProperty = Object.prototype.hasOwnProperty;
-  function resolveYamlSet(data) {
-    if (data === null)
-      return true;
-    const object = data;
-    for (const key in object)
-      if (_hasOwnProperty.call(object, key)) {
-        if (object[key] !== null)
-          return false;
-      }
-    return true;
-  }
-  function constructYamlSet(data) {
-    return data !== null ? data : {};
-  }
-  module.exports = new Type("tag:yaml.org,2002:set", {
-    kind: "mapping",
-    resolve: resolveYamlSet,
-    construct: constructYamlSet
-  });
-});
-var require_default = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  module.exports = require_core().extend({
-    implicit: [require_timestamp(), require_merge()],
-    explicit: [
-      require_binary(),
-      require_omap(),
-      require_pairs(),
-      require_set()
-    ]
-  });
-});
-var require_loader = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var common = require_common();
-  var YAMLException = require_exception();
-  var makeSnippet = require_snippet();
-  var DEFAULT_SCHEMA = require_default();
-  var _hasOwnProperty = Object.prototype.hasOwnProperty;
-  var CONTEXT_FLOW_IN = 1;
-  var CONTEXT_FLOW_OUT = 2;
-  var CONTEXT_BLOCK_IN = 3;
-  var CONTEXT_BLOCK_OUT = 4;
-  var CHOMPING_CLIP = 1;
-  var CHOMPING_STRIP = 2;
-  var CHOMPING_KEEP = 3;
-  var PATTERN_NON_PRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/;
-  var PATTERN_NON_ASCII_LINE_BREAKS = /[\x85\u2028\u2029]/;
-  var PATTERN_FLOW_INDICATORS = /[,\[\]{}]/;
-  var PATTERN_TAG_HANDLE = /^(?:!|!!|![0-9A-Za-z-]+!)$/;
-  var PATTERN_TAG_URI = /^(?:!|[^,\[\]{}])(?:%[0-9a-f]{2}|[0-9a-z\-#;/?:@&=+$,_.!~*'()\[\]])*$/i;
-  function _class(obj) {
-    return Object.prototype.toString.call(obj);
-  }
-  function isEol(c) {
-    return c === 10 || c === 13;
-  }
-  function isWhiteSpace(c) {
-    return c === 9 || c === 32;
-  }
-  function isWsOrEol(c) {
-    return c === 9 || c === 32 || c === 10 || c === 13;
-  }
-  function isFlowIndicator(c) {
-    return c === 44 || c === 91 || c === 93 || c === 123 || c === 125;
-  }
-  function fromHexCode(c) {
-    if (c >= 48 && c <= 57)
-      return c - 48;
-    const lc = c | 32;
-    if (lc >= 97 && lc <= 102)
-      return lc - 97 + 10;
-    return -1;
-  }
-  function escapedHexLen(c) {
-    if (c === 120)
-      return 2;
-    if (c === 117)
-      return 4;
-    if (c === 85)
-      return 8;
-    return 0;
-  }
-  function fromDecimalCode(c) {
-    if (c >= 48 && c <= 57)
-      return c - 48;
-    return -1;
-  }
-  function simpleEscapeSequence(c) {
-    switch (c) {
-      case 48:
-        return "\x00";
-      case 97:
-        return "\x07";
-      case 98:
-        return "\b";
-      case 116:
-        return "\t";
-      case 9:
-        return "\t";
-      case 110:
-        return `
-`;
-      case 118:
-        return "\v";
-      case 102:
-        return "\f";
-      case 114:
-        return "\r";
-      case 101:
-        return "\x1B";
-      case 32:
-        return " ";
-      case 34:
-        return '"';
-      case 47:
-        return "/";
-      case 92:
-        return "\\";
-      case 78:
-        return "";
-      case 95:
-        return " ";
-      case 76:
-        return "\u2028";
-      case 80:
-        return "\u2029";
-      default:
-        return "";
-    }
-  }
-  function charFromCodepoint(c) {
-    if (c <= 65535)
-      return String.fromCharCode(c);
-    return String.fromCharCode((c - 65536 >> 10) + 55296, (c - 65536 & 1023) + 56320);
-  }
-  function setProperty(object, key, value) {
-    if (key === "__proto__")
-      Object.defineProperty(object, key, {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value
-      });
-    else
-      object[key] = value;
-  }
-  var simpleEscapeCheck = new Array(256);
-  var simpleEscapeMap = new Array(256);
-  for (let i = 0;i < 256; i++) {
-    simpleEscapeCheck[i] = simpleEscapeSequence(i) ? 1 : 0;
-    simpleEscapeMap[i] = simpleEscapeSequence(i);
-  }
-  function State(input, options) {
-    this.input = input;
-    this.filename = options["filename"] || null;
-    this.schema = options["schema"] || DEFAULT_SCHEMA;
-    this.onWarning = options["onWarning"] || null;
-    this.legacy = options["legacy"] || false;
-    this.json = options["json"] || false;
-    this.listener = options["listener"] || null;
-    this.maxDepth = typeof options["maxDepth"] === "number" ? options["maxDepth"] : 100;
-    this.maxMergeSeqLength = typeof options["maxMergeSeqLength"] === "number" ? options["maxMergeSeqLength"] : 20;
-    this.implicitTypes = this.schema.compiledImplicit;
-    this.typeMap = this.schema.compiledTypeMap;
-    this.length = input.length;
-    this.position = 0;
-    this.line = 0;
-    this.lineStart = 0;
-    this.lineIndent = 0;
-    this.depth = 0;
-    this.firstTabInLine = -1;
-    this.documents = [];
-    this.anchorMapTransactions = [];
-  }
-  function generateError(state, message) {
-    const mark = {
-      name: state.filename,
-      buffer: state.input.slice(0, -1),
-      position: state.position,
-      line: state.line,
-      column: state.position - state.lineStart
-    };
-    mark.snippet = makeSnippet(mark);
-    return new YAMLException(message, mark);
-  }
-  function throwError(state, message) {
-    throw generateError(state, message);
-  }
-  function throwWarning(state, message) {
-    if (state.onWarning)
-      state.onWarning.call(null, generateError(state, message));
-  }
-  function storeAnchor(state, name, value) {
-    const transactions = state.anchorMapTransactions;
-    if (transactions.length !== 0) {
-      const transaction = transactions[transactions.length - 1];
-      if (!_hasOwnProperty.call(transaction, name))
-        transaction[name] = {
-          existed: _hasOwnProperty.call(state.anchorMap, name),
-          value: state.anchorMap[name]
-        };
-    }
-    state.anchorMap[name] = value;
-  }
-  function beginAnchorTransaction(state) {
-    state.anchorMapTransactions.push(Object.create(null));
-  }
-  function commitAnchorTransaction(state) {
-    const transaction = state.anchorMapTransactions.pop();
-    const transactions = state.anchorMapTransactions;
-    if (transactions.length === 0)
-      return;
-    const parent = transactions[transactions.length - 1];
-    const names = Object.keys(transaction);
-    for (let index = 0, length = names.length;index < length; index += 1) {
-      const name = names[index];
-      if (!_hasOwnProperty.call(parent, name))
-        parent[name] = transaction[name];
-    }
-  }
-  function rollbackAnchorTransaction(state) {
-    const transaction = state.anchorMapTransactions.pop();
-    const names = Object.keys(transaction);
-    for (let index = names.length - 1;index >= 0; index -= 1) {
-      const entry = transaction[names[index]];
-      if (entry.existed)
-        state.anchorMap[names[index]] = entry.value;
-      else
-        delete state.anchorMap[names[index]];
-    }
-  }
-  function snapshotState(state) {
-    return {
-      position: state.position,
-      line: state.line,
-      lineStart: state.lineStart,
-      lineIndent: state.lineIndent,
-      firstTabInLine: state.firstTabInLine,
-      tag: state.tag,
-      anchor: state.anchor,
-      kind: state.kind,
-      result: state.result
-    };
-  }
-  function restoreState(state, snapshot) {
-    state.position = snapshot.position;
-    state.line = snapshot.line;
-    state.lineStart = snapshot.lineStart;
-    state.lineIndent = snapshot.lineIndent;
-    state.firstTabInLine = snapshot.firstTabInLine;
-    state.tag = snapshot.tag;
-    state.anchor = snapshot.anchor;
-    state.kind = snapshot.kind;
-    state.result = snapshot.result;
-  }
-  var directiveHandlers = {
-    YAML: function handleYamlDirective(state, name, args) {
-      if (state.version !== null)
-        throwError(state, "duplication of %YAML directive");
-      if (args.length !== 1)
-        throwError(state, "YAML directive accepts exactly one argument");
-      const match = /^([0-9]+)\.([0-9]+)$/.exec(args[0]);
-      if (match === null)
-        throwError(state, "ill-formed argument of the YAML directive");
-      const major = parseInt(match[1], 10);
-      const minor = parseInt(match[2], 10);
-      if (major !== 1)
-        throwError(state, "unacceptable YAML version of the document");
-      state.version = args[0];
-      state.checkLineBreaks = minor < 2;
-      if (minor !== 1 && minor !== 2)
-        throwWarning(state, "unsupported YAML version of the document");
-    },
-    TAG: function handleTagDirective(state, name, args) {
-      let prefix;
-      if (args.length !== 2)
-        throwError(state, "TAG directive accepts exactly two arguments");
-      const handle = args[0];
-      prefix = args[1];
-      if (!PATTERN_TAG_HANDLE.test(handle))
-        throwError(state, "ill-formed tag handle (first argument) of the TAG directive");
-      if (_hasOwnProperty.call(state.tagMap, handle))
-        throwError(state, 'there is a previously declared suffix for "' + handle + '" tag handle');
-      if (!PATTERN_TAG_URI.test(prefix))
-        throwError(state, "ill-formed tag prefix (second argument) of the TAG directive");
-      try {
-        prefix = decodeURIComponent(prefix);
-      } catch (err) {
-        throwError(state, "tag prefix is malformed: " + prefix);
-      }
-      state.tagMap[handle] = prefix;
-    }
-  };
-  function captureSegment(state, start, end, checkJson) {
-    if (start < end) {
-      const _result = state.input.slice(start, end);
-      if (checkJson)
-        for (let _position = 0, _length = _result.length;_position < _length; _position += 1) {
-          const _character = _result.charCodeAt(_position);
-          if (!(_character === 9 || _character >= 32 && _character <= 1114111))
-            throwError(state, "expected valid JSON character");
-        }
-      else if (PATTERN_NON_PRINTABLE.test(_result))
-        throwError(state, "the stream contains non-printable characters");
-      state.result += _result;
-    }
-  }
-  function mergeMappings(state, destination, source, overridableKeys) {
-    if (!common.isObject(source))
-      throwError(state, "cannot merge mappings; the provided source object is unacceptable");
-    const sourceKeys = Object.keys(source);
-    for (let index = 0, quantity = sourceKeys.length;index < quantity; index += 1) {
-      const key = sourceKeys[index];
-      if (!_hasOwnProperty.call(destination, key)) {
-        setProperty(destination, key, source[key]);
-        overridableKeys[key] = true;
-      }
-    }
-  }
-  function storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, startLine, startLineStart, startPos) {
-    if (Array.isArray(keyNode)) {
-      keyNode = Array.prototype.slice.call(keyNode);
-      for (let index = 0, quantity = keyNode.length;index < quantity; index += 1) {
-        if (Array.isArray(keyNode[index]))
-          throwError(state, "nested arrays are not supported inside keys");
-        if (typeof keyNode === "object" && _class(keyNode[index]) === "[object Object]")
-          keyNode[index] = "[object Object]";
-      }
-    }
-    if (typeof keyNode === "object" && _class(keyNode) === "[object Object]")
-      keyNode = "[object Object]";
-    keyNode = String(keyNode);
-    if (_result === null)
-      _result = {};
-    if (keyTag === "tag:yaml.org,2002:merge")
-      if (Array.isArray(valueNode)) {
-        if (valueNode.length > state.maxMergeSeqLength)
-          throwError(state, "merge sequence length exceeded maxMergeSeqLength (" + state.maxMergeSeqLength + ")");
-        const seen = /* @__PURE__ */ new Set;
-        for (let index = 0, quantity = valueNode.length;index < quantity; index += 1) {
-          const src = valueNode[index];
-          if (seen.has(src))
-            continue;
-          seen.add(src);
-          mergeMappings(state, _result, src, overridableKeys);
-        }
-      } else
-        mergeMappings(state, _result, valueNode, overridableKeys);
-    else {
-      if (!state.json && !_hasOwnProperty.call(overridableKeys, keyNode) && _hasOwnProperty.call(_result, keyNode)) {
-        state.line = startLine || state.line;
-        state.lineStart = startLineStart || state.lineStart;
-        state.position = startPos || state.position;
-        throwError(state, "duplicated mapping key");
-      }
-      setProperty(_result, keyNode, valueNode);
-      delete overridableKeys[keyNode];
-    }
-    return _result;
-  }
-  function readLineBreak(state) {
-    const ch = state.input.charCodeAt(state.position);
-    if (ch === 10)
-      state.position++;
-    else if (ch === 13) {
-      state.position++;
-      if (state.input.charCodeAt(state.position) === 10)
-        state.position++;
-    } else
-      throwError(state, "a line break is expected");
-    state.line += 1;
-    state.lineStart = state.position;
-    state.firstTabInLine = -1;
-  }
-  function skipSeparationSpace(state, allowComments, checkIndent) {
-    let lineBreaks = 0;
-    let ch = state.input.charCodeAt(state.position);
-    while (ch !== 0) {
-      while (isWhiteSpace(ch)) {
-        if (ch === 9 && state.firstTabInLine === -1)
-          state.firstTabInLine = state.position;
-        ch = state.input.charCodeAt(++state.position);
-      }
-      if (allowComments && ch === 35)
-        do
-          ch = state.input.charCodeAt(++state.position);
-        while (ch !== 10 && ch !== 13 && ch !== 0);
-      if (isEol(ch)) {
-        readLineBreak(state);
-        ch = state.input.charCodeAt(state.position);
-        lineBreaks++;
-        state.lineIndent = 0;
-        while (ch === 32) {
-          state.lineIndent++;
-          ch = state.input.charCodeAt(++state.position);
-        }
-      } else
-        break;
-    }
-    if (checkIndent !== -1 && lineBreaks !== 0 && state.lineIndent < checkIndent)
-      throwWarning(state, "deficient indentation");
-    return lineBreaks;
-  }
-  function testDocumentSeparator(state) {
-    let _position = state.position;
-    let ch = state.input.charCodeAt(_position);
-    if ((ch === 45 || ch === 46) && ch === state.input.charCodeAt(_position + 1) && ch === state.input.charCodeAt(_position + 2)) {
-      _position += 3;
-      ch = state.input.charCodeAt(_position);
-      if (ch === 0 || isWsOrEol(ch))
-        return true;
-    }
-    return false;
-  }
-  function writeFoldedLines(state, count) {
-    if (count === 1)
-      state.result += " ";
-    else if (count > 1)
-      state.result += common.repeat(`
-`, count - 1);
-  }
-  function readPlainScalar(state, nodeIndent, withinFlowCollection) {
-    let captureStart;
-    let captureEnd;
-    let hasPendingContent;
-    let _line;
-    let _lineStart;
-    let _lineIndent;
-    const _kind = state.kind;
-    const _result = state.result;
-    let ch = state.input.charCodeAt(state.position);
-    if (isWsOrEol(ch) || isFlowIndicator(ch) || ch === 35 || ch === 38 || ch === 42 || ch === 33 || ch === 124 || ch === 62 || ch === 39 || ch === 34 || ch === 37 || ch === 64 || ch === 96)
-      return false;
-    if (ch === 63 || ch === 45) {
-      const following = state.input.charCodeAt(state.position + 1);
-      if (isWsOrEol(following) || withinFlowCollection && isFlowIndicator(following))
-        return false;
-    }
-    state.kind = "scalar";
-    state.result = "";
-    captureStart = captureEnd = state.position;
-    hasPendingContent = false;
-    while (ch !== 0) {
-      if (ch === 58) {
-        const following = state.input.charCodeAt(state.position + 1);
-        if (isWsOrEol(following) || withinFlowCollection && isFlowIndicator(following))
-          break;
-      } else if (ch === 35) {
-        if (isWsOrEol(state.input.charCodeAt(state.position - 1)))
-          break;
-      } else if (state.position === state.lineStart && testDocumentSeparator(state) || withinFlowCollection && isFlowIndicator(ch))
-        break;
-      else if (isEol(ch)) {
-        _line = state.line;
-        _lineStart = state.lineStart;
-        _lineIndent = state.lineIndent;
-        skipSeparationSpace(state, false, -1);
-        if (state.lineIndent >= nodeIndent) {
-          hasPendingContent = true;
-          ch = state.input.charCodeAt(state.position);
-          continue;
-        } else {
-          state.position = captureEnd;
-          state.line = _line;
-          state.lineStart = _lineStart;
-          state.lineIndent = _lineIndent;
-          break;
-        }
-      }
-      if (hasPendingContent) {
-        captureSegment(state, captureStart, captureEnd, false);
-        writeFoldedLines(state, state.line - _line);
-        captureStart = captureEnd = state.position;
-        hasPendingContent = false;
-      }
-      if (!isWhiteSpace(ch))
-        captureEnd = state.position + 1;
-      ch = state.input.charCodeAt(++state.position);
-    }
-    captureSegment(state, captureStart, captureEnd, false);
-    if (state.result)
-      return true;
-    state.kind = _kind;
-    state.result = _result;
-    return false;
-  }
-  function readSingleQuotedScalar(state, nodeIndent) {
-    let captureStart;
-    let captureEnd;
-    let ch = state.input.charCodeAt(state.position);
-    if (ch !== 39)
-      return false;
-    state.kind = "scalar";
-    state.result = "";
-    state.position++;
-    captureStart = captureEnd = state.position;
-    while ((ch = state.input.charCodeAt(state.position)) !== 0)
-      if (ch === 39) {
-        captureSegment(state, captureStart, state.position, true);
-        ch = state.input.charCodeAt(++state.position);
-        if (ch === 39) {
-          captureStart = state.position;
-          state.position++;
-          captureEnd = state.position;
-        } else
-          return true;
-      } else if (isEol(ch)) {
-        captureSegment(state, captureStart, captureEnd, true);
-        writeFoldedLines(state, skipSeparationSpace(state, false, nodeIndent));
-        captureStart = captureEnd = state.position;
-      } else if (state.position === state.lineStart && testDocumentSeparator(state))
-        throwError(state, "unexpected end of the document within a single quoted scalar");
-      else {
-        state.position++;
-        if (!isWhiteSpace(ch))
-          captureEnd = state.position;
-      }
-    throwError(state, "unexpected end of the stream within a single quoted scalar");
-  }
-  function readDoubleQuotedScalar(state, nodeIndent) {
-    let captureStart;
-    let captureEnd;
-    let tmp;
-    let ch = state.input.charCodeAt(state.position);
-    if (ch !== 34)
-      return false;
-    state.kind = "scalar";
-    state.result = "";
-    state.position++;
-    captureStart = captureEnd = state.position;
-    while ((ch = state.input.charCodeAt(state.position)) !== 0)
-      if (ch === 34) {
-        captureSegment(state, captureStart, state.position, true);
-        state.position++;
-        return true;
-      } else if (ch === 92) {
-        captureSegment(state, captureStart, state.position, true);
-        ch = state.input.charCodeAt(++state.position);
-        if (isEol(ch))
-          skipSeparationSpace(state, false, nodeIndent);
-        else if (ch < 256 && simpleEscapeCheck[ch]) {
-          state.result += simpleEscapeMap[ch];
-          state.position++;
-        } else if ((tmp = escapedHexLen(ch)) > 0) {
-          let hexLength = tmp;
-          let hexResult = 0;
-          for (;hexLength > 0; hexLength--) {
-            ch = state.input.charCodeAt(++state.position);
-            if ((tmp = fromHexCode(ch)) >= 0)
-              hexResult = (hexResult << 4) + tmp;
-            else
-              throwError(state, "expected hexadecimal character");
-          }
-          state.result += charFromCodepoint(hexResult);
-          state.position++;
-        } else
-          throwError(state, "unknown escape sequence");
-        captureStart = captureEnd = state.position;
-      } else if (isEol(ch)) {
-        captureSegment(state, captureStart, captureEnd, true);
-        writeFoldedLines(state, skipSeparationSpace(state, false, nodeIndent));
-        captureStart = captureEnd = state.position;
-      } else if (state.position === state.lineStart && testDocumentSeparator(state))
-        throwError(state, "unexpected end of the document within a double quoted scalar");
-      else {
-        state.position++;
-        if (!isWhiteSpace(ch))
-          captureEnd = state.position;
-      }
-    throwError(state, "unexpected end of the stream within a double quoted scalar");
-  }
-  function readFlowCollection(state, nodeIndent) {
-    let readNext = true;
-    let _line;
-    let _lineStart;
-    let _pos;
-    const _tag = state.tag;
-    let _result;
-    const _anchor = state.anchor;
-    let terminator;
-    let isPair;
-    let isExplicitPair;
-    let isMapping;
-    const overridableKeys = Object.create(null);
-    let keyNode;
-    let keyTag;
-    let valueNode;
-    let ch = state.input.charCodeAt(state.position);
-    if (ch === 91) {
-      terminator = 93;
-      isMapping = false;
-      _result = [];
-    } else if (ch === 123) {
-      terminator = 125;
-      isMapping = true;
-      _result = {};
-    } else
-      return false;
-    if (state.anchor !== null)
-      storeAnchor(state, state.anchor, _result);
-    ch = state.input.charCodeAt(++state.position);
-    while (ch !== 0) {
-      skipSeparationSpace(state, true, nodeIndent);
-      ch = state.input.charCodeAt(state.position);
-      if (ch === terminator) {
-        state.position++;
-        state.tag = _tag;
-        state.anchor = _anchor;
-        state.kind = isMapping ? "mapping" : "sequence";
-        state.result = _result;
-        return true;
-      } else if (!readNext)
-        throwError(state, "missed comma between flow collection entries");
-      else if (ch === 44)
-        throwError(state, "expected the node content, but found ','");
-      keyTag = keyNode = valueNode = null;
-      isPair = isExplicitPair = false;
-      if (ch === 63) {
-        if (isWsOrEol(state.input.charCodeAt(state.position + 1))) {
-          isPair = isExplicitPair = true;
-          state.position++;
-          skipSeparationSpace(state, true, nodeIndent);
-        }
-      }
-      _line = state.line;
-      _lineStart = state.lineStart;
-      _pos = state.position;
-      composeNode(state, nodeIndent, CONTEXT_FLOW_IN, false, true);
-      keyTag = state.tag;
-      keyNode = state.result;
-      skipSeparationSpace(state, true, nodeIndent);
-      ch = state.input.charCodeAt(state.position);
-      if ((isExplicitPair || state.line === _line) && ch === 58) {
-        isPair = true;
-        ch = state.input.charCodeAt(++state.position);
-        skipSeparationSpace(state, true, nodeIndent);
-        composeNode(state, nodeIndent, CONTEXT_FLOW_IN, false, true);
-        valueNode = state.result;
-      }
-      if (isMapping)
-        storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, _line, _lineStart, _pos);
-      else if (isPair)
-        _result.push(storeMappingPair(state, null, overridableKeys, keyTag, keyNode, valueNode, _line, _lineStart, _pos));
-      else
-        _result.push(keyNode);
-      skipSeparationSpace(state, true, nodeIndent);
-      ch = state.input.charCodeAt(state.position);
-      if (ch === 44) {
-        readNext = true;
-        ch = state.input.charCodeAt(++state.position);
-      } else
-        readNext = false;
-    }
-    throwError(state, "unexpected end of the stream within a flow collection");
-  }
-  function readBlockScalar(state, nodeIndent) {
-    let folding;
-    let chomping = CHOMPING_CLIP;
-    let didReadContent = false;
-    let detectedIndent = false;
-    let textIndent = nodeIndent;
-    let emptyLines = 0;
-    let atMoreIndented = false;
-    let tmp;
-    let ch = state.input.charCodeAt(state.position);
-    if (ch === 124)
-      folding = false;
-    else if (ch === 62)
-      folding = true;
-    else
-      return false;
-    state.kind = "scalar";
-    state.result = "";
-    while (ch !== 0) {
-      ch = state.input.charCodeAt(++state.position);
-      if (ch === 43 || ch === 45)
-        if (CHOMPING_CLIP === chomping)
-          chomping = ch === 43 ? CHOMPING_KEEP : CHOMPING_STRIP;
-        else
-          throwError(state, "repeat of a chomping mode identifier");
-      else if ((tmp = fromDecimalCode(ch)) >= 0)
-        if (tmp === 0)
-          throwError(state, "bad explicit indentation width of a block scalar; it cannot be less than one");
-        else if (!detectedIndent) {
-          textIndent = nodeIndent + tmp - 1;
-          detectedIndent = true;
-        } else
-          throwError(state, "repeat of an indentation width identifier");
-      else
-        break;
-    }
-    if (isWhiteSpace(ch)) {
-      do
-        ch = state.input.charCodeAt(++state.position);
-      while (isWhiteSpace(ch));
-      if (ch === 35)
-        do
-          ch = state.input.charCodeAt(++state.position);
-        while (!isEol(ch) && ch !== 0);
-    }
-    while (ch !== 0) {
-      readLineBreak(state);
-      state.lineIndent = 0;
-      ch = state.input.charCodeAt(state.position);
-      while ((!detectedIndent || state.lineIndent < textIndent) && ch === 32) {
-        state.lineIndent++;
-        ch = state.input.charCodeAt(++state.position);
-      }
-      if (!detectedIndent && state.lineIndent > textIndent)
-        textIndent = state.lineIndent;
-      if (isEol(ch)) {
-        emptyLines++;
-        continue;
-      }
-      if (!detectedIndent && textIndent === 0)
-        throwError(state, "missing indentation for block scalar");
-      if (state.lineIndent < textIndent) {
-        if (chomping === CHOMPING_KEEP)
-          state.result += common.repeat(`
-`, didReadContent ? 1 + emptyLines : emptyLines);
-        else if (chomping === CHOMPING_CLIP) {
-          if (didReadContent)
-            state.result += `
-`;
-        }
-        break;
-      }
-      if (folding)
-        if (isWhiteSpace(ch)) {
-          atMoreIndented = true;
-          state.result += common.repeat(`
-`, didReadContent ? 1 + emptyLines : emptyLines);
-        } else if (atMoreIndented) {
-          atMoreIndented = false;
-          state.result += common.repeat(`
-`, emptyLines + 1);
-        } else if (emptyLines === 0) {
-          if (didReadContent)
-            state.result += " ";
-        } else
-          state.result += common.repeat(`
-`, emptyLines);
-      else
-        state.result += common.repeat(`
-`, didReadContent ? 1 + emptyLines : emptyLines);
-      didReadContent = true;
-      detectedIndent = true;
-      emptyLines = 0;
-      const captureStart = state.position;
-      while (!isEol(ch) && ch !== 0)
-        ch = state.input.charCodeAt(++state.position);
-      captureSegment(state, captureStart, state.position, false);
-    }
-    return true;
-  }
-  function readBlockSequence(state, nodeIndent) {
-    const _tag = state.tag;
-    const _anchor = state.anchor;
-    const _result = [];
-    let detected = false;
-    if (state.firstTabInLine !== -1)
-      return false;
-    if (state.anchor !== null)
-      storeAnchor(state, state.anchor, _result);
-    let ch = state.input.charCodeAt(state.position);
-    while (ch !== 0) {
-      if (state.firstTabInLine !== -1) {
-        state.position = state.firstTabInLine;
-        throwError(state, "tab characters must not be used in indentation");
-      }
-      if (ch !== 45)
-        break;
-      if (!isWsOrEol(state.input.charCodeAt(state.position + 1)))
-        break;
-      detected = true;
-      state.position++;
-      if (skipSeparationSpace(state, true, -1)) {
-        if (state.lineIndent <= nodeIndent) {
-          _result.push(null);
-          ch = state.input.charCodeAt(state.position);
-          continue;
-        }
-      }
-      const _line = state.line;
-      composeNode(state, nodeIndent, CONTEXT_BLOCK_IN, false, true);
-      _result.push(state.result);
-      skipSeparationSpace(state, true, -1);
-      ch = state.input.charCodeAt(state.position);
-      if ((state.line === _line || state.lineIndent > nodeIndent) && ch !== 0)
-        throwError(state, "bad indentation of a sequence entry");
-      else if (state.lineIndent < nodeIndent)
-        break;
-    }
-    if (detected) {
-      state.tag = _tag;
-      state.anchor = _anchor;
-      state.kind = "sequence";
-      state.result = _result;
-      return true;
-    }
-    return false;
-  }
-  function readBlockMapping(state, nodeIndent, flowIndent) {
-    let allowCompact;
-    let _keyLine;
-    let _keyLineStart;
-    let _keyPos;
-    const _tag = state.tag;
-    const _anchor = state.anchor;
-    const _result = {};
-    const overridableKeys = Object.create(null);
-    let keyTag = null;
-    let keyNode = null;
-    let valueNode = null;
-    let atExplicitKey = false;
-    let detected = false;
-    if (state.firstTabInLine !== -1)
-      return false;
-    if (state.anchor !== null)
-      storeAnchor(state, state.anchor, _result);
-    let ch = state.input.charCodeAt(state.position);
-    while (ch !== 0) {
-      if (!atExplicitKey && state.firstTabInLine !== -1) {
-        state.position = state.firstTabInLine;
-        throwError(state, "tab characters must not be used in indentation");
-      }
-      const following = state.input.charCodeAt(state.position + 1);
-      const _line = state.line;
-      if ((ch === 63 || ch === 58) && isWsOrEol(following)) {
-        if (ch === 63) {
-          if (atExplicitKey) {
-            storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
-            keyTag = keyNode = valueNode = null;
-          }
-          detected = true;
-          atExplicitKey = true;
-          allowCompact = true;
-        } else if (atExplicitKey) {
-          atExplicitKey = false;
-          allowCompact = true;
-        } else
-          throwError(state, "incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line");
-        state.position += 1;
-        ch = following;
-      } else {
-        _keyLine = state.line;
-        _keyLineStart = state.lineStart;
-        _keyPos = state.position;
-        if (!composeNode(state, flowIndent, CONTEXT_FLOW_OUT, false, true))
-          break;
-        if (state.line === _line) {
-          ch = state.input.charCodeAt(state.position);
-          while (isWhiteSpace(ch))
-            ch = state.input.charCodeAt(++state.position);
-          if (ch === 58) {
-            ch = state.input.charCodeAt(++state.position);
-            if (!isWsOrEol(ch))
-              throwError(state, "a whitespace character is expected after the key-value separator within a block mapping");
-            if (atExplicitKey) {
-              storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
-              keyTag = keyNode = valueNode = null;
-            }
-            detected = true;
-            atExplicitKey = false;
-            allowCompact = false;
-            keyTag = state.tag;
-            keyNode = state.result;
-          } else if (detected)
-            throwError(state, "can not read an implicit mapping pair; a colon is missed");
-          else {
-            state.tag = _tag;
-            state.anchor = _anchor;
-            return true;
-          }
-        } else if (detected)
-          throwError(state, "can not read a block mapping entry; a multiline key may not be an implicit key");
-        else {
-          state.tag = _tag;
-          state.anchor = _anchor;
-          return true;
-        }
-      }
-      if (state.line === _line || state.lineIndent > nodeIndent) {
-        if (atExplicitKey) {
-          _keyLine = state.line;
-          _keyLineStart = state.lineStart;
-          _keyPos = state.position;
-        }
-        if (composeNode(state, nodeIndent, CONTEXT_BLOCK_OUT, true, allowCompact))
-          if (atExplicitKey)
-            keyNode = state.result;
-          else
-            valueNode = state.result;
-        if (!atExplicitKey) {
-          storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, _keyLine, _keyLineStart, _keyPos);
-          keyTag = keyNode = valueNode = null;
-        }
-        skipSeparationSpace(state, true, -1);
-        ch = state.input.charCodeAt(state.position);
-      }
-      if ((state.line === _line || state.lineIndent > nodeIndent) && ch !== 0)
-        throwError(state, "bad indentation of a mapping entry");
-      else if (state.lineIndent < nodeIndent)
-        break;
-    }
-    if (atExplicitKey)
-      storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
-    if (detected) {
-      state.tag = _tag;
-      state.anchor = _anchor;
-      state.kind = "mapping";
-      state.result = _result;
-    }
-    return detected;
-  }
-  function readTagProperty(state) {
-    let isVerbatim = false;
-    let isNamed = false;
-    let tagHandle;
-    let tagName;
-    let ch = state.input.charCodeAt(state.position);
-    if (ch !== 33)
-      return false;
-    if (state.tag !== null)
-      throwError(state, "duplication of a tag property");
-    ch = state.input.charCodeAt(++state.position);
-    if (ch === 60) {
-      isVerbatim = true;
-      ch = state.input.charCodeAt(++state.position);
-    } else if (ch === 33) {
-      isNamed = true;
-      tagHandle = "!!";
-      ch = state.input.charCodeAt(++state.position);
-    } else
-      tagHandle = "!";
-    let _position = state.position;
-    if (isVerbatim) {
-      do
-        ch = state.input.charCodeAt(++state.position);
-      while (ch !== 0 && ch !== 62);
-      if (state.position < state.length) {
-        tagName = state.input.slice(_position, state.position);
-        ch = state.input.charCodeAt(++state.position);
-      } else
-        throwError(state, "unexpected end of the stream within a verbatim tag");
-    } else {
-      while (ch !== 0 && !isWsOrEol(ch)) {
-        if (ch === 33)
-          if (!isNamed) {
-            tagHandle = state.input.slice(_position - 1, state.position + 1);
-            if (!PATTERN_TAG_HANDLE.test(tagHandle))
-              throwError(state, "named tag handle cannot contain such characters");
-            isNamed = true;
-            _position = state.position + 1;
-          } else
-            throwError(state, "tag suffix cannot contain exclamation marks");
-        ch = state.input.charCodeAt(++state.position);
-      }
-      tagName = state.input.slice(_position, state.position);
-      if (PATTERN_FLOW_INDICATORS.test(tagName))
-        throwError(state, "tag suffix cannot contain flow indicator characters");
-    }
-    if (tagName && !PATTERN_TAG_URI.test(tagName))
-      throwError(state, "tag name cannot contain such characters: " + tagName);
-    try {
-      tagName = decodeURIComponent(tagName);
-    } catch (err) {
-      throwError(state, "tag name is malformed: " + tagName);
-    }
-    if (isVerbatim)
-      state.tag = tagName;
-    else if (_hasOwnProperty.call(state.tagMap, tagHandle))
-      state.tag = state.tagMap[tagHandle] + tagName;
-    else if (tagHandle === "!")
-      state.tag = "!" + tagName;
-    else if (tagHandle === "!!")
-      state.tag = "tag:yaml.org,2002:" + tagName;
-    else
-      throwError(state, 'undeclared tag handle "' + tagHandle + '"');
-    return true;
-  }
-  function readAnchorProperty(state) {
-    let ch = state.input.charCodeAt(state.position);
-    if (ch !== 38)
-      return false;
-    if (state.anchor !== null)
-      throwError(state, "duplication of an anchor property");
-    ch = state.input.charCodeAt(++state.position);
-    const _position = state.position;
-    while (ch !== 0 && !isWsOrEol(ch) && !isFlowIndicator(ch))
-      ch = state.input.charCodeAt(++state.position);
-    if (state.position === _position)
-      throwError(state, "name of an anchor node must contain at least one character");
-    state.anchor = state.input.slice(_position, state.position);
-    return true;
-  }
-  function readAlias(state) {
-    let ch = state.input.charCodeAt(state.position);
-    if (ch !== 42)
-      return false;
-    ch = state.input.charCodeAt(++state.position);
-    const _position = state.position;
-    while (ch !== 0 && !isWsOrEol(ch) && !isFlowIndicator(ch))
-      ch = state.input.charCodeAt(++state.position);
-    if (state.position === _position)
-      throwError(state, "name of an alias node must contain at least one character");
-    const alias = state.input.slice(_position, state.position);
-    if (!_hasOwnProperty.call(state.anchorMap, alias))
-      throwError(state, 'unidentified alias "' + alias + '"');
-    state.result = state.anchorMap[alias];
-    skipSeparationSpace(state, true, -1);
-    return true;
-  }
-  function tryReadBlockMappingFromProperty(state, propertyStart, nodeIndent, flowIndent) {
-    const fallbackState = snapshotState(state);
-    beginAnchorTransaction(state);
-    restoreState(state, propertyStart);
-    state.tag = null;
-    state.anchor = null;
-    state.kind = null;
-    state.result = null;
-    if (readBlockMapping(state, nodeIndent, flowIndent) && state.kind === "mapping") {
-      commitAnchorTransaction(state);
-      return true;
-    }
-    rollbackAnchorTransaction(state);
-    restoreState(state, fallbackState);
-    return false;
-  }
-  function composeNode(state, parentIndent, nodeContext, allowToSeek, allowCompact) {
-    let allowBlockScalars;
-    let allowBlockCollections;
-    let indentStatus = 1;
-    let atNewLine = false;
-    let hasContent = false;
-    let propertyStart = null;
-    let type;
-    let flowIndent;
-    let blockIndent;
-    if (state.depth >= state.maxDepth)
-      throwError(state, "nesting exceeded maxDepth (" + state.maxDepth + ")");
-    state.depth += 1;
-    if (state.listener !== null)
-      state.listener("open", state);
-    state.tag = null;
-    state.anchor = null;
-    state.kind = null;
-    state.result = null;
-    const allowBlockStyles = allowBlockScalars = allowBlockCollections = CONTEXT_BLOCK_OUT === nodeContext || CONTEXT_BLOCK_IN === nodeContext;
-    if (allowToSeek) {
-      if (skipSeparationSpace(state, true, -1)) {
-        atNewLine = true;
-        if (state.lineIndent > parentIndent)
-          indentStatus = 1;
-        else if (state.lineIndent === parentIndent)
-          indentStatus = 0;
-        else if (state.lineIndent < parentIndent)
-          indentStatus = -1;
-      }
-    }
-    if (indentStatus === 1)
-      while (true) {
-        const ch = state.input.charCodeAt(state.position);
-        const propertyState = snapshotState(state);
-        if (atNewLine && (ch === 33 && state.tag !== null || ch === 38 && state.anchor !== null))
-          break;
-        if (!readTagProperty(state) && !readAnchorProperty(state))
-          break;
-        if (propertyStart === null)
-          propertyStart = propertyState;
-        if (skipSeparationSpace(state, true, -1)) {
-          atNewLine = true;
-          allowBlockCollections = allowBlockStyles;
-          if (state.lineIndent > parentIndent)
-            indentStatus = 1;
-          else if (state.lineIndent === parentIndent)
-            indentStatus = 0;
-          else if (state.lineIndent < parentIndent)
-            indentStatus = -1;
-        } else
-          allowBlockCollections = false;
-      }
-    if (allowBlockCollections)
-      allowBlockCollections = atNewLine || allowCompact;
-    if (indentStatus === 1 || CONTEXT_BLOCK_OUT === nodeContext) {
-      if (CONTEXT_FLOW_IN === nodeContext || CONTEXT_FLOW_OUT === nodeContext)
-        flowIndent = parentIndent;
-      else
-        flowIndent = parentIndent + 1;
-      blockIndent = state.position - state.lineStart;
-      if (indentStatus === 1)
-        if (allowBlockCollections && (readBlockSequence(state, blockIndent) || readBlockMapping(state, blockIndent, flowIndent)) || readFlowCollection(state, flowIndent))
-          hasContent = true;
-        else {
-          const ch = state.input.charCodeAt(state.position);
-          if (propertyStart !== null && allowBlockStyles && !allowBlockCollections && ch !== 124 && ch !== 62 && tryReadBlockMappingFromProperty(state, propertyStart, propertyStart.position - propertyStart.lineStart, flowIndent))
-            hasContent = true;
-          else if (allowBlockScalars && readBlockScalar(state, flowIndent) || readSingleQuotedScalar(state, flowIndent) || readDoubleQuotedScalar(state, flowIndent))
-            hasContent = true;
-          else if (readAlias(state)) {
-            hasContent = true;
-            if (state.tag !== null || state.anchor !== null)
-              throwError(state, "alias node should not have any properties");
-          } else if (readPlainScalar(state, flowIndent, CONTEXT_FLOW_IN === nodeContext)) {
-            hasContent = true;
-            if (state.tag === null)
-              state.tag = "?";
-          }
-          if (state.anchor !== null)
-            storeAnchor(state, state.anchor, state.result);
-        }
-      else if (indentStatus === 0)
-        hasContent = allowBlockCollections && readBlockSequence(state, blockIndent);
-    }
-    if (state.tag === null) {
-      if (state.anchor !== null)
-        storeAnchor(state, state.anchor, state.result);
-    } else if (state.tag === "?") {
-      if (state.result !== null && state.kind !== "scalar")
-        throwError(state, 'unacceptable node kind for !<?> tag; it should be "scalar", not "' + state.kind + '"');
-      for (let typeIndex = 0, typeQuantity = state.implicitTypes.length;typeIndex < typeQuantity; typeIndex += 1) {
-        type = state.implicitTypes[typeIndex];
-        if (type.resolve(state.result)) {
-          state.result = type.construct(state.result);
-          state.tag = type.tag;
-          if (state.anchor !== null)
-            storeAnchor(state, state.anchor, state.result);
-          break;
-        }
-      }
-    } else if (state.tag !== "!") {
-      if (_hasOwnProperty.call(state.typeMap[state.kind || "fallback"], state.tag))
-        type = state.typeMap[state.kind || "fallback"][state.tag];
-      else {
-        type = null;
-        const typeList = state.typeMap.multi[state.kind || "fallback"];
-        for (let typeIndex = 0, typeQuantity = typeList.length;typeIndex < typeQuantity; typeIndex += 1)
-          if (state.tag.slice(0, typeList[typeIndex].tag.length) === typeList[typeIndex].tag) {
-            type = typeList[typeIndex];
-            break;
-          }
-      }
-      if (!type)
-        throwError(state, "unknown tag !<" + state.tag + ">");
-      if (state.result !== null && type.kind !== state.kind)
-        throwError(state, "unacceptable node kind for !<" + state.tag + '> tag; it should be "' + type.kind + '", not "' + state.kind + '"');
-      if (!type.resolve(state.result, state.tag))
-        throwError(state, "cannot resolve a node with !<" + state.tag + "> explicit tag");
-      else {
-        state.result = type.construct(state.result, state.tag);
-        if (state.anchor !== null)
-          storeAnchor(state, state.anchor, state.result);
-      }
-    }
-    if (state.listener !== null)
-      state.listener("close", state);
-    state.depth -= 1;
-    return state.tag !== null || state.anchor !== null || hasContent;
-  }
-  function readDocument(state) {
-    const documentStart = state.position;
-    let hasDirectives = false;
-    let ch;
-    state.version = null;
-    state.checkLineBreaks = state.legacy;
-    state.tagMap = Object.create(null);
-    state.anchorMap = Object.create(null);
-    while ((ch = state.input.charCodeAt(state.position)) !== 0) {
-      skipSeparationSpace(state, true, -1);
-      ch = state.input.charCodeAt(state.position);
-      if (state.lineIndent > 0 || ch !== 37)
-        break;
-      hasDirectives = true;
-      ch = state.input.charCodeAt(++state.position);
-      let _position = state.position;
-      while (ch !== 0 && !isWsOrEol(ch))
-        ch = state.input.charCodeAt(++state.position);
-      const directiveName = state.input.slice(_position, state.position);
-      const directiveArgs = [];
-      if (directiveName.length < 1)
-        throwError(state, "directive name must not be less than one character in length");
-      while (ch !== 0) {
-        while (isWhiteSpace(ch))
-          ch = state.input.charCodeAt(++state.position);
-        if (ch === 35) {
-          do
-            ch = state.input.charCodeAt(++state.position);
-          while (ch !== 0 && !isEol(ch));
-          break;
-        }
-        if (isEol(ch))
-          break;
-        _position = state.position;
-        while (ch !== 0 && !isWsOrEol(ch))
-          ch = state.input.charCodeAt(++state.position);
-        directiveArgs.push(state.input.slice(_position, state.position));
-      }
-      if (ch !== 0)
-        readLineBreak(state);
-      if (_hasOwnProperty.call(directiveHandlers, directiveName))
-        directiveHandlers[directiveName](state, directiveName, directiveArgs);
-      else
-        throwWarning(state, 'unknown document directive "' + directiveName + '"');
-    }
-    skipSeparationSpace(state, true, -1);
-    if (state.lineIndent === 0 && state.input.charCodeAt(state.position) === 45 && state.input.charCodeAt(state.position + 1) === 45 && state.input.charCodeAt(state.position + 2) === 45) {
-      state.position += 3;
-      skipSeparationSpace(state, true, -1);
-    } else if (hasDirectives)
-      throwError(state, "directives end mark is expected");
-    composeNode(state, state.lineIndent - 1, CONTEXT_BLOCK_OUT, false, true);
-    skipSeparationSpace(state, true, -1);
-    if (state.checkLineBreaks && PATTERN_NON_ASCII_LINE_BREAKS.test(state.input.slice(documentStart, state.position)))
-      throwWarning(state, "non-ASCII line breaks are interpreted as content");
-    state.documents.push(state.result);
-    if (state.position === state.lineStart && testDocumentSeparator(state)) {
-      if (state.input.charCodeAt(state.position) === 46) {
-        state.position += 3;
-        skipSeparationSpace(state, true, -1);
-      }
-      return;
-    }
-    if (state.position < state.length - 1)
-      throwError(state, "end of the stream or a document separator is expected");
-  }
-  function loadDocuments(input, options) {
-    input = String(input);
-    options = options || {};
-    if (input.length !== 0) {
-      if (input.charCodeAt(input.length - 1) !== 10 && input.charCodeAt(input.length - 1) !== 13)
-        input += `
-`;
-      if (input.charCodeAt(0) === 65279)
-        input = input.slice(1);
-    }
-    const state = new State(input, options);
-    const nullpos = input.indexOf("\x00");
-    if (nullpos !== -1) {
-      state.position = nullpos;
-      throwError(state, "null byte is not allowed in input");
-    }
-    state.input += "\x00";
-    while (state.input.charCodeAt(state.position) === 32) {
-      state.lineIndent += 1;
-      state.position += 1;
-    }
-    while (state.position < state.length - 1)
-      readDocument(state);
-    return state.documents;
-  }
-  function loadAll(input, iterator, options) {
-    if (iterator !== null && typeof iterator === "object" && typeof options === "undefined") {
-      options = iterator;
-      iterator = null;
-    }
-    const documents = loadDocuments(input, options);
-    if (typeof iterator !== "function")
-      return documents;
-    for (let index = 0, length = documents.length;index < length; index += 1)
-      iterator(documents[index]);
-  }
-  function load(input, options) {
-    const documents = loadDocuments(input, options);
-    if (documents.length === 0)
-      return;
-    else if (documents.length === 1)
-      return documents[0];
-    throw new YAMLException("expected a single document in the stream, but found more");
-  }
-  module.exports.loadAll = loadAll;
-  module.exports.load = load;
-});
-var require_dumper = /* @__PURE__ */ __commonJSMin((exports, module) => {
-  var common = require_common();
-  var YAMLException = require_exception();
-  var DEFAULT_SCHEMA = require_default();
-  var _toString = Object.prototype.toString;
-  var _hasOwnProperty = Object.prototype.hasOwnProperty;
-  var CHAR_BOM = 65279;
-  var CHAR_TAB = 9;
-  var CHAR_LINE_FEED = 10;
-  var CHAR_CARRIAGE_RETURN = 13;
-  var CHAR_SPACE = 32;
-  var CHAR_EXCLAMATION = 33;
-  var CHAR_DOUBLE_QUOTE = 34;
-  var CHAR_SHARP = 35;
-  var CHAR_PERCENT = 37;
-  var CHAR_AMPERSAND = 38;
-  var CHAR_SINGLE_QUOTE = 39;
-  var CHAR_ASTERISK = 42;
-  var CHAR_COMMA = 44;
-  var CHAR_MINUS = 45;
-  var CHAR_COLON = 58;
-  var CHAR_EQUALS = 61;
-  var CHAR_GREATER_THAN = 62;
-  var CHAR_QUESTION = 63;
-  var CHAR_COMMERCIAL_AT = 64;
-  var CHAR_LEFT_SQUARE_BRACKET = 91;
-  var CHAR_RIGHT_SQUARE_BRACKET = 93;
-  var CHAR_GRAVE_ACCENT = 96;
-  var CHAR_LEFT_CURLY_BRACKET = 123;
-  var CHAR_VERTICAL_LINE = 124;
-  var CHAR_RIGHT_CURLY_BRACKET = 125;
-  var ESCAPE_SEQUENCES = {};
-  ESCAPE_SEQUENCES[0] = "\\0";
-  ESCAPE_SEQUENCES[7] = "\\a";
-  ESCAPE_SEQUENCES[8] = "\\b";
-  ESCAPE_SEQUENCES[9] = "\\t";
-  ESCAPE_SEQUENCES[10] = "\\n";
-  ESCAPE_SEQUENCES[11] = "\\v";
-  ESCAPE_SEQUENCES[12] = "\\f";
-  ESCAPE_SEQUENCES[13] = "\\r";
-  ESCAPE_SEQUENCES[27] = "\\e";
-  ESCAPE_SEQUENCES[34] = "\\\"";
-  ESCAPE_SEQUENCES[92] = "\\\\";
-  ESCAPE_SEQUENCES[133] = "\\N";
-  ESCAPE_SEQUENCES[160] = "\\_";
-  ESCAPE_SEQUENCES[8232] = "\\L";
-  ESCAPE_SEQUENCES[8233] = "\\P";
-  var DEPRECATED_BOOLEANS_SYNTAX = [
-    "y",
-    "Y",
-    "yes",
-    "Yes",
-    "YES",
-    "on",
-    "On",
-    "ON",
-    "n",
-    "N",
-    "no",
-    "No",
-    "NO",
-    "off",
-    "Off",
-    "OFF"
-  ];
-  var DEPRECATED_BASE60_SYNTAX = /^[-+]?[0-9_]+(?::[0-9_]+)+(?:\.[0-9_]*)?$/;
-  function compileStyleMap(schema, map) {
-    if (map === null)
-      return {};
-    const result = {};
-    const keys = Object.keys(map);
-    for (let index = 0, length = keys.length;index < length; index += 1) {
-      let tag = keys[index];
-      let style = String(map[tag]);
-      if (tag.slice(0, 2) === "!!")
-        tag = "tag:yaml.org,2002:" + tag.slice(2);
-      const type = schema.compiledTypeMap["fallback"][tag];
-      if (type && _hasOwnProperty.call(type.styleAliases, style))
-        style = type.styleAliases[style];
-      result[tag] = style;
-    }
-    return result;
-  }
-  function encodeHex(character) {
-    let handle;
-    let length;
-    const string = character.toString(16).toUpperCase();
-    if (character <= 255) {
-      handle = "x";
-      length = 2;
-    } else if (character <= 65535) {
-      handle = "u";
-      length = 4;
-    } else if (character <= 4294967295) {
-      handle = "U";
-      length = 8;
-    } else
-      throw new YAMLException("code point within a string may not be greater than 0xFFFFFFFF");
-    return "\\" + handle + common.repeat("0", length - string.length) + string;
-  }
-  var QUOTING_TYPE_SINGLE = 1;
-  var QUOTING_TYPE_DOUBLE = 2;
-  function State(options) {
-    this.schema = options["schema"] || DEFAULT_SCHEMA;
-    this.indent = Math.max(1, options["indent"] || 2);
-    this.noArrayIndent = options["noArrayIndent"] || false;
-    this.skipInvalid = options["skipInvalid"] || false;
-    this.flowLevel = common.isNothing(options["flowLevel"]) ? -1 : options["flowLevel"];
-    this.styleMap = compileStyleMap(this.schema, options["styles"] || null);
-    this.sortKeys = options["sortKeys"] || false;
-    this.lineWidth = options["lineWidth"] || 80;
-    this.noRefs = options["noRefs"] || false;
-    this.noCompatMode = options["noCompatMode"] || false;
-    this.condenseFlow = options["condenseFlow"] || false;
-    this.quotingType = options["quotingType"] === '"' ? QUOTING_TYPE_DOUBLE : QUOTING_TYPE_SINGLE;
-    this.forceQuotes = options["forceQuotes"] || false;
-    this.replacer = typeof options["replacer"] === "function" ? options["replacer"] : null;
-    this.implicitTypes = this.schema.compiledImplicit;
-    this.explicitTypes = this.schema.compiledExplicit;
-    this.tag = null;
-    this.result = "";
-    this.duplicates = [];
-    this.usedDuplicates = null;
-  }
-  function indentString(string, spaces) {
-    const ind = common.repeat(" ", spaces);
-    let position = 0;
-    let result = "";
-    const length = string.length;
-    while (position < length) {
-      let line;
-      const next = string.indexOf(`
-`, position);
-      if (next === -1) {
-        line = string.slice(position);
-        position = length;
-      } else {
-        line = string.slice(position, next + 1);
-        position = next + 1;
-      }
-      if (line.length && line !== `
-`)
-        result += ind;
-      result += line;
-    }
-    return result;
-  }
-  function generateNextLine(state, level) {
-    return `
-` + common.repeat(" ", state.indent * level);
-  }
-  function testImplicitResolving(state, str) {
-    for (let index = 0, length = state.implicitTypes.length;index < length; index += 1)
-      if (state.implicitTypes[index].resolve(str))
-        return true;
-    return false;
-  }
-  function isWhitespace(c) {
-    return c === CHAR_SPACE || c === CHAR_TAB;
-  }
-  function isPrintable(c) {
-    return c >= 32 && c <= 126 || c >= 161 && c <= 55295 && c !== 8232 && c !== 8233 || c >= 57344 && c <= 65533 && c !== CHAR_BOM || c >= 65536 && c <= 1114111;
-  }
-  function isNsCharOrWhitespace(c) {
-    return isPrintable(c) && c !== CHAR_BOM && c !== CHAR_CARRIAGE_RETURN && c !== CHAR_LINE_FEED;
-  }
-  function isPlainSafe(c, prev, inblock) {
-    const cIsNsCharOrWhitespace = isNsCharOrWhitespace(c);
-    const cIsNsChar = cIsNsCharOrWhitespace && !isWhitespace(c);
-    return (inblock ? cIsNsCharOrWhitespace : cIsNsCharOrWhitespace && c !== CHAR_COMMA && c !== CHAR_LEFT_SQUARE_BRACKET && c !== CHAR_RIGHT_SQUARE_BRACKET && c !== CHAR_LEFT_CURLY_BRACKET && c !== CHAR_RIGHT_CURLY_BRACKET) && c !== CHAR_SHARP && !(prev === CHAR_COLON && !cIsNsChar) || isNsCharOrWhitespace(prev) && !isWhitespace(prev) && c === CHAR_SHARP || prev === CHAR_COLON && cIsNsChar;
-  }
-  function isPlainSafeFirst(c) {
-    return isPrintable(c) && c !== CHAR_BOM && !isWhitespace(c) && c !== CHAR_MINUS && c !== CHAR_QUESTION && c !== CHAR_COLON && c !== CHAR_COMMA && c !== CHAR_LEFT_SQUARE_BRACKET && c !== CHAR_RIGHT_SQUARE_BRACKET && c !== CHAR_LEFT_CURLY_BRACKET && c !== CHAR_RIGHT_CURLY_BRACKET && c !== CHAR_SHARP && c !== CHAR_AMPERSAND && c !== CHAR_ASTERISK && c !== CHAR_EXCLAMATION && c !== CHAR_VERTICAL_LINE && c !== CHAR_EQUALS && c !== CHAR_GREATER_THAN && c !== CHAR_SINGLE_QUOTE && c !== CHAR_DOUBLE_QUOTE && c !== CHAR_PERCENT && c !== CHAR_COMMERCIAL_AT && c !== CHAR_GRAVE_ACCENT;
-  }
-  function isPlainSafeLast(c) {
-    return !isWhitespace(c) && c !== CHAR_COLON;
-  }
-  function codePointAt(string, pos) {
-    const first = string.charCodeAt(pos);
-    let second;
-    if (first >= 55296 && first <= 56319 && pos + 1 < string.length) {
-      second = string.charCodeAt(pos + 1);
-      if (second >= 56320 && second <= 57343)
-        return (first - 55296) * 1024 + second - 56320 + 65536;
-    }
-    return first;
-  }
-  function needIndentIndicator(string) {
-    return /^\n* /.test(string);
-  }
-  var STYLE_PLAIN = 1;
-  var STYLE_SINGLE = 2;
-  var STYLE_LITERAL = 3;
-  var STYLE_FOLDED = 4;
-  var STYLE_DOUBLE = 5;
-  function chooseScalarStyle(string, singleLineOnly, indentPerLevel, lineWidth, testAmbiguousType, quotingType, forceQuotes, inblock) {
-    let i;
-    let char = 0;
-    let prevChar = null;
-    let hasLineBreak = false;
-    let hasFoldableLine = false;
-    const shouldTrackWidth = lineWidth !== -1;
-    let previousLineBreak = -1;
-    let plain = isPlainSafeFirst(codePointAt(string, 0)) && isPlainSafeLast(codePointAt(string, string.length - 1));
-    if (singleLineOnly || forceQuotes)
-      for (i = 0;i < string.length; char >= 65536 ? i += 2 : i++) {
-        char = codePointAt(string, i);
-        if (!isPrintable(char))
-          return STYLE_DOUBLE;
-        plain = plain && isPlainSafe(char, prevChar, inblock);
-        prevChar = char;
-      }
-    else {
-      for (i = 0;i < string.length; char >= 65536 ? i += 2 : i++) {
-        char = codePointAt(string, i);
-        if (char === CHAR_LINE_FEED) {
-          hasLineBreak = true;
-          if (shouldTrackWidth) {
-            hasFoldableLine = hasFoldableLine || i - previousLineBreak - 1 > lineWidth && string[previousLineBreak + 1] !== " ";
-            previousLineBreak = i;
-          }
-        } else if (!isPrintable(char))
-          return STYLE_DOUBLE;
-        plain = plain && isPlainSafe(char, prevChar, inblock);
-        prevChar = char;
-      }
-      hasFoldableLine = hasFoldableLine || shouldTrackWidth && i - previousLineBreak - 1 > lineWidth && string[previousLineBreak + 1] !== " ";
-    }
-    if (!hasLineBreak && !hasFoldableLine) {
-      if (plain && !forceQuotes && !testAmbiguousType(string))
-        return STYLE_PLAIN;
-      return quotingType === QUOTING_TYPE_DOUBLE ? STYLE_DOUBLE : STYLE_SINGLE;
-    }
-    if (indentPerLevel > 9 && needIndentIndicator(string))
-      return STYLE_DOUBLE;
-    if (!forceQuotes)
-      return hasFoldableLine ? STYLE_FOLDED : STYLE_LITERAL;
-    return quotingType === QUOTING_TYPE_DOUBLE ? STYLE_DOUBLE : STYLE_SINGLE;
-  }
-  function writeScalar(state, string, level, iskey, inblock) {
-    state.dump = function() {
-      if (string.length === 0)
-        return state.quotingType === QUOTING_TYPE_DOUBLE ? '""' : "''";
-      if (!state.noCompatMode) {
-        if (DEPRECATED_BOOLEANS_SYNTAX.indexOf(string) !== -1 || DEPRECATED_BASE60_SYNTAX.test(string))
-          return state.quotingType === QUOTING_TYPE_DOUBLE ? '"' + string + '"' : "'" + string + "'";
-      }
-      const indent = state.indent * Math.max(1, level);
-      const lineWidth = state.lineWidth === -1 ? -1 : Math.max(Math.min(state.lineWidth, 40), state.lineWidth - indent);
-      const singleLineOnly = iskey || state.flowLevel > -1 && level >= state.flowLevel;
-      function testAmbiguity(string2) {
-        return testImplicitResolving(state, string2);
-      }
-      switch (chooseScalarStyle(string, singleLineOnly, state.indent, lineWidth, testAmbiguity, state.quotingType, state.forceQuotes && !iskey, inblock)) {
-        case STYLE_PLAIN:
-          return string;
-        case STYLE_SINGLE:
-          return "'" + string.replace(/'/g, "''") + "'";
-        case STYLE_LITERAL:
-          return "|" + blockHeader(string, state.indent) + dropEndingNewline(indentString(string, indent));
-        case STYLE_FOLDED:
-          return ">" + blockHeader(string, state.indent) + dropEndingNewline(indentString(foldString(string, lineWidth), indent));
-        case STYLE_DOUBLE:
-          return '"' + escapeString(string, lineWidth) + '"';
-        default:
-          throw new YAMLException("impossible error: invalid scalar style");
-      }
-    }();
-  }
-  function blockHeader(string, indentPerLevel) {
-    const indentIndicator = needIndentIndicator(string) ? String(indentPerLevel) : "";
-    const clip = string[string.length - 1] === `
-`;
-    return indentIndicator + (clip && (string[string.length - 2] === `
-` || string === `
-`) ? "+" : clip ? "" : "-") + `
-`;
-  }
-  function dropEndingNewline(string) {
-    return string[string.length - 1] === `
-` ? string.slice(0, -1) : string;
-  }
-  function foldString(string, width) {
-    const lineRe = /(\n+)([^\n]*)/g;
-    let result = function() {
-      let nextLF = string.indexOf(`
-`);
-      nextLF = nextLF !== -1 ? nextLF : string.length;
-      lineRe.lastIndex = nextLF;
-      return foldLine(string.slice(0, nextLF), width);
-    }();
-    let prevMoreIndented = string[0] === `
-` || string[0] === " ";
-    let moreIndented;
-    let match;
-    while (match = lineRe.exec(string)) {
-      const prefix = match[1];
-      const line = match[2];
-      moreIndented = line[0] === " ";
-      result += prefix + (!prevMoreIndented && !moreIndented && line !== "" ? `
-` : "") + foldLine(line, width);
-      prevMoreIndented = moreIndented;
-    }
-    return result;
-  }
-  function foldLine(line, width) {
-    if (line === "" || line[0] === " ")
-      return line;
-    const breakRe = / [^ ]/g;
-    let match;
-    let start = 0;
-    let end;
-    let curr = 0;
-    let next = 0;
-    let result = "";
-    while (match = breakRe.exec(line)) {
-      next = match.index;
-      if (next - start > width) {
-        end = curr > start ? curr : next;
-        result += `
-` + line.slice(start, end);
-        start = end + 1;
-      }
-      curr = next;
-    }
-    result += `
-`;
-    if (line.length - start > width && curr > start)
-      result += line.slice(start, curr) + `
-` + line.slice(curr + 1);
-    else
-      result += line.slice(start);
-    return result.slice(1);
-  }
-  function escapeString(string) {
-    let result = "";
-    let char = 0;
-    for (let i = 0;i < string.length; char >= 65536 ? i += 2 : i++) {
-      char = codePointAt(string, i);
-      const escapeSeq = ESCAPE_SEQUENCES[char];
-      if (!escapeSeq && isPrintable(char)) {
-        result += string[i];
-        if (char >= 65536)
-          result += string[i + 1];
-      } else
-        result += escapeSeq || encodeHex(char);
-    }
-    return result;
-  }
-  function writeFlowSequence(state, level, object) {
-    let _result = "";
-    const _tag = state.tag;
-    for (let index = 0, length = object.length;index < length; index += 1) {
-      let value = object[index];
-      if (state.replacer)
-        value = state.replacer.call(object, String(index), value);
-      if (writeNode(state, level, value, false, false) || typeof value === "undefined" && writeNode(state, level, null, false, false)) {
-        if (_result !== "")
-          _result += "," + (!state.condenseFlow ? " " : "");
-        _result += state.dump;
-      }
-    }
-    state.tag = _tag;
-    state.dump = "[" + _result + "]";
-  }
-  function writeBlockSequence(state, level, object, compact) {
-    let _result = "";
-    const _tag = state.tag;
-    for (let index = 0, length = object.length;index < length; index += 1) {
-      let value = object[index];
-      if (state.replacer)
-        value = state.replacer.call(object, String(index), value);
-      if (writeNode(state, level + 1, value, true, true, false, true) || typeof value === "undefined" && writeNode(state, level + 1, null, true, true, false, true)) {
-        if (!compact || _result !== "")
-          _result += generateNextLine(state, level);
-        if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0))
-          _result += "-";
-        else
-          _result += "- ";
-        _result += state.dump;
-      }
-    }
-    state.tag = _tag;
-    state.dump = _result || "[]";
-  }
-  function writeFlowMapping(state, level, object) {
-    let _result = "";
-    const _tag = state.tag;
-    const objectKeyList = Object.keys(object);
-    for (let index = 0, length = objectKeyList.length;index < length; index += 1) {
-      let pairBuffer = "";
-      if (_result !== "")
-        pairBuffer += ", ";
-      if (state.condenseFlow)
-        pairBuffer += '"';
-      const objectKey = objectKeyList[index];
-      let objectValue = object[objectKey];
-      if (state.replacer)
-        objectValue = state.replacer.call(object, objectKey, objectValue);
-      if (!writeNode(state, level, objectKey, false, false))
-        continue;
-      if (state.dump.length > 1024)
-        pairBuffer += "? ";
-      pairBuffer += state.dump + (state.condenseFlow ? '"' : "") + ":" + (state.condenseFlow ? "" : " ");
-      if (!writeNode(state, level, objectValue, false, false))
-        continue;
-      pairBuffer += state.dump;
-      _result += pairBuffer;
-    }
-    state.tag = _tag;
-    state.dump = "{" + _result + "}";
-  }
-  function writeBlockMapping(state, level, object, compact) {
-    let _result = "";
-    const _tag = state.tag;
-    const objectKeyList = Object.keys(object);
-    if (state.sortKeys === true)
-      objectKeyList.sort();
-    else if (typeof state.sortKeys === "function")
-      objectKeyList.sort(state.sortKeys);
-    else if (state.sortKeys)
-      throw new YAMLException("sortKeys must be a boolean or a function");
-    for (let index = 0, length = objectKeyList.length;index < length; index += 1) {
-      let pairBuffer = "";
-      if (!compact || _result !== "")
-        pairBuffer += generateNextLine(state, level);
-      const objectKey = objectKeyList[index];
-      let objectValue = object[objectKey];
-      if (state.replacer)
-        objectValue = state.replacer.call(object, objectKey, objectValue);
-      if (!writeNode(state, level + 1, objectKey, true, true, true))
-        continue;
-      const explicitPair = state.tag !== null && state.tag !== "?" || state.dump && state.dump.length > 1024;
-      if (explicitPair)
-        if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0))
-          pairBuffer += "?";
-        else
-          pairBuffer += "? ";
-      pairBuffer += state.dump;
-      if (explicitPair)
-        pairBuffer += generateNextLine(state, level);
-      if (!writeNode(state, level + 1, objectValue, true, explicitPair))
-        continue;
-      if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0))
-        pairBuffer += ":";
-      else
-        pairBuffer += ": ";
-      pairBuffer += state.dump;
-      _result += pairBuffer;
-    }
-    state.tag = _tag;
-    state.dump = _result || "{}";
-  }
-  function detectType(state, object, explicit) {
-    const typeList = explicit ? state.explicitTypes : state.implicitTypes;
-    for (let index = 0, length = typeList.length;index < length; index += 1) {
-      const type = typeList[index];
-      if ((type.instanceOf || type.predicate) && (!type.instanceOf || typeof object === "object" && object instanceof type.instanceOf) && (!type.predicate || type.predicate(object))) {
-        if (explicit)
-          if (type.multi && type.representName)
-            state.tag = type.representName(object);
-          else
-            state.tag = type.tag;
-        else
-          state.tag = "?";
-        if (type.represent) {
-          const style = state.styleMap[type.tag] || type.defaultStyle;
-          let _result;
-          if (_toString.call(type.represent) === "[object Function]")
-            _result = type.represent(object, style);
-          else if (_hasOwnProperty.call(type.represent, style))
-            _result = type.represent[style](object, style);
-          else
-            throw new YAMLException("!<" + type.tag + '> tag resolver accepts not "' + style + '" style');
-          state.dump = _result;
-        }
-        return true;
-      }
-    }
-    return false;
-  }
-  function writeNode(state, level, object, block, compact, iskey, isblockseq) {
-    state.tag = null;
-    state.dump = object;
-    if (!detectType(state, object, false))
-      detectType(state, object, true);
-    const type = _toString.call(state.dump);
-    const inblock = block;
-    if (block)
-      block = state.flowLevel < 0 || state.flowLevel > level;
-    const objectOrArray = type === "[object Object]" || type === "[object Array]";
-    let duplicateIndex;
-    let duplicate;
-    if (objectOrArray) {
-      duplicateIndex = state.duplicates.indexOf(object);
-      duplicate = duplicateIndex !== -1;
-    }
-    if (state.tag !== null && state.tag !== "?" || duplicate || state.indent !== 2 && level > 0)
-      compact = false;
-    if (duplicate && state.usedDuplicates[duplicateIndex])
-      state.dump = "*ref_" + duplicateIndex;
-    else {
-      if (objectOrArray && duplicate && !state.usedDuplicates[duplicateIndex])
-        state.usedDuplicates[duplicateIndex] = true;
-      if (type === "[object Object]")
-        if (block && Object.keys(state.dump).length !== 0) {
-          writeBlockMapping(state, level, state.dump, compact);
-          if (duplicate)
-            state.dump = "&ref_" + duplicateIndex + state.dump;
-        } else {
-          writeFlowMapping(state, level, state.dump);
-          if (duplicate)
-            state.dump = "&ref_" + duplicateIndex + " " + state.dump;
-        }
-      else if (type === "[object Array]")
-        if (block && state.dump.length !== 0) {
-          if (state.noArrayIndent && !isblockseq && level > 0)
-            writeBlockSequence(state, level - 1, state.dump, compact);
-          else
-            writeBlockSequence(state, level, state.dump, compact);
-          if (duplicate)
-            state.dump = "&ref_" + duplicateIndex + state.dump;
-        } else {
-          writeFlowSequence(state, level, state.dump);
-          if (duplicate)
-            state.dump = "&ref_" + duplicateIndex + " " + state.dump;
-        }
-      else if (type === "[object String]") {
-        if (state.tag !== "?")
-          writeScalar(state, state.dump, level, iskey, inblock);
-      } else if (type === "[object Undefined]")
-        return false;
-      else {
-        if (state.skipInvalid)
-          return false;
-        throw new YAMLException("unacceptable kind of an object to dump " + type);
-      }
-      if (state.tag !== null && state.tag !== "?") {
-        let tagStr = encodeURI(state.tag[0] === "!" ? state.tag.slice(1) : state.tag).replace(/!/g, "%21");
-        if (state.tag[0] === "!")
-          tagStr = "!" + tagStr;
-        else if (tagStr.slice(0, 18) === "tag:yaml.org,2002:")
-          tagStr = "!!" + tagStr.slice(18);
-        else
-          tagStr = "!<" + tagStr + ">";
-        state.dump = tagStr + " " + state.dump;
-      }
-    }
-    return true;
-  }
-  function getDuplicateReferences(object, state) {
-    const objects = [];
-    const duplicatesIndexes = [];
-    inspectNode(object, objects, duplicatesIndexes);
-    const length = duplicatesIndexes.length;
-    for (let index = 0;index < length; index += 1)
-      state.duplicates.push(objects[duplicatesIndexes[index]]);
-    state.usedDuplicates = new Array(length);
-  }
-  function inspectNode(object, objects, duplicatesIndexes) {
-    if (object !== null && typeof object === "object") {
-      const index = objects.indexOf(object);
-      if (index !== -1) {
-        if (duplicatesIndexes.indexOf(index) === -1)
-          duplicatesIndexes.push(index);
-      } else {
-        objects.push(object);
-        if (Array.isArray(object))
-          for (let i = 0, length = object.length;i < length; i += 1)
-            inspectNode(object[i], objects, duplicatesIndexes);
-        else {
-          const objectKeyList = Object.keys(object);
-          for (let i = 0, length = objectKeyList.length;i < length; i += 1)
-            inspectNode(object[objectKeyList[i]], objects, duplicatesIndexes);
-        }
-      }
-    }
-  }
-  function dump(input, options) {
-    options = options || {};
-    const state = new State(options);
-    if (!state.noRefs)
-      getDuplicateReferences(input, state);
-    let value = input;
-    if (state.replacer)
-      value = state.replacer.call({ "": value }, "", value);
-    if (writeNode(state, 0, value, true, true))
-      return state.dump + `
-`;
-    return "";
-  }
-  module.exports.dump = dump;
-});
-var import_js_yaml = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin((exports, module) => {
-  var loader = require_loader();
-  var dumper = require_dumper();
-  function renamed(from, to) {
-    return function() {
-      throw new Error("Function yaml." + from + " is removed in js-yaml 4. Use yaml." + to + " instead, which is now safe by default.");
-    };
-  }
-  module.exports.Type = require_type();
-  module.exports.Schema = require_schema();
-  module.exports.FAILSAFE_SCHEMA = require_failsafe();
-  module.exports.JSON_SCHEMA = require_json();
-  module.exports.CORE_SCHEMA = require_core();
-  module.exports.DEFAULT_SCHEMA = require_default();
-  module.exports.load = loader.load;
-  module.exports.loadAll = loader.loadAll;
-  module.exports.dump = dumper.dump;
-  module.exports.YAMLException = require_exception();
-  module.exports.types = {
-    binary: require_binary(),
-    float: require_float(),
-    map: require_map(),
-    null: require_null(),
-    pairs: require_pairs(),
-    set: require_set(),
-    timestamp: require_timestamp(),
-    bool: require_bool(),
-    int: require_int(),
-    merge: require_merge(),
-    omap: require_omap(),
-    seq: require_seq(),
-    str: require_str()
-  };
-  module.exports.safeLoad = renamed("safeLoad", "load");
-  module.exports.safeLoadAll = renamed("safeLoadAll", "loadAll");
-  module.exports.safeDump = renamed("safeDump", "dump");
-}))(), 1);
-var { Type, Schema, FAILSAFE_SCHEMA, JSON_SCHEMA, CORE_SCHEMA, DEFAULT_SCHEMA, load, loadAll, dump, YAMLException, types, safeLoad, safeLoadAll, safeDump } = import_js_yaml.default;
-var index_vite_proxy_tmp_default = import_js_yaml.default;
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
-var CharacterCodes;
-(function(CharacterCodes2) {
-  CharacterCodes2[CharacterCodes2["lineFeed"] = 10] = "lineFeed";
-  CharacterCodes2[CharacterCodes2["carriageReturn"] = 13] = "carriageReturn";
-  CharacterCodes2[CharacterCodes2["space"] = 32] = "space";
-  CharacterCodes2[CharacterCodes2["_0"] = 48] = "_0";
-  CharacterCodes2[CharacterCodes2["_1"] = 49] = "_1";
-  CharacterCodes2[CharacterCodes2["_2"] = 50] = "_2";
-  CharacterCodes2[CharacterCodes2["_3"] = 51] = "_3";
-  CharacterCodes2[CharacterCodes2["_4"] = 52] = "_4";
-  CharacterCodes2[CharacterCodes2["_5"] = 53] = "_5";
-  CharacterCodes2[CharacterCodes2["_6"] = 54] = "_6";
-  CharacterCodes2[CharacterCodes2["_7"] = 55] = "_7";
-  CharacterCodes2[CharacterCodes2["_8"] = 56] = "_8";
-  CharacterCodes2[CharacterCodes2["_9"] = 57] = "_9";
-  CharacterCodes2[CharacterCodes2["a"] = 97] = "a";
-  CharacterCodes2[CharacterCodes2["b"] = 98] = "b";
-  CharacterCodes2[CharacterCodes2["c"] = 99] = "c";
-  CharacterCodes2[CharacterCodes2["d"] = 100] = "d";
-  CharacterCodes2[CharacterCodes2["e"] = 101] = "e";
-  CharacterCodes2[CharacterCodes2["f"] = 102] = "f";
-  CharacterCodes2[CharacterCodes2["g"] = 103] = "g";
-  CharacterCodes2[CharacterCodes2["h"] = 104] = "h";
-  CharacterCodes2[CharacterCodes2["i"] = 105] = "i";
-  CharacterCodes2[CharacterCodes2["j"] = 106] = "j";
-  CharacterCodes2[CharacterCodes2["k"] = 107] = "k";
-  CharacterCodes2[CharacterCodes2["l"] = 108] = "l";
-  CharacterCodes2[CharacterCodes2["m"] = 109] = "m";
-  CharacterCodes2[CharacterCodes2["n"] = 110] = "n";
-  CharacterCodes2[CharacterCodes2["o"] = 111] = "o";
-  CharacterCodes2[CharacterCodes2["p"] = 112] = "p";
-  CharacterCodes2[CharacterCodes2["q"] = 113] = "q";
-  CharacterCodes2[CharacterCodes2["r"] = 114] = "r";
-  CharacterCodes2[CharacterCodes2["s"] = 115] = "s";
-  CharacterCodes2[CharacterCodes2["t"] = 116] = "t";
-  CharacterCodes2[CharacterCodes2["u"] = 117] = "u";
-  CharacterCodes2[CharacterCodes2["v"] = 118] = "v";
-  CharacterCodes2[CharacterCodes2["w"] = 119] = "w";
-  CharacterCodes2[CharacterCodes2["x"] = 120] = "x";
-  CharacterCodes2[CharacterCodes2["y"] = 121] = "y";
-  CharacterCodes2[CharacterCodes2["z"] = 122] = "z";
-  CharacterCodes2[CharacterCodes2["A"] = 65] = "A";
-  CharacterCodes2[CharacterCodes2["B"] = 66] = "B";
-  CharacterCodes2[CharacterCodes2["C"] = 67] = "C";
-  CharacterCodes2[CharacterCodes2["D"] = 68] = "D";
-  CharacterCodes2[CharacterCodes2["E"] = 69] = "E";
-  CharacterCodes2[CharacterCodes2["F"] = 70] = "F";
-  CharacterCodes2[CharacterCodes2["G"] = 71] = "G";
-  CharacterCodes2[CharacterCodes2["H"] = 72] = "H";
-  CharacterCodes2[CharacterCodes2["I"] = 73] = "I";
-  CharacterCodes2[CharacterCodes2["J"] = 74] = "J";
-  CharacterCodes2[CharacterCodes2["K"] = 75] = "K";
-  CharacterCodes2[CharacterCodes2["L"] = 76] = "L";
-  CharacterCodes2[CharacterCodes2["M"] = 77] = "M";
-  CharacterCodes2[CharacterCodes2["N"] = 78] = "N";
-  CharacterCodes2[CharacterCodes2["O"] = 79] = "O";
-  CharacterCodes2[CharacterCodes2["P"] = 80] = "P";
-  CharacterCodes2[CharacterCodes2["Q"] = 81] = "Q";
-  CharacterCodes2[CharacterCodes2["R"] = 82] = "R";
-  CharacterCodes2[CharacterCodes2["S"] = 83] = "S";
-  CharacterCodes2[CharacterCodes2["T"] = 84] = "T";
-  CharacterCodes2[CharacterCodes2["U"] = 85] = "U";
-  CharacterCodes2[CharacterCodes2["V"] = 86] = "V";
-  CharacterCodes2[CharacterCodes2["W"] = 87] = "W";
-  CharacterCodes2[CharacterCodes2["X"] = 88] = "X";
-  CharacterCodes2[CharacterCodes2["Y"] = 89] = "Y";
-  CharacterCodes2[CharacterCodes2["Z"] = 90] = "Z";
-  CharacterCodes2[CharacterCodes2["asterisk"] = 42] = "asterisk";
-  CharacterCodes2[CharacterCodes2["backslash"] = 92] = "backslash";
-  CharacterCodes2[CharacterCodes2["closeBrace"] = 125] = "closeBrace";
-  CharacterCodes2[CharacterCodes2["closeBracket"] = 93] = "closeBracket";
-  CharacterCodes2[CharacterCodes2["colon"] = 58] = "colon";
-  CharacterCodes2[CharacterCodes2["comma"] = 44] = "comma";
-  CharacterCodes2[CharacterCodes2["dot"] = 46] = "dot";
-  CharacterCodes2[CharacterCodes2["doubleQuote"] = 34] = "doubleQuote";
-  CharacterCodes2[CharacterCodes2["minus"] = 45] = "minus";
-  CharacterCodes2[CharacterCodes2["openBrace"] = 123] = "openBrace";
-  CharacterCodes2[CharacterCodes2["openBracket"] = 91] = "openBracket";
-  CharacterCodes2[CharacterCodes2["plus"] = 43] = "plus";
-  CharacterCodes2[CharacterCodes2["slash"] = 47] = "slash";
-  CharacterCodes2[CharacterCodes2["formFeed"] = 12] = "formFeed";
-  CharacterCodes2[CharacterCodes2["tab"] = 9] = "tab";
-})(CharacterCodes || (CharacterCodes = {}));
-
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
-var cachedSpaces = new Array(20).fill(0).map((_, index) => {
-  return " ".repeat(index);
-});
-var maxCachedValues = 200;
-var cachedBreakLinesWithSpaces = {
-  " ": {
-    "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return `
-` + " ".repeat(index);
-    }),
-    "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return "\r" + " ".repeat(index);
-    }),
-    "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return `\r
-` + " ".repeat(index);
-    })
-  },
-  "\t": {
-    "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return `
-` + "\t".repeat(index);
-    }),
-    "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return "\r" + "\t".repeat(index);
-    }),
-    "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return `\r
-` + "\t".repeat(index);
-    })
-  }
-};
-
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
-var ParseOptions;
-(function(ParseOptions2) {
-  ParseOptions2.DEFAULT = {
-    allowTrailingComma: false
-  };
-})(ParseOptions || (ParseOptions = {}));
-
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
-var ScanError;
-(function(ScanError2) {
-  ScanError2[ScanError2["None"] = 0] = "None";
-  ScanError2[ScanError2["UnexpectedEndOfComment"] = 1] = "UnexpectedEndOfComment";
-  ScanError2[ScanError2["UnexpectedEndOfString"] = 2] = "UnexpectedEndOfString";
-  ScanError2[ScanError2["UnexpectedEndOfNumber"] = 3] = "UnexpectedEndOfNumber";
-  ScanError2[ScanError2["InvalidUnicode"] = 4] = "InvalidUnicode";
-  ScanError2[ScanError2["InvalidEscapeCharacter"] = 5] = "InvalidEscapeCharacter";
-  ScanError2[ScanError2["InvalidCharacter"] = 6] = "InvalidCharacter";
-})(ScanError || (ScanError = {}));
-var SyntaxKind;
-(function(SyntaxKind2) {
-  SyntaxKind2[SyntaxKind2["OpenBraceToken"] = 1] = "OpenBraceToken";
-  SyntaxKind2[SyntaxKind2["CloseBraceToken"] = 2] = "CloseBraceToken";
-  SyntaxKind2[SyntaxKind2["OpenBracketToken"] = 3] = "OpenBracketToken";
-  SyntaxKind2[SyntaxKind2["CloseBracketToken"] = 4] = "CloseBracketToken";
-  SyntaxKind2[SyntaxKind2["CommaToken"] = 5] = "CommaToken";
-  SyntaxKind2[SyntaxKind2["ColonToken"] = 6] = "ColonToken";
-  SyntaxKind2[SyntaxKind2["NullKeyword"] = 7] = "NullKeyword";
-  SyntaxKind2[SyntaxKind2["TrueKeyword"] = 8] = "TrueKeyword";
-  SyntaxKind2[SyntaxKind2["FalseKeyword"] = 9] = "FalseKeyword";
-  SyntaxKind2[SyntaxKind2["StringLiteral"] = 10] = "StringLiteral";
-  SyntaxKind2[SyntaxKind2["NumericLiteral"] = 11] = "NumericLiteral";
-  SyntaxKind2[SyntaxKind2["LineCommentTrivia"] = 12] = "LineCommentTrivia";
-  SyntaxKind2[SyntaxKind2["BlockCommentTrivia"] = 13] = "BlockCommentTrivia";
-  SyntaxKind2[SyntaxKind2["LineBreakTrivia"] = 14] = "LineBreakTrivia";
-  SyntaxKind2[SyntaxKind2["Trivia"] = 15] = "Trivia";
-  SyntaxKind2[SyntaxKind2["Unknown"] = 16] = "Unknown";
-  SyntaxKind2[SyntaxKind2["EOF"] = 17] = "EOF";
-})(SyntaxKind || (SyntaxKind = {}));
-var ParseErrorCode;
-(function(ParseErrorCode2) {
-  ParseErrorCode2[ParseErrorCode2["InvalidSymbol"] = 1] = "InvalidSymbol";
-  ParseErrorCode2[ParseErrorCode2["InvalidNumberFormat"] = 2] = "InvalidNumberFormat";
-  ParseErrorCode2[ParseErrorCode2["PropertyNameExpected"] = 3] = "PropertyNameExpected";
-  ParseErrorCode2[ParseErrorCode2["ValueExpected"] = 4] = "ValueExpected";
-  ParseErrorCode2[ParseErrorCode2["ColonExpected"] = 5] = "ColonExpected";
-  ParseErrorCode2[ParseErrorCode2["CommaExpected"] = 6] = "CommaExpected";
-  ParseErrorCode2[ParseErrorCode2["CloseBraceExpected"] = 7] = "CloseBraceExpected";
-  ParseErrorCode2[ParseErrorCode2["CloseBracketExpected"] = 8] = "CloseBracketExpected";
-  ParseErrorCode2[ParseErrorCode2["EndOfFileExpected"] = 9] = "EndOfFileExpected";
-  ParseErrorCode2[ParseErrorCode2["InvalidCommentToken"] = 10] = "InvalidCommentToken";
-  ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfComment"] = 11] = "UnexpectedEndOfComment";
-  ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfString"] = 12] = "UnexpectedEndOfString";
-  ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfNumber"] = 13] = "UnexpectedEndOfNumber";
-  ParseErrorCode2[ParseErrorCode2["InvalidUnicode"] = 14] = "InvalidUnicode";
-  ParseErrorCode2[ParseErrorCode2["InvalidEscapeCharacter"] = 15] = "InvalidEscapeCharacter";
-  ParseErrorCode2[ParseErrorCode2["InvalidCharacter"] = 16] = "InvalidCharacter";
-})(ParseErrorCode || (ParseErrorCode = {}));
-
-// packages/utils/src/jsonc-parser.ts
-var pluginConfigFileDetectionCache = new Map;
-
-// packages/utils/src/index.ts
-init_xdg_data_dir();
-init_atomic_write();
-
-// packages/utils/src/logging/logger.ts
-var DEFAULT_MAX_LOG_FILE_SIZE_BYTES = 50 * 1024 * 1024;
-// packages/utils/src/logger.ts
-var sharedSubunitLogger = () => {};
-function log(message, data) {
-  sharedSubunitLogger(message, data);
-}
-// packages/utils/src/omo-config.ts
-var HARNESS_IDS = ["codex", "opencode", "omo"];
-// packages/utils/src/omo-config/loader.ts
-var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
 // packages/utils/src/ast-grep/sg-manifest.ts
 function normalizeRuntimePlatform(platform = process.platform) {
   if (platform === "darwin" || platform === "linux" || platform === "win32")
@@ -12596,14 +12866,13 @@ function normalizeRuntimeArch(arch = process.arch) {
 function runtimeSlug(platform = process.platform, arch = process.arch) {
   return `${normalizeRuntimePlatform(platform)}-${normalizeRuntimeArch(arch)}`;
 }
+
 // packages/utils/src/ast-grep/install-script.ts
-import { spawn as spawn3 } from "node:child_process";
-import { existsSync as existsSync4 } from "node:fs";
-import { join as join27 } from "node:path";
 var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
+var KILL_GRACE_MS = 1000;
 var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
 function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
-  return join27(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
+  return join32(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
 }
 function isMissingExecutable(error) {
   if (!("code" in error))
@@ -12611,19 +12880,19 @@ function isMissingExecutable(error) {
   return error.code === "ENOENT";
 }
 function defaultSpawnProcess(command, args, options) {
-  const child = spawn3(command, args, {
+  const child = spawn2(command, args, {
     cwd: options.cwd,
     env: options.env,
     stdio: "ignore",
     windowsHide: true
   });
   let settled = false;
-  const outcome = new Promise((resolve8) => {
+  const outcome = new Promise((resolve9) => {
     const settle = (result) => {
       if (settled)
         return;
       settled = true;
-      resolve8(result);
+      resolve9(result);
     };
     child.once("error", (error) => {
       settle({ kind: "spawn-error", error, missingExecutable: isMissingExecutable(error) });
@@ -12641,7 +12910,7 @@ function defaultSpawnProcess(command, args, options) {
   };
 }
 function scriptPathForPlatform(skillDir, platform) {
-  return join27(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
+  return join32(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
 }
 function invocationsForPlatform(scriptPath, platform) {
   if (platform !== "win32")
@@ -12652,16 +12921,30 @@ function invocationsForPlatform(scriptPath, platform) {
 async function runInvocation(input) {
   const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env });
   let timedOut = false;
+  let terminateDeadline;
+  let terminateDeadlineGrace;
+  const killIgnored = new Promise((_, reject) => {
+    terminateDeadline = () => reject(new Error("ast-grep install child ignored termination"));
+  });
   const timeout = setTimeout(() => {
     timedOut = true;
     child.kill();
+    terminateDeadlineGrace = setTimeout(() => terminateDeadline?.(), KILL_GRACE_MS);
   }, input.timeoutMs);
-  timeout.unref?.();
   try {
-    const outcome = await child.outcome;
-    return timedOut ? { kind: "timed-out" } : outcome;
+    const outcome = await Promise.race([child.outcome, killIgnored]);
+    if (timedOut)
+      return { kind: "timed-out" };
+    return outcome;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("ignored termination")) {
+      return { kind: "spawn-error", error, missingExecutable: false };
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
+    if (terminateDeadlineGrace !== undefined)
+      clearTimeout(terminateDeadlineGrace);
   }
 }
 function failedReason(outcome) {
@@ -12698,710 +12981,7 @@ async function runAstGrepSkillInstall(options) {
     return { kind: "failed", reason: String(error) };
   }
 }
-// packages/utils/src/codegraph/provision.ts
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-var execFileAsync = promisify(execFile);
-// packages/utils/src/command-executor/execute-command.ts
-import { exec } from "node:child_process";
-import { promisify as promisify2 } from "node:util";
-var execAsync = promisify2(exec);
-// packages/utils/src/internal-initiator-marker.ts
-var INTERNAL_INITIATOR_MARKER_DETECT_PATTERN = /<!--\s*OMO_INTERNAL_INITIATOR\s*-->/;
-var INTERNAL_NOREPLY_MARKER_DETECT_PATTERN = /<!--\s*OMO_INTERNAL_NOREPLY\s*-->/;
-function hasInternalInitiatorMarker(text) {
-  return INTERNAL_INITIATOR_MARKER_DETECT_PATTERN.test(text);
-}
-function hasInternalNoReplyMarker(text) {
-  return INTERNAL_NOREPLY_MARKER_DETECT_PATTERN.test(text);
-}
-function isTextPartLike(part) {
-  return part.type === "text" && typeof part.text === "string";
-}
-function isSyntheticOrInternalTextPart(part) {
-  return isTextPartLike(part) && (part.synthetic === true || hasInternalInitiatorMarker(part.text));
-}
-function isSyntheticOrInternalOnlyTextParts(parts) {
-  const textParts = (parts ?? []).filter(isTextPartLike);
-  return textParts.length > 0 && textParts.every(isSyntheticOrInternalTextPart);
-}
-function isSyntheticOrInternalUserMessage(message) {
-  const role = message.info?.role ?? message.role;
-  return role === "user" && isSyntheticOrInternalOnlyTextParts(message.parts);
-}
-function isNoReplyTextPart(part) {
-  return isTextPartLike(part) && hasInternalNoReplyMarker(part.text);
-}
-function isTerminalNoReplyUserMessage(message) {
-  const role = message.info?.role ?? message.role;
-  if (role !== "user") {
-    return false;
-  }
-  const textParts = (message.parts ?? []).filter(isTextPartLike);
-  return textParts.some(isNoReplyTextPart);
-}
-// packages/utils/src/migration/agent-names.ts
-var BUILTIN_AGENT_NAMES = new Set([
-  "sisyphus",
-  "oracle",
-  "librarian",
-  "explore",
-  "multimodal-looker",
-  "metis",
-  "momus",
-  "prometheus",
-  "atlas",
-  "build"
-]);
-// packages/utils/src/migration/model-versions.ts
-var CURRENT_USER_SELECTABLE_MODELS = new Set([
-  "anthropic/claude-opus-4-5",
-  "anthropic/claude-opus-4-6",
-  "anthropic/claude-sonnet-4-5"
-]);
-// packages/utils/src/write-file-atomically.ts
-init_atomic_write();
-// packages/utils/src/session-idle-settle.ts
-var DEFAULT_SESSION_IDLE_SETTLE_MS = 150;
-var DEFAULT_SESSION_STATUS_TIMEOUT_MS = 5000;
-function settleAfterSessionIdle(ms = DEFAULT_SESSION_IDLE_SETTLE_MS) {
-  return ms > 0 ? new Promise((resolve9) => setTimeout(resolve9, ms)) : Promise.resolve();
-}
-function withStatusTimeout(promise, timeoutMs) {
-  let timeoutID;
-  const timeoutPromise = new Promise((_resolve, reject) => {
-    timeoutID = setTimeout(() => {
-      reject(new Error(`session.status() timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-  return Promise.race([promise, timeoutPromise]).finally(() => {
-    if (timeoutID !== undefined) {
-      clearTimeout(timeoutID);
-    }
-  });
-}
-var ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"]);
-function getSessionStatusPayload(response) {
-  if (isRecord(response) && isRecord(response.data)) {
-    return response.data;
-  }
-  if (isRecord(response)) {
-    return response;
-  }
-  return {};
-}
-function isActiveSessionStatusType(statusType) {
-  return ACTIVE_SESSION_STATUSES.has(statusType);
-}
-async function isSessionActive(client, sessionID, statusTimeoutMs = DEFAULT_SESSION_STATUS_TIMEOUT_MS) {
-  if (typeof client.session?.status !== "function") {
-    return false;
-  }
-  try {
-    const statusResult = await withStatusTimeout(client.session.status(), statusTimeoutMs);
-    const status = getSessionStatusPayload(statusResult)[sessionID];
-    if (!isRecord(status)) {
-      return false;
-    }
-    const statusType = status.type;
-    return typeof statusType === "string" && isActiveSessionStatusType(statusType);
-  } catch (error) {
-    if (error instanceof Error) {
-      return false;
-    }
-    return false;
-  }
-}
 
-// packages/utils/src/prompt-async-gate/prompt-message-state.ts
-function messageRole(message) {
-  if (!isRecord(message)) {
-    return;
-  }
-  const info = message.info;
-  if (isRecord(info) && typeof info.role === "string") {
-    return info.role;
-  }
-  return typeof message.role === "string" ? message.role : undefined;
-}
-function messageFinish(message) {
-  if (!isRecord(message)) {
-    return;
-  }
-  const info = message.info;
-  if (isRecord(info)) {
-    if (info.finish === true) {
-      return true;
-    }
-    if (typeof info.finish === "string" && info.finish.length > 0) {
-      return info.finish;
-    }
-  }
-  if (message.finish === true) {
-    return true;
-  }
-  return typeof message.finish === "string" && message.finish.length > 0 ? message.finish : undefined;
-}
-function messageCompleted(message) {
-  if (!isRecord(message)) {
-    return false;
-  }
-  const info = message.info;
-  const time = isRecord(info) && isRecord(info.time) ? info.time : undefined;
-  const completed = time?.completed;
-  if (typeof completed === "number" && Number.isFinite(completed)) {
-    return true;
-  }
-  return typeof completed === "string" && completed.length > 0;
-}
-function messageHasTerminalError(message) {
-  if (!isRecord(message)) {
-    return false;
-  }
-  const info = message.info;
-  if (isRecord(info) && info.error !== undefined && info.error !== null) {
-    return true;
-  }
-  return message.error !== undefined && message.error !== null;
-}
-function toInternalInitiatorTextPartLike(part) {
-  const result = {};
-  if (!isRecord(part)) {
-    return result;
-  }
-  if (typeof part.type === "string") {
-    result.type = part.type;
-  }
-  if (typeof part.text === "string") {
-    result.text = part.text;
-  }
-  if (typeof part.synthetic === "boolean") {
-    result.synthetic = part.synthetic;
-  }
-  return result;
-}
-function toInternalInitiatorMessageLike(message) {
-  if (!isRecord(message)) {
-    return;
-  }
-  const result = {};
-  const info = message.info;
-  if (isRecord(info) && typeof info.role === "string") {
-    result.info = { role: info.role };
-  }
-  if (typeof message.role === "string") {
-    result.role = message.role;
-  }
-  if (Array.isArray(message.parts)) {
-    result.parts = message.parts.map(toInternalInitiatorTextPartLike);
-  }
-  return result;
-}
-function messageIsSyntheticOrInternalUser(message) {
-  const initiatorMessage = toInternalInitiatorMessageLike(message);
-  return initiatorMessage !== undefined && isSyntheticOrInternalUserMessage(initiatorMessage);
-}
-function messageIsTerminalNoReplyUser(message) {
-  const initiatorMessage = toInternalInitiatorMessageLike(message);
-  return initiatorMessage !== undefined && isTerminalNoReplyUserMessage(initiatorMessage);
-}
-function messageHasInternalInitiatorMarker(message) {
-  const initiatorMessage = toInternalInitiatorMessageLike(message);
-  if (initiatorMessage === undefined) {
-    return false;
-  }
-  return (initiatorMessage.parts ?? []).some((part) => part.type === "text" && typeof part.text === "string" && hasInternalInitiatorMarker(part.text));
-}
-var QUESTION_TOOL_NAMES = new Set(["question", "ask_user_question", "askuserquestion"]);
-function partToolName(part) {
-  if (typeof part.name === "string") {
-    return part.name;
-  }
-  if (typeof part.tool === "string") {
-    return part.tool;
-  }
-  return typeof part.toolName === "string" ? part.toolName : undefined;
-}
-function partIsToolCall(part) {
-  return part.type === "tool" || part.type === "tool_use" || part.type === "tool-call" || part.type === "tool-invocation";
-}
-function partIsQuestionTool(part) {
-  if (!isRecord(part) || !partIsToolCall(part)) {
-    return false;
-  }
-  const toolName = partToolName(part);
-  return toolName !== undefined && QUESTION_TOOL_NAMES.has(toolName.toLowerCase());
-}
-function partIsUnansweredQuestionTool(part) {
-  if (!partIsQuestionTool(part) || !isRecord(part)) {
-    return false;
-  }
-  const state = part.state;
-  if (!isRecord(state)) {
-    return true;
-  }
-  return state.status !== "completed";
-}
-function partIsWaitingOnTool(part) {
-  if (!isRecord(part)) {
-    return false;
-  }
-  if (!partIsToolCall(part)) {
-    return false;
-  }
-  const state = part.state;
-  if (!isRecord(state)) {
-    return false;
-  }
-  return state.status === "pending" || state.status === "running";
-}
-function partIsUnresolvedTool(part) {
-  if (!isRecord(part) || !partIsToolCall(part)) {
-    return false;
-  }
-  const state = part.state;
-  if (!isRecord(state)) {
-    return true;
-  }
-  return state.status !== "completed";
-}
-function partHasSubstantiveAssistantOutput(part) {
-  if (!isRecord(part)) {
-    return false;
-  }
-  if (part.type === "step-start" || part.type === "step-finish") {
-    return false;
-  }
-  if (part.type === "text") {
-    return typeof part.text === "string" && part.text.trim().length > 0;
-  }
-  return typeof part.type === "string" && part.type.length > 0;
-}
-function messageHasQuestionTool(message) {
-  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsUnansweredQuestionTool);
-}
-function messageHasWaitingTool(message) {
-  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsWaitingOnTool);
-}
-function messageHasUnresolvedTool(message) {
-  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsUnresolvedTool);
-}
-function messageHasSubstantiveAssistantOutput(message) {
-  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partHasSubstantiveAssistantOutput);
-}
-
-// packages/utils/src/prompt-async-gate/message-inspection-error.ts
-function isPromptMessageInspectionAborted(error) {
-  if (error instanceof Error && error.name === "MessageAbortedError") {
-    return true;
-  }
-  return isRecord(error) && error.name === "MessageAbortedError";
-}
-
-// packages/utils/src/prompt-async-gate/timing.ts
-var DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS = 5000;
-var promptGateMessagesFetchTimeoutMsForTesting;
-function getPromptGateMessagesFetchTimeoutMs() {
-  return promptGateMessagesFetchTimeoutMsForTesting ?? DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS;
-}
-async function withDispatchTimeout(operation, dispatchTimeoutMs, operationName) {
-  if (dispatchTimeoutMs <= 0) {
-    return operation;
-  }
-  let timeoutID;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutID = setTimeout(() => {
-      reject(new Error(`${operationName} timed out after ${dispatchTimeoutMs}ms`));
-    }, dispatchTimeoutMs);
-  });
-  try {
-    return await Promise.race([operation, timeoutPromise]);
-  } finally {
-    if (timeoutID !== undefined) {
-      clearTimeout(timeoutID);
-    }
-  }
-}
-
-// packages/utils/src/prompt-async-gate/pending-tool-turn.ts
-function getPromptQuery(input) {
-  if (!isRecord(input)) {
-    return { directory: "" };
-  }
-  const query = input.query;
-  if (!isRecord(query)) {
-    return { directory: "" };
-  }
-  const promptQuery = { directory: "" };
-  if (typeof query.directory === "string") {
-    return typeof query.limit === "number" ? { directory: query.directory, limit: query.limit } : { directory: query.directory };
-  }
-  if (typeof query.limit === "number") {
-    return { ...promptQuery, limit: query.limit };
-  }
-  return promptQuery;
-}
-function getMessagesData(response) {
-  if (isRecord(response) && Array.isArray(response.data)) {
-    return response.data;
-  }
-  return Array.isArray(response) ? response : [];
-}
-function latestAssistantTurnBlocksInternalPrompt(messages) {
-  let sawAssistantAfterLatestUser = false;
-  for (let index = messages.length - 1;index >= 0; index--) {
-    const message = messages[index];
-    const role = messageRole(message);
-    if (role === "assistant") {
-      sawAssistantAfterLatestUser = true;
-      if (messageHasQuestionTool(message)) {
-        return true;
-      }
-      const finish = messageFinish(message);
-      if (finish === "tool-calls") {
-        return !isRecord(message) || !Array.isArray(message.parts) || messageHasUnresolvedTool(message);
-      }
-      if ((finish === undefined || finish === "unknown") && !messageHasSubstantiveAssistantOutput(message)) {
-        return !(messageCompleted(message) && messageHasTerminalError(message));
-      }
-      if (messageCompleted(message)) {
-        return false;
-      }
-      if (finish === true) {
-        return false;
-      }
-      if (finish === undefined || finish === "unknown") {
-        return true;
-      }
-      if (!isRecord(message) || !Array.isArray(message.parts)) {
-        return finish === "tool-calls";
-      }
-      return messageHasWaitingTool(message);
-    }
-    if (role === "user") {
-      if (messageIsSyntheticOrInternalUser(message)) {
-        if (messageIsTerminalNoReplyUser(message)) {
-          continue;
-        }
-        if (!sawAssistantAfterLatestUser) {
-          if (messageHasInternalInitiatorMarker(message)) {
-            continue;
-          }
-          return true;
-        }
-        continue;
-      }
-      return false;
-    }
-  }
-  return false;
-}
-async function sessionLatestAssistantBlocksInternalPrompt(args) {
-  const session = args.client.session;
-  if (typeof session?.messages !== "function") {
-    return false;
-  }
-  const messages = session.messages.bind(session);
-  try {
-    const response = await withDispatchTimeout(messages({
-      path: { id: args.sessionID },
-      query: getPromptQuery(args.input)
-    }), args.timeoutMs, `[prompt-async-gate] ${args.sessionName} session.messages`);
-    return latestAssistantTurnBlocksInternalPrompt(getMessagesData(response));
-  } catch (error) {
-    log("[prompt-async-gate] latest assistant prompt-block check failed", {
-      sessionID: args.sessionID,
-      source: args.source,
-      error: String(error)
-    });
-    return !isPromptMessageInspectionAborted(error);
-  }
-}
-
-// packages/utils/src/prompt-async-gate/recent-dispatches.ts
-var recentPromptDispatches = new Map;
-function recentDispatchKey(sessionID, dedupeKey) {
-  return `${sessionID}\x00${dedupeKey}`;
-}
-function pruneRecentPromptDispatches(now = Date.now()) {
-  for (const [key, dispatch] of recentPromptDispatches) {
-    if (dispatch.expiresAt <= now) {
-      recentPromptDispatches.delete(key);
-    }
-  }
-}
-function rememberRecentPromptDispatch(args) {
-  pruneRecentPromptDispatches();
-  if (args.holdMs <= 0) {
-    return;
-  }
-  recentPromptDispatches.set(recentDispatchKey(args.sessionID, args.dedupeKey), {
-    source: args.source,
-    expiresAt: Date.now() + args.holdMs
-  });
-  log("[prompt-async-gate] remembered semantic prompt dispatch", {
-    sessionID: args.sessionID,
-    source: args.source,
-    holdMs: args.holdMs
-  });
-}
-
-// packages/utils/src/prompt-async-gate/reservations.ts
-var promptAsyncReservations = new Map;
-var expiredReservationHandler;
-function setExpiredReservationHandler(handler) {
-  expiredReservationHandler = handler;
-}
-function notifyExpiredReservation(sessionID) {
-  expiredReservationHandler?.(sessionID);
-}
-function pruneExpiredReservations(now = Date.now()) {
-  const expiredSessionIDs = [];
-  for (const [sessionID, reservation] of promptAsyncReservations) {
-    if (typeof reservation.expiresAt === "number" && reservation.expiresAt <= now) {
-      promptAsyncReservations.delete(sessionID);
-      expiredSessionIDs.push(sessionID);
-      log("[prompt-async-gate] expired reservation released", {
-        sessionID,
-        source: reservation.source
-      });
-    }
-  }
-  for (const sessionID of expiredSessionIDs) {
-    notifyExpiredReservation(sessionID);
-  }
-}
-function getActiveReservation(sessionID) {
-  pruneExpiredReservations();
-  return promptAsyncReservations.get(sessionID);
-}
-function setPromptReservation(sessionID, reservation) {
-  promptAsyncReservations.set(sessionID, reservation);
-}
-function finishPromptReservation(sessionID, reservation, dispatchAttempted, postDispatchHoldMs) {
-  const current = promptAsyncReservations.get(sessionID);
-  if (current?.token !== reservation.token) {
-    return;
-  }
-  if (dispatchAttempted && postDispatchHoldMs > 0) {
-    promptAsyncReservations.set(sessionID, {
-      ...reservation,
-      expiresAt: Date.now() + postDispatchHoldMs
-    });
-    return;
-  }
-  promptAsyncReservations.delete(sessionID);
-}
-
-// packages/utils/src/prompt-async-gate/session-idle-dispatch.ts
-async function dispatchAfterSessionIdle(args) {
-  const {
-    sessionName,
-    client,
-    sessionID,
-    input,
-    source,
-    dedupeKey,
-    settleMs,
-    postDispatchHoldMs,
-    semanticDedupeHoldMs,
-    dispatchTimeoutMs,
-    checkStatus,
-    checkToolState,
-    dispatch
-  } = args;
-  const existing = getActiveReservation(sessionID);
-  if (existing) {
-    log(`[prompt-async-gate] ${sessionName} skipped because session is reserved`, {
-      sessionID,
-      source,
-      reservedBy: existing.source,
-      reservedAgeMs: Date.now() - existing.reservedAt
-    });
-    return { status: "reserved", reservedBy: existing.source };
-  }
-  const reservation = {
-    source,
-    dedupeKey,
-    reservedAt: Date.now(),
-    token: Symbol(source)
-  };
-  setPromptReservation(sessionID, reservation);
-  let dispatchAttempted = false;
-  try {
-    const canReadStatus = checkStatus && typeof client.session?.status === "function";
-    if (settleMs > 0) {
-      await settleAfterSessionIdle(settleMs);
-    }
-    let sessionActive = false;
-    if (canReadStatus) {
-      try {
-        sessionActive = await withDispatchTimeout(isSessionActive(client, sessionID), Math.min(dispatchTimeoutMs, 5000), `[prompt-async-gate] ${sessionName} isSessionActive`);
-      } catch (error) {
-        if (error instanceof Error) {
-          sessionActive = false;
-        }
-        sessionActive = false;
-      }
-    }
-    if (sessionActive) {
-      log(`[prompt-async-gate] ${sessionName} skipped because session is active`, { sessionID, source });
-      return { status: "active" };
-    }
-    if (checkToolState && typeof client.session?.messages === "function" && await sessionLatestAssistantBlocksInternalPrompt({
-      client,
-      sessionID,
-      input,
-      sessionName,
-      source,
-      timeoutMs: Math.min(dispatchTimeoutMs, getPromptGateMessagesFetchTimeoutMs())
-    })) {
-      log(`[prompt-async-gate] ${sessionName} skipped because latest assistant is still active`, {
-        sessionID,
-        source
-      });
-      return { status: "active" };
-    }
-    log(`[prompt-async-gate] ${sessionName} dispatching`, { sessionID, source });
-    dispatchAttempted = true;
-    const response = await withDispatchTimeout(dispatch(input), dispatchTimeoutMs, `[prompt-async-gate] ${sessionName} dispatch`);
-    rememberRecentPromptDispatch({
-      sessionID,
-      dedupeKey,
-      source,
-      holdMs: semanticDedupeHoldMs
-    });
-    log(`[prompt-async-gate] ${sessionName} dispatched`, { sessionID, source });
-    return { status: "dispatched", response };
-  } catch (error) {
-    if (dispatchAttempted) {
-      rememberRecentPromptDispatch({
-        sessionID,
-        dedupeKey,
-        source,
-        holdMs: semanticDedupeHoldMs
-      });
-    }
-    const errorText = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    log(`[prompt-async-gate] ${sessionName} failed`, { sessionID, source, error: errorText });
-    return { status: "failed", error, dispatchAttempted };
-  } finally {
-    finishPromptReservation(sessionID, reservation, dispatchAttempted, postDispatchHoldMs);
-  }
-}
-
-// packages/utils/src/prompt-async-gate/queue.ts
-var promptQueues = new Map;
-var promptQueueDraining = new Set;
-var promptQueueInFlight = new Map;
-var promptQueueTimers = new Map;
-setExpiredReservationHandler((sessionID) => {
-  schedulePromptQueueDrain(sessionID, 0);
-});
-function setPromptQueue(sessionID, queue) {
-  if (queue.length === 0) {
-    promptQueues.delete(sessionID);
-    return;
-  }
-  promptQueues.set(sessionID, queue);
-}
-function queuedResult(entry, position, queuedBy = entry.source) {
-  return {
-    status: "queued",
-    queuedBy,
-    position
-  };
-}
-function clearPromptQueueTimer(sessionID) {
-  const timer = promptQueueTimers.get(sessionID);
-  if (timer !== undefined) {
-    clearTimeout(timer);
-    promptQueueTimers.delete(sessionID);
-  }
-}
-function schedulePromptQueueDrain(sessionID, delayMs) {
-  const queue = promptQueues.get(sessionID);
-  if (!queue || queue.length === 0) {
-    clearPromptQueueTimer(sessionID);
-    return;
-  }
-  clearPromptQueueTimer(sessionID);
-  const timer = setTimeout(() => {
-    promptQueueTimers.delete(sessionID);
-    drainPromptQueue(sessionID).catch((error) => {
-      log("[prompt-async-gate] queued prompt drain failed", {
-        sessionID,
-        error: String(error)
-      });
-    });
-  }, Math.max(0, delayMs));
-  promptQueueTimers.set(sessionID, timer);
-}
-function removePromptQueueEntry(sessionID, entry) {
-  const queue = promptQueues.get(sessionID);
-  if (!queue) {
-    return;
-  }
-  const nextQueue = queue.filter((queued) => queued.id !== entry.id);
-  setPromptQueue(sessionID, nextQueue);
-}
-async function drainPromptQueue(sessionID, awaitedEntry) {
-  if (promptQueueDraining.has(sessionID)) {
-    return awaitedEntry ? queuedResult(awaitedEntry, 1) : undefined;
-  }
-  promptQueueDraining.add(sessionID);
-  clearPromptQueueTimer(sessionID);
-  let awaitedResult;
-  try {
-    while (true) {
-      const queue = promptQueues.get(sessionID);
-      const entry = queue?.[0];
-      if (!entry) {
-        break;
-      }
-      promptQueueInFlight.set(sessionID, entry);
-      const result = await dispatchAfterSessionIdle({
-        sessionName: entry.sessionName,
-        client: entry.client,
-        sessionID: entry.sessionID,
-        input: entry.input,
-        source: entry.source,
-        dedupeKey: entry.dedupeKey,
-        settleMs: entry.settleMs,
-        postDispatchHoldMs: entry.postDispatchHoldMs,
-        semanticDedupeHoldMs: entry.semanticDedupeHoldMs,
-        dispatchTimeoutMs: entry.dispatchTimeoutMs,
-        checkStatus: entry.checkStatus,
-        checkToolState: entry.checkToolState,
-        dispatch: entry.dispatch
-      });
-      if (promptQueueInFlight.get(sessionID)?.id === entry.id) {
-        promptQueueInFlight.delete(sessionID);
-      }
-      if (result.status === "active" || result.status === "reserved") {
-        const queued = queuedResult(entry, 1, result.status === "reserved" ? result.reservedBy : entry.source);
-        if (awaitedEntry?.id === entry.id) {
-          awaitedResult = queued;
-        }
-        schedulePromptQueueDrain(sessionID, entry.queueRetryMs);
-        break;
-      }
-      removePromptQueueEntry(sessionID, entry);
-      if (awaitedEntry?.id === entry.id) {
-        awaitedResult = result;
-      }
-      const remainingQueue = promptQueues.get(sessionID);
-      if (!remainingQueue || remainingQueue.length === 0) {
-        break;
-      }
-      schedulePromptQueueDrain(sessionID, entry.postDispatchHoldMs);
-      break;
-    }
-  } finally {
-    promptQueueDraining.delete(sessionID);
-  }
-  return awaitedResult;
-}
 // packages/omo-codex/src/install/install-ast-grep-sg.ts
 function describeResult(result) {
   if (result.kind === "succeeded")
@@ -13416,7 +12996,7 @@ async function installAstGrepForCodex(options) {
     return;
   const platform = options.platform ?? process.platform;
   const targetDir = astGrepRuntimeDir(options.codexHome, platform, options.arch ?? process.arch);
-  const skillDir = join28(plugin.path, "skills", "ast-grep");
+  const skillDir = join33(plugin.path, "skills", "ast-grep");
   const installer = options.installer ?? runAstGrepSkillInstall;
   try {
     const result = await installer({ platform, skillDir, targetDir });
@@ -13446,28 +13026,29 @@ async function trackCodexInstallTelemetry() {
 // packages/omo-codex/src/install/install-codex.ts
 var SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
 async function runCodexInstaller(options = {}) {
-  const env3 = options.env ?? process.env;
+  const env2 = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
-  const repoRoot = resolve10(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: env3 }));
-  const codexHome = resolve10(options.codexHome ?? env3.CODEX_HOME ?? join31(homedir2(), ".codex"));
-  const projectDirectory = resolve10(options.projectDirectory ?? env3.OMO_CODEX_PROJECT ?? process.cwd());
-  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: env3 });
+  const repoRoot = resolve9(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: env2 }));
+  const codexHome = resolve9(options.codexHome ?? env2.CODEX_HOME ?? join36(homedir2(), ".codex"));
+  const projectDirectory = resolve9(options.projectDirectory ?? env2.OMO_CODEX_PROJECT ?? process.cwd());
+  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: env2 });
   const runCommand = options.runCommand ?? defaultRunCommand;
-  const log2 = options.log ?? (() => {
+  const log = options.log ?? (() => {
     return;
   });
   const buildSource = await shouldBuildSourcePackages(repoRoot);
+  const versionOverride = env2.LAZYCODEX_DEV_VERSION?.trim() || undefined;
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
-    env: env3,
-    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env: env3 })) : undefined
+    env: env2,
+    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env: env2 })) : undefined
   });
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint);
   }
-  const codexPackageRoot = join31(repoRoot, "packages", "omo-codex");
+  const codexPackageRoot = join36(repoRoot, "packages", "omo-codex");
   const marketplace = await readMarketplace(repoRoot, {
-    marketplacePath: join31(codexPackageRoot, "marketplace.json")
+    marketplacePath: join36(codexPackageRoot, "marketplace.json")
   });
   const distributionManifest = await readDistributionManifest(repoRoot);
   const installed = [];
@@ -13483,13 +13064,15 @@ async function runCodexInstaller(options = {}) {
       manifestVersion: manifest.version,
       marketplaceName: marketplace.name,
       pluginName: entry.name,
-      distributionManifest
+      distributionManifest,
+      versionOverride
     });
     validatePathSegment(version2, "plugin version");
-    log2(`Building ${entry.name}@${version2}`);
+    log(`Building ${entry.name}@${version2}`);
     const plugin = await installCachedPlugin({
       buildSource,
       codexHome,
+      env: env2,
       marketplaceName: marketplace.name,
       name: entry.name,
       runCommand,
@@ -13499,17 +13082,19 @@ async function runCodexInstaller(options = {}) {
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
       await stampLazyCodexPluginVersion({ pluginRoot: plugin.path, version: version2 });
       await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, distributionManifest });
+      await writeInstalledCodexBinDir({ pluginRoot: plugin.path, binDir });
+      await removeGitBashHooksOffWindows({ platform, pluginRoot: plugin.path });
     }
     const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform });
     for (const link of links) {
-      log2(`Linked ${link.name} -> ${link.target}`);
+      log(`Linked ${link.name} -> ${link.target}`);
     }
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
       const runtimeLink = await linkRootRuntimeBin({ binDir, codexHome, repoRoot, platform });
       if (runtimeLink !== null)
-        log2(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
+        log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
       else
-        log2(`Warning: skipped the omo runtime wrapper because ${join31(repoRoot, "dist", "cli", "index.js")} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
+        log(`Warning: skipped the omo-agent-toolkit runtime wrapper because ${join36(repoRoot, "dist", "cli", "index.js")} is missing; omo-agent-toolkit ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
     }
     pluginSources.push({ name: entry.name, sourcePath });
     installed.push(plugin);
@@ -13518,7 +13103,7 @@ async function runCodexInstaller(options = {}) {
     codexHome,
     installed,
     installer: options.astGrepInstaller,
-    log: log2,
+    log,
     platform
   });
   const preservedReasoning = await capturePreservedAgentReasoning({ codexHome });
@@ -13539,13 +13124,14 @@ async function runCodexInstaller(options = {}) {
       preservedServiceTier
     });
     for (const link of agentLinks) {
-      log2(`Linked agent ${link.name} -> ${link.target}`);
-      const agentName = agentNameFromToml2(link.name);
+      log(`Linked agent ${link.name} -> ${link.target}`);
+      const agentName = agentNameFromToml3(link.name);
       agentConfigs.set(agentName, { name: agentName, configFile: `./agents/${link.name}` });
     }
   }
   const trustedHookStates = (await Promise.all(installed.map((plugin) => trustedHookStatesForPlugin({
     marketplaceName: marketplace.name,
+    platform,
     pluginName: plugin.name,
     pluginRoot: plugin.path
   })))).flat();
@@ -13561,14 +13147,23 @@ async function runCodexInstaller(options = {}) {
       pluginNames: marketplace.plugins.map((plugin) => plugin.name)
     });
   }
-  await reapLspDaemons(codexHome).catch(() => []);
-  const marketplaceRoot = join31(codexHome, "plugins", "cache", marketplace.name);
+  const legacyDaemonCleanup = await reapLspDaemons(codexHome).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Warning: skipped legacy Codex LSP daemon cleanup: ${message}`);
+    return [];
+  });
+  for (const cleanup of legacyDaemonCleanup) {
+    if (cleanup.status !== "deferred")
+      continue;
+    log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`);
+  }
+  const marketplaceRoot = join36(codexHome, "plugins", "cache", marketplace.name);
   await writeCachedMarketplaceManifest({
     marketplaceName: marketplace.name,
     marketplaceRoot,
     plugins: installed
   });
-  const configPath = join31(codexHome, "config.toml");
+  const configPath = join36(codexHome, "config.toml");
   await updateCodexConfig({
     configPath,
     repoRoot: codexPackageRoot,
@@ -13576,25 +13171,26 @@ async function runCodexInstaller(options = {}) {
     marketplaceSource: codexMarketplaceSource(marketplaceRoot),
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     platform,
-    codegraphMcpEnabled: options.codegraphMcpEnabled ?? resolveCodegraphNodeSupport({ env: env3 }).supported,
+    codegraphMcpEnabled: options.codegraphMcpEnabled ?? resolveCodegraphNodeSupport({ env: env2 }).supported,
     gitBashEnabled: platform === "win32" && gitBashResolution.found,
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
-    autonomousPermissions: options.autonomousPermissions !== false
+    autonomousPermissions: options.autonomousPermissions !== false,
+    ...options.reasoning === undefined ? {} : { reasoning: options.reasoning }
   });
-  await seedAndMigrateOmoSot({ env: env3, log: log2, repoRoot, runCommand });
+  await seedAndMigrateOmoSot({ env: env2, log, repoRoot, runCommand });
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
     startDirectory: projectDirectory,
     codexHome,
-    log: log2
+    log
   });
   for (const configCleanup of projectCleanup.configs) {
     if (!configCleanup.changed)
       continue;
-    log2(`Repaired project Codex config ${configCleanup.configPath} (backup: ${configCleanup.backupPath})`);
+    log(`Repaired project Codex config ${configCleanup.configPath} (backup: ${configCleanup.backupPath})`);
   }
   for (const artifact of projectCleanup.artifacts) {
-    log2(`Found project-local legacy artifact ${artifact.path}; left in place`);
+    log(`Found project-local legacy artifact ${artifact.path}; left in place`);
   }
   await trackCodexInstallTelemetry();
   return {
@@ -13606,7 +13202,7 @@ async function runCodexInstaller(options = {}) {
     projectCleanup
   };
 }
-function agentNameFromToml2(fileName) {
+function agentNameFromToml3(fileName) {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
 }
 async function agentSourceRootsForInstall(input) {
@@ -13628,25 +13224,25 @@ function findRepoRootFromImporter(importerDir) {
   for (let depth = 0;depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current))
       return current;
-    for (const wrapperPackageRoot of [join31(current, "node_modules", "oh-my-openagent"), join31(current, "oh-my-openagent")]) {
+    for (const wrapperPackageRoot of [join36(current, "node_modules", "oh-my-openagent"), join36(current, "oh-my-openagent")]) {
       if (isRepoRootWithCodexPlugin(wrapperPackageRoot))
         return wrapperPackageRoot;
     }
-    current = resolve10(current, "..");
+    current = resolve9(current, "..");
   }
   throw new Error("Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or sibling oh-my-openagent package within 7 parent levels");
 }
 function findRepoRoot(input) {
   const wrapperPackageRoot = input.env?.OMO_WRAPPER_PACKAGE_ROOT;
   if (wrapperPackageRoot !== undefined && wrapperPackageRoot.trim().length > 0) {
-    const resolvedWrapperPackageRoot = resolve10(wrapperPackageRoot);
+    const resolvedWrapperPackageRoot = resolve9(wrapperPackageRoot);
     if (isRepoRootWithCodexPlugin(resolvedWrapperPackageRoot))
       return resolvedWrapperPackageRoot;
   }
   return findRepoRootFromImporter(input.importerDir);
 }
 function isRepoRootWithCodexPlugin(repoRoot) {
-  return existsSync7(join31(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
+  return existsSync7(join36(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
 }
 function codexMarketplaceSource(marketplaceRoot) {
   return { sourceType: "local", source: marketplaceRoot };
@@ -13809,6 +13405,7 @@ function formatLazyCodexInstallHelp() {
     "Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
     "       lazycodex-ai uninstall [--project <path>]",
     "       lazycodex-ai update [--dry-run] [--repo-root <path>]",
+    "       lazycodex-ai doctor [--source-root <path>] [--model <model>] [--json|--status|--verbose]",
     "       lazycodex-ai version",
     "       lazycodex-ai <command> [args...]",
     "",
@@ -13832,26 +13429,28 @@ async function runDelegatedOmoCommand(parsed, options) {
     options.log(formatShellCommand(invocation.command, invocation.args));
     return;
   }
-  const env3 = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo", ...invocation.env } : { ...process.env, ...invocation.env };
-  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env3 });
+  const env2 = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo-agent-toolkit", ...invocation.env } : { ...process.env, ...invocation.env };
+  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env2 });
 }
 function buildDelegatedOmoInvocation(parsed) {
   if (parsed.command === "doctor")
     return buildLazyCodexDoctorInvocation(parsed.args);
-  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command];
   if (parsed.command === "install") {
-    args.push("--platform=codex");
+    const args2 = ["--yes", "oh-my-openagent@latest", parsed.command, "--platform=codex"];
     if (parsed.noTui)
-      args.push("--no-tui");
+      args2.push("--no-tui");
     if (parsed.skipAuth)
-      args.push("--skip-auth");
+      args2.push("--skip-auth");
     if (parsed.autonomousPermissions !== false)
-      args.push("--codex-autonomous");
+      args2.push("--codex-autonomous");
     if (parsed.autonomousPermissions === false)
-      args.push("--no-codex-autonomous");
+      args2.push("--no-codex-autonomous");
     if (parsed.repoRoot)
-      args.push(`--repo-root=${parsed.repoRoot}`);
-  } else if (parsed.command === "cleanup") {
+      args2.push(`--repo-root=${parsed.repoRoot}`);
+    return { command: "npx", args: args2, delegatesToOmo: true };
+  }
+  const args = ["--yes", "--package", "oh-my-openagent", "omo-agent-toolkit", parsed.command];
+  if (parsed.command === "cleanup") {
     args.push("--platform=codex", ...parsed.args);
   } else {
     args.push(...parsed.args);
@@ -13859,21 +13458,26 @@ function buildDelegatedOmoInvocation(parsed) {
   return { command: "npx", args, delegatesToOmo: true };
 }
 function buildLazyCodexDoctorInvocation(doctorArgs) {
+  const doctorOptions = parseLazyCodexDoctorOptions(doctorArgs);
+  const codexArgs = [
+    "exec",
+    "--ephemeral",
+    "--sandbox",
+    "danger-full-access",
+    "--skip-git-repo-check",
+    "--cd",
+    "."
+  ];
+  if (doctorOptions.model !== undefined)
+    codexArgs.push("--model", doctorOptions.model);
+  codexArgs.push(buildLazyCodexDoctorPrompt(doctorOptions.args));
   return {
     command: "codex",
-    args: [
-      "exec",
-      "--ephemeral",
-      "--sandbox",
-      "read-only",
-      "--skip-git-repo-check",
-      "--cd",
-      ".",
-      buildLazyCodexDoctorPrompt(doctorArgs)
-    ],
+    args: codexArgs,
     delegatesToOmo: false,
     env: {
-      LAZYCODEX_DOCTOR_LCX_ACTIVE: "1"
+      LAZYCODEX_DOCTOR_LCX_ACTIVE: "1",
+      ...doctorOptions.sourceRoot === undefined ? {} : { LAZYCODEX_SOURCE_ROOT: doctorOptions.sourceRoot }
     }
   };
 }
@@ -13881,11 +13485,57 @@ function buildLazyCodexDoctorPrompt(doctorArgs) {
   return [
     "Use $omo:lcx-doctor to diagnose this LazyCodex/Codex installation.",
     "This command is already the lazycodex doctor surface; never invoke lazycodex doctor from inside the doctor workflow.",
-    "Sync the latest LazyCodex and OpenAI Codex sources into /tmp, inventory the local installation,",
+    "Use the resolved source root from LAZYCODEX_SOURCE_ROOT when set; otherwise use ${TMPDIR:-/tmp}/lazycodex-sources.",
+    "Validate cached source checkouts before reuse, quarantine corrupt caches, and do not rely on /tmp/lazycodex-source.",
+    "Sync the latest LazyCodex and OpenAI Codex sources there, inventory the local installation,",
     "probe the Codex plugin/cache/hooks/MCP state, and report PASS/WARN/FAIL findings with evidence and remediations.",
     buildDoctorOutputInstruction(doctorArgs),
     doctorArgs.length > 0 ? `Requested doctor arguments: ${doctorArgs.join(" ")}` : "Requested doctor arguments: none"
   ].join(" ");
+}
+function parseLazyCodexDoctorOptions(doctorArgs) {
+  const args = [];
+  let model;
+  let sourceRoot;
+  let index = 0;
+  while (index < doctorArgs.length) {
+    const arg = doctorArgs[index];
+    if (arg === "--model") {
+      const value = doctorArgs[index + 1];
+      if (typeof value !== "string" || value.trim().length === 0)
+        throw new Error("--model requires a value");
+      model = value;
+      index += 2;
+      continue;
+    }
+    if (typeof arg === "string" && arg.startsWith("--model=")) {
+      const value = arg.slice("--model=".length);
+      if (value.trim().length === 0)
+        throw new Error("--model requires a value");
+      model = value;
+      index += 1;
+      continue;
+    }
+    if (arg === "--source-root") {
+      const value = doctorArgs[index + 1];
+      if (typeof value !== "string" || value.trim().length === 0)
+        throw new Error("--source-root requires a path");
+      sourceRoot = value;
+      index += 2;
+      continue;
+    }
+    if (typeof arg === "string" && arg.startsWith("--source-root=")) {
+      const value = arg.slice("--source-root=".length);
+      if (value.trim().length === 0)
+        throw new Error("--source-root requires a path");
+      sourceRoot = value;
+      index += 1;
+      continue;
+    }
+    args.push(arg);
+    index += 1;
+  }
+  return { args, ...model === undefined ? {} : { model }, ...sourceRoot === undefined ? {} : { sourceRoot } };
 }
 function buildDoctorOutputInstruction(doctorArgs) {
   if (doctorArgs.includes("--json")) {
@@ -13903,26 +13553,26 @@ function shellQuote(value) {
 }
 
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
-import { spawn as spawn4, spawnSync as spawnSync3 } from "node:child_process";
-import { readFileSync as readFileSync3 } from "node:fs";
-import { dirname as dirname9, join as join33 } from "node:path";
+import { spawn as spawn3, spawnSync as spawnSync3 } from "node:child_process";
+import { readFileSync as readFileSync4 } from "node:fs";
+import { dirname as dirname12, join as join38 } from "node:path";
 import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 // packages/omo-codex/src/install/lazycodex-bun-global-paths.ts
-import { join as join32 } from "node:path";
-function isBunGlobalEntrypointPath(invokedPath, env3) {
+import { join as join37 } from "node:path";
+function isBunGlobalEntrypointPath(invokedPath, env2) {
   if (typeof invokedPath !== "string" || invokedPath.trim().length === 0)
     return false;
   const normalizedPath = normalizePathForPrefix(invokedPath);
-  return resolveBunGlobalRoots(env3).some((root) => normalizedPath.startsWith(root));
+  return resolveBunGlobalRoots(env2).some((root) => normalizedPath.startsWith(root));
 }
-function resolveBunGlobalRoots(env3) {
-  const bunInstallRoot = env3.BUN_INSTALL?.trim();
-  const homeRoot = env3.HOME?.trim();
+function resolveBunGlobalRoots(env2) {
+  const bunInstallRoot = env2.BUN_INSTALL?.trim();
+  const homeRoot = env2.HOME?.trim();
   return [
-    ...bunInstallRoot ? [join32(bunInstallRoot, "bin"), join32(bunInstallRoot, "install", "global", "node_modules")] : [],
-    ...homeRoot ? [join32(homeRoot, ".bun", "bin"), join32(homeRoot, ".bun", "install", "global", "node_modules")] : []
+    ...bunInstallRoot ? [join37(bunInstallRoot, "bin"), join37(bunInstallRoot, "install", "global", "node_modules")] : [],
+    ...homeRoot ? [join37(homeRoot, ".bun", "bin"), join37(homeRoot, ".bun", "install", "global", "node_modules")] : []
   ].map(normalizePathForPrefix);
 }
 function normalizePathForPrefix(path2) {
@@ -13948,39 +13598,39 @@ var KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES = new Set([
 ]);
 var KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES = ["@oh-my-opencode/", "oh-my-openagent-", "oh-my-opencode-"];
 async function runLazyCodexManualUpdate(input = {}) {
-  const env3 = input.env ?? process.env;
-  const log2 = input.log ?? console.log;
+  const env2 = input.env ?? process.env;
+  const log = input.log ?? console.log;
   const commandRunner = input.runCommand ?? defaultRunCommandForManualUpdate;
-  const currentVersion = resolveCurrentVersion(env3);
-  const latestVersion = resolveLatestVersion(env3);
+  const currentVersion = resolveCurrentVersion(env2);
+  const latestVersion = resolveLatestVersion(env2);
   const plan = resolveLazyCodexUpdatePlan({
     currentVersion,
     latestVersion,
-    command: resolveCommand2(env3),
-    args: resolveArgs(env3),
-    env: env3,
+    command: resolveCommand2(env2),
+    args: resolveArgs(env2),
+    env: env2,
     invokedPath: input.invokedPath ?? process.argv[1]
   });
   if (!plan.shouldUpdate) {
     const printableVersion = currentVersion ?? "unknown";
-    log2(plan.reason === "up-to-date" ? `lazycodex-ai ${printableVersion} is already up to date.` : `Unable to check lazycodex-ai updates (${plan.reason}).`);
+    log(plan.reason === "up-to-date" ? `lazycodex-ai ${printableVersion} is already up to date.` : `Unable to check lazycodex-ai updates (${plan.reason}).`);
     return plan.reason === "up-to-date" ? 0 : 1;
   }
   if (input.dryRun) {
-    log2(`${plan.command} ${plan.args.join(" ")}`);
+    log(`${plan.command} ${plan.args.join(" ")}`);
     if (plan.postUpdate === "bun-global-trust")
-      log2(`${DEFAULT_UPDATE_COMMAND} ${DEFAULT_UPDATE_ARGS.join(" ")}`);
+      log(`${DEFAULT_UPDATE_COMMAND} ${DEFAULT_UPDATE_ARGS.join(" ")}`);
     return 0;
   }
-  await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env: env3 });
+  await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env: env2 });
   if (plan.postUpdate === "bun-global-trust") {
     await handleBunGlobalTrust({
-      env: env3,
-      log: log2,
+      env: env2,
+      log,
       commandRunner,
       isInteractive: input.isInteractive ?? (process.stdin.isTTY === true && process.stdout.isTTY === true)
     });
-    await commandRunner(DEFAULT_UPDATE_COMMAND, DEFAULT_UPDATE_ARGS, { cwd: process.cwd(), env: env3 });
+    await commandRunner(DEFAULT_UPDATE_COMMAND, DEFAULT_UPDATE_ARGS, { cwd: process.cwd(), env: env2 });
   }
   return 0;
 }
@@ -13998,12 +13648,12 @@ function resolveLazyCodexUpdatePlan(input = {}) {
   }
   return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS, postUpdate: "none" };
 }
-function resolveCommand2(env3) {
-  return env3.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
+function resolveCommand2(env2) {
+  return env2.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
 }
-function resolveArgs(env3) {
-  if (env3.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
-    const parsed = JSON.parse(env3.LAZYCODEX_AUTO_UPDATE_ARGS_JSON);
+function resolveArgs(env2) {
+  if (env2.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
+    const parsed = JSON.parse(env2.LAZYCODEX_AUTO_UPDATE_ARGS_JSON);
     if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
       throw new TypeError("LAZYCODEX_AUTO_UPDATE_ARGS_JSON must be a JSON string array");
     }
@@ -14011,15 +13661,15 @@ function resolveArgs(env3) {
   }
   return DEFAULT_UPDATE_ARGS;
 }
-function resolveCurrentVersion(env3) {
-  if (env3.LAZYCODEX_CURRENT_VERSION?.trim())
-    return env3.LAZYCODEX_CURRENT_VERSION.trim();
-  const pluginRoot = dirname9(dirname9(fileURLToPath(import.meta.url)));
-  return readVersionManifest(resolveInstalledVersionPath(env3, pluginRoot)) ?? readVersionManifest(join33(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join33(pluginRoot, ".codex-plugin", "plugin.json"));
+function resolveCurrentVersion(env2) {
+  if (env2.LAZYCODEX_CURRENT_VERSION?.trim())
+    return env2.LAZYCODEX_CURRENT_VERSION.trim();
+  const pluginRoot = dirname12(dirname12(fileURLToPath(import.meta.url)));
+  return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join38(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join38(pluginRoot, ".codex-plugin", "plugin.json"));
 }
-function resolveLatestVersion(env3) {
-  if (env3.LAZYCODEX_LATEST_VERSION?.trim())
-    return env3.LAZYCODEX_LATEST_VERSION.trim();
+function resolveLatestVersion(env2) {
+  if (env2.LAZYCODEX_LATEST_VERSION?.trim())
+    return env2.LAZYCODEX_LATEST_VERSION.trim();
   const result = spawnSync3("npm", ["view", "lazycodex-ai", "version", "--silent"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"]
@@ -14047,10 +13697,10 @@ ${trustCommand}`);
   input.log(`Skipped Bun postinstall trust. To run it later:
 ${trustCommand}`);
 }
-function resolveKnownBunGlobalUntrustedPackages(env3) {
+function resolveKnownBunGlobalUntrustedPackages(env2) {
   const result = spawnSync3(BUN_UPDATE_COMMAND, BUN_GLOBAL_UNTRUSTED_ARGS, {
     encoding: "utf8",
-    env: env3,
+    env: env2,
     stdio: ["ignore", "pipe", "ignore"]
   });
   if (result.status !== 0)
@@ -14077,12 +13727,12 @@ async function confirmBunGlobalTrust(packageNames) {
 function isKnownLazyCodexBunTrustPackage(packageName) {
   return KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES.has(packageName) || KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES.some((prefix) => packageName.startsWith(prefix));
 }
-function isBunGlobalEntrypoint(invokedPath, env3) {
-  return isBunGlobalEntrypointPath(invokedPath, env3);
+function isBunGlobalEntrypoint(invokedPath, env2) {
+  return isBunGlobalEntrypointPath(invokedPath, env2);
 }
 function defaultRunCommandForManualUpdate(command, args, options) {
-  return new Promise((resolve11, reject) => {
-    const child = spawn4(command, args, {
+  return new Promise((resolve10, reject) => {
+    const child = spawn3(command, args, {
       cwd: options.cwd,
       env: options.env,
       stdio: "inherit",
@@ -14091,7 +13741,7 @@ function defaultRunCommandForManualUpdate(command, args, options) {
     child.once("error", reject);
     child.once("close", (code) => {
       if (code === 0) {
-        resolve11();
+        resolve10();
         return;
       }
       reject(new Error(`${command} ${args.join(" ")} exited with ${code ?? "unknown status"}`));
@@ -14128,14 +13778,14 @@ function compareVersions(left, right) {
   }
   return 0;
 }
-function resolveInstalledVersionPath(env3, pluginRoot) {
-  if (env3.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
-    return env3.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
-  return join33(pluginRoot, INSTALLED_VERSION_FILE);
+function resolveInstalledVersionPath(env2, pluginRoot) {
+  if (env2.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
+    return env2.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
+  return join38(pluginRoot, INSTALLED_VERSION_FILE);
 }
 function readVersionManifest(path2) {
   try {
-    const parsed = JSON.parse(readFileSync3(path2, "utf8"));
+    const parsed = JSON.parse(readFileSync4(path2, "utf8"));
     if (typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string") {
       return parsed.version;
     }
@@ -14147,15 +13797,15 @@ function readVersionManifest(path2) {
   }
 }
 // packages/omo-codex/src/install/codex-git-bash-mcp-env.ts
-import { readFile as readFile18, writeFile as writeFile10 } from "node:fs/promises";
-import { join as join34 } from "node:path";
+import { readFile as readFile22, writeFile as writeFile13 } from "node:fs/promises";
+import { join as join39 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
 var CODEGRAPH_RELATIVE_ARGS2 = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
 async function stampGitBashMcpEnv(input) {
-  const manifestPath = join34(input.pluginRoot, ".mcp.json");
+  const manifestPath = join39(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return false;
-  const parsed = JSON.parse(await readFile18(manifestPath, "utf8"));
+  const parsed = JSON.parse(await readFile22(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed["mcpServers"]))
     return false;
   let changed = stampCodegraphMcpPath(parsed["mcpServers"], input.pluginRoot);
@@ -14173,7 +13823,7 @@ async function stampGitBashMcpEnv(input) {
   }
   if (!changed)
     return false;
-  await writeFile10(manifestPath, `${JSON.stringify(parsed, null, "\t")}
+  await writeFile13(manifestPath, `${JSON.stringify(parsed, null, "\t")}
 `);
   return true;
 }
@@ -14185,7 +13835,7 @@ function stampCodegraphMcpPath(mcpServers, pluginRoot) {
   const entrypoint = args[0];
   if (typeof entrypoint !== "string" || !CODEGRAPH_RELATIVE_ARGS2.has(entrypoint))
     return false;
-  codegraphServer["args"] = [join34(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
+  codegraphServer["args"] = [join39(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
   return true;
 }
 
@@ -14194,19 +13844,23 @@ async function installMarketplaceLocally(options = {}) {
   return runCodexInstaller(options);
 }
 function resolveDefaultRepoRootForEntrypoint(entrypointPath) {
-  return resolve11(dirname10(entrypointPath), "..", "..", "..");
+  return resolve10(dirname13(entrypointPath), "..", "..", "..");
 }
 function resolveDefaultRepoRoot() {
   return resolveDefaultRepoRootForEntrypoint(fileURLToPath2(import.meta.url));
 }
 async function runLazyCodexInstallLocalCli(input) {
+  const logWarning = (message) => {
+    if (message.startsWith("Warning:"))
+      input.log(message);
+  };
   const parsed = parseLazyCodexInstallCliArgs(input.argv);
   if (parsed.kind === "help") {
     input.log(formatLazyCodexInstallHelp());
     return 0;
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile19(join35(input.defaultRepoRoot, "package.json"), "utf8"));
+    const packageJson = JSON.parse(await readFile23(join40(input.defaultRepoRoot, "package.json"), "utf8"));
     const version2 = typeof packageJson.version === "string" ? packageJson.version : "unknown";
     input.log(`lazycodex-ai ${version2}`);
     return 0;
@@ -14222,42 +13876,44 @@ async function runLazyCodexInstallLocalCli(input) {
         return 0;
       }
       const result2 = await installMarketplaceLocally({
-        repoRoot: resolve11(parsed.repoRoot),
+        repoRoot: resolve10(parsed.repoRoot),
         autonomousPermissions: true,
-        env: input.env
+        env: input.env,
+        log: logWarning
       });
       input.log(`Installed ${result2.installed.length} plugin(s) from ${result2.marketplaceName}.`);
       return 0;
     }
     return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath });
   }
-  const repoRoot = parsed.repoRoot ? resolve11(parsed.repoRoot) : input.defaultRepoRoot;
+  const repoRoot = parsed.repoRoot ? resolve10(parsed.repoRoot) : input.defaultRepoRoot;
   const result = await installMarketplaceLocally({
     repoRoot,
     autonomousPermissions: parsed.autonomousPermissions,
-    env: input.env
+    env: input.env,
+    log: logWarning
   });
   input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
   return 0;
 }
 export {
-  updateCodexConfig,
-  stampGitBashMcpEnv,
-  runLazyCodexInstallLocalCli,
-  runDelegatedOmoCommand,
-  resolveDefaultRepoRootForEntrypoint,
-  resolveDefaultRepoRoot,
-  resolveCodexInstallerBinDir,
-  repairNearestProjectLocalCodexArtifacts,
-  readCodexModelCatalog,
-  parseLazyCodexInstallCliArgs,
-  linkRootRuntimeBin,
-  linkCachedPluginBins,
-  installMarketplaceLocally,
-  installCachedPlugin,
-  formatLazyCodexInstallHelp,
-  findMissingHookCommandTargets,
-  buildDelegatedOmoInvocation,
+  PASSTHROUGH_COMMANDS,
   assertHookCommandTargets,
-  PASSTHROUGH_COMMANDS
+  buildDelegatedOmoInvocation,
+  findMissingHookCommandTargets,
+  formatLazyCodexInstallHelp,
+  installCachedPlugin,
+  installMarketplaceLocally,
+  linkCachedPluginBins,
+  linkRootRuntimeBin,
+  parseLazyCodexInstallCliArgs,
+  readCodexModelCatalog,
+  repairNearestProjectLocalCodexArtifacts,
+  resolveCodexInstallerBinDir,
+  resolveDefaultRepoRoot,
+  resolveDefaultRepoRootForEntrypoint,
+  runDelegatedOmoCommand,
+  runLazyCodexInstallLocalCli,
+  stampGitBashMcpEnv,
+  updateCodexConfig
 };

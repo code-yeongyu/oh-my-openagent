@@ -1,9 +1,41 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - LazyCodex publish workflow tests exercise one release workflow fixture; this release adds narrow payload assertions and future additions should split by publish step.
+
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
 const publishWorkflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
+const webTerminalVisualQaRuntimePaths = [
+  "script/qa/strip-ansi.mjs",
+  "script/qa/web-terminal-redaction.d.mts",
+  "script/qa/web-terminal-redaction.mjs",
+  "script/qa/web-terminal-visual-qa.mjs",
+  "script/qa/xterm-live-terminal.mjs",
+] as const
+const packageGuidanceDocPaths = [
+  "docs/reference/github-attachment-upload.md",
+  "docs/reference/web-terminal-visual-qa.md",
+] as const
+const lazycodexRuntimePayloadPaths = [
+  "dist/cli",
+  "dist/cli-node",
+  "packages/omo-codex/plugin/components/bootstrap/dist/cli.js",
+  "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1",
+  "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1",
+  "packages/omo-codex/plugin/components/codegraph/dist/cli.js",
+  "packages/omo-codex/plugin/components/codegraph/dist/serve.js",
+  "packages/omo-codex/plugin/components/comment-checker/dist/cli.js",
+  "packages/omo-codex/plugin/components/git-bash/dist/cli.js",
+  "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js",
+  "packages/omo-codex/plugin/components/lsp/dist/cli.js",
+  "packages/omo-codex/plugin/components/rules/dist/cli.js",
+  "packages/omo-codex/plugin/components/ulw-execute-continuation/dist/cli.js",
+  "packages/omo-codex/plugin/components/teammode/dist/cli.js",
+  "packages/omo-codex/plugin/components/telemetry/dist/cli.js",
+  "packages/omo-codex/plugin/components/ultrawork/dist/cli.js",
+  "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js",
+] as const
 
 function sliceWorkflowSection(workflow: string, startMarker: string, endMarker: string): string {
   const start = workflow.indexOf(startMarker)
@@ -59,8 +91,8 @@ describe("LazyCodex publish workflow", () => {
     const syncBuildsCodexPlugin =
       workflow.includes("bun run --cwd packages/omo-codex/plugin build") &&
       workflow.indexOf("bun run --cwd packages/omo-codex/plugin build") < workflow.indexOf("bun run script/sync-lazycodex-marketplace.ts")
-    const npmPublishBuildsLspDistBeforeMainPackage =
-      buildMainPackageStep.includes("bun run build:lsp-tools-mcp && bun run build")
+    const npmPublishBuildsReleaseStampedInstallerAndLspDistBeforeMainPackage =
+      buildMainPackageStep.includes("bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build")
     const syncStampsMetadataBeforeBuild =
       syncMarketplaceStep.indexOf("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json") >= 0 &&
       syncMarketplaceStep.indexOf("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/package.json") >= 0 &&
@@ -80,7 +112,7 @@ describe("LazyCodex publish workflow", () => {
       workflow.includes('https://registry.npmjs.org/lazycodex-ai/${VERSION}')
     const publishesLazycodexNpm = publishLazycodexStep.includes("name: Publish lazycodex-ai") &&
       publishLazycodexStep.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'") &&
-      publishLazycodexStep.includes("npm publish --access public --provenance --tag latest --loglevel verbose") &&
+      publishLazycodexStep.includes("npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose") &&
       !publishLazycodexStep.includes("continue-on-error: true")
     const syncsLazycodexMarketplaceOnStableReleases = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
       syncMarketplaceStep.includes("if: needs.release-metadata.outputs.dist_tag == ''") &&
@@ -123,7 +155,7 @@ describe("LazyCodex publish workflow", () => {
     expect(publishAliasDefaultsOn, "LazyCodex npm alias publish must stay enabled by default").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
-    expect(npmPublishBuildsLspDistBeforeMainPackage, "release must build LSP dist before npm packages include it").toBe(true)
+    expect(npmPublishBuildsReleaseStampedInstallerAndLspDistBeforeMainPackage, "release must regenerate the Codex installer and build LSP dist before npm packages include them").toBe(true)
     expect(syncInstallsCodexPluginDeps, "release must install nested Codex plugin deps before building the aggregate plugin").toBe(true)
     expect(syncBuildsCodexPlugin, "release must build the aggregate Codex plugin before LazyCodex marketplace sync").toBe(true)
     expect(syncStampsMetadataBeforeBuild, "release must stamp Codex plugin metadata before LazyCodex marketplace build").toBe(true)
@@ -220,13 +252,24 @@ describe("LazyCodex publish workflow", () => {
     const lazycodexStepDropsLifecycleScripts = workflow.includes(".scripts = {}")
     const lazycodexStepDropsPlatformOptionalDeps = workflow.includes(".optionalDependencies = {}")
     const lazycodexStepDropsRuntimeDependencies = workflow.includes(".dependencies = {}")
-    const lazycodexStepScopesPublishedFiles = workflow.includes(
-      '.files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills"]',
+    const publishLazycodexStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Publish lazycodex-ai",
+      "      - name: Smoke test published lazycodex-ai",
+    )
+    const missingLazycodexRuntimePayloadPaths = lazycodexRuntimePayloadPaths.filter(
+      (runtimePath) => !publishLazycodexStep.includes(`"${runtimePath}"`),
+    )
+    const missingWebTerminalRuntimePaths = webTerminalVisualQaRuntimePaths.filter(
+      (runtimePath) => !publishLazycodexStep.includes(`"${runtimePath}"`),
+    )
+    const missingPackageGuidanceDocPaths = packageGuidanceDocPaths.filter(
+      (docPath) => !publishLazycodexStep.includes(`"${docPath}"`),
     )
     const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
     const lazycodexShipsRootCliDistAfterBuild =
-      publishMainJob.indexOf("bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") >= 0 &&
-      publishMainJob.indexOf("bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") <
+      publishMainJob.indexOf("bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") >= 0 &&
+      publishMainJob.indexOf("bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") <
         publishMainJob.indexOf("name: Publish lazycodex-ai")
     const shimKeepsLazycodexMappedForSharedWrapper = platformResolver.includes("lazycodex: \"oh-my-openagent\"")
 
@@ -238,9 +281,11 @@ describe("LazyCodex publish workflow", () => {
     expect(lazycodexStepDropsPlatformOptionalDeps, "lazycodex publish step must not install Bun-backed platform launchers").toBe(true)
     expect(lazycodexStepDropsRuntimeDependencies, "lazycodex publish step must not install OpenCode CLI runtime dependencies").toBe(true)
     expect(
-      lazycodexStepScopesPublishedFiles,
-      "lazycodex npm package must ship the root CLI dist (omo runtime wrapper target), the Node installer and Codex marketplace assets, and packages/lsp-daemon (lsp MCP arg target and components/lsp file: dependency — npm ci in the plugin cache hard-fails without it)",
+      missingLazycodexRuntimePayloadPaths.length === 0,
+      "lazycodex npm package must ship the root CLI dist (omo runtime wrapper target), web-terminal QA helper runtime, the Node installer and Codex marketplace assets, and packages/lsp-daemon (lsp MCP arg target and components/lsp file: dependency — npm ci in the plugin cache hard-fails without it)",
     ).toBe(true)
+    expect(missingWebTerminalRuntimePaths).toEqual([])
+    expect(missingPackageGuidanceDocPaths).toEqual([])
     expect(
       lazycodexShipsRootCliDistAfterBuild,
       "publish-main must build the root CLI dist before the lazycodex-ai publish step so dist/cli/index.js exists in the tarball",
@@ -253,17 +298,19 @@ describe("LazyCodex publish workflow", () => {
     const workflow = readFileSync(publishWorkflowPath, "utf8")
     const publishIndex = workflow.indexOf("name: Publish lazycodex-ai")
     const smokeIndex = workflow.indexOf("name: Smoke test published lazycodex-ai")
-    const restoreIndex = workflow.indexOf("name: Restore package.json after lazycodex-ai publish attempt")
+    // The smoke moved out of publish-main into the post-publish-verify job, which runs after the release
+    // exists, so it is no longer bounded by the publish-main package restore step.
+    const postPublishVerifyIndex = workflow.indexOf("  post-publish-verify:")
     const smokeStep = sliceWorkflowSection(
       workflow,
       "      - name: Smoke test published lazycodex-ai",
-      "      - name: Restore package.json after lazycodex-ai publish attempt",
+      "      - name: Write job summary",
     )
 
     // #when
-    const smokeRunsAfterPublishBeforeRestore = publishIndex >= 0 &&
-      smokeIndex > publishIndex &&
-      restoreIndex > smokeIndex
+    const smokeRunsAfterPublishInPostVerifyJob = publishIndex >= 0 &&
+      postPublishVerifyIndex > publishIndex &&
+      smokeIndex > postPublishVerifyIndex
     const smokesReleaseVersion = smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"')
     const smokesStableLatestOnly = smokeStep.includes('if [ -z "$DIST_TAG" ]; then') &&
       smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@latest"')
@@ -274,26 +321,57 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"')
     const assertsDryRunRouting = smokeStep.includes('npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous') &&
       smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
-      smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
-      smokeStep.includes("npx --yes --package oh-my-openagent omo doctor")
-    const installsRealPackageAndVerifiesOmoBin =
+      smokeStep.includes('expected_install_output="npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous"') &&
+      smokeStep.includes('expected_doctor_output_prefix="codex exec ') &&
+      smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous") &&
+      smokeStep.includes('case "$npx_doctor_output" in "$expected_doctor_output_prefix"*) true ;; *) false ;; esac') &&
+      smokeStep.includes('case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac') &&
+      smokeStep.includes('expected_doctor_hint="Use \\$omo:lcx-doctor"') &&
+      smokeStep.includes('case "$npx_doctor_output" in *"$expected_doctor_hint"*) true ;; *) false ;; esac') &&
+      smokeStep.includes('case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac') &&
+      !smokeStep.includes("npx --yes --package oh-my-openagent omo install") &&
+      !smokeStep.includes("--platform=claude-code") &&
+      !smokeStep.includes("--platform=gemini")
+    const installsRealPackageAndVerifiesOmoAgentToolkitBin =
       smokeStep.includes('npx -y "$package_spec" install --no-tui --codex-autonomous') &&
-      smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
-      smokeStep.includes('omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1)') &&
-      smokeStep.includes('[ "$omo_version_output" = "$OMO_VERSION" ]') &&
-      smokeStep.includes('sparkshell_output=$("$CODEX_LOCAL_BIN_DIR/omo" sparkshell echo lazycodex-smoke 2>&1)') &&
-      smokeStep.includes('[ "$sparkshell_output" = "lazycodex-smoke" ]')
+      smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ]') &&
+      smokeStep.includes('omo_agent_toolkit_version_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" --version 2>&1)') &&
+      smokeStep.includes('[ "$omo_agent_toolkit_version_output" = "$OMO_VERSION" ]') &&
+      smokeStep.includes('ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ulw-loop --help 2>&1)') &&
+      smokeStep.includes('printf "%s" "$ulw_loop_output" | grep -q "ulw-loop"')
+    const assertsLegacyOmoBinIsRemoved =
+      smokeStep.includes('[ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
+      !smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
+      !smokeStep.includes('"$CODEX_LOCAL_BIN_DIR/omo" --version') &&
+      !smokeStep.includes('"$CODEX_LOCAL_BIN_DIR/omo" ulw-loop --help')
+    const simulatesLegacyOmoUpgrade =
+      smokeStep.includes('simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-marked" marked') &&
+      smokeStep.includes('simulate_legacy_omo_upgrade "$package_spec" "$SMOKE_DIR/upgrade-unmarked" unmarked') &&
+      smokeStep.includes("# OMO_GENERATED_RUNTIME_WRAPPER") &&
+      smokeStep.includes('if [ -e "$CODEX_LOCAL_BIN_DIR/omo" ]; then') &&
+      smokeStep.includes('if ! cmp -s "$scenario_root/omo.seeded" "$CODEX_LOCAL_BIN_DIR/omo"; then')
 
     // #then
-    expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
+    expect(
+      smokeRunsAfterPublishInPostVerifyJob,
+      "post-publish smoke must run after the lazycodex publish, inside the post-publish-verify job that cannot block the release",
+    ).toBe(true)
     expect(smokesReleaseVersion, "post-publish smoke must verify the exact release version").toBe(true)
     expect(smokesStableLatestOnly, "post-publish smoke must verify latest only for stable releases").toBe(true)
     expect(retriesRegistryPropagation, "post-publish smoke must tolerate npm registry propagation").toBe(true)
     expect(isolatesCodexState, "post-publish smoke must isolate HOME and Codex paths").toBe(true)
     expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
     expect(
-      installsRealPackageAndVerifiesOmoBin,
-      "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes sparkshell",
+      installsRealPackageAndVerifiesOmoAgentToolkitBin,
+      "post-publish smoke must run a real install and verify the omo-agent-toolkit runtime wrapper exists, reports the release version, and executes ulw-loop",
+    ).toBe(true)
+    expect(
+      assertsLegacyOmoBinIsRemoved,
+      "post-publish smoke must assert the removed legacy omo wrapper is absent and must not invoke it",
+    ).toBe(true)
+    expect(
+      simulatesLegacyOmoUpgrade,
+      "post-publish smoke must simulate upgrades: a marker-bearing legacy omo is reclaimed and an unmarked user-owned omo survives byte-identical",
     ).toBe(true)
   })
 

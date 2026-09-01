@@ -57,6 +57,26 @@ describe("cli-program", () => {
     expect(cleanupBlock?.[1]).toContain('.alias("uninstall")')
   })
 
+  test("config migrate command exposes dry-run and JSON-only controls", async () => {
+    // given
+    const cliProgramSource = await readFile(
+      path.resolve(import.meta.dir, "cli-program.ts"),
+      "utf-8",
+    )
+
+    // when
+    const migrateBlock = cliProgramSource.match(
+      /\.command\("config"\)([\s\S]*?)configureRuntimeCommands/,
+    )
+
+    // then
+    expect(migrateBlock).not.toBeNull()
+    expect(migrateBlock?.[1]).toContain('.command("migrate")')
+    expect(migrateBlock?.[1]).toContain('.option("--dry-run"')
+    expect(migrateBlock?.[1]).toContain('.option("--json"')
+    expect(migrateBlock?.[1]).toContain("runConfigMigrate")
+  })
+
   test("doctor command exposes explicit platform selection for Codex-only diagnostics", async () => {
     // given
     const cliProgramSource = await readFile(
@@ -96,7 +116,7 @@ test("program configures explicit '-h, --help' help option for consistent help-f
   expect(programBlock?.[1]).toContain('.helpOption("-h, --help", "Display help for command")')
 })
 
-test("program registers sparkshell as a runtime command", async () => {
+test("program registers runtime commands", async () => {
   // given
   const cliProgramSource = await readFile(
     path.resolve(import.meta.dir, "cli-program.ts"),

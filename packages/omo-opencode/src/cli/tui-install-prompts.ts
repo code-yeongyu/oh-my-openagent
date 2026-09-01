@@ -8,6 +8,7 @@ import type {
 } from "./types"
 import { detectedToInitialValues } from "./install-validators"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
+import { isSenpiPlatformEnabled } from "./senpi-platform-flag"
 
 async function selectOrCancel<TValue extends Readonly<string | boolean | number>>(params: {
   message: string
@@ -36,6 +37,9 @@ export async function promptInstallPlatform(
     { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
     { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
   ]
+  if (isSenpiPlatformEnabled()) {
+    options.push({ value: "senpi", label: "Senpi", hint: "Install Senpi harness adapter only" })
+  }
 
   return selectOrCancel<InstallPlatform>({
     message: "Which platform do you want to install?",
@@ -51,6 +55,7 @@ export async function promptInstallConfig(
 ): Promise<InstallConfig | null> {
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodex = platform === "codex" || platform === "both"
+  const hasSenpi = platform === "senpi"
   const codexAutonomous = await resolveCodexAutonomous(hasCodex, codexAutonomousOverride)
   if (codexAutonomous === null) return null
 
@@ -64,6 +69,7 @@ export async function promptInstallConfig(
       hasGemini: false,
       hasCopilot: false,
       hasCodex,
+      hasSenpi,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
@@ -82,8 +88,8 @@ export async function promptInstallConfig(
     message: "Do you have a Claude Pro/Max subscription?",
     options: [
       { value: "no", label: "No", hint: `Will use ${ULTIMATE_FALLBACK} as fallback` },
-      { value: "yes", label: "Yes (standard)", hint: "Claude Opus 4.5 for orchestration" },
-      { value: "max20", label: "Yes (max20 mode)", hint: "Full power with Claude Sonnet 4.6 for Librarian" },
+      { value: "yes", label: "Yes (standard)", hint: "Claude Opus 5 for orchestration" },
+      { value: "max20", label: "Yes (max20 mode)", hint: "Higher Claude usage limits for orchestration" },
     ],
     initialValue: initial.claude,
   })
@@ -93,7 +99,7 @@ export async function promptInstallConfig(
     message: "Do you have an OpenAI/ChatGPT Plus subscription?",
     options: [
       { value: "no", label: "No", hint: "Oracle will use fallback models" },
-      { value: "yes", label: "Yes", hint: "GPT-5.4 for Oracle (high-IQ debugging)" },
+      { value: "yes", label: "Yes", hint: "GPT-5.6 Sol for Oracle (high-IQ debugging)" },
     ],
     initialValue: initial.openai,
   })
@@ -123,7 +129,7 @@ export async function promptInstallConfig(
     message: "Do you have access to OpenCode Zen (opencode/ models)?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "opencode/claude-opus-4-7, opencode/gpt-5.5, etc." },
+      { value: "yes", label: "Yes", hint: "opencode/claude-opus-5, opencode/gpt-5.6-sol, etc." },
     ],
     initialValue: initial.opencodeZen,
   })
@@ -143,7 +149,7 @@ export async function promptInstallConfig(
     message: "Do you have a Kimi For Coding subscription?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "Kimi K2.5 for Sisyphus/Prometheus fallback" },
+      { value: "yes", label: "Yes", hint: "Kimi K3 for Sisyphus/Prometheus fallback" },
     ],
     initialValue: initial.kimiForCoding,
   })
@@ -208,6 +214,7 @@ export async function promptInstallConfig(
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
     hasCodex,
+    hasSenpi,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",

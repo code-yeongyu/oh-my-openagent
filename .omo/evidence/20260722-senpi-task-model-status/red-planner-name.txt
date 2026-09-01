@@ -1,0 +1,13 @@
+Command:
+`bun test packages/omo-senpi/src/components/task/planner.test.ts`
+
+Observed RED before planner data plumbing:
+
+Expected:
+`display: "Gemini 3.1 Pro"`
+
+Received:
+`display: "google/gemini-3.1-pro"`
+
+Result:
+10 pass, 1 fail. The registry's friendly model name was discarded by category planning.

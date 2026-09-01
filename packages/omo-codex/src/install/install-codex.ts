@@ -15,6 +15,8 @@ import { defaultRunCommand } from "./codex-process"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import { reapLspDaemons } from "./lsp-daemon-reaper"
 import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
+import { writeInstalledCodexBinDir } from "./codex-installed-bin-dir"
+import { removeGitBashHooksOffWindows } from "./codex-git-bash-hooks"
 import { seedAndMigrateOmoSot } from "./omo-sot-migration"
 import { installAstGrepForCodex } from "./install-ast-grep-sg"
 import { trackCodexInstallTelemetry } from "./codex-install-telemetry"
@@ -33,6 +35,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
   const buildSource = await shouldBuildSourcePackages(repoRoot)
+  const versionOverride = env.LAZYCODEX_DEV_VERSION?.trim() || undefined
 
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
@@ -68,6 +71,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       marketplaceName: marketplace.name,
       pluginName: entry.name,
       distributionManifest,
+      versionOverride,
     })
     validatePathSegment(version, "plugin version")
     log(`Building ${entry.name}@${version}`)
@@ -75,6 +79,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     const plugin = await installCachedPlugin({
       buildSource,
       codexHome,
+      env,
       marketplaceName: marketplace.name,
       name: entry.name,
       runCommand,
@@ -84,6 +89,10 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
       await stampLazyCodexPluginVersion({ pluginRoot: plugin.path, version })
       await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, distributionManifest })
+      // `CODEX_LOCAL_BIN_DIR` is often a one-shot override, so uninstall cannot recompute this
+      // location from the environment later; record it while it is known.
+      await writeInstalledCodexBinDir({ pluginRoot: plugin.path, binDir })
+      await removeGitBashHooksOffWindows({ platform, pluginRoot: plugin.path })
     }
 
     const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform })
@@ -95,7 +104,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       if (runtimeLink !== null) log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`)
       else
         log(
-          `Warning: skipped the omo runtime wrapper because ${join(repoRoot, "dist", "cli", "index.js")} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
+          `Warning: skipped the omo-agent-toolkit runtime wrapper because ${join(repoRoot, "dist", "cli", "index.js")} is missing; omo-agent-toolkit ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
         )
     }
     pluginSources.push({ name: entry.name, sourcePath })
@@ -139,6 +148,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       installed.map((plugin) =>
         trustedHookStatesForPlugin({
           marketplaceName: marketplace.name,
+          platform,
           pluginName: plugin.name,
           pluginRoot: plugin.path,
         }),
@@ -159,7 +169,15 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     })
   }
 
-  await reapLspDaemons(codexHome).catch(() => [])
+  const legacyDaemonCleanup = await reapLspDaemons(codexHome).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    log(`Warning: skipped legacy Codex LSP daemon cleanup: ${message}`)
+    return []
+  })
+  for (const cleanup of legacyDaemonCleanup) {
+    if (cleanup.status !== "deferred") continue
+    log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`)
+  }
 
   const marketplaceRoot = join(codexHome, "plugins", "cache", marketplace.name)
   await writeCachedMarketplaceManifest({
@@ -181,6 +199,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
     autonomousPermissions: options.autonomousPermissions !== false,
+    ...(options.reasoning === undefined ? {} : { reasoning: options.reasoning }),
   })
   await seedAndMigrateOmoSot({ env, log, repoRoot, runCommand })
 

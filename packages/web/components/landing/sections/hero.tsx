@@ -56,12 +56,16 @@ export async function HeroSection(): Promise<JSX.Element> {
             specializedAgents: t("hero.specializedAgents", { count: "11" }),
             totalDownloads: t("hero.totalDownloads", { count: "{count}" }),
             monthlyDownloads: t("hero.monthlyDownloads", { count: "{count}" }),
-            lifecycleHooks: t("hero.lifecycleHooks", { count: "54+" }),
+            lifecycleHooks: t("hero.lifecycleHooks", { count: "60+" }),
           }}
         />
 
         <div className="w-full max-w-md">
           <InstallCommand command={t("hero.installCommand")} />
+        </div>
+        <div className="w-full max-w-md">
+          <p className="mb-1 text-xs text-zinc-500">{t("hero.codexLabel")}</p>
+          <InstallCommand command={t("hero.codexInstallCommand")} />
         </div>
 
         <div className="flex flex-col gap-4 sm:flex-row">

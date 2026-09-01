@@ -1,8 +1,0 @@
-Todo 7 — vendor insane-search engine (junk-excluded, import-clean)
-Vendored 9 engine files + 3 templates via explicit whitelist; EXCLUDED __pycache__/*.pyc/.DS_Store/engine/tests/test_smoke.py.
-Acceptance:
-- find __pycache__/*.pyc -> 0
-- python3 -m engine --help (from vendored path) -> exit 0
-- grep personal paths (/Users/, .agent-reach, .claude/skills) in engine -> none (exit 1)
-QA: python3 -m engine "https://example.com" --json -> JSON with verdict/trace fields, engine executes end-to-end.
-Note: engine carries user-original Korean R7-hint strings (runtime prose, not personal identity); no personal tokens present. No-Hangul invariant applies only to ultraresearch/SKILL.md (PR-B), not the vendored engine.

@@ -91,6 +91,8 @@ function createCodexDoctorResult(): DoctorResult {
       pluginEnabled: true,
       pluginsFeatureEnabled: true,
       pluginHooksFeatureEnabled: true,
+      companionPluginEnabled: false,
+      companionLifecycleHookStateEvents: [],
     },
     linkedBins: ["omo", "omo-rules"],
     agents: ["plan"],

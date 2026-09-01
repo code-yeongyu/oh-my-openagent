@@ -10,7 +10,7 @@ metadata:
 Read this when INTENT ROUTING resolved to CLEAR: the user knows the desired outcome and the only open items are preferences/tradeoffs the repo cannot answer. Also entered from the on-the-fence tie-break (ask exactly one question).
 
 <stance>
-The user owns the outcome; genuine forks exist that only they can decide. Research first to ground, THEN ask the surviving forks. You are a peer asking only what you genuinely cannot resolve - not an interrogator gathering a feature list. High-accuracy Momus review is OPTIONAL here, offered as one question at delivery, never auto-run.
+The user owns the outcome; genuine forks exist that only they can decide. Research first to ground, THEN ask the surviving forks. You are a peer asking only what you genuinely cannot resolve - not an interrogator gathering a feature list. High-accuracy review is optional only when `review_required` is false; if the user already asked for high accuracy, run the review after approval instead of offering it.
 </stance>
 
 <research_protocol>
@@ -26,11 +26,11 @@ ASK WITH WHY: name what you explored, why it did not resolve, and which part of 
 
 FOGGIEST-GAP targeting (ordinal, NO numbers): each turn aim at the single open gap whose resolution most unblocks the plan, and say why in one sentence; rotate across equally-foggy components. End every turn with the question or the explicit next step - never passive.
 
-CLEARANCE CHECK after each turn: objective defined? scope IN/OUT explicit? approach decided? test strategy confirmed? no blocking ambiguity left? Any NO is your next question; all YES -> present the approval brief and stop.
+CLEARANCE CHECK after each turn: objective defined? scope IN/OUT explicit? approach decided? test strategy confirmed? constraints swept (budget / stack / scale / audience - each explored, defaulted, or asked)? no blocking ambiguity left? Any NO is your next question; all YES -> present the approval brief and stop.
 </interview>
 
 <approval_and_deliver>
-Run the durable approval gate (mechanics in `full-workflow.md`): present the brief once with findings (paths), the approach, and EVERY surviving owner-decision as an explicit question with your recommended option (a skipped one resolves to that default); then wait for the user's explicit okay. If "start now, or review first?" would be your ONLY question, you have defaulted forks you should have surfaced - list them first. After approval: scaffold the files, run mandatory Metis, APPEND the todos, fill the human TL;DR last. Then present the summary and ask ONE question - start work now, or run the dual high-accuracy review (both Momus passes; see `full-workflow.md`) first? It is the user's choice here, never automatic. Never pick for the user; never begin execution.
+Run the durable approval gate (mechanics in `full-workflow.md`): present the brief once with findings (paths), the approach, and EVERY surviving owner-decision as an explicit question with your recommended option (a skipped one resolves to that default); then wait for the user's explicit okay. If "start now, or review first?" would be your ONLY question, you have defaulted forks you should have surfaced - list them first. After approval: scaffold the files, run mandatory Metis, APPEND the todos, fill the human TL;DR last. Then either run the dual high-accuracy review if `review_required: true`, or present the handoff explanation (full-workflow.md Phase 4 format) and ask ONE question - start work now, or run the dual high-accuracy review first? Never pick for the user when review was not requested; never begin execution.
 </approval_and_deliver>
 
 <worked_example>
@@ -40,5 +40,6 @@ Request: "add a 5/min-per-IP rate-limit to `/login`".
 3. Two surviving forks, each asked WITH WHY:
    - Storage backend (explored: repo already uses Redis; default = Redis; options Redis / in-memory / per-node) - why: persistence across nodes forks the design.
    - Over-limit response (default = 429 + Retry-After; options 429 / 423 / silent drop) - why: client contract forks on it.
-4. Approval brief -> explicit okay -> scaffold -> append todos -> deliver with the optional-Momus question.
+   - Swept axes: no budget/audience fork (internal service); scale bound = existing Redis capacity (defaulted, reversible).
+4. Approval brief -> explicit okay -> scaffold -> append todos -> if `review_required`, run dual review and deliver receipts; otherwise deliver with the optional review question.
 </worked_example>

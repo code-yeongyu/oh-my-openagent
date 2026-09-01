@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { applyUserPromptUlwLoopSteering, type UserPromptSubmitPayload } from "../src/codex-hook.js";
+import { buildUltraworkSkillPointer } from "../src/ultrawork-skill-pointer.js";
 
 const DEFAULT_SESSION_ID = "s1";
 
@@ -44,10 +45,74 @@ describe("standalone ultrawork directive injection", () => {
 		expect(await applyUserPromptUlwLoopSteering(input, { includeUltraworkDirective: true })).toBe("");
 	});
 
-	it("#given ulw-loop bundles the ultrawork directive #when compared to ultrawork #then the copy stays byte-identical", async () => {
-		const ulwLoopDirective = await readFile(new URL("../directive.md", import.meta.url), "utf8");
-		const ultraworkDirective = await readFile(new URL("../../ultrawork/directive.md", import.meta.url), "utf8");
+	it("#given context-pressure marker exists only outside transcript tail #when standalone injection is enabled #then emits the directive", async () => {
+		const input = await payloadWithTranscript(
+			"ulw this change",
+			`context_length_exceeded\n${"old transcript padding\n".repeat(32_000)}`,
+		);
+		const output = await applyUserPromptUlwLoopSteering(input, { includeUltraworkDirective: true });
+		const parsed = JSON.parse(output);
 
-		expect(ulwLoopDirective).toBe(ultraworkDirective);
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
+	});
+
+	it("#given ulw-loop bundles the ultrawork directive #when compared to the canonical prompts-core source #then the copy stays byte-identical", async () => {
+		// ulw-loop is a standalone published package with no prompts-core dependency, so it bundles its
+		// own copy as the runtime fallback its `files` list ships. This pins that copy to the canonical
+		// source that scripts/sync-directive.mjs in the ultrawork component regenerates it from.
+		const ulwLoopDirective = await readFile(new URL("../directive.md", import.meta.url), "utf8");
+		const canonicalDirective = await readFile(
+			new URL("../../../../../prompts-core/prompts/ultrawork/codex.md", import.meta.url),
+			"utf8",
+		);
+
+		expect(ulwLoopDirective).toBe(canonicalDirective);
+	});
+
+	it("#given an existing ultrawork skill file #when standalone injection runs #then emits the compact skill pointer", async () => {
+		const skillFilePath = join(await mkdtemp(join(tmpdir(), "ug-skill-")), "SKILL.md");
+		await writeFile(
+			skillFilePath,
+			"---\nname: ultrawork\n---\n\n<ultrawork-mode>\ndirective body\n</ultrawork-mode>\n",
+		);
+
+		const output = await applyUserPromptUlwLoopSteering(payload("ulw this change", "/tmp"), {
+			includeUltraworkDirective: true,
+			ultraworkSkillFilePath: skillFilePath,
+		});
+		const parsed = JSON.parse(output);
+		const context = parsed.hookSpecificOutput.additionalContext;
+
+		expect(context).toBe(buildUltraworkSkillPointer(skillFilePath).trim());
+	});
+
+	it("#given a missing ultrawork skill file #when standalone injection runs #then falls back to the full directive", async () => {
+		const missingSkillFilePath = join(await mkdtemp(join(tmpdir(), "ug-skill-")), "SKILL.md");
+
+		const output = await applyUserPromptUlwLoopSteering(payload("ulw this change", "/tmp"), {
+			includeUltraworkDirective: true,
+			ultraworkSkillFilePath: missingSkillFilePath,
+		});
+		const parsed = JSON.parse(output);
+		const directive = await readFile(new URL("../directive.md", import.meta.url), "utf8");
+
+		expect(parsed.hookSpecificOutput.additionalContext).toBe(directive.trim());
+	});
+
+	it("#given the ulw-loop pointer template #when compared to ultrawork #then the copy stays byte-identical", async () => {
+		const ulwLoopPointerSource = await readFile(
+			new URL("../src/ultrawork-skill-pointer.ts", import.meta.url),
+			"utf8",
+		);
+		const ultraworkPointerSource = await readFile(
+			new URL("../../ultrawork/src/skill-pointer.ts", import.meta.url),
+			"utf8",
+		);
+		const templatePattern = /export const ULTRAWORK_SKILL_POINTER_TEMPLATE = `[\s\S]*?`;\n/;
+		const ulwLoopTemplate = ulwLoopPointerSource.match(templatePattern)?.[0];
+		const ultraworkTemplate = ultraworkPointerSource.match(templatePattern)?.[0];
+
+		expect(ulwLoopTemplate).toBeDefined();
+		expect(ulwLoopTemplate).toBe(ultraworkTemplate);
 	});
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { isCliEntry } from "./entry-guard.mjs";
 import {
 	DEFAULT_LOCK_STALE_MS,
 	acquireLock,
@@ -14,6 +14,7 @@ import {
 import {
 	compareVersions,
 	defaultRunCommandForManualUpdate,
+	detectMarketplaceLocalRepair,
 	detectAutoUpdateInstallFlow,
 	parsePositiveInteger,
 	parseVersion,
@@ -23,7 +24,12 @@ import {
 	resolveLatestVersion,
 	resolveLazyCodexUpdatePlan,
 } from "./auto-update-plan.mjs";
-import { formatMarketplaceFlowNotice, formatUpdateStartedNotice, resolveReleaseNotes } from "./auto-update-release-notes.mjs";
+import {
+	formatMarketplaceFlowNotice,
+	formatMarketplaceRepairStartedNotice,
+	formatUpdateStartedNotice,
+	resolveReleaseNotes,
+} from "./auto-update-release-notes.mjs";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
 import { migrateOmoSotConfig } from "./migrate-omo-sot.mjs";
 import { resolveSpawnInvocation } from "./spawn-command.mjs";
@@ -33,14 +39,54 @@ const DEFAULT_RETRY_INTERVAL_MS = 30 * 60 * 1_000;
 
 export { resolveLazyCodexUpdatePlan };
 
+/**
+ * Read Codex SessionStart stdin JSON and extract the effective session model.
+ * @param {NodeJS.ReadableStream | null | undefined} stdin
+ * @returns {Promise<string | null>}
+ */
+export async function readSessionModelFromStdin(stdin = process.stdin) {
+	if (!stdin || typeof stdin.on !== "function") return null;
+	if (stdin.isTTY) return null;
+
+	const raw = await new Promise((resolve) => {
+		let data = "";
+		let settled = false;
+		const finish = () => {
+			if (settled) return;
+			settled = true;
+			resolve(data);
+		};
+		stdin.setEncoding("utf8");
+		stdin.on("data", (chunk) => {
+			data += chunk;
+		});
+		stdin.once("end", finish);
+		stdin.once("error", finish);
+		// Hooks normally close stdin quickly; avoid hanging migration forever.
+		setTimeout(finish, 250).unref?.();
+	});
+
+	const trimmed = raw.trim();
+	if (!trimmed) return null;
+	try {
+		const payload = JSON.parse(trimmed);
+		if (typeof payload?.model === "string" && payload.model.trim()) return payload.model.trim();
+		return null;
+	} catch {
+		return null;
+	}
+}
+
 export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), lastCheckedAt, lastAttemptedAt, lastStatus, installFlow } = {}) {
 	if (env.LAZYCODEX_AUTO_UPDATE_DISABLED === "1" || env.OMO_CODEX_AUTO_UPDATE_DISABLED === "1") {
 		return { shouldRun: false, reason: "disabled" };
 	}
 
+	const flow = installFlow ?? detectAutoUpdateInstallFlow(env).flow;
+	const marketplaceRepair = flow === "marketplace" ? detectMarketplaceLocalRepair(env) : undefined;
 	const intervalMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_INTERVAL_MS, DEFAULT_INTERVAL_MS);
 	const successStatus = lastStatus === undefined || lastStatus === "success";
-	if (successStatus && typeof lastCheckedAt === "number" && intervalMs > 0 && now - lastCheckedAt < intervalMs) {
+	if (marketplaceRepair?.needsRepair !== true && successStatus && typeof lastCheckedAt === "number" && intervalMs > 0 && now - lastCheckedAt < intervalMs) {
 		return { shouldRun: false, reason: "throttled" };
 	}
 	const retryIntervalMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_RETRY_INTERVAL_MS, DEFAULT_RETRY_INTERVAL_MS);
@@ -48,8 +94,26 @@ export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), las
 		return { shouldRun: false, reason: "retry-throttled" };
 	}
 
-	const flow = installFlow ?? detectAutoUpdateInstallFlow(env).flow;
-	if (flow === "marketplace") return { shouldRun: false, reason: "marketplace-flow" };
+	if (flow === "marketplace") {
+		const repair = marketplaceRepair ?? detectMarketplaceLocalRepair(env);
+		if (!repair.needsRepair) return { shouldRun: false, reason: "marketplace-flow" };
+		const currentVersion = resolveCurrentVersion(env) ?? "unknown";
+		const latestVersion = resolveLatestVersion(env) ?? currentVersion ?? "latest";
+		return {
+			shouldRun: true,
+			kind: "marketplace-local-repair",
+			repairReasons: repair.reasons,
+			command: resolveCommand(env),
+			args: resolveArgs(env),
+			currentVersion,
+			latestVersion,
+			env: {
+				...env,
+				LAZYCODEX_AUTO_UPDATE_DISABLED: "1",
+				OMO_CODEX_AUTO_UPDATE_DISABLED: "1",
+			},
+		};
+	}
 
 	const currentVersion = resolveCurrentVersion(env);
 	const latestVersion = resolveLatestVersion(env);
@@ -100,8 +164,13 @@ export async function runLazyCodexManualUpdate({ env = process.env, dryRun = fal
 	return 0;
 }
 
-export async function runAutoUpdateCheck({ env = process.env, now = Date.now() } = {}) {
-	const migrationNotices = await runConfigMigration({ env });
+export async function runAutoUpdateCheck({
+	env = process.env,
+	now = Date.now(),
+	sessionModel = null,
+	requireSessionModel = false,
+} = {}) {
+	const migrationNotices = await runConfigMigration({ env, sessionModel, requireSessionModel });
 	const statePath = resolveStatePath(env);
 	const notices = [...migrationNotices];
 	const state = await settlePendingNotice({ env, now, statePath, state: await readState(statePath), notices });
@@ -142,7 +211,13 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 		return { started: false, reason: "locked", notices };
 	}
 	try {
-		await appendUpdateLog(env, now, "started", { command: plan.command, args: plan.args });
+		await appendUpdateLog(env, now, "started", plan.kind === "marketplace-local-repair"
+			? { kind: plan.kind, repairReasons: plan.repairReasons ?? [] }
+			: {
+				command: plan.command,
+				args: plan.args,
+				...(plan.kind === undefined ? {} : { kind: plan.kind }),
+			});
 		const pendingNotice = { fromVersion: plan.currentVersion, toVersion: plan.latestVersion, startedAt: now };
 		const releaseNotes = await resolveReleaseNotes({ env, latestVersion: plan.latestVersion });
 		if (env.LAZYCODEX_AUTO_UPDATE_WAIT === "1") {
@@ -155,7 +230,7 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			await appendUpdateLog(env, now, "finished", { status });
 			if (status === 0) {
 				await writeState(statePath, { lastCheckedAt: now, lastAttemptedAt: now, lastStatus: "success", pendingNotice });
-				await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes });
+				await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes, plan });
 			} else {
 				await writeState(statePath, { lastAttemptedAt: now, lastStatus: "failed" });
 			}
@@ -169,7 +244,7 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			detached: true,
 		});
 		await writeState(statePath, { lastAttemptedAt: now, lastStatus: "started", pendingNotice });
-		await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes });
+		await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes, plan });
 		child.unref();
 		return { started: true, notices };
 	} finally {
@@ -197,10 +272,16 @@ async function settlePendingNotice({ env, now, statePath, state, notices }) {
 	return nextState;
 }
 
-async function recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes }) {
-	notices.push(formatUpdateStartedNotice({ pendingNotice, releaseNotes }));
+async function recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes, plan }) {
+	notices.push(plan.kind === "marketplace-local-repair"
+		? formatMarketplaceRepairStartedNotice({
+			pendingNotice,
+			releaseNotes,
+			repairReasons: plan.repairReasons ?? [],
+		})
+		: formatUpdateStartedNotice({ pendingNotice, releaseNotes }));
 	await appendUpdateLog(env, now, "notified", {
-		kind: "update-started",
+		kind: plan.kind === "marketplace-local-repair" ? "marketplace-local-repair-started" : "update-started",
 		fromVersion: pendingNotice.fromVersion,
 		toVersion: pendingNotice.toVersion,
 	});
@@ -213,11 +294,18 @@ function resolveUpdateContext({ env }) {
 	return { currentVersion, latestVersion, shouldUpdate: plan.shouldUpdate };
 }
 
-async function runConfigMigration({ env }) {
+async function runConfigMigration({ env, sessionModel = null, requireSessionModel = false }) {
 	if (env.LAZYCODEX_CONFIG_MIGRATION_DISABLED === "1" || env.OMO_CODEX_CONFIG_MIGRATION_DISABLED === "1") return [];
+	// The two migrations are independent; a SoT seeding failure must never
+	// block the config.toml repair (which can be the difference between a
+	// working and a fully broken GPT-5.6 session).
 	try {
 		await migrateOmoSotConfig({ env, seed: true });
-		const result = await migrateCodexConfig({ env });
+	} catch (error) {
+		if (!(error instanceof Error)) throw error;
+	}
+	try {
+		const result = await migrateCodexConfig({ env, sessionModel, requireSessionModel });
 		if (result.modeChanged.length === 0) return [];
 		return [
 			"[LazyCodex] Removed unsupported Codex root multi_agent_mode from config.toml. Tell the user LazyCodex cleaned up a stale OMO-managed setting so Codex uses its supported per-turn multiAgentMode API.",
@@ -228,19 +316,23 @@ async function runConfigMigration({ env }) {
 	}
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-	runAutoUpdateCheck()
-		.then(({ notices }) => {
-			if (notices.length === 0) return;
-			console.log(JSON.stringify({
-				hookSpecificOutput: {
-					hookEventName: "SessionStart",
-					additionalContext: notices.join("\n\n"),
-				},
-			}));
-		})
-		.catch((error) => {
-			console.error(error instanceof Error ? error.message : String(error));
-			process.exit(0);
+if (isCliEntry(import.meta.url)) {
+	(async () => {
+		const sessionModel = await readSessionModelFromStdin(process.stdin);
+		const { notices } = await runAutoUpdateCheck({
+			sessionModel,
+			// Hook CLI path: only force-disable when SessionStart provided the active model.
+			requireSessionModel: true,
 		});
+		if (notices.length === 0) return;
+		console.log(JSON.stringify({
+			hookSpecificOutput: {
+				hookEventName: "SessionStart",
+				additionalContext: notices.join("\n\n"),
+			},
+		}));
+	})().catch((error) => {
+		console.error(error instanceof Error ? error.message : String(error));
+		process.exit(0);
+	});
 }

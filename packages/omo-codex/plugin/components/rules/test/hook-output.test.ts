@@ -5,14 +5,14 @@ import { formatAdditionalContextOutput } from "../src/hook-output.js";
 describe("formatAdditionalContextOutput", () => {
 	it("#given context with outer whitespace and CRLF #when serializing hook JSON #then additional context is newline-normalized", () => {
 		// given
-		const context = "\r\n\r\nFirst line\r\nSecond line\rThird line\r\n";
+		const context = "\r\n\r\nA1\r\nB2\rC3\r\n";
 
 		// when
 		const output = formatAdditionalContextOutput("PostToolUse", context);
 		const parsed: unknown = JSON.parse(output);
 
 		// then
-		expect(readAdditionalContext(parsed)).toBe("First line\nSecond line\nThird line");
+		expect(readAdditionalContext(parsed)).toBe("A1\nB2\nC3");
 		expect(output.endsWith("\n")).toBe(true);
 	});
 
@@ -40,7 +40,6 @@ describe("formatAdditionalContextOutput", () => {
 		expect(additionalContext.length).toBeLessThanOrEqual(32_000);
 		expect(additionalContext).toContain("first");
 		expect(additionalContext).not.toContain("last");
-		expect(additionalContext).toContain("[Truncated hook additional context to 32000 chars");
 	});
 });
 

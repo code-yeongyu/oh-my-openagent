@@ -72,4 +72,16 @@ describe("writeFileAtomically", () => {
     // then
     expect(readFileSync(targetFilePath, "utf-8")).toBe("third")
   })
+
+  it("#given Windows fsync returns EPERM #when writing #then preserves the atomic file contract", () => {
+    const tempDir = createTempPath("utils-atomic-windows-fsync")
+    const targetFilePath = join(tempDir, "state.json")
+    const fsyncImpl = () => {
+      throw Object.assign(new Error("operation not permitted"), { code: "EPERM" })
+    }
+
+    writeFileAtomically(targetFilePath, "windows-content", { platform: "win32", fsyncSync: fsyncImpl })
+
+    expect(readFileSync(targetFilePath, "utf-8")).toBe("windows-content")
+  })
 })

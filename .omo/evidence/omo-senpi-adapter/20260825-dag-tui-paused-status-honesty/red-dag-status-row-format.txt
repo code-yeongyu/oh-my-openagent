@@ -1,0 +1,62 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/dag-status-row-format.test.ts:
+(pass) runRows node selection > #given fifteen nodes with the three running ones beyond the row budget #when rendering #then every running node is shown [2.31ms]
+(pass) runRows node selection > #given more running nodes than the whole row budget #when rendering #then running rows are exempt from the cap [0.55ms]
+(pass) runRows node selection > #given two running nodes declared latest-first #when rendering #then the earlier start leads [0.17ms]
+(pass) runRows node selection > #given nodes across every settled bucket #when rendering #then running leads waiting, failed, completed, skipped [28.34ms]
+(pass) runRows node elapsed > #given a running node with startedAt #when rendering at a fixed now #then the row carries elapsed since start [0.19ms]
+(pass) runRows node elapsed > #given a completed node #when rendering now and later #then the settled duration is frozen [0.23ms]
+(pass) runRows node elapsed > #given a pending node without startedAt #when rendering #then no elapsed token appears [0.15ms]
+(pass) runRows width awareness > #given a 50-column terminal #when rendering #then activity is dropped while label route and elapsed stay [0.13ms]
+(pass) runRows width awareness > #given a 120-column terminal #when rendering #then a long latest-activity line survives well past 40 characters [0.17ms]
+(pass) runRows width awareness > #given a 120-column terminal and a short node #when rendering #then the row is not padded [0.10ms]
+213 |       undefined,
+214 |       { now: NOW, maxWidth: 120, isProcessAlive },
+215 |     )
+216 | 
+217 |     // then the header stops claiming paused and stops wearing the pause glyph
+218 |     expect(rendered[0]).toContain("resuming")
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "resuming"
+Received: "⏸ ship-it paused wave 1/1 0/1 done, 1 running"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/dag-tui-paused-status-honesty/packages/omo-senpi/src/components/task/dag-status-row-format.test.ts:218:25)
+(fail) runRows paused run header honesty > #given a paused run whose lease holder is alive #when rendering #then the header reads resuming under the neutral icon [0.32ms]
+237 |       undefined,
+238 |       { now: NOW, maxWidth: 200, isProcessAlive },
+239 |     )
+240 | 
+241 |     // then the header names the suspension and how many lanes are stranded in it
+242 |     expect(rendered[0]).toContain("suspended · 2 active")
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "suspended · 2 active"
+Received: "⏸ ship-it paused wave 1/1 1/3 done, 2 running"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/dag-tui-paused-status-honesty/packages/omo-senpi/src/components/task/dag-status-row-format.test.ts:242:25)
+(fail) runRows paused run header honesty > #given a paused run with no live lease and running nodes #when rendering #then the header reads suspended with the active count [0.25ms]
+257 | 
+258 |     // then
+259 |     expect(rendered[0]).toContain("paused")
+260 |     expect(rendered[0]).not.toContain("suspended")
+261 |     expect(rendered[0]).not.toContain("resuming")
+262 |     expect(rendered[0].startsWith("· ")).toBe(true)
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/dag-tui-paused-status-honesty/packages/omo-senpi/src/components/task/dag-status-row-format.test.ts:262:42)
+(fail) runRows paused run header honesty > #given a paused run with no live lease and no running nodes #when rendering #then the header still reads paused under the neutral icon [0.19ms]
+(pass) runRows activity semantics > #given a running node with live activity #when rendering #then the row shows it after the route [0.14ms]
+(pass) runRows activity semantics > #given a completed node with stale activity still known #when rendering #then no activity text shows [0.16ms]
+
+ 12 pass
+ 3 fail
+ 36 expect() calls
+Ran 15 tests across 1 file. [213.00ms]

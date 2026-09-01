@@ -14,7 +14,7 @@ The build materializes third-party designpowers files into `packages/shared-skil
 
 - `LICENSE` -> `vendor/LICENSE`
 - `agents/*.md` allowlist -> `vendor/agents/`
-- selected `skills/*/SKILL.md` allowlist -> `vendor/skills/*/SKILL.md`
+- selected `skills/*/SKILL.md` allowlist -> `vendor/skills/*/reference.md`
 
 The materialized `vendor/` directory is ignored in git and included in npm/package output through the frontend skill's `.npmignore` behavior.
 

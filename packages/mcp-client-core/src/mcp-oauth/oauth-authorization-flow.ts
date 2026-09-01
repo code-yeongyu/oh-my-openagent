@@ -109,7 +109,7 @@ function openBrowser(url: string): void {
   }
 
   try {
-    const child = spawn(command, args, { stdio: "ignore", detached: true })
+    const child = spawn(command, args, { stdio: "ignore", detached: true, windowsHide: true })
     child.on("error", () => {})
     child.unref()
   } catch (error) {

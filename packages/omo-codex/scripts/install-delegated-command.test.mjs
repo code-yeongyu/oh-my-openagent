@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { buildDelegatedOmoInvocation, runDelegatedOmoCommand } from "./install-local.mjs";
 
-test("#given a lazycodex passthrough command #when delegating to omo #then resets OMO_INVOCATION_NAME so the delegate does not re-enter the lazycodex path", async () => {
+test("#given a lazycodex passthrough command #when delegating to omo-agent-toolkit #then resets OMO_INVOCATION_NAME so the delegate does not re-enter the lazycodex path", async () => {
 	// given
 	const parsed = { kind: "command", command: "boulder", args: [] };
 	let received;
@@ -25,12 +25,12 @@ test("#given a lazycodex passthrough command #when delegating to omo #then reset
 	assert.equal(received.runOptions.cwd, "/tmp/project");
 	assert.equal(
 		received.runOptions.env?.OMO_INVOCATION_NAME,
-		"omo",
-		"delegated omo command must run with OMO_INVOCATION_NAME=omo to avoid infinite recursion",
+		"omo-agent-toolkit",
+		"delegated command must run with OMO_INVOCATION_NAME=omo-agent-toolkit to avoid infinite recursion",
 	);
 });
 
-test("#given OMO_INVOCATION_NAME=lazycodex in the parent env #when delegating a cleanup passthrough #then the child env overrides it to omo", async () => {
+test("#given OMO_INVOCATION_NAME=lazycodex in the parent env #when delegating a cleanup passthrough #then the child env overrides it to omo-agent-toolkit", async () => {
 	// given
 	const previous = process.env.OMO_INVOCATION_NAME;
 	process.env.OMO_INVOCATION_NAME = "lazycodex";
@@ -52,7 +52,7 @@ test("#given OMO_INVOCATION_NAME=lazycodex in the parent env #when delegating a 
 	}
 
 	// then
-	assert.equal(received.env.OMO_INVOCATION_NAME, "omo");
+	assert.equal(received.env.OMO_INVOCATION_NAME, "omo-agent-toolkit");
 });
 
 test("#given a dry-run doctor #when delegating #then routes to the Codex LazyCodex doctor workflow", async () => {
@@ -75,11 +75,104 @@ test("#given a dry-run doctor #when delegating #then routes to the Codex LazyCod
 	// then
 	assert.equal(ran, false);
 	assert.match(logged, /^codex exec /);
+	assert.match(logged, /--sandbox danger-full-access/);
+	assert.doesNotMatch(logged, /--model/);
+	assert.doesNotMatch(logged, /gpt-5\.5-codex-mini/);
+	assert.doesNotMatch(logged, /--sandbox read-only/);
 	assert.match(logged, /Use \$omo:lcx-doctor/);
+	assert.match(logged, /LAZYCODEX_SOURCE_ROOT/);
+	assert.match(logged, /\$\{TMPDIR:-\/tmp\}\/lazycodex-sources/);
 	assert.match(logged, /Requested doctor arguments: --json/);
 	assert.doesNotMatch(logged, /oh-my-openagent omo doctor/);
 });
 
+test("#given doctor without model override #when delegating #then uses the configured Codex default model", async () => {
+	// given
+	const parsed = { kind: "command", command: "doctor", args: ["--json"] };
+
+	// when
+	const invocation = buildDelegatedOmoInvocation(parsed);
+
+	// then
+	assert.equal(invocation.command, "codex");
+	assert.equal(invocation.args.includes("--model"), false);
+	assert.equal(invocation.args.some((arg) => arg.includes("gpt-5.5-codex-mini")), false);
+});
+
+test("#given explicit doctor model override #when delegating #then passes only that model to Codex exec", async () => {
+	// given
+	const parsed = { kind: "command", command: "doctor", args: ["--model", "gpt-5.5", "--json"] };
+
+	// when
+	const invocation = buildDelegatedOmoInvocation(parsed);
+
+	// then
+	assert.equal(invocation.command, "codex");
+	assert.deepEqual(invocation.args.slice(0, 9), [
+		"exec",
+		"--ephemeral",
+		"--sandbox",
+		"danger-full-access",
+		"--skip-git-repo-check",
+		"--cd",
+		".",
+		"--model",
+		"gpt-5.5",
+	]);
+	assert.match(invocation.args.at(-1), /Requested doctor arguments: --json/);
+	assert.doesNotMatch(invocation.args.at(-1), /--model/);
+});
+
+test("#given doctor source-root override #when delegating #then passes it to the Codex workflow environment", async () => {
+	// given
+	const parsed = { kind: "command", command: "doctor", args: ["--source-root", "/var/tmp/lcx-sources", "--json"] };
+
+	// when
+	const invocation = buildDelegatedOmoInvocation(parsed);
+
+	// then
+	assert.equal(invocation.env?.LAZYCODEX_SOURCE_ROOT, "/var/tmp/lcx-sources");
+	assert.deepEqual(invocation.args.slice(0, 7), [
+		"exec",
+		"--ephemeral",
+		"--sandbox",
+		"danger-full-access",
+		"--skip-git-repo-check",
+		"--cd",
+		".",
+	]);
+	assert.match(invocation.args.at(-1), /Requested doctor arguments: --json/);
+	assert.doesNotMatch(invocation.args.at(-1), /--source-root/);
+});
+
+test("#given dry-run install without explicit platform #when delegating #then logs one Windows-safe Codex install command", async () => {
+	// given
+	const parsed = {
+		kind: "command",
+		command: "install",
+		dryRun: true,
+		noTui: true,
+		skipAuth: false,
+		autonomousPermissions: true,
+		repoRoot: undefined,
+		args: [],
+	};
+	const logged = [];
+
+	// when
+	await runDelegatedOmoCommand(parsed, {
+		cwd: "/tmp/project",
+		log: (line) => {
+			logged.push(line);
+		},
+		runCommand: async () => {},
+	});
+
+	// then
+	assert.deepEqual(logged, [
+		"npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous",
+	]);
+});
 test("#given doctor recursion guard is active #when lazycodex doctor delegates #then rejects before launching Codex", async () => {
 	// given
 	const parsed = { kind: "command", command: "doctor", args: [] };
@@ -146,5 +239,5 @@ test("#given dry-run args with shell metacharacters #when delegating #then logs 
 	});
 
 	// then
-	assert.equal(logged, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project '/tmp/lazy codex'\\''s qa'");
+	assert.equal(logged, "npx --yes --package oh-my-openagent omo-agent-toolkit cleanup --platform=codex --project '/tmp/lazy codex'\\''s qa'");
 });

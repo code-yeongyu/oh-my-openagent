@@ -66,33 +66,6 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
-			name: "workflow-selector user-prompt-submit start-work",
-			component: "workflow-selector",
-			event: "user-prompt-submit",
-			payload: {
-				hook_event_name: "UserPromptSubmit",
-				session_id: "s-task12",
-				turn_id: "t-task12",
-				transcript_path: null,
-				cwd: tempRoot,
-				model: "gpt-5.5",
-				permission_mode: "default",
-				prompt: "Continue the approved plan",
-			},
-			env: { OMO_CODEX_AUTO_WORKFLOW: "1" },
-			assertOutput(stdout) {
-				const output = JSON.parse(stdout);
-				assert.equal(
-					output.hookSpecificOutput.hookEventName,
-					"UserPromptSubmit",
-				);
-				assert.match(
-					output.hookSpecificOutput.additionalContext,
-					/\$start-work/,
-				);
-			},
-		},
-		{
 			name: "ulw-loop pre-tool-use budget guard",
 			component: "ulw-loop",
 			event: "pre-tool-use",
@@ -207,12 +180,12 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
-			name: "lazycodex executor verifier subagent-stop blocks missing evidence",
+			name: "lazycodex worker verifier subagent-stop blocks missing evidence",
 			component: "lazycodex-executor-verify",
 			event: "subagent-stop",
 			payload: {
 				hook_event_name: "SubagentStop",
-				agent_type: "lazycodex-executor",
+				agent_type: "lazycodex-worker-medium",
 				agent_id: "agent-task12",
 				session_id: "s-task12",
 				transcript_path: join(tempRoot, "transcript.jsonl"),
@@ -229,8 +202,8 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
-			name: "start-work-continuation stop no state",
-			component: "start-work-continuation",
+			name: "ulw-execute-continuation stop no state",
+			component: "ulw-execute-continuation",
 			event: "stop",
 			payload: {
 				hook_event_name: "Stop",

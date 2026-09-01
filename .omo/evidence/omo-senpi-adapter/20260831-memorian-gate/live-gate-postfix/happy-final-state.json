@@ -1,0 +1,118 @@
+{
+  "sessionFiles": [
+    "2026-09-01T06-36-34-743Z_01a05b6d-0000-7000-8000-00000000000a.jsonl"
+  ],
+  "recall": [
+    {
+      "shape": "custom",
+      "content": "",
+      "paths": [
+        "reference/project/test-note.md"
+      ]
+    },
+    {
+      "shape": "custom_message",
+      "content": "<recalled-memory source=\"[[reference/project/test-note.md]]\">\nA stored memory surfaced. It is a hint, not current state — verify before relying on it; read the source path for full context.\nRebase the oldest reviewed branch first so the dependent stack never inverts.\n</recalled-memory>",
+      "paths": []
+    }
+  ],
+  "stubInvocations": [
+    {
+      "at": "2026-09-01T06:36:35.651Z",
+      "argv": [
+        "-p",
+        "--system-prompt",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/7540fae6-27c1-4b8a-bcf9-89a21aa6f66b/memorian-persona.md",
+        "--tools",
+        "nudge,read",
+        "-e",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/7540fae6-27c1-4b8a-bcf9-89a21aa6f66b/nudge-extension.ts",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--session-dir",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/7540fae6-27c1-4b8a-bcf9-89a21aa6f66b",
+        "--model",
+        "omo-mock/mock-1",
+        "Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/7540fae6-27c1-4b8a-bcf9-89a21aa6f66b/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/7540fae6-27c1-4b8a-bcf9-89a21aa6f66b/transcript-window.txt, then follow the system prompt."
+      ],
+      "nudgePath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/7540fae6-27c1-4b8a-bcf9-89a21aa6f66b/nudges.ndjson",
+      "candidatesPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/7540fae6-27c1-4b8a-bcf9-89a21aa6f66b/candidates.json",
+      "transcriptPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/7540fae6-27c1-4b8a-bcf9-89a21aa6f66b/transcript-window.txt",
+      "memorianSentinel": "1",
+      "candidates": {
+        "version": 1,
+        "maxItems": 2,
+        "candidates": [
+          {
+            "path": "reference/project/test-note.md",
+            "description": "Project rebase ordering rule captured for memorian gate QA",
+            "excerpt": "The zebra-quokka rebase ordering rule says: rebase the oldest reviewed branch first, then replay the dependent branches in merge order so the stack never inverts.",
+            "score": 6.9
+          }
+        ],
+        "surfaced": []
+      },
+      "transcript": "user: remind me about the zebra-quokka rebase ordering rule before I restack the branches\n\nassistant: ok\n",
+      "persona": "# Memorian — memory nudge agent\n\nYou watch a conversation that already happened and decide whether a stored memory would materially change what the primary agent does next. You are not the primary agent and you never address the user. Your only output channel is the `nudge` tool; any text you write outside tool calls is discarded.\n\n## Inputs\n\nRead both files before deciding.\n\n- `$MEMORIAN_TRANSCRI"
+    },
+    {
+      "at": "2026-09-01T06:36:36.795Z",
+      "argv": [
+        "-p",
+        "--system-prompt",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/066acb05-e5fa-4444-bb40-415bcf17ef6f/memorian-persona.md",
+        "--tools",
+        "nudge,read",
+        "-e",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/066acb05-e5fa-4444-bb40-415bcf17ef6f/nudge-extension.ts",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--session-dir",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/066acb05-e5fa-4444-bb40-415bcf17ef6f",
+        "--model",
+        "omo-mock/mock-1",
+        "Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/066acb05-e5fa-4444-bb40-415bcf17ef6f/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/066acb05-e5fa-4444-bb40-415bcf17ef6f/transcript-window.txt, then follow the system prompt."
+      ],
+      "nudgePath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/066acb05-e5fa-4444-bb40-415bcf17ef6f/nudges.ndjson",
+      "candidatesPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/066acb05-e5fa-4444-bb40-415bcf17ef6f/candidates.json",
+      "transcriptPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/runs/066acb05-e5fa-4444-bb40-415bcf17ef6f/transcript-window.txt",
+      "memorianSentinel": "1",
+      "candidates": {
+        "version": 1,
+        "maxItems": 2,
+        "candidates": [
+          {
+            "path": "skills/memory-discipline/SKILL.md",
+            "description": "This skill should be used when deciding whether and where to save memory. It routes knowledge between memory notes, skills, and people records, specifies the card and observation formats, and explains when to reach for /reflect, /dream, /search, and /people.",
+            "excerpt": "or reference/, or a system/ block when it must always be in context | | A repeatable procedure: steps you would follow again in a similar situation | A skill: skills/<name>/SKILL.md, with a descripti",
+            "score": 603
+          }
+        ],
+        "surfaced": [
+          "reference/project/test-note.md"
+        ]
+      },
+      "transcript": "user: remind me about the zebra-quokka rebase ordering rule before I restack the branches\n\nassistant: ok\n\nuser: now walk me through the restack steps one by one\n\nassistant: ok\n",
+      "persona": "# Memorian — memory nudge agent\n\nYou watch a conversation that already happened and decide whether a stored memory would materially change what the primary agent does next. You are not the primary agent and you never address the user. Your only output channel is the `nudge` tool; any text you write outside tool calls is discarded.\n\n## Inputs\n\nRead both files before deciding.\n\n- `$MEMORIAN_TRANSCRI"
+    }
+  ],
+  "pending": {
+    "dir": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pdm3i2/memory/agents/project-87b7c8f0/runtime/recall/pending",
+    "files": []
+  },
+  "ledger": {
+    "present": true,
+    "files": [
+      {
+        "name": "01a05b6d-0000-7000-8000-00000000000a.json",
+        "surfaced": [
+          "reference/project/test-note.md"
+        ]
+      }
+    ]
+  }
+}

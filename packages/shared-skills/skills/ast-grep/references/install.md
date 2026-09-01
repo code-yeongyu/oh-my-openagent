@@ -94,7 +94,7 @@ If every package manager fails:
 #      app-aarch64-pc-windows-msvc.zip       Windows ARM64
 
 # 2. Download and extract:
-VERSION=0.43.0
+VERSION=0.45.0
 TRIPLE=aarch64-apple-darwin
 curl -fsSL "https://github.com/ast-grep/ast-grep/releases/download/${VERSION}/app-${TRIPLE}.zip" -o /tmp/ast-grep.zip
 unzip /tmp/ast-grep.zip -d /tmp/ast-grep
@@ -125,7 +125,7 @@ Requires Rust 1.74+. Slowest path; only useful when you need a specific commit o
 
 ```bash
 ast-grep --version            # or `sg --version`
-# ast-grep 0.43.0
+# ast-grep 0.45.0
 ```
 
 Then sanity-check a real query:

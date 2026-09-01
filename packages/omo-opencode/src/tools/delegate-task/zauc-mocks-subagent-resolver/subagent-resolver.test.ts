@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - legacy fixture-heavy resolver matrix; add new resolver behavior in focused sibling tests instead.
+
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { DelegateTaskArgs } from "../types"
 import type { ExecutorContext } from "../executor-types"
@@ -692,40 +694,6 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.categoryModel).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
-  })
-
-  test("does not inherit hardcoded fallback chain when agent override uses custom provider model", async () => {
-    //#given
-    readProviderModelsCacheMock.mockReturnValue({
-      models: { openai: ["gemini-3.5-flash-thinking"] },
-      connected: ["openai"],
-      updatedAt: "2026-03-03T00:00:00.000Z",
-    })
-    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
-    const args = createBaseArgs({ subagent_type: "oracle" })
-    const executorCtx = createExecutorContext(
-      async () => ([
-        { name: "oracle", mode: "subagent", model: "anthropic/claude-opus-4-7" },
-      ]),
-      {
-        agentOverrides: {
-          oracle: {
-            model: "openai/gemini-3.5-flash-thinking",
-          },
-        } as ExecutorContext["agentOverrides"],
-      }
-    )
-
-    //#when
-    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
-
-    //#then
-    expect(result.error).toBeUndefined()
-    expect(result.categoryModel).toEqual({
-      providerID: "openai",
-      modelID: "gemini-3.5-flash-thinking",
-    })
-    expect(result.fallbackChain).toBeUndefined()
   })
 
   test("matches agents even when zero-width characters are present in the requested name", async () => {

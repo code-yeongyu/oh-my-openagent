@@ -1,0 +1,17 @@
+# Scenario 09 - aggregate cleanup receipts and leftover audit
+mock_server_pid=23228
+mock_server_dead=PASS (kill -0 failed)
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-prefix.XXXXXX.mi5NGI1J5z
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-prefix.XXXXXX.mi5NGI1J5z; path absent
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-agent.XXXXXX.p365cG4p0v
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-agent.XXXXXX.p365cG4p0v; path absent
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-home.XXXXXX.QV9wyptLUI
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-home.XXXXXX.QV9wyptLUI; path absent
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-xdg.XXXXXX.vnyHkByDAm
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-xdg.XXXXXX.vnyHkByDAm; path absent
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-pack.XXXXXX.fJ6X95lKp6
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-pack.XXXXXX.fJ6X95lKp6; path absent
++ audit known task-11 mktemp patterns
+leftover_paths=PASS none
+evidence_pointer_files_removed=PASS
+scenario_09=PASS

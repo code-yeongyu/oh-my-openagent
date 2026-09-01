@@ -20,13 +20,13 @@ export type ChatMessageInput = {
   readonly model?: { readonly providerID: string; readonly modelID: string }
 }
 
-export type StartWorkHookOutput = {
+export type UlwExecuteHookOutput = {
   readonly parts: Array<{ readonly type: string; readonly text?: string }>
 }
 
 export type SessionModelOverride = { readonly providerID: string; readonly modelID: string }
 
-export type WorkStartingCommand = "start-work" | "ralph-loop" | "ulw-loop"
+export type WorkStartingCommand = "ulw-execute" | "ralph-loop" | "ulw-loop"
 
 type ChatMessageHook = {
   "chat.message"?: (
@@ -42,19 +42,17 @@ type StopContinuationGuard = {
   clear: (sessionID: string) => void
 }
 
-type RalphLoopHook = {
-  startLoop: (
-    sessionID: string,
-    prompt: string,
-    options?: {
-      readonly ultrawork?: boolean
-      readonly maxIterations?: number
-      readonly completionPromise?: string
-      readonly strategy?: "continue" | "reset"
-    },
-  ) => boolean | void
-  resumeLoop?: (sessionID: string) => boolean
-  cancelLoop: (sessionID: string) => boolean | void
+type GoalHook = {
+  setGoal: (sessionID: string, objective: string) => { readonly objective: string; readonly status: string } | null
+  getGoal: (sessionID: string) => { readonly objective: string; readonly status: string } | null
+  pauseGoal: (sessionID: string) => { readonly objective: string; readonly status: string } | null
+  resumeGoal: (sessionID: string) => { readonly objective: string; readonly status: string } | null
+  clearGoal: (sessionID: string) => boolean
+  markComplete: (sessionID: string) => { readonly objective: string; readonly status: string } | null
+}
+
+type TodoContinuationEnforcerHook = {
+  cancelAllCountdowns: () => void
 }
 
 export type ChatMessageHooks = {
@@ -69,6 +67,7 @@ export type ChatMessageHooks = {
   noSisyphusGpt?: ChatMessageHook | null
   noHephaestusNonGpt?: ChatMessageHook | null
   hephaestusAgentsMdInjector?: ChatMessageHook | null
-  startWork?: ChatMessageHook | null
-  ralphLoop?: RalphLoopHook | null
+  ulwExecute?: ChatMessageHook | null
+  goal?: GoalHook | null
+  todoContinuationEnforcer?: TodoContinuationEnforcerHook | null
 }

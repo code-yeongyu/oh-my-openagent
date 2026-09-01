@@ -1,0 +1,156 @@
+{
+  "result": "PASS",
+  "fatal": null,
+  "checks": [
+    {
+      "name": "fresh seed and accepted turn 1: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "fresh seed created the isolated identity repo",
+      "ok": true,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-rerun-gOQcpx/memory/agents/f3-qa-agent-88506410/repo"
+    },
+    {
+      "name": "fresh seed committed persona.md and human.md",
+      "ok": true,
+      "detail": "d1b2281a183b6e3aceca5639cf252e78474c4d53\tchore: initialize local memory"
+    },
+    {
+      "name": "accepted turn 2 without memory save: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "nudge remains absent one turn after the initial save",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "accepted turn 3 without memory save: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "nudge appears at every_user_turns=2",
+      "ok": true,
+      "detail": "expected exact nudge count N=2"
+    },
+    {
+      "name": "accepted turn 4 with memory tool save: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "memory tool save committed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "accepted turn 5 after memory save: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "nudge self-clears on the turn after memory save",
+      "ok": true,
+      "detail": "nudge token absent"
+    },
+    {
+      "name": "facts run published final.json",
+      "ok": true,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-rerun-gOQcpx/memory/agents/f3-qa-agent-88506410/runtime/facts/runs/facts-520255c652b8-1/final.json {\"version\":1,\"runId\":\"facts-520255c652b8-1\",\"outcome\":\"committed\",\"finishedAt\":\"2026-08-10T11:37:10.018Z\",\"sha\":\"026dcd5384a68cf9cae4f9f8f520cabc4e2f483c\"}"
+    },
+    {
+      "name": "facts child committed extracted facts",
+      "ok": true,
+      "detail": "{\"version\":1,\"runId\":\"facts-520255c652b8-1\",\"outcome\":\"committed\",\"finishedAt\":\"2026-08-10T11:37:10.018Z\",\"sha\":\"026dcd5384a68cf9cae4f9f8f520cabc4e2f483c\"}"
+    },
+    {
+      "name": "facts extraction produced Mina Kim person card",
+      "ok": true,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-rerun-gOQcpx/memory/agents/f3-qa-agent-88506410/repo/people/mina-kim/card.md"
+    },
+    {
+      "name": "facts commit carries Omo-Writer: facts-extractor trailer",
+      "ok": true,
+      "detail": "3574f0c4e577d8ef7ea802008b2c302b358a5e62 | chore(facts): extract 1 fact |  | Generated-By: facts-extractor | Omo-Writer: facts-extractor | Omo-Facts-Batch: 045c7df9-2884-42bd-a4b4-b97ad136eefe"
+    },
+    {
+      "name": "soul edit through memory tool: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "soul edit tool result carries announcement discipline",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "soul edit appends the visible-notice entry",
+      "ok": true,
+      "detail": "omo-memory:soul-updated persisted"
+    },
+    {
+      "name": "turn after soul edit: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "next TUI turn visibly renders the soul notice",
+      "ok": true,
+      "detail": "\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38"
+    },
+    {
+      "name": "visible soul turn carries the tool-result discipline line",
+      "ok": true,
+      "detail": "\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38;2;80;80;80m─\u001b[39m\u001b[38"
+    },
+    {
+      "name": "manual dream command reserved a run through live RPC slash dispatch",
+      "ok": true,
+      "detail": "ey\":\"anthropic-web-search\"}\n{\"type\":\"extension_ui_request\",\"id\":\"9f7b248f-8bb1-4822-bdfb-a511897dd3ce\",\"method\":\"setWidget\",\"widgetKey\":\"anthropic-web-search\"}\n{\"type\":\"extension_ui_request\",\"id\":\"26e81f72-882d-4c2e-9a2f-6b6080d84acd\",\"method\":\"setStatus\",\"statusKey\":\"openai-web-search\"}\n{\"type\":\"extension_ui_request\",\"id\":\"6065bafc-3619-4444-8362-d7fe007b22d0\",\"method\":\"setWidget\",\"widgetKey\":\"openai-web-search\"}\n{\"type\":\"extension_ui_request\",\"id\":\"eb4c6858-fdda-4904-9869-dc49f68de853\",\"method\":\"setStatus\",\"statusKey\":\"monitors\"}\n{\"type\":\"extension_ui_request\",\"id\":\"541a460b-483c-4ba0-beaf-7c456fa28f05\",\"method\":\"setStatus\",\"statusKey\":\"pi-websearch\"}\n{\"type\":\"extension_ui_request\",\"id\":\"22576ee5-68bf-4015-b3f0-45427bd1c1d4\",\"method\":\"setWidget\",\"widgetKey\":\"pi-websearch\"}\n{\"type\":\"extension_ui_request\",\"id\":\"31c2f3af-25bc-45a1-87fd-7461623b8f97\",\"method\":\"setStatus\",\"statusKey\":\"pi-webfetch\"}\n{\"type\":\"extension_ui_request\",\"id\":\"3b87bfa2-1390-43c1-a5f2-ed412d476eb6\",\"method\":\"setWidget\",\"widgetKey\":\"pi-webfetch\"}\n{\"type\":\"extension_ui_request\",\"id\":\"0b596641-432b-4e03-96e6-2e7b9bdacba7\",\"method\":\"notify\",\"message\":\"dream run reflection-run-1 reserved\",\"notifyType\":\"info\"}\n{\"id\":\"dream\",\"type\":\"response\",\"command\":\"prompt\",\"success\":true}\n{\"type\":\"extension_ui_request\",\"id\":\"e0dd7197-700c-4a52-ad29-64888c1d0080\",\"method\":\"setStatus\",\"statusKey\":\"memory\",\"statusText\":\"mem:f3-qa-agent-88506410 @73bb324\"}\n\nomo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }\n"
+    },
+    {
+      "name": "dream supervisor published outcome.json before reconciliation",
+      "ok": true,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-rerun-gOQcpx/memory/agents/f3-qa-agent-88506410/runtime/reflection/runs/reflection-run-1/outcome.json"
+    },
+    {
+      "name": "dream reconciliation turn: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "/people renders the extracted Mina Kim card through live RPC slash dispatch",
+      "ok": true,
+      "detail": ":\"prompt-url\"}\n{\"type\":\"extension_ui_request\",\"id\":\"7df00f97-6c30-4433-99a2-6dbc2827548b\",\"method\":\"setStatus\",\"statusKey\":\"  omo-native\",\"statusText\":\"(😺 OmO Native)\"}\n{\"type\":\"extension_ui_request\",\"id\":\"ab7dea12-bd8b-42cd-9083-5c27072f7a79\",\"method\":\"setStatus\",\"statusKey\":\"anthropic-web-search\"}\n{\"type\":\"extension_ui_request\",\"id\":\"4b486d59-cc80-4293-9eaa-5b51c7a7a63f\",\"method\":\"setWidget\",\"widgetKey\":\"anthropic-web-search\"}\n{\"type\":\"extension_ui_request\",\"id\":\"6e88dda8-f649-4a01-a2a2-ba8e8799c0ff\",\"method\":\"setStatus\",\"statusKey\":\"openai-web-search\"}\n{\"type\":\"extension_ui_request\",\"id\":\"3f3ab9aa-7242-4801-aa69-dd14a6571916\",\"method\":\"setWidget\",\"widgetKey\":\"openai-web-search\"}\n{\"type\":\"extension_ui_request\",\"id\":\"39aaffa2-a012-4357-a05b-bbace1c91568\",\"method\":\"setStatus\",\"statusKey\":\"monitors\"}\n{\"type\":\"extension_ui_request\",\"id\":\"e1f548ab-95e5-4458-9f87-6c7c2418e0d3\",\"method\":\"setStatus\",\"statusKey\":\"pi-websearch\"}\n{\"type\":\"extension_ui_request\",\"id\":\"c3404dec-85e9-4481-8431-e887fefeb945\",\"method\":\"setWidget\",\"widgetKey\":\"pi-websearch\"}\n{\"type\":\"extension_ui_request\",\"id\":\"823957c1-7857-480d-89a1-bec5e45cfd98\",\"method\":\"setStatus\",\"statusKey\":\"pi-webfetch\"}\n{\"type\":\"extension_ui_request\",\"id\":\"a814829d-6c20-4ab6-bebd-4a022bc1e879\",\"method\":\"setWidget\",\"widgetKey\":\"pi-webfetch\"}\n{\"type\":\"extension_ui_request\",\"id\":\"e7c9c0e8-7eec-4b3b-bed1-11312ce79383\",\"method\":\"setStatus\",\"statusKey\":\"memory\",\"statusText\":\"mem:f3-qa-agent-88506410 @e1aad99\"}\n{\"type\":\"extension_ui_request\",\"id\":\"91457e51-3132-4ef6-9a59-fccb8a199071\",\"method\":\"notify\",\"message\":\"# Mina Kim (mina-kim)\\nkind: person | aliases: Mina\\nstate: committed | path: people/mina-kim/card.md\\n\\n## Card\\n(empty card)\\n\\n## Observations\\n\\n### Explicit (1)\\n- [2026-08-10] Mina Kim is the release manager and prefers concise release checklists.  (n=5)\",\"notifyType\":\"info\"}\n{\"id\":\"people\",\"type\":\"response\",\"command\":\"prompt\",\"success\":true}\n\nomo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }\n"
+    },
+    {
+      "name": "dream fs.watch observed final.json",
+      "ok": true,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-rerun-gOQcpx/memory/agents/f3-qa-agent-88506410/runtime/reflection/runs/reflection-run-1/final.json"
+    },
+    {
+      "name": "dream completed successfully with an outcome sentinel",
+      "ok": true,
+      "detail": "{\"version\":1,\"runId\":\"reflection-run-1\",\"outcome\":\"no_changes\",\"finishedAt\":\"2026-08-10T11:37:25.245Z\"}"
+    },
+    {
+      "name": "all isolated tmux command sessions exited",
+      "ok": true,
+      "detail": "remaining=0"
+    },
+    {
+      "name": "all directly spawned child processes exited",
+      "ok": true,
+      "detail": "remaining="
+    },
+    {
+      "name": "isolated HOME/SENPI/XDG/memory root removed",
+      "ok": true,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-rerun-gOQcpx"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+RED - direct reported resolution surface
+command:
+  cd packages/omo-senpi/plugin/extensions
+  node --input-type=module -e "import { Type } from 'typebox'; import { truncateToWidth } from '@earendil-works/pi-tui'"
+observed:
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'typebox'
+  DIRECT_RESOLUTION_RED_EXIT=1
+
+RED - focused regression before production edit
+command:
+  bun test packages/omo-senpi/src/runtime-dependency-resolution.test.ts
+observed:
+  Cannot find module '@earendil-works/pi-tui' from 'packages/omo-senpi/plugin/extensions/omo.js'
+  0 pass
+  1 fail
+
+GREEN - focused regression after dependency declaration and install
+command:
+  bun test packages/omo-senpi/src/runtime-dependency-resolution.test.ts
+observed:
+  1 pass
+  0 fail
+  2 expect() calls
+
+GREEN - direct runtime imports
+command:
+  cd packages/omo-senpi/plugin/extensions
+  node --input-type=module -e "<import TypeBox and Pi TUI, exercise both>"
+observed:
+  typebox_kind=object
+  pi_tui=resolved
+
+MUTATION RED - runtime ownership excludes devDependencies
+mutation:
+  Temporarily moved both packages from dependencies to devDependencies while leaving the current node_modules tree intact.
+command:
+  bun test packages/omo-senpi/src/runtime-dependency-resolution.test.ts
+observed:
+  generated non-peer imports missing from dependencies:
+    @earendil-works/pi-tui
+    typebox
+  0 pass
+  1 fail
+
+MUTATION GREEN - restored runtime dependency declarations
+command:
+  bun test packages/omo-senpi/src/runtime-dependency-resolution.test.ts
+observed:
+  A temporary checkout and host node_modules tree were created.
+  The host plugin path was a symlink to the temporary real path.
+  Only generated non-peer imports declared in dependencies were linked into the real-path tree.
+  Node imported the runtime probe through the host symlink successfully.
+  1 pass
+  0 fail
+  7 expect() calls

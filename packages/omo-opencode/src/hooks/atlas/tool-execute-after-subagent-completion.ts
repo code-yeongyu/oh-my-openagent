@@ -27,6 +27,22 @@ function isBackgroundLaunchOutput(output: string): boolean {
     || output.includes("Background agent task launched")
 }
 
+function isBackgroundOutputIncompleteReport(toolName: string, output: string): boolean {
+  if (toolName !== "background_output") return false
+  const trimmedOutput = output.trimStart()
+  const incompleteStatus = "(?:pending|running|error|cancelled|interrupt)"
+  const taskStatusTable = new RegExp(
+    `^# Task Status\\b[\\s\\S]*\\|\\s*Status\\s*\\|\\s*\\*\\*${incompleteStatus}\\*\\*\\s*\\|`,
+  )
+  const fullSessionStatusReport = new RegExp(`^# Full Session Output\\b[\\s\\S]*^Status:\\s*${incompleteStatus}\\s*$`, "m")
+  const bareStatusReport = new RegExp(`^Status:\\s*${incompleteStatus}\\s*$`)
+
+  return taskStatusTable.test(trimmedOutput)
+    || fullSessionStatusReport.test(trimmedOutput)
+    || bareStatusReport.test(trimmedOutput)
+    || trimmedOutput.startsWith("Error fetching messages:")
+}
+
 export async function handleSubagentCompletionAfter(input: {
   ctx: PluginInput
   pendingTaskRefs: Map<string, PendingTaskRef>
@@ -69,6 +85,9 @@ export async function handleSubagentCompletionAfter(input: {
   }
 
   if (outputStr.length === 0) {
+    return
+  }
+  if (isBackgroundOutputIncompleteReport(toolInput.tool, outputStr)) {
     return
   }
 

@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - Atlas background-launch scenarios share one session/event harness; this release adds final-wave regressions and future additions should split by verdict class.
+
 import { afterEach, beforeEach, describe, expect, it, mock, afterAll, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -8,6 +10,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { Project } from "@opencode-ai/sdk"
 import { readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
+import type { SessionState } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 const isCallerOrchestratorMock = mock(async () => true)
@@ -72,7 +75,10 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
     } as SessionGetResult
   }
 
-  function createHandler(parentSessionIDs?: Record<string, string | undefined>) {
+  function createHandler(
+    parentSessionIDs?: Record<string, string | undefined>,
+    trackedState?: SessionState,
+  ) {
     const project = createProject()
     const client = unsafeTestValue<PluginInput["client"]>({
       session: {
@@ -100,7 +106,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
       pendingFilePaths: new Map(),
       pendingTaskRefs: new Map(),
       autoCommit: true,
-      getState: () => ({ promptFailureCount: 0 }),
+      getState: () => trackedState ?? { promptFailureCount: 0 },
       isCallerOrchestrator: isCallerOrchestratorMock,
       collectGitDiffStats: collectGitDiffStatsMock as never,
       formatFileChanges: formatFileChangesMock as never,
@@ -245,7 +251,8 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         })
 
-        const handler = createHandler({ [childSessionID]: sessionID })
+        const trackedState: SessionState = { promptFailureCount: 0 }
+        const handler = createHandler({ [childSessionID]: sessionID }, trackedState)
         const output = {
           title: "background_output",
           output: "Subagent finished implementation and tests.",
@@ -259,8 +266,9 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           output,
         )
 
-        expect(output.output).toContain("COMPLETION GATE")
-        expect(output.output).not.toContain("TASK ALREADY COMPLETE")
+        // the unchecked task is recorded for verification instead of taking the already-verified shortcut
+        expect(output.output).toContain("<system-reminder>")
+        expect(trackedState.verifiedTaskKeys?.has("todo:1")).toBe(true)
         expect(output.output).toContain(childSessionID)
       })
 

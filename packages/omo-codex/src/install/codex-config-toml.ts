@@ -13,10 +13,10 @@ import {
 } from "./codex-config-marketplaces"
 import { ensureAutonomousPermissions } from "./codex-config-permissions"
 import { ensureHookTrusted, ensureOmoBuiltinMcpPolicies, ensurePluginEnabled } from "./codex-config-plugins"
-import { ensureCodexReasoningConfig } from "./codex-config-reasoning"
+import { applyReasoningOverride, ensureCodexReasoningConfig } from "./codex-config-reasoning"
 import { readCodexModelCatalog } from "./codex-model-catalog"
 import { removeUnsupportedCodexMultiAgentModeConfig } from "./codex-multi-agent-mode-config"
-import { ensureCodexMultiAgentV2Config } from "./codex-multi-agent-v2-config"
+import { ensureCodexMultiAgentV2Config, resolveCodexMultiAgentVersion } from "./codex-multi-agent-v2-config"
 import type { CodexAgentConfig, CodexInstallPlatform, CodexMarketplaceSource, TrustedHookState } from "./types"
 
 export async function updateCodexConfig(input: {
@@ -32,10 +32,17 @@ export async function updateCodexConfig(input: {
   readonly agentConfigs?: readonly CodexAgentConfig[]
   readonly autonomousPermissions?: boolean
   readonly preserveMarketplaceSource?: boolean
+  /** Unified omo config reasoning level; overrides the catalog's model_reasoning_effort (off maps to none). */
+  readonly reasoning?: string
 }): Promise<void> {
   await mkdir(dirname(input.configPath), { recursive: true })
-  let config = ""
-  if (await exists(input.configPath)) config = await readFile(input.configPath, "utf8")
+  let config: string
+  try {
+    config = await readFile(input.configPath, "utf8")
+  } catch (error) {
+    if (!isMissingFileError(error)) throw error
+    config = ""
+  }
 
   const pluginSet = new Set(input.pluginNames)
   for (const legacyMarketplaceName of legacyMarketplaceNames(input.marketplaceName)) {
@@ -52,10 +59,14 @@ export async function updateCodexConfig(input: {
   config = ensureFeatureEnabled(config, "plugins")
   config = ensureFeatureEnabled(config, "plugin_hooks")
   config = ensureFeatureEnabled(config, "multi_agent")
-  config = ensureFeatureEnabled(config, "child_agents_md")
   config = removeUnsupportedCodexMultiAgentModeConfig(config)
-  config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
-  config = ensureCodexMultiAgentV2Config(config)
+  config = ensureCodexReasoningConfig(
+    config,
+    applyReasoningOverride(await readCodexModelCatalog(input.repoRoot), input.reasoning),
+  )
+  config = ensureCodexMultiAgentV2Config(config, {
+    multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath),
+  })
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)
   if (!(input.preserveMarketplaceSource === true && hasMarketplaceBlock(config, input.marketplaceName))) {
     config = ensureMarketplaceBlock(config, input.marketplaceName, input.marketplaceSource)
@@ -74,12 +85,6 @@ export async function updateCodexConfig(input: {
   await writeFileAtomic(input.configPath, `${config.trimEnd()}\n`)
 }
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await readFile(path, "utf8")
-    return true
-  } catch (error) {
-    if (error instanceof Error) return false
-    return false
-  }
+function isMissingFileError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT"
 }

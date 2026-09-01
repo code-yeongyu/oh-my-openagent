@@ -17,9 +17,10 @@ test("#given aggregate plugin manifest #when inspected #then it owns the omo nam
 	// then
 	assert.equal(manifest.name, "omo");
 	assert(Array.isArray(hookPaths));
-	assert.equal(hookPaths.length, 22);
+	assert.equal(hookPaths.length, 23);
 	assert(hookPaths.every((hookPath) => typeof hookPath === "string" && hookPath.startsWith("./hooks/")));
 	assert(!hookPaths.includes("./hooks/hooks.json"));
+	assert(!hookPaths.includes("./hooks/user-prompt-submit-selecting-lazycodex-workflow.json"));
 	assert.equal(skillsPath, "./skills/");
 	assert.equal(mcpPath, "./.mcp.json");
 });
@@ -59,12 +60,11 @@ test("#given component directories #when scanned #then only intentional resource
 		"lazycodex-executor-verify",
 		"lsp",
 		"rules",
-		"start-work-continuation",
 		"teammode",
 		"telemetry",
 		"ultrawork",
+		"ulw-execute-continuation",
 		"ulw-loop",
-		"workflow-selector",
 	]);
 	for (const name of componentNames) {
 		const expectedManifest = expectedComponentManifests.get(name);

@@ -13,6 +13,7 @@ let err: string[];
 let originalCodexSessionId: string | undefined;
 let originalCodexThreadId: string | undefined;
 let originalOmoSessionId: string | undefined;
+let originalPiSessionId: string | undefined;
 
 beforeEach(async () => {
 	testDir = await mkdtemp(join(tmpdir(), "ug-cli-create-goals-"));
@@ -21,9 +22,11 @@ beforeEach(async () => {
 	originalCodexSessionId = process.env["CODEX_SESSION_ID"];
 	originalCodexThreadId = process.env["CODEX_THREAD_ID"];
 	originalOmoSessionId = process.env["OMO_ULW_LOOP_SESSION_ID"];
+	originalPiSessionId = process.env["PI_SESSION_ID"];
 	delete process.env["CODEX_SESSION_ID"];
 	delete process.env["CODEX_THREAD_ID"];
 	delete process.env["OMO_ULW_LOOP_SESSION_ID"];
+	delete process.env["PI_SESSION_ID"];
 	vi.spyOn(process, "cwd").mockReturnValue(testDir);
 	vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 		out.push(chunk.toString());
@@ -43,6 +46,8 @@ afterEach(async () => {
 	else process.env["CODEX_THREAD_ID"] = originalCodexThreadId;
 	if (originalOmoSessionId === undefined) delete process.env["OMO_ULW_LOOP_SESSION_ID"];
 	else process.env["OMO_ULW_LOOP_SESSION_ID"] = originalOmoSessionId;
+	if (originalPiSessionId === undefined) delete process.env["PI_SESSION_ID"];
+	else process.env["PI_SESSION_ID"] = originalPiSessionId;
 	await rm(testDir, { recursive: true, force: true });
 });
 
@@ -103,6 +108,8 @@ describe("ulwLoopCommand create-goals", () => {
 
 	it("#given completed default aggregate #when creating another default plan #then guides to a fresh session", async () => {
 		await createPlan("- Finished");
+		expect(await ulwLoopCommand(["complete-goals"])).toBe(0);
+		resetOutput();
 		for (const criterionId of ["C001", "C002", "C003"]) await passCriterion("G001-finished", criterionId);
 		expect(
 			await ulwLoopCommand([
@@ -126,6 +133,16 @@ describe("ulwLoopCommand create-goals", () => {
 		expect(err.join("")).toContain("Existing ulw-loop aggregate is already complete");
 		expect(err.join("")).toContain("create-goals --session-id <new-id>");
 		expect(err.join("")).toContain("--force only");
+	});
+
+	it("#given an active goal on a v2 plan #when reading status --json #then exposes the current attempt dir", async () => {
+		await createPlan();
+		expect(await ulwLoopCommand(["complete-goals"])).toBe(0);
+		resetOutput();
+
+		expect(await ulwLoopCommand(["status", "--json"])).toBe(0);
+
+		expect(stdoutJson()).toMatchObject({ currentAttemptDir: ".omo/evidence/ulw/session/G001-goal-a/a1" });
 	});
 
 	it("#given two session ids #when creating goals #then writes isolated session-scoped plans", async () => {
@@ -168,5 +185,41 @@ describe("ulwLoopCommand create-goals", () => {
 		).toBe(0);
 
 		expect(await readFile(join(testDir, ".omo/ulw-loop/manual-456/goals.json"), "utf8")).toContain("Manual scoped");
+	});
+
+	it("#given two Senpi sessions in one cwd #when each reads ulw-loop state #then only the owner sees its run", async () => {
+		process.env["PI_SESSION_ID"] = "session-A";
+		expect(await ulwLoopCommand(["create-goals", "--brief", "- Session A run", "--json"])).toBe(0);
+		resetOutput();
+
+		process.env["PI_SESSION_ID"] = "session-B";
+		expect(await ulwLoopCommand(["status", "--json"])).toBe(1);
+		expect(stdoutJson()).toMatchObject({ ok: false, error: { code: "ULW_LOOP_PLAN_MISSING" } });
+		resetOutput();
+
+		process.env["PI_SESSION_ID"] = "session-A";
+		expect(await ulwLoopCommand(["status", "--json"])).toBe(0);
+		expect(stdoutJson()).toMatchObject({
+			plan: {
+				goalsPath: ".omo/ulw-loop/session-A/goals.json",
+				goals: [{ title: "Session A run" }],
+			},
+		});
+	});
+
+	it("#given a valueless --session-id #when creating goals #then it fails and writes no plan", async () => {
+		const code = await ulwLoopCommand(["create-goals", "--session-id", "--brief", "- Alpha"]);
+
+		expect(code).toBe(1);
+		expect(err.join("")).toContain("--session-id requires a non-empty value");
+		await expect(readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).rejects.toThrow();
+	});
+
+	it("#given an empty --session-id= #when creating goals #then it fails and writes no plan", async () => {
+		const code = await ulwLoopCommand(["create-goals", "--session-id=", "--brief", "- Alpha"]);
+
+		expect(code).toBe(1);
+		expect(err.join("")).toContain("--session-id requires a non-empty value");
+		await expect(readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).rejects.toThrow();
 	});
 });

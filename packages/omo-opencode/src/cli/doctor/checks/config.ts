@@ -5,6 +5,7 @@ import type { CheckResult, DoctorIssue } from "../framework/types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { getModelResolutionInfoWithOverrides } from "./model-resolution"
 import type { OmoConfig } from "./model-resolution-types"
+import { findLegacyConfigLeftovers, legacyConfigLeftoverWarning } from "./legacy-config-leftovers"
 
 interface ConfigValidationResult {
   exists: boolean
@@ -110,12 +111,18 @@ function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
 export async function checkConfig(): Promise<CheckResult> {
   const validation = validateConfig()
   const issues: DoctorIssue[] = []
+  const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? process.cwd()
+  const legacyWarning = legacyConfigLeftoverWarning(findLegacyConfigLeftovers({
+    cwd: process.cwd(),
+    homeDir,
+  }))
+  if (legacyWarning !== undefined) issues.push(legacyWarning)
 
   if (!validation.exists) {
     return {
       name: CHECK_NAMES[CHECK_IDS.CONFIG],
-      status: "pass",
-      message: "No custom config found; defaults are used",
+      status: issues.length > 0 ? "warn" : "pass",
+      message: issues.length > 0 ? "Legacy configuration migration required" : "No custom config found; defaults are used",
       details: undefined,
       issues,
     }

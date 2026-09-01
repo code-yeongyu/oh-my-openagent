@@ -29,6 +29,10 @@ export interface PollOptions {
   eventWatchdogMs?: number
   secondaryMeaningfulWorkTimeoutMs?: number
   requireMeaningfulWork?: boolean
+  /** Injectable clock (default Date.now). Tests drive a virtual clock to assert timing causality deterministically. */
+  now?: () => number
+  /** Injectable poll delay (default real setTimeout). Tests advance the virtual clock here instead of sleeping. */
+  sleep?: (ms: number) => Promise<void>
 }
 
 export async function pollForCompletion(
@@ -50,14 +54,16 @@ export async function pollForCompletion(
     options.secondaryMeaningfulWorkTimeoutMs ??
     DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS
   const requireMeaningfulWork = options.requireMeaningfulWork ?? false
+  const now = options.now ?? Date.now
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
   let secondaryTimeoutChecked = false
-  const pollStartTimestamp = Date.now()
+  const pollStartTimestamp = now()
 
   while (!abortController.signal.aborted) {
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+    await sleep(pollIntervalMs)
 
     if (abortController.signal.aborted) {
       return 130
@@ -91,7 +97,7 @@ export async function pollForCompletion(
 
     let mainSessionStatus: "idle" | "busy" | "retry" | null = null
     if (eventState.lastEventTimestamp !== null) {
-      const timeSinceLastEvent = Date.now() - eventState.lastEventTimestamp
+      const timeSinceLastEvent = now() - eventState.lastEventTimestamp
       if (timeSinceLastEvent > eventWatchdogMs) {
         console.log(
           pc.yellow(
@@ -108,7 +114,7 @@ export async function pollForCompletion(
           eventState.mainSessionIdle = false
         }
 
-        eventState.lastEventTimestamp = Date.now()
+        eventState.lastEventTimestamp = now()
       }
     }
 
@@ -132,13 +138,13 @@ export async function pollForCompletion(
     }
 
     if (!eventState.hasReceivedMeaningfulWork) {
-      if (Date.now() - pollStartTimestamp < minStabilizationMs) {
+      if (now() - pollStartTimestamp < minStabilizationMs) {
         consecutiveCompleteChecks = 0
         continue
       }
 
       if (requireMeaningfulWork) {
-        if (Date.now() - pollStartTimestamp <= secondaryMeaningfulWorkTimeoutMs) {
+        if (now() - pollStartTimestamp <= secondaryMeaningfulWorkTimeoutMs) {
           consecutiveCompleteChecks = 0
           continue
         }
@@ -155,7 +161,7 @@ export async function pollForCompletion(
         return 1
       }
 
-      if (Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs && !secondaryTimeoutChecked) {
+      if (now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs && !secondaryTimeoutChecked) {
         secondaryTimeoutChecked = true
         const hasActiveWork = await hasActiveSessionWork(ctx)
 
@@ -172,10 +178,10 @@ export async function pollForCompletion(
       }
     } else {
       if (firstWorkTimestamp === null) {
-        firstWorkTimestamp = Date.now()
+        firstWorkTimestamp = now()
       }
 
-      if (Date.now() - firstWorkTimestamp < minStabilizationMs) {
+      if (now() - firstWorkTimestamp < minStabilizationMs) {
         consecutiveCompleteChecks = 0
         continue
       }

@@ -194,4 +194,65 @@ describe("createSessionStateStore", () => {
     expect(progressUpdate.progressSource).toBe("none")
     expect(progressUpdate.stagnationCount).toBe(1)
   })
+
+  test("given an observed continuation response without progress, blocks directive re-arming", () => {
+    // given
+    const sessionID = "ses-directive-response-block"
+    const state = sessionStateStore.getState(sessionID)
+    const todos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+    ]
+    sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
+    state.awaitingPostInjectionProgressCheck = true
+    state.continuationResponseObserved = true
+
+    // when
+    sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
+
+    // then
+    expect(state.continuationBlockReason).toBe("directive-response")
+    expect(state.continuationResponseObserved).toBe(false)
+  })
+
+  test("given a user interruption, preserves it over directive-response provenance", () => {
+    // given
+    const sessionID = "ses-user-interruption-priority"
+    const state = sessionStateStore.getState(sessionID)
+    const todos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+    ]
+    sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
+    state.awaitingPostInjectionProgressCheck = true
+    state.continuationResponseObserved = true
+    state.continuationBlockReason = "user-interruption"
+
+    // when
+    sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
+
+    // then
+    expect(state.continuationBlockReason).toBe("user-interruption")
+  })
+
+  test("given todo progress after an interruption, clears the continuation block", () => {
+    // given
+    const sessionID = "ses-progress-clears-interruption"
+    const state = sessionStateStore.getState(sessionID)
+    const initialTodos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    state.awaitingPostInjectionProgressCheck = true
+    state.continuationBlockReason = "user-interruption"
+
+    // when
+    const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 1, [
+      { id: "1", content: "Task 1", status: "completed", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ])
+
+    // then
+    expect(progressUpdate.hasProgressed).toBe(true)
+    expect(state.continuationBlockReason).toBeUndefined()
+  })
 })

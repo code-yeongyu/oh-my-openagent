@@ -23,7 +23,7 @@ type BunLock = {
   packages?: Record<string, [string, ...unknown[]]>
 }
 
-const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.4"
+const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.7"
 const REPOSITORY_ROOT = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = __repoRootFrom(REPOSITORY_ROOT)
 const FIRST_PARTY_SOURCE_PATHS = ["packages", "script", "test-support"] as const
@@ -77,8 +77,14 @@ async function findFirstPartyEffectImports(): Promise<string[]> {
       ":(exclude)**/node_modules/**",
       ":(exclude)**/dist/**",
     ],
-    { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
+    // Bound the spawn so a slow `git grep -P` on a loaded Windows runner fails
+    // deterministically instead of hanging past the test timeout (the observed flake).
+    { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe", timeout: 60_000 },
   )
+  expect(
+    result.signalCode ?? null,
+    `git grep did not finish within the spawn timeout (signal ${result.signalCode})`,
+  ).toBeNull()
   if (result.exitCode === 1) return []
   expect(result.exitCode, result.stderr.toString()).toBe(0)
   return result.stdout
@@ -116,12 +122,16 @@ describe("dependency security", () => {
     expect(opencodePluginDependencies).toMatchObject({
       dependencies: expect.objectContaining({ effect: expect.any(String) }),
     })
-    expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.66")
+    expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.83")
   })
 
+  // The scan spawns `git grep -P` over every first-party source and already bounds that spawn at
+  // 60s so a stalled grep fails deterministically. The case therefore has to outlive its own
+  // guard: on the 5s default the test died before the spawn budget could ever apply, which is the
+  // Windows failure. The assertion is unchanged - only the ceiling now exceeds what it wraps.
   it("#given first-party TypeScript sources #when dependency imports are scanned #then no source imports effect directly", async () => {
     const effectImports = await findFirstPartyEffectImports()
 
     expect(effectImports).toEqual([])
-  })
+  }, 90_000)
 })

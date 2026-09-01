@@ -149,7 +149,7 @@ function createFakeTimers(): FakeTimers {
 }
 
 describe("todo-continuation-enforcer", () => {
-  let promptCalls: Array<{ sessionID: string; agent?: string; model?: { providerID?: string; modelID?: string }; text: string }>
+  let promptCalls: Array<{ sessionID: string; agent?: string; model?: { providerID?: string; modelID?: string }; variant?: string; text: string }>
   let toastCalls: Array<{ title: string; message: string }>
   let fakeTimers: FakeTimers
 
@@ -157,8 +157,10 @@ describe("todo-continuation-enforcer", () => {
     info: {
       id: string
       role: "user" | "assistant"
+      finish?: string
       error?: { name: string; data?: { message: string } }
     }
+    parts?: Array<{ type: string; text?: string; synthetic?: boolean }>
   }
 
   interface PromptRequestOptions {
@@ -166,6 +168,7 @@ describe("todo-continuation-enforcer", () => {
     body: {
       agent?: string
       model?: { providerID?: string; modelID?: string }
+      variant?: string
       parts: Array<{ text: string }>
     }
   }
@@ -190,6 +193,7 @@ describe("todo-continuation-enforcer", () => {
       sessionID: opts.path.id,
       agent: opts.body.agent,
       model: opts.body.model,
+      variant: opts.body.variant,
       text: opts.body.parts[0].text,
     })
   }
@@ -1023,6 +1027,100 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(MAX_STAGNATION_COUNT)
   }, { timeout: 60000 })
 
+  test("given a continuation response without todo progress, does not re-arm the directive", async () => {
+    // given
+    const sessionID = "main-directive-response-loop-breaker"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    expect(promptCalls).toHaveLength(1)
+
+    // when
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" } },
+      },
+    })
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+  }, { timeout: 30000 })
+
+  test("given a real user interruption after continuation, does not re-arm after the user turn", async () => {
+    // given
+    const sessionID = "main-user-interruption-loop-breaker"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    expect(promptCalls).toHaveLength(1)
+
+    // when
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: { sessionID, role: "user" },
+          parts: [{ type: "text", text: "Stop. Inspect the broken context first.", synthetic: false }],
+        },
+      },
+    })
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" } },
+      },
+    })
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+  }, { timeout: 30000 })
+
+  test("given todo progress after a continuation response, permits the next continuation", async () => {
+    // given
+    const sessionID = "main-directive-response-progress"
+    setMainSession(sessionID)
+    let todos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: todos })
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    expect(promptCalls).toHaveLength(1)
+
+    // when
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" } },
+      },
+    })
+    todos = [
+      { id: "1", content: "Task 1", status: "completed", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 30000 })
+
   test("should skip idle handling while injection is in flight", async () => {
     //#given
     const sessionID = "main-in-flight"
@@ -1660,6 +1758,29 @@ describe("todo-continuation-enforcer", () => {
      // then - model should be extracted from assistant message's flat modelID/providerID
      expect(promptCalls.length).toBe(1)
      expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+  })
+
+  test("#given newest assistant message has a flat variant #when continuation is injected #then prompt body preserves the variant", async () => {
+    // given - OpenCode assistant messages carry model identity and variant as flat fields
+    const sessionID = "main-assistant-flat-variant"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.messages = async () => ({ data: [
+      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-5.5" } } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "sisyphus", providerID: "openai", modelID: "gpt-5.5", variant: "max" } },
+    ] }) as never
+    const hook = createTodoContinuationEnforcer(mockInput, {
+      backgroundManager: createMockBackgroundManager(false),
+    })
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(promptCalls[0].variant).toBe("max")
   })
 
   // COMPACTION AGENT FILTERING TESTS

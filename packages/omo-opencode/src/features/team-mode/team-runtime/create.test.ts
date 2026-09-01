@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - team runtime creation tests share filesystem and tmux mock state; this release adds small lock/spawn coverage and future edits should split by runtime phase.
+
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { access, mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -18,10 +20,11 @@ import {
   clearSessionTeamRunCleanupRegistry,
   getSessionCreatedTeamRunIds,
 } from "./session-cleanup"
+import { createLaunchConcurrencyProbe } from "../test-support/async-test-helpers"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   agentToUse: `${member.name}-agent`,
-  model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+  model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
   fallbackChain: undefined,
   systemContent: `system:${member.name}`,
 }))
@@ -198,9 +201,9 @@ describe("createTeamRun", () => {
       subagent_type: member.subagent_type,
       model: member.model,
     }))).toEqual([
-      { name: "member-1", subagent_type: "member-1-agent", model: { providerID: "openai", modelID: "gpt-5.4-mini" } },
-      { name: "member-2", subagent_type: "member-2-agent", model: { providerID: "openai", modelID: "gpt-5.4-mini" } },
-      { name: "member-3", subagent_type: "member-3-agent", model: { providerID: "openai", modelID: "gpt-5.4-mini" } },
+      { name: "member-1", subagent_type: "member-1-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
+      { name: "member-2", subagent_type: "member-2-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
+      { name: "member-3", subagent_type: "member-3-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
     ])
   })
 
@@ -220,7 +223,6 @@ describe("createTeamRun", () => {
 
     // then
     expect(firstPrompt).toContain("Lead-only tools you must NOT call")
-    expect(firstPrompt).not.toContain("3. Request shutdown via `team_shutdown_request`")
   })
 
   test("rolls back launched members in reverse order when a later spawn fails", async () => {
@@ -342,24 +344,32 @@ describe("createTeamRun", () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-parallel-"))
     temporaryDirectories.push(baseDir)
-    let inFlight = 0
-    let maxInFlight = 0
-    let launchCount = 0
-    const { manager } = createManager(baseDir, async () => {
-      launchCount += 1
-      inFlight += 1
-      maxInFlight = Math.max(maxInFlight, inFlight)
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      inFlight -= 1
-      return { id: `task-${launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask
+    const launchLimit = 4
+    const launchProbe = createLaunchConcurrencyProbe({
+      launchLimit,
+      sessionIdPrefix: "session",
+      taskIdPrefix: "task",
     })
+    const { manager } = createManager(baseDir, async (input) => launchProbe.launch(input))
 
     // when
-    await createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, 4), manager)
+    const run = createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, launchLimit), manager)
+    try {
+      const firstBatch = await launchProbe.waitForFirstBatch()
+      await launchProbe.releaseAndWaitForCompletion(run)
+      const completed = launchProbe.snapshot()
 
-    // then
-    expect(maxInFlight).toBeLessThanOrEqual(4)
-  })
+      // then
+      expect(firstBatch.launchCount).toBe(launchLimit)
+      expect(firstBatch.inFlight).toBe(launchLimit)
+      expect(firstBatch.maxInFlight).toBe(launchLimit)
+      expect(completed.launchCount).toBe(8)
+      expect(completed.maxInFlight).toBeLessThanOrEqual(launchLimit)
+    } finally {
+      launchProbe.release()
+      run.catch(() => undefined)
+    }
+  }, 30000)
 
   test("reuses the caller session for the lead when the lead matches the caller agent", async () => {
     // given

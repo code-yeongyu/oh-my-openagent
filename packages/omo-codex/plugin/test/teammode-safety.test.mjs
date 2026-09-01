@@ -10,7 +10,9 @@ import {
 	createTeamRoot,
 	readTeamJson,
 	runTeam,
+	runTeamAsync,
 	runTeamRaw,
+	runTeamRawWithEnv,
 	symlinkOrSkip,
 	teamDir,
 	teamJsonPath,
@@ -77,6 +79,97 @@ test("#given member A exists #when add-member receives A with trailing space #th
 			team.members.map((member) => member.id),
 			["A"],
 		);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given two add-member commands run concurrently #then both successful mutations are preserved", async () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-concurrent-add-");
+	try {
+		runTeam(tempRoot, "init", "--name", "Concurrent", "--session-name", "Members", "--session", "safe-concurrent-add");
+
+		const [alpha, beta] = await Promise.all([
+			runTeamAsync(
+				tempRoot,
+				"add-member",
+				"--team",
+				"safe-concurrent-add",
+				"--id",
+				"A",
+				"--name",
+				"alpha",
+				"--focus",
+				"alpha",
+				"--lens",
+				"area",
+				"--deliverable",
+				"first",
+			),
+			runTeamAsync(
+				tempRoot,
+				"add-member",
+				"--team",
+				"safe-concurrent-add",
+				"--id",
+				"B",
+				"--name",
+				"beta",
+				"--focus",
+				"beta",
+				"--lens",
+				"perspective",
+				"--deliverable",
+				"second",
+			),
+		]);
+		const team = readTeamJson(tempRoot, "safe-concurrent-add");
+
+		assert.equal(alpha.status, 0, alpha.stderr);
+		assert.equal(beta.status, 0, beta.stderr);
+		assert.deepEqual(
+			team.members.map((member) => member.id).sort(),
+			["A", "B"],
+		);
+		assert.equal(team.log.filter((entry) => entry.event === "add-member").length, 2);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given another command holds the team lock #when add-member times out #then it fails without mutating team state", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-lock-timeout-");
+	try {
+		runTeam(tempRoot, "init", "--name", "Locked", "--session-name", "Members", "--session", "safe-lock-timeout");
+		const lockDir = join(teamDir(tempRoot, "safe-lock-timeout"), ".team.lock");
+		mkdirSync(lockDir);
+		writeFileSync(
+			join(lockDir, "owner.json"),
+			`${JSON.stringify({ command: "held-test", pid: 12345, createdAt: "2026-06-30T00:00:00.000Z" }, null, 2)}\n`,
+		);
+
+		const result = runTeamRawWithEnv(
+			tempRoot,
+			{ OMO_TEAMMODE_LOCK_TIMEOUT_MS: "25", OMO_TEAMMODE_LOCK_RETRY_MS: "5" },
+			"add-member",
+			"--team",
+			"safe-lock-timeout",
+			"--id",
+			"A",
+			"--name",
+			"alpha",
+			"--focus",
+			"alpha",
+			"--lens",
+			"area",
+			"--deliverable",
+			"first",
+		);
+		const team = readTeamJson(tempRoot, "safe-lock-timeout");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /team state is locked by held-test, pid 12345/);
+		assert.deepEqual(team.members, []);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}

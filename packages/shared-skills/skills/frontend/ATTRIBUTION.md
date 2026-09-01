@@ -9,10 +9,12 @@ below. Modifications to the original files are noted where applicable.
 
 These third-party references are NOT committed to this repository. Each upstream is
 tracked as a pinned git submodule under `packages/shared-skills/upstreams/<name>`, and the
-build materializes the referenced files verbatim, path-mapped into this skill's
-`references/` tree, when packaging the published artifact. The `Pinned upstream commit`
-line in each section below records the exact submodule commit that the materialization
-reads.
+build materializes the referenced files path-mapped into this skill's `references/` tree,
+when packaging the published artifact. The file bodies are copied verbatim, except
+materialized `SKILL.md` frontmatter may normalize an unquoted single-line `description:`
+scalar into a JSON-quoted YAML string so Codex/OpenCode frontmatter parsing remains
+deterministic; the description text itself is unchanged. The `Pinned upstream commit` line
+in each section below records the exact submodule commit that the materialization reads.
 
 ---
 
@@ -63,14 +65,18 @@ The taste-skill files and image-generation skills under `frontend/references/des
 (`taste-skill.md`, `gpt-tasteskill.md`, `minimalist-skill.md`, `brutalist-skill.md`,
 `soft-skill.md`, `redesign-skill.md`, `image-to-code-skill.md`, `output-skill.md`,
 `stitch-skill.md`, `imagegen-frontend-web.md`, `imagegen-frontend-mobile.md`,
-`imagegen-brandkit.md`) are path-mapped verbatim copies of the per-skill `SKILL.md` files
-from the taste-skill project (each `skills/<name>/SKILL.md` is renamed to
+`imagegen-brandkit.md`) are path-mapped copies of the per-skill `SKILL.md` files from the
+taste-skill project (each `skills/<name>/SKILL.md` is renamed to
 `references/design/<name>.md`; `imagegen-brandkit.md` maps from `skills/brandkit/SKILL.md`).
+`stitch-design-example.md` is a path-mapped verbatim copy of `skills/stitch-skill/DESIGN.md`,
+the worked example of the design-system document that the stitch skill exports.
 They are not committed here; the build materializes them from the pinned submodule under
-`packages/shared-skills/upstreams/taste-skill`.
+`packages/shared-skills/upstreams/taste-skill`. Only the allowed frontmatter description
+quoting normalization described above may alter these materialized `SKILL.md` files.
 
 - Source: https://github.com/Leonxlnx/taste-skill
-- Pinned upstream commit: 06d6028b5c623016c59ce8536f578e5a1127b499
+- Official site: https://www.tasteskill.dev/
+- Pinned upstream commit: b17742737e796305d829b3ad39eda3add0d79060
 
 ```
 MIT License
@@ -143,13 +149,15 @@ SOFTWARE.
 ## 4. designpowers (Owl-Listener) — design operating-layer references
 
 The designpowers reference corpus under `frontend/references/designpowers/vendor/` is
-path-mapped verbatim from the designpowers project. It is not committed here; the build
+path-mapped from the designpowers project. It is not committed here; the build
 materializes the selected files from the pinned submodule under
 `packages/shared-skills/upstreams/designpowers`. The materialized set includes the
 upstream `LICENSE`, ten `agents/*.md` role-reference files, and selected
-`skills/*/SKILL.md` files. Bridge/state/router integration skills are intentionally
+`skills/*/SKILL.md` files renamed to `vendor/skills/*/reference.md` so they remain
+reference documents instead of nested skill entrypoints. Bridge/state/router integration skills are intentionally
 excluded; see `frontend/references/designpowers/UPSTREAM.md` for the allowlist and
-exclusion list.
+exclusion list. Only the allowed frontmatter description quoting normalization described
+above may alter these materialized `reference.md` files.
 
 - Source: https://github.com/Owl-Listener/designpowers
 - Pinned upstream commit: cb00757da9d554591fa78d27aa1854d60a05c4f7
@@ -182,10 +190,36 @@ SOFTWARE.
 
 ## 5. Project-original files
 
-`frontend/SKILL.md`, `frontend/references/design/README.md`, `_INDEX.md`,
+`frontend/SKILL.md`, `frontend/references/design/README.md`, `_INDEX.md`, `aside.md`,
 `design-system-architecture.md`, `react-dev-tooling-skill.md`,
 `frontend/references/perfection/README.md`, `react-perf-tooling.md`, and
 `frontend/scripts/perfection/lighthouse-audit.py` are original to this project and require
 no third-party attribution. The perfection docs and script only invoke third-party tools
 (react-scan, react-doctor, react-grab, playwright-lighthouse, lighthouse, chrome-launcher)
 at runtime; no source from those tools is vendored, so their licenses are not carried here.
+
+`frontend/references/design/aside.md` is a project-original synthesis from live browser
+capture evidence and a local reconnaissance run following the MIT-licensed
+`JCodesMore/ai-website-cloner-template` workflow; it is not copied from Aside or from the
+template. Aside names, trademarks, product text, and visual assets remain the property of
+their respective owners and are referenced only for descriptive design-analysis purposes.
+
+`frontend/references/design/lazyweb.md` is a project-original, curl-only operating guide
+for the Lazyweb (lazyweb.com) design-research API, written from live endpoint verification;
+no Lazyweb source, documentation text, or screenshot content is vendored. Lazyweb names
+remain the property of their owner, and the guide grants no license to ship, trace, or
+commit reference screenshots harvested through it.
+
+`frontend/references/design/interaction-skill.md` is a project-original, curl-only
+operating guide for consulting the beui.dev animated-component registry during interaction
+and motion work, written from live endpoint verification; no beui.dev source code,
+documentation text, or component implementations are vendored. beui.dev names remain the
+property of their owner, and the guide instructs reading component source for mechanism
+extraction only, not vendoring it into references or projects.
+
+`frontend/references/design/clone-from-url.md` is a project-original runtime-extraction
+workflow guide. Its browser + `getComputedStyle` clone approach follows the same
+MIT-licensed `JCodesMore/ai-website-cloner-template` clone-website workflow that `aside.md`
+cites; no source from that template is copied. It carries no third-party attribution beyond
+that lineage note, and it grants no license to copy any target site's trademarks, brand
+assets, or proprietary copy.

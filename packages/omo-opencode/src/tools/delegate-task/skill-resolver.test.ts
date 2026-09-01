@@ -11,6 +11,19 @@ function makeNativeSkill(name: string, description: string, content: string) {
   return { name, description, location: `/fake/native/${name}/SKILL.md`, content }
 }
 
+function makeLoadedSkill(name: string, content: string) {
+  return {
+    name,
+    path: `/fake/runtime/${name}/SKILL.md`,
+    definition: {
+      name,
+      description: `Runtime skill ${name}`,
+      template: content,
+    },
+    scope: "config" as const,
+  }
+}
+
 function makeNativeAccessor(skills: ReturnType<typeof makeNativeSkill>[]) {
   return {
     all: () => skills,
@@ -57,6 +70,42 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     expect(result.contents).toHaveLength(1)
     expect(result.content).toContain("Red-Green-Refactor")
     expect(result.content).toContain("Write a failing test first")
+  })
+
+  it("#given a plugin runtime skill reachable through getLoadedSkills #when delegate load_skills resolves #then returns its content without native fallback", async () => {
+    const nativeSkills = {
+      all: mock(() => [makeNativeSkill("native-only", "Native only", "NATIVE_ONLY_BODY")]),
+      get: () => undefined,
+      dirs: () => [],
+    }
+
+    const result = await resolveSkillContent(["plugin-runtime-skill"], {
+      directory: TEST_DIR,
+      nativeSkills,
+      getLoadedSkills: async () => [makeLoadedSkill("plugin-runtime-skill", "PLUGIN_RUNTIME_BODY")],
+    })
+
+    expect(result.error).toBeNull()
+    expect(result.content).toContain("PLUGIN_RUNTIME_BODY")
+    expect(nativeSkills.all).not.toHaveBeenCalled()
+  })
+
+  it("#given runtime/base misses and native has a user normal-path skill #when delegate load_skills resolves #then returns native content", async () => {
+    const native = makeNativeSkill(
+      "user-normal-skill",
+      "User normal-path skill",
+      "USER_NORMAL_BODY",
+    )
+    const nativeSkills = makeNativeAccessor([native])
+
+    const result = await resolveSkillContent(["user-normal-skill"], {
+      nativeSkills,
+      directory: TEST_DIR,
+      getLoadedSkills: async () => [],
+    })
+
+    expect(result.error).toBeNull()
+    expect(result.content).toContain("USER_NORMAL_BODY")
   })
 
   it("#given a name present in both OMO disk-discovered and nativeSkills #when resolved #then OMO content wins", async () => {
@@ -177,11 +226,11 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     expect(result.error).not.toContain("DELEGATE_BYPASS_CONFIRMED")
   })
 
-  it("#given shared ulw-plan is disabled #when delegate load_skills requests its bare alias #then fallback discovery cannot bypass it", async () => {
+  it("#given bare ulw-plan is disabled #when delegate load_skills requests it #then fallback discovery cannot bypass it", async () => {
     // when
     const result = await resolveSkillContent(["ulw-plan"], {
       directory: TEST_DIR,
-      disabledSkills: new Set(["shared/ulw-plan"]),
+      disabledSkills: new Set(["ulw-plan"]),
     })
 
     // then
@@ -191,18 +240,16 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     expect(result.error).not.toContain("Prometheus")
   })
 
-  it("#given bare ulw-plan is disabled #when delegate load_skills requests its shared alias #then fallback discovery cannot bypass it", async () => {
+  it("#given the stale shared/ulw-plan prefix is requested #when delegate load_skills resolves #then it is unavailable (full cutover)", async () => {
     // when
     const result = await resolveSkillContent(["shared/ulw-plan"], {
       directory: TEST_DIR,
-      disabledSkills: new Set(["ulw-plan"]),
     })
 
     // then
     expect(result.content).toBeUndefined()
     expect(result.contents).toEqual([])
     expect(result.error).toContain("Skills not found: shared/ulw-plan")
-    expect(result.error).not.toContain("Prometheus")
   })
 
   it("#given a namespaced OMO skill #when requested by unique short name with different case #then resolves it", async () => {

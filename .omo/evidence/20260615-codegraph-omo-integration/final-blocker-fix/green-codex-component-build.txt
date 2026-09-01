@@ -1,9 +1,0 @@
-$ bun run build
-$ bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
-Bundled 12 modules in 3ms
-
-  serve.js  30.49 KB  (entry point)
-
-Bundled 17 modules in 3ms
-
-  cli.js  54.11 KB  (entry point)

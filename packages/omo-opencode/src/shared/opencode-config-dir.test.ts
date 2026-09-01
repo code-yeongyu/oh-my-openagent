@@ -150,6 +150,34 @@ describe("opencode-config-dir", () => {
         resolve("/xdg/config/opencode"),
       ])
     })
+
+    test("deduplicates when OPENCODE_CONFIG_DIR equals the default XDG path", () => {
+      // given OPENCODE_CONFIG_DIR points to the same path as the XDG default
+      const defaultDir = join(homedir(), ".config", "opencode")
+      process.env.OPENCODE_CONFIG_DIR = defaultDir
+      delete process.env.XDG_CONFIG_HOME
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      // when getOpenCodeConfigDirs is called
+      const result = getOpenCodeConfigDirs({ binary: "opencode", version: "1.0.200" })
+
+      // then the array contains a single deduplicated entry
+      expect(result).toEqual([resolve(defaultDir)])
+    })
+
+    test("returns single-element array for non-opencode binary", () => {
+      // given a Tauri desktop binary and OPENCODE_CONFIG_DIR is set
+      process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      // when getOpenCodeConfigDirs is called with binary="opencode-desktop"
+      const result = getOpenCodeConfigDirs({ binary: "opencode-desktop", version: "1.0.200" })
+
+      // then it returns a single-element array (no additive semantics for non-opencode binaries)
+      expect(result).toEqual([getOpenCodeConfigDir({ binary: "opencode-desktop", version: "1.0.200" })])
+      expect(result).toHaveLength(1)
+    })
+
   })
 
   describe("isDevBuild", () => {
@@ -313,38 +341,34 @@ describe("opencode-config-dir", () => {
   })
 
   describe("getOpenCodeConfigPaths", () => {
-    test("returns all config paths for CLI binary", () => {
-      // given opencode CLI binary on Linux
+    test("returns all OpenCode config paths for CLI binary", () => {
       Object.defineProperty(process, "platform", { value: "linux" })
       delete process.env.XDG_CONFIG_HOME
       delete process.env.OPENCODE_CONFIG_DIR
 
-      // when getOpenCodeConfigPaths is called
       const paths = getOpenCodeConfigPaths({ binary: "opencode", version: "1.0.200" })
-
-      // then returns all expected paths
       const expectedDir = join(homedir(), ".config", "opencode")
-      expect(paths.configDir).toBe(expectedDir)
-      expect(paths.configJson).toBe(join(expectedDir, "opencode.json"))
-      expect(paths.configJsonc).toBe(join(expectedDir, "opencode.jsonc"))
-      expect(paths.packageJson).toBe(join(expectedDir, "package.json"))
-      expect(paths.omoConfig).toBe(join(expectedDir, "oh-my-openagent.json"))
+
+      expect(paths).toEqual({
+        configDir: expectedDir,
+        configJson: join(expectedDir, "opencode.json"),
+        configJsonc: join(expectedDir, "opencode.jsonc"),
+        packageJson: join(expectedDir, "package.json"),
+      })
     })
 
-    test("returns all config paths for desktop binary", () => {
-      // given opencode-desktop binary on macOS
+    test("returns all OpenCode config paths for desktop binary", () => {
       Object.defineProperty(process, "platform", { value: "darwin" })
 
-      // when getOpenCodeConfigPaths is called
       const paths = getOpenCodeConfigPaths({ binary: "opencode-desktop", version: "1.0.200", checkExisting: false })
-
-      // then returns all expected paths
       const expectedDir = join(homedir(), "Library", "Application Support", TAURI_APP_IDENTIFIER)
-      expect(paths.configDir).toBe(expectedDir)
-      expect(paths.configJson).toBe(join(expectedDir, "opencode.json"))
-      expect(paths.configJsonc).toBe(join(expectedDir, "opencode.jsonc"))
-      expect(paths.packageJson).toBe(join(expectedDir, "package.json"))
-      expect(paths.omoConfig).toBe(join(expectedDir, "oh-my-openagent.json"))
+
+      expect(paths).toEqual({
+        configDir: expectedDir,
+        configJson: join(expectedDir, "opencode.json"),
+        configJsonc: join(expectedDir, "opencode.jsonc"),
+        packageJson: join(expectedDir, "package.json"),
+      })
     })
   })
 

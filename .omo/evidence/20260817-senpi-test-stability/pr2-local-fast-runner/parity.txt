@@ -1,0 +1,63 @@
+PARITY AND SPEEDUP PROOF
+Branch: perf/local-test-path-groups-20260817-ulw (evidence gathered at base dev 889658e5c; final head addd64c3e re-verified 8/8)
+Host: mengmotaHost, 14 cores, Bun 1.3.12 via npm exec
+
+SERIAL BASELINE (bunfig.root.toml root suite, then bun test packages/omo-senpi)
+  root:  13900 pass / 12 skip / 0 fail - Ran 13912 tests across 1781 files - real 265.65s
+  senpi:  1907 pass /   1 skip / 0 fail - Ran  1908 tests across  279 files - real 145.02s
+  total: 15807 pass / 13 skip / 0 fail - 15820 tests - wall 410.67s
+
+FAST PARALLEL (bun run test:fast; three groups via Promise.all)
+  opencode-memory: 8898 pass /  1 skip / 0 fail - Ran 8899 tests across  730 files - 97.82s (group shown)
+  root-rest:       5003 pass / 11 skip / 0 fail - Ran 5014 tests across 1051 files - 149.16s
+  senpi:           1907 pass /   1 skip / 0 fail - Ran 1908 tests across  279 files - 162.51s
+  combined exit 0; wall (real) 163.55s
+
+FILE INVENTORY PARITY
+  opencode-memory + root-rest = 730 + 1051 = 1781 files = serial root file count (exact).
+  senpi group = 279 files = serial senpi file count (exact).
+  Exact-union ownership is additionally machine-checked by
+  script/ci-root-test-partition.test.ts (green on this branch).
+
+TEST-NAME SET PARITY
+  Sorted (pass|skip|fail) name sets compared with comm:
+    only-in-fast = 0 lines
+    only-in-serial = 0 lines
+  Raw pass-count delta (+1 in fast, 13901 vs 13900) is output-attribution
+  noise from three processes interleaving into one log: per-file counts show
+  balanced +/-1 across ~31 files in BOTH directions; name sets and file
+  inventories are identical, and both runs report 0 fail with equal skip
+  totals (13). No test exists in one run and not the other.
+
+SPEEDUP
+  163.55s / 410.67s = 0.398 -> 60.2% wall-clock reduction (2.51x).
+  Merge condition fast_real <= baseline_real * 0.80: 163.55 <= 328.53 PASS.
+
+NOTES
+- First fast attempt (fast-path-groups.txt) showed root-rest exit 1 from two
+  omo-native payload tests whose precondition dist was not built; after
+  `bun run build:omo-native` the same suite passes (payload 4/4) and the
+  clean rerun (fast-path-clean.txt) is 0-fail with exit 0. Serial baseline
+  ran with prerequisites present.
+- The nested "[test-fast] root-rest: exit 3" line inside the root-rest group
+  output was the runner unit test's mocked exit flowing through runTestFast
+  logging; per-group exit logging has since been relocated into the real
+  spawner so nested suite output is no longer polluted. Timing evidence was
+  captured before this cosmetic relocation; three console.log calls per run
+  are not performance-relevant.
+- The serial gate remains the merge-blocking surface; test:fast is opt-in.
+
+SELF-REVIEW (ultrawork verification gate: no plan file -> self-review)
+- Owned diff: script/test-fast.ts (new), script/test-fast.test.ts (new),
+  package.json (+1 script line "test:fast"). No production code, no workflow
+  changes, no manifest/dependency changes, serial "test" gate unchanged.
+- Pure LOC: test-fast.ts=55, test-fast.test.ts=43 (ceiling 250).
+- Concurrency safety: three groups have machine-checked disjoint file scopes
+  (ci-root-test-partition.test.ts), per-process XDG sandboxes (#6931), and
+  the single-writer vendored LSP bootstrap from merged PR #6964 make
+  same-worktree parallel processes safe; measured clean run: 0 fail.
+- The serial root gate remains the merge-blocking surface; test:fast is
+  opt-in only and not wired into any CI job.
+- Final gates on rebased head 7f23af694: unit 2/2, typecheck:script exit 0,
+  full typecheck exit 0, build exit 0, partition contract 6/6 (plus 4 root-config tests, 10 total),
+  git diff --check clean, worktree clean, generated diff restored.

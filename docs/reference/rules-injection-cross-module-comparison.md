@@ -5,7 +5,7 @@ tracked during cross-repository development:
 
 - **codex-rules** — Codex hook plugin now bundled under the OMO Codex marketplace plugin (`packages/omo-codex/plugin/components/rules`, marketplace `sisyphuslabs`, plugin `omo`). The original standalone repo was `code-yeongyu/codex-rules`, branch `main`.
 - **pi-rules** — pi-mono extension (`pi-extensions/pi-rules`, repo `code-yeongyu/pi-rules`, branch `main`).
-- **omo rules-injector** — opencode plugin path (`omo/src/hooks/rules-injector`, repo `code-yeongyu/oh-my-openagent`, branch `dev`).
+- **omo rules-injector** — opencode plugin path (`packages/omo-opencode/src/hooks/rules-injector`, repo `code-yeongyu/oh-my-openagent`, branch `dev`).
 
 ## 0. Latest pushed commits
 
@@ -85,7 +85,7 @@ modules were validated via their existing unit and integration suites
 
 ### omo rules-injector (`fbe423a2d feat(rules-injector): hydrate dedup cache from session transcript`)
 
-- New file `src/hooks/rules-injector/transcript-hydration.ts` (~140 LOC) exposing `createTranscriptHydrationStore({ client })` with three methods: `hydrateSession(sessionID)`, `getHydratedRelativePaths(sessionID)`, `clearSession(sessionID)`.
+- New file `packages/omo-opencode/src/hooks/rules-injector/transcript-hydration.ts` (~140 LOC) exposing `createTranscriptHydrationStore({ client })` with three methods: `hydrateSession(sessionID)`, `getHydratedRelativePaths(sessionID)`, `clearSession(sessionID)`.
 - Hydration scans the last `200` messages and at most `1_000_000` characters of text per session, matches `\[Rule: <relativePath>\]\n\[Match: <reason>\]` exactly once per session per process, and joins concurrent calls onto a single in-flight promise. Transport errors fail open so injection never blocks.
 - New optional dep `transcriptHydration?: TranscriptHydrationHook` on `createRuleInjectionProcessor`. Existing tests that do not pass it keep their old behavior, which keeps all 70 rules-injector tests green.
 - `hook.ts` wires `createTranscriptHydrationStore({ client: ctx.client })` into the processor and also calls `transcriptHydration.clearSession(sessionID)` on `session.deleted` and `session.compacted` events so post-compaction reinjection still works.
