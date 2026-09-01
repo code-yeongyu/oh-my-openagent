@@ -422,4 +422,40 @@ describe("resolveSpawnItems category+model exclusivity", () => {
     if (result.kind !== "ok") throw new Error("expected ok")
     expect(result.items[0]?.model).toBe("openai/gpt-5.6-sol")
   })
+
+  test("#given a single task with a cwd #then resolves ok with the cwd attached", () => {
+    // given / when
+    const result = resolveSpawnItems({ prompt: "explore", category: "quick", cwd: "/scrubbed" })
+
+    // then
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") throw new Error("expected ok")
+    expect(result.items[0]?.cwd).toBe("/scrubbed")
+  })
+
+  test("#given batch items inheriting a top-level cwd #then each resolves with that cwd", () => {
+    // given / when
+    const result = resolveSpawnItems({ category: "quick", cwd: "/parent-cwd", tasks: [{ prompt: "a" }, { prompt: "b" }] })
+
+    // then
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") throw new Error("expected ok")
+    expect(result.items[0]?.cwd).toBe("/parent-cwd")
+    expect(result.items[1]?.cwd).toBe("/parent-cwd")
+  })
+
+  test("#given an item cwd that overrides the top-level #then the item keeps its own cwd", () => {
+    // given / when
+    const result = resolveSpawnItems({
+      category: "quick",
+      cwd: "/top-cwd",
+      tasks: [{ prompt: "a", cwd: "/item-cwd" }, { prompt: "b" }],
+    })
+
+    // then
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") throw new Error("expected ok")
+    expect(result.items[0]?.cwd).toBe("/item-cwd")
+    expect(result.items[1]?.cwd).toBe("/top-cwd")
+  })
 })

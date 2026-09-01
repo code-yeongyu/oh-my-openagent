@@ -75,6 +75,7 @@ type ResolvedSpawnItemBase = {
   readonly description?: string
   readonly name?: string
   readonly model?: string
+  readonly cwd?: string
   readonly load_skills: readonly string[]
 }
 

@@ -19,12 +19,14 @@ export function buildStartSpec(
   deps: TaskToolDeps,
   cwd: string,
 ): ResolvedManagerStartSpec {
+  const effectiveCwd = params.cwd ?? cwd
   const ancestry = deps.resolveAncestry?.(parentSessionId)
   const loadSkills = deps.loadSkills ?? createFsSkillLoader()
-  const skills = loadSkills(params.load_skills ?? [], cwd)
+  const skills = loadSkills(params.load_skills ?? [], effectiveCwd)
   const skillSummary = taskSkillSummary(params.load_skills ?? [], skills)
   const executionMode = resolvedTaskExecutionMode(target, deps)
   return {
+    cwd: effectiveCwd,
     prompt: skills.prepend + params.prompt,
     ...(skillSummary === undefined ? {} : { skills: skillSummary }),
     ...(params.task_summary !== undefined && { task_summary: params.task_summary }),
@@ -77,6 +79,7 @@ export function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: bool
     ...(item.description !== undefined && { description: item.description }),
     ...(item.name !== undefined && { name: item.name }),
     ...(item.model !== undefined && { model: item.model }),
+    ...(item.cwd !== undefined && { cwd: item.cwd }),
     load_skills: [...item.load_skills],
     ...(runInBackground !== undefined && { run_in_background: runInBackground }),
   }

@@ -86,4 +86,67 @@ describe("task tool over the real TaskManager", () => {
     expect(text).toContain("quick")
     expect(text).toContain("deep")
   })
+
+  test("#given an explicit cwd #when a single task spawns #then the child runs in that cwd", async () => {
+    // given
+    const { manager, inProcess } = makeManager()
+    const execute = buildTaskExecute(deps(manager))
+
+    // when
+    const result = await execute(
+      "call-4",
+      { prompt: "explore", category: "quick", cwd: "/scrubbed/worktree", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+
+    // then the child was started in the overridden cwd, not the parent's
+    expect(result.details.status).toBe("running")
+    expect(inProcess.startedSpecs[0]?.cwd).toBe("/scrubbed/worktree")
+  })
+
+  test("#given no cwd #when a single task spawns #then the child inherits the parent cwd", async () => {
+    // given
+    const { manager, inProcess } = makeManager()
+    const execute = buildTaskExecute(deps(manager))
+
+    // when
+    const result = await execute(
+      "call-5",
+      { prompt: "explore", category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+
+    // then the child ran in the parent session's cwd
+    expect(result.details.status).toBe("running")
+    expect(inProcess.startedSpecs[0]?.cwd).toBe(CTX.cwd)
+  })
+
+  test("#given a batch where an item sets cwd #when spawned #then that item runs in its own cwd while the sibling inherits", async () => {
+    // given
+    const { manager, inProcess } = makeManager()
+    const execute = buildTaskExecute(deps(manager))
+
+    // when
+    const result = await execute(
+      "call-6",
+      {
+        tasks: [
+          { prompt: "a", category: "quick", cwd: "/item-cwd" },
+          { prompt: "b", category: "quick" },
+        ],
+        run_in_background: true,
+      },
+      undefined,
+      undefined,
+      CTX,
+    )
+
+    // then each item started under its own resolved cwd
+    expect(inProcess.startedSpecs[0]?.cwd).toBe("/item-cwd")
+    expect(inProcess.startedSpecs[1]?.cwd).toBe(CTX.cwd)
+  })
 })

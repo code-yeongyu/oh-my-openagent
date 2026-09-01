@@ -33,6 +33,11 @@ export const TaskToolParams = Type.Object({
       description: "Skill names whose SKILL.md content is prepended to the child prompt. Defaults to [].",
     }),
   ),
+  cwd: Type.Optional(
+    Type.String({
+      description: "Optional working directory for the child task. Defaults to the parent session's cwd. Point it at an isolated worktree to keep the child away from credentials or other sensitive paths.",
+    }),
+  ),
   tasks: Type.Optional(
     Type.Array(
       Type.Object({
@@ -49,6 +54,7 @@ export const TaskToolParams = Type.Object({
         name: Type.Optional(Type.String({ description: "Optional stable name for this task." })),
         model: Type.Optional(Type.String({ description: "Model override for this task. Only valid when the item's effective target is subagent_type; rejected with a category target." })),
         load_skills: Type.Optional(Type.Array(Type.String(), { description: "Skills loaded for this task." })),
+        cwd: Type.Optional(Type.String({ description: "Optional working directory for this task; overrides the top-level cwd when both are set." })),
       }),
       {
         maxItems: MAX_TASK_BATCH_ITEMS,

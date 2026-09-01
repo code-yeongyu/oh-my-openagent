@@ -25,6 +25,7 @@ type SpawnItemInput = TargetInput & {
   readonly description?: string
   readonly name?: string
   readonly model?: string
+  readonly cwd?: string
   readonly load_skills?: readonly string[]
 }
 
@@ -33,6 +34,7 @@ type SpawnParamsInput = TargetInput & {
   readonly description?: string
   readonly name?: string
   readonly model?: string
+  readonly cwd?: string
   readonly load_skills?: readonly string[]
   readonly run_in_background?: boolean
   readonly tasks?: readonly SpawnItemInput[]
@@ -127,6 +129,7 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
             ...(params.task_summary === undefined ? {} : { task_summary: params.task_summary }),
             ...(params.description === undefined ? {} : { description: params.description }),
             ...(params.name === undefined ? {} : { name: params.name }),
+            ...(params.cwd === undefined ? {} : { cwd: params.cwd }),
           },
         ])
   const items: ResolvedSpawnItem[] = []
@@ -154,12 +157,14 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
     }
 
     const model = effectiveModel
+    const effectiveCwd = input.cwd ?? params.cwd
     const common = {
       prompt: input.prompt,
       load_skills: input.load_skills ?? params.load_skills ?? [],
       ...(input.task_summary === undefined ? {} : { task_summary: input.task_summary }),
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.name === undefined ? {} : { name: input.name }),
+      ...(effectiveCwd === undefined ? {} : { cwd: effectiveCwd }),
       ...(model === undefined ? {} : { model }),
     }
     if (target.kind === "category") {
