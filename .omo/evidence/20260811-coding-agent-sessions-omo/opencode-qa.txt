@@ -1,0 +1,30 @@
+WHAT WAS TESTED
+Command:
+  script/agent/qa-docker.sh exec \
+    bash .agents/skills/opencode-qa/scripts/server-smoke.sh --self-test
+
+Isolation proof:
+  The host OpenCode DB session count was queried before and after the disposable
+  Docker run.
+
+WHAT WAS OBSERVED
+Exit code: 0
+
+  PASS: GET /global/health healthy=true version=1.17.20
+  PASS: GET /doc lists 162 documented paths
+  PASS: unauthenticated GET /session rejected with HTTP 401
+  PASS: server-smoke
+  OPENCODE_SERVER_QA_PASS before=5826 after=5826
+
+WHY IT IS ENOUGH
+The change ships through the OpenCode shared-skill package but does not modify
+an OpenCode lifecycle hook. Package and generated-copy tests prove the changed
+skill is shipped; this isolated live-server smoke proves the adjacent OpenCode
+harness still boots, documents routes, and enforces auth without touching the
+real session DB.
+
+WHAT WAS OMITTED
+An earlier attempted `opencode debug skill` assertion was discarded because
+that command does not list plugin-provided shared skills in the disposable
+container. It was a QA-surface mismatch, not a product failure. Container IDs,
+configuration copies, credentials, and raw environment data were omitted.

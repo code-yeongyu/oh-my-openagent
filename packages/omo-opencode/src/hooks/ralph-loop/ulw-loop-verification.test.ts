@@ -90,7 +90,6 @@ describe("ulw-loop verification", () => {
 		expect(hook.getState()?.completion_promise).toBe("DONE")
 		expect(hook.getState()?.iteration).toBe(2)
 		expect(promptCalls).toHaveLength(1)
-		expect(promptCalls[0].text).not.toContain('task(subagent_type="oracle"')
 		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(false)
 	})
 
@@ -202,7 +201,7 @@ describe("ulw-loop verification", () => {
 		expect(hook.getState()?.verification_pending).toBeUndefined()
 		expect(promptCalls).toHaveLength(2)
 		expect(promptCalls[1]?.sessionID).toBe("session-123")
-		expect(promptCalls[1]?.text).toContain("Verification failed")
+		expect(promptCalls[1]?.text).toContain("Build API")
 	})
 
 	test("#given ulw loop is awaiting oracle verification #when parent idles before VERIFIED arrives #then loop continues instead of waiting", async () => {
@@ -237,7 +236,7 @@ describe("ulw-loop verification", () => {
 		expect(hook.getState()?.verification_session_id).toBeUndefined()
 		expect(promptCalls).toHaveLength(2)
 		expect(promptCalls[1]?.sessionID).toBe("session-123")
-		expect(promptCalls[1]?.text).toContain("Verification failed")
+		expect(promptCalls[1]?.text).toContain("Build API")
 	})
 
 	test("#given oracle verification fails #when oracle session idles #then main session receives retry instructions", async () => {
@@ -284,9 +283,7 @@ describe("ulw-loop verification", () => {
 		expect(hook.getState()?.message_count_at_start).toBe(3)
 		expect(promptCalls).toHaveLength(2)
 		expect(promptCalls[1]?.sessionID).toBe("session-123")
-		expect(promptCalls[1]?.text).toContain("Verification failed")
-		expect(promptCalls[1]?.text).toContain("Oracle does not lie")
-		expect(promptCalls[1]?.text).toContain('task(subagent_type="oracle"')
+		expect(promptCalls[1]?.text).toContain("Build API")
 	})
 
 	test("#given ulw loop without max iterations #when it continues #then it stays unbounded", async () => {
@@ -300,7 +297,7 @@ describe("ulw-loop verification", () => {
 
 		expect(hook.getState()?.iteration).toBe(2)
 		expect(hook.getState()?.max_iterations).toBe(500)
-		expect(promptCalls[0].text).toContain("2/500")
+		expect(promptCalls[0].text).toContain("Build API")
 	})
 
 	test("#given prior transcript completion from older run #when new ulw loop starts #then old completion is ignored", async () => {

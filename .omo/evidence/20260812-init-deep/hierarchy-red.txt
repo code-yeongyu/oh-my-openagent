@@ -1,0 +1,41 @@
+# Hierarchy RED baseline
+Worktree: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/init-deep-20260812
+Branch: docs/init-deep-20260812
+
+## Scale
+files=7546
+TypeScript lines=656586
+max directory depth=10
+TypeScript files over 500 lines=119
+
+## Existing local gap candidates
+2728 packages/omo-opencode
+96 packages/memory-core
+
+## Highest-scoring directories
+```
+files  lines    subdirs symbols local-AGENTS path
+2364   321015   19      8421    yes          packages/omo-opencode/src
+625    80162    2       8421    no           packages/omo-opencode
+417    54210    14      2113    no           packages/senpi-task/src
+283    47130    4       4995    yes          packages/omo-codex
+279    39057    4       2044    no           packages/omo-senpi/src
+248    36014    3       2202    yes          packages/senpi-task
+152    23632    5       3312    yes          packages/omo-senpi
+185    21439    1       917     yes          packages/utils
+182    21409    10      917     no           packages/utils/src
+136    17418    2       769     no           packages/omo-codex/src
+94     11333    13      489     no           packages/memory-core/src
+90     11019    1       489     no           packages/memory-core
+87     10543    3       494     no           packages/lsp-core/src
+90     10098    2       557     yes          script
+```
+
+## Binary RED observable
+FAIL: `packages/memory-core` has 96 files, 11,019 lines, 13 direct source
+subdirectories, and no package-scoped `AGENTS.md`.
+
+`packages/omo-opencode` lacks a package-root `AGENTS.md`, but its 2,364-file
+source tree already has `packages/omo-opencode/src/AGENTS.md`; scoring must
+decide whether package-root guidance adds distinct value rather than duplicate
+the source file.

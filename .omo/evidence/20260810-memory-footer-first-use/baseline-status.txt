@@ -1,0 +1,21 @@
+Command:
+bun test packages/omo-senpi/src/components/memory/status.test.ts
+
+Observed before production changes:
+bun test v1.4.0-canary.1 (b58cd4685)
+
+PASS refreshMemoryStatus committed HEAD renders mem:<identity> @<short-sha>
+PASS advisory under threshold emits no notification
+PASS advisory over threshold emits one warning
+PASS already-notified suppresses a second warning
+PASS no HEAD renders the uncommitted sentinel
+PASS custom repository adapter is used
+PASS token estimate counts only system/**/*.md
+
+7 pass
+0 fail
+21 expect() calls
+Ran 7 tests across 1 file. [2.83s]
+
+Baseline conclusion:
+The unchanged implementation is green for the old contract and explicitly pins the two behaviors being replaced: eager SHA rendering and @uncommitted rendering.

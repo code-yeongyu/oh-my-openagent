@@ -1,0 +1,37 @@
+=== GREEN: passing test output (after implementation) ===
+
+Command: bun test packages/omo-senpi/src/components/memory/commands/sleeptime.test.ts
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/commands/sleeptime.test.ts:
+(pass) /sleeptime > #given default settings #when invoked #then resolved reflection, nudge, facts, dream, people, soul settings, the config path, and the reflect and dream hints render [1.15ms]
+(pass) /sleeptime > #given per-agent overrides on reflection, nudge, facts, dream, people, soul #when invoked #then overridden fields are marked and applied [0.37ms]
+(pass) /sleeptime > #given an unbound session #when invoked #then an actionable error is returned [0.11ms]
+
+ 3 pass
+ 0 fail
+ 42 expect() calls
+Ran 3 tests across 1 file. [94.00ms]
+
+=== Full package suite (bun test packages/omo-senpi) ===
+
+918 pass
+1 fail (KNOWN PRE-EXISTING: OMO_BIN env-resolution test, not related to this change)
+2641 expect() calls
+Ran 919 tests across 141 files. [46.69s]
+
+=== Typecheck ===
+
+Command: npx tsc --noEmit --project packages/omo-senpi/tsconfig.json
+Result: clean (no errors)
+
+=== Test discipline note ===
+
+This todo changes DISPLAYED TEXT. Per .omo/rules/test-discipline.md, prose
+phrase-pins are banned. The tests assert on stable machine-consumed tokens
+(block labels and resolved config values like "Nudge: on", "every 10 turns",
+"Facts: off [agent override]") that are behavioral seams (which branch renders
+for which config state), not full-sentence prose pins. The /dream hint addition
+is a pure-prose change with no machine consumer; it ships on review + QA-by-read
+with no dedicated test beyond the token-level toContain("/dream") assertion.

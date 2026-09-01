@@ -1,18 +1,27 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { SkillDefinition } from "../../../types"
 import { configEntryToLoadedSkill } from "./config-skill-entry-loader"
 
 describe("configEntryToLoadedSkill", () => {
-  const fixtureRoot = join(tmpdir(), `config-skill-entry-loader-${Date.now()}`)
-  const configDir = join(fixtureRoot, "config")
-  const allowedSkillPath = join(configDir, "allowed-skill.md")
-  const linkedSecretSkillPath = join(configDir, "linked-secret-skill.md")
-  const outsideSkillPath = join(fixtureRoot, "secret-skill.md")
+  // mkdtempSync, never a Date.now()-derived name: consecutive Date.now() calls in one
+  // process return the same millisecond, so sibling suites collided on one directory and
+  // each teardown removed the other's live fixture. On Windows, removing an in-use tree
+  // blocks until the hook budget expires ("a beforeEach/afterEach hook timed out").
+  let fixtureRoot = ""
+  let configDir = ""
+  let allowedSkillPath = ""
+  let linkedSecretSkillPath = ""
+  let outsideSkillPath = ""
 
   beforeAll(() => {
+    fixtureRoot = mkdtempSync(join(tmpdir(), "config-skill-entry-loader-"))
+    configDir = join(fixtureRoot, "config")
+    allowedSkillPath = join(configDir, "allowed-skill.md")
+    linkedSecretSkillPath = join(configDir, "linked-secret-skill.md")
+    outsideSkillPath = join(fixtureRoot, "secret-skill.md")
     mkdirSync(configDir, { recursive: true })
     writeFileSync(
       allowedSkillPath,

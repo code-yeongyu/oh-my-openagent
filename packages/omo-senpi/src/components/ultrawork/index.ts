@@ -1,10 +1,12 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 
-// `ulw(?!-)` keeps generous matching ("하이ulw", "ulw_helper.ts") while skipping the
-// `ulw-` skill-name family (ulw-plan, ulw-loop, ulw-research): typing a skill name
-// must not arm ultrawork mode on top of the skill itself.
-const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw(?!-))/i
+// Generous, exception-free matching by design ("하이ulw", "ulw_helper.ts", "ulw-plan"):
+// overlapping keywords all fire, so a skill-name mention like "ulw-loop" arms ultrawork
+// while the skill-pointers component loads that skill in the same turn. Only structural
+// dedup remains: /skill: name-only, /skill:ultrawork expansion, and an embedded
+// <ultrawork-mode> tag pair never re-inject.
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i
 const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
 const ULTRAWORK_MODE_OPEN_TAG = "<ultrawork-mode>"
 const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"
@@ -26,6 +28,31 @@ interface SenpiInputEvent {
   streamingBehavior?: "steer" | "followUp"
 }
 
+export interface ArmingSnapshot {
+  readonly wasArmed: boolean
+  readonly compactRearmPending: boolean
+}
+
+export type UltraworkInvocationStage = "none" | "first_arm" | "remention" | "post_compact_rearm"
+export type UltraworkRoute = "none" | "direct" | "skill_args" | "skill_expansion" | "embedded_directive"
+export type UltraworkSuppressionReason =
+  | "none"
+  | "extension_source"
+  | "no_keyword"
+  | "skill_name_only"
+  | "skill_expansion"
+  | "embedded_directive"
+
+export interface UltraworkClassification {
+  readonly matchedUlw: boolean
+  readonly matchedUltrawork: boolean
+  readonly occurrenceCount: number
+  readonly effective: boolean
+  readonly stage: UltraworkInvocationStage
+  readonly route: UltraworkRoute
+  readonly suppressionReason: UltraworkSuppressionReason
+}
+
 type SenpiInputEventResult = { action: "continue" } | { action: "transform"; text: string }
 
 // The structural slice of senpi's ExtensionContext the arming ledger reads. Every
@@ -42,6 +69,7 @@ export interface SessionArming {
   currentSessionId(): string | undefined
   rearmOnCompact(sessionId: string | undefined): void
   isArmed(sessionId: string | undefined): boolean
+  isCompactRearmPending?(sessionId: string | undefined): boolean
   markArmed(sessionId: string | undefined): void
 }
 
@@ -79,7 +107,7 @@ function isCurrentArmingSlot(value: unknown): value is SharedArmingSlot {
   return slot.directive === SENPI_ULTRAWORK_DIRECTIVE && typeof slot.arming === "object" && slot.arming !== null
 }
 
-function sharedSessionArming(): SessionArming {
+export function sharedSessionArming(): SessionArming {
   const registry = globalThis as unknown as Record<symbol, unknown>
   const existing = registry[ARMING_LEDGER_KEY]
   if (isCurrentArmingSlot(existing)) {
@@ -118,6 +146,79 @@ export function isUltraworkInput(text: string): boolean {
   return ULTRAWORK_CURRENT_PROMPT_PATTERN.test(text)
 }
 
+export function armingSnapshot(sessionId: string | undefined): ArmingSnapshot {
+  const registry = globalThis as unknown as Record<symbol, unknown>
+  const existing = registry[ARMING_LEDGER_KEY]
+  if (!isCurrentArmingSlot(existing)) {
+    return { wasArmed: false, compactRearmPending: false }
+  }
+  return snapshotSessionArming(existing.arming, sessionId)
+}
+
+export function classifyUltraworkInput(
+  input: { readonly text: string; readonly source: SenpiInputEvent["source"] },
+  snapshot: ArmingSnapshot,
+): UltraworkClassification {
+  const matches = [...input.text.matchAll(new RegExp(ULTRAWORK_CURRENT_PROMPT_PATTERN.source, "gi"))]
+  let matchedUlw = false
+  let matchedUltrawork = false
+  for (const match of matches) {
+    if (match[0].toLowerCase() === "ulw") {
+      matchedUlw = true
+    } else {
+      matchedUltrawork = true
+    }
+  }
+
+  const base = {
+    matchedUlw,
+    matchedUltrawork,
+    occurrenceCount: matches.length,
+  }
+
+  if (input.source === "extension") {
+    return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "extension_source" }
+  }
+
+  if (matches.length === 0) {
+    return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "no_keyword" }
+  }
+
+  if (input.text.includes(ULTRAWORK_MODE_OPEN_TAG) && input.text.includes(ULTRAWORK_MODE_CLOSE_TAG)) {
+    return {
+      ...base,
+      effective: false,
+      stage: "none",
+      route: "embedded_directive",
+      suppressionReason: "embedded_directive",
+    }
+  }
+
+  let route: UltraworkRoute = "direct"
+  if (input.text.startsWith(SKILL_COMMAND_PREFIX)) {
+    const spaceIndex = input.text.indexOf(" ")
+    const skillName =
+      spaceIndex === -1 ? input.text.slice(SKILL_COMMAND_PREFIX.length) : input.text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
+    if (skillName === ULTRAWORK_SKILL_NAME) {
+      return { ...base, effective: false, stage: "none", route: "skill_expansion", suppressionReason: "skill_expansion" }
+    }
+
+    const argsStart = spaceIndex === -1 ? input.text.length : spaceIndex + 1
+    const matchedInArgs = matches.some((match) => (match.index ?? -1) >= argsStart)
+    if (!matchedInArgs) {
+      return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "skill_name_only" }
+    }
+    route = "skill_args"
+  }
+
+  const stage: UltraworkInvocationStage = snapshot.compactRearmPending
+    ? "post_compact_rearm"
+    : snapshot.wasArmed
+      ? "remention"
+      : "first_arm"
+  return { ...base, effective: true, stage, route, suppressionReason: "none" }
+}
+
 /**
  * Once-per-session arming ledger. The full directive rides in on a session's FIRST
  * trigger; later triggers in that same session get the short reminder because the
@@ -130,8 +231,10 @@ export function isUltraworkInput(text: string): boolean {
  */
 export function createSessionArming(): SessionArming {
   const armedSessionIds = new Set<string>()
+  const compactRearmPendingSessionIds = new Set<string>()
   let currentSessionId: string | undefined
   let anonymousArmed = false
+  let anonymousCompactRearmPending = false
 
   return {
     trackSession(sessionId) {
@@ -144,21 +247,36 @@ export function createSessionArming(): SessionArming {
       const target = sessionId ?? currentSessionId
       if (target === undefined) {
         anonymousArmed = false
+        anonymousCompactRearmPending = true
         return
       }
       armedSessionIds.delete(target)
+      compactRearmPendingSessionIds.add(target)
     },
     isArmed(sessionId) {
       if (sessionId === undefined) return anonymousArmed
       return armedSessionIds.has(sessionId)
     },
+    isCompactRearmPending(sessionId) {
+      if (sessionId === undefined) return anonymousCompactRearmPending
+      return compactRearmPendingSessionIds.has(sessionId)
+    },
     markArmed(sessionId) {
       if (sessionId === undefined) {
         anonymousArmed = true
+        anonymousCompactRearmPending = false
         return
       }
       armedSessionIds.add(sessionId)
+      compactRearmPendingSessionIds.delete(sessionId)
     },
+  }
+}
+
+function snapshotSessionArming(arming: SessionArming, sessionId: string | undefined): ArmingSnapshot {
+  return {
+    wasArmed: arming.isArmed(sessionId),
+    compactRearmPending: arming.isCompactRearmPending?.(sessionId) ?? false,
   }
 }
 
@@ -188,6 +306,7 @@ function handleInput(
   // The input event's own ctx names the live session; the lifecycle tracker covers
   // hosts that only expose the id on session events.
   const sessionId = eventSessionId ?? arming.currentSessionId()
+  const classification = classifyUltraworkInput(payload, snapshotSessionArming(arming, sessionId))
 
   // A pasted transcript (or an earlier injection) already carries the directive
   // block; injecting again would duplicate the same ~17KB of rules in one turn.
@@ -195,36 +314,26 @@ function handleInput(
   // question must not silently disarm a legitimate trigger. The paste still counts
   // as arming: the session's context now holds the full directive, so the next
   // plain trigger only needs the reminder.
-  if (payload.text.includes(ULTRAWORK_MODE_OPEN_TAG) && payload.text.includes(ULTRAWORK_MODE_CLOSE_TAG)) {
+  if (classification.route === "embedded_directive") {
     arming.markArmed(sessionId)
+    return { action: "continue" }
+  }
+
+  // `/skill:ultrawork` expansion already inlines the full SKILL.md, whose body
+  // IS the directive block, so arming again would duplicate it in one turn. The
+  // expansion still counts as arming for the same reason a pasted block does.
+  if (classification.route === "skill_expansion") {
+    arming.markArmed(sessionId)
+    return { action: "continue" }
+  }
+
+  if (!classification.effective) {
     return { action: "continue" }
   }
 
   // Any defined streamingBehavior means senpi will QUEUE this prompt instead of
   // sending it now, which changes how the directive has to travel.
   const isQueued = payload.streamingBehavior !== undefined
-
-  if (payload.text.startsWith(SKILL_COMMAND_PREFIX)) {
-    // Mirror senpi's parse exactly: skill name runs to the FIRST space (or end).
-    const spaceIndex = payload.text.indexOf(" ")
-    const skillName = spaceIndex === -1 ? payload.text.slice(SKILL_COMMAND_PREFIX.length) : payload.text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
-    const args = spaceIndex === -1 ? "" : payload.text.slice(spaceIndex + 1)
-
-    // `/skill:ultrawork` expansion already inlines the full SKILL.md, whose body
-    // IS the directive block, so arming again would duplicate it in one turn. The
-    // expansion still counts as arming for the same reason a pasted block does.
-    if (skillName === ULTRAWORK_SKILL_NAME) {
-      arming.markArmed(sessionId)
-      return { action: "continue" }
-    }
-
-    // Arm only when the user's own words (the args) carry a trigger; a trigger
-    // that appears solely inside the skill NAME must not arm the mode.
-    if (!isUltraworkInput(args)) {
-      return { action: "continue" }
-    }
-  }
-
   return armUltrawork(pi, payload.text, isQueued, arming, sessionId)
 }
 

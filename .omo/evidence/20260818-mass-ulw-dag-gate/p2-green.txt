@@ -1,0 +1,194 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/scheduler.test.ts:
+(pass) DAG scheduler terminal result persistence > #given only the senpi-task scheduler #when a node completes #then output and run stats are persisted without an adapter [19.87ms]
+(pass) DAG scheduler subscriber backpressure > #given a non-default subscriber ring #when a scheduler listener falls behind #then overflow occurs at the configured bound [15.71ms]
+(pass) DAG scheduler execution mode dispatch > #given task.default_execution_mode #when a DAG node is dispatched #then the scheduler resolves through the existing chain [14.41ms]
+(pass) DAG scheduler failure semantics > #given every terminal task status #when folded #then each maps to its exact node outcome and error code [89.98ms]
+(pass) DAG scheduler failure semantics > #given every start denial #when admission fails #then each maps to its exact node error code [22.06ms]
+(pass) DAG scheduler failure semantics > #given a failed root with a descendant chain #when failure cascades #then every descendant skip is persisted separately [36.78ms]
+(pass) DAG scheduler failure semantics > #given graph-ordered failures finish out of order #when independent work settles #then the run uses the first wave and declaration failure [101.45ms]
+(pass) DAG scheduler cancellation > #given durable waiters armed before and during cancellation #when the scheduler cancels through a separate journal path #then every wait and re-attach settles cancelled [21.61ms]
+(pass) DAG scheduler cancellation > #given a running wave and pending descendants #when cancelled #then tasks cancel, admission stops, and waiters resolve cancelled [29.32ms]
+(pass) DAG scheduler cancellation > #given one startOwned rejects after a sibling starts #when cancellation follows #then admission clears and the sibling is attached and cancelled [15.83ms]
+(pass) DAG scheduler cancellation > #given an AbortError returned by task cancellation #when the run is cancelled #then durable cancellation settles and the rejection still surfaces [12.93ms]
+(pass) DAG scheduler cancellation > #given a genuine task cancellation failure #when a wave is cancelled #then the run settles cancelled and the failure still surfaces [16.67ms]
+(pass) DAG scheduler cancellation > #given a paused unclaimed run #when cancelled #then it ends cancelled without task cancellation [10.90ms]
+(pass) DAG scheduler strict wave barrier > #given a linear three-wave DAG #when run #then nodes and wave events are admitted in order [33.59ms]
+(pass) DAG scheduler strict wave barrier > #given a diamond DAG #when run #then the fan-out shares one wave and the join waits for it [111.01ms]
+(pass) DAG scheduler strict wave barrier > #given a wave-one task is still running #when the scheduler is active #then wave two is not admitted before terminal [20.98ms]
+(pass) DAG scheduler strict wave barrier > #given one waitFor rejects while a sibling is running #when the wave settles #then the rejection becomes one node failure and the sibling completes [22.57ms]
+(pass) DAG scheduler strict wave barrier > #given one root start fails #when its wave is admitted #then siblings and the independent branch still run [28.29ms]
+(pass) DAG scheduler strict wave barrier > #given startOwned queues a scheduled node #when attached #then its queue position is journaled [13.44ms]
+(pass) DAG scheduler strict wave barrier > #given a same-wave node is residency denied #when an attached sibling frees a slot #then admission retries without failing it [25.57ms]
+(pass) DAG scheduler strict wave barrier > #given a wave wider than residency capacity #when tasks settle #then all nodes are admitted in batches without a second concurrency limit [39.12ms]
+(pass) DAG scheduler node spawn policy > #given a policy that denies an agent-routed node #when the wave admits #then the node fails with the denial message and startOwned is never called [12.71ms]
+(pass) DAG scheduler node spawn policy > #given a policy that forces the prompt #when the node starts #then the child receives the forced prompt [16.01ms]
+(pass) DAG scheduler node spawn policy > #given category-routed nodes #when the wave admits #then the policy is never consulted [13.90ms]
+
+packages/omo-senpi/src/components/task/dag-runtime.test.ts:
+(pass) assembled DAG runtime > #given a running DAG node #when its assembled child emits progress #then RPC and the live widget share one activity subscription that tears down [51.08ms]
+(pass) assembled DAG runtime > #given an unknown node skill #when the assembled runtime creates the run #then snapshot records missing_skill and dispatch keeps the prompt [64.73ms]
+(pass) assembled DAG runtime > #given a terminal wake buffered during compaction #when the assembled runtime attaches on session start #then it redelivers exactly once [25.84ms]
+(pass) assembled DAG runtime > #given a live task component runtime #when a two-node dag runs #then scheduler, artifacts, rpc, widget, and one wake all observe the same run [106.90ms]
+(pass) assembled DAG runtime > #given a live-shaped in-process child whose abort rejects #when the assembled runtime cancels #then no unhandled rejection escapes and a later run still completes [51.87ms]
+(pass) assembled DAG runtime > #given an active run #when detach switches sessions before its task settles #then the old scheduler terminates without resolving ownership against the new session [25.43ms]
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishDurableEvents (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:423:58)
+      at writeCheckpoint (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:89:9)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:110:21)
+      at withLock (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/store.ts:570:12)
+      at appendPayload (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:90:32)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/manager.ts:347:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:432:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-mass-ulw-dag-gate/packages/senpi-task/src/dag/journal.ts:226:13)
+
+(pass) assembled DAG runtime > #given a throwing durable-event subscriber #when a run publishes checkpoints #then the scheduler and other subscribers still reach completion [26.33ms]
+(pass) assembled DAG runtime > #given a live adapter DAG #when shutdown pauses it and a later adapter starts #then the paused event is durable and the run is claimed, resumed, and completed [46.65ms]
+(pass) assembled DAG runtime > #given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then shipped RPC receives the recovery scheduler overflow [42.56ms]
+(pass) assembled DAG runtime > #given a paused adapter DAG whose lease holder PID is still live #when another adapter starts #then it never claims or resumes the run [18.25ms]
+(pass) dag runtime node spawn policy > #given a runtime with a denying node spawn policy #when an agent-routed node is admitted #then the node fails with the denial and no child starts [24.92ms]
+
+ 35 pass
+ 0 fail
+ 140 expect() calls
+Ran 35 tests across 2 files. [3.43s]

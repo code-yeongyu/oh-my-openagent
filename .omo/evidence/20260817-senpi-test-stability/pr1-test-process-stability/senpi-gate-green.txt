@@ -1,0 +1,56 @@
+FAITHFUL CI-EQUIVALENT COMMAND SEQUENCE
+
+  bun run script/remove-stale-self-package-tests.ts
+  node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+  bun run build:senpi-plugin
+  npm pack --pack-destination "$PACK_DIR" packages/omo-senpi/plugin
+  npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
+  bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+  bun test packages/omo-senpi
+
+Every Bun command ran through:
+
+  npm exec --yes --package=bun@1.3.12
+
+OBSERVED
+
+  STEP remove_stale_self_package_tests
+  STEP bundle_freshness
+  omo-senpi extension build is current
+
+  STEP build_senpi_plugin
+  STEP npm_pack
+
+  STEP lsp_daemon_roundtrip
+  Test Files 1 passed (1)
+  Tests 5 passed (5)
+
+  STEP senpi_typecheck
+  exit=0
+
+  STEP senpi_tests
+  1881 pass
+  0 fail
+  Ran 1882 tests across 275 files. [166.57s]
+
+  SENPI_GATE_PASS=1
+
+CLEANUP
+
+  CLEANUP pack_dir_removed=1
+
+The pack directory was created with `mktemp -d` and removed by an EXIT trap.
+No generated Senpi extension/runtime diff remained.
+
+WHY THIS IS ENOUGH
+
+This is the same ordered surface as the GitHub
+`senpi-compatibility` job: freshness, build/stage, package, daemon roundtrip,
+adapter typecheck, and the complete Senpi test tree. It used the CI-pinned Bun
+version and finished with exit code 0.
+
+OMITTED
+
+Routine package listing and individual passing test lines were summarized.
+Expected test fixtures that log words such as `error` remained passing tests.
+No secrets or private environment values were captured.

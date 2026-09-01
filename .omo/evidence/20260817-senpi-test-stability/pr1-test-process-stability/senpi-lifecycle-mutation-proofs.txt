@@ -1,0 +1,128 @@
+ONBOARDING READY-LISTENER MUTATION RED
+
+Mutation:
+
+  await the child's first `message` before constructing `waitForReady()`
+
+This deterministically consumes the one-shot ready event before the production
+test listener is armed.
+
+Command:
+
+  /opt/homebrew/bin/timeout 8s \
+    npm exec --yes --package=bun@1.3.12 -- bun test \
+    packages/omo-senpi/src/components/onboarding/state.test.ts \
+    -t 'two concurrent child processes'
+
+Observed:
+
+  error: child did not signal ready in time
+  (fail) claimOnboarding > #given two concurrent child processes ...
+  0 pass
+  1 fail
+  Ran 1 test across 1 file. [5.11s]
+  mutation_exit=1
+  orphans_remaining=0
+
+The mutation was removed immediately.
+
+ONBOARDING CLEANUP MUTATION RED
+
+Permanent regression test:
+
+  #given a child waiting on IPC
+  #when test cleanup stops it
+  #then the exit is observed
+
+Mutation:
+
+  replace the `SIGKILL` action in `stopChildren()` with a no-op
+
+Command:
+
+  /opt/homebrew/bin/timeout 3s \
+    npm exec --yes --package=bun@1.3.12 -- bun test \
+    packages/omo-senpi/src/components/onboarding/state.test.ts \
+    -t 'child waiting on IPC'
+
+Observed:
+
+  mutation_exit=124
+  orphans_remaining=0
+
+The bounded command timed out because cleanup waited for an exit it never
+triggered. The mutation was removed immediately.
+
+ONBOARDING CLEANUP MUTATION GREEN
+
+The same command with `SIGKILL` restored:
+
+  1 pass
+  15 filtered out
+  0 fail
+  Ran 1 test across 1 file. [112.00ms]
+
+IC-8 EXIT-RESOURCE MUTATION RED
+
+Permanent regression test:
+
+  #given an unconnected exit server
+  #when test cleanup runs
+  #then the listener and timeout are released
+
+Mutation:
+
+  make `cleanupExitResources()` a no-op
+
+Command:
+
+  /opt/homebrew/bin/timeout 3s \
+    npm exec --yes --package=bun@1.3.12 -- bun test \
+    packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts \
+    -t 'unconnected exit server'
+
+Observed:
+
+  error: expect(received).toBe(expected)
+  Expected: false
+  Received: true
+  at memory-run-supervisor.ic8.test.ts:202:30
+  0 pass
+  1 fail
+  mutation_exit=1
+  supervisor_processes_remaining=0
+
+The mutation was removed immediately.
+
+FINAL GREEN
+
+Command:
+
+  npm exec --yes --package=bun@1.3.12 -- bun test \
+    packages/omo-senpi/src/components/onboarding/state.test.ts \
+    packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts
+
+Observed:
+
+  22 pass
+  0 fail
+  39 expect() calls
+  Ran 22 tests across 2 files. [1028.00ms]
+
+WHY THIS IS ENOUGH
+
+- The listener mutation deterministically proves why subscription must happen
+  before the child can emit ready.
+- The cleanup mutation proves the child exit is caused by explicit cleanup,
+  not timing luck.
+- The IC-8 mutation proves both the listener and timer remain live when the
+  cleanup registry is bypassed.
+- Every mutation was reverted with `apply_patch`, then the final files passed
+  together once under Bun 1.3.12.
+
+CLEANUP
+
+- no `claim-race-child.mjs` process remained;
+- no memory supervisor/bootstrap/model-child process remained;
+- no `.orig` backup remained;
+- all temporary roots were removed by the test cleanup.

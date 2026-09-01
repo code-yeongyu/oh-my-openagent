@@ -4,13 +4,21 @@ import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from "bun:
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentOverrides } from "./types"
 import { resolveAgentSkills } from "./agent-skill-resolution"
-import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
+import { createEnvContext } from "./env-context"
+import { clearSkillCache, resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import * as modelAvailability from "../shared/model-availability"
 import * as shared from "../shared"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-5"
 let createBuiltinAgents: (typeof import("./builtin-agents"))["createBuiltinAgents"]
+
+// The runtime contract is composition against the real skill loader, not any
+// particular wording inside the frontend SKILL.md.
+function frontendSkillContent(): string {
+  const { resolved } = resolveMultipleSkills(["frontend"])
+  return Array.from(resolved.values()).join("\n\n")
+}
 
 async function importFreshBuiltinAgentsModule(): Promise<typeof import("./builtin-agents")> {
   return import(`./builtin-agents?test=${Date.now()}-${Math.random()}`)
@@ -872,31 +880,18 @@ describe("Hephaestus environment context toggle", () => {
     )
   }
 
-  test("includes <omo-env> tag when disable flag is unset", async () => {
+  test("appends the generated environment context unless disabled", async () => {
     // #when
-    const agents = await buildAgents(undefined)
+    const [agentsDefault, agentsEnabled, agentsDisabled] = await Promise.all([
+      buildAgents(undefined),
+      buildAgents(false),
+      buildAgents(true),
+    ])
 
     // #then
-    expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.prompt).toContain("<omo-env>")
-  })
-
-  test("includes <omo-env> tag when disable flag is false", async () => {
-    // #when
-    const agents = await buildAgents(false)
-
-    // #then
-    expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.prompt).toContain("<omo-env>")
-  })
-
-  test("omits <omo-env> tag when disable flag is true", async () => {
-    // #when
-    const agents = await buildAgents(true)
-
-    // #then
-    expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.prompt).not.toContain("<omo-env>")
+    const envContext = createEnvContext()
+    expect(agentsDefault.hephaestus.prompt).toBe(`${agentsDisabled.hephaestus.prompt}${envContext}`)
+    expect(agentsEnabled.hephaestus.prompt).toBe(`${agentsDisabled.hephaestus.prompt}${envContext}`)
   })
 })
 
@@ -931,31 +926,18 @@ describe("Sisyphus and Librarian environment context toggle", () => {
     )
   }
 
-  test("includes <omo-env> for sisyphus and librarian when disable flag is unset", async () => {
-    const agents = await buildAgents(undefined)
+  test("appends the generated environment context unless disabled", async () => {
+    const [agentsDefault, agentsEnabled, agentsDisabled] = await Promise.all([
+      buildAgents(undefined),
+      buildAgents(false),
+      buildAgents(true),
+    ])
 
-    expect(agents.sisyphus).toBeDefined()
-    expect(agents.librarian).toBeDefined()
-    expect(agents.sisyphus.prompt).toContain("<omo-env>")
-    expect(agents.librarian.prompt).toContain("<omo-env>")
-  })
-
-  test("includes <omo-env> for sisyphus and librarian when disable flag is false", async () => {
-    const agents = await buildAgents(false)
-
-    expect(agents.sisyphus).toBeDefined()
-    expect(agents.librarian).toBeDefined()
-    expect(agents.sisyphus.prompt).toContain("<omo-env>")
-    expect(agents.librarian.prompt).toContain("<omo-env>")
-  })
-
-  test("omits <omo-env> for sisyphus and librarian when disable flag is true", async () => {
-    const agents = await buildAgents(true)
-
-    expect(agents.sisyphus).toBeDefined()
-    expect(agents.librarian).toBeDefined()
-    expect(agents.sisyphus.prompt).not.toContain("<omo-env>")
-    expect(agents.librarian.prompt).not.toContain("<omo-env>")
+    const envContext = createEnvContext()
+    expect(agentsDefault.sisyphus.prompt).toBe(`${agentsDisabled.sisyphus.prompt}${envContext}`)
+    expect(agentsEnabled.sisyphus.prompt).toBe(`${agentsDisabled.sisyphus.prompt}${envContext}`)
+    expect(agentsDefault.librarian.prompt).toBe(`${agentsDisabled.librarian.prompt}${envContext}`)
+    expect(agentsEnabled.librarian.prompt).toBe(`${agentsDisabled.librarian.prompt}${envContext}`)
   })
 })
 
@@ -972,7 +954,7 @@ describe("Atlas is unaffected by environment context toggle", () => {
     fetchSpy.mockRestore()
   })
 
-  test("atlas prompt is unchanged and never contains <omo-env>", async () => {
+  test("atlas prompt is unchanged by the environment context toggle", async () => {
     const agentsDefault = await createBuiltinAgents(
       [],
       {},
@@ -1007,8 +989,6 @@ describe("Atlas is unaffected by environment context toggle", () => {
 
     expect(agentsDefault.atlas).toBeDefined()
     expect(agentsDisabled.atlas).toBeDefined()
-    expect(agentsDefault.atlas.prompt).not.toContain("<omo-env>")
-    expect(agentsDisabled.atlas.prompt).not.toContain("<omo-env>")
     expect(agentsDisabled.atlas.prompt).toBe(agentsDefault.atlas.prompt)
   })
 })
@@ -1245,10 +1225,8 @@ describe("buildAgent with category and skills", () => {
     // #when
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
-    // #then
-    expect(agent.prompt).toContain("router, not a rulebook")
-    expect(agent.prompt).toContain("Original prompt content")
-    expect(agent.prompt).toMatch(/router, not a rulebook[\s\S]*Original prompt content/s)
+    // #then - resolved skill content is composed in before the original prompt
+    expect(agent.prompt).toBe(`${frontendSkillContent()}\n\nOriginal prompt content`)
   })
 
   test("agent with multiple skills has all content prepended", () => {
@@ -1266,8 +1244,7 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
-    expect(agent.prompt).toContain("router, not a rulebook")
-    expect(agent.prompt).toContain("Agent prompt")
+    expect(agent.prompt).toBe(`${frontendSkillContent()}\n\nAgent prompt`)
   })
 
   test("agent without category or skills works as before", () => {
@@ -1299,7 +1276,7 @@ describe("buildAgent with category and skills", () => {
           description: "Test agent",
           category: "ultrabrain",
           skills: ["frontend"],
-          prompt: "Task description",
+          prompt: "SENTINEL_CATEGORY_PROMPT",
         }) as AgentConfig,
     }
 
@@ -1309,8 +1286,11 @@ describe("buildAgent with category and skills", () => {
     // #then - category's built-in model and skills are applied
     expect(agent.model).toBe("openai/gpt-5.6-sol")
     expect(agent.variant).toBe("xhigh")
-    expect(agent.prompt).toContain("router, not a rulebook")
-    expect(agent.prompt).toContain("Task description")
+    const prompt = agent.prompt ?? ""
+    const skillContent = frontendSkillContent()
+    expect(prompt).toContain(skillContent)
+    expect(prompt).toContain("SENTINEL_CATEGORY_PROMPT")
+    expect(prompt.indexOf(skillContent)).toBeLessThan(prompt.indexOf("SENTINEL_CATEGORY_PROMPT"))
   })
 
   test("agent with non-existent category has no effect", () => {
@@ -1348,9 +1328,8 @@ describe("buildAgent with category and skills", () => {
     // #when
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
-    // #then
-    expect(agent.prompt).toContain("router, not a rulebook")
-    expect(agent.prompt).toContain("Base prompt")
+    // #then - only the found skill is composed in
+    expect(agent.prompt).toBe(`${frontendSkillContent()}\n\nBase prompt`)
   })
 
   test("agent with empty skills array keeps original prompt", () => {
@@ -1422,9 +1401,8 @@ describe("createBuiltinAgents with skill overrides", () => {
       // #when
       const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-      // #then
-      expect(agents.librarian.prompt).toContain("router, not a rulebook")
-      expect(agents.librarian.prompt).toContain("THE LIBRARIAN")
+      // #then - the injected skill's real content is composed into the prompt
+      expect(agents.librarian.prompt).toContain(frontendSkillContent())
       expect("skills" in agents.librarian).toBe(false)
     } finally {
       fetchSpy.mockRestore()

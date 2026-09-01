@@ -1,0 +1,24 @@
+[user-config] served main-agent effective task permissions:
+PASS: sisyphus effective task action=ask
+PASS: atlas effective task action=ask
+PASS: hephaestus effective task action=ask
+PASS: prometheus effective task action=ask
+[user-config] all served agent names: Sisyphus - ultraworker, Hephaestus - Deep Agent, Prometheus - Plan Builder, Atlas - Plan Executor, Metis - Plan Consultant, Momus - Plan Critic, Sisyphus-Junior, build, compaction, explore, general, librarian, multimodal-looker, oracle, plan, summary, title
+[user-config] raw task entries per main agent (dedup):
+[user-config] sisyphus: *=deny *=ask
+[user-config] atlas: *=deny *=ask
+[user-config] hephaestus: *=deny *=ask
+[user-config] prometheus: *=deny *=ask
+[default] served main-agent effective task permissions:
+PASS: sisyphus effective task action=allow
+PASS: atlas effective task action=allow
+PASS: hephaestus effective task action=allow
+PASS: prometheus effective task action=allow
+[default] all served agent names: Sisyphus - ultraworker, Hephaestus - Deep Agent, Prometheus - Plan Builder, Atlas - Plan Executor, Metis - Plan Consultant, Momus - Plan Critic, Sisyphus-Junior, build, compaction, explore, general, librarian, multimodal-looker, oracle, plan, summary, title
+[default] raw task entries per main agent (dedup):
+[default] sisyphus: *=deny *=allow
+[default] atlas: *=deny *=allow
+[default] hephaestus: *=deny *=allow
+[default] prometheus: *=deny *=allow
+PASS: isolation: real opencode.db session count unchanged (5861 -> 5861)
+ALL QA CHECKS PASSED

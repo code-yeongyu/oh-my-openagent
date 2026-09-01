@@ -1,0 +1,33 @@
+Scenario: every workspace Senpi consumer and lock entry uses 2026.8.11-4
+Command:
+cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-senpi-2026-8-11-4 && bun -e 'import { readFileSync } from "node:fs"; const want="2026.8.11-4"; const roots=["package.json","packages/omo-senpi/package.json","packages/senpi-task/package.json"]; const found=roots.map(path=>{const pkg=JSON.parse(readFileSync(path,"utf8")); const declared=pkg.dependencies?.["@code-yeongyu/senpi"]??pkg.devDependencies?.["@code-yeongyu/senpi"]??null; return {path,declared,ok:declared===want};}); const lock=readFileSync("bun.lock","utf8"); const stale=(lock.match(/@code-yeongyu\/senpi(?:-[a-z-]+)?@2026\.8\.11-2/g)??[]).length; console.log(JSON.stringify({want,found,staleLockEntries:stale},null,2)); if(found.some(x=>!x.ok)||stale>0) process.exit(1);'
+
+Binary observable:
+FAIL unless all three manifests use 2026.8.11-4 and staleLockEntries is zero.
+
+Observed:
+{
+  "want": "2026.8.11-4",
+  "found": [
+    {
+      "path": "package.json",
+      "declared": "2026.8.11-4",
+      "ok": true
+    },
+    {
+      "path": "packages/omo-senpi/package.json",
+      "declared": "2026.8.11-2",
+      "ok": false
+    },
+    {
+      "path": "packages/senpi-task/package.json",
+      "declared": "2026.8.11-2",
+      "ok": false
+    }
+  ],
+  "staleLockEntries": 36
+}
+
+Command exited with code 1.
+RED PASS: the expanded contract exposed two stale runtime consumers and stale nested lock entries.
+

@@ -8,11 +8,14 @@ on:
     paths:
       - '.github/workflows/**'
 
+permissions:
+  contents: read
+
 jobs:
   actionlint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install actionlint
         run: |

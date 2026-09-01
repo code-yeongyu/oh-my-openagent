@@ -1,6 +1,6 @@
 ---
 description: Publish oh-my-opencode to npm via GitHub Actions workflow
-argument-hint: <patch|minor|major>
+argument-hint: <patch|minor|major|explicit-semver>
 ---
 
 
@@ -54,15 +54,16 @@ This contract applies to the slash-command copies (`.agents/command/publish.md`,
 
 ## CRITICAL: ARGUMENT REQUIREMENT
 
-**You MUST receive a version bump type from the user.** Valid options:
+**You MUST receive one release selector from the user.** Valid options:
 - `patch`: Bug fixes, backward-compatible (1.1.7 → 1.1.8)
 - `minor`: New features, backward-compatible (1.1.7 → 1.2.0)
 - `major`: Breaking changes (1.1.7 → 2.0.0)
+- An explicit valid semantic version, including a prerelease such as `5.0.0-beta.9`
 
-**If the user did not provide a bump type argument, STOP IMMEDIATELY and ask:**
-> "To proceed with deployment, please specify a version bump type: `patch`, `minor`, or `major`"
+**If the user did not provide a release selector, STOP IMMEDIATELY and ask:**
+> "To proceed with deployment, specify `patch`, `minor`, `major`, or an explicit semantic version such as `5.0.0-beta.9`."
 
-**DO NOT PROCEED without explicit user confirmation of bump type.**
+Reject any other value. Do not infer or repair malformed versions.
 
 ---
 
@@ -72,7 +73,7 @@ This contract applies to the slash-command copies (`.agents/command/publish.md`,
 
 ```
 [
-  { "id": "confirm-bump", "content": "Confirm version bump type with user (patch/minor/major)", "status": "in_progress", "priority": "high" },
+  { "id": "confirm-release-input", "content": "Confirm release selector with user (patch/minor/major or explicit semver)", "status": "in_progress", "priority": "high" },
   { "id": "check-uncommitted", "content": "Check for uncommitted changes and commit if needed", "status": "pending", "priority": "high" },
   { "id": "sync-remote", "content": "Sync with remote (pull --rebase && push if unpushed commits)", "status": "pending", "priority": "high" },
   { "id": "run-workflow", "content": "Trigger GitHub Actions publish workflow", "status": "pending", "priority": "high" },
@@ -92,9 +93,23 @@ This contract applies to the slash-command copies (`.agents/command/publish.md`,
 
 ---
 
-## STEP 1: CONFIRM BUMP TYPE
+## STEP 1: CONFIRM AND CLASSIFY THE RELEASE SELECTOR
 
-If the user already named a bump type (argument or message), that IS the confirmation — state it and continue immediately. Only ask and wait when no bump type was given.
+If the user already supplied the selector in the command argument or message, that IS the confirmation. Parse it exactly once:
+
+```bash
+RELEASE_INPUT="${ARGUMENTS}"
+if [[ "$RELEASE_INPUT" =~ ^(patch|minor|major)$ ]]; then
+  RELEASE_KIND=bump
+elif [[ "$RELEASE_INPUT" =~ ^([0-9]+\.){2}[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+  RELEASE_KIND=version
+else
+  echo "Invalid release selector: $RELEASE_INPUT" >&2
+  exit 1
+fi
+```
+
+Only ask and wait when no selector was provided.
 
 ---
 
@@ -125,15 +140,28 @@ This ensures the GitHub Actions workflow runs on the latest code including all l
 
 ## STEP 3: TRIGGER GITHUB ACTIONS WORKFLOW
 
-Run the publish workflow:
+Dispatch from `dev`, pass bump selectors through `bump`, and pass exact versions through `version`. The required `bump` input remains `patch` for explicit-version dispatches but is ignored by the workflow because `version` takes precedence.
+
 ```bash
-gh workflow run publish -f bump={bump_type}
+if [ "$RELEASE_KIND" = bump ]; then
+  RUN_URL="$(gh workflow run publish.yml --ref dev -f "bump=${RELEASE_INPUT}")"
+else
+  RUN_URL="$(gh workflow run publish.yml --ref dev -f bump=patch -f "version=${RELEASE_INPUT}")"
+fi
+
+if ! [[ "$RUN_URL" =~ ^https://github.com/code-yeongyu/oh-my-openagent/actions/runs/[0-9]+$ ]]; then
+  echo "Publish dispatch did not return an exact workflow run URL: $RUN_URL" >&2
+  exit 1
+fi
+RUN_ID="${RUN_URL##*/}"
+if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+  echo "Publish dispatch returned an invalid run ID: $RUN_ID" >&2
+  exit 1
+fi
+gh run view "${RUN_ID}" --json databaseId,status,url --jq '{databaseId,status,url}'
 ```
 
-Wait 3 seconds, then get the run ID:
-```bash
-gh run list --workflow=publish --limit=1 --json databaseId,status --jq '.[0]'
-```
+The returned run ID owns this release attempt. Never replace it with a latest-run lookup.
 
 ---
 
@@ -150,14 +178,14 @@ The publish run is a single workflow with sequential stages. Expected timeline (
 
 Poll job-level status every 30 seconds and report stage transitions to the user:
 ```bash
-gh run view {run_id} --json status,conclusion,jobs --jq '{status, conclusion, stage: ([.jobs[] | select(.status=="in_progress") | .name] | join(", "))}'
+gh run view "${RUN_ID}" --json status,conclusion,jobs --jq '{status, conclusion, stage: ([.jobs[] | select(.status=="in_progress") | .name] | join(", "))}'
 ```
 
 **IMPORTANT: Use polling loop, NOT sleep commands.** Use the waiting time to draft the enhanced release summary (Step 6) — do not sit idle, and do not start any review activity.
 
 If conclusion is `failure`, show error and stop:
 ```bash
-gh run view {run_id} --log-failed
+gh run view "${RUN_ID}" --log-failed
 ```
 
 ---

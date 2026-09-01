@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, jest, test } from "bun:test"
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -50,19 +50,25 @@ describe("acquireSessionAdmissionLease", () => {
     next.release()
   })
 
-  test("#given a holder that keeps renewing #when a waiter contends past several stale windows #then the holder is NOT reclaimed and the waiter yields contended", async () => {
-    // given: a live holder renewing every 40ms against a 120ms stale threshold
-    const stateDir = tempStateDir()
-    const timing = { renewMs: 40, staleMs: 120, acquireTimeoutMs: 300, retryMs: 10 }
-    const holder = acquired(await acquireSessionAdmissionLease(stateDir, "parent-1", timing))
+  test("#given a holder renewing on virtual time #when several stale windows pass before a waiter contends #then the holder is NOT reclaimed and the waiter yields contended", async () => {
+    jest.useFakeTimers()
+    try {
+      // given: a real holder renews every 40ms against a 120ms stale threshold
+      const stateDir = tempStateDir()
+      const timing = { renewMs: 40, staleMs: 120, acquireTimeoutMs: 0, retryMs: 10 }
+      const holder = acquired(await acquireSessionAdmissionLease(stateDir, "parent-1", timing))
 
-    // when: the waiter waits 300ms - two and a half stale windows - while the holder keeps renewing
-    const waiter = await acquireSessionAdmissionLease(stateDir, "parent-1", timing)
+      // when: virtual time runs ten renewal ticks before an immediate contention attempt
+      jest.advanceTimersByTime(400)
+      const waiter = await acquireSessionAdmissionLease(stateDir, "parent-1", timing)
 
-    // then: the slow-but-alive holder was never reclaimed underneath itself
-    expect(waiter.kind).toBe("contended")
-    expect(holder.isOwner()).toBe(true)
-    holder.release()
+      // then: the live holder's on-disk token stayed fresh and was never reclaimed
+      expect(waiter.kind).toBe("contended")
+      expect(holder.isOwner()).toBe(true)
+      holder.release()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   test("#given a crashed holder whose renewal stopped #when the lease goes stale #then a waiter takes over and the crashed holder's late release cannot delete the successor", async () => {
@@ -90,33 +96,47 @@ describe("acquireSessionAdmissionLease", () => {
   })
 
   test("#given one stale lease and two racing waiters #when both attempt the takeover CAS #then exactly one wins and the loser never deletes the winner's lease", async () => {
-    // given: a stale lease left by a crashed holder
-    const stateDir = tempStateDir()
-    const crashed = acquired(
-      await acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000, staleMs: 150, acquireTimeoutMs: 300, retryMs: 10 }),
-    )
+    jest.useFakeTimers()
+    try {
+      // given: a stale lease left by a crashed holder, aged past its stale window on virtual time
+      const stateDir = tempStateDir()
+      const crashed = acquired(
+        await acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000, staleMs: 150, acquireTimeoutMs: 300, retryMs: 10 }),
+      )
+      jest.advanceTimersByTime(200)
 
-    // when: two waiters race the takeover from the same starting gun
-    const timing = { renewMs: 50, staleMs: 150, acquireTimeoutMs: 1_500, retryMs: 5 }
-    const [first, second] = await Promise.all([
-      acquireSessionAdmissionLease(stateDir, "parent-1", timing),
-      acquireSessionAdmissionLease(stateDir, "parent-1", timing),
-    ])
+      // when: two waiters race the takeover from the same starting gun. The winner's renewals and
+      // the loser's bounded wait both run on virtual time, so which one wins is decided by the CAS
+      // alone - never by a scheduler pause that lets the loser reclaim a live winner.
+      const timing = { renewMs: 50, staleMs: 150, acquireTimeoutMs: 1_500, retryMs: 5 }
+      const race = Promise.all([
+        acquireSessionAdmissionLease(stateDir, "parent-1", timing),
+        acquireSessionAdmissionLease(stateDir, "parent-1", timing),
+      ])
+      for (let tick = 0; tick < 40; tick += 1) {
+        jest.advanceTimersByTime(timing.renewMs)
+        await Promise.resolve()
+        await Promise.resolve()
+      }
+      const [first, second] = await race
 
-    // then: exactly one waiter won
-    const winners = [first, second].filter((result) => result.kind === "acquired")
-    expect(winners).toHaveLength(1)
-    const winner = winners[0]
-    if (winner === undefined || winner.kind !== "acquired") throw new Error("expected exactly one winner")
-    expect(winner.lease.isOwner()).toBe(true)
+      // then: exactly one waiter won
+      const winners = [first, second].filter((result) => result.kind === "acquired")
+      expect(winners).toHaveLength(1)
+      const winner = winners[0]
+      if (winner === undefined || winner.kind !== "acquired") throw new Error("expected exactly one winner")
+      expect(winner.lease.isOwner()).toBe(true)
 
-    // and the loser's failed takeover plus the crashed holder's late release left the winner's lease intact
-    crashed.release()
-    expect(winner.lease.isOwner()).toBe(true)
-    expect(existsSync(admissionLeasePath(stateDir, "parent-1"))).toBe(true)
-    const body = JSON.parse(readFileSync(admissionLeasePath(stateDir, "parent-1"), "utf8")) as Record<string, unknown>
-    expect(body.token).toBe(winner.lease.token)
-    winner.lease.release()
-    expect(existsSync(admissionLeasePath(stateDir, "parent-1"))).toBe(false)
+      // and the loser's failed takeover plus the crashed holder's late release left the winner's lease intact
+      crashed.release()
+      expect(winner.lease.isOwner()).toBe(true)
+      expect(existsSync(admissionLeasePath(stateDir, "parent-1"))).toBe(true)
+      const body = JSON.parse(readFileSync(admissionLeasePath(stateDir, "parent-1"), "utf8")) as Record<string, unknown>
+      expect(body.token).toBe(winner.lease.token)
+      winner.lease.release()
+      expect(existsSync(admissionLeasePath(stateDir, "parent-1"))).toBe(false)
+    } finally {
+      jest.useRealTimers()
+    }
   })
 })
