@@ -360,6 +360,98 @@ worktree (macOS arm64, Bun 1.3.13) and passed 20/20, so the window appears to ne
 timing. Re-running the job is expected to go green, and a rebase would not help because the defect
 travels with `dev`.
 
+## Review round 4 — rebase onto current `dev` and the `CMUX_AGENT_LAUNCH_KIND` contract
+
+### The issue is still live on `dev`
+
+Checked before doing any work, because a 2,659-commit gap is long enough for a fix to land
+independently. It has not. `origin/dev` still carries the regressed expression verbatim:
+
+```ts
+const tmuxEnvironment = environment.TMUX
+return tmuxEnvironment?.includes("cmuxterm") === true ||
+	(Boolean(environment.CMUX_SOCKET_PATH) && !tmuxEnvironment)
+```
+
+The only commit to touch `cmux-detect.ts` since this branch forked is `7da0e4d3c`
+(`fix(tmux): support inline cmux pane lifecycle`), which parameterises `process.env` for testability
+and leaves the condition unchanged. Evaluated against this host's real environment, that expression
+still returns `false` inside a cmux omo pane — see `live-signal-inheritance.log` for the environment
+and `built-artifact-live-env.log` for the shipped-bundle comparison.
+
+### Rebase
+
+`b072d2791..origin/dev` replayed 14 of the 15 commits with one conflict, in
+`docs/reference/re-export-shim-inventory.md`. `dev` had regenerated that inventory (317 → 256
+shims, snapshot 2026-08-31), so the original registration commit reduced to an empty diff and was
+dropped; the shim is re-registered against the current tree instead, with the counts regenerated
+from the scan command the document itself documents rather than incremented by hand
+(257 total, `@oh-my-opencode/tmux-core` 3 → 4). No source file this PR touches had drifted on `dev`.
+
+### Reconciling the two signals
+
+The review asked for the socket-shape detection and cmux's `CMUX_AGENT_LAUNCH_KIND=omo` contract to
+have a defined precedence rather than being independent paths. The measurement that decides the
+order is in `live-signal-inheritance.log`: starting a real tmux server inside a cmux pane passes
+`CMUX_AGENT_LAUNCH_KIND=omo` and `CMUX_SOCKET_PATH` through to its children byte-identically, and
+only `TMUX` changes to the real socket. The launch kind describes the launcher; the socket path
+describes the server a tmux command would actually reach.
+
+So the order is:
+
+1. the `TMUX` socket shape — the only discriminator, and it can veto both env signals;
+2. `CMUX_SOCKET_PATH` — the authenticated credential, sufficient on its own once 1 has not vetoed;
+3. `CMUX_AGENT_LAUNCH_KIND === "omo"` — accepted only as a stand-in for 2 and only where 1 confirms
+   a cmux-shaped socket. Never sufficient alone, so an environment carrying only the launch kind
+   fails closed to native tmux.
+
+Matched exactly against `omo`: cmux names the launched agent in this variable and ships a wrapper
+shim per agent, so only `omo` carries the `CMUX_OMO_CMUX_BIN` contract `resolveCmuxCliExecutable()`
+depends on. A `claude`/`codex` value means this process descends from another agent's launch.
+
+Against the previous head this changes exactly one of the eighteen signal combinations —
+`CMUX_SOCKET_PATH` absent, launch kind `omo`, `TMUX` cmux-shaped — which is reachable when a shell
+profile scrubs `CMUX_*` while the cmux tmux shim still injects `TMUX`.
+
+### RED
+
+- **`red-5-launch-kind-fallback.log`** — launch kind left unreconciled. 13 pass / 2 fail: the one
+  matrix row above, plus the assertion that isolates it. Proves the signal is load-bearing rather
+  than documented-but-inert.
+- **`red-6-launch-kind-precedence.log`** — launch kind promoted above the socket shape, i.e. the
+  naive reading of the request. 12 pass / 3 fail: two nested-real-tmux rows and the fail-closed
+  boundary. This is why the launch kind is subordinate rather than primary.
+
+### Checks before the change
+
+- Every non-test reader of `CMUX_SOCKET_PATH` was enumerated, because row 11 makes detection true
+  without it for the first time. There are two: the detector itself, and a debug log object in
+  `pane-spawn.ts` that reads it optionally. Nothing dereferences it as required.
+- `cmuxterm` was re-checked against the shipped app rather than assumed: `~/.cmuxterm/` holds
+  config and state and contains no sockets (`find -type s` is empty), while the live socket is
+  `~/.local/state/cmux/cmux-501.sock`. Both live socket shapes match `/^cmux([-.]|$)/`, so the
+  pattern needs no widening and the removed branch stays removed.
+- `killTmuxSessionIfExists` reads a non-zero `has-session` exit as "no such session", and that
+  helper now routes through the compat layer for the first time, so the convention was measured:
+  `cmux __tmux-compat has-session` exits 1 for a missing session, same as real tmux
+  (`cmux-compat-exit-codes.log`).
+
+### GREEN and live verification
+
+- `review-round-3-green.log` — 442 pass / 0 fail across `tmux-core`, `omo-opencode/src/shared/tmux`,
+  `omo-opencode/src/tools/interactive-bash`, `omo-opencode/src/features/tmux-subagent` and
+  `openclaw-core`, plus `script/package-registration-audit.test.ts` at 6 pass / 0 fail. Both
+  affected packages typecheck clean.
+- `live-cmux-driver.log` — re-run on the rebased head against the cmux-launched OpenCode server on
+  port 64155. Detection true, cmux CLI resolved to the real binary, pane spawned without the
+  placeholder, `opencode attach` observed in the process table, pane closed, exit 0.
+- `built-artifact-live-env.log` — `bun run build` then the detector driven straight out of
+  `dist/index.js`. All eight guards hold in the shipped bundle, including nested-real-tmux.
+
+`cmux-detect.test.ts` now clears `CMUX_AGENT_LAUNCH_KIND` in `beforeEach` alongside the other two
+variables. Without that the suite would read this host's cmux configuration and the
+"cmux socket directory without `CMUX_SOCKET_PATH`" guard would invert on any cmux machine.
+
 ## Residual
 
 `findTmuxPath()` still probes a bare `cmux` on `PATH` before falling back to a verified `tmux`
