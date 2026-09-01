@@ -13,6 +13,10 @@ function isInactiveBoulderStatus(status: BoulderState["status"]): boolean {
   return status === "paused" || status === "abandoned"
 }
 
+function isCompletedBoulderState(state: BoulderState): boolean {
+  return state.status === "completed" && state.ended_at !== undefined
+}
+
 export async function resolveActiveBoulderSession(input: {
   client: PluginInput["client"]
   directory: string
@@ -52,6 +56,10 @@ export async function resolveActiveBoulderSession(input: {
     : boulderState
 
   if (isInactiveBoulderStatus(nextBoulderState.status)) {
+    return null
+  }
+
+  if (isCompletedBoulderState(nextBoulderState)) {
     return null
   }
 
