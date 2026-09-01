@@ -158,6 +158,26 @@ describe("runtime fallback error classifier", () => {
     expect(type).toBeUndefined()
   })
 
+  test("leaves OpenCode context overflow to native compaction", () => {
+    //#given
+    const error = {
+      name: "ContextOverflowError",
+      data: {
+        message: "Your input exceeds the context window of this model. Please adjust your input and try again.",
+        responseBody:
+          '{"error":{"message":"Your input exceeds the context window of this model. Please adjust your input and try again.","type":"invalid_request_error","code":"context_too_large"}}',
+      },
+    }
+
+    //#when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, [400, ...DEFAULT_RETRY_CODES])
+
+    //#then
+    expect(type).toBe("context_overflow")
+    expect(retryable).toBe(false)
+  })
+
   test("extracts provider auto-retry signals from status summary or details", () => {
     //#given
     const retryInfo = {

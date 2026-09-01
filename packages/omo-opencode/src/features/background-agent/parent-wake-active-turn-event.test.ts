@@ -1,6 +1,7 @@
 import { tmpdir } from "node:os"
 import { afterEach, describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { createOpencodeClient } from "@opencode-ai/sdk"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
@@ -19,6 +20,7 @@ type PromptAsyncCall = {
 type PendingParentWakeForTest = {
   notifications: string[]
   shouldReply: boolean
+  queuedAt?: number
 }
 
 let managerUnderTest: BackgroundManager | undefined
@@ -52,23 +54,23 @@ function createManager(sessionStatuses: Record<string, { type: string }>): {
   promptAsyncCalls: PromptAsyncCall[]
 } {
   const promptAsyncCalls: PromptAsyncCall[] = []
-  const client = {
-    session: {
-      messages: async () => [],
-      status: async () => ({ data: sessionStatuses }),
-      prompt: async () => ({}),
-      promptAsync: async (call: PromptAsyncCall) => {
-        promptAsyncCalls.push(call)
-        return {}
-      },
-      abort: async () => ({}),
+  const client = createOpencodeClient({ baseUrl: "http://127.0.0.1:1" })
+  Object.assign(client.session, {
+    messages: async () => [],
+    status: async () => ({ data: sessionStatuses }),
+    prompt: async () => ({}),
+    promptAsync: async (call: PromptAsyncCall) => {
+      promptAsyncCalls.push(call)
+      return {}
     },
-  }
+    abort: async () => ({}),
+  })
   const ctx: PluginInput = {
-    client: client as PluginInput["client"],
+    client,
     project: {} as PluginInput["project"],
     directory: tmpdir(),
     worktree: tmpdir(),
+    experimental_workspace: { register: () => {} },
     serverUrl: new URL("http://localhost"),
     $: {} as PluginInput["$"],
   }

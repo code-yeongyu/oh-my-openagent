@@ -80,7 +80,11 @@ describe("codex-config-toml", () => {
     const v2Section = content.slice(content.indexOf("[features.multi_agent_v2]"))
       .split(/^\[/m).slice(0, 1).join("")
     expect(v2Section).not.toContain("enabled")
-    expect(content).toContain("max_concurrent_threads_per_session = 1000")
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
+    // The stamped gpt-5.6 default is a V2-preferred model: Codex rejects
+    // agents.max_threads while MultiAgentV2 is active, so a fresh install
+    // must not introduce it.
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
   })
 
   test("#given stale queue multi-agent mode #when updating config #then removes unsupported root key", async () => {
@@ -169,11 +173,16 @@ describe("codex-config-toml", () => {
 
   test("#given existing MultiAgentV2 table #when updating config #then preserves user enabled flag and unrelated tuning while setting thread limit", async () => {
     // given
+    // A pinned v1 model keeps this exercising the preserve-user-disable path;
+    // an absent model would be stamped with the v2-preferred default, which
+    // intentionally clears the disable.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-existing-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[features.multi_agent_v2]",
         "enabled = false",
         "usage_hint_enabled = false",
@@ -196,8 +205,8 @@ describe("codex-config-toml", () => {
     expect(content).toContain("[features.multi_agent_v2]")
     expect(content).toContain("enabled = false")
     expect(content).toContain("usage_hint_enabled = false")
-    expect(content).toContain("max_concurrent_threads_per_session = 1000")
-    expect(content).not.toContain("max_concurrent_threads_per_session = 4")
+    expect(content).toContain("max_concurrent_threads_per_session = 4")
+    expect(content).not.toContain("max_concurrent_threads_per_session = 1000")
   })
 
   test("#given empty Codex config #when updating config #then leaves Context7 to the plugin MCP manifest", async () => {
@@ -375,16 +384,20 @@ describe("codex-config-toml", () => {
       .split(/^\[/m).slice(0, 1).join("")
     expect(v2LegacySection).not.toContain("enabled")
     expect(content).toContain("usage_hint_enabled = false")
-    expect(content).toContain("max_concurrent_threads_per_session = 1000")
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
   })
 
   test("#given legacy boolean MultiAgentV2 flag false #when updating config #then normalizes to a disabled table config", async () => {
     // given
+    // A pinned v1 model keeps the legacy boolean materializing as a disabled
+    // table; the stamped v2-preferred default would drop the disable instead.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-false-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[features]",
         "multi_agent_v2 = false",
         "plugins = false",
@@ -405,16 +418,20 @@ describe("codex-config-toml", () => {
     const content = await readFile(configPath, "utf8")
     expect(content).not.toMatch(/^multi_agent_v2\s*=/m)
     expect(content).toContain("[features.multi_agent_v2]")
-    expect(content).toMatch(/\[features\.multi_agent_v2\]\nenabled = false\nmax_concurrent_threads_per_session = 1000/)
+    expect(content).toMatch(/\[features\.multi_agent_v2\]\nenabled = false\nmax_concurrent_threads_per_session = 16/)
   })
 
   test("#given legacy agents max_threads #when updating config #then raises the root subagent thread cap", async () => {
     // given
+    // A pinned v1 model keeps the legacy low-cap raise path exercised; the
+    // stamped v2-preferred default would remove agents.max_threads instead.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-threads-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[agents]",
         "max_threads = 16",
         "max_depth = 4",
@@ -438,7 +455,7 @@ describe("codex-config-toml", () => {
     const v2ThreadsSection = content.slice(content.indexOf("[features.multi_agent_v2]"))
       .split(/^\[/m).slice(0, 1).join("")
     expect(v2ThreadsSection).not.toContain("enabled")
-    expect(content).toContain("max_concurrent_threads_per_session = 1000")
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
     expect(content).toContain("[agents]")
     expect(content).toContain("max_threads = 1000")
     expect(content).not.toContain("max_threads = 16")
@@ -446,13 +463,128 @@ describe("codex-config-toml", () => {
     expect(content).toContain("job_max_runtime_seconds = 3600")
   })
 
+  test("#given gpt-5.6 v2 model in models_cache #when updating config #then skips agents.max_threads and legacy disable", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-v2-preferred-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        'model = "gpt-5.6-sol"',
+        "",
+        "[features]",
+        "multi_agent_v2 = false",
+        "",
+        "[agents]",
+        "max_threads = 16",
+        "max_depth = 4",
+        "",
+      ].join("\n"),
+    )
+    await writeFile(
+      join(root, "models_cache.json"),
+      JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v2" }] }),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
+    expect(content).not.toMatch(/^\s*multi_agent_v2\s*=/m)
+    expect(content).not.toMatch(/^\s*enabled\s*=\s*false/m)
+    expect(content).toContain("max_depth = 4")
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
+  })
+
+  test("#given gpt-5.6 family model without models_cache #when updating config #then treats it as V2-preferred", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-v2-nocache-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(configPath, ['model = "gpt-5.6-terra"', ""].join("\n"))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
+  })
+
+  test("#given gpt-5.6-luna resolving v1 in models_cache #when updating config #then keeps the v1 thread cap", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-v1-luna-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(configPath, ['model = "gpt-5.6-luna"', ""].join("\n"))
+    await writeFile(
+      join(root, "models_cache.json"),
+      JSON.stringify({ models: [{ slug: "gpt-5.6-luna", multi_agent_version: "v1" }] }),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain("max_threads = 1000")
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
+  })
+
+  test("#given user-modified config without root model #when updating config #then does not introduce agents.max_threads", async () => {
+    // given: Codex Desktop selects the model in the UI; a user-modified config
+    // (reasoning profile not applied) keeps no root model, so the installer
+    // cannot prove the session is not a GPT-5.6 V2 model that rejects
+    // agents.max_threads at thread/start (#6002).
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-no-model-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(configPath, ['model_reasoning_effort = "high"', "", "[features]", "plugins = false", ""].join("\n"))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
+  })
+
   test("#given managed agent role sections #when updating config #then preserves role config while raising only root agents max_threads", async () => {
     // given
+    // A pinned v1 model keeps the legacy low-cap raise path exercised; the
+    // stamped v2-preferred default would remove agents.max_threads instead.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-role-section-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[agents]",
         "max_threads = 16",
         "",
@@ -711,3 +843,35 @@ describe("codex-config-toml", () => {
   })
 
 })
+
+  test("#given model_catalog_json declares a v2 family model as v1 #when updating config #then keeps agents.max_threads", async () => {
+    // given: Codex documents model_catalog_json as a complete replacement for
+    // models_cache.json (codex-rs load_model_catalog). A user forcing gpt-5.6-sol
+    // to v1 via that catalog must keep the v1 thread cap (lazycodex#120).
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-model-catalog-override-"))
+    const configPath = join(root, "config.toml")
+    const catalogPath = join(root, "custom-catalog.json")
+    await writeFile(configPath, [
+      'model = "gpt-5.6-sol"',
+      `model_catalog_json = "${catalogPath}"`,
+      "",
+      "[features]",
+      "multi_agent_v2 = false",
+      "",
+    ].join("\n"))
+    await writeFile(catalogPath, JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v1" }] }))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain("max_threads = 1000")
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
+  })

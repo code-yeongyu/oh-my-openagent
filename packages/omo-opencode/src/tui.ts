@@ -1,5 +1,6 @@
 import type { TuiPluginModule } from "@opencode-ai/plugin/tui"
 
+import { registerBtwSideTui } from "./features/btw-side"
 import { computeView, viewKey } from "./features/tui-sidebar/compute-view"
 import { POLL_INTERVAL_MS } from "./features/tui-sidebar/constants"
 import { deriveAgents, deriveConfig, deriveJobBoard, deriveLoop, deriveRoster } from "./features/tui-sidebar/derivers"
@@ -19,7 +20,7 @@ type SolidRuntime<Node> = {
 type SidebarSlotRegistration<Node> = {
   readonly order: number
   readonly slots: {
-    readonly sidebar_content: () => Node
+    readonly sidebar_content: () => Node | (() => Node)
   }
 }
 
@@ -29,7 +30,7 @@ type RegisterSidebarContentSlotInput<Node> = {
   readonly renderSidebar: () => Node
 }
 
-function registerSidebarContentSlot<Node>({
+export function registerSidebarContentSlot<Node>({
   registerSlot,
   requestRender,
   renderSidebar,
@@ -37,7 +38,7 @@ function registerSidebarContentSlot<Node>({
   registerSlot({
     order: 900,
     slots: {
-      sidebar_content: renderSidebar,
+      sidebar_content: () => renderSidebar,
     },
   })
   requestRender()
@@ -120,6 +121,12 @@ const module: TuiPluginModule = {
     const solid = await import("@opentui/solid").catch(() => null)
     if (!solid) {
       return
+    }
+
+    try {
+      await registerBtwSideTui(api, solid)
+    } catch (error) {
+      log("[btw-side] TUI registration failed", { error })
     }
 
     const directory = api.state.path.directory

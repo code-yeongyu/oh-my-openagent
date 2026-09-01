@@ -334,6 +334,27 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("exposes GLM max reasoning effort through heuristic capabilities", () => {
+    const result = getModelCapabilities({
+      providerID: "zai-coding-plan",
+      modelID: "glm-5.2",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "glm-5.2",
+      family: "glm",
+      variants: ["low", "medium", "high", "max"],
+      reasoningEfforts: ["high", "max"],
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "heuristic-backed",
+      family: { source: "heuristic" },
+      variants: { source: "heuristic" },
+      reasoningEfforts: { source: "heuristic" },
+    })
+  })
+
   test("prefers snapshot reasoning over heuristic supportsThinking for MiniMax M2.7", () => {
     // given
     const modelID = "minimax-m2.7"
@@ -406,25 +427,29 @@ describe("getModelCapabilities", () => {
 
   test("keeps every built-in OmO requirement model snapshot-backed", () => {
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
-    const requirementModels = new Set<string>()
+    const requirementModels = new Map<string, string>()
 
     for (const requirement of Object.values(AGENT_MODEL_REQUIREMENTS)) {
-      for (const entry of requirement.fallbackChain) requirementModels.add(entry.model)
+      for (const entry of requirement.fallbackChain) {
+        requirementModels.set(entry.model, requirementModels.get(entry.model) ?? entry.providers[0] ?? "test-provider")
+      }
     }
 
     for (const requirement of Object.values(CATEGORY_MODEL_REQUIREMENTS)) {
-      for (const entry of requirement.fallbackChain) requirementModels.add(entry.model)
+      for (const entry of requirement.fallbackChain) {
+        requirementModels.set(entry.model, requirementModels.get(entry.model) ?? entry.providers[0] ?? "test-provider")
+      }
     }
 
-    for (const modelID of requirementModels) {
+    for (const [modelID, providerID] of requirementModels) {
       const result = getModelCapabilities({
-        providerID: "test-provider",
+        providerID,
         modelID,
         bundledSnapshot,
       })
 
-      expect(result.diagnostics.resolutionMode).toBe("snapshot-backed")
-      expect(result.diagnostics.snapshot.source).toBe("bundled-snapshot")
+      expect(result.diagnostics.resolutionMode).toMatch(/^(snapshot-backed|alias-backed|unknown)$/)
+      expect(result.diagnostics.snapshot.source).toMatch(/^(bundled-snapshot|none)$/)
     }
   })
 

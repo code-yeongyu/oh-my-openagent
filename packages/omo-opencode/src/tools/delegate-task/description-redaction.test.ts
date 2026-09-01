@@ -28,7 +28,7 @@ describe("background task description redaction", () => {
     const tool = createDelegateTask(unsafeTestValue({
       directory: "/tmp/project",
       connectedProvidersOverride: ["openai"],
-      availableModelsOverride: new Set(["openai/gpt-5.4-mini"]),
+      availableModelsOverride: new Set(["openai/gpt-5.6-luna-fast"]),
       manager: {
         launch: async (input: { readonly description: string; readonly agent: string }) => {
           launchedDescription = input.description
@@ -44,7 +44,7 @@ describe("background task description redaction", () => {
       },
       client: {
         app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: "openai/gpt-5.4-mini" } }) },
+        config: { get: async () => ({ data: { model: "openai/gpt-5.6-luna-fast" } }) },
         session: {
           create: async () => ({ data: { id: "ses_tool_secret" } }),
           prompt: async () => ({ data: {} }),

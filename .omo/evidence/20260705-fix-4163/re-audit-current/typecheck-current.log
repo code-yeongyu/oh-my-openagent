@@ -1,8 +1,0 @@
-surface: repository typecheck
-invocation: /Users/yeongyu/.bun/bin/bun run typecheck
----
-$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
-/opt/homebrew/bin/bash: line 1: bun: command not found
-error: script "typecheck" exited with code 127
-
-exit_code=127

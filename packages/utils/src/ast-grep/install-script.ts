@@ -5,7 +5,8 @@ import { join } from "node:path"
 import { runtimeSlug } from "./sg-manifest"
 
 export const AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR"
-export const AST_GREP_INSTALL_TIMEOUT_MS = 30_000
+export const KILL_GRACE_MS = 1_000
+const AST_GREP_INSTALL_TIMEOUT_MS = 30_000
 
 export type AstGrepInstallSpawnOutcome =
   | { readonly kind: "exit"; readonly code: number | null; readonly signal: NodeJS.Signals | null }
@@ -109,16 +110,37 @@ async function runInvocation(input: {
 }): Promise<TimedInvocationOutcome> {
   const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env })
   let timedOut = false
+  // The timeout MUST stay ref'd: it is the only producer of progress when the
+  // child never exits. An unref'd timer can be starved by the runtime's event
+  // loop (observed hanging the Windows test runner for the full job ceiling),
+  // and clearTimeout in the finally block already prevents leaks.
+  let terminateDeadline: (() => void) | undefined
+  let terminateDeadlineGrace: ReturnType<typeof setTimeout> | undefined
+  const killIgnored = new Promise<never>((_, reject) => {
+    terminateDeadline = () => reject(new Error("ast-grep install child ignored termination"))
+  })
   const timeout = setTimeout(() => {
     timedOut = true
     child.kill()
+    // Grace period for kill() to settle the outcome; a child that ignores
+    // termination must fail loudly instead of hanging the caller forever.
+    terminateDeadlineGrace = setTimeout(() => terminateDeadline?.(), KILL_GRACE_MS)
   }, input.timeoutMs)
-  timeout.unref?.()
   try {
-    const outcome = await child.outcome
-    return timedOut ? { kind: "timed-out" } : outcome
+    const outcome = await Promise.race([child.outcome, killIgnored])
+    if (timedOut) return { kind: "timed-out" }
+    return outcome
+  } catch (error) {
+    // The child ignored termination past the grace deadline: fail loudly with
+    // a named reason instead of hanging the caller forever. Spawn-error shape
+    // carries the reason through the caller's failedReason mapping.
+    if (error instanceof Error && error.message.includes("ignored termination")) {
+      return { kind: "spawn-error", error, missingExecutable: false }
+    }
+    throw error
   } finally {
     clearTimeout(timeout)
+    if (terminateDeadlineGrace !== undefined) clearTimeout(terminateDeadlineGrace)
   }
 }
 

@@ -1,0 +1,28 @@
+$ git stash push --include-untracked   # remove EVERY change from this run
+Saved working directory and index state On fix/6320-uninstall-bin-links: a2-baseline
+
+$ git status --short   # clean HEAD
+
+$ git log -1 --format=%H   # baseline commit
+4ee7c7131a148b1bb2798befbde4d40dd7c10194
+
+$ npm --prefix packages/lsp-tools-mcp test
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/process.test.ts > createSpawnCommand > #given windows executable command #when building spawn command #then it avoids shell mode
++     "C:\\Users\\pss\\AppData\\Roaming\\npm\\typescript-language-server.CMD",
+-   "command": "typescript-language-server",
+     75|    command: "typescript-language-server",
+ FAIL  test/process.test.ts > createSpawnCommand > #given windows cmd shim #when building spawn command #then it uses cmd only for the shim
+-     "typescript-language-server.cmd",
++     "C:\\Users\\pss\\AppData\\Roaming\\npm\\typescript-language-server.cmd",
+     91|    args: ["/d", "/s", "/c", "typescript-language-server.cmd", "--stdio…
+ Test Files  1 failed | 24 passed (25)
+      Tests  2 failed | 92 passed | 1 skipped (95)
+exit=1
+
+$ git stash pop   # restore this run's changes
+  (use "git add <file>..." to include in what will be committed)
+	script/codex-install-bundle-freshness.test.ts
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (bb7d62748c884ad4ec220f588309ad8ac00455a8)

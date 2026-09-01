@@ -104,7 +104,10 @@ const model = {
   reasoning: false,
   input: ["text" as const],
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  contextWindow: 16_000,
+  // Must exceed the injected ultrawork directive plus the system prompt: at 16k the
+  // driver tripped senpi's compaction path, which a scripted mock cannot satisfy, and
+  // every ulw assertion died on a non-zero exit instead of on its own merits.
+  contextWindow: 200_000,
   maxTokens: 4096,
 }
 

@@ -1,0 +1,24 @@
+=== GREEN 1: facts queue core ===
+$ bun test src/facts/   (cwd packages/memory-core)
+
+src/facts/queue.test.ts:
+(pass) facts queue enqueue > #given a fresh journal delta #when enqueue runs #then one queue file holds the full canonical range [12.11ms]
+(pass) facts queue enqueue > #given an identical settle #when enqueue runs again #then the duplicate endpoint is skipped [7.02ms]
+(pass) facts queue enqueue > #given a retained entry ending at m2 #when a later settle arrives #then the new range starts strictly after it [20.72ms]
+(pass) facts queue enqueue > #given the consumed watermark already covers the endpoint #when enqueue runs #then nothing is published [14.42ms]
+(pass) facts queue enqueue > #given only non-canonical trailing entries #when enqueue runs #then no queue file is published [3.23ms]
+(pass) facts queue file naming > #given a published entry #when the filename is inspected #then it is colon-free and hashes the conversation id [3.87ms]
+(pass) facts queue file naming > #given two publications in the same millisecond #when both land #then the endpoint hash keeps them distinct [7.00ms]
+(pass) facts queue concurrency > #given two concurrent enqueue attempts for the same delta #when both run #then exactly one entry is published [32.35ms]
+(pass) facts queue watermark monotonicity > #given an older batch settling after a newer one was queued #when it is consumed #then the enqueue watermark never rolls back [19.45ms]
+(pass) facts queue watermark monotonicity > #given a late older batch consumed #when the next settle runs #then no range overlapping the retained newer entry is republished [20.20ms]
+(pass) facts queue watermark monotonicity > #given a failed batch #when it is retained #then the enqueue watermark does not roll back and the entry survives [11.42ms]
+(pass) facts queue watermark monotonicity > #given a queue file that landed without its cursor write #when the next settle runs #then the retained endpoint anchors the range [8.52ms]
+(pass) facts queue reconcile > #given a leftover queue file with no completion #when reconcile runs #then it is listed as launchable [5.67ms]
+(pass) facts queue reconcile > #given a malformed queue file #when listPending runs #then it is ignored instead of throwing [6.17ms]
+(pass) facts queue reconcile > #given consumed entries #when markConsumed runs #then the files are deleted and the watermark records the endpoint [9.70ms]
+
+ 15 pass
+ 0 fail
+ 46 expect() calls
+Ran 15 tests across 1 file. [193.00ms]

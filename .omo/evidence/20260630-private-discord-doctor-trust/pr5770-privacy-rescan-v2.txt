@@ -1,9 +1,0 @@
-command=privacy marker class scan over sanitized evidence directory; exact private marker values omitted
-timestamp_start=2026-06-30T05:04:17Z
-git_head_before=3b4b7b8c5f71080e3c2ad0102f263adcce1fd065
-scan_root=.omo/evidence/20260630-private-discord-doctor-trust
-public_marker_classes=discord_message_locator,channel_path,channel_name,access_metadata_label,url_label
-public_marker_scan=PASS zero matches
-private_identifier_scan=PASS zero matches; exact values omitted
-timestamp_end=2026-06-30T05:04:17Z
-privacy_rescan_exit=0

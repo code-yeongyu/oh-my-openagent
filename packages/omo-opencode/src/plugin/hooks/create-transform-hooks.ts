@@ -1,7 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../../config"
 import type { MonitorManager } from "../../features/monitor"
 import type { PluginContext } from "../types"
-import type { RalphLoopHook } from "../../hooks/ralph-loop"
 
 import {
   createClaudeCodeHooksHook,
@@ -15,11 +14,13 @@ import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
 } from "../../features/context-injector"
+import { createBtwSideContextInjectorHook } from "../../features/btw-side"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 
 export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
+  btwSideContextInjector: ReturnType<typeof createBtwSideContextInjectorHook>
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   teamModeStatusInjector: ReturnType<typeof createTeamModeStatusInjector> | null
   teamMailboxInjector: ReturnType<typeof createTeamMailboxInjector> | null
@@ -32,10 +33,9 @@ export function createTransformHooks(args: {
   pluginConfig: OhMyOpenCodeConfig
   isHookEnabled: (hookName: string) => boolean
   safeHookEnabled?: boolean
-  ralphLoop?: RalphLoopHook | null
   monitorManager?: MonitorManager
 }): TransformHooks {
-  const { ctx, pluginConfig, isHookEnabled, ralphLoop, monitorManager } = args
+  const { ctx, pluginConfig, isHookEnabled, monitorManager } = args
   const safeHookEnabled = args.safeHookEnabled ?? true
 
   const claudeCodeHooks = isHookEnabled("claude-code-hooks")
@@ -61,7 +61,7 @@ export function createTransformHooks(args: {
           createKeywordDetectorHook(
             ctx,
             contextCollector,
-            ralphLoop ?? undefined,
+            undefined,
             pluginConfig.keyword_detector,
             pluginConfig.default_mode,
           ),
@@ -71,6 +71,9 @@ export function createTransformHooks(args: {
 
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector)
+  const btwSideContextInjector = createBtwSideContextInjectorHook({
+    client: ctx.client,
+  })
 
   const teamModeConfig = pluginConfig.team_mode
 
@@ -110,6 +113,7 @@ export function createTransformHooks(args: {
   return {
     claudeCodeHooks,
     keywordDetector,
+    btwSideContextInjector,
     contextInjectorMessagesTransform,
     teamModeStatusInjector,
     teamMailboxInjector,

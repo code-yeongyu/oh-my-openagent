@@ -1,0 +1,8 @@
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi process sweep skipped: running inside a senpi-task RPC child undefined
+omo-senpi start-work-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }
+omo-senpi start-work-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }

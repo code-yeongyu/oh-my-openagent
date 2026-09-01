@@ -102,11 +102,20 @@ Mocks are a last resort, not a default. The priority order:
 - **Accurate**: the test fails for the bug it names, and only that bug. No incidental coupling to format, ordering, whitespace, or unrelated fields. Assert on the *contract*, not on the dump.
 - **Efficient**: the whole unit suite runs in < 30 seconds on a developer laptop. The whole integration suite in < 5 minutes. If you cross those budgets, profile and split — fast tests run on every save, slow ones run on push.
 - **Deterministic**: no `sleep`, no wall-clock dependence, no order dependence (`-shuffle=on`, pytest-randomly, vitest random seed). Inject a `Clock`. Subscribe to the event, do not poll for it. Time-based flake is a bug, not a test issue.
-- **Isolated**: every test starts from a known fixture and tears down. `t.TempDir()`, `t.Setenv()`, transactional rollback for DB tests. Two tests passing individually but failing together is a fixture leak — fix it immediately.
+- **Isolated**: every test starts from a known fixture and tears down. `t.TempDir()`, `t.Setenv()`, transactional rollback for DB tests. Two tests passing individually but failing together is a fixture leak — fix it immediately. Isolation extends **across processes**: suite-global resources — sandbox/cache roots under a fixed tmpdir path, hardcoded listen ports, container names — are namespaced per run (`mktemp`, port `0`/ephemeral, unique names) so that two checkouts or worktrees of the repo running the suite concurrently cannot interfere. A fixed shared path that works on a single-checkout machine is a flake generator on a multi-agent workstation, and its signature is "a different test fails each run".
 
-### Prompt tests follow the same rule
+### Prompt tests: NEVER assert prose
 
-When tests cover LLM prompts or agent outputs, assert on **parsed structure, decisions, or rule data**, never on exact prompt strings. Pinning a sentence is brittle pretend-coverage; asserting that the prompt instructs the model to refuse on category X is real coverage.
+**FORBIDDEN — NO EXCEPTIONS: a test MUST NOT assert natural-language prompt text.** `expect(prompt).toContain("based on GPT-5.6")`, `not.toContain("old wording")`, `toMatchSnapshot()` on prose, grepping a sentence fragment — every one of these is pretend-coverage. It stays green while the behavior it claims to guard breaks, then blocks every legitimate rewording until someone bumps the pinned string. A reviewer MUST block it as HIGH; deleting such a test is a fix, not a coverage loss. "A nearby test already does it" is not a defense — that test is the disease, not the convention.
+
+Assert ONLY what a machine consumes:
+
+- the builder's routing decision — `expect(getPromptSource(model)).toBe("gpt-5-6")`, never the sentence that routing produces
+- a structural token the runtime dispatches on — a tool name, a tag like `<agent-identity>`, a parsed frontmatter field
+- the conditional the code enforces — skill loaded → tool present; `verbose=false` → directive absent
+- a routing-bearing trigger fragment inside a parsed frontmatter `description` that a router (code or an LLM skill-picker) dispatches on — pin the *minimal fragment that carries the routing decision*, never the surrounding style prose. Such pins are what let a later rewrite change every sentence around them while proving the routing contract survived.
+
+If no machine consumes the text, there is no seam: write NO test and say so in the PR; review guards prose. When you DELEGATE test-writing, hand the child the behavior the test must distinguish ("fails if override precedence breaks"), never a ready-made assertion string, prompt fragment, or marker to copy — a prescribed mechanism that is wrong gets implemented faithfully, and the error ships with a green suite.
 
 ### Anti-patterns the skill rejects
 
@@ -119,6 +128,8 @@ When tests cover LLM prompts or agent outputs, assert on **parsed structure, dec
 | Snapshot tests for everything | Locks formatting, not behavior. | Snapshots for *structure* (CLI help, JSON shape). Assertions for *behavior*. |
 | Removing a failing test to "unblock CI" | You just deleted a bug report. | Fix the code or fix the test — never delete to silence. |
 | `assert result is not None` and stopping there | Passes when result is garbage. | Assert the *value*, not its existence. |
+| Expected value derived from the output under test (`expect(config.prompt).toBe(getPrompt(config.model))` when the criterion is about `config.prompt`) | Recomputes a projection of the output and compares it to itself — passes even when the artifact is built from the wrong input. | Derive the expected value from the test's *input*: `expect(config.prompt).toBe(getPrompt(inputModel))` (independent known-good builder fed the fixture's input), or a stable builder routing decision. |
+| Override/precedence fixture equal to its fallback (override == system default) | The assertion passes whether or not the code honored the override — precedence is never exercised. | Make every value the code must select, preserve, or override differ from its fallback. Prove it: temporarily force the regression the test names, watch it fail, revert. |
 | Single happy-path E2E, no edges | Most bugs live on edges. | Edges are unit-test territory — but include at least one E2E that exercises an error path. |
 
 ---
@@ -221,6 +232,14 @@ Naming variables, functions, or flags by the **absence** of a quality (`isNotVal
 Logging is part of the code you ship, and it has iron rules of its own: levels chosen by naming the consumer (never by severity vibes), placement at decision points (never inside helpers), stable messages with structured fields — and, above everything else, **the project's existing practice wins: a project with a designated logger gets that logger and nothing else, and a project that does not log does not get logging uninvited.**
 
 **Read [`references/logging.md`](references/logging.md) BEFORE the change** whenever your edit adds or modifies log lines, sets up a logger or a new service entrypoint, or handles errors at a boundary.
+
+---
+
+## DEPENDENCY UPGRADES — CROSS-CUTTING RULES
+
+- **`0.x` minor = major.** Semver promises nothing below 1.0: treat `0.N → 0.N+1` as a breaking upgrade — read the changelog, build, and run the full suite before trusting it. A required field appearing in a public options type is a routine `0.x` "minor".
+- **Version literals live outside the manifest.** Before committing a bump, grep the repo for the old version string: Dockerfiles pinning a global CLI, CI workflows, and docs all carry copies. A bump that updates only the package manifest ships a split-brain deploy.
+- **Never hand-merge a lockfile.** On conflict, take either side whole and regenerate with the package manager — the resolver owns that file, not you.
 
 ---
 

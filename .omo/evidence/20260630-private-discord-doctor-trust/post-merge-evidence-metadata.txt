@@ -1,9 +1,0 @@
-purpose=record post-merge evidence hygiene context for PR 5767 follow-up
-code_merge_commit=afc515ba627cc5e418ba5d123fdac718d984f0d5
-followup_base_commit=afc515ba627cc5e418ba5d123fdac718d984f0d5
-source_files_changed_in_followup=none
-evidence_files_changed_in_followup=.omo/evidence/20260630-private-discord-doctor-trust/discord-sanitized-summary.md, .omo/evidence/20260630-private-discord-doctor-trust/SUMMARY.md, opencode-qa/build metadata artifacts
-reason=review-work found privacy/evidence metadata blockers after PR 5767 merged
-privacy_fix=removed full Discord URL, guild/channel identifiers, channel name, and access metadata from committed sanitized summary
-metadata_fix=added explicit opencode-qa harness evidence and build command/timestamp/exit evidence
-tests_reused_from_code_merge=doctor-tests-v5.txt, typecheck-v5.txt, bun-test-full-v5.txt, manual-qa-doctor-trust-invocation-v3.txt

@@ -1,0 +1,36 @@
+<reminder/>
+
+<self>
+<projection>$MEMORY_DIR/system/persona.md</projection>
+I am a careful coding agent.
+</self>
+
+<memory>
+<facts>
+  <projection>$MEMORY_DIR/system/facts.md</projection>
+  <description>Stable facts</description>
+  The project uses Bun.
+</facts>
+<human>
+  <prefs>
+    <coding>
+      <projection>$MEMORY_DIR/system/human/prefs/coding.md</projection>
+      <description>Coding preferences</description>
+      Prefer focused changes.
+Run tests once.
+    </coding>
+  </prefs>
+</human>
+<external_projection>
+$MEMORY_DIR/
+├── archive/
+│   └── diagram.png
+├── reference/
+│   └── details.md
+└── README.MD
+</external_projection>
+</memory>
+
+<memory_metadata>
+- AGENT_ID: agent-golden
+</memory_metadata>

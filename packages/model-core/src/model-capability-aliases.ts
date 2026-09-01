@@ -8,6 +8,8 @@ export type ExactAliasRule = {
 export type PatternAliasRule = {
   ruleID: string
   description: string
+  providerIDs?: readonly string[]
+  allowedSubproviderHosts?: readonly string[]
   match: (normalizedModelID: string) => boolean
   canonicalize: (normalizedModelID: string) => string
 }
@@ -32,12 +34,6 @@ const EXACT_ALIAS_RULES: ReadonlyArray<ExactAliasRule> = [
     canonicalModelID: "gemini-3-pro-preview",
     rationale: "Legacy Gemini 3 tier suffixes still need to land on the canonical preview model.",
   },
-  {
-    aliasModelID: "k2pb",
-    ruleID: "kimi-k2pb-alias",
-    canonicalModelID: "k2p5",
-    rationale: "Kimi for Coding exposes k2pb while the bundled capabilities snapshot uses the canonical k2p5 ID.",
-  },
 ]
 
 const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(
@@ -45,6 +41,14 @@ const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(
 )
 
 const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
+  {
+    ruleID: "openai-gpt-5.6-fast-service-tier-alias",
+    description: "Normalizes OpenCode's OpenAI GPT-5.6 fast service-tier IDs to canonical snapshot IDs.",
+    providerIDs: ["openai"],
+    allowedSubproviderHosts: ["vercel"],
+    match: (normalizedModelID) => /^gpt-5\.6-(?:sol|terra|luna)-fast$/.test(normalizedModelID),
+    canonicalize: (normalizedModelID) => normalizedModelID.slice(0, -"-fast".length),
+  },
   {
     ruleID: "claude-thinking-legacy-alias",
     description: "Normalizes the legacy claude-opus-4-7-thinking id to the canonical snapshot ID.",
@@ -72,9 +76,12 @@ function stripProviderPrefixForAliasLookup(normalizedModelID: string): string {
   return normalizedModelID.slice(slashIndex + 1)
 }
 
-export function resolveModelIDAlias(modelID: string): ModelIDAliasResolution {
+export function resolveModelIDAlias(modelID: string, providerID?: string): ModelIDAliasResolution {
   const requestedModelID = normalizeLookupModelID(modelID)
   const aliasLookupModelID = stripProviderPrefixForAliasLookup(requestedModelID)
+  const normalizedProviderID = providerID ? normalizeLookupModelID(providerID) : undefined
+  const providerPrefixEnd = requestedModelID.indexOf("/")
+  const embeddedProviderID = providerPrefixEnd > 0 ? requestedModelID.slice(0, providerPrefixEnd) : undefined
   const exactRule = EXACT_ALIAS_RULES_BY_MODEL.get(aliasLookupModelID)
   if (exactRule) {
     return {
@@ -86,6 +93,17 @@ export function resolveModelIDAlias(modelID: string): ModelIDAliasResolution {
   }
 
   for (const rule of PATTERN_ALIAS_RULES) {
+    if (rule.providerIDs) {
+      const matchesProviderID = normalizedProviderID !== undefined && rule.providerIDs.includes(normalizedProviderID)
+      const matchesEmbeddedProviderID =
+        normalizedProviderID !== undefined &&
+        rule.allowedSubproviderHosts?.includes(normalizedProviderID) === true &&
+        embeddedProviderID !== undefined &&
+        rule.providerIDs.includes(embeddedProviderID)
+      if (!matchesProviderID && !matchesEmbeddedProviderID) {
+        continue
+      }
+    }
     if (!rule.match(aliasLookupModelID)) {
       continue
     }

@@ -71,13 +71,11 @@ describe("node-target CLI build (lazycodex#47)", () => {
 
   test("the main build chain and the lazycodex-ai payload carry the node CLI", () => {
     // #given
-    const packageJson = JSON.parse(readFileSync(rootPackageJsonPath, "utf8")) as {
-      scripts?: Record<string, string>
-    }
+    const buildOrchestrator = readFileSync(new URL("./build.ts", import.meta.url), "utf8")
     const workflow = readFileSync(publishWorkflowPath, "utf8")
 
     // #then
-    expect(packageJson.scripts?.build, "root build script must produce dist/cli-node").toContain("build:cli-node")
+    expect(buildOrchestrator, "the build orchestrator must produce dist/cli-node").toContain("build:cli-node")
     expect(workflow, "lazycodex-ai files list must ship dist/cli-node").toContain('"dist/cli-node"')
   })
 })

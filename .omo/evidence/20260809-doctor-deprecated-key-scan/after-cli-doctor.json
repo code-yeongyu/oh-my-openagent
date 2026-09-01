@@ -1,0 +1,214 @@
+{
+  "results": [
+    {
+      "name": "System",
+      "status": "fail",
+      "message": "1 system issue(s) detected",
+      "details": [
+        "OpenCode: 1.18.13",
+        "Plugin expected: 4.19.4",
+        "Plugin loaded: 4.19.4",
+        "Bun: 1.4.0"
+      ],
+      "issues": [
+        {
+          "title": "oh-my-openagent is not registered",
+          "description": "Plugin entry is missing from OpenCode configuration.",
+          "fix": "Run: bunx oh-my-openagent install",
+          "severity": "error",
+          "affects": [
+            "all agents"
+          ]
+        }
+      ],
+      "duration": 467
+    },
+    {
+      "name": "Configuration",
+      "status": "fail",
+      "message": "Configuration invalid (1 issue)",
+      "details": [
+        "Path: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc"
+      ],
+      "issues": [
+        {
+          "title": "Invalid configuration",
+          "description": "../../../../../var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: Invalid omo config at /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: agents.oracle, models.sol, [codex].agents.explore",
+          "severity": "error",
+          "affects": [
+            "plugin startup"
+          ]
+        }
+      ],
+      "duration": 14
+    },
+    {
+      "name": "TUI Plugin",
+      "status": "skip",
+      "message": "Plugin not registered (server or TUI)",
+      "details": [
+        "tui.json: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.config/opencode/tui.json"
+      ],
+      "issues": [],
+      "duration": 9
+    },
+    {
+      "name": "Configuration",
+      "status": "warn",
+      "message": "1 deprecated config key(s) found",
+      "details": [
+        "Scanned: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc"
+      ],
+      "issues": [
+        {
+          "title": "Deprecated config key",
+          "description": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: categories.deep.variant",
+          "fix": "Replace variant with reasoning, or run: oh-my-openagent config migrate",
+          "severity": "warning",
+          "affects": [
+            "categories.deep.variant"
+          ]
+        }
+      ],
+      "duration": 9
+    },
+    {
+      "name": "Tools",
+      "status": "warn",
+      "message": "1 tools issue(s) detected",
+      "details": [
+        "AST-Grep CLI: yes",
+        "Comment checker: yes",
+        "LSP: 1 server(s)",
+        "GH CLI: installed",
+        "MCP: builtin=4, user=1"
+      ],
+      "issues": [
+        {
+          "title": "GitHub CLI not authenticated",
+          "description": "gh CLI is installed but not logged in.",
+          "fix": "Run: gh auth login",
+          "severity": "warning",
+          "affects": [
+            "GitHub automation"
+          ]
+        }
+      ],
+      "duration": 44
+    },
+    {
+      "name": "Models",
+      "status": "warn",
+      "message": "11 agents, 8 categories, 0 overrides",
+      "details": [
+        "═══ Available Models (from cache) ═══",
+        "",
+        "  ⚠ Cache not found. Run 'opencode' to populate.",
+        "",
+        "═══ Configured Models ═══",
+        "",
+        "Agents:",
+        "  ○ sisyphus: anthropic/claude-opus-5 (max) [capabilities: snapshot-backed]",
+        "  ○ hephaestus: openai/gpt-5.6-sol (medium) [capabilities: snapshot-backed]",
+        "  ○ oracle: openai/gpt-5.6-sol (xhigh) [capabilities: snapshot-backed]",
+        "  ○ librarian: openai/gpt-5.6-luna-fast (low) [capabilities: alias-backed]",
+        "  ○ explore: openai/gpt-5.6-luna-fast (low) [capabilities: alias-backed]",
+        "  ○ multimodal-looker: openai/gpt-5.6-sol (low) [capabilities: snapshot-backed]",
+        "  ○ prometheus: anthropic/claude-fable-5 (xhigh) [capabilities: snapshot-backed]",
+        "  ○ metis: anthropic/claude-opus-5 (high) [capabilities: snapshot-backed]",
+        "  ○ momus: openai/gpt-5.6-terra (high) [capabilities: snapshot-backed]",
+        "  ○ atlas: anthropic/claude-sonnet-5 [capabilities: snapshot-backed]",
+        "  ○ sisyphus-junior: anthropic/claude-sonnet-5 [capabilities: snapshot-backed]",
+        "",
+        "Categories:",
+        "  ○ visual-engineering: anthropic/claude-opus-5 (max) [capabilities: snapshot-backed]",
+        "  ○ ultrabrain: openai/gpt-5.6-sol (max) [capabilities: snapshot-backed]",
+        "  ○ deep: openai/gpt-5.6-sol (medium) [capabilities: snapshot-backed]",
+        "  ○ artistry: anthropic/claude-fable-5 (xhigh) [capabilities: snapshot-backed]",
+        "  ○ quick: kimi-for-coding/kimi-for-coding-highspeed [capabilities: snapshot-backed]",
+        "  ○ unspecified-low: openai/gpt-5.6-terra (high) [capabilities: snapshot-backed]",
+        "  ○ unspecified-high: kimi-for-coding/kimi-k3 (max) [capabilities: snapshot-backed]",
+        "  ○ writing: kimi-for-coding/kimi-k3 (low) [capabilities: snapshot-backed]",
+        "",
+        "● = user override, ○ = provider fallback"
+      ],
+      "issues": [
+        {
+          "title": "Model cache not found",
+          "description": "OpenCode model cache is missing, so model availability cannot be validated.",
+          "fix": "Run: opencode models --refresh",
+          "severity": "warning",
+          "affects": [
+            "model resolution"
+          ]
+        }
+      ],
+      "duration": 5
+    },
+    {
+      "name": "Telemetry",
+      "status": "pass",
+      "message": "Telemetry: enabled",
+      "details": [
+        "PostHog host: https://us.i.posthog.com",
+        "Last daily active date: never",
+        "State file: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.local/share/oh-my-opencode/posthog-activity.json"
+      ],
+      "issues": [],
+      "duration": 2
+    },
+    {
+      "name": "Team Mode",
+      "status": "skip",
+      "message": "team_mode: disabled",
+      "issues": [],
+      "duration": 2
+    }
+  ],
+  "systemInfo": {
+    "opencodeVersion": "1.18.13",
+    "opencodePath": "/Users/yeongyu/.bun/bin/opencode",
+    "pluginVersion": "4.19.4",
+    "loadedVersion": "4.19.4",
+    "bunVersion": "1.4.0",
+    "configPath": null,
+    "configValid": true,
+    "isLocalDev": false
+  },
+  "tools": {
+    "lspServers": [
+      {
+        "id": "lsp-tools-mcp",
+        "extensions": [
+          "*"
+        ]
+      }
+    ],
+    "astGrepCli": true,
+    "commentChecker": true,
+    "ghCli": {
+      "installed": true,
+      "authenticated": false,
+      "username": null
+    },
+    "mcpBuiltin": [
+      "websearch",
+      "context7",
+      "grep_app",
+      "lsp"
+    ],
+    "mcpUser": [
+      "codegraph"
+    ]
+  },
+  "summary": {
+    "total": 8,
+    "passed": 1,
+    "failed": 2,
+    "warnings": 3,
+    "skipped": 2,
+    "duration": 467
+  },
+  "exitCode": 1,
+  "target": "opencode"
+}

@@ -2,8 +2,6 @@ import type { SkillInfo } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { isDisabledSkillAlias } from "../../features/opencode-skill-loader/skill-discovery"
 
-const SHARED_SKILL_PREFIX = "shared/"
-
 export type NativeSkillEntry = {
   name: string
   description: string
@@ -33,8 +31,8 @@ function normalizeDisabledSkills(disabledSkills: ReadonlySet<string> | undefined
   return new Set(Array.from(disabledSkills, normalizeSkillName))
 }
 
-function nativeSkillScope(native: NativeSkillEntry): LoadedSkill["scope"] {
-  return normalizeSkillName(native.name).startsWith(SHARED_SKILL_PREFIX) ? "shared" : "config"
+function nativeSkillScope(_native: NativeSkillEntry): LoadedSkill["scope"] {
+  return "config"
 }
 
 function nativeSkillToLoadedSkill(native: NativeSkillEntry): LoadedSkill {

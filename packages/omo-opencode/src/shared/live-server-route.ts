@@ -8,20 +8,29 @@ export const LIVE_ROUTE_UNAVAILABLE_LOG = "[live-server-route] route unavailable
 
 const PROBE_TTL_MS = 60_000
 const PROBE_ABORT_MS = 1_500
+const AFFINITY_TTL_MS = 60_000
 
 type RouteResult = {
   client: unknown
   route: "live" | "in-process"
-  reason: "identity" | "flag" | "child" | "unavailable" | "live"
+  reason: "identity" | "flag" | "child" | "unavailable" | "live" | "affinity"
+}
+
+type SessionAffinityEntry = {
+  owned: boolean
+  timestamp: number
 }
 
 type RouteRegistration = {
   serverUrl: URL | undefined
+  directory: string
   liveClient: unknown
   available: boolean | undefined
   probeTimestamp: number
   inFlightProbe: Promise<boolean> | undefined
   warnedOnce: boolean
+  sessionAffinity: Map<string, SessionAffinityEntry>
+  inFlightAffinity: Map<string, Promise<boolean | undefined>>
 }
 
 const registrations = new Map<unknown, RouteRegistration>()
@@ -61,11 +70,14 @@ export function initLiveServerRoute(opts: {
 }): void {
   const registration: RouteRegistration = {
     serverUrl: opts.serverUrl,
+    directory: opts.directory,
     liveClient: undefined,
     available: undefined,
     probeTimestamp: 0,
     inFlightProbe: undefined,
     warnedOnce: false,
+    sessionAffinity: new Map(),
+    inFlightAffinity: new Map(),
   }
   registrations.set(opts.inProcessClient, registration)
   lastRegistration = registration
@@ -128,6 +140,81 @@ async function probe(registration: RouteRegistration): Promise<boolean> {
   }
 }
 
+// A healthy `/global/health` only proves SOME listener answers on the
+// registered URL — not that it is the instance owning the target session.
+// Dispatching a parent wake to a listener that does not own the session
+// silently drops the wake and the parent never continues (#5569). Before
+// trusting the live route for a session, confirm the listener can actually
+// resolve it. Only a definite 404 demotes the route: transient failures keep
+// the live route so serve-topology runner-split protection is not lost.
+async function probeSessionAffinity(registration: RouteRegistration, sessionID: string): Promise<boolean | undefined> {
+  if (!registration.serverUrl) {
+    return undefined
+  }
+
+  const probeUrl = new URL(`/session/${sessionID}`, registration.serverUrl)
+  const authHeader = getServerBasicAuthHeader()
+  const headers: Record<string, string> = authHeader ? { Authorization: authHeader } : {}
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), PROBE_ABORT_MS)
+    let response: Response
+    try {
+      response = await getFetch()(probeUrl, { headers, signal: controller.signal })
+    } finally {
+      clearTimeout(timeoutId)
+    }
+
+    if (response.ok) {
+      setSessionAffinity(registration, sessionID, true)
+      return true
+    }
+    if (response.status === 404) {
+      setSessionAffinity(registration, sessionID, false)
+      log("[live-server-route] live listener does not own session; falling back to in-process client", { sessionID })
+      return false
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+function setSessionAffinity(registration: RouteRegistration, sessionID: string, owned: boolean): void {
+  const now = Date.now()
+  for (const [key, entry] of registration.sessionAffinity) {
+    if (now - entry.timestamp >= AFFINITY_TTL_MS) {
+      registration.sessionAffinity.delete(key)
+    }
+  }
+  registration.sessionAffinity.set(sessionID, { owned, timestamp: now })
+}
+
+function getFreshSessionAffinity(registration: RouteRegistration, sessionID: string): boolean | undefined {
+  const entry = registration.sessionAffinity.get(sessionID)
+  if (!entry || Date.now() - entry.timestamp >= AFFINITY_TTL_MS) {
+    return undefined
+  }
+  return entry.owned
+}
+
+async function resolveSessionAffinity(registration: RouteRegistration, sessionID: string): Promise<boolean | undefined> {
+  const cached = getFreshSessionAffinity(registration, sessionID)
+  if (cached !== undefined) {
+    return cached
+  }
+
+  let inFlight = registration.inFlightAffinity.get(sessionID)
+  if (!inFlight) {
+    inFlight = probeSessionAffinity(registration, sessionID).finally(() => {
+      registration.inFlightAffinity.delete(sessionID)
+    })
+    registration.inFlightAffinity.set(sessionID, inFlight)
+  }
+  return inFlight
+}
+
 function getFreshProbeAvailability(registration: RouteRegistration): boolean | undefined {
   const available = registration.available
   if (available === undefined || Date.now() - registration.probeTimestamp >= PROBE_TTL_MS) {
@@ -158,7 +245,10 @@ function getOrBuildLiveClient(registration: RouteRegistration): unknown {
   if (!registration.serverUrl) {
     return undefined
   }
-  const client = createOpencodeClientSdk({ baseUrl: registration.serverUrl.toString() })
+  const client = createOpencodeClientSdk({
+    baseUrl: registration.serverUrl.toString(),
+    directory: registration.directory,
+  })
   injectServerAuthIntoClient(client)
   registration.liveClient = client
   return registration.liveClient
@@ -191,6 +281,16 @@ export function tryResolveDispatchClientSync(client: unknown, sessionID: string)
     return { client, route: "in-process", reason: "unavailable" }
   }
 
+  const cachedAffinity = getFreshSessionAffinity(registration, sessionID)
+  if (cachedAffinity === undefined) {
+    // No affinity evidence yet — defer to the async path so the listener is
+    // verified to own this session before a wake is trusted to it (#5569).
+    return undefined
+  }
+  if (!cachedAffinity) {
+    return { client, route: "in-process", reason: "affinity" }
+  }
+
   const resolvedLiveClient = getOrBuildLiveClient(registration)
   if (!resolvedLiveClient) {
     return { client, route: "in-process", reason: "unavailable" }
@@ -214,6 +314,11 @@ export async function resolveDispatchClient(client: unknown, sessionID: string):
     return { client, route: "in-process", reason: "unavailable" }
   }
 
+  const affinity = await resolveSessionAffinity(registration, sessionID)
+  if (affinity === false) {
+    return { client, route: "in-process", reason: "affinity" }
+  }
+
   const resolvedLiveClient = getOrBuildLiveClient(registration)
   if (!resolvedLiveClient) {
     return { client, route: "in-process", reason: "unavailable" }
@@ -231,7 +336,17 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
     return false
   }
 
-  const CONNECTION_CODES = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"])
+  const CONNECTION_CODES = new Set([
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ENETUNREACH",
+    "EHOSTUNREACH",
+    "ENETDOWN",
+    "EHOSTDOWN",
+    "EADDRNOTAVAIL",
+    "UND_ERR_CONNECT_TIMEOUT",
+  ])
 
   const self = error as NodeJS.ErrnoException
   if (self.code && CONNECTION_CODES.has(self.code)) {
@@ -246,13 +361,6 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
     }
   }
 
-  if (error instanceof TypeError) {
-    const msg = error.message
-    if (msg.includes("fetch failed") || msg.includes("Unable to connect")) {
-      return true
-    }
-  }
-
   return false
 }
 
@@ -260,6 +368,7 @@ export function markLiveRouteUnavailable(reason: string): void {
   for (const registration of registrations.values()) {
     registration.available = false
     registration.probeTimestamp = Date.now()
+    registration.sessionAffinity.clear()
   }
   log(`[live-server-route] marked unavailable: ${reason}`)
 }

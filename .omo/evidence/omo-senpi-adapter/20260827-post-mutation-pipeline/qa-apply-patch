@@ -1,0 +1,1 @@
+Outcome: PASS. Added regression coverage dispatching a multi-file apply_patch event; comment-checker receives one HookInput per changed file, with absolute per-file paths. Shared extraction also covers all patch paths for diagnostics/formatter fan-out.

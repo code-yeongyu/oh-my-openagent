@@ -7,6 +7,7 @@ import { SENPI_LOADER_ALIASES } from "../plugin/scripts/build-extension.mjs"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
+const builtTaskExtensionPath = join(packageRoot, "plugin", "extensions", "omo-task.js")
 
 const EXPECTED_SENPI_LOADER_ALIASES = [
   "@earendil-works/pi-coding-agent",
@@ -35,23 +36,24 @@ describe("omo-senpi bundle purity", () => {
     expect(SENPI_LOADER_ALIASES).toEqual([...EXPECTED_SENPI_LOADER_ALIASES])
   })
 
-  it("#given a built extension #when static imports are inspected #then only senpi peers and node builtins remain external", () => {
-    expect(existsSync(builtExtensionPath), `missing built extension at ${builtExtensionPath}`).toBe(true)
-
-    const source = readFileSync(builtExtensionPath, "utf8")
-    const imports = collectStaticImportSpecifiers(source)
+  it("#given built extension artifacts #when static imports are inspected #then only senpi peers and node builtins remain external", () => {
     const allowed = new Set<string>(SENPI_LOADER_ALIASES)
-    const forbidden = imports.filter((specifier) => !specifier.startsWith("node:") && !allowed.has(specifier))
-
-    expect(forbidden).toEqual([])
+    for (const path of [builtExtensionPath, builtTaskExtensionPath]) {
+      expect(existsSync(path), `missing built extension at ${path}`).toBe(true)
+      const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
+      const forbidden = imports.filter((specifier) => !specifier.startsWith("node:") && !allowed.has(specifier))
+      expect(forbidden).toEqual([])
+    }
   })
 })
 
 function collectStaticImportSpecifiers(source: string): string[] {
   const specifiers = new Set<string>()
+  // Whitespace-tolerant so the minified bundle shape (`import{x}from"y"`, `import"y"`, `export*from"y"`)
+  // is scanned exactly like the spaced shape - otherwise the guard would pass vacuously on minified output.
   const patterns = [
-    /\bimport\s+(?:[^"'()]*?\s+from\s+)?["']([^"']+)["']/g,
-    /\bexport\s+[^"']*?\s+from\s+["']([^"']+)["']/g,
+    /\bimport\s*(?:[^"'()]*?\bfrom\s*)?["']([^"']+)["']/g,
+    /\bexport\s*[^"'()]*?\bfrom\s*["']([^"']+)["']/g,
   ]
 
   for (const pattern of patterns) {

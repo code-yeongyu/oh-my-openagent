@@ -1,3 +1,0 @@
-webterm-live-ok
-
-[web-terminal-visual-qa exit:0]

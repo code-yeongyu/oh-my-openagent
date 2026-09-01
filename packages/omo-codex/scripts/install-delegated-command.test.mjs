@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { buildDelegatedOmoInvocation, runDelegatedOmoCommand } from "./install-local.mjs";
 
-test("#given a lazycodex passthrough command #when delegating to omo #then resets OMO_INVOCATION_NAME so the delegate does not re-enter the lazycodex path", async () => {
+test("#given a lazycodex passthrough command #when delegating to omo-agent-toolkit #then resets OMO_INVOCATION_NAME so the delegate does not re-enter the lazycodex path", async () => {
 	// given
 	const parsed = { kind: "command", command: "boulder", args: [] };
 	let received;
@@ -25,12 +25,12 @@ test("#given a lazycodex passthrough command #when delegating to omo #then reset
 	assert.equal(received.runOptions.cwd, "/tmp/project");
 	assert.equal(
 		received.runOptions.env?.OMO_INVOCATION_NAME,
-		"omo",
-		"delegated omo command must run with OMO_INVOCATION_NAME=omo to avoid infinite recursion",
+		"omo-agent-toolkit",
+		"delegated command must run with OMO_INVOCATION_NAME=omo-agent-toolkit to avoid infinite recursion",
 	);
 });
 
-test("#given OMO_INVOCATION_NAME=lazycodex in the parent env #when delegating a cleanup passthrough #then the child env overrides it to omo", async () => {
+test("#given OMO_INVOCATION_NAME=lazycodex in the parent env #when delegating a cleanup passthrough #then the child env overrides it to omo-agent-toolkit", async () => {
 	// given
 	const previous = process.env.OMO_INVOCATION_NAME;
 	process.env.OMO_INVOCATION_NAME = "lazycodex";
@@ -52,7 +52,7 @@ test("#given OMO_INVOCATION_NAME=lazycodex in the parent env #when delegating a 
 	}
 
 	// then
-	assert.equal(received.env.OMO_INVOCATION_NAME, "omo");
+	assert.equal(received.env.OMO_INVOCATION_NAME, "omo-agent-toolkit");
 });
 
 test("#given a dry-run doctor #when delegating #then routes to the Codex LazyCodex doctor workflow", async () => {
@@ -239,5 +239,5 @@ test("#given dry-run args with shell metacharacters #when delegating #then logs 
 	});
 
 	// then
-	assert.equal(logged, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project '/tmp/lazy codex'\\''s qa'");
+	assert.equal(logged, "npx --yes --package oh-my-openagent omo-agent-toolkit cleanup --platform=codex --project '/tmp/lazy codex'\\''s qa'");
 });

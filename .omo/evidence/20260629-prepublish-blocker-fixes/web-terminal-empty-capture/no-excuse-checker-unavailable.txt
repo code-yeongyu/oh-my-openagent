@@ -1,3 +1,0 @@
-command: find . -path "*check-no-excuse-rules*" -maxdepth 5 -type f
-exit_code: 0
-observed: no checker file found in this checkout; used LOC check plus bun run typecheck:script instead
