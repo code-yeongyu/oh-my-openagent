@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, readdirSync } from "node:fs";
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 
@@ -11,6 +11,7 @@ import {
 	ulwLoopLedgerPath,
 	ulwLoopRelativeDir,
 } from "./paths.js";
+import { planMissingRecovery } from "./plan-missing-recovery.js";
 import type { UlwLoopLedgerEntry, UlwLoopPlan } from "./types.js";
 import { iso, ULW_LOOP_DIR, ULW_LOOP_GOALS, ULW_LOOP_LEDGER, UlwLoopError } from "./types.js";
 
@@ -27,7 +28,12 @@ function isLegacyEnumeratedAggregateObjective(objective: string | undefined): ob
 }
 
 function isSteeringKind(value: unknown): value is UlwLoopLedgerEntry["kind"] {
-	return value === "steering_accepted" || value === "steering_rejected" || value === "criteria_revised";
+	return (
+		value === "steering_accepted" ||
+		value === "steering_rejected" ||
+		value === "criteria_revised" ||
+		value === "batch_updated"
+	);
 }
 
 export async function withUlwLoopMutationLock<T>(repoRoot: string, fn: () => Promise<T>): Promise<T>;
@@ -68,10 +74,11 @@ export async function readUlwLoopPlan(repoRoot: string, scope?: UlwLoopScope): P
 		raw = await readFile(path, "utf8");
 	} catch (error) {
 		if (!hasCode(error, "ENOENT")) throw error;
+		const recovery = planMissingRecovery(readSessionDirs(repoRoot));
 		throw new UlwLoopError(
-			`No ulw-loop plan found at ${repoRelative(path, repoRoot)}. Run \`omo ulw-loop create-goals ...\` first.`,
+			`No ulw-loop plan found at ${repoRelative(path, repoRoot)}.\n${recovery.message}`,
 			"ULW_LOOP_PLAN_MISSING",
-			{ cause: error },
+			{ cause: error, ...(recovery.details === undefined ? {} : { details: recovery.details }) },
 		);
 	}
 	const parsed: UlwLoopPlan = JSON.parse(raw);
@@ -103,6 +110,19 @@ export async function readUlwLoopPlan(repoRoot: string, scope?: UlwLoopScope): P
 	return parsed;
 }
 
+// Session dirs are the only recovery hint that matters when a plan is missing: the
+// caller is almost always scoped to a session whose sibling actually holds the plan.
+function readSessionDirs(repoRoot: string): readonly string[] {
+	try {
+		return readdirSync(ulwLoopDir(repoRoot), { withFileTypes: true })
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name)
+			.sort();
+	} catch {
+		return [];
+	}
+}
+
 export async function writePlan(repoRoot: string, plan: UlwLoopPlan, scope?: UlwLoopScope): Promise<void> {
 	await mkdir(ulwLoopDir(repoRoot, scope), { recursive: true });
 	const path = ulwLoopGoalsPath(repoRoot, scope);
@@ -112,8 +132,21 @@ export async function writePlan(repoRoot: string, plan: UlwLoopPlan, scope?: Ulw
 }
 
 export async function appendLedger(repoRoot: string, entry: UlwLoopLedgerEntry, scope?: UlwLoopScope): Promise<void> {
+	await appendLedgerEntries(repoRoot, [entry], scope);
+}
+
+export async function appendLedgerEntries(
+	repoRoot: string,
+	entries: readonly UlwLoopLedgerEntry[],
+	scope?: UlwLoopScope,
+): Promise<void> {
+	if (entries.length === 0) return;
 	await mkdir(ulwLoopDir(repoRoot, scope), { recursive: true });
-	await appendFile(ulwLoopLedgerPath(repoRoot, scope), `${JSON.stringify(entry)}\n`, "utf8");
+	await appendFile(
+		ulwLoopLedgerPath(repoRoot, scope),
+		`${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
+		"utf8",
+	);
 }
 
 /**

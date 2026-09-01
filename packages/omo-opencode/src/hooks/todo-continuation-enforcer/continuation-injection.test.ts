@@ -337,4 +337,44 @@ describe("injectContinuation", () => {
     expect(state.consecutiveFailures).toBe(0)
     expect(state.lastInjectedAt).toBeGreaterThan(0)
   })
+
+  test("#given promptAsync rejects with a non-retryable request error #when the injection fails #then the session is marked unrecoverable", async () => {
+    // given
+    const state = { inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 } as Record<string, unknown>
+    const ctx = {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          todo: async () => ({ data: [{ id: "1", content: "todo", status: "pending", priority: "high" }] }),
+          promptAsync: async () => {
+            throw Object.assign(new Error("APIError"), {
+              name: "APIError",
+              data: {
+                message:
+                  "messages.2: `tool_use` ids were found without `tool_result` blocks immediately after: toolu_01PCXjcagoMAca32awicQHce.",
+                statusCode: 400,
+                isRetryable: false,
+              },
+            })
+          },
+        },
+      },
+    }
+
+    // when
+    await injectContinuation({
+      ctx: ctx as never,
+      sessionID: "ses_injection_non_retryable",
+      resolvedInfo: {
+        agent: "Sisyphus - ultraworker",
+        model: { providerID: "anthropic", modelID: "claude-opus-5" },
+      },
+      sessionStateStore: { getExistingState: () => state } as never,
+    })
+
+    // then
+    expect(state["unrecoverableErrorDetected"]).toBe(true)
+    expect(state["tokenLimitDetected"]).toBeUndefined()
+    expect(state["inFlight"]).toBe(false)
+  })
 })

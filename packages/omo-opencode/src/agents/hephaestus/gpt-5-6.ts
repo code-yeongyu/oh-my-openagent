@@ -187,7 +187,11 @@ export function buildGpt56HephaestusPrompt(
     availableCategories,
     availableSkills,
   )
-  const delegationTable = buildDelegationTable(availableAgents)
+  const delegationTable = buildDelegationTable(
+    availableAgents.filter((agent) =>
+      ["explore", "librarian", "oracle"].includes(agent.name),
+    ),
+  )
   const oracleSection = buildOracleSection(availableAgents)
   const frontendGuidance = buildFrontendGuidanceSection(availableCategories)
 

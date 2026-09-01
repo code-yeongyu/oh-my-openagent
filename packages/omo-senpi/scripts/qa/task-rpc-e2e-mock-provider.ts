@@ -117,7 +117,7 @@ const model = {
   reasoning: false,
   input: ["text" as const],
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  contextWindow: 16_000,
+  contextWindow: 200_000,
   maxTokens: 4096,
 }
 

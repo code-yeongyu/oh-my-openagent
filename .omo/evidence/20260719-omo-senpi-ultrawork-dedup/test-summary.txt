@@ -1,0 +1,39 @@
+# Gate outputs (worktree fix/omo-senpi-ultrawork-dedup, base origin/dev d3c72a873)
+
+## bun run test:senpi (tail)
+}
+
+ 233 pass
+ 0 fail
+ 1 snapshots, 758 expect() calls
+Ran 233 tests across 47 files. [2.22s]
+SENPI_EXIT=0
+
+## bun run typecheck (exit)
+TYPECHECK_EXIT=0
+
+## bun test (root, tail)
+empty-project: cold=72.1ms warm=[39.4, 38.5] median=39.4ms
+in-tree-fixture: cold=65.6ms warm=[41.8, 40.6] median=41.8ms
+
+ 11750 pass
+ 3 skip
+ 2 fail
+ 2 snapshots, 29054 expect() calls
+Ran 11755 tests across 1509 files. [125.47s]
+ROOTTEST_EXIT=1
+
+Note: 2 failures in opencode-config-agents-reader.test.ts are machine-local
+(fail identically on a clean origin/dev checkout on this machine; the test's
+OPENCODE_CONFIG_DIR mock does not mask this host's real opencode config).
+They pass in CI and are unrelated to this change.
+
+## live driver (driver.mjs, real senpi binary + built plugin)
+DRIVER_EXIT=0
+result: PASS | realSenpiUntouched: True
+ - trigger-still-injects PASS
+ - ulw-plan-does-not-arm PASS
+ - pasted-block-not-reinjected PASS
+ - skill-command-appends PASS
+ - skill-ultrawork-not-duplicated PASS
+ - open-tag-mention-still-arms PASS

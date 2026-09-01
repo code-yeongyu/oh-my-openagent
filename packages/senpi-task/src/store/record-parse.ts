@@ -1,27 +1,59 @@
 import {
+  BACKGROUND_MODES,
   RESIDENCY_STATES,
-  RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
-  type ResolvedModelRecord,
+  type BackgroundMode,
   type TaskRecord,
 } from "../state"
 import { parseTaskId } from "../state/id"
+import {
+  parseNotification,
+  parseOptionalOwner,
+  parseOptionalPendingSteering,
+  parseOptionalResolvedModel,
+  parseOptionalResolvedModelArray,
+  parseOptionalSpawnSpec,
+} from "./record-blocks-parse"
+import { parseRunStats } from "./run-stats-parse"
+import {
+  isRecord,
+  readNumber,
+  readOptionalBoolean,
+  readOptionalNumber,
+  readOptionalString,
+  readOptionalStringArray,
+  readString,
+} from "./scalar-read"
 
-export function parseTaskRecord(value: unknown, path: string): TaskRecord {
+export function parseTaskRecord(value: unknown, path: string, warnings?: string[]): TaskRecord {
   if (!isRecord(value)) throw new Error(`JSON record at ${path} is not an object`)
 
   const name = readOptionalString(value, "name")
+  const taskSummary = readOptionalString(value, "task_summary")
+  const description = readOptionalString(value, "description")
   const agentType = readOptionalString(value, "agent_type")
   const category = readOptionalString(value, "category")
   const toolAllow = readOptionalStringArray(value, "tool_allow")
   const toolDeny = readOptionalStringArray(value, "tool_deny")
   const pid = readOptionalNumber(value, "pid")
+  const hostPid = readOptionalNumber(value, "host_pid")
   const childSessionId = readOptionalString(value, "child_session_id")
   const finalResponse = readOptionalString(value, "final_response")
   const errorMessage = readOptionalString(value, "error_message")
   const killed = readOptionalBoolean(value, "killed")
-  const resolvedModel = readOptionalResolvedModel(value)
-  const spawnSpec = readOptionalSpawnSpec(value)
+  // Legacy records predate the field: they never asked for a terminal notification, so false.
+  const notifyOnTerminal = readOptionalBoolean(value, "notify_on_terminal") ?? false
+  const requestedModel = parseOptionalResolvedModel(value, "requested_model")
+  const fallbackModels = parseOptionalResolvedModelArray(value, "fallback_models")
+  const fallbackAttempts = parseOptionalResolvedModelArray(value, "fallback_attempts")
+  const resolvedModel = parseOptionalResolvedModel(value, "resolved_model")
+  const spawnSpec = parseOptionalSpawnSpec(value)
+  const owner = parseOptionalOwner(value)
+  const pendingSteering = parseOptionalPendingSteering(value, path, warnings)
+  const runStats = value["run_stats"] === undefined ? undefined : parseRunStats(value["run_stats"])
+  const taskSeq = readOptionalNumber(value, "task_seq")
+  const configGeneration = readOptionalNumber(value, "config_generation")
+  const backgroundMode = readOptionalBackgroundMode(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -32,55 +64,47 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     depth: readNumber(value, "depth"),
     execution_mode: readString(value, "execution_mode"),
     model: readString(value, "model"),
+    notify_on_terminal: notifyOnTerminal,
     created_at: readString(value, "created_at"),
     updated_at: readString(value, "updated_at"),
-    notification: readNotification(value),
+    notification: parseNotification(value),
     ...(name === undefined ? {} : { name }),
+    ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
+    ...(description === undefined ? {} : { description }),
     ...(agentType === undefined ? {} : { agent_type: agentType }),
     ...(category === undefined ? {} : { category }),
     ...(toolAllow === undefined ? {} : { tool_allow: toolAllow }),
     ...(toolDeny === undefined ? {} : { tool_deny: toolDeny }),
+    ...(requestedModel === undefined ? {} : { requested_model: requestedModel }),
+    ...(fallbackModels === undefined ? {} : { fallback_models: fallbackModels }),
+    ...(fallbackAttempts === undefined ? {} : { fallback_attempts: fallbackAttempts }),
     ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
+    ...(owner === undefined ? {} : { owner }),
+    ...(pendingSteering !== undefined && pendingSteering.length > 0 ? { pending_steering: pendingSteering } : {}),
     ...(pid === undefined ? {} : { pid }),
+    ...(hostPid === undefined ? {} : { host_pid: hostPid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
     ...(killed === undefined ? {} : { killed }),
+    ...(runStats === undefined ? {} : { run_stats: runStats }),
+    ...(taskSeq === undefined ? {} : { task_seq: taskSeq }),
+    ...(configGeneration === undefined ? {} : { config_generation: configGeneration }),
+    ...(backgroundMode === undefined ? {} : { background_mode: backgroundMode }),
   }
 }
 
-function readOptionalSpawnSpec(record: Record<string, unknown>): TaskRecord["spawn_spec"] {
-  const value = record["spawn_spec"]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("spawn_spec is not an object")
-  return { cwd: readString(value, "cwd") }
-}
-
-function readOptionalResolvedModel(record: Record<string, unknown>): ResolvedModelRecord | undefined {
-  const value = record["resolved_model"]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("resolved_model is not an object")
-  const variant = readOptionalString(value, "variant")
-  const reasoningEffort = readOptionalString(value, "reasoning_effort")
-  return {
-    provider: readString(value, "provider"),
-    model_id: readString(value, "model_id"),
-    display: readString(value, "display"),
-    source: readResolvedModelSource(value),
-    ...(variant === undefined ? {} : { variant }),
-    ...(reasoningEffort === undefined ? {} : { reasoning_effort: reasoningEffort }),
-  }
-}
-
-function readNotification(record: Record<string, unknown>): TaskRecord["notification"] {
-  const notification = record["notification"]
-  if (!isRecord(notification)) throw new Error("notification is not an object")
-  const failedEpoch = readOptionalNumber(notification, "notification_failed_epoch")
-  return {
-    run_epoch: readNumber(notification, "run_epoch"),
-    notified_epoch: readNumber(notification, "notified_epoch"),
-    ...(failedEpoch === undefined ? {} : { notification_failed_epoch: failedEpoch }),
+function readOptionalBackgroundMode(record: Record<string, unknown>): BackgroundMode | undefined {
+  const mode = readOptionalString(record, "background_mode")
+  if (mode === undefined) return undefined
+  switch (mode) {
+    case "foreground":
+    case "background":
+    case "promoted":
+      return mode
+    default:
+      throw new Error(`background_mode must be one of ${BACKGROUND_MODES.join(", ")}`)
   }
 }
 
@@ -100,17 +124,6 @@ function readTaskStatus(record: Record<string, unknown>): TaskRecord["status"] {
   }
 }
 
-function readResolvedModelSource(record: Record<string, unknown>): ResolvedModelRecord["source"] {
-  const source = readString(record, "source")
-  switch (source) {
-    case "category":
-    case "explicit":
-      return source
-    default:
-      throw new Error(`resolved_model.source must be ${RESOLVED_MODEL_SOURCES.join(" or ")}`)
-  }
-}
-
 function readResidencyState(record: Record<string, unknown>): TaskRecord["residency_state"] {
   const residencyState = readString(record, "residency_state")
   switch (residencyState) {
@@ -123,51 +136,4 @@ function readResidencyState(record: Record<string, unknown>): TaskRecord["reside
     default:
       throw new Error(`Invalid residency state [REDACTED]; expected one of ${RESIDENCY_STATES.join(", ")}`)
   }
-}
-
-function readString(record: Record<string, unknown>, key: string): string {
-  const value = record[key]
-  if (typeof value !== "string") throw new Error(`${key} is not a string`)
-  return value
-}
-
-function readNumber(record: Record<string, unknown>, key: string): number {
-  const value = record[key]
-  if (typeof value !== "number") throw new Error(`${key} is not a number`)
-  return value
-}
-
-function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key]
-  if (value === undefined) return undefined
-  if (typeof value !== "string") throw new Error(`${key} is not a string`)
-  return value
-}
-
-function readOptionalNumber(record: Record<string, unknown>, key: string): number | undefined {
-  const value = record[key]
-  if (value === undefined) return undefined
-  if (typeof value !== "number") throw new Error(`${key} is not a number`)
-  return value
-}
-
-function readOptionalBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
-  const value = record[key]
-  if (value === undefined) return undefined
-  if (typeof value !== "boolean") throw new Error(`${key} is not a boolean`)
-  return value
-}
-
-function readOptionalStringArray(record: Record<string, unknown>, key: string): readonly string[] | undefined {
-  const value = record[key]
-  if (value === undefined) return undefined
-  if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string")) {
-    throw new Error(`${key} is not a string array`)
-  }
-  return value
-}
-
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

@@ -8,8 +8,6 @@ type SkillsConfigRecord = {
   readonly [key: string]: unknown
 }
 
-const SHARED_SKILL_PREFIX = "shared/"
-
 export function normalizeSkillAliasName(name: string): string {
   return name.toLowerCase()
 }
@@ -65,12 +63,5 @@ export function isDisabledSkillName(
   name: string,
   disabledSkills: ReadonlySet<string>,
 ): boolean {
-  const normalizedName = normalizeSkillAliasName(name)
-  if (isDisabledAlias(normalizedName, disabledSkills)) return true
-
-  if (normalizedName.startsWith(SHARED_SKILL_PREFIX)) {
-    return isDisabledAlias(normalizedName.slice(SHARED_SKILL_PREFIX.length), disabledSkills)
-  }
-
-  return isDisabledAlias(`${SHARED_SKILL_PREFIX}${normalizedName}`, disabledSkills)
+  return isDisabledAlias(normalizeSkillAliasName(name), disabledSkills)
 }

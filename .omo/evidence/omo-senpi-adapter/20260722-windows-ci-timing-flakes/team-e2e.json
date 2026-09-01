@@ -1,0 +1,33 @@
+{
+  "result": "PASS",
+  "runtime": "@code-yeongyu/senpi 2026.7.5-2",
+  "checks": {
+    "createTwoMembersActive": true,
+    "createListsActiveMembers": true,
+    "leadToMemberEnqueued": true,
+    "memberEnvelopeEchoed": true,
+    "teamWaitReceivedMemberMessage": true,
+    "teamWaitProcessedLedger": true,
+    "teamWaitEventLoggedOnce": true,
+    "taskCreateClaimUpdate": true,
+    "shutdownApproved": true,
+    "shutdown_via_task_send": true,
+    "rejectRestoredMember": true,
+    "leadExitClean": true,
+    "duraBacklogSeeded": true,
+    "duraMessagesEnqueued": true,
+    "duraUnreadDrainedToZero": true,
+    "reclaimReservationRestored": true,
+    "reclaimNoLeak": true,
+    "crashHoldReached": true,
+    "crashKilledMemberAtHold": true,
+    "crashReservationUncommittedAtKill": true,
+    "crashRestartExitClean": true,
+    "crashProcessedLedgerExactlyOnce": true,
+    "crashDeliveredEventExactlyOnce": true,
+    "crashSessionEnvelopeExactlyOnce": true
+  },
+  "failed": [],
+  "credentialIsolationClean": true,
+  "leakedPids": 0
+}

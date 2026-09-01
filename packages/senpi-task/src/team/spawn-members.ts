@@ -3,6 +3,8 @@ import { mkdir } from "node:fs/promises"
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, StartResult } from "../manager"
+import type { ResolvedModelRecord } from "../state"
+import { assembleMemberExtensions } from "./member-extensions"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
 import {
   SenpiTeamRuntimeError,
@@ -16,6 +18,7 @@ export type SpawnedMember = {
   readonly taskId: string
   readonly sessionId?: string
   readonly status: RuntimeMemberStatus
+  readonly resolvedModel?: ResolvedModelRecord
 }
 
 export type SpawnMembersInput = {
@@ -106,16 +109,22 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
   const record = input.manager.get(result.task_id)
   const sessionId = input.manager.getResidentHandle(result.task_id)?.sessionId ?? record?.child_session_id
   const status = projectMemberStatus(record?.status ?? (result.status === "pending" ? "pending" : "running"))
-  return { taskId: result.task_id, ...(sessionId !== undefined ? { sessionId } : {}), status }
+  const resolvedModel = result.resolved_model ?? record?.resolved_model
+  return {
+    taskId: result.task_id,
+    ...(sessionId !== undefined ? { sessionId } : {}),
+    status,
+    ...(resolvedModel !== undefined ? { resolvedModel } : {}),
+  }
 }
 
 function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): ManagerStartSpec {
   const launch = input.memberExtension
   const extensions = launch === undefined
     ? undefined
-    : [...new Set([...(launch.inheritedExtensions ?? []), launch.entryPath])]
+    : assembleMemberExtensions(launch.entryPath, launch.inheritedExtensions)
   return {
-    prompt: member.prompt ?? `You are team member '${member.name}' in team '${input.spec.name}'.`,
+    prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,
     root_session_id: input.leadSessionId,
     depth: input.spawnDepth,
@@ -123,6 +132,7 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
     execution_mode: "process",
     run_in_background: true,
     ...(member.kind === "category" ? { category: member.category } : { subagent_type: member.subagent_type }),
+    ...(member.task_summary !== undefined ? { task_summary: member.task_summary } : {}),
     ...(member.worktreePath !== undefined ? { cwd: member.worktreePath } : {}),
     ...(extensions !== undefined ? { extensions } : {}),
     ...(launch !== undefined ? {
@@ -132,6 +142,19 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
       },
     } : {}),
   }
+}
+
+// Every member bootstrap frames the injection protocol FIRST so members end their initial turn while
+// remaining resident; later lead mail steers into that same session's running turn.
+function buildMemberPrompt(spec: TeamSpec, member: TeamMember): string {
+  const role = member.prompt ?? `You are team member '${member.name}' in team '${spec.name}'.`
+  return [
+    `You are '${member.name}', a member of team '${spec.name}' running under the senpi-task team runtime.`,
+    "Work arrives as injected messages from the lead and other members; coordinate with task_send.",
+    "After completing any immediate instructions below, report with task_send, then end your turn. Injected messages revive this resident session with more work.",
+    "When you finish assigned work, task_send the lead a summary, then end your turn and wait for an injected message.",
+    role,
+  ].join("\n\n")
 }
 
 function describeStartResult(result: Exclude<StartResult, { kind: "started" }>): string {

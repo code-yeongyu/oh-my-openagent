@@ -101,6 +101,25 @@ describe("no-sisyphus-gpt hook", () => {
     expect(output.message.agent).toBeUndefined()
   })
 
+  test("does not show toast for gpt-5.6 Sol model (native Sisyphus support)", async () => {
+    // given Sisyphus uses the automatic GPT-5.6 Sol fallback
+    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const hook = createNoSisyphusGptHook(createHookContext(showToast))
+    const output = createOutput()
+
+    // when chat.message applies the compatibility guard
+    await hook["chat.message"]?.({
+      sessionID: "ses_gpt56_sol",
+      agent: SISYPHUS_DISPLAY,
+      model: { providerID: "openai", modelID: "gpt-5.6-sol" },
+    }, output)
+
+    // then Sisyphus remains selected with its configured Sol effort
+    expect(showToast).toHaveBeenCalledTimes(0)
+    expect(output.message.agent).toBeUndefined()
+    expect(output.message.variant).toBe("medium")
+  })
+
   test("sets medium variant for gpt-5.5 model when native Sisyphus support is used", async () => {
     // given - sisyphus with gpt-5.5 model and no selected variant
     const showToast = spyOn({ fn: async () => ({}) }, "fn")

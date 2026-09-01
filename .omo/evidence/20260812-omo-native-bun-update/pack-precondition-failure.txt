@@ -1,0 +1,18 @@
+Pack integrity precondition failure
+
+Command:
+`node script/verify-omo-ai-payload.mjs && npm pack packages/omo-native`
+
+Result:
+The verifier failed before packing because the fresh task worktree had not yet
+staged `packages/omo-native/plugin`.
+
+Reported missing payload included:
+
+- `plugin/package.json`
+- extension and runtime artifacts
+- bundled skill files
+
+No tarball was created. The premature pack-integrity todo was superseded by
+explicit payload-build and retry tasks. The failed pack sandbox is registered
+for cleanup.

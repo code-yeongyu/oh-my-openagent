@@ -34,6 +34,7 @@ import {
 import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
 import { isTokenLimitError } from "./token-limit-detection"
+import { isUnrecoverableRequestError } from "./unrecoverable-request-error"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
@@ -282,6 +283,9 @@ ${todoList}`
       if (isTokenLimitError(errorObj)) {
         injectionState.tokenLimitDetected = true
         log(`[${HOOK_NAME}] Token limit error detected during injection, stopping continuation`, { sessionID })
+      } else if (isUnrecoverableRequestError(error)) {
+        injectionState.unrecoverableErrorDetected = true
+        log(`[${HOOK_NAME}] Non-retryable request error detected during injection, stopping continuation`, { sessionID })
       }
     }
   }

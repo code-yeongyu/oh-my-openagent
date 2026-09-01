@@ -6,15 +6,34 @@ const TEAM = ["actions-user", "github-actions[bot]", "code-yeongyu"]
 
 const EXCLUDED_PREFIX_PATTERN = /^(ignore:|test:|chore:|ci:|release:)/i
 const CONTAINED_SURFACE_PATTERN = /\bsenpi\b|\bpi-goal\b|\bpi-webfetch\b/i
+const RELEASE_VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
 
 export function isExcludedReleaseNoteSubject(subject: string): boolean {
   return EXCLUDED_PREFIX_PATTERN.test(subject) || CONTAINED_SURFACE_PATTERN.test(subject)
 }
 
-async function getLatestReleasedTag(): Promise<string | null> {
+function releaseChannel(version: string): string | null {
+  const prerelease = version.replace(/^v/, "").split("-", 2)[1]
+  return prerelease?.split(".", 1)[0] ?? null
+}
+
+export function selectPreviousReleaseTag(currentVersion: string, tags: readonly string[]): string | null {
+  const target = currentVersion.replace(/^v/, "")
+  const targetChannel = releaseChannel(target)
+  const candidates = tags.flatMap((tag) => {
+    const version = tag.replace(/^v/, "")
+    if (!RELEASE_VERSION_PATTERN.test(version) || releaseChannel(version) !== targetChannel ||
+      Bun.semver.order(version, target) >= 0) return []
+    return [{ tag, version }]
+  })
+  candidates.sort((left, right) => Bun.semver.order(right.version, left.version))
+  return candidates[0]?.tag ?? null
+}
+
+async function getLatestReleasedTag(currentVersion: string): Promise<string | null> {
   try {
-    const tag = await $`gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty'`.text()
-    return tag.trim() || null
+    const output = await $`gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName'`.text()
+    return selectPreviousReleaseTag(currentVersion, output.split("\n").filter(Boolean))
   } catch {
     return null
   }
@@ -39,72 +58,6 @@ async function generateChangelog(previousTag: string): Promise<string[]> {
   }
 
   return notes
-}
-
-async function getChangedFiles(previousTag: string): Promise<string[]> {
-  try {
-    const diff = await $`git diff --name-only ${previousTag}..HEAD`.text()
-    return diff
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
-function touchesAnyPath(files: string[], candidates: string[]): boolean {
-  return files.some((file) => candidates.some((candidate) => file === candidate || file.startsWith(`${candidate}/`)))
-}
-
-function buildReleaseFraming(files: string[]): string[] {
-  const bullets: string[] = []
-
-  if (
-    touchesAnyPath(files, [
-      "packages/omo-opencode/src/index.ts",
-      "packages/omo-opencode/src/plugin-config.ts",
-      "bin/platform.js",
-      "postinstall.mjs",
-      "docs",
-    ])
-  ) {
-    bullets.push("Rename transition updates across package detection, plugin/config compatibility, and install surfaces.")
-  }
-
-  if (touchesAnyPath(files, ["packages/omo-opencode/src/tools/delegate-task", "packages/omo-opencode/src/plugin/tool-registry.ts"])) {
-    bullets.push("Task and tool behavior updates, including delegate-task contract and runtime registration behavior.")
-  }
-
-  if (
-    touchesAnyPath(files, [
-      "packages/omo-opencode/src/plugin/tool-registry.ts",
-      "packages/omo-opencode/src/plugin-handlers/agent-config-handler.ts",
-      "packages/omo-opencode/src/plugin-handlers/tool-config-handler.ts",
-      "packages/omo-opencode/src/hooks/tasks-todowrite-disabler",
-    ])
-  ) {
-    bullets.push("Task-system default behavior alignment so omitted configuration behaves consistently across runtime paths.")
-  }
-
-  if (touchesAnyPath(files, [".github/workflows", "docs/guide/installation.md", "postinstall.mjs"])) {
-    bullets.push("Install and publish workflow hardening, including safer release sequencing and package/install fixes.")
-  }
-
-  if (bullets.length === 0) {
-    return []
-  }
-
-  return [
-    "## Minor Compatibility and Stability Release",
-    "",
-    "This release carries compatibility-facing behavior changes and operational hardening. Read the summary below before upgrading or publishing.",
-    "",
-    ...bullets.map((bullet) => `- ${bullet}`),
-    "",
-    "## Commit Summary",
-    "",
-  ]
 }
 
 async function getContributors(previousTag: string): Promise<string[]> {
@@ -144,18 +97,21 @@ async function getContributors(previousTag: string): Promise<string[]> {
 }
 
 async function main() {
-  const previousTag = await getLatestReleasedTag()
+  const packageJson: unknown = await Bun.file(new URL("../package.json", import.meta.url)).json()
+  if (typeof packageJson !== "object" || packageJson === null || !("version" in packageJson) ||
+    typeof packageJson.version !== "string") {
+    throw new TypeError("package.json must contain a string version")
+  }
+  const previousTag = await getLatestReleasedTag(packageJson.version)
 
   if (!previousTag) {
     console.log("Initial release")
     process.exit(0)
   }
 
-  const changedFiles = await getChangedFiles(previousTag)
   const changelog = await generateChangelog(previousTag)
   const contributors = await getContributors(previousTag)
-  const framing = buildReleaseFraming(changedFiles)
-  const notes = [...framing, ...changelog, ...contributors]
+  const notes = [...changelog, ...contributors]
 
   if (notes.length === 0) {
     console.log("No notable changes")

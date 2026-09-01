@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { ChildHandle as InProcessChildHandle, RunnerOutcome } from "../runners/in-process/child-handle"
-import type { ChildExitOutcome, RpcChildHandle } from "../runners/types"
+import type { ChildExitOutcome, RpcChildHandle, RpcTerminalAssistantMessage } from "../runners/types"
 import { adaptInProcessHandle, adaptRpcHandle } from "./child-handle"
 
 function fakeInProcessHandle(outcome: RunnerOutcome): InProcessChildHandle {
@@ -24,7 +24,13 @@ function fakeInProcessHandle(outcome: RunnerOutcome): InProcessChildHandle {
   } as InProcessChildHandle & { __disposed: boolean }
 }
 
-function fakeRpcHandle(exit: ChildExitOutcome | undefined): RpcChildHandle {
+type FakeRpcOptions = {
+  readonly exit?: ChildExitOutcome
+  readonly terminal?: RpcTerminalAssistantMessage
+  readonly abortedByUser?: boolean
+}
+
+function fakeRpcHandle(options: FakeRpcOptions = {}): RpcChildHandle {
   return {
     task_id: "st_00000002",
     sessionId: "rpc-session-2",
@@ -34,11 +40,13 @@ function fakeRpcHandle(exit: ChildExitOutcome | undefined): RpcChildHandle {
     abort: () => Promise.resolve(),
     subscribe: () => () => {},
     waitForIdle: () => Promise.resolve(),
-    lastAssistantText: () => "rpc final",
+    lastAssistantText: () => options.terminal?.text,
+    terminalAssistantMessage: () => options.terminal,
+    wasAbortedByUser: () => options.abortedByUser === true,
     dispose: () => Promise.resolve(),
     terminate: () => Promise.resolve(),
-    exitOutcome: () => exit,
-    waitForExit: () => Promise.resolve(exit ?? { kind: "clean", facts: { pid: 4242, code: 0, signal: null, stderrTail: "" } }),
+    exitOutcome: () => options.exit,
+    waitForExit: () => Promise.resolve(options.exit ?? { kind: "clean", facts: { pid: 4242, code: 0, signal: null, stderrTail: "" } }),
     lastSeen: () => undefined,
   }
 }
@@ -71,9 +79,66 @@ describe("adaptInProcessHandle", () => {
 })
 
 describe("adaptRpcHandle", () => {
-  test("#given an rpc handle that reached idle with no crash #when adapted #then the outcome is completed", async () => {
+  test("#given an rpc terminal provider error on a resident process #when adapted #then the outcome is a child-turn error carrying the provider message", async () => {
     // given
-    const handle = adaptRpcHandle(fakeRpcHandle(undefined))
+    const handle = adaptRpcHandle(
+      fakeRpcHandle({ terminal: { stopReason: "error", errorMessage: "401 unauthorized; re-authenticate" } }),
+    )
+
+    // when
+    const outcome = await handle.waitForOutcome()
+
+    // then
+    expect(outcome).toEqual({
+      status: "error",
+      failure: { kind: "child-turn-failed", message: "401 unauthorized; re-authenticate" },
+    })
+  })
+
+  test("#given an rpc terminal non-user abort #when adapted #then the outcome is a child-turn error", async () => {
+    // given
+    const handle = adaptRpcHandle(fakeRpcHandle({ terminal: { stopReason: "aborted" } }))
+
+    // when
+    const outcome = await handle.waitForOutcome()
+
+    // then
+    expect(outcome).toEqual({
+      status: "error",
+      failure: { kind: "child-turn-failed", message: 'child turn ended with stopReason "aborted"' },
+    })
+  })
+
+  test("#given an rpc turn explicitly aborted by the user #when adapted #then the outcome remains cancelled", async () => {
+    // given
+    const handle = adaptRpcHandle(
+      fakeRpcHandle({ terminal: { stopReason: "aborted", errorMessage: "operation aborted" }, abortedByUser: true }),
+    )
+
+    // when
+    const outcome = await handle.waitForOutcome()
+
+    // then
+    expect(outcome).toEqual({ status: "cancelled" })
+  })
+
+  test("#given an rpc clean turn with no assistant output #when adapted #then the outcome is a child-turn error", async () => {
+    // given
+    const handle = adaptRpcHandle(fakeRpcHandle({ terminal: { stopReason: "stop" } }))
+
+    // when
+    const outcome = await handle.waitForOutcome()
+
+    // then
+    expect(outcome).toEqual({
+      status: "error",
+      failure: { kind: "child-turn-failed", message: "child turn produced no assistant output" },
+    })
+  })
+
+  test("#given an rpc clean turn with assistant text #when adapted #then the outcome is completed", async () => {
+    // given
+    const handle = adaptRpcHandle(fakeRpcHandle({ terminal: { text: "rpc final", stopReason: "stop" } }))
 
     // when
     const outcome = await handle.waitForOutcome()
@@ -87,7 +152,7 @@ describe("adaptRpcHandle", () => {
   test("#given an rpc handle that crashed #when adapted #then the outcome is an error carrying the stderr tail", async () => {
     // given
     const handle = adaptRpcHandle(
-      fakeRpcHandle({ kind: "crashed", facts: { pid: 4242, code: 1, signal: null, stderrTail: "boom" } }),
+      fakeRpcHandle({ exit: { kind: "crashed", facts: { pid: 4242, code: 1, signal: null, stderrTail: "boom" } } }),
     )
 
     // when
@@ -96,6 +161,7 @@ describe("adaptRpcHandle", () => {
     // then
     expect(outcome.status).toBe("error")
     if (outcome.status !== "error") throw new Error("expected error outcome")
+    expect(outcome.failure.kind).toBe("child-prompt-failed")
     expect(outcome.failure.message).toContain("boom")
   })
 })

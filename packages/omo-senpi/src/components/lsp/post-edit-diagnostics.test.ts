@@ -46,6 +46,24 @@ function setup(): TestContext {
 }
 
 describe("omo-senpi lsp post-edit diagnostics", () => {
+  it("#given a session pi cwd #when the real LSP component handles a mutation #then default post-edit diagnostics use that cwd", async () => {
+    const sessionCwd = "/session/project"
+    const calls: Array<{ name: string; cwd?: string }> = []
+    const test = setup()
+    test.pi.cwd = sessionCwd
+
+    createLspComponent({
+      callDaemonTool: async (name, _args, options) => {
+        calls.push({ name, cwd: options?.cwd })
+        return { content: [{ type: "text", text: "No diagnostics found" }] }
+      },
+    }).register(test.pi, test.ctx)
+
+    await test.pi.dispatch("tool_result", mutationEvent("src/file.ts"), sessionContext("session-1"))
+
+    expect(calls).toEqual([{ name: "lsp_diagnostics", cwd: sessionCwd }])
+  })
+
   it("#given post-edit diagnostics with errors #when a write tool result arrives #then model-visible diagnostics are injected", async () => {
     // given
     const event = mutationEvent("src/broken.ts")

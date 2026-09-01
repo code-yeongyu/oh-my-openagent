@@ -1,0 +1,92 @@
+=== Task 7: Soul-edit notice (3 surfaces) - unit/integration evidence ===
+
+RED (failing first, captured before implementation):
+- red-core.txt: bun test over the six memory-core targets
+  (tools/soul-edit.test.ts [new], soul/watermark.test.ts [new], compile/compile.test.ts,
+  compile/cache.test.ts, identity/layout.test.ts, locks/domains.test.ts)
+  Result: 9 pass / 7 fail / 4 errors - failures are exactly the new behavioral pins
+  (missing ../soul module, missing MEMORY_SOUL_METADATA_TOKEN, cache variant ignoring
+  soulNotice, layout/domains pins not yet extended).
+- red-senpi.txt: bun test over the six omo-senpi targets
+  (soul-notice.test.ts [new], tools.test.ts, prompt.test.ts, mcp/memory-server.test.ts,
+  nudge-wiring.test.ts, commands/doctor.test.ts)
+  Result: 43 pass / 10 fail / 1 error - failures are exactly the new pins
+  (onCommit seam, receipt write/consume, soul metadata line, exactly-once, MCP catalog
+  tool-name injection, toolCallId injection, v1 doctor advisory).
+- Build-defect RED: build-extension.test.mjs shebang test failed before the fix
+  (marker line landed above the shebang; spawned MCP bundle unstartable under Node ESM).
+
+GREEN (after implementation):
+- green.txt: same 13 files in one run - 104 pass / 0 fail / 318 expect() calls.
+- Full package suites in the same working tree:
+  - bun test packages/memory-core: 401 pass / 0 fail (42 files).
+  - bun test packages/omo-senpi/src/components/memory + src/mcp: 347 pass / 0 fail (50 files).
+  - bun test packages/omo-senpi/plugin/scripts/build-extension.test.mjs: 9 pass / 0 fail.
+- Typecheck: tsgo clean for packages/memory-core and packages/omo-senpi (exit 0 both).
+  (LSP server is pinned to another checkout in this environment, so package-level
+  strict typecheck was used instead, per the task brief's allowance.)
+- Package gate: bun run test:senpi - 997 pass / 2 fail, both pre-existing and NOT mine:
+  * omo-senpi bundle size budget (937,022 > 880,000): the documented shared-branch
+    overage. The TRACKED bundle at HEAD is 867,366 (in budget); the overage appears only
+    when building with all in-flight wave-3 changes (facts/dream/supervisor). My
+    contribution to the bundle is ~2KB minified.
+  * omo-senpi ulw-loop runtime OMO_BIN test: listed pre-existing failure.
+  Transient note: worker/memory-run-supervisor.integration (termination-grace deadline)
+  failed once under full-suite parallel load and passes standalone; todo-25 territory,
+  not touched by this task.
+
+Surface coverage map (acceptance criteria):
+(a) Tool-result discipline line (unconditional): tools/soul-edit.test.ts pins
+    MEMORY_SOUL_EDIT_RESULT_TOKEN presence for persona/identity/rename commits via both
+    memory and memory_apply_patch, and absence for non-soul commits; commit metadata
+    {sha, subject, affectedPaths} pinned on every success (IC-4).
+(b) Visible entry (gated by memory.soul.edit_notice): soul-notice.test.ts pins exactly one
+    omo-memory:soul-updated entry with exact {sha, subject, affectedPaths} for soul commits,
+    none for non-soul, none when edit_notice:false; renderer registration pinned.
+    tools.test.ts pins the onCommit seam (called on success with first-line subject; never
+    on engine rejection). Entry WORDING is prose with no machine consumer: never asserted
+    (per .omo/rules/test-discipline.md), ships on review + QA-by-read.
+(c) Reflection-delta metadata line: soul/watermark.test.ts pins IC-5 (silent establish,
+    exactly-once advance, in-band commits excluded via Omo-Writer trailer, non-soul
+    excluded, corrupt/stale watermark re-establishes silently). compile.test.ts pins the
+    metadata line + sha7 interpolation. cache.test.ts pins the consumed-notice variant
+    replacement. prompt.test.ts pins the end-to-end exactly-once at an unchanged HEAD
+    (line on first compile, absent on second and third).
+(d) Doctor advisory: doctor.test.ts pins [warn] soul-seed for the byte-exact v1 seed
+    (historical fixture from commit 02a7d562e; hash constant V1_PERSONA_SEED_SHA256 =
+    sha256 of the exact v1 seed file, 977 bytes) and [ok] soul-seed for a diverged persona.
+
+MCP surface (IC-17 outbound half): memory-server.test.ts pins the receipt file
+(runtime/tool-receipts/<sha256(toolCallId).slice(0,32)>.json, {version, toolCallId, sha,
+subject, affectedPaths}) written only on success with an injected toolCallId, and never on
+error or standalone calls. soul-notice.test.ts pins the tool_result read-and-delete,
+embedded-toolCallId verification, and non-memory-tool isolation.
+
+Real-surface QA:
+- senpi-run.txt: scripted senpi -p (print mode) session, tool_exposure "search" +
+  non-auto memory.agent, commits a persona edit through the MCP surface. 7/7 PASS:
+  bound identity repo, commit with IC-2 trailers (proves the tool_call provenance bridge
+  now matches senpi's MCP catalog names - see report), discipline line in the tool
+  result, receipt consumed, exactly one persisted soul-updated entry carrying the HEAD
+  sha and affectedPaths. Driver: senpi-run-driver.mjs. Teardown receipt included.
+- tui-render.txt: interactive TUI driven under tmux on a private socket (print mode
+  never invokes entry renderers). 7/7 PASS: soul scenario renders exactly one
+  `memory soul updated <sha7>` component from the registered renderer with the entry
+  persisted; non-soul scenario commits, executes, and renders/persists nothing.
+  Driver: tui-render-driver.mjs. Teardown receipts included.
+
+Plan/code discrepancies found and fixed (flagged per protocol):
+1. The extension build prepended the build marker ABOVE the bundle shebang, so the
+   tracked omo-memory-mcp.js (and memory-run-supervisor.mjs) could not start under
+   Node's ESM loader (shebang must be byte 0): the entire MCP tool surface was dead on
+   the real host. Fixed in plugin/scripts/build-extension.mjs (shebang stays first;
+   parseBuildArtifact tolerates both layouts; digest body unchanged) with a regression
+   test in build-extension.test.mjs. Bundles were rebuilt ONLY for QA and restored with
+   git checkout per the task brief; bundle regeneration belongs to the build owner.
+2. Todo 3's tool_call provenance bridge matched only the bare tool names
+   ("memory"/"memory_apply_patch"); senpi exposes MCP tools as
+   mcp_omo-memory_memory(_apply_patch), so provenance/identity injection never fired on
+   the search exposure. Fixed by matching the catalog names too (nudge-wiring.ts) and
+   proven on the real surface in senpi-run.txt (non-auto identity, trailers landed).
+3. Todo 6's persona seed on this branch was updated mid-task by 015e0e877 (em dash
+   drop); the v1 hash constant is unaffected (it pins the historical v1 seed).

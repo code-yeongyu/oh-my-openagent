@@ -11,9 +11,9 @@ import { createRepoWithBuiltComponentBins, EXPECTED_OMO_COMPONENT_BINS, expected
 const STALE_CODEX_COMPONENT_BINS = [
   "codex-comment-checker",
   "codex-rules",
-  "codex-start-work-continuation",
   "codex-telemetry",
   "codex-ultrawork",
+  "codex-ulw-execute-continuation",
 ] as const
 
 const LAZYCODEX_AGENT_ROLE_NAMES = [
@@ -26,7 +26,7 @@ const LAZYCODEX_AGENT_ROLE_NAMES = [
   "lazycodex-worker-medium",
 ] as const
 
-const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 120_000 : 20_000
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 
@@ -35,9 +35,10 @@ describe("lazycodex install surface", () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-lazycodex-agents-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-lazycodex-agents-"))
+    const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+    await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
 
     // then
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
@@ -96,7 +97,9 @@ describe("lazycodex install surface", () => {
     const installationGuide = await readFile(join(process.cwd(), "docs", "guide", "installation.md"), "utf8")
 
     // when
-    const componentBinNames = EXPECTED_OMO_COMPONENT_BINS.map((entry) => entry.name)
+    const componentBinNames = EXPECTED_OMO_COMPONENT_BINS.filter(
+      (entry) => !("kind" in entry && entry.kind === "runtime-wrapper"),
+    ).map((entry) => entry.name)
 
     // then
     for (const name of componentBinNames) {
@@ -121,9 +124,10 @@ describe("lazycodex install surface", () => {
     await mkdir(join(marketplaceRoot, ".git"), { recursive: true })
     await writeFile(join(marketplaceRoot, ".git", "config"), "[remote \"origin\"]\n")
     await writeFile(join(marketplaceRoot, ".codex-marketplace-install.json"), '{"source_type":"git"}\n')
+    const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
     // when
-    const result = await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+    const result = await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
     const pluginPath = result.installed[0]?.path
     if (pluginPath === undefined) {
       throw new Error("Codex installer did not report an installed plugin path")
@@ -147,9 +151,10 @@ describe("lazycodex install surface", () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-clean-snapshot-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-clean-snapshot-"))
+    const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+    await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
     await rm(join(codexHome, ".tmp", "marketplaces", "sisyphuslabs"), { recursive: true, force: true })
     await rm(join(codexHome, "plugins", "cache", "sisyphuslabs"), { recursive: true, force: true })
 

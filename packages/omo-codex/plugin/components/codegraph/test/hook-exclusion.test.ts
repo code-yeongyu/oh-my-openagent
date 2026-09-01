@@ -20,8 +20,9 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 		// given
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
+		let sweepCalls = 0;
 		const stateRoot = createAllowedWorkspace("codegraph-omo-state");
-		const workspace = join(stateRoot, ".omo", "ultraresearch", "run", "clones", "repo");
+		const workspace = join(stateRoot, ".omo", "ulw-research", "run", "clones", "repo");
 		mkdirSync(workspace, { recursive: true });
 
 		try {
@@ -33,13 +34,17 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => {
-					throw new Error("excluded projects must not probe CodeGraph status");
+				ancestorProbe: () => {
+					throw new Error("excluded projects must not probe CodeGraph ancestors");
+				},
+				sweepZombies: () => {
+					sweepCalls += 1;
 				},
 			});
 
 			// then
 			expect(result).toEqual({ action: "skipped-excluded", exitCode: 0 });
+			expect(sweepCalls).toBe(0);
 			expect(spawned).toEqual([]);
 			expect(stdout.join("")).toBe("");
 		} finally {
@@ -63,8 +68,8 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				env: { HOME: "/tmp/home" },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
+				ancestorProbe: () => ({ kind: "uninitialized" }),
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
 			});
 
 			// then
@@ -92,8 +97,8 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				env: { HOME: "/tmp/home" },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
+				ancestorProbe: () => ({ kind: "uninitialized" }),
 				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
 			});
 
 			// then

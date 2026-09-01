@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { describe, expect, test } from "bun:test"
 
 import {
@@ -83,7 +84,7 @@ describe("runtime shims", () => {
   test("#given Bun global is unavailable #when spawning async and sync commands #then Node fallback preserves process output", async () => {
     const temporaryDirectory = await mkdtemp(join(tmpdir(), "runtime-node-fallback-"))
     const modulePath = join(temporaryDirectory, "spawn.mjs")
-    const source = await readFile(join(process.cwd(), "packages/utils/src/runtime/spawn.ts"), "utf8")
+    const source = await readFile(fileURLToPath(new URL("./spawn.ts", import.meta.url)), "utf8")
     const transpiled = new Bun.Transpiler({ loader: "ts" }).transformSync(source)
     const nodePath = bunWhich("node")
     const script = String.raw`
