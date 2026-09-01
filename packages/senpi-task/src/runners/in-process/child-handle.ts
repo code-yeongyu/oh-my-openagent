@@ -99,6 +99,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+// Mirrors the RPC runner's terminal-event contract (runners/rpc/handle.ts): ONLY an explicit
+// willRetry === false ends the turn. An omitted or malformed flag is not terminal, so a partial
+// event can never settle a turn the agent still intends to retry.
+function isTerminalAgentEnd(event: unknown): boolean {
+  return isRecord(event) && event["willRetry"] === false
+}
+
 // Derive the settled turn's outcome from what it emitted. The session-level getLastAssistantText()
 // is only trusted when it CHANGED during this turn (baseline diff): on a revive, the previous run's
 // text must never masquerade as a fresh completion.
@@ -178,27 +185,49 @@ function createTrackedChildHandle(taskId: string, session: ChildSession): Tracke
   let turnActive = false
   // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
   let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session))
-  const observation: TurnObservation = { text: undefined, stopReason: undefined, errorMessage: undefined, baseline: undefined }
-  const unsubscribeObserver = session.subscribe((event) => observeTurnEvent(observation, event))
+  // Every turn owns its generation, its observation and its subscription. A turn that has been
+  // superseded can no longer settle, deactivate, or observe on behalf of the turn that replaced it.
+  let generation = 0
+  let unsubscribeActiveTurn: (() => void) | undefined
 
   // Start a fresh tracked turn and mark it active until it settles. waitForIdle() always returns the
   // CURRENT turn, so a revive follow-up re-arms it to the new turn instead of a stale resolved one.
   const beginTurn = (text: string): void => {
     aborted = false
     turnActive = true
-    observation.text = undefined
-    observation.stopReason = undefined
-    observation.errorMessage = undefined
-    observation.baseline = session.getLastAssistantText()
-    running = runTurn(session, text, () => aborted, observation)
-    void running.then(
-      () => {
-        turnActive = false
-      },
-      () => {
-        turnActive = false
-      },
-    )
+    generation += 1
+    const turn = generation
+    const observation: TurnObservation = {
+      text: undefined,
+      stopReason: undefined,
+      errorMessage: undefined,
+      baseline: session.getLastAssistantText(),
+    }
+    const cell = Promise.withResolvers<RunnerOutcome>()
+    running = cell.promise
+
+    // runTurn's resolution races the session's terminating agent_end event; first writer wins.
+    // Without the event path a child whose loop exits while its prompt() promise never settles
+    // (#5167) strands waitForIdle forever, leaving the parent's task() blocked with no timeout.
+    const settle = (outcome: RunnerOutcome): void => {
+      if (turn !== generation) return
+      unsubscribeActiveTurn?.()
+      unsubscribeActiveTurn = undefined
+      turnActive = false
+      cell.resolve(outcome)
+    }
+
+    // Dropping the previous turn's subscription is what gives event attribution: a late event from
+    // the prior turn reaches an unsubscribed listener instead of mutating this turn's observation.
+    unsubscribeActiveTurn?.()
+    unsubscribeActiveTurn = session.subscribe((event) => {
+      if (turn !== generation) return
+      observeTurnEvent(observation, event)
+      if (event.type !== "agent_end" || !isTerminalAgentEnd(event)) return
+      settle(aborted ? { status: "cancelled" } : turnOutcome(session, observation))
+    })
+
+    void runTurn(session, text, () => aborted, observation).then(settle)
   }
 
   const handle: ChildHandle = {
@@ -224,7 +253,8 @@ function createTrackedChildHandle(taskId: string, session: ChildSession): Tracke
     dispose: () => {
       if (disposed) return
       disposed = true
-      unsubscribeObserver()
+      unsubscribeActiveTurn?.()
+      unsubscribeActiveTurn = undefined
       session.dispose()
     },
   }
