@@ -3,7 +3,6 @@ import { createRequire } from "node:module"
 import { basename, delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import type { RpcRunnerSpec } from "../types"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
 import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
 
@@ -36,6 +35,7 @@ export type RpcSpawnRuntime = {
   readonly platform: NodeJS.Platform
   readonly parentEnv: NodeJS.ProcessEnv
   readonly resolveRpcEntry: () => string
+  readonly resolveSenpiPackageCli?: () => string | null
   // Injectable so tests can pin the executable-vs-fallback branch; defaults to resolveSenpiExecutable.
   readonly resolveSenpiExecutable?: (runtime: RpcSpawnRuntime) => string | null
 }
@@ -115,6 +115,22 @@ function normalizeSenpiLauncher(executable: string, runtime: RpcSpawnRuntime): S
   return cliPath === undefined ? null : { command: runtime.execPath, prefixArgs: [cliPath] }
 }
 
+/**
+ * The installed engine package, found through module resolution rather than PATH. A Windows install
+ * whose shims never reached PATH (a team package installed under the app, an empty PATH in a service
+ * account) still exposes its CLI here, so the child launches instead of falling through to the
+ * loader-hijackable rpc-entry.
+ */
+function resolveInstalledSenpiCli(): string | null {
+  try {
+    const packageRoot = dirname(require.resolve("@code-yeongyu/senpi/package.json"))
+    const cliPath = join(packageRoot, "dist", "cli.js")
+    return existsSync(cliPath) ? cliPath : null
+  } catch {
+    return null
+  }
+}
+
 export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
   const executable = (runtime.resolveSenpiExecutable ?? resolveSenpiExecutable)(runtime)
   if (executable !== null) {
@@ -127,6 +143,10 @@ export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | 
     if (npmShim === null) continue
     const normalized = normalizeSenpiLauncher(npmShim, runtime)
     if (normalized !== null) return normalized
+  }
+  if (!runtime.isBunBinary) {
+    const packageCli = (runtime.resolveSenpiPackageCli ?? resolveInstalledSenpiCli)()
+    if (packageCli !== null) return { command: runtime.execPath, prefixArgs: [packageCli] }
   }
   return null
 }
