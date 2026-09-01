@@ -22,6 +22,7 @@ type LspRequestContext = {
 };
 
 const DAEMON_TOOL_NAMES = {
+	format: "format",
 	lsp_diagnostics: "diagnostics",
 	lsp_goto_definition: "goto_definition",
 	lsp_find_references: "find_references",
@@ -52,11 +53,16 @@ const cachedClients = new Map<string, Promise<DaemonClientModule>>();
 export async function callPackagedDaemonTool(
 		name: string,
 		args: Record<string, unknown>,
-		options: { readonly signal?: AbortSignal } = {},
+		options: {
+		readonly signal?: AbortSignal;
+		readonly cwd?: string;
+		readonly homeDir?: string;
+		readonly env?: Record<string, string | undefined>;
+	} = {},
 		importerUrl = import.meta.url,
 ): Promise<ToolExecutionResult> {
 	const client = await loadPackagedDaemonClient(importerUrl);
-	const context = currentSenpiRequestContext();
+	const context = currentSenpiRequestContext(options.cwd, options.homeDir, options.env);
 	return client.callToolViaDaemon(toDaemonToolName(name), args, { context, signal: options.signal });
 }
 
@@ -64,9 +70,13 @@ export function clearPackagedDaemonToolClientCache(): void {
 	cachedClients.clear();
 }
 
-function currentSenpiRequestContext(): LspRequestContext {
-	const cwd = canonicalCwd();
-	const home = resolve(process.env.HOME?.trim() || homedir());
+function currentSenpiRequestContext(
+	cwdInput?: string,
+	homeDir?: string,
+	env: Record<string, string | undefined> = process.env,
+): LspRequestContext {
+	const cwd = canonicalCwd(cwdInput);
+	const home = resolve(homeDir ?? (env.HOME?.trim() || homedir()));
 	return {
 		cwd,
 		projectConfigPaths: [join(cwd, ".pi", "lsp-client.json")],
@@ -76,8 +86,8 @@ function currentSenpiRequestContext(): LspRequestContext {
 	};
 }
 
-function canonicalCwd(): string {
-	const cwd = resolve(process.cwd());
+function canonicalCwd(cwdInput?: string): string {
+	const cwd = resolve(cwdInput ?? process.cwd());
 	return existsSync(cwd) ? realpathSync(cwd) : cwd;
 }
 

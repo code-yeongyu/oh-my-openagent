@@ -305,7 +305,7 @@ describe("codex components doctor check", () => {
         lastStatus: "degraded",
         degraded: [
           { component: "ast_grep", reason: "download failed: checksum mismatch", hint: "npx lazycodex-ai doctor" },
-          { component: "omo-cli", reason: "payload has no dist/cli" },
+          { component: "omo-agent-toolkit", reason: "payload has no dist/cli" },
         ],
       },
     })
@@ -318,7 +318,7 @@ describe("codex components doctor check", () => {
     expect(result.details).toContain(
       "degraded component=ast_grep reason=download failed: checksum mismatch hint=npx lazycodex-ai doctor",
     )
-    expect(result.details).toContain("degraded component=omo-cli reason=payload has no dist/cli")
+    expect(result.details).toContain("degraded component=omo-agent-toolkit reason=payload has no dist/cli")
   })
 
   test("#given malformed bootstrap state json #when checking components #then treats bootstrap as pending without crashing", async () => {

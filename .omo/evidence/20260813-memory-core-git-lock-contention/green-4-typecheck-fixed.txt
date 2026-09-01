@@ -1,0 +1,10 @@
+typecheck
+$ tsgo --noEmit -p tsconfig.json
+
+git_tests
+(pass) git lock retry > #given a non-lock git failure #when an operation runs #then it surfaces immediately without retrying [0.23ms]
+
+ 50 pass
+ 0 fail
+ 121 expect() calls
+Ran 50 tests across 4 files. [5.83s]

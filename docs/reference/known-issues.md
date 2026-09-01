@@ -16,18 +16,17 @@ Tracks bugs that are present in the current release but have been intentionally 
 - **Workaround**: If a native `plan_exit` prompt appears inside a delegated `ulw` planner, do not switch that nested child to build mode. Interrupt back to the parent, then ask the parent to recover the plan output or rerun planning through Prometheus/OMO planning explicitly.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5850.
 
-## #5839 - Ultrawork verification can miss prose-only Oracle approvals
+## #5839 - Ralph Loop prose-only Oracle approval detection (resolved)
 
-- **Affects**: Ultrawork/Ralph-loop verification flows that rely on Oracle returning the exact `<promise>VERIFIED</promise>` token.
-- **Symptom**: Oracle can approve the work in normal prose, but the detector treats the verification as failed because the success token was never requested or emitted. The loop may then spend extra iterations re-fixing already-correct work.
-- **Workaround**: When manually asking Oracle to verify completion, explicitly instruct it to end with `<promise>VERIFIED</promise>` only if the work is genuinely complete and correct. If a verification failure follows a clear prose approval, inspect the Oracle transcript before assuming the implementation regressed.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5839.
+- **Historical behavior**: The former Ralph Loop required Oracle to return the exact `<promise>VERIFIED</promise>` token and could reject a prose-only approval.
+- **Resolution**: Ralph Loop is no longer wired into current session hooks. The Goal subsystem replaced its user-facing continuation path and does not use the Ralph Loop Oracle verification detector.
+- **Status**: Resolved for current releases. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5839.
 
 ## #5746 - tmux subagent panes attach only after focus by default
 
 - **Affects**: `tmux.enabled` sessions that expect every subagent pane to show a live attached session immediately.
-- **Symptom**: New panes can show only the placeholder text `Focus this pane to attach` until the user focuses each pane. With high background concurrency, the tmux layout can look blank or inactive even though subagents are running.
-- **Workaround**: Focus a pane to activate its `opencode attach` session, or inspect subagent status through normal task/background outputs when live pane rendering is not necessary. Treat the placeholder as current behavior unless an eager-attach option is added.
+- **Symptom**: New panes auto-attach for about 5 seconds after spawn (`AUTO_ACTIVATE_GRACE_MS`). If that window is missed, a pane can stay on the placeholder text `Focus this pane to attach` until the user focuses it. With high background concurrency, parts of the tmux layout can look blank or inactive even though subagents are running.
+- **Workaround**: Focus a pane to activate its `opencode attach` session, or inspect subagent status through normal task/background outputs when live pane rendering is not necessary. After the grace window, treat focus-to-attach as current behavior; there is no user-facing eager-attach config flag.
 - **Status**: Open enhancement. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5746.
 
 ## #5809 - cmux tmux panes can stay on the focus-to-attach placeholder
@@ -51,19 +50,18 @@ Tracks bugs that are present in the current release but have been intentionally 
 - **Workaround**: Add an explicit instruction such as "verify with visual-qa before claiming done" to frontend prompts, and require screenshot/evidence output before accepting UI work as complete. If no rendered surface is available, ask the agent to state that limitation directly.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5838.
 
-## #5529 - GPT-5.5 reasoning effort can conflict with some OpenAI-compatible chat providers
+## #5529 - Manual GPT-5.5 custom-provider reasoning effort can conflict with chat providers
 
-- **Affects**: Third-party OpenAI-compatible providers that expose `gpt-5.5` through `/v1/chat/completions` but reject tool requests when `reasoning_effort` is present. Native OpenAI supports tools and reasoning effort for GPT-5.5.
-- **Symptom**: Tool requests can fail because OMO agent configs and OpenCode's GPT model transforms may supply reasoning effort based on the model ID, even when the compatible provider's chat-completions implementation does not support that combination.
-- **Workaround**: Use a provider-native route or adapter that supports GPT-5.5 reasoning with tools, or use a model/provider configuration that does not emit the unsupported reasoning setting for tool-heavy agents.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5529.
+- **Affects**: Manual custom-provider configurations that expose `gpt-5.5` through `/v1/chat/completions` but reject tool requests when `reasoning_effort` is present. Current built-in OMO agent chains use GPT-5.6 Sol rather than GPT-5.5.
+- **Symptom**: Upstream OpenCode model transforms may supply reasoning effort based on a manually configured GPT-5.5 model ID even when the compatible provider's chat-completions implementation does not support that combination.
+- **Workaround**: Use a provider-native route or adapter that supports GPT-5.5 reasoning with tools, or use a custom model/provider configuration that does not emit the unsupported reasoning setting.
+- **Status**: Open as a manual custom-provider/upstream OpenCode caveat. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5529.
 
-## #5604 - Required-model delegation can fail before the child stream starts
+## #5604 - Required-model delegation availability gate (resolved)
 
-- **Affects**: OpenCode delegation when provider connectivity is known and none of the connected providers can serve a required-model subagent's fallback chain.
-- **Symptom**: Model resolution can return success without pinning a provider/model. The harness may then create a child session that fails before producing assistant or tool output, which can look like a hidden, stuck, or skipped subagent.
-- **Workaround**: Connect a provider supported by the target agent, or reroute through a category or subagent whose fallback chain has an available provider. If a child produces no assistant/tool output, treat the dispatch as failed and retry through a supported route.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5604.
+- **Historical behavior**: A required-model subagent could be registered without an available model and then fail before producing child output.
+- **Resolution**: Required agents are now skipped during registration when their availability gates find no model in the built-in fallback chain. An explicit user configuration still counts as an intentional override.
+- **Status**: Resolved. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5604.
 
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
@@ -86,37 +84,11 @@ Tracks bugs that are present in the current release but have been intentionally 
 
 BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first prompt payload before dispatch and consume that bootstrap payload exactly once when runtime fallback must retry an empty-history child session.
 
-## v4.2.0 - Delegate-task early-failure-fallback (BLOCKER-4, deferred from PR #3825)
-
-### Symptom
-
-A delegated child session that fails on its very first `promptAsync` call (for example, the provider rejects the request before any session history is persisted) may not advance to the configured fallback models. The session ends in early failure instead of retrying with the next fallback in the chain.
-
-This affects subagents launched via the delegate-task tool (background or sync) where the first provider call fails immediately and `session.messages` is still empty.
-
-### History
-
-PR #3825 (`tw-yshuang/fix/delegated-child-session-early-failure-fallback`, merged as `cd33f3a39` and then `fac90d69f` on 2026-05-07) introduced a shared bootstrap context (`packages/omo-opencode/src/shared/delegated-child-session-bootstrap.ts`) to capture the retry payload before the first prompt dispatch, so empty-history failures could still retry with the fallback chain.
-
-After the merge landed on `dev`, the PR's own regression test (`delegated child-session empty-history fallback retries with captured bootstrap prompt` in `packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts`) failed on a clean root `bun test --timeout 30000` run (6828 pass / 1 fail). PR #4044 (`code-yeongyu/revert/3825-delegated-bootstrap`, revert commit `3c7d1299a`, merge-revert commit `e2b8e49e2`, merged on 2026-05-15) reverted the merge to keep `dev` green (6823 pass / 0 fail / 6 skip across 709 files).
-
-The original failure-mode the PR targets remains in v4.2.0.
-
-### Workaround
-
-- For delegated subagents, prefer providers that succeed reliably on the first call (rarely fail with auth/quota errors at request time).
-- Configure fallback models conservatively in `categories[].fallback_models` and accept that the very first failure may not auto-retry.
-- The existing runtime-fallback persisted-history retry path still works after the subagent produces any history.
-
-### Tracking
-
-Issue #4059 tracks the reland with stabilized regression coverage. The reland is deferred to a follow-up release and should account for current schema-shape changes plus prompt-async-gate semantics.
-
 ## #4225 — Custom LSP config in `.opencode/oh-my-openagent.jsonc` is silently ignored
 
 - **Affects**: v4.2.3+ after the LSP to MCP migration.
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
-- **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
+- **Workaround**: Configure the server in `.opencode/lsp.json`, `.omo/lsp.json`, `.omo/lsp-client.json`, or the user-level OpenCode config directory's `lsp.json`.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
 
 ## #4990 — Team-mode lead can stall after full quiescence
@@ -161,18 +133,18 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 
 - **Status**: Open. The runtime now avoids the misleading auto-updated toast when it detects an OpenCode-managed sandbox, but users may still need the manual cache refresh above until OpenCode exposes a reliable package-sandbox update path. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5367.
 
-## #4710: `@plan` may stay in Sisyphus instead of switching to Prometheus
+## #4710: `@plan` does not switch to Prometheus
 
 - **Affects**: Current OpenCode/Ultimate planning flow.
-- **Symptom**: Typing `@plan` from Sisyphus can leave the request in Sisyphus instead of handing it to Prometheus.
-- **Workaround**: Switch to Prometheus first with the Tab agent selector or `/agent`, ask for the plan there, then run `/start-work` after approval.
+- **Symptom**: `@plan` is OpenCode's native plan-agent mention, not an OMO Prometheus switch, so typing it from Sisyphus does not hand the request to Prometheus.
+- **Workaround**: Select Prometheus first with the Tab agent selector or `/agent`, ask for the plan there; after the plan is written under `.omo/plans/`, run `/ulw-execute` so Atlas executes it.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4710.
 
 ## #5050: OpenCode can hang during startup before the plugin runs
 
 - **Affects**: OpenCode 1.16.2 startup with external plugins and cold package caches.
 - **Symptom**: `opencode --pure` starts, but normal `opencode` clears the terminal and stalls after `service=plugin path=oh-my-openagent@latest loading plugin`.
-- **Workaround**: If the hang happens before `/tmp/oh-my-opencode.log` gets a plugin entry, avoid the npm resolver path by using an absolute `file://` plugin path or by pre-populating the OpenCode package cache. If logs point to a malformed or locked `opencode.db`, back up and remove `~/.local/share/opencode/opencode.db*`; OpenCode recreates it on next start, but local session history is lost.
+- **Workaround**: If the hang happens before `$TMPDIR/oh-my-opencode.log` (on Linux often `/tmp/oh-my-opencode.log`) gets a plugin entry, avoid the npm resolver path by using an absolute `file://` plugin path or by pre-populating the OpenCode package cache. If logs point to a malformed or locked `opencode.db`, back up and remove `~/.local/share/opencode/opencode.db*`; OpenCode recreates it on next start, but local session history is lost.
 - **Status**: Open. The npm resolver timeout belongs upstream in OpenCode; tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5050.
 
 ## #5260: Background tasks can wait on an LSP install decision
@@ -189,35 +161,23 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: For one-off trivial prompts, run `opencode --pure` or temporarily disable the plugin for that session.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5120.
 
-## #5105: Ralph Loop can flood logs while child subagents are active
+## #5105: Ralph Loop log flooding while child subagents were active (resolved)
 
-- **Affects**: Sessions with an active Ralph Loop and background child subagents.
-- **Symptom**: `/tmp/oh-my-opencode.log` repeats `promptAsync reservation release skipped for different source` while child subagents emit message events.
-- **Workaround**: Ralph Loop was replaced by the Goal subsystem (PR #6184), and the `ralph-loop` hook is no longer wired at HEAD, so the original flooding only affects releases before that migration. On those older releases, the historical controls were `"disabled_hooks": ["ralph-loop"]` in `oh-my-openagent.jsonc` and `/cancel-ralph`. On current releases, Goal is opt-in (`goal.enabled` defaults to `false`); if you see the same log pattern while a Goal continuation is active, disable the hook with `"disabled_hooks": ["goal"]` and run `/goal clear` (or `/stop-continuation`) to stop the active continuation before disabling it.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5105.
+- **Historical behavior**: Sessions with an active Ralph Loop and background child subagents could repeatedly log `promptAsync reservation release skipped for different source`.
+- **Resolution**: Ralph Loop was replaced by the Goal subsystem (PR #6184), and the `ralph-loop` hook is no longer wired in current session hooks. The original flooding affects only releases before that migration.
+- **Status**: Resolved for current releases. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5105.
 
-## #5025 — OpenCode Desktop loads the plugin but only shows native modes
+## #5025 - Windows runtime skill source server required Bun.serve (resolved)
 
-- **Affects**: OpenCode Desktop on Windows with `oh-my-openagent@4.7.5`.
-- **Symptom**: The Desktop plugin list shows `oh-my-openagent` as loaded, but the UI only exposes the native `build` and `plan` modes. The OpenCode log may include `Runtime skill source server requires Bun.serve failed to load plugin`.
-- **Workaround**: Disable the runtime security skills that start the Bun-backed skill source server, then restart OpenCode Desktop:
-
-  ```json
-  {
-    "disabled_skills": [
-      "security-research",
-      "security-review"
-    ]
-  }
-  ```
-
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5025.
+- **Historical behavior**: OpenCode Desktop on Windows with `oh-my-openagent@4.7.5` could fail to load the plugin when the runtime skill source server could not use `Bun.serve`.
+- **Resolution**: The runtime skill source server now falls back to a Node HTTP server when `Bun.serve` is unavailable. Disabling `security-research` and `security-review` is no longer required for this failure mode.
+- **Status**: Resolved for current releases. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5025.
 
 ## #5021 — Codex planner or reviewer subagents can appear stuck
 
 - **Affects**: LazyCodex / OMO Codex planner and reviewer flows that use native Codex subagents.
 - **Symptom**: A parent session can receive repeated `wait_agent` timeouts while a planner or reviewer subagent remains `running`. Follow-up prompts may not recover the run, and the session can look stuck until the child agent is closed or respawned.
-- **Workaround**: Use short wait cycles, send one targeted follow-up that asks the child to return a result or `BLOCKED`, then record the child as inconclusive before closing or respawning it. Do not treat repeated wait timeouts as proof that the child finished.
+- **Workaround**: Do not spin short `wait_agent` cycles; back off between calls by doubling the timeout up to about 5 minutes. Send one targeted follow-up that asks the child to return a result or `BLOCKED`, then record the child as inconclusive before closing or respawning it. Do not treat repeated wait timeouts as proof that the child finished.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5021.
 
 ## #3303 - Windows OpenCode proxy install can fail before OMO loads

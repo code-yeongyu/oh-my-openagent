@@ -1,0 +1,126 @@
+# Task 3 - Extension activation: provision PATH + OMO_AGENT_TOOLKIT_BIN (RED -> GREEN)
+
+Date: 2026-08-09
+Branch: feat/omo-ai-beta-release
+Plan: .omo/plans/omo-ai-beta-release.md (todo 3)
+Commit subject: feat(omo-senpi): provision in-session PATH and toolkit env at extension activation
+
+## Deliverable
+
+- packages/omo-senpi/src/extension/toolkit-path-provisioning.ts (NEW)
+  createToolkitPathProvisioning({ baseDir?, logger? }) factory. baseDir defaults to the
+  running extension's own ../runtime/agent-toolkit (import.meta.url-derived; extensions/omo.js
+  layout in the bundle). Source tree has no src/runtime, so dev runs take the absent-dir
+  branch. When the dir exists: prepend to process.env.PATH (path.delimiter-joined, skipped
+  when already the leading entry) and set OMO_AGENT_TOOLKIT_BIN to <baseDir>/cli.js ONLY IF
+  currently unset/empty. Absent dir: silent no-op. Any failure: logger.warn + continue, never
+  throws. OMO_BIN untouched; no settings or files written.
+- packages/omo-senpi/src/extension/toolkit-path-provisioning.test.ts (NEW)
+  Temp-dir fixtures, nested #given/#when/#then describes, env snapshot/restore per test.
+- packages/omo-senpi/src/extension/compose.ts (wired)
+  provisionToolkitPath() runs as the first step of activation, BEFORE any component registers.
+- packages/omo-senpi/plugin/extensions/omo.js (REGENERATED via
+  node packages/omo-senpi/plugin/scripts/build-extension.mjs; never hand-edited)
+
+## RED capture (tests written first, module absent)
+
+Command:
+
+  bun test packages/omo-senpi/src/extension/toolkit-path-provisioning.test.ts
+
+Output:
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/extension/toolkit-path-provisioning.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './toolkit-path-provisioning' from '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/src/extension/toolkit-path-provisioning.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [92.00ms]
+
+## GREEN capture (implementation landed)
+
+Command:
+
+  bun test packages/omo-senpi/src/extension
+
+Summary:
+
+  29 pass
+  0 fail
+  68 expect() calls
+  Ran 29 tests across 6 files.
+
+New-suite detail:
+
+  (pass) toolkit path provisioning > #given the toolkit directory exists > #when provisioning runs with a bare PATH and no preset toolkit bin > #then prepends the dir as the leading PATH entry and sets OMO_AGENT_TOOLKIT_BIN to cli.js
+  (pass) toolkit path provisioning > #given the toolkit directory exists > #when OMO_AGENT_TOOLKIT_BIN is already set > #then keeps the preset value and still prepends the toolkit dir to PATH
+  (pass) toolkit path provisioning > #given the toolkit directory exists > #when OMO_AGENT_TOOLKIT_BIN is set to an empty string > #then treats it as unset and points it at cli.js
+  (pass) toolkit path provisioning > #given the toolkit directory exists > #when provisioning runs twice > #then PATH holds exactly one toolkit entry and it stays leading
+  (pass) toolkit path provisioning > #given the toolkit directory is absent > #when provisioning runs > #then leaves the environment byte-identical
+
+Note: the first GREEN run surfaced one tsgo error (TS2769 at the OMO_AGENT_TOOLKIT_BIN
+assertion): TypeScript control-flow narrows a process.env read to undefined after
+`delete process.env.X`, so the post-provisioning read was pinned to the undefined type.
+Fixed in the test by reading through a function boundary (readEnv helper); no cast, no
+suppression. tsgo clean after.
+
+## Typecheck
+
+Command:
+
+  tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+
+Exit: 0 (no output)
+
+## Bundle regeneration + currency check
+
+Commands:
+
+  node packages/omo-senpi/plugin/scripts/build-extension.mjs
+  node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+
+Output:
+
+  omo-member.js  117.61 KB  (entry point)
+
+omo-senpi extension build is current: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/extensions/omo.js
+
+## QA scenarios
+
+Happy (posix; this machine is darwin/arm64, win32 covered by the .cmd shim design note in
+plan todo 3): temp fixture runtime/agent-toolkit with a cli.js dispatcher and an executable
+omo-agent-toolkit shim; provisioning ran with baseDir=<fixture>, then
+spawnSync('omo-agent-toolkit', ['ulw-loop', '--help'], { env: process.env }) resolved through
+the provisioned PATH. Failure: second provisioning run against a deleted toolkit dir.
+
+Output:
+
+happy: PATH leading entry = /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-qa-happy-qSPeIp/runtime/agent-toolkit
+happy: OMO_AGENT_TOOLKIT_BIN = /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-qa-happy-qSPeIp/runtime/agent-toolkit/cli.js
+happy: spawn status = 0 error = undefined
+happy: spawn stdout = cli-dispatcher:ulw-loop --help
+failure: absent-dir activation completed without throw = true
+failure: PATH byte-identical = true
+failure: OMO_AGENT_TOOLKIT_BIN byte-identical = true
+
+## Regression
+
+Command:
+
+  bun run test:senpi   # build:senpi-plugin && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && bun test packages/omo-senpi
+
+Summary:
+
+  620 pass
+  0 fail
+  1719 expect() calls
+  Ran 620 tests across 94 files.
+  Exit: 0

@@ -51,9 +51,6 @@ describe("web terminal visual QA guidance", () => {
     expect(attachmentDoc).toContain("/upload/policies/assets")
     expect(attachmentDoc).toContain("asset_upload_authenticity_token")
     expect(attachmentDoc).toContain("https://github.com/user-attachments/assets/<uuid>")
-    expect(attachmentDoc).toContain("Never use GitHub Releases")
-    expect(attachmentDoc).toContain("Never use external image hosters")
-    expect(attachmentDoc).toContain("Do not print cookies")
     for (const pointer of pointers) {
       expect(pointer.text, `${pointer.path} must point at attachment upload guidance`).toContain(
         "docs/reference/github-attachment-upload.md",

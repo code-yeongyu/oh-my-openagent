@@ -1,26 +1,42 @@
 import type { TaskRecord } from "../state"
+import { log } from "@oh-my-opencode/utils"
+
 import { acquireSessionAdmissionLease, type AdmissionLeaseTiming } from "./admission-lease"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { AgentLimitReached } from "./errors"
 import type { AdmissionResult } from "./types"
 
+// Completed in-process sessions are large, so reclaim them after 15 minutes without activity.
+// This is deliberately shorter than the 24-hour record TTL: the record remains available for
+// task_output while the live AgentSession is released. The sweep runs at the same cadence and is
+// unref'd so it cannot keep an otherwise idle host alive.
+export const RESIDENT_IDLE_TIMEOUT_MS = 15 * 60 * 1000
+const RESIDENT_IDLE_SWEEP_INTERVAL_MS = RESIDENT_IDLE_TIMEOUT_MS
+
+// Both the "unlimited" literal and a 0 cap mean unbounded residency (omo.json accepts either).
+function isUnbounded(maxChildren: number | "unlimited"): maxChildren is "unlimited" | 0 {
+  return maxChildren === "unlimited" || maxChildren === 0
+}
+
 /**
  * Residency cap gate (codex residency contract). A resident is a spawned-not-disposed child of the
  * parent session. Under the cap -> admit. At the cap -> LRU-evict the OLDEST terminal, idle resident
  * (skipping any with a queued send) via the destruction port. If nothing is evictable -> reject with
- * AgentLimitReached naming the residents so the caller can explain why.
+ * AgentLimitReached naming the residents so the caller can explain why. An unbounded cap
+ * ("unlimited" or 0) admits every child and never evicts.
  */
 export async function admitResident(context: LifecycleContext, parentSessionId: string): Promise<AdmissionResult> {
   const residents = residentsFor(context, parentSessionId)
-  if (residents.length < context.config.residency_max_children) return { kind: "admitted" }
+  const maxChildren = context.config.residency_max_children
+  if (isUnbounded(maxChildren) || residents.length < maxChildren) return { kind: "admitted" }
 
   const victim = lruEvictable(context, residents)
   if (victim === undefined) {
     return {
       kind: "rejected",
       error: new AgentLimitReached({
-        max_children: context.config.residency_max_children,
+        max_children: maxChildren,
         session_id: parentSessionId,
         residents: residents.map((record) => ({ task_id: record.task_id, name: record.name ?? record.task_id, status: record.status })),
       }),
@@ -32,9 +48,64 @@ export async function admitResident(context: LifecycleContext, parentSessionId: 
 }
 
 function residentsFor(context: LifecycleContext, parentSessionId: string): readonly TaskRecord[] {
+  // Capacity remains scoped to the parent session for compatibility with the persisted contract.
+  // A process-wide cap needs a host registry shared by all session engines and is follow-up work.
   return context.store
     .list()
     .records.filter((record) => record.parent_session_id === parentSessionId && record.residency_state === "resident")
+}
+
+/** Reclaim terminal residents that have not been touched during the idle retention window. */
+export async function reclaimIdleResidents(context: LifecycleContext): Promise<readonly string[]> {
+  const cutoff = context.now() - RESIDENT_IDLE_TIMEOUT_MS
+  const candidates = context.store.list().records.filter(
+    (record) =>
+      record.residency_state === "resident" &&
+      (record.host_pid === context.hostPid || context.registry.get(record.task_id) !== undefined) &&
+      TERMINAL_STATUSES.has(record.status) &&
+      Date.parse(record.updated_at) <= cutoff &&
+      !context.registry.hasPendingSends(record.task_id),
+  )
+  const evicted: string[] = []
+  for (const candidate of candidates) {
+    // Re-read immediately before teardown: a concurrent revive changes status/residency and must
+    // win over an idle observation. The destruction port remains the only disposer.
+    const fresh = context.store.load(candidate.task_id)
+    if (
+      fresh === null ||
+      fresh.residency_state !== "resident" ||
+      (fresh.host_pid !== context.hostPid && context.registry.get(fresh.task_id) === undefined) ||
+      !TERMINAL_STATUSES.has(fresh.status) ||
+      Date.parse(fresh.updated_at) > cutoff ||
+      context.registry.hasPendingSends(fresh.task_id)
+    ) continue
+    try {
+      await destroyResidentTask(context, fresh.task_id, "evict")
+      evicted.push(fresh.task_id)
+    } catch (error) {
+      log("senpi-task idle resident eviction failed", { taskId: fresh.task_id, error: String(error) })
+    }
+  }
+  return evicted
+}
+
+export function startIdleResidentReclaimer(
+  context: LifecycleContext,
+  cleanupExpired: () => Promise<unknown> = async () => undefined,
+): () => void {
+  let running = false
+  const timer = context.idleReclaimerScheduler.setInterval(() => {
+    if (running) return
+    running = true
+    void reclaimIdleResidents(context)
+      .then(() => cleanupExpired())
+      .catch((error) => {
+        log("senpi-task idle resident sweep failed", { error: String(error) })
+      })
+      .finally(() => { running = false })
+  }, RESIDENT_IDLE_SWEEP_INTERVAL_MS)
+  timer.unref?.()
+  return () => context.idleReclaimerScheduler.clearInterval(timer)
 }
 
 // Oldest-first scan (updated_at is touched on every steer/revive, so it tracks recency of use). The
@@ -140,7 +211,10 @@ export async function admitSuspendedBatch(
     const candidates = byRevivalPriority(revivalCandidates(context, parentSessionId, options.excludeTaskIds))
     // Residents include live foreign owners; when the configured cap sits below the current
     // resident count, available clamps to 0 - revive none, keep owned residents, evict nothing.
-    const available = Math.max(0, context.config.residency_max_children - residentsFor(context, parentSessionId).length)
+    const maxChildren = context.config.residency_max_children
+    const available = isUnbounded(maxChildren)
+      ? candidates.length
+      : Math.max(0, maxChildren - residentsFor(context, parentSessionId).length)
     const selected = candidates.slice(0, available)
     for (const record of selected) {
       // Holder-side fencing: re-read the lease before EVERY mutation; a displaced holder aborts

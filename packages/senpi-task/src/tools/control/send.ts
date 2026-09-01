@@ -1,4 +1,5 @@
-import { defineTool, type ToolDefinition } from "@code-yeongyu/senpi"
+import type { defineTool, ToolDefinition } from "@code-yeongyu/senpi"
+import type { TSchema } from "typebox"
 
 import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
@@ -25,6 +26,7 @@ const DESCRIPTION = [
   "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
   "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
   "Team messages always steer into the recipient's running turn.",
+  "One-shot agents (momus) always refuse task_send in every state; spawn a new momus instead.",
 ].join(" ")
 
 const MEMBER_SCOPED_DESCRIPTION = [
@@ -120,9 +122,20 @@ export type MemberScopedTaskSendDeps = {
   readonly resolveCallerSessionId?: CallerSessionResolver
 }
 
-export function createMemberScopedTaskSendTool(deps: MemberScopedTaskSendDeps) {
+// senpi declares AnyToolDefinition privately, so mirror defineTool's declared return type instead
+// of hand-rolling `ToolDefinition<any, any, any>`: a senpi bump that widens or narrows that
+// intersection propagates here rather than silently drifting from the engine's own shape. The
+// import is type-only, so it is erased and never binds this module to the engine barrel.
+type DefinedTool<TParams extends TSchema, TDetails> = ReturnType<typeof defineTool<TParams, TDetails>>
+
+export function createMemberScopedTaskSendTool(
+  deps: MemberScopedTaskSendDeps,
+): DefinedTool<typeof MemberScopedTaskSendParams, SendResultDetails> {
   const resolveCaller = deps.resolveCallerSessionId ?? defaultResolveCallerSessionId
-  return defineTool<typeof MemberScopedTaskSendParams, SendResultDetails>({
+  // Returned as a plain literal: senpi's defineTool is an identity helper for type inference
+  // (pinned by the senpi API tripwire), so wrapping here would only statically bind this module
+  // to the engine barrel. The cast below is type-level only — defineTool was identity at runtime.
+  const tool: ToolDefinition<typeof MemberScopedTaskSendParams, SendResultDetails> = {
     name: "task_send",
     label: "Task Send",
     description: MEMBER_SCOPED_DESCRIPTION,
@@ -135,5 +148,6 @@ export function createMemberScopedTaskSendTool(deps: MemberScopedTaskSendDeps) {
       }),
     renderCall: (args, theme) => renderMemberScopedTaskSendCall(args, theme),
     renderResult: (result, options, theme) => renderTaskSendResult(result, options, theme),
-  })
+  }
+  return tool as DefinedTool<typeof MemberScopedTaskSendParams, SendResultDetails>
 }

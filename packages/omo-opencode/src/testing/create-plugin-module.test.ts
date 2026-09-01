@@ -46,9 +46,11 @@ const mockCreateRuntimeTmuxConfig = mock(() => ({
   agent_pane_min_width: 40,
   isolation: "inline" as const,
 }))
+const mockTuiStateMirrorStop = mock(() => {})
 const mockCreateManagers = mock(() => ({
   backgroundManager: { shutdown: async () => {} },
   skillMcpManager: { disconnectAll: async () => {} },
+  tuiStateMirror: { stop: mockTuiStateMirrorStop },
   configHandler: async () => {},
 }))
 const mockRuntimeSkillSourceStop = mock(() => {})
@@ -123,6 +125,7 @@ describe("createPluginModule()", () => {
     mockLoadConfigChain.mockClear()
     mockRunOpenCodeStartupMigration.mockClear()
     mockCreateManagers.mockClear()
+    mockTuiStateMirrorStop.mockClear()
     mockRuntimeSkillSourceStop.mockClear()
     mockCreateRuntimeSkillSourceServer.mockClear()
     mockCreateTools.mockClear()
@@ -194,7 +197,7 @@ describe("createPluginModule()", () => {
       }
     })
 
-    it("#given sidebar is disabled #then startup does not write a TUI plugin entry", async () => {
+    it("#given sidebar is disabled #then startup still writes the TUI entry for BTW", async () => {
       // given
       const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
       const configDir = mkdtempSync(join(tmpdir(), "omo-server-tui-disabled-"))
@@ -212,7 +215,7 @@ describe("createPluginModule()", () => {
         } as Parameters<typeof pluginModule.server>[0])
 
         // then
-        expect(() => readFileSync(join(configDir, "tui.json"), "utf-8")).toThrow()
+        expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`"${PLUGIN_NAME}"`)
       } finally {
         rmSync(configDir, { recursive: true, force: true })
         if (originalConfigDir === undefined) {
@@ -275,6 +278,23 @@ describe("createPluginModule()", () => {
       } finally {
         console.warn = originalWarn
       }
+    })
+
+    it("#then dispose stops the started TUI state mirror", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+
+      // when
+      const hooks: Awaited<ReturnType<typeof pluginModule.server>> & {
+        dispose?: () => Promise<void>
+      } = await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+      await hooks.dispose?.()
+
+      // then
+      expect(mockTuiStateMirrorStop).toHaveBeenCalledTimes(1)
     })
 
     it("#then dispose stops the runtime skill source", async () => {

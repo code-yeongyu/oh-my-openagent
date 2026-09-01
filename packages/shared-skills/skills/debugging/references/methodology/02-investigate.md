@@ -39,6 +39,27 @@ If two hypotheses have identical distinguishing evidence, they aren't actually d
 
 ## Phase 3 — Parallel Investigation
 
+### State freshness invariant
+
+**A debug session's state is a snapshot with a lifetime, not a fact you can carry forward indefinitely.**
+- Before any action that mutates the debuggee, re-observe the session's current state.
+- This includes continue, step, side-effecting evaluation, setting or removing breakpoints, and termination.
+- Record the current thread state and stop reason; those are the concrete tells for whether the old plan still applies.
+- An observation from an earlier turn may already be stale when the next action is issued.
+- Turns can be minutes apart while the debuggee runs at full speed, so this failure mode is normal, not exceptional.
+- If the thread state or stop reason has moved, re-observe the new state and do not replay the old plan.
+- Treat every mutation as conditional on the state you just observed, not on a remembered stop.
+
+### Failure-to-recovery taxonomy
+
+| Failure signature | Most likely cause | Next move |
+|---|---|---|
+| Adapter or debugger process failed to start | Wrong binary or missing installation | Verify the tool exists, then re-launch; do not retry blindly. |
+| Breakpoint accepted but never bound or verified | Source path mismatch, optimized-out code, or missing debug symbols | Check the binary was built with symbols and that the debugger-resolved path matches your file. |
+| Attach refused | Permissions, ptrace scope, SIP, or wrong PID | Fix the environment or target identity; a retry will not change it. |
+| No stop event within the expected window | Process is running, the breakpoint is unreachable, or the wait was too short | Pause and inspect threads rather than waiting longer. |
+| Session terminated unexpectedly | The debuggee crashed or exited | Capture the exit and crash evidence before restarting. |
+
 Branch depending on what's available.
 
 ### Path A: Team mode ENABLED

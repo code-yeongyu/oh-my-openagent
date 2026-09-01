@@ -87,12 +87,11 @@ describe("materialize-frontend-refs", () => {
 		}
 	});
 
-	test("materialized brand reference is verbatim upstream content", async () => {
+	test("materialized brand reference is byte-identical to its upstream source", () => {
 		if (result.skipped) return;
-		// given a known brand whose upstream keeps the leading Category blockquote
-		const appleContent = await Bun.file(join(frontendSkillRoot, "references", "design", "apple.md")).text();
-		// then the verbatim upstream blockquote is present (not abridged)
-		expect(appleContent).toContain("> Category:");
+		const upstream = readFileSync(join(upstreamsRoot, "open-design", "design-systems", "apple", "DESIGN.md"), "utf8");
+		const materialized = readFileSync(join(frontendSkillRoot, "references", "design", "apple.md"), "utf8");
+		expect(materialized).toBe(upstream);
 	});
 
 	test("missing submodule is a soft skip in non-strict mode", () => {

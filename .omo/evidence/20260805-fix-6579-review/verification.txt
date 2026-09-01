@@ -1,0 +1,14 @@
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+exit_code=0
+result=8 pass, 0 fail, 21 expect calls
+
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback
+exit_code=0
+result=255 pass, 0 fail, 459 expect calls, 29 files
+
+command=bun run typecheck
+exit_code=0
+
+command=bun run build
+exit_code=0
+result=build: all steps completed

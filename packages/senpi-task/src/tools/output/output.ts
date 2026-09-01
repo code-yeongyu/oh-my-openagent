@@ -77,14 +77,17 @@ function transcriptResult(
   tailLines: number,
 ): TaskOutputToolResult {
   const reader: TranscriptReader = deps.transcriptReader ?? defaultTranscriptReader
-  const { entries, source } = reader({ taskId: record.task_id, stateDir: deps.stateDir })
+  const { entries, source, truncated: sourceTruncated } = reader({
+    taskId: record.task_id,
+    stateDir: deps.stateDir,
+  })
   const rendered = renderTranscript(entries, { mode, tailLines })
   const details: TaskOutputDetails = {
     kind: "transcript",
     mode,
     source,
     transcript: rendered.text,
-    truncated: rendered.truncated,
+    truncated: rendered.truncated || sourceTruncated === true,
     snapshot,
   }
   return toolResult(`${record.task_id} [${record.status}] transcript via ${source}:\n${rendered.text}`, details)

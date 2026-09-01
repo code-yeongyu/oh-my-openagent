@@ -54,6 +54,14 @@ URL_ALLOWLIST = {
     "www.google.com", "google.com",
     # Generic HTTP test endpoint for infrastructure / transport tests.
     "httpbin.org",
+    # Surrogate-tier infrastructure (engine/surrogates.yaml): archives/relays
+    # that serve a copy of ANY target URL. Same no-site-preference category as
+    # the google.com Referer — they are not target sites.
+    "archive.org", "web.archive.org",
+    "r.jina.ai",
+    # Placeholder host in the proxy-entry shape example; "canonical non-routable
+    # doc domain" (.invalid TLD), can never be a real target.
+    "relay.invalid",
 }
 
 # Files / dirs that must be clean.
@@ -79,6 +87,9 @@ COMMENT_OK_MARKERS = {
 EXPLICIT_ALLOW_FILES = {
     # None right now — add if needed with justification.
 }
+
+# NOTE-BIAS-OK convention for surrogate tests: fixture URLs (stub/interstitial
+# captures from third-party services) carry the marker on the flagged line.
 
 
 def _line_is_exempt(line: str, ext: str) -> bool:

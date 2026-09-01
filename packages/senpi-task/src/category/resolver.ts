@@ -201,6 +201,13 @@ function gatedAvailableCategories<TModel extends SenpiModelPort>(
   }
 }
 
+export function resolveAvailableCategoryNames<TModel extends SenpiModelPort>(
+  config: OmoConfig,
+  senpiModelRegistry: SenpiModelRegistryPort<TModel>,
+): readonly string[] {
+  return gatedAvailableCategories(config, senpiModelRegistry)
+}
+
 // Chain providers with no model in the live registry, in chain order, deduplicated.
 function missingChainProviders(
   chain: readonly DelegateFallbackEntry[],

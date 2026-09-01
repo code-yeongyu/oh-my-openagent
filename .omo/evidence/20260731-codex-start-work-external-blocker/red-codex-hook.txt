@@ -1,0 +1,14 @@
+[TRIMMED] Full vitest output contained the entire rendered directive (~20 KB). Kept the failure header and summary.
+
+ ❯ test/codex-hook.test.ts (12 tests | 1 failed) 858ms
+     × #given active codex work and an external-blocker marker #when hook runs #then returns empty output 130ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/codex-hook.test.ts > start-work Stop hook > #given active codex work and an external-blocker marker #when 
+AssertionError: expected '{"decision":"block","reason":"<start-…' to be '' // Object.is equality
+`browser:control-in-app-browser` action, `page.click`) and PASS/FAIL observable, plus ultraqa classes, artifact, and 
+work\". No \"tests pass\" as completion proof.\n- TUI visual evidence MUST render through the real xterm.js web 
+discipline\n\n- Surface only state changes: sub-agent dispatched, scenario PASS/FAIL with artifact path, checkbox 
+     93|   expect(output).toBe("");
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 passed (12)
+   Duration  1.42s (transform 134ms, setup 0ms, import 192ms, tests 858ms, environment 0ms)

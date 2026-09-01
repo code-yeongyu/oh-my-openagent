@@ -167,6 +167,7 @@ export function spawnProcess(
 		const outputByteLimit = Number.isFinite(maxOutputBytes) && maxOutputBytes > 0 ? Math.floor(maxOutputBytes) : 0;
 		const proc = spawn(command, args, {
 			stdio: ["pipe", "pipe", "pipe"],
+			windowsHide: true,
 		});
 		const stdout: OutputAccumulator = { text: "", bytes: 0, truncated: false };
 		const stderr: OutputAccumulator = { text: "", bytes: 0, truncated: false };

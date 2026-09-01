@@ -85,6 +85,40 @@ describe("runAstGrepSkillInstall", () => {
     expect(kills).toBe(1)
   })
 
+  test("#given a child that ignores termination #when the timeout fires #then the invocation rejects instead of hanging", async () => {
+    // given
+    const neverSettles = new Promise<AstGrepInstallSpawnOutcome>(() => {})
+    const spawnProcess: AstGrepInstallSpawn = () => ({
+      kill: () => undefined,
+      outcome: neverSettles,
+    })
+
+    // when: race against an explicit 3s circuit breaker so a regression fails fast instead of hanging the runner.
+    let hung = false
+    const breaker = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        hung = true
+        reject(new Error("waited 3s for the kill-ignored rejection, never fired"))
+      }, 3_000)
+    })
+
+    // then: the deadline race must settle as a failed outcome naming the ignored termination.
+    const result = await Promise.race([
+      runAstGrepSkillInstall({
+        fileExists: (filePath) => filePath.endsWith("install.sh"),
+        platform: "linux",
+        skillDir: "/skills/ast-grep",
+        spawnProcess,
+        targetDir: "/home/test/.omo/runtime/ast-grep/linux-x64",
+        timeoutMs: 5,
+      }),
+      breaker,
+    ])
+    expect(hung).toBe(false)
+    expect(result.kind).toBe("failed")
+    if (result.kind === "failed") expect(result.reason).toContain("ignored termination")
+  })
+
   test("#given Windows and pwsh is missing #when provisioning runs #then powershell.exe is tried next", async () => {
     // given
     const commands: string[] = []

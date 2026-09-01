@@ -1,0 +1,18 @@
+{
+  "label": "baseline",
+  "driverStarted": true,
+  "parentPid": 20644,
+  "terminationChildren": [
+    {
+      "name": "node.exe",
+      "pid": 25292,
+      "console": {
+        "attached": true,
+        "errorCode": 0,
+        "windowHandle": 34671160,
+        "windowVisible": true
+      }
+    }
+  ],
+  "visibleConsoleWindows": 1
+}

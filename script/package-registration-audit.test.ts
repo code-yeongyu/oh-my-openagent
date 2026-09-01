@@ -21,6 +21,7 @@ const corePackagePaths: readonly string[] = [
   "packages/team-core",
   "packages/openclaw-core",
   "packages/boulder-state",
+  "packages/memory-core",
   "packages/telemetry-core",
   "packages/claude-code-compat-core",
   "packages/skills-loader-core",
@@ -39,6 +40,7 @@ const adapterPackagePaths: readonly string[] = [
   "packages/omo-opencode",
   "packages/pi-goal",
   "packages/pi-webfetch",
+  "packages/omo-native",
 ] as const
 const skillPackagePaths: readonly string[] = ["packages/shared-skills"] as const
 const shimSourceRoots: readonly string[] = ["packages/omo-opencode/src", "packages/omo-codex/src"] as const
@@ -226,7 +228,9 @@ describe("package registration audit", () => {
     const expectedDevDependencyNames = (
       await Promise.all(
         managedWorkspacePaths
-          .filter((path) => path !== "packages/omo-opencode")
+          // omo-opencode stays linked because the Senpi build imports its config-migration export.
+          // omo-native publishes under its own npm name and is not an internal workspace devDependency.
+          .filter((path) => path !== "packages/omo-native")
           .map((path) => readManifest(join(path, "package.json")).then((manifest) => manifest.name)),
       )
     ).toSorted()

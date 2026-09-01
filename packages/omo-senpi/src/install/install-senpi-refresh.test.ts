@@ -54,6 +54,7 @@ describe("runSenpiInstaller source refresh", () => {
       ["node", join(pluginPath, "scripts", "build-install.mjs")],
       ["node", join(pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")],
       ["node", join(pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")],
+      ["node", join(pluginPath, "scripts", "stage-agent-toolkit.mjs")],
     ])
     expect(calls.every(({ cwd }) => cwd === repoRoot)).toBe(true)
   })

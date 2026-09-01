@@ -39,7 +39,7 @@ _DEFAULT_PROFILES: dict = {
         ],
         "referer_strategies": ["self_root", "google_search", "none"],
         "url_transform_order": ["original", "mobile_subdomain"],
-        "fallback_when_challenge": ["playwright_mcp", "playwright_real_chrome"],
+        "fallback_when_challenge": ["surrogate_wayback", "playwright_mcp", "playwright_real_chrome"],
         "notes": "in-code default — waf_profiles.yaml unavailable",
     },
 }
