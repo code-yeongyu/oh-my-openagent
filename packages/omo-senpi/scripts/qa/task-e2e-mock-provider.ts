@@ -12,6 +12,7 @@ declare const process: {
 interface FsModule {
   existsSync(path: string): boolean
   readFileSync(path: string, encoding: string): string
+  appendFileSync(path: string, data: string): void
 }
 
 interface PathModule {
@@ -22,7 +23,8 @@ interface UrlModule {
   pathToFileURL(path: string): { href: string }
 }
 
-const { existsSync, readFileSync } = process.getBuiltinModule<FsModule>("fs")
+const { existsSync, readFileSync, appendFileSync } = process.getBuiltinModule<FsModule>("fs")
+const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const { join } = process.getBuiltinModule<PathModule>("path")
 const { pathToFileURL } = process.getBuiltinModule<UrlModule>("url")
 
@@ -34,6 +36,10 @@ interface MockStepUsage {
   input?: number
   output?: number
   totalTokens?: number
+  cacheRead?: number
+  cacheWrite?: number
+  // Senpi reports cost either as a plain number or as a per-bucket breakdown carrying `.total`.
+  cost?: number | { input?: number; output?: number; total: number }
 }
 
 type MockStep =
@@ -84,7 +90,14 @@ interface AssistantMessage {
   api: Api
   provider: "omo-mock"
   model: string
-  usage: { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; cost: number }
+  usage: {
+    input: number
+    output: number
+    cacheRead: number
+    cacheWrite: number
+    totalTokens: number
+    cost: number | { input?: number; output?: number; total: number }
+  }
   stopReason: StopReason
   errorMessage?: string
   timestamp: number
@@ -162,6 +175,10 @@ export default function registerMockProvider(pi: ExtensionAPI): void {
 }
 
 export function loadMockScript(cwd: string): MockScript {
+  const override = env.MOCK_SCRIPT_PATH
+  if (typeof override === "string" && override.length > 0 && existsSync(override)) {
+    return JSON.parse(readFileSync(override, "utf8")) as MockScript
+  }
   const scriptPath = join(cwd, "mock-script.json")
   if (!existsSync(scriptPath)) {
     return { parentSteps: [{ type: "text", text: "no script" }], childSteps: [{ type: "text", text: "child done" }] }
@@ -234,6 +251,12 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
       stream.end(failure)
     })
     return stream
+  }
+  const dumpTarget = env.MOCK_DUMP_SYSTEM
+  if (typeof dumpTarget === "string" && dumpTarget.length > 0) {
+    const systemPrompt = (context as { systemPrompt?: unknown }).systemPrompt
+    const rendered = typeof systemPrompt === "string" ? systemPrompt : JSON.stringify(systemPrompt ?? null)
+    appendFileSync(dumpTarget, `\n=== model=${streamModel.id} cwd=${context.cwd ?? process.cwd()} ===\n${rendered}\n`)
   }
   const steps = isChild ? script.childSteps : script.parentSteps
   const index = isChild ? childCallCount : parentCallCount

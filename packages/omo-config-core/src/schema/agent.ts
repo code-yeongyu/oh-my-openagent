@@ -1,29 +1,27 @@
 import * as z from "zod"
 
-import { OmoReasoningEffortSchema } from "./fallback-models"
+import {
+  OmoFallbackModelObjectSchema,
+  OmoReasoningEffortSchema,
+  normalizeLegacyModelFields,
+} from "./fallback-models"
+import { OmoReasoningSchema } from "./model-ref"
 
-/**
- * An agent model chain entry. A bare string keeps every existing config parsing unchanged; the
- * object form adds the per-entry tuning an agent can actually apply. This is deliberately NARROWER
- * than a category `fallback_models` entry: agent resolution only threads `variant` and
- * `reasoningEffort` to the child, so accepting `temperature` / `maxTokens` / `thinking` here would
- * advertise fields that are silently dropped.
- */
-export const OmoAgentModelEntrySchema = z.union([
-  z.string(),
-  z.object({
-    model: z.string(),
-    variant: z.string().optional(),
-    reasoningEffort: OmoReasoningEffortSchema.optional(),
-  }).strict(),
-])
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
 
-export const OmoAgentDefSchema = z.object({
+export const OmoAgentModelEntrySchema = z.union([z.string(), OmoFallbackModelObjectSchema])
+
+const OmoAgentDefInputSchema = z.object({
   description: z.string().optional(),
   prompt: z.string().optional(),
   model: z.string().optional(),
   models: z.array(OmoAgentModelEntrySchema).optional(),
+  reasoning: OmoReasoningSchema.optional(),
+  /** @deprecated Use reasoning. */
   variant: z.string().optional(),
+  /** @deprecated Use reasoning. */
   reasoningEffort: OmoReasoningEffortSchema.optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   execution_mode: z.enum(["in-process", "process"]).optional(),
@@ -35,6 +33,11 @@ export const OmoAgentDefSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   disable: z.boolean().optional(),
 }).strict()
+
+export const OmoAgentDefSchema = z.preprocess(
+  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  OmoAgentDefInputSchema,
+)
 
 export const OmoAgentsConfigSchema = z.record(z.string(), OmoAgentDefSchema)
 

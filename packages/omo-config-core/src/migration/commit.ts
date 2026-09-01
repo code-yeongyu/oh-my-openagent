@@ -90,6 +90,28 @@ export function prepareTargetWrite(input: {
   return { diagnostics: merged.diagnostics, document, edits }
 }
 
+export function prepareTargetReplacement(input: {
+  readonly document: Readonly<Record<string, unknown>>
+  readonly migrationId: string
+  readonly target: Readonly<Record<string, unknown>>
+  readonly targetPath: string
+}): PreparedTargetWrite {
+  const marker = markerValue(input.target, input.migrationId, input.targetPath)
+  const document = { ...input.document, _migrations: marker }
+  validateTarget(input.targetPath, document)
+  const edits: { path: readonly string[]; value: unknown }[] = []
+  for (const key of Object.keys(input.target)) {
+    if (key !== "_migrations" && !Object.prototype.hasOwnProperty.call(input.document, key)) {
+      edits.push({ path: [key], value: undefined })
+    }
+  }
+  for (const [key, value] of Object.entries(input.document)) {
+    if (key !== "_migrations") edits.push({ path: [key], value })
+  }
+  edits.push({ path: ["_migrations"], value: marker })
+  return { diagnostics: [], document, edits }
+}
+
 export function writePreparedTarget(input: {
   readonly env: MigrationEnvironment
   readonly fileSystem: MigrationFileSystem

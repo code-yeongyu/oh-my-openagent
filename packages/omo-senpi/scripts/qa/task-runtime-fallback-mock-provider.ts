@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 declare const process: {
   argv: string[]
+  env: Record<string, string | undefined>
   getBuiltinModule<T>(id: string): T
 }
-
 type StopReason = "stop" | "toolUse" | "error"
 
 interface Model {
@@ -68,6 +68,10 @@ interface ExtensionAPI {
 const CHILD_IDENTITY = "running as an omo senpi-task child"
 const QUOTA_ERROR = `403: {"message":"You've reached your usage limit for this billing cycle. Your quota will be refreshed in the next cycle.","type":"access_terminated_error"}`
 const FINAL_TEXT = "omo e2e fallback child final text"
+// Scenarios: "user-fallback" (custom category, user fallback_models), "builtin-chain-fallback"
+// (builtin quick rung-1 dead, rung-2 healthy, no user fallback_models), "chain-exhausted"
+// (every available rung dead).
+const SCENARIO = process.env.OMO_FALLBACK_SCENARIO ?? "user-fallback"
 let parentCalls = 0
 
 export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
@@ -83,9 +87,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     ],
     streamSimple(model, context) {
       if (isChild(context)) {
-        return streamMessage(model.id === "dead-primary"
-          ? assistant(model.id, "error", [], QUOTA_ERROR)
-          : assistant(model.id, "stop", [{ type: "text", text: FINAL_TEXT }]))
+        return streamMessage(childReply(model.id))
       }
       parentCalls += 1
       return streamMessage(parentCalls === 1
@@ -94,7 +96,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
             id: "fallback-task-call",
             name: "task",
             arguments: {
-              category: "fallbackcat",
+              category: SCENARIO === "user-fallback" ? "fallbackcat" : "quick",
               prompt: "complete through the configured fallback chain",
               run_in_background: false,
               name: "fallback-child",
@@ -103,6 +105,60 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
         : assistant(model.id, "stop", [{ type: "text", text: "parent observed fallback completion" }]))
     },
   })
+
+  // Builtin chain fixture providers for the "quick" category: rung 1 (kimi-coding/
+  // kimi-for-coding-highspeed) always dies on the child; rung 2 (openai-codex/gpt-5.6-luna-fast)
+  // answers unless the scenario exhausts the chain. openai-codex needs reasoning so the runtime
+  // accepts the rung variant (":minimal") in its fallback selector.
+  pi.registerProvider("kimi-coding", {
+    name: "omo runtime fallback kimi-coding fixture",
+    baseUrl: "file://omo-runtime-fallback-mock",
+    apiKey: "mock",
+    api: "openai-completions",
+    models: [mockModel("kimi-for-coding-highspeed", "Dead chain rung one")],
+    streamSimple(model, context) {
+      return streamMessage(childReply(model.id))
+    },
+  })
+  pi.registerProvider("openai-codex", {
+    name: "omo runtime fallback openai-codex fixture",
+    baseUrl: "file://omo-runtime-fallback-mock",
+    apiKey: "mock",
+    api: "openai-completions",
+    models: [{ ...mockModel("gpt-5.6-luna-fast", "Chain rung two"), reasoning: true }],
+    streamSimple(model, context) {
+      return streamMessage(childReply(model.id))
+    },
+  })
+
+  if (process.env.OMO_FALLBACK_DEBUG_DUMP === "1") {
+    const fs = process.getBuiltinModule<typeof import("node:fs")>("node:fs")
+    const dump = (label: string) => {
+      const registry = (pi as unknown as { modelRegistry?: { getAll(): { provider: string; id: string }[]; find(p: string, i: string): unknown } }).modelRegistry
+      const ids = registry?.getAll().map((model) => `${model.provider}/${model.id}`) ?? []
+      fs.writeFileSync(`/tmp/fallback-dump-${label}.json`, JSON.stringify({
+        label,
+        count: ids.length,
+        quotio: ids.filter((id) => id.includes("quotio")),
+        kimi: ids.filter((id) => id.includes("kimi")),
+        mock: ids.filter((id) => id.includes("omo-fallback-mock")),
+        findQuotio: registry?.find("openai-codex", "gpt-5.6-luna-fast") !== undefined,
+      }, null, 2))
+    }
+    dump("t0")
+    setTimeout(() => dump("t3s"), 3000)
+    setTimeout(() => dump("t8s"), 8000)
+  }
+}
+
+function childReply(modelId: string): AssistantMessage {
+  if (modelId === "healthy-fallback") {
+    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
+  }
+  if (modelId === "gpt-5.6-luna-fast" && SCENARIO !== "chain-exhausted") {
+    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
+  }
+  return assistant(modelId, "error", [], QUOTA_ERROR)
 }
 
 function mockModel(id: string, name: string) {

@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable, TypeAlias
 
+from .aside_scanner import scan_aside
 from .claude import scan_claude
 from .codex import scan_codex
 from .file_scanners import (
@@ -54,6 +55,7 @@ PLATFORM_SCANNERS: dict[str, Scanner] = {
     "crush": scan_crush,
     "zed": scan_zed,
     "kiro": scan_kiro,
+    "aside": scan_aside,
 }
 DEFAULT_PLATFORMS = frozenset(PLATFORM_SCANNERS)
 PLATFORM_ALIASES = {
@@ -69,6 +71,7 @@ PLATFORM_ALIASES = {
     "gjc": "gajae-code",
     "gajae": "gajae-code",
     "gajaecode": "gajae-code",
+    "aside-browser": "aside",
 }
 
 __all__ = ["DEFAULT_PLATFORMS", "PLATFORM_SCANNERS", "scan", "scan_claude", "scan_codex", "scan_gajae_code", "scan_oh_my_pi", "scan_opencode", "scan_senpi"]

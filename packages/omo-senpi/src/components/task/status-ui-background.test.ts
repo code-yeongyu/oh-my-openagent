@@ -20,6 +20,7 @@ function record(overrides: Partial<TaskRecord> & { task_id: string; status: Task
     created_at: "2026-07-07T00:00:00.000Z",
     updated_at: "2026-07-07T00:00:01.000Z",
     notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: false,
     ...overrides,
   }
 }
@@ -44,35 +45,38 @@ function fakeUi(): FakeUi {
 }
 
 describe("createTaskStatusUi.background progress", () => {
-  it("#given only terminal background tasks #when syncing #then no refresh timer remains active", () => {
+  it("#given a completed resident team member #when syncing #then its settled row remains without a refresh timer", () => {
     // given
     const active = new Map<number, () => void>()
-    let nextHandle = 1
     const timers: StatusUiTimers = {
-      set: (callback) => {
-        const handle = nextHandle++
-        active.set(handle, callback)
-        return handle
-      },
+      set: (callback) => { active.set(1, callback); return 1 },
       clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
     }
-    const manager: StatusUiManager = {
-      list: () => listed([record({ task_id: "st_done", status: "completed" })]),
+    const member = record({
+      task_id: "st_done",
+      name: "team:12345678-1234-1234-1234-123456789abc:researcher",
+      task_summary: "settled researcher",
+      status: "completed",
+    })
+    const manager = {
+      list: () => listed([member, record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })]),
       wasBackground: () => true,
+      residentTaskIds: () => [member.task_id, "st_ordinary"],
     }
     const ui = fakeUi()
-    const statusUi = createTaskStatusUi({
-      manager,
-      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
-      timers,
-    })
+    const statusUi = createTaskStatusUi({ manager, runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" }, timers })
 
     // when
     statusUi.syncNow()
 
     // then
+    const rows = ui.widgetCalls.at(-1)?.content ?? []
     expect(active.size).toBe(0)
-    expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toContain("settled researcher")
+    expect(rows[0]).toContain("completed")
+    expect(rows[0]).not.toStartWith("⠋ ")
+    expect(rows.join("\n")).not.toContain("ordinary task")
   })
 
   it("#given an idle parent with a running background task #when time advances quietly #then live status refreshes", () => {
@@ -191,10 +195,26 @@ describe("createTaskStatusUi.background progress", () => {
       model: "requested/model",
       resolved_model: {
         source: "category",
-        provider: "quotio-openai",
-        model_id: "gpt-5.4-mini-fast",
-        display: "quotio-openai/gpt-5.4-mini-fast",
+        provider: "openai-codex",
+        model_id: "gpt-5.6-luna-fast",
+        display: "openai-codex/gpt-5.6-luna-fast",
+        reasoning_effort: "high",
       },
+      fallback_attempts: [
+        {
+          source: "category",
+          provider: "anthropic",
+          model_id: "claude-haiku-4-5",
+          display: "anthropic/claude-haiku-4-5",
+        },
+        {
+          source: "category",
+          provider: "openai-codex",
+          model_id: "gpt-5.6-luna-fast",
+          display: "openai-codex/gpt-5.6-luna-fast",
+          reasoning_effort: "high",
+        },
+      ],
     })
     const second = record({
       task_id: "st_second",
@@ -204,9 +224,9 @@ describe("createTaskStatusUi.background progress", () => {
       model: "requested/model",
       resolved_model: {
         source: "agent",
-        provider: "quotio-openai",
-        model_id: "gpt-5.4-mini-fast",
-        display: "quotio-openai/gpt-5.4-mini-fast",
+        provider: "openai-codex",
+        model_id: "gpt-5.6-luna-fast",
+        display: "openai-codex/gpt-5.6-luna-fast",
       },
     })
     const listeners = new Map<string, (event: { readonly type: string; readonly toolName?: string; readonly args?: unknown }) => void>()
@@ -226,7 +246,7 @@ describe("createTaskStatusUi.background progress", () => {
     const statusUi = createTaskStatusUi({
       manager,
       runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
-      timers,
+      timers, terminalWidth: () => 220,
       now: () => Date.parse("2026-07-07T00:01:05.000Z"),
     })
 
@@ -237,8 +257,8 @@ describe("createTaskStatusUi.background progress", () => {
     for (const callback of [...active.values()]) callback()
 
     expect(ui.widgetCalls.at(-1)?.content).toEqual([
-      "⠋ Investig... · category:quick · model:gpt-5.4-mini-fast · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
-      "⠋ Review t... · agent:explore · model:gpt-5.4-mini-fast · turn 1 (2 tools) · bash bun test · 1m 5s",
+      "⠋ Investigate the unexpectedly long background child description · category:quick(openai-codex/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
+      "⠋ Review tests · agent:explore(openai-codex/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
     ])
     // C1: the duplicated footer task status line is gone; widget rows are the only task surface.
     expect(ui.statusCalls).toHaveLength(0)

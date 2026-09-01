@@ -1,0 +1,8 @@
+$ bun test packages/omo-opencode/src/features/opencode-skill-loader/shared-skill-harness-scope.test.ts
+bun test v1.3.14 (0d9b296a)
+
+ 1 pass
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [1333.00ms]
+exit=0

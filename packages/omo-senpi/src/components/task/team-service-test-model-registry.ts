@@ -1,6 +1,7 @@
-import { ModelRegistry, ModelRuntime } from "@code-yeongyu/senpi"
+import type { ModelRegistry as SenpiModelRegistry } from "@code-yeongyu/senpi"
+import { ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 
-export function createTeamServiceTestModelRegistry(): ModelRegistry {
+export function createTeamServiceTestModelRegistry(): SenpiModelRegistry {
   const modelRegistry = new ModelRegistry(ModelRuntime.createSync())
   modelRegistry.registerProvider("omo-mock", {
     api: "openai-completions",

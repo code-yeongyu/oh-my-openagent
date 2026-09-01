@@ -13,7 +13,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
     "explorer",
     [
       {
-        previous: { model: "gpt-5.4-mini", effort: "low" },
+        previous: { model: "gpt-5.6-luna-fast", effort: "low" },
         current: { model: "gpt-5.6-terra", effort: "medium" },
       },
       {
@@ -26,7 +26,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
     "librarian",
     [
       {
-        previous: { model: "gpt-5.4-mini", effort: "low" },
+        previous: { model: "gpt-5.6-luna-fast", effort: "low" },
         current: { model: "gpt-5.6-terra", effort: "medium" },
       },
       {

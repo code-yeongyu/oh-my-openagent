@@ -29,7 +29,7 @@ function toAgentDefinition(name: string, def: OmoAgentDef): AgentDefinition {
     ...(def.model === undefined ? {} : { model: def.model }),
     ...(def.models === undefined ? {} : { models: def.models }),
     ...(def.variant === undefined ? {} : { variant: def.variant }),
-    ...(def.reasoningEffort === undefined ? {} : { reasoningEffort: def.reasoningEffort }),
+    ...(def.reasoning === undefined && def.reasoningEffort === undefined ? {} : { reasoningEffort: def.reasoning ?? def.reasoningEffort }),
     ...(def.temperature === undefined ? {} : { temperature: def.temperature }),
     ...(tools === undefined ? {} : { tools }),
     ...(def.disable === undefined ? {} : { disable: def.disable }),

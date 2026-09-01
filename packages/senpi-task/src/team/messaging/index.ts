@@ -3,6 +3,8 @@ export type { BuildTeamMessageOptions } from "./message"
 export { createLeadDeliveryJournal } from "./delivery-journal"
 export type { LeadDeliveryJournal, LeadDeliveryJournalOptions } from "./delivery-journal"
 export { createLeadPoller } from "./lead-poller"
+export { createIncrementalSessionMarkerIndex } from "./session-marker-index"
+export type { SessionMarkerExtractor, SessionMarkerIndex, SessionSliceReader } from "./session-marker-index"
 export type {
   LeadInjection,
   LeadInjectionSink,

@@ -7,6 +7,7 @@ export type BuiltinCategoryDefinition = {
   readonly name: string
   readonly config: OmoCategoryConfig
   readonly description: string
+  readonly callerGuidance?: string
   readonly promptAppend: string
   readonly resolvePromptAppend?: (model: string | undefined) => string
   readonly requiresModel?: string
@@ -30,6 +31,7 @@ export type ResolvedChildSpec<TModel extends SenpiModelPort> = {
   readonly fallback_models?: readonly ResolvedModelRecord[]
   readonly displayName?: string
   readonly variant?: string
+  readonly reasoning?: string
   readonly temperature?: number
   readonly top_p?: number
   readonly maxTokens?: number
@@ -79,4 +81,7 @@ export type CategoryResolutionResult<TModel extends SenpiModelPort> =
       readonly availableCategories: readonly string[]
       readonly nearestFallback?: string
       readonly fallbackEntry?: DelegateFallbackEntry
+      // Dead-chain detail: present when the builtin fallback chain had zero resolvable rungs.
+      readonly attempted_chain?: readonly DelegateFallbackEntry[]
+      readonly missing_providers?: readonly string[]
     }

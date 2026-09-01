@@ -65,9 +65,10 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
           agentType: details.snapshot.agent_type,
           resolvedModel: details.snapshot.resolved_model,
         }) ?? `model:${normalizeRendererText(details.snapshot.model)}`
+      const statusLabel = details.snapshot.suspended !== undefined ? "suspended" : normalizeRendererText(details.snapshot.status)
       return {
         color: statusThemeColor(details.snapshot.status),
-        text: `${joinRendererTokens([`task_output ${identity}`, idSuffix, normalizeRendererText(details.snapshot.status)])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
+        text: `${joinRendererTokens([`task_output ${identity}`, idSuffix, statusLabel])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
       }
     }
     case "transcript":
@@ -98,7 +99,7 @@ function notFoundRow(details: Extract<TaskOutputDetails, { readonly kind: "not_f
 export function taskOutputModelText(snapshot: TaskSnapshot): string {
   const display = nonEmpty(snapshot.resolved_model?.display)
   const model = normalizeRendererText(snapshot.model)
-  const reasoning = nonEmpty(snapshot.resolved_model?.reasoning_effort)
+  const reasoning = nonEmpty(snapshot.resolved_model?.reasoning) ?? nonEmpty(snapshot.resolved_model?.reasoning_effort)
   const variant = nonEmpty(snapshot.resolved_model?.variant)
   const details = [
     reasoning === undefined ? undefined : `reasoning ${reasoning}`,
@@ -113,7 +114,12 @@ function nonEmpty(value: string | undefined): string | undefined {
 }
 
 function snapshotIdentity(snapshot: TaskSnapshot): string {
-  return taskIdentityLabel({ taskId: snapshot.task_id, name: snapshot.name, description: snapshot.description })
+  return taskIdentityLabel({
+    taskId: snapshot.task_id,
+    name: snapshot.name,
+    description: snapshot.description,
+    taskSummary: snapshot.task_summary,
+  })
 }
 
 function assertNever(value: never): never {

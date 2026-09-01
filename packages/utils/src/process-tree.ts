@@ -22,6 +22,7 @@ export interface ProcessTreeRunOptions {
   readonly onTerminationReport?: (report: ProcessTreeTerminationReport) => void
   readonly terminationGraceMs?: number
   readonly terminationWaitMs?: number
+  readonly timeoutSignal?: AbortSignal
   readonly timeoutMs: number
 }
 
@@ -102,20 +103,33 @@ export function runProcessWithTreeTimeout(options: ProcessTreeRunOptions): Promi
     child.stdout.on("data", (chunk: Buffer) => capture("stdout", chunk))
     child.stderr.on("data", (chunk: Buffer) => capture("stderr", chunk))
 
-    const timeout = setTimeout(() => {
-      timedOut = true
-      void startTermination().then(() => settle(124, child.signalCode))
-    }, options.timeoutMs)
-    timeout.unref()
+    let removeTimeoutSignal = (): void => undefined
+    let timeout: ReturnType<typeof setTimeout>
 
     const settle = async (exitCode: number, signal: NodeJS.Signals | null): Promise<void> => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
+      removeTimeoutSignal()
       const termination = treeTermination === undefined ? null : await treeTermination
       stderr += stderrDecoder.end()
       stdout += stdoutDecoder.end()
       resolvePromise({ exitCode, signal, stderr, stdout, termination, timedOut })
+    }
+
+    const triggerTimeout = (): void => {
+      if (settled) return
+      timedOut = true
+      void startTermination().then(() => settle(124, child.signalCode))
+    }
+    timeout = setTimeout(triggerTimeout, options.timeoutMs)
+    timeout.unref()
+    if (options.timeoutSignal?.aborted === true) {
+      triggerTimeout()
+    } else if (options.timeoutSignal !== undefined) {
+      const timeoutSignal = options.timeoutSignal
+      timeoutSignal.addEventListener("abort", triggerTimeout, { once: true })
+      removeTimeoutSignal = () => timeoutSignal.removeEventListener("abort", triggerTimeout)
     }
 
     child.once("error", () => {

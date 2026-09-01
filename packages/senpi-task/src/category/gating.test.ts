@@ -23,7 +23,7 @@ const MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED = [
   model("google", "gemini-3.1-pro"),
   model("anthropic", "claude-opus-5"),
   model("opencode-go", "glm-5.2"),
-  model("apitopia", "kimi-k3"),
+  model("kimi-coding", "k3"),
 ] as const
 
 describe("category activation gating", () => {
@@ -60,19 +60,19 @@ describe("category activation gating", () => {
 
     test("#when the gate model is absent but omo.json configures the category #then the explicit entry bypasses the gate", () => {
       // given
-      const models = registry([model("apitopia", "kimi-k3")])
+      const models = registry([model("kimi-coding", "k3")])
 
       // when
       const result = resolveCategory(
         "architect",
-        { categories: { architect: { model: "apitopia/kimi-k3" } } },
+        { categories: { architect: { model: "kimi-coding/k3" } } },
         models,
       )
 
       // then
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec.modelId).toBe("kimi-k3")
+      expect(result.spec.modelId).toBe("k3")
     })
 
     test("#when the gate model is absent and omo.json only sets a description #then the gate is bypassed and the category stays listed", () => {
@@ -132,14 +132,63 @@ describe("category activation gating", () => {
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("github-copilot")
-      expect(result.spec.variant).toBe("high")
+      expect(result.spec.variant).toBe("max")
+    })
+  })
+
+  describe("#given a builtin category gated on gpt-5.6-sol via the deep chain", () => {
+    test("#when the registry offers only cross-family models #then deep is unavailable and never falls back", () => {
+      // given
+      const models = registry(MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED)
+
+      // when
+      const result = resolveCategory("deep", {}, models)
+
+      // then
+      expect(result.kind).toBe("model_unavailable")
+      if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
+      expect(result.attemptedModel).toBe("openai/gpt-5.6-sol")
+      expect(result.availableCategories).not.toContain("deep")
+    })
+
+    test("#when the registry offers gpt-5.6-sol #then deep resolves at medium", () => {
+      // given
+      const models = registry([model("openai", "gpt-5.6-sol")])
+
+      // when
+      const result = resolveCategory("deep", {}, models)
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind !== "resolved") throw new Error("Expected resolved")
+      expect(result.spec.provider).toBe("openai")
+      expect(result.spec.modelId).toBe("gpt-5.6-sol")
+      expect(result.spec.variant).toBe("medium")
+      expect(result.availableCategories).toContain("deep")
+    })
+
+    test("#when the gate model is absent but omo.json configures the category #then the explicit entry bypasses the gate", () => {
+      // given
+      const models = registry([model("anthropic", "claude-opus-5")])
+
+      // when
+      const result = resolveCategory(
+        "deep",
+        { categories: { deep: { model: "anthropic/claude-opus-5" } } },
+        models,
+      )
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind !== "resolved") throw new Error("Expected resolved")
+      expect(result.spec.modelId).toBe("claude-opus-5")
     })
   })
 
   describe("#given a retargeted fallback fixture", () => {
-    test("#when visual-engineering resolves on a gemini-only registry #then it is a REAL chain fallback, not a primary hit", () => {
+    test("#when visual-engineering resolves on a kimi-only registry #then it is a REAL chain fallback, not a primary hit", () => {
       // given
-      const models = registry([model("google", "gemini-3.1-pro")])
+      const models = registry([model("kimi-coding", "k3")])
 
       // when
       const result = resolveCategory("visual-engineering", {}, models)
@@ -148,7 +197,7 @@ describe("category activation gating", () => {
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.modelSelection.matchedFallback).toBe(true)
-      expect(result.spec.variant).toBe("high")
+      expect(result.spec.variant).toBe("max")
     })
 
     test("#when artistry resolves on a fable-only registry #then it is a PRIMARY hit, which is why it cannot prove fallback", () => {
@@ -206,7 +255,7 @@ describe("category activation gating", () => {
   describe("#given an ungated builtin category", () => {
     test("#when the registry offers only a chain rung #then the pre-gating fallback behavior is unchanged", () => {
       // given
-      const models = registry([model("anthropic-api", "claude-haiku-4-5")])
+      const models = registry([model("openai-codex", "gpt-5.6-luna-fast")])
 
       // when
       const result = resolveCategory("quick", {}, models)
@@ -214,13 +263,13 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec.modelId).toBe("claude-haiku-4-5")
+      expect(result.spec.modelId).toBe("gpt-5.6-luna-fast")
       expect(result.availableCategories).toContain("quick")
     })
 
     test("#when a gated category is unmet #then other categories stay listed as available", () => {
       // given
-      const models = registry([model("anthropic-api", "claude-haiku-4-5")])
+      const models = registry([model("openai-codex", "gpt-5.6-luna-fast")])
 
       // when
       const result = resolveCategory("quick", {}, models)
@@ -228,7 +277,8 @@ describe("category activation gating", () => {
       // then
       expect(result.availableCategories).not.toContain("architect")
       expect(result.availableCategories).not.toContain("ultrabrain")
-      expect(result.availableCategories).toContain("deep")
+      expect(result.availableCategories).not.toContain("deep")
+      expect(result.availableCategories).toContain("quick")
     })
   })
 })

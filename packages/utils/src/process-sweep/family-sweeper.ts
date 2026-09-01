@@ -42,6 +42,7 @@ interface KillContext {
 }
 
 export interface FamilySweepConfig<TTarget extends { readonly pid: number }, TSpared extends TTarget = TTarget> {
+  readonly attestBeforeSignal?: (target: TTarget) => Promise<boolean>
   readonly familyLabel: string
   readonly stampFile: string
   readonly collect: () => Promise<FamilySweepPlan<TTarget, TSpared>>
@@ -65,7 +66,7 @@ export async function runProcessFamilySweep<TTarget extends { readonly pid: numb
     const plan = await config.collect()
     const { failed, killed } = dryRun
       ? { failed: [], killed: [] }
-      : await killTargets(plan.killList, options, config.familyLabel)
+      : await killTargets(plan.killList, options, config)
     if (!dryRun) writeSweepStamp(config.stampFile, nowMs)
     return {
       action: "swept",
@@ -85,17 +86,18 @@ export async function runProcessFamilySweep<TTarget extends { readonly pid: numb
 async function killTargets<TTarget extends { readonly pid: number }>(
   targets: readonly TTarget[],
   options: ProcessFamilySweepOptions,
-  familyLabel: string,
+  config: FamilySweepConfig<TTarget>,
 ): Promise<Pick<ProcessFamilySweepResult<TTarget>, "failed" | "killed">> {
   const failed: ProcessSweepFailure[] = []
   const killed: TTarget[] = []
   const context: KillContext = {
     failed,
-    familyLabel,
+    familyLabel: config.familyLabel,
     killer: options.killer ?? createDefaultProcessKiller(options.platform),
     log: options.log,
   }
   for (const target of targets) {
+    if (!(await passesSignalAttestation(target, config.attestBeforeSignal, options.log, "SIGTERM"))) continue
     const terminated = await safelyTerminate(target.pid, context)
     if (!terminated) continue
     await delay(options.graceMs ?? DEFAULT_GRACE_MS)
@@ -103,9 +105,27 @@ async function killTargets<TTarget extends { readonly pid: number }>(
       killed.push(target)
       continue
     }
+    if (!(await passesSignalAttestation(target, config.attestBeforeSignal, options.log, "SIGKILL"))) continue
     if (await safelyKill(target.pid, context)) killed.push(target)
   }
   return { failed, killed }
+}
+
+async function passesSignalAttestation<TTarget extends { readonly pid: number }>(
+  target: TTarget,
+  attest: ((target: TTarget) => Promise<boolean>) | undefined,
+  log: ((message: string) => void) | undefined,
+  signal: "SIGKILL" | "SIGTERM",
+): Promise<boolean> {
+  if (attest === undefined) return true
+  try {
+    const attested = await attest(target)
+    if (!attested) log?.(`process sweep sparing pid ${target.pid}: identity changed before ${signal}`)
+    return attested
+  } catch (error) {
+    log?.(`process sweep sparing pid ${target.pid}: identity attestation failed before ${signal}: ${String(error)}`)
+    return false
+  }
 }
 
 async function safelyTerminate(pid: number, context: KillContext): Promise<boolean> {

@@ -61,6 +61,7 @@ async function activeTeamHarness(sessionId?: string) {
   )
   const service = createTeamService({
     manager: engine.manager,
+    destruction: engine.lifecycle,
     runtime: engine.runtime,
     settings: engine.settings,
     omoConfig,
@@ -100,6 +101,7 @@ function extensionOrderHarness() {
   })
   const service = createTeamService({
     manager: engine.manager,
+    destruction: engine.lifecycle,
     runtime: engine.runtime,
     settings: engine.settings,
     omoConfig,
@@ -136,6 +138,7 @@ describe("createTeamService curated agent gating", () => {
     expect(Object.keys(engine.agents)).toContain("momus")
     const service = createTeamService({
       manager: engine.manager,
+      destruction: engine.lifecycle,
       runtime: engine.runtime,
       settings: engine.settings,
       omoConfig,
@@ -239,6 +242,7 @@ describe("createTeamService named-team lookup", () => {
     engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "lead-session" } })
     const service = createTeamService({
       manager: engine.manager,
+      destruction: engine.lifecycle,
       runtime: engine.runtime,
       settings: engine.settings,
       omoConfig,

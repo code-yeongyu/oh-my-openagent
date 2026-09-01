@@ -1,6 +1,6 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import type { AgentDefinition } from "../../agents"
+import type { AgentDefinition, SkillInvocationState } from "../../agents"
 import type { TaskManager } from "../../manager"
 import type { ResolvedModelRecord, TaskRunStats } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
@@ -23,16 +23,28 @@ export type TaskAncestry = {
 
 export type ResolveAncestry = (parentSessionId: string) => TaskAncestry | undefined
 
+export type LoadedSkill = {
+  readonly name: string
+  readonly content: string
+  readonly location?: string
+}
+
 // v1 load_skills contract: resolve named skills to SKILL.md content and expose a ready-to-prepend
 // block plus which names resolved vs went missing (missing names never fail the spawn).
 export type SkillResolution = {
   readonly prepend: string
   readonly resolved: readonly string[]
   readonly missing: readonly string[]
+  readonly skills?: readonly LoadedSkill[]
 }
 
 export type SkillLoader = (names: readonly string[], cwd: string) => SkillResolution
 
+export type TaskSkillSummary = {
+  readonly requested: readonly string[]
+  readonly resolved: readonly string[]
+  readonly missing: readonly string[]
+}
 
 export type TaskCategoryInfo = {
   readonly name: string
@@ -50,12 +62,16 @@ export type TaskToolDeps = {
   readonly agents: Readonly<Record<string, AgentDefinition>>
   readonly resolveAncestry?: ResolveAncestry
   readonly loadSkills?: SkillLoader
+  // Session-scoped skill-invocation state for plan-gated agents (metis/momus). When absent the
+  // invocation gate fails CLOSED: without a resolver there is no proof ulw-plan was invoked.
+  readonly resolveSkillInvocations?: (sessionId: string) => SkillInvocationState
 }
 
 export type TaskToolMode = "spawn"
 
 type ResolvedSpawnItemBase = {
   readonly prompt: string
+  readonly task_summary?: string
   readonly description?: string
   readonly name?: string
   readonly model?: string
@@ -68,6 +84,7 @@ export type ResolvedSpawnItem =
 
 export type TaskToolItemDetail = {
   readonly task_id: string
+  readonly task_summary?: string
   readonly name?: string
   readonly category?: string
   readonly subagent_type?: string
@@ -77,23 +94,27 @@ export type TaskToolItemDetail = {
   readonly error_message?: string
   readonly queue_position?: number
   readonly run_in_background?: boolean
+  readonly skills?: TaskSkillSummary
 }
 
 export type TaskToolDetails = {
   readonly task_id: string
   readonly status: string
   readonly mode: TaskToolMode
+  readonly task_summary?: string
   readonly name?: string
   readonly category?: string
   readonly subagent_type?: string
   readonly execution_mode?: string
   readonly model?: string
   readonly resolved_model?: ResolvedModelRecord
+  readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly run_in_background?: boolean
   readonly queue_position?: number
   readonly items?: readonly TaskToolItemDetail[]
   readonly reason?: string
   readonly run_stats?: TaskRunStats
+  readonly skills?: TaskSkillSummary
 }
 
 export type { TaskToolParamsStatic }

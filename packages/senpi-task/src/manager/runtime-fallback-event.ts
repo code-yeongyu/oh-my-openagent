@@ -47,7 +47,9 @@ function parseModelSelector(
     provider: display.slice(0, slash),
     model_id: display.slice(slash + 1),
     display,
-    ...(hasThinking ? { reasoning_effort: selector.slice(colon + 1) } : {}),
+    ...(hasThinking
+      ? { reasoning: selector.slice(colon + 1), reasoning_effort: selector.slice(colon + 1) }
+      : {}),
   }
 }
 

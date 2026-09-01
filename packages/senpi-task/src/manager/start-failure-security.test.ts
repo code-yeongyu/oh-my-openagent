@@ -99,7 +99,7 @@ describe("TaskManager start failure security", () => {
       reason: GENERIC_START_FAILURE,
     })
     expect(row).toBe(
-      `task category:ultrabrain (openai GPT-5.6 Sol reasoning:xhigh) <i>background</i> error id:${capturedStart.task_id} reason:${GENERIC_START_FAILURE}`,
+      `task category:ultrabrain(openai/gpt-5.6-sol:xhigh) <i>background</i> error id:${capturedStart.task_id} reason:${GENERIC_START_FAILURE}`,
     )
 
     const persistedRecord = readFileSync(join(store.stateDir, "tasks", `${capturedStart.task_id}.json`), "utf8")
@@ -217,7 +217,7 @@ describe("TaskManager start failure security", () => {
   test.each([
     ["depth-exceeded", "In-process child depth limit exceeded."],
     ["session-create-failed", "In-process child session creation failed."],
-    ["child-prompt-failed", "In-process child prompt failed to start."],
+    ["child-prompt-failed", "Child prompt failed to start."],
   ] satisfies readonly (readonly [RunnerFailure["kind"], string])[])(
     "#given a %s RunnerError containing secrets #when a named subagent start fails #then its stable classification preserves the resolved context",
     async (kind, publicMessage) => {

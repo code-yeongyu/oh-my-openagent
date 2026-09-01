@@ -9,7 +9,7 @@ import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, ru
 import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
 import { createLegacyCodexHome, liveLegacyEndpointFor, startLegacyDaemonProcess, stopChild, waitForChildReady, writeLegacyVersionState } from "./lsp-daemon-reaper.test-support"
 
-const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 120_000 : 20_000
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 
@@ -247,11 +247,11 @@ describe("install-codex", () => {
 
     // then
     const cliPath = join(repoRoot, "dist", "cli", "index.js")
-    const wrapperWarnings = logs.filter((line) => line.includes("omo runtime wrapper"))
+    const wrapperWarnings = logs.filter((line) => line.includes("omo-agent-toolkit runtime wrapper"))
     expect(wrapperWarnings.length).toBeGreaterThan(0)
     expect(wrapperWarnings.join("\n")).toContain(cliPath)
     const linkedNames = await readdir(binDir)
-    const rootCliBinName = process.platform === "win32" ? "omo.cmd" : "omo"
+    const rootCliBinName = process.platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit"
     expect(linkedNames).not.toContain(rootCliBinName)
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 

@@ -6,6 +6,7 @@ export function runMigration(options: RunMigrationOptions): MigrationRunResult {
     ...options,
     discover: () => [{
       id: options.id,
+      ...(options.mode === undefined ? {} : { mode: options.mode }),
       sources: options.sources,
       targetPath: options.targetPath,
       transform: options.transform,

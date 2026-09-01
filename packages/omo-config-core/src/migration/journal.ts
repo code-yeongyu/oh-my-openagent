@@ -11,11 +11,13 @@ export type MigrationBackupMove = {
 
 export type MigrationJournal = {
   readonly backupMoves: readonly MigrationBackupMove[]
+  readonly diagnostics: readonly string[]
   readonly completedMoves: readonly string[]
   readonly migrationId: string
   readonly targetPath: string
   readonly targetWrite: {
     readonly additions: Record<string, unknown>
+    readonly mode?: "replace-target"
   }
   readonly targetWritten: boolean
   readonly version: 1
@@ -43,8 +45,16 @@ function parseJournal(value: unknown): MigrationJournal {
   if (!isPlainObject(value["targetWrite"]) || !isPlainObject(value["targetWrite"]["additions"])) {
     throw new Error("Migration journal target write is invalid")
   }
+  const targetWriteMode = value["targetWrite"]["mode"]
+  if (targetWriteMode !== undefined && targetWriteMode !== "replace-target") {
+    throw new Error("Migration journal target write mode is invalid")
+  }
   if (typeof value["targetWritten"] !== "boolean" || !Array.isArray(value["completedMoves"])) {
     throw new Error("Migration journal completion state is invalid")
+  }
+  const diagnostics = value["diagnostics"]
+  if (diagnostics !== undefined && (!Array.isArray(diagnostics) || !diagnostics.every((entry) => typeof entry === "string"))) {
+    throw new Error("Migration journal diagnostics are invalid")
   }
   if (!value["completedMoves"].every((path) => typeof path === "string")) {
     throw new Error("Migration journal completed moves are invalid")
@@ -62,9 +72,13 @@ function parseJournal(value: unknown): MigrationJournal {
   return {
     backupMoves,
     completedMoves: [...value["completedMoves"]],
+    diagnostics: diagnostics === undefined ? [] : [...diagnostics],
     migrationId: value["migrationId"],
     targetPath: value["targetPath"],
-    targetWrite: { additions: { ...value["targetWrite"]["additions"] } },
+    targetWrite: {
+      additions: { ...value["targetWrite"]["additions"] },
+      ...(targetWriteMode === undefined ? {} : { mode: targetWriteMode }),
+    },
     targetWritten: value["targetWritten"],
     version: 1,
   }

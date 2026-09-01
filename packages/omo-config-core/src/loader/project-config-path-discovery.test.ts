@@ -74,6 +74,25 @@ describe("findProjectConfigPathsFarthestFirst", () => {
     expect(paths).toEqual([projectConfigPath(projectDir)])
   })
 
+  test("#given overridden HOME outside the account home #when resolving project paths #then the account user config is excluded", () => {
+    // given
+    const configuredHomeDir = resolve("/tmp/isolated-home")
+    const accountHomeDir = resolve("/home/alice")
+    const projectDir = join(accountHomeDir, "work", "project")
+    const fileSystem = makeProjectFileSystem([accountHomeDir, projectDir])
+
+    // when
+    const paths = findProjectConfigPathsFarthestFirst(
+      join(projectDir, "src"),
+      configuredHomeDir,
+      fileSystem,
+      accountHomeDir,
+    )
+
+    // then
+    expect(paths).toEqual([projectConfigPath(projectDir)])
+  })
+
   test("#given a symlinked project .omo directory #when resolving project paths #then it is refused", () => {
     // given
     const projectDir = resolve("/opt/work/project")

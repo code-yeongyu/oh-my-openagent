@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { AGENT_INTERACTION_POLICIES } from "../agents"
 import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager, settings } from "./__fixtures__/manager-fakes"
 
 afterEach(cleanupProjects)
@@ -85,6 +86,27 @@ describe("TaskManager.continueTask", () => {
 
     // then
     expect(result.kind).toBe("not_continuable")
+  })
+})
+
+describe("TaskManager.sendToTask one-shot refusal", () => {
+  test("#given a momus child started through manager.start #when sent #then the outcome is one_shot_agent (guards the subagent_type -> agent_type rename)", async () => {
+    // given
+    const inProcess = new FakeRunner()
+    const { manager } = makeManager({ inProcess })
+    const started = await manager.start(baseSpec({ subagent_type: "momus" }))
+    if (started.kind !== "started") throw new Error("expected started")
+
+    // when
+    const outcome = await manager.sendToTask({ idOrName: started.task_id, message: "mid-run note" })
+
+    // then
+    if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
+    expect(outcome.task_id).toBe(started.task_id)
+    expect(outcome.agent).toBe("momus")
+    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual([])
+    expect(inProcess.handles.get(started.task_id)?.steerCalls).toEqual([])
   })
 })
 

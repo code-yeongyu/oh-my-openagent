@@ -7,7 +7,7 @@ import type {
   OmoFallbackModels,
   OmoModelCatalog,
   OmoModelCatalogEntry,
-  OmoReasoningEffort,
+  OmoReasoning,
 } from "../schema"
 import { findModelCatalogCycles } from "./model-catalog-cycles"
 
@@ -24,8 +24,7 @@ export type ResolveModelReferencesResult = {
 
 function catalogReference(
   model: string,
-  variant: string | undefined,
-  reasoningEffort: OmoReasoningEffort | undefined,
+  reasoning: OmoReasoning | undefined,
   catalog: OmoModelCatalog | undefined,
   cycleNames: ReadonlySet<string>,
 ): OmoModelCatalogEntry | undefined {
@@ -34,56 +33,29 @@ function catalogReference(
 
   return {
     model: entry.model,
-    ...(variant === undefined && entry.variant !== undefined ? { variant: entry.variant } : variant !== undefined ? { variant } : {}),
-    ...(reasoningEffort === undefined && entry.reasoningEffort !== undefined
-      ? { reasoningEffort: entry.reasoningEffort }
-      : reasoningEffort !== undefined ? { reasoningEffort } : {}),
+    ...(reasoning === undefined && entry.reasoning !== undefined
+      ? { reasoning: entry.reasoning }
+      : reasoning !== undefined ? { reasoning } : {}),
   }
 }
 
-function resolveAgentModelEntry(
-  entry: OmoAgentModelEntry,
+function resolveModelEntry(
+  entry: OmoAgentModelEntry | string | OmoFallbackModelObject,
   catalog: OmoModelCatalog | undefined,
   cycleNames: ReadonlySet<string>,
 ): OmoAgentModelEntry {
   if (typeof entry === "string") {
-    const resolved = catalogReference(entry, undefined, undefined, catalog, cycleNames)
+    const resolved = catalogReference(entry, undefined, catalog, cycleNames)
     if (resolved === undefined) return entry
-    return resolved.variant === undefined && resolved.reasoningEffort === undefined ? resolved.model : resolved
+    return resolved.reasoning === undefined ? resolved.model : resolved
   }
 
-  const resolved = catalogReference(entry.model, entry.variant, entry.reasoningEffort, catalog, cycleNames)
+  const resolved = catalogReference(entry.model, entry.reasoning, catalog, cycleNames)
   if (resolved === undefined) return entry
   return {
     ...entry,
     model: resolved.model,
-    ...(entry.variant === undefined && resolved.variant !== undefined ? { variant: resolved.variant } : {}),
-    ...(entry.reasoningEffort === undefined && resolved.reasoningEffort !== undefined
-      ? { reasoningEffort: resolved.reasoningEffort }
-      : {}),
-  }
-}
-
-function resolveFallbackModelEntry(
-  entry: string | OmoFallbackModelObject,
-  catalog: OmoModelCatalog | undefined,
-  cycleNames: ReadonlySet<string>,
-): string | OmoFallbackModelObject {
-  if (typeof entry === "string") {
-    const resolved = catalogReference(entry, undefined, undefined, catalog, cycleNames)
-    if (resolved === undefined) return entry
-    return resolved.variant === undefined && resolved.reasoningEffort === undefined ? resolved.model : resolved
-  }
-
-  const resolved = catalogReference(entry.model, entry.variant, entry.reasoningEffort, catalog, cycleNames)
-  if (resolved === undefined) return entry
-  return {
-    ...entry,
-    model: resolved.model,
-    ...(entry.variant === undefined && resolved.variant !== undefined ? { variant: resolved.variant } : {}),
-    ...(entry.reasoningEffort === undefined && resolved.reasoningEffort !== undefined
-      ? { reasoningEffort: resolved.reasoningEffort }
-      : {}),
+    ...(entry.reasoning === undefined && resolved.reasoning !== undefined ? { reasoning: resolved.reasoning } : {}),
   }
 }
 
@@ -94,13 +66,11 @@ function resolveFallbackModels(
 ): OmoFallbackModels | undefined {
   if (fallbackModels === undefined) return undefined
   if (typeof fallbackModels !== "string") {
-    return fallbackModels.map((entry) => resolveFallbackModelEntry(entry, catalog, cycleNames))
+    return fallbackModels.map((entry) => resolveModelEntry(entry, catalog, cycleNames))
   }
 
-  const resolved = catalogReference(fallbackModels, undefined, undefined, catalog, cycleNames)
-  if (resolved === undefined || (resolved.variant === undefined && resolved.reasoningEffort === undefined)) {
-    return resolved?.model ?? fallbackModels
-  }
+  const resolved = catalogReference(fallbackModels, undefined, catalog, cycleNames)
+  if (resolved === undefined || resolved.reasoning === undefined) return resolved?.model ?? fallbackModels
   return [resolved]
 }
 
@@ -111,18 +81,17 @@ function resolveAgentDefinition(
 ): OmoAgentDef {
   const resolvedModel = definition.model === undefined
     ? undefined
-    : catalogReference(definition.model, definition.variant, definition.reasoningEffort, catalog, cycleNames)
+    : catalogReference(definition.model, definition.reasoning, catalog, cycleNames)
 
   return {
     ...definition,
     ...(resolvedModel === undefined ? {} : { model: resolvedModel.model }),
-    ...(definition.variant === undefined && resolvedModel?.variant !== undefined ? { variant: resolvedModel.variant } : {}),
-    ...(definition.reasoningEffort === undefined && resolvedModel?.reasoningEffort !== undefined
-      ? { reasoningEffort: resolvedModel.reasoningEffort }
+    ...(definition.reasoning === undefined && resolvedModel?.reasoning !== undefined
+      ? { reasoning: resolvedModel.reasoning }
       : {}),
     ...(definition.models === undefined
       ? {}
-      : { models: definition.models.map((entry) => resolveAgentModelEntry(entry, catalog, cycleNames)) }),
+      : { models: definition.models.map((entry) => resolveModelEntry(entry, catalog, cycleNames)) }),
   }
 }
 
@@ -133,15 +102,17 @@ function resolveCategoryDefinition(
 ): OmoCategoryConfig {
   const resolvedModel = definition.model === undefined
     ? undefined
-    : catalogReference(definition.model, definition.variant, definition.reasoningEffort, catalog, cycleNames)
+    : catalogReference(definition.model, definition.reasoning, catalog, cycleNames)
 
   return {
     ...definition,
     ...(resolvedModel === undefined ? {} : { model: resolvedModel.model }),
-    ...(definition.variant === undefined && resolvedModel?.variant !== undefined ? { variant: resolvedModel.variant } : {}),
-    ...(definition.reasoningEffort === undefined && resolvedModel?.reasoningEffort !== undefined
-      ? { reasoningEffort: resolvedModel.reasoningEffort }
+    ...(definition.reasoning === undefined && resolvedModel?.reasoning !== undefined
+      ? { reasoning: resolvedModel.reasoning }
       : {}),
+    ...(definition.models === undefined
+      ? {}
+      : { models: definition.models.map((entry) => resolveModelEntry(entry, catalog, cycleNames)) }),
     ...(definition.fallback_models === undefined
       ? {}
       : { fallback_models: resolveFallbackModels(definition.fallback_models, catalog, cycleNames) }),

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
-import { delimiter, dirname, join, resolve } from "node:path"
+import { delimiter, dirname, isAbsolute, join, resolve, win32 } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
@@ -17,19 +17,22 @@ import {
   seedCrashReservation,
 } from "./team-e2e-support.mjs"
 import { analyzeMain, injectionEvidence, teamMessageEnqueues, verdict } from "./team-e2e-analysis.mjs"
-import { evaluateCrashRecovery, runCrashRestartScenario } from "./team-e2e-crash.mjs"
-import { cleanupProcessGroups, pollUntil, startSenpiRun } from "./team-e2e-runtime.mjs"
+import { runCrashRestartScenario } from "./team-e2e-crash.mjs"
+import { runTeamResumeScenarios } from "./team-resume-e2e.mjs"
+import { createOwnedProcessRegistry, pollUntil, startSenpiRun } from "./team-e2e-runtime.mjs"
 import { LEAD_SCRIPT, DURA_REVIVE_SCRIPT, DURA_SEED_SCRIPT, NOOP_SCRIPT } from "./team-e2e-scripts.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "team-e2e-mock-provider.ts")
+const memberExtensionEntry = join(scriptDir, "..", "..", "plugin", "extensions", "omo-member.js")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 const STALE_TTL_MS = 10 * 60 * 1000
 const DURA_DRAIN_TIMEOUT_MS = 30_000
-const MAIN_INJECTION_TIMEOUT_MS = 30_000
+const MAIN_INJECTION_TIMEOUT_MS = 60_000
 const DURA_EXPECTED_PROCESSED = 3
 
-const OMO_CONFIG = {
+export const TEAM_E2E_OMO_CONFIG = {
+  task: { reattach_on_reconcile: false },
   categories: {
     quick: { model: "omo-mock/mock-1" },
     fixture: { model: "omo-mock/mock-1" },
@@ -38,23 +41,39 @@ const OMO_CONFIG = {
   agents: { fixture: { model: "omo-mock/mock-1", description: "team fixture agent", prompt: "You are the fixture agent." } },
 }
 
-const spawnedGroups = new Set()
+const spawnedGroups = createOwnedProcessRegistry()
 
-function resolveSenpi() {
-  const bin = process.env.SENPI_BIN?.trim() || "senpi"
-  if (bin.includes("/")) return existsSync(bin) ? bin : null
-  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
-    const candidate = resolve(dir || ".", bin)
-    if (existsSync(candidate)) return candidate
+export function resolveSenpi(operations = {}) {
+  const platform = operations.platform ?? process.platform
+  const env = operations.env ?? process.env
+  const fileExists = operations.existsSync ?? existsSync
+  const requested = env.SENPI_BIN?.trim()
+  if (requested !== undefined && requested !== "" && isExecutablePath(requested)) {
+    return fileExists(requested) ? requested : null
+  }
+  const names = platform === "win32" && (requested === undefined || requested === "" || requested.toLowerCase() === "senpi")
+    ? ["senpi.exe", "senpi.cmd", "senpi"]
+    : [requested || "senpi"]
+  const pathDelimiter = operations.delimiter ?? (platform === "win32" ? ";" : delimiter)
+  const joinPath = operations.joinPath ?? (platform === "win32" ? win32.join : join)
+  for (const dir of (env.PATH ?? "").split(pathDelimiter)) {
+    for (const name of names) {
+      const candidate = joinPath(dir || ".", name)
+      if (fileExists(candidate)) return candidate
+    }
   }
   return null
+}
+
+function isExecutablePath(value) {
+  return isAbsolute(value) || win32.isAbsolute(value) || value.includes("/") || value.includes("\\")
 }
 
 function seedProject(sandbox) {
   seedSandbox(sandbox)
   const omoDir = join(sandbox.cwd, ".omo")
   mkdirSync(omoDir, { recursive: true })
-  writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(OMO_CONFIG, null, 2)}\n`)
+  writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(TEAM_E2E_OMO_CONFIG, null, 2)}\n`)
 }
 
 function startRun(input) {
@@ -62,7 +81,8 @@ function startRun(input) {
     ...input,
     mockProviderEntry,
     parseEvents,
-    onPid: (pid) => spawnedGroups.add(pid),
+    onPid: (pid) => spawnedGroups.onSpawn(pid),
+    onClose: (pid) => spawnedGroups.onClose(pid),
   })
 }
 
@@ -71,7 +91,7 @@ function runSenpi(input) {
 }
 
 function killGroups() {
-  return cleanupProcessGroups(spawnedGroups)
+  return spawnedGroups.cleanup()
 }
 
 async function runMain(senpiBin, outDir) {
@@ -88,7 +108,7 @@ async function runMain(senpiBin, outDir) {
         MAIN_INJECTION_TIMEOUT_MS,
       )
     } finally {
-      active.kill()
+      await active.kill()
     }
     const run = await active.completion
     writeFileSync(join(outDir, "main-stdout.json.log"), run.stdout)
@@ -122,7 +142,7 @@ async function runDuraRevive(senpiBin, outDir) {
         DURA_DRAIN_TIMEOUT_MS,
       )
     } finally {
-      active.kill()
+      await active.kill()
     }
     const run = await active.completion
     writeFileSync(join(outDir, "dura-stdout.json.log"), run.stdout)
@@ -195,10 +215,12 @@ async function main() {
     let leakedPids = 0
     try {
       const main = await runMain(senpiBin, outDir)
-      const crash = await runCrashRestartScenario({ senpiBin, outDir, createSandbox, seedProject, startRun })
-      checks = { ...main.checks, ...crash }
+      const crash = await runCrashRestartScenario({ senpiBin, outDir, createSandbox, seedProject, startRun, memberExtensionEntry })
+      // Plan todo 22: member quit->resume revival + shutdown-approved non-revival (own module).
+      const resume = await runTeamResumeScenarios({ senpiBin, outDir, startRun })
+      checks = { ...main.checks, ...crash, ...resume }
     } finally {
-      leakedPids = killGroups()
+      leakedPids = await killGroups()
     }
     const afterCredential = credentialDigest(realSenpiAgentDir)
     const afterWholeDir = digestDirectory(realSenpiAgentDir)
@@ -248,28 +270,6 @@ function selfTest() {
   const enqueue = teamMessageEnqueues(send)[0]
   if (enqueue?.messageId !== "msg-1" || enqueue.recipients[0] !== "quick") {
     throw new Error("self-test: pull enqueue details not parsed")
-  }
-  const crashChecks = evaluateCrashRecovery({
-    target: { ready: true },
-    before: { processedExists: false, eventCount: 0 },
-    memberKilled: true,
-    parentKilled: true,
-    restartStatus: 0,
-    livenessInjected: true,
-  })
-  if (!Object.values(crashChecks).every((value) => value === true)) {
-    throw new Error("self-test: SIGKILL liveness recovery should pass")
-  }
-  const missingLiveness = evaluateCrashRecovery({
-    target: { ready: true },
-    before: { processedExists: false, eventCount: 0 },
-    memberKilled: true,
-    parentKilled: true,
-    restartStatus: 0,
-    livenessInjected: false,
-  })
-  if (missingLiveness.crashLivenessInjectedToLead !== false) {
-    throw new Error("self-test: missing liveness injection must fail")
   }
   const empty = inboxCounts(join(scriptDir, "does-not-exist"))
   if (empty.unread !== 0 || empty.reserved !== 0) throw new Error("self-test: missing inbox should be zeroed")

@@ -28,6 +28,8 @@ function notImplemented(name: string): never {
 function fakeManager(overrides: Partial<TaskManager>): TaskManager {
   return {
     start: () => notImplemented("start"),
+    startOwned: () => notImplemented("startOwned"),
+    findOwnedTask: () => undefined,
     continueTask: () => notImplemented("continueTask"),
     sendToTask: () => notImplemented("sendToTask"),
     interruptTask: () => notImplemented("interruptTask"),
@@ -230,9 +232,7 @@ describe("createTaskTool", () => {
     const [row = ""] = renderedLines(component, 72)
 
     // then
-    expect(row).toContain("category:quick")
-    expect(row).toContain("GPT-5.6 Sol")
-    expect(row).toContain("xhigh")
+    expect(row).toContain("category:quick(openai/gpt-5.6-sol:xhigh)")
     expect(row).toContain(`${ANSI_ITALIC}foreground${ANSI_ITALIC_END}`)
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
   })

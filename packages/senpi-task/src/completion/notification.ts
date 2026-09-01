@@ -3,12 +3,15 @@ import { join } from "node:path"
 
 import { messageability } from "../state"
 import type { TaskRecord } from "../state"
+import { formatTargetWithModel } from "../status-line"
+import { formatRunDuration } from "../tools/run-stats-format"
 import {
   excerptRendererPromptText,
   joinRendererTokens,
   normalizeRendererText,
   rendererVisibleWidth,
 } from "../tools/task/renderers"
+import { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
 import type { CompletionDetails, ParentNotifierMessage } from "./types"
 
 export const FINAL_RESPONSE_TRANSPORT_LIMIT = 32_000
@@ -41,14 +44,19 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
     final_response: finalResponse.text,
     ...(finalResponse.file === undefined ? {} : { final_response_file: finalResponse.file }),
     continuation_hint: continuationHint(record),
+    ...(record.owner?.kind === "dag"
+      ? { dag: { run_id: record.owner.runId, node_id: record.owner.nodeId } }
+      : {}),
   }
   return tokens === undefined ? base : { ...base, tokens }
 }
 
 export function buildCompletionMessage(details: readonly CompletionDetails[]): ParentNotifierMessage {
+  const body = completionMessageLines(details).join("\n")
+  const carriesDag = details.some((detail) => detail.dag !== undefined)
   return {
     customType: "senpi-task.completion",
-    content: completionMessageLines(details).join("\n"),
+    content: carriesDag ? `${body}\n\n${DAG_VERIFICATION_DIRECTIVE}` : body,
     display: false,
     details,
   }
@@ -87,27 +95,35 @@ function continuationHint(record: TaskRecord): string {
 }
 
 function completionDetailLines(detail: CompletionDetails, width: number | undefined): readonly string[] {
-  const summary = joinRendererTokens([
+  const identity = joinRendererTokens([
     "task completion",
     `name:${normalizeRendererText(detail.name)}`,
     `id:${normalizeRendererText(detail.task_id)}`,
-    detail.category === undefined ? undefined : `category:${normalizeRendererText(detail.category)}`,
-    detail.agent_type === undefined ? undefined : `agent:${normalizeRendererText(detail.agent_type)}`,
-    `model:${normalizeRendererText(detail.resolved_model?.display ?? detail.model)}`,
+    formatTargetWithModel({
+      category: detail.category,
+      agentType: detail.agent_type,
+      resolvedModel: detail.resolved_model,
+      model: detail.model,
+    }),
     fallbackToken(detail),
     `status:${normalizeRendererText(detail.status)}`,
+  ])
+  const stats = joinRendererTokens([
     `duration:${formatDuration(detail.duration_ms)}`,
     detail.tokens === undefined ? undefined : `tokens:${detail.tokens}`,
     detail.run_stats?.tool_calls === undefined ? undefined : `tools:${detail.run_stats.tool_calls}`,
     detail.run_stats?.tokens_per_second === undefined ? undefined : `tps:${detail.run_stats.tokens_per_second}`,
   ])
+  const summaryLines = width === undefined
+    ? [joinRendererTokens([identity, stats])]
+    : [excerptRendererPromptText(identity, width), excerptRendererPromptText(stats, width)]
   const response = width === undefined ? detail.final_response : normalizeRendererText(detail.final_response)
   const continuation = width === undefined ? detail.continuation_hint : normalizeRendererText(detail.continuation_hint)
   const resultPrefix = 'result:"'
   const resultFilePrefix = "result_file:"
   const nextPrefix = "next:"
   return [
-    width === undefined ? summary : excerptRendererPromptText(summary, width),
+    ...summaryLines,
     ...(response.length === 0
       ? []
       : [`${resultPrefix}${excerptForWidth(response, width, resultPrefix, '"')}"`]),
@@ -139,6 +155,7 @@ function availableExcerptWidth(width: number | undefined, prefix: string, suffix
 
 function formatDuration(durationMs: number): string {
   if (durationMs < 1_000) return `${durationMs}ms`
+  if (durationMs >= 60_000) return formatRunDuration(durationMs)
   const seconds = (durationMs / 1_000).toFixed(2).replace(/\.00$/u, "").replace(/(\.\d)0$/u, "$1")
   return `${seconds}s`
 }

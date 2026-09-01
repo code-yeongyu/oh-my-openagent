@@ -3,97 +3,209 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("category routing policy", () => {
-  test("visual-engineering prioritizes Opus max, Kimi K3 max, then Fable low", () => {
+  test("visual-engineering prioritizes Opus max, Kimi K3 max, GLM 5.2 max, then Sol medium", () => {
     // given
     const visual = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when
-    const leadingChain = visual.fallbackChain.slice(0, 3)
+    const leadingChain = visual.fallbackChain
 
     // then
     expect(leadingChain).toEqual([
       {
-        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5",
         variant: "max",
       },
       {
-        providers: ["apitopia", "opencode-go", "kimi-for-coding", "moonshotai", "opencode", "vercel"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: "kimi-k3",
         variant: "max",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-        model: "claude-fable-5",
-        variant: "low",
+        providers: ["zai-coding-plan", "opencode-go"],
+        model: "glm-5.2",
+        variant: "max",
       },
+      {
+        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      }
     ])
   })
 
-  test("artistry prioritizes Fable xhigh, Kimi K3 max, then Opus xhigh", () => {
+  test("deep is limited to a single sol-family medium rung", () => {
     // given
-    const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
+    const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
     // when
-    const chain = artistry.fallbackChain
+    const chain = deep.fallbackChain
 
     // then
     expect(chain).toEqual([
       {
-        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-        model: "claude-fable-5",
-        variant: "xhigh",
-      },
-      {
-        providers: ["apitopia", "opencode-go", "kimi-for-coding", "moonshotai", "opencode", "vercel"],
-        model: "kimi-k3",
-        variant: "max",
-      },
-      {
-        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-        model: "claude-opus-5",
-        variant: "xhigh",
-      },
+        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      }
     ])
   })
 
-  test("quick prioritizes HighSpeed, GPT Mini Fast, then Haiku", () => {
+  test("quick prioritizes Kimi high-speed, Luna low, DeepSeek off, then the speed tier", () => {
     // given
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
     // when
-    const leadingChain = quick.fallbackChain.slice(0, 3)
+    const leadingChain = quick.fallbackChain
 
     // then
     expect(leadingChain).toEqual([
-      { providers: ["apitopia"], model: "kimi-for-coding-highspeed" },
-      { providers: ["quotio-openai"], model: "gpt-5.4-mini-fast" },
       {
-        providers: ["anthropic-api", "anthropic", "github-copilot", "vercel"],
-        model: "claude-haiku-4-5",
+        providers: ["kimi-for-coding"],
+        model: "kimi-for-coding-highspeed",
       },
+      {
+        providers: ["openai-codex"],
+        model: "gpt-5.6-luna-fast",
+        variant: "low",
+      },
+      {
+        providers: ["deepseek"],
+        model: "deepseek-v4-flash",
+        variant: "off",
+      },
+      {
+        providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
+        model: "qwen3.6-flash",
+        variant: "low",
+      },
+      {
+        providers: ["opencode-go"],
+        model: "minimax-m3",
+        variant: "max",
+      },
+      {
+        providers: ["opencode-go"],
+        model: "minimax-m2.7",
+        variant: "max",
+      },
+      {
+        providers: ["xai"],
+        model: "grok-4.20-0309-non-reasoning",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot"],
+        model: "claude-haiku-4-5",
+        variant: "off",
+      }
     ])
   })
 
-  test("unspecified-high prioritizes Kimi K3 max then Opus high", () => {
+  test("unspecified-low follows the approved 6-rung chain headed by grok-4.6 xhigh", () => {
     // given
-    const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
+    const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
     // when
-    const leadingChain = unspecifiedHigh.fallbackChain.slice(0, 2)
+    const chain = unspecifiedLow.fallbackChain
 
     // then
-    expect(leadingChain).toEqual([
+    expect(chain.map((entry) => entry.model)).not.toContain("gpt-5.6-luna")
+    expect(chain).toEqual([
       {
-        providers: ["apitopia", "opencode-go", "kimi-for-coding", "moonshotai", "opencode", "vercel"],
+        providers: ["xai", "github-copilot", "opencode"],
+        model: "grok-4.6",
+        variant: "xhigh",
+      },
+      {
+        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+        model: "gpt-5.6-terra",
+        variant: "high",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-sonnet-5",
+        variant: "low",
+      },
+      {
+        providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
+        model: "qwen3.8-max-preview",
+        variant: "max",
+      },
+      {
+        providers: ["deepseek", "opencode-go"],
+        model: "deepseek-v4-pro",
+        variant: "max",
+      },
+      {
+        providers: ["xiaomi", "opencode-go"],
+        model: "mimo-v2.5-pro",
+        variant: "max",
+      }
+    ])
+  })
+
+  test("unspecified-high, artistry, and writing follow the approved kimi-for-coding chains", () => {
+    // given
+    const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
+    const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
+    const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
+
+    // when
+    const highChain = unspecifiedHigh.fallbackChain
+    const artistryChain = artistry.fallbackChain
+    const writingChain = writing.fallbackChain
+
+    // then
+    expect(highChain).toEqual([
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
+        variant: "xhigh",
+      },
+      {
+        providers: ["zai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+        variant: "max",
+      },
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
+        variant: "max",
+      }
+    ])
+    expect(artistryChain).toEqual([
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5",
+        variant: "xhigh",
+      },
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: "kimi-k3",
         variant: "max",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5",
-        variant: "high",
+        variant: "xhigh",
+      }
+    ])
+    expect(writingChain).toEqual([
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
+        variant: "low",
       },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
+        variant: "low",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode"],
+        model: "gemini-3.6-flash",
+      }
     ])
   })
 })

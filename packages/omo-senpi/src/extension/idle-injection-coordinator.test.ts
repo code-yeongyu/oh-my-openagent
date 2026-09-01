@@ -207,6 +207,26 @@ describe("IdleInjectionCoordinator", () => {
     expect(scheduledCount).toBe(2)
   })
 
+  it("#given an async delivery rejection #when the queue flushes #then the producer receives a failure receipt and onFlushed does not run", async () => {
+    const events: string[] = []
+    let rejectDelivery: (error: Error) => void = () => undefined
+    const delivery = new Promise<void>((_resolve, reject) => { rejectDelivery = reject })
+    const coordinator = new IdleInjectionCoordinator(() => delivery)
+    coordinator.enqueue({
+      key: "team-liveness:1",
+      source: "team-liveness",
+      content: "member failed",
+      onFlushed: () => events.push("flushed"),
+      onDeliveryFailed: (error) => events.push(error instanceof Error ? error.message : String(error)),
+    })
+
+    coordinator.flushOnIdle()
+    rejectDelivery(new Error("provider rejected"))
+    await Promise.resolve()
+
+    expect(events).toEqual(["provider rejected"])
+  })
+
   it("#given an injection callback w2lead #when the queue flushes #then onFlushed runs synchronously after delivery returns", () => {
     // given
     const order: string[] = []

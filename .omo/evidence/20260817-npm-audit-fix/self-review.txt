@@ -1,0 +1,35 @@
+Tier:
+HEAVY remains correct because this is dependency-security remediation on the
+release build path.
+
+Intended diff review:
+- exactly three package-lock.json files
+- 21 added lines and 21 removed lines
+- every changed line belongs to one of:
+  - nanoid 3.3.12 -> 3.3.18
+  - postcss 8.5.15 -> 8.5.23
+  - PostCSS nanoid requirement ^3.3.12 -> ^3.3.16
+  - matching npm registry URLs and integrity hashes
+- `git diff --check` exit 0
+- no manifest override or audit-policy weakening
+
+Lock semantics:
+- all three locks parse as JSON
+- all three frozen npm installs exit 0
+- all three resolve nanoid 3.3.18 and postcss 8.5.23
+
+Criterion coverage:
+- RED: three exit-1 audits plus the exact npm ci warning
+- GREEN: three identical exit-0 audits with zero findings
+- release regression: package installs, builds, tests, typechecks, and smoke
+- real surface: isolated Codex install plus real app-server hook proof
+- adjacent regression: full test:codex, repository typecheck, repository build
+
+Generated churn:
+Root materialization updated tracked bundles unrelated to this lockfile
+remediation. Those paths are not part of the intended diff and will not be
+staged or committed.
+
+Verdict:
+PASS. The smallest lockfile-only remediation satisfies all evidence-backed
+criteria without expanding policy or runtime scope.

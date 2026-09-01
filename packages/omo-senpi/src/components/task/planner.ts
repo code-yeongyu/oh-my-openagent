@@ -118,9 +118,9 @@ function resolveAgentTarget(
 
 function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedModelMetadata | undefined): ResolvedPlan {
   const resolvedModel = resolution.resolved_model ?? explicitModel
-  // Identical precedence to the category path below: reasoningEffort outranks variant, and either
-  // one becomes the child's thinking level through asSenpiThinkingLevel.
-  const appliedVariant = resolution.resolved_model?.reasoning_effort ?? resolution.resolved_model?.variant
+  // Identical precedence to the category path below: reasoning outranks reasoningEffort outranks
+  // variant, and whichever is chosen becomes the child's thinking level through asSenpiThinkingLevel.
+  const appliedVariant = resolution.resolved_model?.reasoning ?? resolution.resolved_model?.reasoning_effort ?? resolution.resolved_model?.variant
   return {
     model: resolution.model,
     ...(resolution.requested_model !== undefined
@@ -153,7 +153,7 @@ function toPlanResolution(
   availableAgents: readonly string[],
 ): PlanResolution {
   if (resolution.kind === "resolved") {
-    const appliedVariant = resolution.spec.reasoningEffort ?? resolution.spec.variant
+    const appliedVariant = resolution.spec.reasoning ?? resolution.spec.reasoningEffort ?? resolution.spec.variant
     return {
       kind: "resolved",
       plan: {
@@ -171,6 +171,7 @@ function toPlanResolution(
           display: resolution.spec.displayName ?? `${resolution.spec.provider}/${resolution.spec.modelId}`,
           ...(resolution.spec.variant !== undefined ? { variant: resolution.spec.variant } : {}),
           ...(resolution.spec.reasoningEffort !== undefined ? { reasoning_effort: resolution.spec.reasoningEffort } : {}),
+          ...(resolution.spec.reasoning !== undefined ? { reasoning: resolution.spec.reasoning } : {}),
         },
         ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
         category: resolution.category,
@@ -201,6 +202,10 @@ function toPlanResolution(
       code: "model_unavailable",
       message: `No available model for category "${categoryName}" (attempted ${resolution.attemptedModel ?? "none"}).`,
       availableCategories: resolution.availableCategories,
+      // Dead-chain detail rides the error so the warning layer can surface it without re-resolving.
+      category: categoryName,
+      ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
+      ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
     },
   }
 }

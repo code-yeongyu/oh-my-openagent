@@ -52,6 +52,15 @@ function toPersistedEvent(event: ManagedChildEvent): PersistedTaskEvent | undefi
       },
     }
   }
+  if (event.type === "retry_fallback_exhausted") {
+    return {
+      type: event.type,
+      payload: {
+        chain_key: readEventString(event, "chainKey"),
+        last_error: readEventString(event, "lastError"),
+      },
+    }
+  }
   return undefined
 }
 

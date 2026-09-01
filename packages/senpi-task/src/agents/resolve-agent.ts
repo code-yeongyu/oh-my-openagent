@@ -1,7 +1,7 @@
 import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
 
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
-import { buildRuntimeModelChain } from "../model-chain"
+import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
 import type { ResolvedModelRecord } from "../state"
 import { agentModelCandidates, type AgentModelCandidate } from "./agent-model-entry"
 import {
@@ -20,6 +20,9 @@ type AgentPersona = {
   readonly agentType: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
+  // The definition's disallowedTools, carried so the record's tool_deny -> ChildSpec.toolDenylist
+  // -> senpi excludeTools chain can actually deny (previously dropped here, leaking denied tools).
+  readonly toolDenylist?: readonly string[]
   readonly agentExecutionMode?: "in-process" | "process"
   readonly allowedSubagents?: readonly string[]
   readonly maxDepth?: number
@@ -142,11 +145,25 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       if (found !== undefined) {
         // A builtin chain rung carries its own variant, but an agent that configured tuning without
         // naming a model still resolves here, so the configured values must win over the rung's.
+        const availableModelSet = new Set(availableModels)
         return resolvedAgent(
           context,
           found,
           configuredTuning.variant ?? resolution.variant,
           configuredTuning.reasoningEffort,
+          buildRuntimeModelChain({
+            candidates: chainRungCandidates({
+              chain: fallbackChain,
+              selectedModel: resolution.model,
+              ...(resolution.fallbackEntry !== undefined
+                ? { selectedRungEntry: resolution.fallbackEntry }
+                : {}),
+              availableModels: availableModelSet,
+            }),
+            selectedModel: resolution.model,
+            availableModels: availableModelSet,
+            source: "agent",
+          }),
         )
       }
     }
@@ -164,6 +181,7 @@ function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
     agentType: name,
     ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
     ...(toolAllowlist !== undefined ? { toolAllowlist } : {}),
+    ...(definition.disallowedTools !== undefined ? { toolDenylist: definition.disallowedTools } : {}),
     ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
     ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
     ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),
@@ -199,6 +217,7 @@ function resolvedAgent(
       display,
       ...(variant !== undefined ? { variant } : {}),
       ...(reasoningEffort !== undefined ? { reasoning_effort: reasoningEffort } : {}),
+      ...((reasoningEffort ?? variant) !== undefined ? { reasoning: reasoningEffort ?? variant } : {}),
     },
     availableAgents: context.availableAgents,
     ...context.persona,

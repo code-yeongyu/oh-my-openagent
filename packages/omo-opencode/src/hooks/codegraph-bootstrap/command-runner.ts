@@ -12,6 +12,7 @@ export interface CodegraphCommandResult {
 
 export interface RunCodegraphCommandOptions {
   readonly env: Record<string, string>
+  readonly timeoutSignal?: AbortSignal
   readonly timeoutMs: number
 }
 
@@ -37,6 +38,7 @@ export async function runCodegraphCommand(
     cwd: projectRoot,
     env: buildCodegraphChildEnv({ ambientEnv: process.env, codegraphEnv: options.env }),
     maxBuffer: 1024 * 1024,
+    ...(options.timeoutSignal === undefined ? {} : { timeoutSignal: options.timeoutSignal }),
     timeoutMs: options.timeoutMs,
   }).then(({ exitCode, stderr, stdout, timedOut }) => ({ exitCode, stderr, stdout, timedOut }))
 }

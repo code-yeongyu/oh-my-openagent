@@ -1,0 +1,8 @@
+Command: bun install
+
+Result:
+- Installed 1082 packages in the dedicated worktree.
+- Restored local workspace links required by omo-senpi and senpi-task.
+- Postinstall completed the repository build.
+- Generated build artifacts unrelated to issue #6538 were reverted before commit.
+- No package.json version was changed.

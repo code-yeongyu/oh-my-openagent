@@ -1,0 +1,84 @@
+Task 14: omo setup consent-gated credential inheritance and model report
+Date: 2026-08-09
+
+Credential type derivation
+--------------------------
+Read-only commands executed against the live stores:
+
+  sqlite3 "file:$HOME/.omp/agent/agent.db?mode=ro" \
+    'SELECT credential_type, COUNT(*) FROM auth_credentials GROUP BY credential_type'
+  sqlite3 "file:$HOME/.gjc/agent/agent.db?mode=ro" \
+    'SELECT credential_type, COUNT(*) FROM auth_credentials GROUP BY credential_type'
+
+Both stores currently contain zero auth_credentials rows, so the probes emitted no type rows.
+The installed pinned OMP/GJC storage source accepts api_key and oauth row types and decodes
+api_key data from {"key": string}. OAuth is explicitly excluded. The checked-in
+API_KEY_TYPE_ACCEPTLIST is therefore exactly:
+
+  api_key
+
+The before/after SHA-256 transcript in /tmp/task14-readonly-probe.txt was identical for both
+agent.db files and their pre-existing WAL/SHM files. Fixture tests additionally assert every
+source auth.json/agent.db stays byte-identical and that fixture reads create no -wal or -shm.
+
+TDD RED
+-------
+Initial failing-first run:
+
+  bun test packages/omo-native/test/setup-import.test.ts
+
+Excerpt:
+
+  0 pass
+  7 fail
+  Expected to contain: "DRY RUN"
+  Received: "HARNESS | INSTALLED | PROVIDERS | CREDENTIAL TYPES | MODELS ..."
+  error: ENOENT: no such file or directory, open '.../senpi-agent/auth.json'
+
+Skip-if-present mutation probe:
+
+  bun test packages/omo-native/test/setup-import.test.ts -t 'existing senpi provider'
+
+Excerpt:
+
+  Expected: {"type":"api_key","key":"EXISTING-NOT-A-SENTINEL","metadata":{"order":[3,2,1]}}
+  Received: {"type":"api_key","key":"SK-SENTINEL-DO-NOT-LOG-1"}
+  0 pass, 1 fail
+
+The mutation was restored before final verification.
+
+GREEN and security/read-only proof
+----------------------------------
+Focused suite:
+
+  bun test packages/omo-native/test/setup-import.test.ts
+  7 pass, 0 fail, 93 expect() calls
+
+The focused suite covers:
+- mapped and exact opencode API imports while OAuth and hosted gateway ids are skipped
+- pinned OMP schema 7 and GJC schema 4 api_key imports
+- unknown schema report-only behavior
+- skip-if-present preservation
+- dry-run and declined consent
+- 0600 atomic write and timestamped backup bytes
+- second-run idempotency
+- malformed target JSON
+- model report and omo.json catalog template
+- all captured stdout/stderr checked against every planted secret sentinel
+- every source store hashed before/after every fixture run, with no SQLite artifacts created
+
+Full package suite:
+
+  bun test packages/omo-native
+  63 pass, 0 fail, 285 expect() calls
+
+Typecheck:
+
+  tsgo --noEmit -p packages/omo-native/tsconfig.json
+  exit 0, no output
+
+Line limits:
+
+  setup-import.js       231 lines
+  setup-models.js        26 lines
+  setup-import.test.ts  237 lines

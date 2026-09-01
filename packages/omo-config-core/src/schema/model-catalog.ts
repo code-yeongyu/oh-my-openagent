@@ -1,16 +1,33 @@
 import * as z from "zod"
 
-import { OmoReasoningEffortSchema } from "./fallback-models"
+import { OmoReasoningEffortSchema, normalizeLegacyModelFields } from "./fallback-models"
+import { OmoReasoningSchema } from "./model-ref"
 
-export const OmoModelCatalogEntrySchema = z.object({
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+const OmoModelCatalogEntryInputSchema = z.object({
   model: z.string(),
+  reasoning: OmoReasoningSchema.optional(),
+  /** @deprecated Use reasoning. */
   variant: z.string().optional(),
+  /** @deprecated Use reasoning. */
   reasoningEffort: OmoReasoningEffortSchema.optional(),
 }).strict()
 
+export const OmoModelCatalogEntrySchema = z.preprocess(
+  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  OmoModelCatalogEntryInputSchema,
+)
+
 export const OmoModelCatalogSchema = z.record(z.string(), OmoModelCatalogEntrySchema)
 
-export const OmoModelCatalogEntryLayerSchema = OmoModelCatalogEntrySchema.partial()
+const OmoModelCatalogEntryLayerInputSchema = OmoModelCatalogEntryInputSchema.partial()
+export const OmoModelCatalogEntryLayerSchema = z.preprocess(
+  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  OmoModelCatalogEntryLayerInputSchema,
+)
 export const OmoModelCatalogLayerSchema = z.record(z.string(), OmoModelCatalogEntryLayerSchema)
 
 export type OmoModelCatalogEntry = z.infer<typeof OmoModelCatalogEntrySchema>

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-This module provides state-first tmux integration for background agent sessions. It handles split decisions, grid planning, polling, and lifecycle events. Reusable tmux command, layout, and pane primitives are extracted to [`packages/tmux-core/`](../../../../../packages/tmux-core); this directory is the OpenCode session adapter.
+This module provides state-first tmux integration for background agent sessions (~48 files incl. colocated tests). It handles split decisions, grid planning, polling, and lifecycle events. Reusable tmux command, layout, and pane primitives are extracted to [`packages/tmux-core/`](../../../../../packages/tmux-core); this directory is the OpenCode session adapter.
 
 ## CORE ARCHITECTURE
 
@@ -42,8 +42,13 @@ session.deleted → cleanup tracked session → close pane if empty
 
 - `MIN_PANE_WIDTH`: 52 chars
 - `MIN_PANE_HEIGHT`: 11 lines
+- Grid limits: 2 columns, 3 rows, max grid size 4
 - Main pane preserved (never split below minimum)
 - Agent panes split from remaining space
+
+## ISOLATION MODES
+
+Supports `inline` (panes in the current window), `window` (dedicated window), and `session` (isolated tmux session). Cmux-compatible/headless environments are detected (`isCmuxCompatEnvironment`) and degrade to deferred-attach queues with readiness TTLs; never-activated panes hit a hard timeout via `polling-manager.ts`.
 
 ## EVENT HANDLERS
 

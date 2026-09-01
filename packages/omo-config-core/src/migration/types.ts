@@ -53,6 +53,8 @@ export type MigrationBoundary =
 
 export type MigrationPlan = {
   readonly id: string
+  /** Rewrites the current target document instead of no-clobber merging separate legacy sources. */
+  readonly mode?: "merge" | "replace-target"
   readonly sources: readonly MigrationSourceDescriptor[]
   readonly targetPath: string
   readonly transform: MigrationTransform
@@ -65,6 +67,7 @@ export type RunMigrationOptions = {
   readonly id: string
   readonly isProcessAlive?: (pid: number) => boolean
   readonly leaseDurationMs?: number
+  readonly mode?: "merge" | "replace-target"
   readonly onBoundary?: (boundary: MigrationBoundary) => void
   readonly pid?: number
   readonly sources: readonly MigrationSourceDescriptor[]
@@ -88,7 +91,7 @@ export type MigrationRunResult = {
 
 export type RunMigrationsOptions = Omit<
   RunMigrationOptions,
-  "id" | "sources" | "targetPath" | "transform"
+  "id" | "mode" | "sources" | "targetPath" | "transform"
 > & {
   readonly afterMigrations?: (results: readonly MigrationRunResult[]) => void
   readonly discover: () => readonly MigrationPlan[]

@@ -9,6 +9,10 @@ export {
 export { executeLegacyConfigMigrationPlan } from "./migration-executor"
 export { transformConfigJsoncSources } from "./transform-config-jsonc"
 export { transformOpenCodeSources } from "./transform-opencode"
+export {
+  REASONING_UNIFICATION_MIGRATION_ID,
+  transformReasoningUnification,
+} from "./reasoning-unification"
 export type { ExecuteLegacyConfigMigrationPlanOptions } from "./migration-executor"
 export type {
   CreateLegacyConfigMigrationPlansOptions,

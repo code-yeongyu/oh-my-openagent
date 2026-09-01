@@ -1,3 +1,5 @@
+import { transformModelForProvider, type DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
+
 import type { ResolvedModelRecord, ResolvedModelSource } from "./state"
 
 export type ModelChainCandidate = {
@@ -38,6 +40,65 @@ export function buildRuntimeModelChain(options: BuildModelChainOptions): Runtime
     requested_model: requestedModel,
     ...(fallbackModels.length > 0 ? { fallback_models: fallbackModels } : {}),
   }
+}
+
+export type ChainRungCandidateOptions = {
+  readonly chain: readonly DelegateFallbackEntry[]
+  readonly selectedModel: string
+  readonly selectedRungEntry?: DelegateFallbackEntry
+  readonly availableModels: ReadonlySet<string>
+}
+
+// Chain-derived runtime candidates for a resolved selection: the selected rung's concrete model
+// first (so buildRuntimeModelChain can locate it), then the remaining rungs after it, each resolved
+// to the first available provider with the provider-specific model-id transform applied. Rungs with
+// no available provider are skipped. Returns [] when the selected model cannot be located in the
+// chain (e.g. a user-forced model), leaving user-configured chains untouched.
+export function chainRungCandidates(options: ChainRungCandidateOptions): readonly ModelChainCandidate[] {
+  const selectedIndex = locateSelectedRung(options)
+  if (selectedIndex === -1) return []
+
+  const rungs: ModelChainCandidate[] = [{ model: options.selectedModel }]
+  for (const entry of options.chain.slice(selectedIndex + 1)) {
+    for (const provider of entry.providers) {
+      const modelID = entry.model.startsWith(`${provider}/`)
+        ? entry.model.slice(provider.length + 1)
+        : entry.model
+      const concrete = `${provider}/${transformModelForProvider(provider, modelID)}`
+      if (!options.availableModels.has(concrete)) continue
+      rungs.push({
+        model: concrete,
+        ...(entry.variant !== undefined ? { variant: entry.variant } : {}),
+      })
+      break
+    }
+  }
+  return rungs
+}
+
+function locateSelectedRung(options: ChainRungCandidateOptions): number {
+  const { chain, selectedModel, selectedRungEntry } = options
+  if (selectedRungEntry !== undefined) {
+    const byIdentity = chain.indexOf(selectedRungEntry)
+    if (byIdentity !== -1) return byIdentity
+    const byShape = chain.findIndex((entry) =>
+      entry.model === selectedRungEntry.model
+      && entry.variant === selectedRungEntry.variant
+      && entry.providers.length === selectedRungEntry.providers.length
+      && entry.providers.every((provider, index) => provider === selectedRungEntry.providers[index])
+    )
+    if (byShape !== -1) return byShape
+  }
+  return chain.findIndex((entry) =>
+    entry.providers.some(
+      (provider) => {
+        const modelID = entry.model.startsWith(`${provider}/`)
+          ? entry.model.slice(provider.length + 1)
+          : entry.model
+        return `${provider}/${transformModelForProvider(provider, modelID)}` === selectedModel
+      },
+    )
+  )
 }
 
 function deduplicateCandidates(candidates: readonly ModelChainCandidate[]): readonly ModelChainCandidate[] {

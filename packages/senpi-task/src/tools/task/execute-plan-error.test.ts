@@ -30,7 +30,7 @@ describe("buildTaskExecute plan errors", () => {
     )
   })
 
-  test("#given a model_unavailable plan error #when executed #then the suffix says valid category names with an override hint", async () => {
+  test("#given a model_unavailable plan error #when executed #then the suffix says valid category names with the omo.json config hint", async () => {
     // given
     const manager = createFakeManager({
       start: async (): Promise<StartResult> => ({
@@ -50,7 +50,8 @@ describe("buildTaskExecute plan errors", () => {
     // then
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toContain("Valid category names: deep, quick")
-    expect(text).toContain("model:")
+    expect(text).toContain("omo.json")
+    expect(text).not.toContain('Pass model:')
     expect(text).not.toContain("Available categories:")
   })
 })
