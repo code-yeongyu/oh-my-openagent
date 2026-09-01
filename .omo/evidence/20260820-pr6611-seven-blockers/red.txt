@@ -1,0 +1,252 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/chat-message.test.ts:
+(pass) createChatMessageHandler - synthetic/internal messages > acknowledges fallback-marked synthetic retries through runtime fallback before other hooks mutate [2.72ms]
+179 |     // when
+180 |     await handler(createMockInput("sisyphus"), output)
+181 |
+182 |     // then
+183 |     expect(args._appliedSessions).toEqual([])
+184 |     expect(hookCalls).toEqual([])
+                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "runtimeFallback",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/plugin/chat-message.test.ts:184:23)
+(fail) createChatMessageHandler - synthetic/internal messages > does not acknowledge unrelated synthetic continuations as fallback retries [4.84ms]
+(pass) createChatMessageHandler - synthetic/internal messages > skips internally marked user messages before first-message gate is consumed [0.49ms]
+(pass) createChatMessageHandler - first message hook ordering > updates session agent and marks the first-message gate before chat hooks run [2.04ms]
+(pass) createChatMessageHandler - first message hook ordering > skips model fallback when runtime fallback is enabled [0.52ms]
+(pass) createChatMessageHandler - cache warning behavior > does not show provider cache warning when provider-models cache exists [0.98ms]
+(pass) createChatMessageHandler - cache warning behavior > does not show provider cache warning when OpenCode models cache exists [1.48ms]
+(pass) createChatMessageHandler - /start-work integration > falls back to Sisyphus through the full chat.message slash-command path when Atlas is unavailable [25.80ms]
+(pass) createChatMessageHandler - /start-work integration > smoke: resolves quoted human-readable plan names through the full /start-work chat.message path [15.72ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > clears stop state before raw /start-work resumes work through chat.message [0.32ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for /goal <objective> [0.57ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for /goal pause [0.34ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for /goal resume [0.41ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for /goal clear [0.38ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for ordinary stopped chat messages [0.24ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state when the session was not stopped [0.63ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > does not route an auto-slash-expanded skill payload into goal handling [4.31ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > sets goal when /goal <objective> arrives through chat.message without native command expansion [0.45ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > pauses goal when /goal pause arrives [0.75ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > resumes goal when /goal resume arrives [0.23ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > clears goal when /goal clear arrives [0.29ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > default goal auto-starts on first message when default_mode.goal is enabled [0.38ms]
+(pass) createChatMessageHandler - TUI variant passthrough > first message: does not override TUI variant when user has no selection [0.27ms]
+(pass) createChatMessageHandler - TUI variant passthrough > first message: preserves user-selected variant when already set [0.34ms]
+(pass) createChatMessageHandler - TUI variant passthrough > subsequent message: preserves TUI variant [0.14ms]
+(pass) createChatMessageHandler - TUI variant passthrough > subsequent message: does not inject variant when TUI sends none [0.27ms]
+(pass) createChatMessageHandler - TUI variant passthrough > first message: marks gate as applied regardless of variant presence [0.25ms]
+(pass) createChatMessageHandler - TUI variant passthrough > injects queued background notifications through chat.message hook [0.45ms]
+(pass) createChatMessageHandler - TUI variant passthrough > reuses the stored model for subsequent messages in the main session when the UI sends none [0.39ms]
+(pass) createChatMessageHandler - TUI variant passthrough > does not reuse a stored model for the first message of a session [0.27ms]
+(pass) createChatMessageHandler - TUI variant passthrough > does not reuse the main-session model for subagent sessions [0.32ms]
+(pass) createChatMessageHandler - TUI variant passthrough > does not override explicit agent model overrides with stored session model [0.45ms]
+(pass) createChatMessageHandler - TUI variant passthrough > treats prefixed list-display agent names as explicit model overrides [0.55ms]
+(pass) createChatMessageHandler - TUI variant passthrough > respects a mid-conversation model switch instead of reusing the previous stored model [0.49ms]
+(pass) createChatMessageHandler - TUI variant passthrough > strips legacy ZWSP-prefixed agent names from persisted prompt body session state (GH-3259) [0.22ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:
+(pass) createAutoRetryHelpers > #given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted [5.70ms]
+(pass) createAutoRetryHelpers > #given an existing fallback result is pending #when the next retry is accepted as queued #then queued pending state supersedes the previous fallback [1.35ms]
+138 |     // Without the marker + synthetic flag, OMO's continuation/keyword-detector
+139 |     // hooks treat this as a real user prompt and the TUI shows a bare "continue"
+140 |     // that the user never typed (see #4085 / Discord report).
+141 |     expect(firstPart["synthetic"]).toBe(true)
+142 |     expect(String(firstPart["text"] ?? "")).toContain("OMO_INTERNAL_INITIATOR")
+143 |     expect(String(firstPart["text"] ?? "")).toContain("OMO_RUNTIME_FALLBACK_RETRY")
+                                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "OMO_RUNTIME_FALLBACK_RETRY"
+Received: "continue\n<!-- OMO_INTERNAL_INITIATOR -->"
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:143:45)
+(fail) createAutoRetryHelpers > #given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085) [1.01ms]
+(pass) createAutoRetryHelpers > #given a persisted user message with id and part ids #when auto retry runs #then the fallback prompt reuses the original messageID and part ids [1.26ms]
+(pass) createAutoRetryHelpers > #given internal abort marker is set #when abort request runs #then stale cleanup TTL is refreshed [0.86ms]
+(pass) createAutoRetryHelpers > #given stale internal abort marker #when stale session cleanup runs #then the marker is cleared [0.31ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts:
+(pass) createEventHandler > #given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared [1.05ms]
+(pass) createEventHandler > #given a session retry dedupe key without a pending fallback result #when session.idle fires #then the retry dedupe key is cleared [0.50ms]
+(pass) createEventHandler > #given a cancelled session #when session.error receives an abort error #then fallback retry state is reset [1.26ms]
+(pass) createEventHandler > #given a cancelled session #when session.idle fires #then fallback retry state stays cleared [0.40ms]
+(pass) createEventHandler > #given a session we aborted ourselves (internal abort flag set) #when session.error fires with isAbort #then fallback retry state is preserved (issue #4006) [0.32ms]
+(pass) createEventHandler > #given an external abort (no internal flag) #when session.error fires with isAbort #then state is still reset as a real cancellation [0.22ms]
+(pass) createEventHandler > #given two consecutive internal-abort cycles #when session.error fires each time #then attemptCount can progress past 1 [0.53ms]
+(pass) createEventHandler > #given session.created with an object-shaped model (opencode 1.15.x) #when the event fires #then state stores a canonical string model (issue #4315) [0.28ms]
+(pass) createEventHandler > #given session.created on an inherited-variant fallback #when the configured fallback is base-only #then the fallback index is retained [2.57ms]
+(pass) createEventHandler > #given session.created on a category-variant fallback #when the configured fallback is base-only #then the fallback index is retained [0.82ms]
+412 |       },
+413 |     })
+414 |
+415 |     // then
+416 |     const created = deps.sessionStates.get(sessionID)
+417 |     expect(created?.originalModel).toBe("anthropic/claude-opus-4-7")
+                                         ^
+error: expect(received).toBe(expected)
+
+Expected: "anthropic/claude-opus-4-7"
+Received: "openai/gpt-5.4(high)"
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts:417:36)
+(fail) createEventHandler > #given session.created on a registered-category fallback #when that category supplies the effective reasoning #then the active fallback is indexed with the category identity [1.42ms]
+(pass) createEventHandler > #given session.created on a fallback whose inherited reasoning lowers to effort #when the event reports the base model #then the fallback index is retained [0.56ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/retry-model-payload.test.ts:
+(pass) buildRetryModelPayload > should return undefined for empty model string [1.38ms]
+(pass) buildRetryModelPayload > should return undefined for model without provider prefix [0.06ms]
+(pass) buildRetryModelPayload > should parse provider and model ID [0.11ms]
+(pass) buildRetryModelPayload > should include variant from model string [0.09ms]
+(pass) buildRetryModelPayload > should use agent variant when model string has no variant [0.06ms]
+(pass) buildRetryModelPayload > should prefer model string variant over agent variant [0.06ms]
+(pass) buildRetryModelPayload > should include reasoningEffort from agent settings [0.06ms]
+(pass) buildRetryModelPayload > should not include reasoningEffort when agent settings has none [0.05ms]
+(pass) buildRetryModelPayload > should lower unsupported configured reasoning to reasoningEffort [0.26ms]
+134 |
+135 |     // when
+136 |     const result = buildRetryModelPayload(model, agentSettings)
+137 |
+138 |     // then
+139 |     expect(result).toEqual({
+                         ^
+error: expect(received).toEqual(expected)
+
+  {
+    "model": {
+      "modelID": "gpt-5.4",
+      "providerID": "openai",
+    },
+-   "reasoningEffort": "xhigh",
+    "variant": "medium",
+  }
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/retry-model-payload.test.ts:139:20)
+(fail) buildRetryModelPayload > should preserve explicit reasoningEffort alongside an inline model variant [0.15ms]
+(pass) buildRetryModelPayload > should let an explicit model variant suppress inherited reasoning [0.06ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts:
+(pass) createChatMessageHandler runtime fallback model override > #given retained retry status keys #when the user selects another model #then the reset starts a fresh retry generation [0.37ms]
+(pass) createChatMessageHandler runtime fallback model override > #given retained variant retry keys #when the user changes only the variant #then the reset starts a fresh retry generation [0.29ms]
+(pass) createChatMessageHandler runtime fallback model override > #given session is on an accepted fallback #when a later user message is transformed after cooldown #then it stays on the fallback model [0.12ms]
+(pass) createChatMessageHandler runtime fallback model override > #given an accepted variant fallback #when the fallback override is reapplied #then model and variant remain separate [0.09ms]
+196 |       },
+197 |       output,
+198 |     )
+199 |
+200 |     // then
+201 |     expect(output.message).toEqual({
+                                 ^
+error: expect(received).toEqual(expected)
+
+  {
+    "model": {
+      "modelID": "gpt-5.4",
+      "providerID": "openai",
+    },
++   "variant": "high",
+  }
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts:201:28)
+(fail) createChatMessageHandler runtime fallback model override > #given an explicit-variant fallback and a base primary #when cooldown restoration runs #then the fallback-only variant is removed [0.49ms]
+(pass) createChatMessageHandler runtime fallback model override > #given an inherited primary variant #when cooldown restoration runs #then the inherited variant remains applied [0.17ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts:
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a stale promptAsync reservation that releases shortly after #when auto retry runs #then the fallback dispatch is retried instead of silently abandoned [1.05ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given the retried dispatch fails ambiguously after the reservation releases #when auto retry runs #then the pending fallback is preserved as possibly accepted [0.38ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given the failed assistant is still active #when auto retry runs #then the fallback dispatch is queued until the assistant unblocks [1.32ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a session WE internally aborted whose dangling assistant turn has no finish, no output and no terminal error #when auto retry runs #then the fallback dispatch fires immediately instead of looping forever on active-queue [0.31ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a session NOT internally aborted whose assistant turn is genuinely active #when auto retry runs #then the dispatch is still withheld (active-check preserved for live turns) [0.66ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given an inherited agent variant #when a base fallback is dispatched #then pending state stores the effective variant identity [0.76ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a category-inherited variant #when a base fallback is dispatched #then pending state stores the effective variant identity [0.76ms]
+338 |     // when
+339 |     await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", "sisyphus", "session.error")
+340 |
+341 |     // then
+342 |     expect(promptCalls.count).toBe(1)
+343 |     expect(capturedBody?.variant).toBe("high")
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "high"
+Received: "low"
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts:343:35)
+(fail) createAutoRetryDispatcher reserved-session retry (#5109) > #given a registered session category has reasoning #when its fallback is dispatched through another agent #then category reasoning qualifies the prompt and pending identity [0.69ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given an older fallback is awaiting #when a variant-qualified next fallback is accepted as queued #then effective pending state is preserved [1.26ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given manual model change replaces state during a failed dispatch #when rollback runs #then the replacement state is preserved [0.53ms]
+508 |     if (!releaseMessages) throw new Error("message lookup did not start")
+509 |     releaseMessages()
+510 |     const outcome = await retryPromise
+511 |
+512 |     // then
+513 |     expect(outcome).toEqual({
+                          ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "accepted": false,
+-   "reason": "stale fallback generation",
+-   "status": "blocked",
++   "accepted": true,
++   "status": "dispatched",
+  }
+
+- Expected  - 3
++ Received  + 2
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts:513:21)
+(fail) createAutoRetryDispatcher reserved-session retry (#5109) > #given state is replaced while fallback message lookup is pending #when the lookup completes #then the stale generation cannot dispatch or arm a watchdog [0.52ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts:
+(pass) createFallbackTimeoutHelpers > #given timeout fallback dispatch is blocked #when the timeout fires #then fallback state is restored [3.65ms]
+(pass) createFallbackTimeoutHelpers > #given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed [4.29ms]
+173 |     const replacementState = createFallbackState("google/gemini-2.5-pro")
+174 |     deps.sessionStates.set(sessionID, replacementState)
+175 |     await clock.advanceBy(1)
+176 |
+177 |     // then
+178 |     expect(abortCalls).toBe(0)
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts:178:24)
+(fail) createFallbackTimeoutHelpers > #given a timeout belongs to an older state generation #when that generation is replaced before its callback runs #then it never aborts the replacement request [0.59ms]
+(pass) createFallbackTimeoutHelpers > #given timeout callback awaits abort #when manual model change replaces state #then the stale generation never dispatches [0.83ms]
+
+8 tests failed:
+(fail) createChatMessageHandler - synthetic/internal messages > does not acknowledge unrelated synthetic continuations as fallback retries [4.84ms]
+(fail) createAutoRetryHelpers > #given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085) [1.01ms]
+(fail) createEventHandler > #given session.created on a registered-category fallback #when that category supplies the effective reasoning #then the active fallback is indexed with the category identity [1.42ms]
+(fail) buildRetryModelPayload > should preserve explicit reasoningEffort alongside an inline model variant [0.15ms]
+(fail) createChatMessageHandler runtime fallback model override > #given an explicit-variant fallback and a base primary #when cooldown restoration runs #then the fallback-only variant is removed [0.49ms]
+(fail) createAutoRetryDispatcher reserved-session retry (#5109) > #given a registered session category has reasoning #when its fallback is dispatched through another agent #then category reasoning qualifies the prompt and pending identity [0.69ms]
+(fail) createAutoRetryDispatcher reserved-session retry (#5109) > #given state is replaced while fallback message lookup is pending #when the lookup completes #then the stale generation cannot dispatch or arm a watchdog [0.52ms]
+(fail) createFallbackTimeoutHelpers > #given a timeout belongs to an older state generation #when that generation is replaced before its callback runs #then it never aborts the replacement request [0.59ms]
+
+ 77 pass
+ 8 fail
+ 206 expect() calls
+Ran 85 tests across 7 files. [391.00ms]
+
+expected_red_exit_code=1
+production_head=1cca53e227ee28e1920c349a9630c01fc7ad8486

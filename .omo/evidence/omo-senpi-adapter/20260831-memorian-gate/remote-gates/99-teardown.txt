@@ -1,0 +1,27 @@
+TEARDOWN=REMOVED\nworktree path: /tmp/memorian-gate-qa-20260901\n--- git worktree list ---\n/Users/yeongyu/local-workspaces/omo                                                              7268b12c8 [dev]
+/private/tmp/omo-7537-20260831/wt                                                                de7ad603f (detached HEAD)
+/private/tmp/omo-b29                                                                             922a0c56e (detached HEAD)
+/private/tmp/omo-runtime-build-20260901/omo-src                                                  b5cbae3fb (detached HEAD)
+/private/tmp/omo-verify-base                                                                     09f8e43f5 (detached HEAD)
+/private/tmp/omo-verify-w1                                                                       fb9ad9edd [deslop-w1]
+/private/tmp/smokefix                                                                            6c5ace409 (detached HEAD)
+/private/tmp/smokerepro                                                                          e40b92191 (detached HEAD)
+/Users/yeongyu/.codex-gui-cli-remote/worktrees/6294/omo                                          c4a371aa2 [fix/task-reject-both-category-and-subagent_type]
+/Users/yeongyu/.codex-gui-cli-remote/worktrees/7ead/omo                                          f8b224122 [code-yeongyu/repair-pr-6148]
+/Users/yeongyu/.codex-gui-cli-remote/worktrees/cc30/omo                                          dec381ed2 (detached HEAD)
+/Users/yeongyu/.codex-gui-cli-remote/worktrees/ea6e/omo                                          dec381ed2 (detached HEAD)
+/Users/yeongyu/.codex-gui-cli-remote/worktrees/f2f6/omo                                          bf5416dab (detached HEAD)
+/Users/yeongyu/.codex-local-gui-cli-remote/worktrees/8cff/omo                                    ee61dcb51 (detached HEAD)
+/Users/yeongyu/local-workspaces/.omo/ulw-dependency-modernization/worktrees/omo-4dff9139         843390730 [ulw/deps-20260726]
+/Users/yeongyu/local-workspaces/omo-pr-5565-ci-repair                                            325a57bbf [code-yeongyu/fix-shared-skills-release-blockers-ci-repair-local]
+/Users/yeongyu/local-workspaces/omo-pr-5672-review                                               3930f0d63 (detached HEAD)
+/Users/yeongyu/local-workspaces/omo-wt-migration-lock                                            226d7f44b [fix/migration-lock-reclaim]
+/Users/yeongyu/local-workspaces/omo-wt/feature/senpi-category-provider-agnostic-resolution       0e23b5115 [feature/senpi-category-provider-agnostic-resolution]
+/Users/yeongyu/local-workspaces/omo-wt/fix-senpi-category-model-label                            7bd2be0c4 [fix/senpi-category-model-label]
+/Users/yeongyu/local-workspaces/omo-wt/fix-senpi-task-live-qa                                    0a09a0ccd [fix/senpi-task-live-qa]
+/Users/yeongyu/local-workspaces/omo-wt/fix/codegraph-1.5.0-bump                                  690cf8f21 [fix/codegraph-1.5.0-bump]
+/Users/yeongyu/local-workspaces/omo-wt/fix/codegraph-session-start                               cba88d22c (detached HEAD)
+/Users/yeongyu/local-workspaces/omo-wt/fix/codegraph-zombie-sweep                                71a6f49bf [fix/codegraph-zombie-sweep]
+/Users/yeongyu/local-workspaces/omo/.claude/worktrees/agent-adc5b7681c4e42ebf                    f5cd951c4 [improve/global-review-debug-gate]
+/Users/yeongyu/local-workspaces/omo/.omo/teams/019efc76-1d42-70d3-a707-128b49db015e/worktrees/F  565e5a692 [code-yeongyu/fix-shared-skills-release-blockers]\n--- main checkout status --porcelain ---\n M .omo/evidence/20260816-remove-omo-telemetry-command/disclosure-tui/terminal-ansi.txt
+ M .omo/evidence/20260816-remove-omo-telemetry-command/tui-pass/terminal-ansi.txt\n--- worktree dir presence ---\nDIR_CONFIRMED_ABSENT

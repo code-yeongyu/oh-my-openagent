@@ -1,6 +1,51 @@
+import { resolve } from "node:path"
 import { describe, expect, test } from "bun:test"
 
-import { createTaskId, createTaskIdFactory } from "./id"
+import { bumpTaskId, createTaskId, createTaskIdFactory } from "./id"
+
+const idChildFixturePath = resolve(import.meta.dir, "__fixtures__", "id-child.ts")
+
+async function expectChildModeToSucceed(mode: string): Promise<void> {
+  const child = Bun.spawn([process.execPath, idChildFixturePath, mode], { stdout: "pipe", stderr: "pipe" })
+  const [exitCode, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ])
+
+  expect(exitCode, `stdout:\n${stdout}\nstderr:\n${stderr}`).toBe(0)
+}
+
+describe("task id primitives", () => {
+  test("#given a task id ending in ffff #when bumped #then it carries into the next hexadecimal group", () => {
+    // given
+    const taskId = "st_0000ffff"
+
+    // when
+    const bumped = bumpTaskId(taskId)
+
+    // then
+    expect(bumped).toBe("st_00010000")
+  })
+
+  test("#given a task id #when bumped #then the hexadecimal value increments", () => {
+    // given
+    const taskId = "st_00000010"
+
+    // when
+    const bumped = bumpTaskId(taskId)
+
+    // then
+    expect(bumped).toBe("st_00000011")
+  })
+
+  test.each(["bump-exhaust", "create-exhaust", "floor-raise", "floor-never-lower", "nowms"])(
+    "#given an isolated module process #when %s executes #then it succeeds",
+    async (mode) => {
+      await expectChildModeToSucceed(mode)
+    },
+  )
+})
 
 describe("createTaskId", () => {
   test("#given a deterministic clock #when ids are created #then ids are canonical and sortable", () => {

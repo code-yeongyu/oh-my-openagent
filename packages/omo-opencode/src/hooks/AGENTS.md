@@ -40,7 +40,7 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `goal` | event | Persistent per-session objective; idle continuation + usage accounting. Replaces `ralphLoop` (see [`goal/AGENTS.md`](goal/AGENTS.md)) |
 | `editErrorRecovery` | tool.execute.after | Retry failed file edits |
 | `delegateTaskRetry` | tool.execute.after | Retry failed task delegations |
-| `startWork` | chat.message | `/start-work` command handler |
+| `ulwExecute` | chat.message | `/ulw-execute` command handler |
 | `prometheusMdOnly` | tool.execute.before | Enforce .md-only writes for Prometheus |
 | `sisyphusJuniorNotepad` | chat.message | Notepad injection for subagents |
 | `questionLabelTruncator` | tool.execute.before | Truncate long Question tool labels |

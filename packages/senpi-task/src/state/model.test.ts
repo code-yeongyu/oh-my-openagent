@@ -14,15 +14,15 @@ const expectedMessageability: Record<TaskStatus, Record<ResidencyState, Messagea
     resident: "steer",
     evicted: "not-continuable",
     disposed: "not-continuable",
-    persisted_only: "revive",
-    rpc_detached: "revive",
+    persisted_only: "not-continuable",
+    rpc_detached: "not-continuable",
   },
   running: {
     resident: "steer",
     evicted: "not-continuable",
     disposed: "not-continuable",
-    persisted_only: "revive",
-    rpc_detached: "revive",
+    persisted_only: "not-continuable",
+    rpc_detached: "not-continuable",
   },
   completed: {
     resident: "revive",
@@ -86,6 +86,30 @@ describe("messageability", () => {
   })
 })
 
+describe("messageability suspended residencies", () => {
+  test("#given any status #when residency is persisted_only or rpc_detached #then classification is not-continuable (no lazy revive-on-send)", () => {
+    // given
+    const suspendedResidencies: readonly ResidencyState[] = ["persisted_only", "rpc_detached"]
+
+    // when
+    const actual = Object.fromEntries(
+      TASK_STATUSES.flatMap((status) =>
+        suspendedResidencies.map(
+          (residency) => [`${status}/${residency}`, messageability(status, residency)] as const,
+        ),
+      ),
+    )
+
+    // then
+    const expected = Object.fromEntries(
+      TASK_STATUSES.flatMap((status) =>
+        suspendedResidencies.map((residency) => [`${status}/${residency}`, "not-continuable"] as const),
+      ),
+    )
+    expect(actual).toEqual(expected)
+  })
+})
+
 describe("transitionTaskRecord", () => {
   test("#given a cancelled task #when late failure arrives #then cancelled remains terminal and failure is logged", () => {
     // given
@@ -95,6 +119,7 @@ describe("transitionTaskRecord", () => {
       depth: 1,
       execution_mode: "direct",
       model: "claude-sonnet-4",
+      notify_on_terminal: false,
     })
     const running = transitionTaskRecord(record, {
       type: "start",

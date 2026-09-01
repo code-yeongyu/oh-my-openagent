@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import { createReadToolDefinition, type CreateAgentSessionOptions, type ToolDefinition } from "@code-yeongyu/senpi"
 
 import { InProcessRunner, RunnerError } from "./in-process"
@@ -90,10 +94,19 @@ function createFakeSession(sessionId = "child-session-1"): FakeSessionControls {
   }
 }
 
+const tmpSessionDirs: string[] = []
+
+function makeSessionDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), "senpi-task-in-process-"))
+  tmpSessionDirs.push(dir)
+  return dir
+}
+
 function baseSpec(overrides: Partial<ChildSpec> = {}): ChildSpec {
   return {
     taskId: "task-1",
     cwd: process.cwd(),
+    sessionDir: makeSessionDir(),
     depth: 0,
     parentSessionId: "parent-1",
     rootSessionId: "root-1",
@@ -111,6 +124,9 @@ describe("InProcessRunner", () => {
   afterEach(() => {
     unhandled.length = 0
     process.off("unhandledRejection", onUnhandled)
+    while (tmpSessionDirs.length > 0) {
+      rmSync(tmpSessionDirs.pop() ?? "", { recursive: true, force: true })
+    }
   })
 
   test("#given a running child #when steered while the prompt is in flight #then the fake session receives it", async () => {
@@ -161,10 +177,10 @@ describe("InProcessRunner", () => {
 
   test("#given a completing child #when idle #then the last assistant text is extracted", async () => {
     const fake = createFakeSession()
-    fake.lastText.value = "final answer"
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const handle = await runner.start(baseSpec())
 
+    fake.lastText.value = "final answer"
     fake.resolvePrompt()
     const outcome = await handle.waitForIdle()
 
@@ -195,7 +211,28 @@ describe("InProcessRunner", () => {
     }
   })
 
-  test("#given a started child #when the session is constructed #then an in-memory session manager is used", async () => {
+  test("#given a tool allowlist and shared lsp tools #when a child is started #then options.tools equals the allowlist while customTools still carries the lsp tool", async () => {
+    let captured: CreateAgentSessionOptions | undefined
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({
+      sharedParentTools: [makeTool("lsp_diagnostics"), makeTool("grep")],
+      createSession: async (options) => {
+        captured = options
+        return fake.session
+      },
+    })
+
+    const handle = await runner.start(baseSpec({ toolAllowlist: ["read", "find", "grep", "ls", "bash"] }))
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    expect(captured?.tools).toEqual(["read", "find", "grep", "ls", "bash"])
+    const customNames = (captured?.customTools ?? []).map((tool) => tool.name)
+    expect(customNames).toEqual(["lsp_diagnostics", "grep"])
+  })
+
+  test("#given a curated child with bash allowed #when the session is constructed #then a restricted bash override replaces the builtin", async () => {
+    // given
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
     const runner = new InProcessRunner({
@@ -205,11 +242,54 @@ describe("InProcessRunner", () => {
       },
     })
 
-    const handle = await runner.start(baseSpec())
+    // when
+    const handle = await runner.start(baseSpec({ agentType: "explore", toolAllowlist: ["bash"] }))
     fake.resolvePrompt()
     await handle.waitForIdle()
 
-    expect(captured?.sessionManager?.isPersisted()).toBe(false)
+    // then
+    const bashTools = (captured?.customTools ?? []).filter((tool) => tool.name === "bash")
+    expect(bashTools).toHaveLength(1)
+    expect(bashTools[0]?.description).toContain("read-only")
+  })
+
+  test("#given a non-curated child #when the session is constructed #then no bash override is injected", async () => {
+    // given
+    let captured: CreateAgentSessionOptions | undefined
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({
+      createSession: async (options) => {
+        captured = options
+        return fake.session
+      },
+    })
+
+    // when
+    const handle = await runner.start(baseSpec({ agentType: "scout", toolAllowlist: ["bash"] }))
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    // then
+    expect((captured?.customTools ?? []).some((tool) => tool.name === "bash")).toBe(false)
+  })
+
+  test("#given a started child #when the session is constructed #then a persisted session manager rooted at the spec session dir is used", async () => {
+    let captured: CreateAgentSessionOptions | undefined
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({
+      createSession: async (options) => {
+        captured = options
+        return fake.session
+      },
+    })
+
+    const spec = baseSpec()
+    const handle = await runner.start(spec)
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    expect(captured?.sessionManager?.isPersisted()).toBe(true)
+    expect(captured?.sessionManager?.getSessionDir()).toBe(spec.sessionDir)
     expect(captured?.resourceLoader?.getExtensions().extensions).toHaveLength(0)
   })
 
@@ -293,5 +373,47 @@ describe("InProcessRunner", () => {
     await handle.waitForIdle()
 
     expect(seen).toEqual(["agent_start", "agent_end"])
+  })
+})
+
+describe("InProcessRunner thinking level", () => {
+  test("#given a spec carrying a thinking level #when the child session is created #then the level reaches the senpi session options", async () => {
+    // given
+    let captured: CreateAgentSessionOptions | undefined
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({
+      createSession: async (options) => {
+        captured = options
+        return fake.session
+      },
+    })
+
+    // when
+    const handle = await runner.start(baseSpec({ thinkingLevel: "xhigh" }))
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    // then
+    expect(captured?.thinkingLevel).toBe("xhigh")
+  })
+
+  test("#given a spec without a thinking level #when the child session is created #then no level is forced so senpi keeps its default", async () => {
+    // given
+    let captured: CreateAgentSessionOptions | undefined
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({
+      createSession: async (options) => {
+        captured = options
+        return fake.session
+      },
+    })
+
+    // when
+    const handle = await runner.start(baseSpec())
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    // then
+    expect(captured?.thinkingLevel).toBeUndefined()
   })
 })

@@ -6,6 +6,7 @@ import { getLocalVersion } from "./get-local-version"
 import { doctor, resolveDoctorTarget } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { configureRuntimeCommands } from "./runtime-commands"
+import { runConfigMigrate } from "./config-migrate"
 import { availableInstallPlatforms, isSenpiPlatformEnabled, SENPI_PLATFORM_ENV_FLAG } from "./senpi-platform-flag"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
@@ -40,6 +41,11 @@ type RootCommandOptions = {
   readonly platform?: InstallArgs["platform"]
 }
 
+type ConfigMigrateCommandOptions = {
+  readonly dryRun?: boolean
+  readonly json?: boolean
+}
+
 type DoctorCommandOptions = {
   readonly status?: boolean
   readonly verbose?: boolean
@@ -51,7 +57,8 @@ export function resolveInstallArgs(
   options: InstallCommandOptions,
   invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
 ): InstallArgs {
-  const defaultPlatform = invocationName === "lazycodex" || invocationName === "lazycodex-ai" ? "codex" : undefined
+  const defaultPlatform =
+    process.env.OMO_EDITION === "codex" || invocationName === "lazycodex" || invocationName === "lazycodex-ai" ? "codex" : undefined
   const platform = options.platform ?? defaultPlatform
   if (platform === "senpi" && !isSenpiPlatformEnabled()) {
     throw new Error(
@@ -115,17 +122,17 @@ Examples:
   $ bunx oh-my-opencode install
   $ npx lazycodex-ai install --no-tui
   $ bunx oh-my-opencode install --no-tui --platform=both --claude=max20 --openai=yes --gemini=yes --copilot=no
-  $ omo install --platform=codex --codex-autonomous
+  $ omo-agent-toolkit install --platform=codex --codex-autonomous
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
-  OpenAI        Native openai/ models (GPT-5.4 for Oracle)
+  OpenAI        Native openai/ models (GPT-5.6 Sol for Oracle)
   Gemini        Native google/ models (Gemini 3.1 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
-  OpenCode Zen  opencode/ models (opencode/claude-opus-4-7, etc.)
-  Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
-  Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
+  OpenCode Zen  opencode/ models (opencode/claude-opus-5, etc.)
+  Z.ai          zai-coding-plan/glm-5.2 (visual-engineering fallback)
+  Kimi          kimi-for-coding/kimi-k3 (Sisyphus/Prometheus fallback)
   Bailian       bailian-coding-plan/ models (Qwen, GLM, Kimi fallback)
   MiniMax       minimax-coding-plan/MiniMax-M3 (utility fallback)
   MiniMax CN    minimax-cn-coding-plan/MiniMax-M3 (utility fallback)
@@ -165,12 +172,12 @@ Examples:
   $ bunx oh-my-opencode run --on-complete "notify-send Done" "Fix the bug"
   $ bunx oh-my-opencode run --session-id ses_abc123 "Continue the work"
   $ bunx oh-my-opencode run --model anthropic/claude-sonnet-4 "Fix the bug"
-  $ bunx oh-my-opencode run --agent Sisyphus --model openai/gpt-5.5 "Implement feature X"
+  $ bunx oh-my-opencode run --agent Sisyphus --model openai/gpt-5.6-sol "Implement feature X"
 
 Agent resolution order:
   1) --agent flag
   2) OPENCODE_DEFAULT_AGENT
-  3) oh-my-opencode.json "default_run_agent"
+  3) .omo/omo.jsonc "default_run_agent"
   4) Sisyphus (fallback)
 
 Available core agents:
@@ -241,7 +248,7 @@ Examples:
   $ bunx oh-my-opencode doctor --status   # Compact dashboard
   $ bunx oh-my-opencode doctor --verbose  # Deep diagnostics
   $ bunx oh-my-opencode doctor --json     # JSON output
-  $ omo doctor --platform=codex           # Codex/LazyCodex diagnostics only
+  $ omo-agent-toolkit doctor --platform=codex   # Codex/LazyCodex diagnostics only
 `)
   .action(async (options: DoctorCommandOptions) => {
     const rootOptions = program.opts<RootCommandOptions>()
@@ -252,6 +259,18 @@ Examples:
       json: options.json ?? false, target: resolveDoctorTarget(process.env.OMO_INVOCATION_NAME, options.platform ?? rootDoctorPlatform),
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("config")
+  .description("Manage unified OMO configuration")
+  .command("migrate")
+  .description("Migrate legacy OMO configuration into ~/.omo/omo.jsonc")
+  .option("--dry-run", "Print the transform, backup move plan, and conflicts without new migration writes")
+  .option("--json", "Print machine-readable migration output")
+  .action((options: ConfigMigrateCommandOptions) => {
+    const exitCode = runConfigMigrate({ dryRun: options.dryRun ?? false, json: options.json ?? false })
     process.exit(exitCode)
   })
 

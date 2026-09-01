@@ -70,7 +70,7 @@ function extractCommandShimTarget(content: string): string | null {
   return match?.[1] ?? null
 }
 
-function isManagedComponentBinTarget(target: string): boolean {
+export function isManagedComponentBinTarget(target: string): boolean {
   const parts = target.split(/[\\/]+/)
   const suffix = parts.slice(-4)
   return (

@@ -1,0 +1,30 @@
+HEAVY self-review
+
+1. Single responsibility: PASS. `planner.ts` resolves task plans; `renderers.ts` formats task tool rows; the model port remains the category resolver's model boundary.
+2. Boundary purity: PASS. No untyped input crosses the changed boundary; `SenpiModelPort.name` is optional and typed.
+3. Variant discrimination: PASS. No tagged union or enum branch was added.
+4. Escape hatches: PASS. No `any`, suppression, non-null assertion, or production `expect` was added.
+5. Defensive layer: PASS. The optional name/provider/display handling reflects real persisted-data and renderer boundaries; no type-proven null check was added.
+6. One-off helpers: PASS. `qualifyResolvedModelDisplay` has two production callers and centralizes one compatibility rule that had diverged.
+7. Tests: PASS. Reverting planner display preservation fails `planner.test.ts`; reverting provider qualification fails `renderers.test.ts`.
+8. Parameter bloat: PASS. No production function parameter list changed.
+9. Redundant verification: PASS. Cleanup verification was limited to QA sandbox teardown and did not add production code.
+10. Negative naming: PASS. No negatively named symbol was introduced.
+11. Logging: N/A. No log or error-boundary behavior changed.
+
+File size:
+- `renderers.ts` is pre-existing oversized at 292 pure LOC and is reduced below its base after extracting provider qualification.
+- `resolver.ts` remains at the 250 pure-LOC ceiling.
+- `resolved-model-display.ts` is a focused 14-pure-LOC module.
+- `planner.test.ts` drops from 263 to 260 pure LOC.
+- Oversized manager tests received replacement-only expected-output updates.
+
+Diff review:
+- Friendly model name is preserved only when the registry supplies it; provider/model-id remains the fallback.
+- Registry model names are copied only from own string data properties and rejected when empty, control-bearing, inherited, accessor-backed, or longer than 120 characters.
+- Persisted records whose display is already provider-qualified by slash or human-readable delimiter are not double-prefixed.
+- Plain rows use labeled `reasoning:xhigh`; compact 72-column rows use `xhigh` so provider + friendly model + mode + status remain complete.
+- Legacy explicit-model, sanitization, width, error, persistence, and task-tool tests remain green.
+
+Tier:
+Upgraded from LIGHT to HEAVY after review required a shared compatibility module and explicit registry security-boundary validation. The five-lane reviewer loop must pass again after branch synchronization.

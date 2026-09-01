@@ -13,7 +13,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
     "explorer",
     [
       {
-        previous: { model: "gpt-5.4-mini", effort: "low" },
+        previous: { model: "gpt-5.6-luna-fast", effort: "low" },
         current: { model: "gpt-5.6-terra", effort: "medium" },
       },
       {
@@ -26,7 +26,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
     "librarian",
     [
       {
-        previous: { model: "gpt-5.4-mini", effort: "low" },
+        previous: { model: "gpt-5.6-luna-fast", effort: "low" },
         current: { model: "gpt-5.6-terra", effort: "medium" },
       },
       {
@@ -55,6 +55,10 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
         previous: { model: "gpt-5.6-sol", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "max" },
       },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "high" },
+      },
     ],
   ],
   [
@@ -63,6 +67,37 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
         current: { model: "gpt-5.6-luna", effort: "max" },
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "max" },
+        current: { model: "gpt-5.6-terra", effort: "high" },
+      },
+    ],
+  ],
+  [
+    "lazycodex-worker-high",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "medium" },
+      },
+    ],
+  ],
+  [
+    "lazycodex-code-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "medium" },
+      },
+    ],
+  ],
+  [
+    "lazycodex-clone-fidelity-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "high" },
       },
     ],
   ],
@@ -81,6 +116,10 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       {
         previous: { model: "gpt-5.6-sol", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "high" },
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-sol", effort: "low" },
       },
     ],
   ],

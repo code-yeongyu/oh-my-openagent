@@ -1,4 +1,4 @@
-import type { InternalPromptDispatchArgs, InternalPromptDispatchResult, PromptAsyncInput, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import type { InternalPromptDispatchArgs, InternalPromptDispatchResult, PromptAsyncInput, PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import type { MonitorRecord, OutputBatch } from "./types"
 
 export type MonitorPromptClient = PromptDispatchClient & InternalPromptDispatchArgs<PromptAsyncInput>["client"]
@@ -10,6 +10,8 @@ export type MonitorOutputInjectorDeps = {
   readonly acceptedMessageSkewMs: number
   readonly userMessageInProgressWindowMs: number
   readonly postDispatchHoldMs: number
+  /** Undefined keeps the unbounded legacy deferral. */
+  readonly maxActiveDeferMs?: number
   readonly dispatchInternalPrompt?: (args: InternalPromptDispatchArgs<PromptAsyncInput>) => Promise<InternalPromptDispatchResult>
   readonly now?: () => number
   readonly settleAfterSessionIdle?: () => Promise<void>

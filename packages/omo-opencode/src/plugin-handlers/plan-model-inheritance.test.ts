@@ -20,6 +20,7 @@ describe("buildPlanDemoteConfig", () => {
       name: "prometheus",
       model: "anthropic/claude-opus-4-7",
       variant: "max",
+      reasoning: "xhigh",
       mode: "primary",
       prompt: "You are Prometheus...",
       permission: { edit: "allow" },
@@ -42,6 +43,7 @@ describe("buildPlanDemoteConfig", () => {
     expect(result.mode).toBe("subagent")
     expect(result.model).toBe("anthropic/claude-opus-4-7")
     expect(result.variant).toBe("max")
+    expect(result.reasoning).toBe("xhigh")
     expect(result.temperature).toBe(0.1)
     expect(result.top_p).toBe(0.95)
     expect(result.maxTokens).toBe(32000)
@@ -65,6 +67,7 @@ describe("buildPlanDemoteConfig", () => {
     const prometheusConfig = {
       model: "anthropic/claude-opus-4-7",
       variant: "max",
+      reasoning: "high",
       temperature: 0.1,
       reasoningEffort: "high",
       fallback_models: ["openai/gpt-5.5"],
@@ -72,6 +75,7 @@ describe("buildPlanDemoteConfig", () => {
     const planOverride = {
       model: "openai/gpt-5.4",
       variant: "high",
+      reasoning: "low",
       temperature: 0.5,
       reasoningEffort: "low",
       fallback_models: [{ model: "opencode-go/glm-5.2" }],
@@ -83,6 +87,7 @@ describe("buildPlanDemoteConfig", () => {
     //#then
     expect(result.model).toBe("openai/gpt-5.4")
     expect(result.variant).toBe("high")
+    expect(result.reasoning).toBe("low")
     expect(result.temperature).toBe(0.5)
     expect(result.reasoningEffort).toBe("low")
     expect(result.fallback_models).toEqual([{ model: "opencode-go/glm-5.2" }])
@@ -93,6 +98,7 @@ describe("buildPlanDemoteConfig", () => {
     const prometheusConfig = {
       model: "anthropic/claude-opus-4-7",
       variant: "max",
+      reasoning: "high",
       temperature: 0.1,
       reasoningEffort: "high",
     }
@@ -106,6 +112,7 @@ describe("buildPlanDemoteConfig", () => {
     //#then - plan model wins, rest inherits from prometheus
     expect(result.model).toBe("openai/gpt-5.4")
     expect(result.variant).toBe("max")
+    expect(result.reasoning).toBe("high")
     expect(result.temperature).toBe(0.1)
     expect(result.reasoningEffort).toBe("high")
   })

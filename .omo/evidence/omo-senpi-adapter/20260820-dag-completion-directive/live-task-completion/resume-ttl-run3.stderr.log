@@ -1,0 +1,13 @@
+omo config hot-reload rejected {
+  paths: [],
+  pathCount: 0,
+  errors: [ 'Configuration watch target is restricted' ],
+  errorCount: 1
+}
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi process sweep skipped: running inside a senpi-task RPC child undefined
+Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi start-work-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }
