@@ -2,7 +2,7 @@ import type { ExecutionMode, StartResult } from "../../manager"
 import type { ToolProgressDetails } from "../../progress"
 import type { TaskRecord } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
-import type { TaskToolDetails, TaskToolMode } from "./types"
+import type { TaskSkillSummary, TaskToolDetails, TaskToolMode } from "./types"
 
 export type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 
@@ -42,6 +42,7 @@ export function startedDetails(
   started: Extract<StartResult, { kind: "started" }>,
   params: SingleSpawnParams,
   executionMode: ExecutionMode,
+  skills?: TaskSkillSummary,
 ): TaskToolDetails {
   return {
     task_id: started.task_id,
@@ -56,6 +57,7 @@ export function startedDetails(
     resolved_model: started.resolved_model,
     run_in_background: params.run_in_background === true,
     queue_position: started.queue_position,
+    ...(skills === undefined ? {} : { skills }),
   }
 }
 
@@ -64,6 +66,7 @@ export function partialDetails(
   params: SingleSpawnParams,
   executionMode: ExecutionMode,
   progress: ToolProgressDetails,
+  skills?: TaskSkillSummary,
 ): TaskToolDetails & ToolProgressDetails {
-  return { ...startedDetails(started, params, executionMode), ...progress }
+  return { ...startedDetails(started, params, executionMode, skills), ...progress }
 }

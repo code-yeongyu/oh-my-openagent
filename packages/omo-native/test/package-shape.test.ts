@@ -33,7 +33,7 @@ describe("omo-ai published package shape", () => {
     })
 
     describe("#when the files array is audited", () => {
-      test("#then it ships exactly bin and plugin", () => {
+      test("#then it ships the launcher, plugin, and published Senpi patch installer", () => {
         expect(manifest.files).toEqual(["bin", "plugin"])
       })
     })
@@ -45,13 +45,20 @@ describe("omo-ai published package shape", () => {
     })
 
     describe("#when the dependencies are audited", () => {
-      test("#then @code-yeongyu/senpi is the sole runtime dependency", () => {
-        expect(Object.keys(manifest.dependencies ?? {})).toEqual(["@code-yeongyu/senpi"])
+      test("#then it declares exactly the engine and codemode parser runtime dependencies", () => {
+        expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
+          "@babel/parser",
+          "@code-yeongyu/senpi",
+        ])
+      })
+
+      test("#then the codemode parser dependency is exactly pinned", () => {
+        expect(manifest.dependencies?.["@babel/parser"]).toBe("8.0.4")
       })
 
       test("#then the senpi pin is exact with no range operator", () => {
         const pin = manifest.dependencies?.["@code-yeongyu/senpi"]
-        expect(pin).toBe("2026.8.12-4")
+        expect(pin).toBe("2026.8.31")
         expect(pin).toMatch(/^\d/)
         expect(pin).not.toMatch(/^[\^~]/)
       })
@@ -76,8 +83,8 @@ describe("omo-ai published package shape", () => {
         expect(manifest.scripts?.prepack).toBeUndefined()
       })
 
-      test("#then no postinstall lifecycle hook exists", () => {
-        expect(manifest.scripts?.postinstall).toBeUndefined()
+      test("#then postinstall applies the shipped Senpi patch", () => {
+        expect(manifest.scripts?.postinstall).toBe("node bin/senpi-patch.mjs")
       })
     })
   })

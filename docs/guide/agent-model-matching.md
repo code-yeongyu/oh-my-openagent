@@ -158,7 +158,7 @@ You don't need every provider. You need the right two.
 | Subscription | Cost | What You Get | Covers |
 |---|---|---|---|
 | **OpenCode Go** | $10/mo | `kimi-k3`, `glm-5.2`, `minimax-m2.5`, `minimax-m2.7`, `minimax-m3`, `mimo-v2-pro`, `qwen3.7-plus`, `qwen3.6-plus` | Claude-family alternatives (Kimi, GLM), Gemini-family alternatives (Qwen), utility/retrieval (MiniMax) |
-| **OpenAI Plus/Pro** | $20+/mo | `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` | GPT-native agents (Hephaestus, Oracle, Momus), GPT-5.6 category defaults (`deep`, `ultrabrain`, `unspecified-low`), GPT fallbacks for model-flexible agents |
+| **OpenAI Plus/Pro** | $20+/mo | `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` | GPT-native agents (Hephaestus, Oracle, Momus), GPT-5.6 category defaults (`deep`, `ultrabrain`), GPT fallbacks for model-flexible agents |
 
 ### Why this specific combination
 
@@ -231,7 +231,7 @@ The chain entries below are the active recommendations, not snapshot-backed lega
 
 ### Claude Family (communicative, instruction-following)
 
-Used by: Sisyphus, Atlas, Sisyphus-Junior, Metis (Claude path), Prometheus (primary fallback), `unspecified-low`, `unspecified-high`.
+Used by: Sisyphus, Atlas, Sisyphus-Junior, Metis (Claude path), Prometheus (primary fallback), `unspecified-high`.
 
 The priorities below include manual model choices. They are not a literal copy of every agent's automatic fallback chain; see [Agent Profiles](#agent-profiles) for the exact runtime chains.
 
@@ -250,16 +250,16 @@ The priorities below include manual model choices. They are not a literal copy o
 
 ### GPT Family (principle-driven, autonomous)
 
-Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, `unspecified-low`, Atlas (GPT path).
+Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, Atlas (GPT path). `unspecified-low` falls back to GPT-5.6 Terra after Grok 4.6.
 
 | Priority | Model | Provider | Why |
 |---|---|---|---|
 | 1 | `gpt-5.6-sol` (xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | The GPT-5.6 flagship. Default for Hephaestus, Oracle, and `ultrabrain`; first GPT-5.6 Sol-family fallback for deep GPT-native roles. |
 | 1 | `gpt-5.6-terra` (xhigh / high) | `openai`, `vercel` | GPT-5.6 mid-tier. Default for Momus (high) and an optional balanced override elsewhere. |
-| 1 | `gpt-5.6-luna` (xhigh) | `openai`, `vercel` | GPT-5.6 light tier. New default for the `unspecified-low` category. |
+| 1 | `gpt-5.6-luna` (xhigh) | `openai`, `vercel` | GPT-5.6 light tier. Not the `unspecified-low` default; that category now starts at Grok 4.6. |
 | 2 | `gpt-5.4` / `gpt-5.4-pro` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Previous flagship generation available as an explicit manual or catalog choice, not an active Hephaestus fallback. |
 | 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v4-pro`) | `deepseek`, `opencode-go`, `vercel` | Approved in the `unspecified-low` fallback chain, but not a substitute for the Sol-only `deep` category. |
-| 4 | **MiniMax — STRONGLY DISCOURAGED** (`minimax-m3`, `minimax-m2.7`, `minimax-m2.5`) | `opencode-go`, `opencode`, `openrouter/minimax` | Used in the Explore, Librarian, Atlas, and Sisyphus-Junior fallback chains. Consistency and long-context management issues make it a poor substitute for Hephaestus/Oracle. Do NOT override deep agents to MiniMax. |
+| 4 | **MiniMax — STRONGLY DISCOURAGED** (`minimax-m3`, `minimax-m2.7`) | `opencode-go`, `opencode`, `openrouter/minimax` | Used in the Explore, Librarian, Atlas, and Sisyphus-Junior fallback chains. Consistency and long-context management issues make it a poor substitute for Hephaestus/Oracle. Do NOT override deep agents to MiniMax. |
 
 > **DeepSeek ≻≻ MiniMax.** DeepSeek retains GPT's autonomous exploration character. MiniMax loses coherence on multi-step deep work. MiniMax is fine for grep-style utility agents, nothing more.
 
@@ -334,7 +334,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | ----------------- | ----------------------------------------------------------------------------------------------- |
 | **GPT-5.6 Sol**   | The GPT-5.6 flagship. Default for Hephaestus and `ultrabrain`; first GPT-5.6 Sol-family fallback for deep GPT-native roles. |
 | **GPT-5.6 Terra** | GPT-5.6 mid-tier. Default for Momus (high) and an optional balanced override elsewhere. |
-| **GPT-5.6 Luna**  | GPT-5.6 light tier. Default for the `unspecified-low` category (xhigh). |
+| **GPT-5.6 Luna**  | GPT-5.6 light tier. No longer the `unspecified-low` default (that is Grok 4.6 xhigh). |
 | **GPT-5.6 Sol override paths** | High intelligence, strategic reasoning. Default for Oracle and a key fallback for Atlas. |
 | **GPT 5.6 Luna Fast**  | Fast + strong reasoning. Utility fallback after the Kimi high-speed quick default. |
 | **GPT-5-Nano**    | Ultra-cheap, fast. Good for simple utility tasks.                                               |
@@ -390,8 +390,8 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.6-sol (max)` | `openai\|quotio-openai\|vercel/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|opencode\|vercel/gpt-5.6-sol (max)` |
 | `deep` | Deep coding, complex logic | `openai/gpt-5.6-sol (medium)` | `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` |
 | `artistry` | Creative, novel approaches | `anthropic/claude-fable-5 (xhigh)` | `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-fable-5 (xhigh)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (xhigh)` |
-| `quick` | Simple, fast tasks | `kimi-for-coding/kimi-for-coding-highspeed` | `kimi-for-coding/kimi-for-coding-highspeed` → `quotio-openai/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan\|opencode-go\|vercel/qwen3.6-flash (low)` → `opencode-go\|vercel/minimax-m3 (max)` → `opencode-go\|vercel/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot\|vercel/claude-haiku-4-5 (off)` |
-| `unspecified-low` | General standard work | `openai/gpt-5.6-terra (high)` | `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go\|vercel/deepseek-v4-pro (max)` → `xiaomi\|opencode-go\|vercel/mimo-v2.5-pro (max)` |
+| `quick` | Simple, fast tasks | `kimi-for-coding/kimi-for-coding-highspeed` | `kimi-for-coding/kimi-for-coding-highspeed` → `openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan\|vercel/qwen3.6-flash (low)` → `opencode-go\|vercel/minimax-m3 (max)` → `opencode-go\|vercel/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot\|vercel/claude-haiku-4-5 (off)` |
+| `unspecified-low` | General standard work | `xai/grok-4.6 (xhigh)` | `xai\|github-copilot\|opencode\|vercel/grok-4.6 (xhigh)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go\|vercel/deepseek-v4-pro (max)` → `xiaomi\|opencode-go\|vercel/mimo-v2.5-pro (max)` |
 | `unspecified-high` | General complex work | `kimi-for-coding/kimi-k3 (max)` | `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (xhigh)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` |
 | `writing` | Text, docs, prose | `kimi-for-coding/kimi-k3 (low)` | `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (low)` → `google\|github-copilot\|opencode\|vercel/gemini-3.6-flash` |
 

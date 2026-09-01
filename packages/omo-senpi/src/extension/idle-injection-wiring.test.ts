@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "../components/ulw-loop"
-import { activeStatus, createLogger } from "../components/ulw-loop/ulw-loop.test-support"
+import { activeStatus, createLogger, sessionEventCtx } from "../components/ulw-loop/ulw-loop.test-support"
 import { createParentNotifier } from "../components/task/parent-notifier"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 
@@ -25,11 +25,12 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
       resolveOmoBin: () => "/tmp/omo",
+      planDirExists: () => true,
       runCommand: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator: coordinator })
 
     // when the ulw continuation fires at turn end (enqueues, defers its flush)
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
     expect(delivered).toEqual([])
 
     // and a background completion wakes the idle parent on the same edge (synchronous, throw-safe path)
@@ -43,7 +44,7 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
           task_id: "st_done",
           name: "bg",
           status: "completed",
-          model: "quotio-openai/gpt-5.6-luna-fast",
+          model: "openai-codex/gpt-5.6-luna-fast",
           duration_ms: 1,
           final_response: "",
           continuation_hint: "",

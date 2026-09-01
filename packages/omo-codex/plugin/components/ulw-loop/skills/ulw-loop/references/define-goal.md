@@ -23,7 +23,7 @@ Write the objective outcome-first, in this order:
 1. **Outcome**: one sentence stating what will be true, naming the artifact, system, repo, or user-facing behavior involved.
 2. **Deliverables**: the named surfaces the work lands on (files, endpoints, packages, environments). Use literal paths and names: the executing agent interprets the objective literally and will not infer surfaces you did not name.
 3. **Success criteria**: sized by tier (below), each one a binary observable with its scenario and evidence named upfront.
-4. **Scope bounds**: what is out of scope, stated wherever ambiguity would let the run expand. Unstated bounds do not exist.
+4. **Constraints and scope bounds**: Record the user's stated constraints verbatim, including what is explicitly out of scope wherever ambiguity would let the run expand. Where the user was silent on a bound the work forks on, SET it yourself: derive the clearest defensible bound from repo evidence and best practice (stack already in use, compatibility surfaces, scale the code must serve, audience or compliance the repo implies) and record it inside the objective as `assumed: <constraint> — <rationale>, <reversible?>`, binding until the user vetoes it. Unstated bounds do not exist — which is why you write them.
 5. **WHEN TO STOP**: one line, "I'll stop right away when <the exact observable state that ends this run>". This line is binding: the moment it holds, the run delivers and stops. Work past it is a defect, not diligence.
 
 State the motivation when it changes execution ("p95 matters because the checkout SLA is 300ms") and omit it when it does not. Positive statements beat prohibitions: "verify against staging" carries more signal than "do not touch production".
@@ -61,11 +61,13 @@ Prefer numbers that represent real success over decorative precision. A threshol
 
 Reject pure activity objectives: "make progress", "keep investigating", "improve things", "work on X". They cannot fail, so they cannot finish.
 
-Rewrite vague goals into measurable ones when local context makes the rewrite safe. Ask ONE narrow question only when the missing detail changes the intended outcome or its validation, shaped around the missing validator or bound:
+Rewrite vague goals into measurable ones when local context makes the rewrite safe. Ask ONE narrow question only when the missing detail is an OWNER-DECISION — irreversible, destructive, safety-critical, or a cross-cutting product choice (real budget or spend, public surface, external dependency, data shape, target audience) — that changes the intended outcome or its validation, shaped around the missing validator or bound:
 
 - "What metric defines success here: latency, cost, accuracy, or user-visible behavior?"
 - "Which environment do I verify against: local, staging, or production?"
 - "What is the minimum evidence you want before this goal is marked complete?"
+
+Every other missing constraint follows Objective anatomy #4: adopt the clearest defensible default, state it in the objective as `assumed:`, and let the user veto.
 
 When the user cannot provide a metric, propose the most honest binary validator available and proceed with it stated in the objective.
 
@@ -85,7 +87,7 @@ Repaired: "Resolve every open change-requesting review comment on PR 123 touchin
 | an active goal matching this intent | Continue it. Never register a duplicate. |
 | an active goal conflicting with this intent | Stop and surface the conflict; the user decides whether to finish it, complete it, or branch. |
 
-2. Goals are unlimited. Never invent a numeric budget, token limit, or deadline the user did not state.
+2. Goals are unlimited. Never invent a numeric budget, token limit, or deadline the user did not state — that ban covers run quotas; the `assumed:` work constraints from Objective anatomy #4 are different and required.
 3. In a ulw-loop run, the loop CLI owns per-goal state (`.omo/ulw-loop/goals.json`): `create_goal` registers the aggregate objective from the printed handoff, and this reference shapes both that objective and every goal's `successCriteria` at `create-goals` time.
 
 ## Completion honesty

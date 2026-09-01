@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -20,9 +20,13 @@ import {
 } from "./completion"
 import { CapturedCompletionApi } from "./runner.test-support"
 import { realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+
+const FIXED_NOW_MS = Date.parse("2026-08-16T12:00:00.000Z")
+const FIXED_RECENT_TIMESTAMP = new Date(FIXED_NOW_MS - 60_000).toISOString()
 
 function record(): ReflectionCompletionRecord {
   return {
@@ -36,8 +40,8 @@ function record(): ReflectionCompletionRecord {
     trigger: "dream",
     origin: "shutdown",
     outcome: "merged",
-    startedAt: "2026-08-09T12:00:00.000Z",
-    finishedAt: "2026-08-09T12:00:01.000Z",
+    startedAt: FIXED_RECENT_TIMESTAMP,
+    finishedAt: FIXED_RECENT_TIMESTAMP,
     delivery: { status: "pending" },
   }
 }
@@ -128,7 +132,7 @@ describe("reflection completion flow", () => {
       trigger: "dream",
       origin: "shutdown",
       outcome: "merged",
-      finishedAt: "2026-08-09T12:00:01.000Z",
+      finishedAt: FIXED_RECENT_TIMESTAMP,
     })
   })
 
@@ -146,7 +150,7 @@ describe("reflection completion flow", () => {
     expect(reflection.outcomes).toEqual([{
       runId: "run-offline",
       outcome: "merged",
-      finishedAt: "2026-08-09T12:00:01.000Z",
+      finishedAt: FIXED_RECENT_TIMESTAMP,
     }])
   })
 
@@ -160,21 +164,78 @@ describe("reflection completion flow", () => {
     registerReflectionCompletionRenderer(api)
 
     // when
-    const consumed = await consumePendingReflectionCompletions(root, {
+    const consumed = await consumePendingReflectionCompletions(root, "agent-test", {
       sessionId: "conversation-a",
       api,
       ui: { notify: (message, level) => notifications.push({ message, level }) },
-    })
+    }, FIXED_NOW_MS)
 
     // then
     expect(consumed).toHaveLength(1)
     expect(api.renderers.map((item) => item.customType)).toEqual([
-      REFLECTION_COMPLETION_ENTRY_TYPE,
-      REFLECTION_LAUNCHED_ENTRY_TYPE,
+      "senpi-memory.reflection-completion",
+      "senpi-memory.reflection-launched",
+      "senpi-memory.reflection-summary",
     ])
     expect(api.entries).toEqual([{ customType: REFLECTION_COMPLETION_ENTRY_TYPE, data: consumed[0] }])
     expect(notifications).toHaveLength(1)
     expect(consumed[0]?.delivery).toMatchObject({ status: "consumed", sessionId: "conversation-a" })
+  })
+
+  describe("#given target foreign and missing-identity pending completions in one drained directory", () => {
+    describe("#when the target identity drains the backlog", () => {
+      test("#then only target records are delivered counted and consumed", async () => {
+        // given
+        const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-completion-")))
+        roots.push(root)
+        const now = FIXED_NOW_MS
+        const targetRecords = Array.from({ length: 8 }, (_, index): ReflectionCompletionRecord => ({
+          ...record(),
+          runId: `target-${index}`,
+          finishedAt: new Date(now - (index + 2) * 60_000).toISOString(),
+        }))
+        const foreignRecords = Array.from({ length: 2 }, (_, index): ReflectionCompletionRecord => ({
+          ...record(),
+          runId: `foreign-${index}`,
+          identity: "agent-foreign",
+          finishedAt: new Date(now - index * 60_000).toISOString(),
+        }))
+        for (const pending of [...targetRecords, ...foreignRecords]) await recordReflectionCompletion(root, pending)
+        const { identity: _identity, ...missingIdentity } = {
+          ...record(),
+          runId: "missing-identity",
+          finishedAt: new Date(now + 60_000).toISOString(),
+        }
+        await writeFile(join(root, "missing-identity.json"), `${JSON.stringify(missingIdentity, null, 2)}\n`)
+        const api = new CapturedCompletionApi()
+
+        // when
+        await consumePendingReflectionCompletions(root, "agent-test", {
+          sessionId: "target-session",
+          api,
+        }, now)
+
+        // then
+        expect(api.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE)).toHaveLength(5)
+        expect(api.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE).map((entry) => entry.data)).toEqual(
+          expect.arrayContaining(targetRecords.slice(0, 5).map((pending) => expect.objectContaining({ runId: pending.runId, identity: "agent-test" }))),
+        )
+        expect(api.entries.filter((entry) => entry.customType === REFLECTION_SUMMARY_ENTRY_TYPE)).toEqual([{
+          customType: REFLECTION_SUMMARY_ENTRY_TYPE,
+          data: expect.objectContaining({ count: 3 }),
+        }])
+        for (const pending of foreignRecords) {
+          expect(JSON.parse(await readFile(join(root, `${pending.runId}.json`), "utf8"))).toMatchObject({
+            identity: "agent-foreign",
+            delivery: { status: "pending" },
+          })
+        }
+        expect(JSON.parse(await readFile(join(root, "missing-identity.json"), "utf8"))).toMatchObject({
+          runId: "missing-identity",
+          delivery: { status: "pending" },
+        })
+      })
+    })
   })
 
   describe("#given a throwing reflection UI", () => {
@@ -188,12 +249,12 @@ describe("reflection completion flow", () => {
         const warnings: unknown[] = []
 
         // when
-        const consumed = await consumePendingReflectionCompletions(root, {
+        const consumed = await consumePendingReflectionCompletions(root, "agent-test", {
           sessionId: "different-session",
           api,
           ui: { notify: () => { throw new Error("ui unavailable") } },
           logger: { warn: (_message, details) => warnings.push(details) },
-        })
+        }, FIXED_NOW_MS)
 
         // then
         expect(consumed[0]?.delivery.status).toBe("consumed")
@@ -209,7 +270,7 @@ describe("reflection completion flow", () => {
         // given
         const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-completion-")))
         roots.push(root)
-        const now = Date.now()
+        const now = FIXED_NOW_MS
         const records = Array.from({ length: 8 }, (_, index): ReflectionCompletionRecord => ({
           ...record(),
           runId: `run-${index}`,
@@ -228,8 +289,8 @@ describe("reflection completion flow", () => {
         }
 
         // when
-        const first = await consumePendingReflectionCompletions(root, live)
-        const second = await consumePendingReflectionCompletions(root, live)
+        const first = await consumePendingReflectionCompletions(root, "agent-test", live, now)
+        const second = await consumePendingReflectionCompletions(root, "agent-test", live, now)
 
         // then
         expect(first).toHaveLength(8)

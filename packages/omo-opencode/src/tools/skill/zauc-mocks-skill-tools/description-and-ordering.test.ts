@@ -63,7 +63,6 @@ describe("skill tool - ordering and priority", () => {
     const desc = tool.description
     expect(desc).toContain("<name>/builtin-skill</name>")
     expect(desc).toContain("<name>/project-skill</name>")
-    expect(desc).not.toContain("<skill>")
     const skillCmdIndex = desc.indexOf("/project-skill")
     const regularCmdIndex = desc.indexOf("/project-cmd")
     expect(skillCmdIndex).toBeLessThan(regularCmdIndex)
@@ -122,7 +121,6 @@ describe("skill tool - ordering and priority", () => {
 
     expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("</available_items>")
-    expect(tool.description).not.toContain("<skill>")
     expect(tool.description).toContain("<command>")
     expect(tool.description).not.toContain("/test-skill")
     expect(tool.description).toContain("/test-cmd")

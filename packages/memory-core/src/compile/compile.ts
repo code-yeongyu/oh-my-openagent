@@ -8,19 +8,11 @@ import {
 
 const PERSONA_PATH = "system/persona.md"
 const IDENTITY_PATH = "system/identity.md"
-export const MEMORY_NUDGE_METADATA_TOKEN = "user turns since your last memory save"
-export const MEMORY_SOUL_METADATA_TOKEN = "Soul updated by"
 const REMINDER =
   "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md)."
 
 export interface CompileMemoryBlockOptions {
   agentId: string
-  conversationId: string
-  previousMessageCount: number
-  nudgeTurns?: number
-  /** Newest out-of-band soul commit since the identity watermark (plan IC-5); rendered once, then consumed. */
-  soulNotice?: { readonly sha: string }
-  clock?: () => Date
 }
 
 export async function compileMemoryBlock(
@@ -47,7 +39,7 @@ export async function compileMemoryBlockAtRevision(
     : []
   const externalPaths = paths.filter(isExternalPath)
   const projection = renderProjection(persona, identity, systemFiles, externalPaths)
-  const metadata = renderMetadata(options, (options.clock ?? (() => new Date()))())
+  const metadata = renderMetadata(options)
   return [projection, metadata].filter((part) => part.length > 0).join("\n\n")
 }
 
@@ -119,30 +111,10 @@ function isExternalPath(path: string): boolean {
   return !path.startsWith("system/") && !path.startsWith("skills/")
 }
 
-function renderMetadata(options: CompileMemoryBlockOptions, compiledAt: Date): string {
+function renderMetadata(options: CompileMemoryBlockOptions): string {
   return [
     "<memory_metadata>",
     `- AGENT_ID: ${options.agentId}`,
-    `- CONVERSATION_ID: ${options.conversationId}`,
-    `- System prompt last recompiled: ${formatUtcTimestamp(compiledAt)}`,
-    `- ${options.previousMessageCount} previous messages between you and the user are stored in recall memory`,
-    ...(options.nudgeTurns === undefined
-      ? []
-      : [`- ${options.nudgeTurns} ${MEMORY_NUDGE_METADATA_TOKEN}. Save durable facts now, or decide nothing qualifies.`]),
-    ...(options.soulNotice === undefined
-      ? []
-      : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${options.soulNotice.sha.slice(0, 7)} since your last run`]),
     "</memory_metadata>",
   ].join("\n")
-}
-
-function formatUtcTimestamp(date: Date): string {
-  const hour = date.getUTCHours()
-  const hour12 = hour % 12 || 12
-  const meridiem = hour < 12 ? "AM" : "PM"
-  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())} ${pad2(hour12)}:${pad2(date.getUTCMinutes())}:${pad2(date.getUTCSeconds())} ${meridiem} UTC+0000`
-}
-
-function pad2(value: number): string {
-  return value.toString().padStart(2, "0")
 }

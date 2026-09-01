@@ -1,24 +1,20 @@
-import { readFile, readdir } from "node:fs/promises"
+import { readFile, readdir } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import type { ReflectionOutcome } from "@oh-my-opencode/memory-core"
 
-import { safeNotify, type ReflectionLiveSession } from "./completion"
-import { reflectionRemediation } from "./remediation"
+/**
+ * A trailing failure streak stops counting once its newest failure is older than this window.
+ * Pending completion delivery already expires after 7 days (COMPLETION_MAX_AGE_MS), so a streak
+ * whose newest failure is past this bound can no longer change: identities that stopped
+ * reflecting must not nag or badge forever off a frozen burst. A fresh failure resumes the count.
+ */
+export const REFLECTION_HEALTH_STALE_MS = 7 * 24 * 60 * 60_000
 
-export const REFLECTION_HEALTH_ENTRY_TYPE = "senpi-memory.health"
-
-export interface ReflectionHealthEntry {
-  readonly schemaVersion: 1
-  readonly identity: string
-  readonly streak: number
-  readonly fingerprint: string
-  readonly lastReason: string
-  readonly lastDetail?: string
-  readonly sinceISO: string
-  readonly recommendation: string
-}
-
+/**
+ * READ-ONLY derived health. This module must never write: no transcript entries, no notifications,
+ * no filesystem mutations. The alerting side effects live in `./health-alert`.
+ */
 export interface ReflectionHealth {
   readonly streak: number
   readonly fingerprint: string
@@ -57,7 +53,7 @@ type HealthRecord = {
 
 export async function readReflectionHealth(
   completionsDir: string,
-  options: { readonly limit?: number } = {},
+  options: { readonly limit?: number; readonly now?: number } = {},
 ): Promise<ReflectionHealth> {
   let names: string[]
   try {
@@ -83,15 +79,21 @@ export async function readReflectionHealth(
     if (record.outcome === "merged" || record.outcome === "no_changes") break
     if (record.outcome === "failed") failuresBeforeSuccess.push(record)
   }
-  const recent = failuresBeforeSuccess.slice(0, 3).map(fingerprintOf)
+  const now = options.now ?? Date.now()
+  const newestFailureAt = failuresBeforeSuccess[0] === undefined
+    ? undefined
+    : Date.parse(failuresBeforeSuccess[0].finishedAt)
+  const stale = newestFailureAt !== undefined && Number.isFinite(newestFailureAt)
+    && now - newestFailureAt > REFLECTION_HEALTH_STALE_MS
+  const recent = (stale ? [] : failuresBeforeSuccess.slice(0, 3)).map(fingerprintOf)
   const dominant = dominantFingerprint(recent)
   const lastFailure = bounded.find((record) => record.outcome === "failed")
   const lastSuccess = bounded.find((record) => record.outcome === "merged" || record.outcome === "no_changes")
-  const streakSinceISO = failuresBeforeSuccess.at(-1)?.finishedAt
+  const streakSinceISO = stale ? undefined : failuresBeforeSuccess.at(-1)?.finishedAt
   const newest = bounded[0]
 
   return {
-    streak: failuresBeforeSuccess.length,
+    streak: stale ? 0 : failuresBeforeSuccess.length,
     fingerprint: dominant,
     ...(lastFailure === undefined
       ? {}
@@ -118,34 +120,6 @@ export async function readReflectionHealth(
     recentFailureFingerprints: recent,
     ...(streakSinceISO === undefined ? {} : { streakSinceISO }),
   }
-}
-
-export async function emitReflectionHealthAlert(
-  completionsDir: string,
-  identity: string,
-  live: ReflectionLiveSession | undefined,
-  once: (key: string) => boolean,
-): Promise<boolean> {
-  if (!live?.ui) return false
-  const health = await readReflectionHealth(completionsDir)
-  if (health.streak < 3 || health.fingerprint.length === 0) return false
-  if (health.recentFailureFingerprints.filter((item) => item === health.fingerprint).length < 2) return false
-  if (!once(`${live.sessionId}:${health.fingerprint}`)) return false
-  const failure = health.lastFailure
-  const recommendation = reflectionRemediation(failure?.reason, failure?.detail)
-  const entry: ReflectionHealthEntry = {
-    schemaVersion: 1,
-    identity,
-    streak: health.streak,
-    fingerprint: health.fingerprint,
-    lastReason: failure?.reason ?? "failed",
-    ...(failure?.detail === undefined ? {} : { lastDetail: failure.detail }),
-    sinceISO: health.streakSinceISO ?? failure?.finishedAt ?? new Date(0).toISOString(),
-    recommendation,
-  }
-  live.api.appendEntry(REFLECTION_HEALTH_ENTRY_TYPE, entry)
-  safeNotify(live, `Memory reflection has failed ${health.streak} times (${health.fingerprint}). ${recommendation}`, "warning")
-  return true
 }
 
 export function reflectionFailureFingerprint(reason: string | undefined, detail: string | undefined): string {

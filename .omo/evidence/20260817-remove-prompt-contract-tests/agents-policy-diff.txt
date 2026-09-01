@@ -1,0 +1,27 @@
+COMMAND: git diff --check && git diff -- AGENTS.md tests/AGENTS.md 'packages/**/AGENTS.md'
+EXPECTED: zero whitespace errors and reviewer-readable effective policy.
+OBSERVED:
+diff --git a/AGENTS.md b/AGENTS.md
+index 0e8ccf1ed..25e790abf 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -317,6 +317,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
+ - Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`).
+ - Never empty catch blocks `catch(e) {}`.
+ - Never test with Arrange-Act-Assert comments — use given/when/then.
++- **Prompt/prose contract tests are forbidden.** Never assert authored agent prompt, `SKILL.md`, rule, `AGENTS.md`, or markdown-instruction wording, headings, section order, fragments, snapshots, negative past wording, or authored text length. Test only machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, or observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation. Pure prose has no automated-test seam; review and QA-by-read are the correct verification.
+ - Never dump business logic into `index.ts` — barrel exports only.
+ - Prometheus may ONLY edit `.md` files (enforced by `prometheus-md-only` hook); FORBIDDEN paths: `packages/*/src/`, `package.json`, config files.
+
+diff --git a/tests/AGENTS.md b/tests/AGENTS.md
+index 092fa3272..3b788a1c6 100644
+--- a/tests/AGENTS.md
++++ b/tests/AGENTS.md
+@@ -29,6 +29,7 @@ tests/
+ ## CONVENTIONS
+
+ - Keep package-specific tests beside package source; use this directory only for real cross-package or standalone-fixture boundaries.
++- **Prompt/prose contract tests are forbidden.** Do not pin authored prompt, skill, rule, `AGENTS.md`, or markdown-instruction wording or structure. Allowed seams are machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, and observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation.
+ - Treat `tests/hashline/` as its own Bun package. Preserve its lockfile and headless entry rather than importing it into the root test preload.
+ - The Hashline fixture imports adapter-internal `../../packages/...` paths, performs live network/model calls, and may write model-selected paths relative to cwd. Run it only from a disposable full-repository copy inside a filesystem-isolated VM or container with no sensitive parent files and never from the primary checkout or an active worktree.
+ - In that sandbox, set explicit short-lived, least-privilege test-only values for `HASHLINE_TEST_BASE_URL` and `HASHLINE_TEST_API_KEY`. `test-environment.ts` requires and validates them (HTTP/HTTPS URL, non-blank key); `headless.ts` throws without them and no longer falls back to hardcoded defaults. Use a non-production endpoint and never use production or personal credentials.

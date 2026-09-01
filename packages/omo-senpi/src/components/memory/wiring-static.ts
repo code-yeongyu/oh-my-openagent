@@ -16,12 +16,19 @@ import type { createMemoryNudgeWiring } from "./nudge-wiring"
 import { registerPalaceCommand } from "./palace/command"
 import { registerMemorySkillsScope } from "./skills-scope"
 import { registerSkillsUsage, type SkillsUsageTracker } from "./skills-usage"
-import type { createSoulNoticeWiring } from "./soul-notice"
+import { registerMemoryUsage, type MemoryUsageTracker } from "./memory-usage"
+import type { createMemoryNoticeWiring } from "./memory-notice-wiring"
+import type { MemorianGateWiring } from "./memorian-wiring"
+import type { createMemoryRecallWiring } from "./recall-wiring"
 import { createReflectionTriggerWiring } from "./trigger-wiring"
-import { MEMORY_APPLY_PATCH_TOOL_NAME, MEMORY_TOOL_NAME, registerMemoryToolSurface } from "./tools"
-import { refreshMemoryStatus } from "./status"
-import { registerReflectionCompletionRenderer, type ReflectionCompletionApi } from "./worker"
-import { branchEntryCount, isRecord, readUi, sessionIdFrom } from "./wiring-context"
+import { registerMemoryToolSurface } from "./tools"
+import {
+  registerReflectionCompletionRenderer,
+  registerReflectionHealthRenderer,
+  type ReflectionCompletionApi,
+} from "./worker"
+import { branchEntryCount, sessionIdFrom } from "./wiring-context"
+import { registerMemoryWriteListener } from "./wiring-memory-write"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { MemoryIdentityContext } from "./context"
 import { createMemoryPromptHandler as createPromptHandler } from "./prompt"
@@ -32,7 +39,9 @@ export function registerMemoryStatic(input: {
   readonly options: MemoryWiringOptions
   readonly promptCache: MemoryBlockCache
   readonly nudgeWiring: ReturnType<typeof createMemoryNudgeWiring>
-  readonly soulNoticeWiring: ReturnType<typeof createSoulNoticeWiring>
+  readonly noticeWiring: ReturnType<typeof createMemoryNoticeWiring>
+  readonly recallWiring: ReturnType<typeof createMemoryRecallWiring>
+  readonly memorianGateWiring: MemorianGateWiring
   readonly dreamTriggerWiring: DreamTriggerWiring
   readonly completionApi: (pi: SenpiExtensionAPI) => ReflectionCompletionApi | undefined
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
@@ -45,6 +54,7 @@ export function registerMemoryStatic(input: {
   readonly lastEventCtx: { current?: unknown }
   readonly activeSession: { current?: string }
   readonly skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> }
+  readonly memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> }
   /** Fires at the manual reflection launch site so the footer animates while the run is in flight. */
   readonly onReflectionLaunch?: (identity: string, run: ReservedRun) => void | Promise<void>
   /** Fires after each settle so the footer can refresh its segments behind the fingerprint gate. */
@@ -53,22 +63,26 @@ export function registerMemoryStatic(input: {
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
   const {
-    pi, ctx, options, promptCache, nudgeWiring, soulNoticeWiring, dreamTriggerWiring,
+    pi, ctx, options, promptCache, nudgeWiring, noticeWiring, recallWiring, memorianGateWiring, dreamTriggerWiring,
     completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
     triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
-    activeSession, skillsUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
+    activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
   } = input
   const api = completionApi(pi)
-  if (api !== undefined) registerReflectionCompletionRenderer(api)
+  if (api !== undefined) {
+    registerReflectionCompletionRenderer(api)
+    registerReflectionHealthRenderer(api)
+  }
   if (hasMemoryCapabilities(pi)) {
     nudgeWiring.register(pi)
-    soulNoticeWiring.register(pi)
+    noticeWiring.register(pi)
   }
   const toolExposure = options.toolExposure ?? "direct"
   const promptHandler = createPromptHandler({
     resolveContext,
     cache: promptCache,
     searchExposure: () => toolExposure === "search",
+    resolveCompileWarnTokens: () => loadCommandSettings().settings.compile_warn_tokens,
     resolveNudgeTurns: (repo, sessionId, identity) => nudgeWiring.nudgeTurns(repo, sessionId, identity),
     resolveSoulNotice: async (repo, sessionId, identity) => {
       const context = resolveContext(sessionId)
@@ -83,6 +97,10 @@ export function registerMemoryStatic(input: {
     lastEventCtx.current = eventCtx
     return promptHandler(payload, eventCtx)
   })
+  // Recall owns a SEPARATE before_agent_start handler registered AFTER the projection handler:
+  // senpi merges one message per handler in registration order, so the hint lands last and the
+  // prompt handler stays the only writer of systemPrompt.
+  if (hasMemoryCapabilities(pi)) recallWiring.register(pi)
   pi.on("session_start", (_payload, eventCtx) => {
     if (eventCtx !== undefined) lastEventCtx.current = eventCtx
   })
@@ -99,46 +117,25 @@ export function registerMemoryStatic(input: {
     }
     const result = await journalWiringFor(identity).reconcileSession(eventCtx)
     await factsWiringFor(identity).onSettled(sessionId)
+    // Fire-and-forget by contract: the gate advises the NEXT turn, so this one never waits for it.
+    memorianGateWiring.onSettled(eventCtx)
     await onSettled?.(sessionId, eventCtx)
     return result
   })
-  // Status footer after a successful memory write: shown at most once per session, gated on the
-  // session state flag so a burst of memory tool results does not repaint the footer repeatedly.
-  const refreshStatus = options.refreshStatus ?? refreshMemoryStatus
-  pi.on("tool_result", async (payload: unknown, eventCtx: unknown) => {
-    if (!isMemoryToolResult(payload)) return
-    const sessionId = sessionIdFrom(eventCtx)
-    if (sessionId === undefined) return
-    const state = options.sessions.get(sessionId)
-    if (state?.context === undefined) return
-    // The rpc snapshot follows every successful write; only the footer honors the once-only latch.
-    await onMemoryWrite?.(sessionId)
-    if (state.memoryStatusAttempted === true) return
-    const ui = readUi(eventCtx)
-    if (ui === undefined) return
-    state.memoryStatusAttempted = true
-    const settings = options.loadConfig({ cwd: options.cwd() }).config.memory
-    try {
-      const result = await refreshStatus({
-        context: state.context,
-        ui,
-        compileWarnTokens: settings?.compile_warn_tokens ?? 30_000,
-        alreadyNotified: false,
-        checkAdvisory: false,
-        sessionId,
-        ...(options.now === undefined ? {} : { now: options.now }),
-      })
-      state.memoryStatusAttempted = result.footerShown
-    } catch (error) {
-      state.memoryStatusAttempted = false
-      throw error
-    }
-  })
+  registerMemoryWriteListener(pi, options, onMemoryWrite)
   registerMemoryToolSurface(pi, () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)), {
     exposure: toolExposure,
     onCommit: (commit) => {
       const context = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
-      if (context !== undefined) soulNoticeWiring.onCommit(context, commit)
+      if (context !== undefined) noticeWiring.onCommit(context, commit)
+    },
+    // Read per call rather than latched at registration: the gate is presentation-only, so a
+    // config edit takes effect on the next write instead of at the next restart.
+    writeNotice: {
+      get enabled(): boolean {
+        return resolveWriteNoticeEnabled(loadCommandSettings, activeSession, resolveContext)
+      },
+      resolveSessionId: () => activeSession.current,
     },
   })
   registerMemoryGuard(pi, ctx, {
@@ -158,6 +155,15 @@ export function registerMemoryStatic(input: {
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   skillsUsageTrackersRef.current = skillsUsageTrackers
+  const memoryUsageTrackers = registerMemoryUsage(pi, {
+    resolveContext: (eventContext) => {
+      const sessionId = sessionIdFrom(eventContext)
+      return sessionId === undefined ? undefined : resolveContext(sessionId)
+    },
+    resolveCwd: options.cwd,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+  memoryUsageTrackersRef.current = memoryUsageTrackers
   registerPalaceCommand(
     pi,
     () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)),
@@ -189,35 +195,45 @@ export function registerMemoryStatic(input: {
       },
     },
     dreamSink: { request: (request) => dreamTriggerWiring.requestManualDream(request) },
+    factsSink: {
+      // ONE attempt after a manual unpark: `reconcileExtractor` fires the extractor's own
+      // reconcile-then-launch path, which owns the re-entrancy latch, so this never loops.
+      reconcile: async () => {
+        const identity = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
+        if (identity !== undefined) factsWiringFor(identity).reconcileExtractor()
+      },
+    },
     sessionsDir: () => join(options.env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"), "sessions"),
   })
   const triggerWiring = createReflectionTriggerWiring({
     resolveSession: triggerSessionFor,
     onLaunch: () => {},
+    // A compaction rewrites the transcript the pending nudges were judged against, so they die with it.
+    onCompactionAccepted: (conversationId) => memorianGateWiring.onCompactionAccepted(conversationId),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   triggerWiring.register(pi)
   dreamTriggerWiring.register(pi)
 }
 
+/** memory.write_notice.enabled for the bound identity, honouring its per-agent override. */
+function resolveWriteNoticeEnabled(
+  loadCommandSettings: () => MemoryCommandSettings,
+  activeSession: { current?: string },
+  resolveContext: (sessionId: string) => MemoryIdentityContext | undefined,
+): boolean {
+  try {
+    const settings = loadCommandSettings().settings
+    const identity = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)?.identity
+    const override = identity === undefined ? undefined : settings.agents[identity]?.write_notice
+    return override?.enabled ?? settings.write_notice.enabled
+  } catch {
+    // Presentation must never depend on config health: an unreadable config keeps the default on.
+    return true
+  }
+}
+
 function asCommandIdentity(identity: MemoryIdentityContext | undefined): MemoryCommandIdentity | undefined {
   if (identity === undefined) return undefined
   return { identity: identity.identity, identityPaths: identity.identityPaths }
-}
-
-function isMemoryToolResult(value: unknown): boolean {
-  if (
-    !isRecord(value)
-    || value.type !== "tool_result"
-    || value.isError === true
-    || typeof value.toolName !== "string"
-  ) return false
-  return matchesToolName(value.toolName, MEMORY_TOOL_NAME)
-    || matchesToolName(value.toolName, MEMORY_APPLY_PATCH_TOOL_NAME)
-}
-
-function matchesToolName(toolName: string, expected: string): boolean {
-  const normalized = toolName.trim().toLowerCase().replaceAll("-", "_")
-  const target = expected.trim().toLowerCase().replaceAll("-", "_")
-  return normalized === target || normalized.endsWith(`_${target}`)
 }

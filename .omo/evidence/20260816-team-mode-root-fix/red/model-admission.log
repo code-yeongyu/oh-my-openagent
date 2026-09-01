@@ -1,0 +1,27 @@
+Command:
+  bun test packages/senpi-task/src/runners/rpc-process.test.ts -t 'admission'
+
+Result:
+  RED (exit 1) before model-admission production changes.
+
+Observed failure 1 — missing model:
+  Expected start to reject with typed `model_unavailable`.
+  Received a resolved RPC child handle.
+
+Observed failure 2 — visible model:
+  Expected execution order:
+
+    ["admit", "spawn"]
+
+  Received:
+
+    ["spawn"]
+
+Aggregate:
+  0 pass
+  2 fail
+
+Why this is valid RED:
+  The assertions prove the process runner does not inspect the child launch profile before spawning.
+  The unavailable path already uses the repository's typed `RunnerError` contract as its expected result.
+  No syntax, import, fixture, timing, dependency, or setup failure occurred.

@@ -34,8 +34,9 @@ function createHarness(claimResult = true) {
 async function dispatchSessionStart(
   pi: FakeExtensionAPI,
   reason: SessionStartEvent["reason"],
+  hasUI = true,
 ): Promise<void> {
-  await pi.dispatch("session_start", { type: "session_start", reason }, { ui: {} })
+  await pi.dispatch("session_start", { type: "session_start", reason }, { ui: {}, hasUI })
 }
 
 describe("createOnboardingComponent", () => {
@@ -68,7 +69,6 @@ describe("createOnboardingComponent", () => {
       content: expect.stringContaining("Read the onboarding skill at"),
       display: false,
     }, { triggerTurn: true, deliverAs: "followUp" })
-    expect(mock.sendMessage.mock.calls[0]?.[0]?.["content"]).not.toContain("/skill:onboarding")
     expect(mock.appendEntry).toHaveBeenCalledWith("omo-onboarding:started", {
       reason: "startup",
       forced: false,
@@ -134,6 +134,32 @@ describe("createOnboardingComponent", () => {
       reason: "startup",
       forced: true,
     })
+  })
+
+  test("#given a headless session #when startup fires #then onboarding is neither claimed nor injected", async () => {
+    // given
+    const { pi, mock } = createHarness()
+
+    // when
+    await dispatchSessionStart(pi, "startup", false)
+
+    // then
+    expect(mock.sendMessage).not.toHaveBeenCalled()
+    expect(mock.appendEntry).not.toHaveBeenCalled()
+    expect(mock.claimOnboarding).not.toHaveBeenCalled()
+  })
+
+  test("#given a headless session with force #when startup fires #then onboarding is still not injected", async () => {
+    // given
+    const { pi, mock } = createHarness()
+    pi.setFlag("onboard", true)
+
+    // when
+    await dispatchSessionStart(pi, "startup", false)
+
+    // then
+    expect(mock.sendMessage).not.toHaveBeenCalled()
+    expect(mock.appendEntry).not.toHaveBeenCalled()
   })
 
   test("#given an existing marker without force #when startup fires #then claim blocks onboarding injection", async () => {

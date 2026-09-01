@@ -1,0 +1,79 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/reflection/completion-validation.test.ts:
+(pass) dream token budget completion validation > #given a pressure dream whose merged system estimate remains at target #when validated #then budget_not_met is recorded [0.59ms]
+(pass) dream token budget completion validation > #given a pressure dream below target #when validated #then the estimate is clean [0.10ms]
+(pass) dream token budget completion validation > #given a non-pressure dream above target #when validated #then the estimate is reported without failing [0.09ms]
+(pass) reflection completion validation > #given an uncommitted worktree edit #when finalized #then it reports dirty_uncommitted and cleans up [403.96ms]
+(pass) reflection completion validation > #given the linked-worktree .git administration file is altered #when finalized #then validation fails and cleans up [318.80ms]
+
+packages/memory-core/src/reflection/assets/assets.test.ts:
+(pass) dream persona asset > #given the source asset and the packaged plugin copy #when loaded and read #then all copies are identical [0.32ms]
+(pass) dream persona asset > #given the dream persona #when parsed as sections #then the machine budget-contract anchor is embedded [0.14ms]
+(pass) reflection persona asset > #given the source asset #when loaded through assets.ts #then it equals the real source [0.17ms]
+(pass) reflection persona asset > #given the reflection persona asset #when trailer keys are parsed #then the runtime keys are present [0.18ms]
+
+packages/omo-senpi/src/components/memory/worker/spawn-supervisor.test.ts:
+(pass) supervised child outcome authority > #given a matching durable outcome and a later supervisor failure #when the parent completes #then the outcome remains authoritative [16.34ms]
+(pass) supervised child outcome authority > #given an outcome before launch cleanup and a supervisor failure #when the parent completes #then the incomplete outcome is rejected [14.76ms]
+(pass) supervised child outcome authority > #given a matching durable outcome while the supervisor stays alive #when the parent completes #then the outcome wins without waiting for close [68.38ms]
+(pass) supervised child outcome authority > #given a supervisor that never publishes #when the parent deadline expires #then publication timeout is reported [5036.95ms]
+
+packages/omo-senpi/src/components/memory/worker/dream-dispatch.integration.test.ts:
+(pass) dream worker dispatch > #given a dream with people disabled #when the worker launches #then it selects dream inputs and touches no people path [1010.98ms]
+(pass) dream worker dispatch > #given absent dream ledgers #when the worker launches #then it supplies readable empty objects [710.76ms]
+(pass) dream worker dispatch > #given custom people limits #when the dream writes fixture entries #then it honors the resolved limits exactly [702.85ms]
+(pass) dream worker dispatch > #given a memory document target #when the dream completes #then only that document is merged [844.42ms]
+
+packages/omo-senpi/src/components/memory/worker/remediation.test.ts:
+(pass) reflectionRemediation > #given a category_unavailable failure > #when remediated #then it names the config escape hatches instead of a nonexistent child log [0.20ms]
+(pass) reflectionRemediation > #given the senpi child's verbatim model-not-found error > #when remediated #then it names the model the child could not see instead of the generic child log [0.10ms]
+(pass) reflectionRemediation > #given a pressure dream budget warning > #when remediated #then it tells the next run to trim system memory below the supplied target [0.06ms]
+(pass) reflectionRemediation > #given the pre-existing failure taxonomies > #when the child could not see the model #then the category/model hint is kept [0.06ms]
+(pass) reflectionRemediation > #given the pre-existing failure taxonomies > #when spawn failed #then the SENPI_BIN hint is kept [0.06ms]
+(pass) reflectionRemediation > #given the pre-existing failure taxonomies > #when nothing matches #then the child log hint remains the default for post-spawn failures [0.07ms]
+
+packages/omo-senpi/src/components/memory/worker/entry-renderers.test.ts:
+(pass) memory reflection entry rendering > #given a launched reflection > #when it renders collapsed #then a bold title leads a senpi notice with a visible context line [1.10ms]
+(pass) memory reflection entry rendering > #given a launched reflection > #when a single backlog step is pending #then the step noun is singular [0.11ms]
+(pass) memory reflection entry rendering > #given a launched reflection > #when triggered manually #then the why line reads as a manual trigger [0.10ms]
+(pass) memory reflection entry rendering > #given a launched reflection > #when it renders expanded #then the detail row carries identity started and trigger [0.17ms]
+(pass) memory reflection entry rendering > #given a launched reflection > #when in flight #then the title is accent toned and the secondary rows are dim [0.11ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when the outcome merged #then it reads as success with a prose summary [0.21ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when merge metadata is present #then the payoff line is visible in success tone [0.13ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when merge metadata is present and expanded #then the detail row carries identity and trigger [0.09ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when the outcome failed #then it reads as error with the cursor warning and a visible reason [23.85ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when a failure carries a reason and detail #then both appear on the visible payoff line [0.19ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when a failure carries a reason and detail and is expanded #then the detail row carries identity [0.12ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when the outcome timed out #then it reads as warning [0.17ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when the outcome is a clean no-op #then snake_case becomes readable prose [0.11ms]
+(pass) memory reflection entry rendering > #given a completed reflection > #when colour is applied #then the emphasis wraps the text rather than replacing it [0.09ms]
+(pass) memory reflection entry rendering > #given a collapsed backlog summary > #when failures are present #then it warns and surfaces the dominant fingerprint visibly [0.17ms]
+(pass) memory reflection entry rendering > #given a collapsed backlog summary > #when nothing failed #then it stays muted and says so [0.10ms]
+(pass) memory reflection entry rendering > #given a collapsed backlog summary > #when exactly one completion collapsed #then the noun is singular [0.09ms]
+(pass) memory reflection entry rendering > #given a reflection failure streak > #when the alert renders #then it is error toned with a bold title and leads with the remediation [0.17ms]
+(pass) memory reflection entry rendering > #given a narrow terminal > #when a long summary must fit 60 columns #then it degrades with an ellipsis and no stray reset [0.15ms]
+(pass) memory reflection entry rendering > #given a narrow terminal > #when a very long run id is rendered #then the identifier itself is excerpted [0.11ms]
+(pass) memory reflection entry rendering > #given a narrow terminal > #when coloured output is truncated #then no terminal reset leaks into the middle of the why span [0.09ms]
+(pass) memory reflection entry rendering > #given a narrow terminal > #when the title is bolded at a narrow width #then the bold escapes wrap the whole fitted title [0.10ms]
+(pass) memory reflection entry rendering > #given a narrow terminal > #when rendered at hostile widths #then no line ever exceeds the terminal width [0.86ms]
+
+packages/omo-senpi/src/components/memory/worker/run-finalization-crash.test.ts:
+(pass) reflection finalization crash recovery > #given integration landed before its checkpoint #when finalization retries #then receipt recovery settles exactly once [691.50ms]
+(pass) reflection finalization crash recovery > #given merge cleanup and settlement completed before final publication #when retried #then completion and final repair without duplicate settlement [713.25ms]
+(pass) reflection finalization crash recovery > #given a pressure dream merges above its token target #when finalization validates committed system memory #then the merge records a budget_not_met warning [720.23ms]
+(pass) reflection finalization crash recovery > #given parent_dirty was checkpointed before cleanup #when finalization retries #then the durable decision and user edit are preserved [508.46ms]
+
+packages/omo-senpi/src/components/memory/worker/spawn.test.ts:
+(pass) worker payload mode relaxation > #given a missing facts payload from the first launch #when mode relaxation reports ENOENT #then preparation continues [1.19ms]
+(pass) worker payload mode relaxation > #given facts payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [0.31ms]
+(pass) worker payload mode relaxation > #given reflection payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [0.48ms]
+(pass) dream token budget launch contract > #given a pressure dream fixture repo #when its spawn is prepared #then all three budget inputs carry the committed per-file estimate [1.49ms]
+(pass) dream token budget launch contract > #given configured compile pressure #when the production candidate assembly prepares a dream #then budget and target reuse the shared soft ratio [2.02ms]
+(pass) worker senpi command resolution > #given an env whose PATH cannot resolve senpi #when a facts spawn is prepared #then the command is executable rather than the bare name [0.63ms]
+(pass) worker senpi command resolution > #given an explicit senpiCommand #when a facts spawn is prepared #then the override is preserved [0.47ms]
+
+ 57 pass
+ 0 fail
+ 170 expect() calls
+Ran 57 tests across 8 files. [12.62s]

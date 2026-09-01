@@ -1,0 +1,59 @@
+== isolation: developer state BEFORE
+14bbcdea4958ada4fe3cca800bd2ec40487b7677  /Users/yeongyu/.omo/agent/settings.json
+a1ab26713404830d67fb46cea364cbf2f98d329f  /Users/yeongyu/.omo/settings.json
+
+== sandbox HOME: ONLY the pre-unification flat layout holds state
+<HOME>/.omo/settings.json
+
+== 1. omo --version : the changed launcher boots against the real pinned engine
+omo: carried forward settings from the legacy ~/.omo layout (settings.json)
+omo 5.0.0-0.beta.7 (engine: senpi 2026.8.12-4)
+
+== 2. omo doctor : first launch adopts the stranded flat state
+FAIL senpi version: expected 2026.8.13, found 2026.8.12-4
+.omo/evidence/20260814-omo-agent-dir-unification/run.sh: line 68: 78064 Terminated: 15          ( sleep 60; kill -9 $pid 2> /dev/null )
+
+== canonical file after one launch
+{
+  "favoriteModels": ["anthropic/claude-fable-5", "apitopia/kimi-k3-unlocked"],
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "claude-fable-5": [],
+      "openmodel/claude-fable-5": ["anthropic-api/claude-fable-5:xhigh"]
+    }
+  }
+}
+-- keys readable at the canonical location:
+{"favoriteModels":["anthropic/claude-fable-5","apitopia/kimi-k3-unlocked"],"fallbackChains":{"claude-fable-5":[],"openmodel/claude-fable-5":["anthropic-api/claude-fable-5:xhigh"]}}
+-- legacy flat file:
+UNCHANGED 0ba283a2984890dc2078360c563d29910b3bd890
+
+== 3. second launch is idempotent
+PASS: no adoption notice on the second launch
+PASS: canonical file unchanged
+
+== 4. omo setup --dry-run resolves the canonical directory
+senpi: providers none; models none
+DRY RUN: no files will be written
+planned-add: anthropic
+PASS: no ~/.senpi anywhere in the sandbox
+
+== 5. what the launcher actually hands the engine (capture stub)
+{
+  "OMO_CODING_AGENT_DIR": "<HOME>/.omo/agent",
+  "SENPI_CODING_AGENT_DIR": "<HOME>/.omo/agent",
+  "brandConfigDir": ".omo",
+  "brandFlatLayout": false
+}
+
+== 6. an explicit override still wins
+{"OMO_CODING_AGENT_DIR":"<SANDBOX>/pinned","SENPI_CODING_AGENT_DIR":"<SANDBOX>/pinned"}
+
+== isolation: developer state AFTER
+d5521fcafa939508ea8cce530f52f6bab6fd4757  /Users/yeongyu/.omo/agent/settings.json
+a1ab26713404830d67fb46cea364cbf2f98d329f  /Users/yeongyu/.omo/settings.json
+
+== cleanup
+removed /tmp/omo-agentdir-qa.d1oOAb
+no QA sandboxes remain

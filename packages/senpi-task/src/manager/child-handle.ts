@@ -76,12 +76,49 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
     followUp: (text) => handle.followUp(text),
     abort: () => handle.abort(),
     subscribe: (listener) => handle.subscribe(listener),
-    waitForOutcome: () => rpcOutcome(handle),
+    waitForOutcome: () => handle.waitForOutcome === undefined ? rpcOutcome(handle) : handle.waitForOutcome(),
     ...(switchSession === undefined ? {} : { switchSession: (sessionPath: string) => switchSession(sessionPath) }),
     ...(getEntries === undefined ? {} : { getEntries: (since?: string) => getEntries(since) }),
     lastAssistantText: () => handle.lastAssistantText(),
     terminate: () => handle.terminate(),
     dispose: () => handle.dispose(),
+  }
+}
+
+async function rpcOutcome(handle: RpcChildHandle): Promise<RunnerOutcome> {
+  await handle.waitForIdle()
+  const exit = handle.exitOutcome()
+  if (exit !== undefined && exit.kind !== "clean") {
+    const facts = mapExitOutcomeToError(exit, { alreadyTerminal: false })
+    const message = facts?.error_message ?? "RPC child terminated abnormally"
+    return { status: "error", failure: { kind: "child-prompt-failed", message }, killed: facts?.killed === true }
+  }
+  // A user-requested abort is a cancellation, never a turn failure. Handles that expose the tracked
+  // per-turn outcome never reach here; this fallback serves legacy/custom handles only.
+  if (handle.wasAbortedByUser?.() === true) return { status: "cancelled" }
+
+  const hasTerminalReader = handle.terminalAssistantMessage !== undefined
+  const terminal = handle.terminalAssistantMessage?.()
+  if (terminal?.stopReason === "error" || terminal?.stopReason === "aborted") {
+    return {
+      status: "error",
+      failure: {
+        kind: "child-turn-failed",
+        message: terminal.errorMessage ?? `child turn ended with stopReason "${terminal.stopReason}"`,
+      },
+    }
+  }
+
+  // Legacy handles without the observation seam retain their prior text behavior, so a revived turn
+  // cannot silently reuse the previous turn's final text.
+  const finalResponse = hasTerminalReader ? terminal?.text : handle.lastAssistantText()
+  if (finalResponse !== undefined && finalResponse.length > 0) return { status: "completed", finalResponse }
+  return {
+    status: "error",
+    failure: {
+      kind: "child-turn-failed",
+      message: terminal?.errorMessage ?? "child turn produced no assistant output",
+    },
   }
 }
 
@@ -101,15 +138,3 @@ export async function discardRpcHandle(handle: RpcChildHandle): Promise<void> {
   }
 }
 
-async function rpcOutcome(handle: RpcChildHandle): Promise<RunnerOutcome> {
-  await handle.waitForIdle()
-  const exit = handle.exitOutcome()
-  if (exit !== undefined && exit.kind !== "clean") {
-    const facts = mapExitOutcomeToError(exit, { alreadyTerminal: false })
-    const message = facts?.error_message ?? "RPC child terminated abnormally"
-    // Thread the killed FACT (an external SIGKILL / exit-by-signal) onto the outcome so the manager can
-    // persist status=error with killed:true, per the todo-8 kill contract.
-    return { status: "error", failure: { kind: "child-prompt-failed", message }, killed: facts?.killed === true }
-  }
-  return { status: "completed", finalResponse: handle.lastAssistantText() ?? "" }
-}

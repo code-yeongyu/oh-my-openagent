@@ -145,7 +145,7 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         memberExtension: {
           entryPath: memberExtensionEntryPath,
-          inheritedExtensions: [memberExtensionEntryPath, ...parseExtensionEntries(process.argv)],
+          inheritedExtensions: parseExtensionEntries(process.argv),
         },
       })
     },

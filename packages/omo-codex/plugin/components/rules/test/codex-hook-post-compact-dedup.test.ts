@@ -18,6 +18,10 @@ const PROJECT_ONLY_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: "CONTEXT.md,.omo/rules",
 };
 
+// Runtime sentinel: the rules hook emits and re-greps this marker when
+// deduplicating injected rules against the transcript (transcript-rule-filter.ts).
+const INSTRUCTIONS_FROM = "Instructions from: ";
+
 afterEach(() => {
 	for (const directory of tempDirectories.splice(0)) {
 		rmSync(directory, { recursive: true, force: true });
@@ -114,9 +118,8 @@ describe("codex rules PostCompact deduplication", () => {
 
 		// then
 		const context = readAdditionalContext(output);
-		expect(context).toContain("MUST READ");
 		expect(context).toContain("CONTEXT.md");
-		expect(context).not.toContain("Instructions from:");
+		expect(context).not.toContain(INSTRUCTIONS_FROM);
 	});
 
 	it("#given startup static context dropped by compaction #when compact SessionStart runs after PostCompact #then it emits a mandatory read directive without rule bodies", async () => {
@@ -140,9 +143,8 @@ describe("codex rules PostCompact deduplication", () => {
 
 		// then
 		const context = readAdditionalContext(output);
-		expect(context).toContain("MUST READ");
 		expect(context).toContain("CONTEXT.md");
-		expect(context).not.toContain("Instructions from:");
+		expect(context).not.toContain(INSTRUCTIONS_FROM);
 	});
 });
 

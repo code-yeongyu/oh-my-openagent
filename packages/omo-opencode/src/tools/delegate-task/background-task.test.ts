@@ -339,7 +339,6 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then - background launch should still succeed without fake abort failure
     expectFn(result).toContain("Background task launched")
     expectFn(result).toContain("Background Task ID: bg_abort_after_launch")
-    expectFn(result).not.toContain("Task aborted while waiting for session to start")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn("sessionId" in metadataCalls[0].metadata).toBe(false)
   })
@@ -560,7 +559,6 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
     //#then - both tasks still launch and the sibling is not reported as interrupted
     expectFn(firstResult).toContain("Background task launched")
-    expectFn(firstResult).not.toContain("Task failed to start")
     expectFn(secondResult).toContain("Background task launched")
     expectFn(secondResult).toContain("session_id: ses_second")
     expectFn(secondResult).not.toContain("interrupt")
@@ -608,47 +606,5 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then
     expectFn(launchCalls).toHaveLength(1)
     expectFn(launchCalls[0].agent).toBe("Hephaestus - Deep Agent")
-  })
-
-  testFn("does not advertise background_output CTA in launch return (issue #5221)", async () => {
-    //#given - a successful launch
-    const manager = {
-      launch: async () => ({
-        id: "bg_cta_check",
-        sessionId: "ses_cta_check",
-        description: "CTA check",
-        agent: "explore",
-        status: "running",
-      }),
-      getTask: () => ({ sessionId: "ses_cta_check" }),
-    }
-
-    //#when
-    const result = await executeBackgroundTask(
-      {
-        description: "CTA check",
-        prompt: "check",
-        run_in_background: true,
-        load_skills: [],
-      },
-      {
-        sessionID: "ses_parent",
-        callID: "call_cta",
-        metadata: async () => {},
-        abort: new AbortController().signal,
-      },
-      { manager },
-      { sessionID: "ses_parent", messageID: "msg_cta" },
-      "explore",
-      undefined,
-      undefined,
-      undefined,
-    )
-
-    //#then - no polling CTA, anti-polling instruction preserved
-    expectFn(result).not.toContain("Use `background_output` with task_id=")
-    expectFn(result).not.toContain("to check.")
-    expectFn(result).toContain("Do NOT call background_output now")
-    expectFn(result).toContain("<system-reminder>")
   })
 })

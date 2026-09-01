@@ -4,7 +4,7 @@ import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { GOAL_TEMPLATE } from "./templates/goal"
 import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE, REFACTOR_TEAM_MODE_ADDENDUM } from "./templates/refactor"
-import { START_WORK_TEMPLATE } from "./templates/start-work"
+import { ULW_EXECUTE_TEMPLATE } from "./templates/ulw-execute"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
 import { HYPERPLAN_TEMPLATE } from "./templates/hyperplan"
@@ -14,7 +14,7 @@ interface LoadBuiltinCommandsOptions {
   teamModeEnabled?: boolean
 }
 
-function resolveStartWorkAgent(options?: LoadBuiltinCommandsOptions): "atlas" | "sisyphus" {
+function resolveUlwExecuteAgent(options?: LoadBuiltinCommandsOptions): "atlas" | "sisyphus" {
   if (options?.useRegisteredAgents) {
     return isAgentRegistered("atlas") ? "atlas" : "sisyphus"
   }
@@ -57,11 +57,11 @@ ${refactorContent}
 </command-instruction>`,
       argumentHint: "<refactoring-target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]",
     },
-    "start-work": {
-      description: "(builtin) Start Atlas work session from Prometheus plan",
-      agent: resolveStartWorkAgent(options),
+    "ulw-execute": {
+      description: "(builtin) Execute an Atlas work session from a Prometheus plan",
+      agent: resolveUlwExecuteAgent(options),
       template: `<command-instruction>
-${START_WORK_TEMPLATE}
+${ULW_EXECUTE_TEMPLATE}
 </command-instruction>
 
 <session-context>

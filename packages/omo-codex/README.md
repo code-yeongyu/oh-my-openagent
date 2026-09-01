@@ -1,6 +1,6 @@
 # @oh-my-opencode/omo-codex
 
-Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, plugin-scoped MCPs, ultrawork, ulw-loop, start-work continuation, telemetry) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
+Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, plugin-scoped MCPs, ultrawork, ulw-loop, ulw-execute continuation, telemetry) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
 
 ## Layout
 
@@ -20,7 +20,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 - `git-bash` (TypeScript + Git Bash MCP) - exposes the Windows-only `git_bash` MCP and reminds Codex on the first shell-like call, including the first one after compaction.
 - `ultrawork` (TypeScript) - keyword detector (`ulw` / `ultrawork`) that injects the full ultrawork directive; bundled agent TOML files are installed into `CODEX_HOME/agents`.
 - `ulw-loop` (TypeScript) - durable multi-goal orchestration backed by `.omo/ulw-loop/` evidence audit; `PreToolUse` spawn guards (fan-out cap + gate-artifact preflight) and a `Stop` auto-resume hook.
-- `start-work-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` start-work plans.
+- `ulw-execute-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` ulw-execute plans.
 - `telemetry` (TypeScript) - anonymous daily active telemetry hook.
 
 ## Install
@@ -194,4 +194,4 @@ The bundled component implementations come from the Sisyphus Labs Codex plugin f
 - [code-yeongyu/codex-lsp](https://github.com/code-yeongyu/codex-lsp)
 - [code-yeongyu/codex-ultrawork](https://github.com/code-yeongyu/codex-ultrawork)
 - [code-yeongyu/codex-ulw-loop](https://github.com/code-yeongyu/codex-ulw-loop)
-- [code-yeongyu/codex-start-work-continuation](https://github.com/code-yeongyu/codex-start-work-continuation)
+- [code-yeongyu/codex-ulw-execute-continuation](https://github.com/code-yeongyu/codex-ulw-execute-continuation)

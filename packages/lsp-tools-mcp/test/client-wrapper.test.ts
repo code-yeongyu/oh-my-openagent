@@ -9,7 +9,11 @@ import { findWorkspaceRoot, formatServerLookupError, withLspClient } from "../sr
 import { LspManager } from "../src/lsp/manager.js";
 import { recordInstallDecision } from "../src/lsp/server-install-state.js";
 import type { ResolvedServer, ServerLookupResult } from "../src/lsp/types.js";
-import { createStandaloneMcpRequestContext, runWithRequestContext } from "../src/request-context.js";
+import {
+	createStandaloneMcpRequestContext,
+	runWithRequestContext,
+	type LspRequestContext,
+} from "../src/request-context.js";
 
 import { FakeLspClient } from "./helpers/fake-lsp-client.js";
 
@@ -28,23 +32,34 @@ const notInstalled: Exclude<ServerLookupResult, { status: "found" }> = {
 	installHint: "rustup component add rust-analyzer",
 };
 
-function withRequestContext<T>(fn: () => T): T {
-	return runWithRequestContext(createStandaloneMcpRequestContext(), fn);
-}
-
 describe("formatServerLookupError install decisions", () => {
 	const tempDirectories: string[] = [];
 	let previousDecisionsEnv: string | undefined;
+	let requestContext: LspRequestContext;
 
-	function useDecisionsFile(): void {
+	function useDecisionsFile(): string {
 		const dir = mkdtempSync(join(tmpdir(), "lsp-format-decisions-"));
 		tempDirectories.push(dir);
 		process.env[DECISIONS_ENV] = join(dir, "lsp-install-decisions.json");
+		return dir;
+	}
+
+	function withDecisionContext<T>(fn: () => T): T {
+		return runWithRequestContext(requestContext, fn);
 	}
 
 	beforeEach(() => {
 		previousDecisionsEnv = process.env[DECISIONS_ENV];
-		useDecisionsFile();
+		const directory = useDecisionsFile();
+		requestContext = createStandaloneMcpRequestContext({
+			cwd: directory,
+			homeDir: directory,
+			env: {
+				HOME: directory,
+				USERPROFILE: directory,
+				[DECISIONS_ENV]: process.env[DECISIONS_ENV],
+			},
+		});
 	});
 
 	afterEach(() => {
@@ -60,7 +75,7 @@ describe("formatServerLookupError install decisions", () => {
 
 	it("#given no recorded decision #when formatting not_installed #then asks the user and explains decline recording", () => {
 		// when
-		const message = withRequestContext(() => formatServerLookupError(notInstalled));
+		const message = withDecisionContext(() => formatServerLookupError(notInstalled));
 
 		// then
 		expect(message).toContain("NOT INSTALLED");
@@ -74,10 +89,10 @@ describe("formatServerLookupError install decisions", () => {
 
 	it("#given a declined decision #when formatting not_installed #then returns a minimal one-line ignorable note", () => {
 		// given
-		withRequestContext(() => recordInstallDecision("rust", "declined"));
+		withDecisionContext(() => recordInstallDecision("rust", "declined"));
 
 		// when
-		const message = withRequestContext(() => formatServerLookupError(notInstalled));
+		const message = withDecisionContext(() => formatServerLookupError(notInstalled));
 
 		// then
 		expect(message.trim().split("\n")).toHaveLength(1);
@@ -89,10 +104,10 @@ describe("formatServerLookupError install decisions", () => {
 
 	it("#given an allowed decision #when formatting not_installed #then keeps install steps but skips the ask", () => {
 		// given
-		withRequestContext(() => recordInstallDecision("rust", "allowed"));
+		withDecisionContext(() => recordInstallDecision("rust", "allowed"));
 
 		// when
-		const message = withRequestContext(() => formatServerLookupError(notInstalled));
+		const message = withDecisionContext(() => formatServerLookupError(notInstalled));
 
 		// then
 		expect(message).toContain("NOT INSTALLED");
@@ -102,11 +117,11 @@ describe("formatServerLookupError install decisions", () => {
 	});
 
 	it("#given any decision state #when formatting not_installed #then keeps the hook quiet marker", () => {
-		const noDecision = withRequestContext(() => formatServerLookupError(notInstalled));
-		withRequestContext(() => recordInstallDecision("rust", "declined"));
-		const declined = withRequestContext(() => formatServerLookupError(notInstalled));
-		withRequestContext(() => recordInstallDecision("rust", "allowed"));
-		const allowed = withRequestContext(() => formatServerLookupError(notInstalled));
+		const noDecision = withDecisionContext(() => formatServerLookupError(notInstalled));
+		withDecisionContext(() => recordInstallDecision("rust", "declined"));
+		const declined = withDecisionContext(() => formatServerLookupError(notInstalled));
+		withDecisionContext(() => recordInstallDecision("rust", "allowed"));
+		const allowed = withDecisionContext(() => formatServerLookupError(notInstalled));
 
 		for (const message of [noDecision, declined, allowed]) {
 			expect(message).toContain("NOT INSTALLED");

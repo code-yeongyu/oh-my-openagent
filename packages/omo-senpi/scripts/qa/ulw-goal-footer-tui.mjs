@@ -87,7 +87,7 @@ function prepareScenario() {
   const omoBin = join(fakeBinDir, "omo")
   writeFileSync(
     omoBin,
-    `#!/bin/sh\nif [ "$1 $2" = "ulw-loop create-goals" ]; then\n  : > '${ulwActiveMarker}'\n  exit 0\nfi\nif [ "$1 $2 $3" = "ulw-loop status --json" ]; then\n  if [ -f '${ulwActiveMarker}' ]; then printf '%s\\n' '${activeUlwStatus}'; else printf '%s\\n' '{"ok":false,"error":{"code":"ULW_LOOP_PLAN_MISSING"}}'; fi\n  exit 0\nfi\nexit 2\n`,
+    `#!/bin/sh\nif [ "$1 $2" = "ulw-loop create-goals" ]; then\n  : > '${ulwActiveMarker}'\n  mkdir -p .omo/ulw-loop\n  exit 0\nfi\nif [ "$1 $2 $3" = "ulw-loop status --json" ]; then\n  if [ -f '${ulwActiveMarker}' ]; then printf '%s\\n' '${activeUlwStatus}'; else printf '%s\\n' '{"ok":false,"error":{"code":"ULW_LOOP_PLAN_MISSING"}}'; fi\n  exit 0\nfi\nexit 2\n`,
   )
   chmodSync(omoBin, 0o755)
   writeFileSync(

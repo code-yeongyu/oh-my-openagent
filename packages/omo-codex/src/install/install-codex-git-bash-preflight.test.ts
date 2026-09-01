@@ -1,11 +1,12 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
+import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
 import type { CommandRunOptions } from "./types"
 
 const WINDOWS_GIT_BASH_PATH = "C:\\Program Files\\Git\\bin\\bash.exe"
@@ -13,6 +14,15 @@ const LSP_CLI_PATH = join(process.cwd(), "packages", "lsp-tools-mcp", "dist", "c
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+let fixtureRepoRoot = ""
+
+beforeAll(async () => {
+  fixtureRepoRoot = await createRepoWithBuiltComponentBins()
+})
+
+afterAll(async () => {
+  await rm(fixtureRepoRoot, { recursive: true, force: true })
+})
 
 async function withBundledLspRuntimeForTest<T>(run: () => Promise<T>): Promise<T> {
   let lspCliAlreadyPresent = true
@@ -89,7 +99,7 @@ describe("install-codex Git Bash preflight", () => {
     const install = withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
-      repoRoot: process.cwd(),
+      repoRoot: fixtureRepoRoot,
       platform: "win32",
       astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => {
@@ -118,7 +128,7 @@ describe("install-codex Git Bash preflight", () => {
     const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
-      repoRoot: process.cwd(),
+      repoRoot: fixtureRepoRoot,
       platform: "linux",
       astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => ({ found: true, path: WINDOWS_GIT_BASH_PATH, source: "program-files" }),
@@ -141,7 +151,7 @@ describe("install-codex Git Bash preflight", () => {
     const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
-      repoRoot: process.cwd(),
+      repoRoot: fixtureRepoRoot,
       platform: "win32",
       astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => ({ found: true, path: WINDOWS_GIT_BASH_PATH, source: "program-files" }),
@@ -164,7 +174,7 @@ describe("install-codex Git Bash preflight", () => {
     const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
-      repoRoot: process.cwd(),
+      repoRoot: fixtureRepoRoot,
       platform: "win32",
       astGrepInstaller: skipAstGrepInstall,
       env: { OMO_CODEX_GIT_BASH_PATH: gitBashPath },
@@ -184,7 +194,7 @@ describe("install-codex Git Bash preflight", () => {
     const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
-      repoRoot: process.cwd(),
+      repoRoot: fixtureRepoRoot,
       platform: "linux",
       astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => ({

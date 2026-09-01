@@ -1,6 +1,6 @@
 # rules-engine — Rule Discovery + Matching (Core)
 
-**Generated:** 2026-06-16
+**Generated:** 2026-06-16 / updated 2026-08-24 (f3642fcda)
 
 ## OVERVIEW
 
@@ -20,6 +20,8 @@
 | `src/engine/matcher.ts` | `matchRule()` with content-hash dedup |
 | `src/engine/scanner.ts` | `scanRuleFiles()` — recursive directory scanner with caching |
 | `src/engine/formatter.ts` | `formatStaticBlock()` / `formatDynamicBlock()` with per-mode char budgets |
+| `src/engine/truncator.ts` | Char-budget truncation for static/dynamic/post-compact blocks |
+| `src/engine/parser-yaml.ts` | YAML frontmatter parser (largest impl file) |
 | `src/constants.ts` | Rule sources, extensions, source priority map, project root markers |
 
 ## FLOW
@@ -27,8 +29,9 @@
 Discovery (`finder.ts` / `engine/finder.ts`)
   Walk UP from cwd toward project root
     Scan `.omo/rules`, `.claude/rules`, `.cursor/rules`, `.github/instructions`
-    Collect `.md` / `.mdc` files + single-file rules (`copilot-instructions.md`, `CONTEXT.md`)
+    Collect `.md` / `.mdc` files + single-file rules (`.github/copilot-instructions.md`, `CONTEXT.md`)
   Walk user home: `~/.omo/rules`, `~/.opencode/rules`, `~/.claude/rules`
+  `.sisyphus/rules` (project + user) still matched but emits a deprecation warning (hook: `setSisyphusRuleDeprecationLogger`); migrate to `.omo/rules`
   Plugin bundled: platform-gated rules under `bundled-rules/`
 
 Matching (`matcher.ts` / `engine/matcher.ts`)
@@ -43,6 +46,8 @@ Ordering
 ## NOTES
 
 - Two APIs: root `src/` (simple functions) and `src/engine/` (stateful engine with truncation budgets). Both consumed in production.
+- ESM split: `src/engine/` uses explicit `.js` relative imports; root `src/` is extensionless. Do not normalize either tree.
+- Deps: `picomatch` + `@oh-my-opencode/utils` only.
 - Default char budgets: static 12K rule / 40K total; dynamic 4K / 10K; post-compact 3.5K / 4K.
 - `AGENTS.md` discovery lives here but injection logic is in `agents-md-core`.
 - Parent: [`packages/AGENTS.md`](../AGENTS.md)
