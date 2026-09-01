@@ -45,11 +45,11 @@ const InlineTeamSpecSchema = Type.Object(
 
 export const TeamCreateParams = Type.Object({
   team_name: Type.Optional(
-    Type.String({ description: "Named team spec (project .omo/teams or omo.json) to create. Provide exactly one of team_name or inline_spec." }),
+    Type.String({ description: "Named team spec (project .omo/teams or omo.json) to create. Ignored when inline_spec is also provided." }),
   ),
   inline_spec: Type.Optional(
     Type.Union([InlineTeamSpecSchema, Type.String({ description: "The same spec as a JSON string; parsed automatically. Passing the object form is preferred." })], {
-      description: "Inline team spec, e.g. { name, members: [{ name, category|subagent_type, prompt? }] }. A JSON string of the same object is also accepted and parsed automatically. Provide exactly one of team_name or inline_spec.",
+      description: "Inline team spec, e.g. { name, members: [{ name, category|subagent_type, prompt? }] }. A JSON string of the same object is also accepted and parsed automatically. Takes precedence when team_name is also provided.",
     }),
   ),
 })
@@ -84,7 +84,7 @@ export type TeamDeleteDetails =
 
 const CREATE_DESCRIPTION = [
   "Create a team run from a named spec or an inline spec. The current session is the team lead.",
-  "Provide exactly one of team_name or inline_spec. Members run as background children; you coordinate them with the other team_* tools.",
+  "Pass inline_spec for an ad hoc team or team_name for a named spec; inline_spec takes precedence when both are provided. Members run as background children; you coordinate them with the other team_* tools.",
   "Returns invalid_arguments for malformed input, spec_error for invalid specs, and runtime_error for spawn/bounds failures.",
 ].join(" ")
 
@@ -106,8 +106,8 @@ function coerceInlineSpec(input: unknown): { readonly ok: true; readonly spec: u
 export async function runTeamCreate(service: TeamToolsService, params: TeamCreateInput): Promise<AgentToolResult<TeamCreateDetails>> {
   const hasName = params.team_name !== undefined && params.team_name.length > 0
   const hasInline = params.inline_spec !== undefined
-  if (hasName === hasInline) {
-    return toolResult("Provide exactly one of team_name or inline_spec.", { kind: "invalid_arguments", reason: "provide exactly one of team_name or inline_spec" })
+  if (!hasName && !hasInline) {
+    return toolResult("Provide team_name or inline_spec.", { kind: "invalid_arguments", reason: "provide team_name or inline_spec" })
   }
 
   let inlineSpec: unknown
@@ -121,7 +121,7 @@ export async function runTeamCreate(service: TeamToolsService, params: TeamCreat
 
   try {
     const result = await service.createTeam(
-      hasName ? { teamName: params.team_name } : { inlineSpec },
+      hasInline ? { inlineSpec } : { teamName: params.team_name },
     )
     const state = result.runtimeState
     const members: TeamCreateMemberView[] = result.members.map((member) => ({

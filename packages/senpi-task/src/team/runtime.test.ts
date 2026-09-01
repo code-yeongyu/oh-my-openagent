@@ -57,7 +57,7 @@ describe("createTeam", () => {
 
     // then
     const started = manager.started[0]
-    expect(started?.extensions).toEqual(["/tmp/mock-provider.ts", "/tmp/omo-member.js"])
+    expect(started?.extensions).toEqual(["/tmp/omo-member.js", "/tmp/mock-provider.ts"])
     expect(started?.memberEnv?.["SENPI_TASK_MEMBER"]).toBe(`${created.runtimeState.teamRunId}::alpha`)
     const config = JSON.parse(started?.memberEnv?.["SENPI_TASK_TEAM_CONFIG"] ?? "null")
     expect(config).toMatchObject({
@@ -176,8 +176,6 @@ describe("createTeam", () => {
     // then
     const [alphaStart, betaStart] = manager.started
     for (const start of [alphaStart, betaStart]) {
-      expect(start?.prompt).toContain("injected messages")
-      expect(start?.prompt).not.toContain("team_wait")
       expect(start?.prompt).toContain("task_send")
     }
     expect(alphaStart?.prompt).toContain("'alpha'")

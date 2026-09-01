@@ -139,5 +139,7 @@ describe("createTeamIdleWakeHint leader delivery", () => {
 
     const unreadMessages = await listUnreadMessages(teamRunId, "lead", config)
     expect(unreadMessages.map((message) => message.body)).toEqual(completionBodies)
-  })
+    // Loaded Windows runners push this past the 5s default; the waits stay event-driven
+    // (~11ms locally), so only the ceiling moves.
+  }, 30_000)
 })

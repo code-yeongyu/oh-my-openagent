@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
 import { resolveCategory } from "../category"
@@ -23,6 +27,7 @@ function baseSpec(): ChildSpec {
   return {
     taskId: "task-runtime-fallback",
     cwd: process.cwd(),
+    sessionDir: mkdtempSync(join(tmpdir(), "senpi-task-runtime-fallback-")),
     depth: 0,
     parentSessionId: "parent-1",
     rootSessionId: "root-1",
@@ -53,9 +58,9 @@ describe("InProcessRunner runtime fallback", () => {
     const fallbackModels = [
       {
         source: "category" as const,
-        provider: "quotio-openai",
+        provider: "openai-codex",
         model_id: "gpt-5.6-luna-fast",
-        display: "quotio-openai/gpt-5.6-luna-fast",
+        display: "openai-codex/gpt-5.6-luna-fast",
         reasoning_effort: "minimal",
       },
       {
@@ -81,7 +86,7 @@ describe("InProcessRunner runtime fallback", () => {
       modelFallback: true,
       chains: {
         "kimi-coding/kimi-for-coding-highspeed-unlocked": [
-          "quotio-openai/gpt-5.6-luna-fast:minimal",
+          "openai-codex/gpt-5.6-luna-fast:minimal",
           "example-gateway/z-ai/glm-5.2-ultrafast-unlocked:none",
         ],
       },
@@ -103,9 +108,9 @@ describe("InProcessRunner runtime fallback", () => {
       fallbackModels: [
         {
           source: "category" as const,
-          provider: "quotio-openai",
+          provider: "openai-codex",
           model_id: "gpt-5.6-luna-fast",
-          display: "quotio-openai/gpt-5.6-luna-fast",
+          display: "openai-codex/gpt-5.6-luna-fast",
           reasoning_effort: "high",
           variant: "max",
         },
@@ -119,7 +124,7 @@ describe("InProcessRunner runtime fallback", () => {
     // then
     expect(capturedRetrySettings(captured)).toMatchObject({
       chains: {
-        "kimi-coding/kimi-for-coding-highspeed-unlocked": ["quotio-openai/gpt-5.6-luna-fast:high"],
+        "kimi-coding/kimi-for-coding-highspeed-unlocked": ["openai-codex/gpt-5.6-luna-fast:high"],
       },
     })
   })
@@ -127,7 +132,7 @@ describe("InProcessRunner runtime fallback", () => {
   test("#given a builtin category resolving to a chain rung #when the child session is created #then the remaining chain rungs land in retry fallback chains", async () => {
     // given
     const models = [
-      { provider: "quotio-openai", id: "gpt-5.6-luna-fast" },
+      { provider: "openai-codex", id: "gpt-5.6-luna-fast" },
       { provider: "opencode-go", id: "minimax-m3" },
     ] as const
     const registry = {
@@ -155,11 +160,11 @@ describe("InProcessRunner runtime fallback", () => {
     await handle.waitForIdle()
 
     // then
-    expect(`${spec.provider}/${spec.modelId}`).toBe("quotio-openai/gpt-5.6-luna-fast")
+    expect(`${spec.provider}/${spec.modelId}`).toBe("openai-codex/gpt-5.6-luna-fast")
     expect(capturedRetrySettings(captured)).toMatchObject({
       modelFallback: true,
       chains: {
-        "quotio-openai/gpt-5.6-luna-fast": ["opencode-go/minimax-m3:max"],
+        "openai-codex/gpt-5.6-luna-fast": ["opencode-go/minimax-m3:max"],
       },
     })
   })

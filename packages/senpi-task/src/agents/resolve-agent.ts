@@ -20,6 +20,9 @@ type AgentPersona = {
   readonly agentType: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
+  // The definition's disallowedTools, carried so the record's tool_deny -> ChildSpec.toolDenylist
+  // -> senpi excludeTools chain can actually deny (previously dropped here, leaking denied tools).
+  readonly toolDenylist?: readonly string[]
   readonly agentExecutionMode?: "in-process" | "process"
   readonly allowedSubagents?: readonly string[]
   readonly maxDepth?: number
@@ -178,6 +181,7 @@ function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
     agentType: name,
     ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
     ...(toolAllowlist !== undefined ? { toolAllowlist } : {}),
+    ...(definition.disallowedTools !== undefined ? { toolDenylist: definition.disallowedTools } : {}),
     ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
     ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
     ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),

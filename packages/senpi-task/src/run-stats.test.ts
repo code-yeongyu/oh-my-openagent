@@ -35,6 +35,9 @@ describe("run stats tracker", () => {
       total_tokens: 1_000,
       generation_ms: 2_000,
       tokens_per_second: 75,
+      duration_status: "monotonic",
+      token_status: "complete",
+      cost_status: "unavailable",
     })
   })
 
@@ -52,6 +55,9 @@ describe("run stats tracker", () => {
       turns: 1,
       tool_calls: 0,
       generation_ms: 500,
+      duration_status: "monotonic",
+      token_status: "unavailable",
+      cost_status: "unavailable",
     })
   })
 

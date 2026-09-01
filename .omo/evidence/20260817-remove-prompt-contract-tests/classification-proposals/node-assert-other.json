@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "domain": "node-assert-other",
+  "rule": "Allow Node assert candidates only when they verify machine-consumed sentinels, parser fixtures, shipped source-to-artifact equality, required machine-field presence, or observable routing, lifecycle, transformation, and deduplication behavior without pinning free-standing authored prose.",
+  "allowed": [
+    {
+      "fingerprint": "5cd82d3b8ed7359a80354d30da76d20c51aa77befb6c2ded6c8a727d3b9b164b",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that idle events from unrelated or merely lineage-connected fixture sessions do not invoke prompt or promptAsync; promptCalls.length is an observable lifecycle side effect, and the synthetic session IDs are not production identifiers being pinned.",
+      "path": "packages/omo-opencode/src/hooks/atlas/idle-event-lineage.test.ts",
+      "expected": "<expression:0>"
+    },
+    {
+      "fingerprint": "5095a8843317e8e93dea042d2b740be4535f584a9d8f9227d513bc2049feef57",
+      "category": "runtime-behavior",
+      "rationale": "Verifies exactly one continuation injection for an explicitly tracked boulder session; this is dispatch and lifecycle behavior independent of continuation wording or fixture session-ID spelling.",
+      "path": "packages/omo-opencode/src/hooks/atlas/idle-event-lineage.test.ts",
+      "expected": "<expression:1>"
+    },
+    {
+      "fingerprint": "1ac4ad125a9e64c5724852fb32bbe7bbdce95711ffeb4e809c81fa81129cf43c",
+      "category": "runtime-behavior",
+      "rationale": "Checks the native-skill registry invariant that each source equals join(nativeSkillsRoot, name); the resulting path is consumed by synchronization code and no SKILL prose is inspected.",
+      "path": "packages/omo-senpi/plugin/scripts/native-skill-sources.test.mjs",
+      "expected": "<expression:expectedPath>"
+    },
+    {
+      "fingerprint": "ac7cf2786b6670d263d945654be0df301e941a2b50efeb601fa29ba0abfc54dc",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that the onboarding registry entry resolves to its executable filesystem source under the native-skills root; this is package synchronization routing rather than authored onboarding content.",
+      "path": "packages/omo-senpi/plugin/scripts/native-skill-sources.test.mjs",
+      "expected": "<expression:join(nativeSkillsRoot, \"onboarding\")>"
+    },
+    {
+      "fingerprint": "0eb9dbff0ac9958dbccfd281631fc374b8757365433ee4548d307e693b40775e",
+      "category": "parser-fixture",
+      "rationale": "Uses synthetic markdown input to prove the compatibility transformer is a no-op when no OpenCode orchestration-call syntax is present; the equality covers input/output transformation behavior, not shipped prose.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "--- name: test --- # Test Skill No orchestration here."
+    },
+    {
+      "fingerprint": "c26fe5047d818c8e94decc329ff6c73117368ca8139e8148096668af2be3c5a3",
+      "category": "machine-sentinel",
+      "rationale": "Checks presence of the exact compatibility-section marker consumed by insertion, removal, and duplicate-detection code after transformation; it does not independently contract the surrounding guidance prose.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "26eeb5dd74facbf09ac7d97ecee327f626c64e7747763129fe28b7bf2908cfbe",
+      "category": "machine-sentinel",
+      "rationale": "Pins the compatibility heading only as the section identity marker mechanically consumed by the transformer for insertion, removal, and deduplication, not as free-standing SKILL wording.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "## Senpi Harness Tool Compatibility"
+    },
+    {
+      "fingerprint": "8833fca1dbdb6fa49dfa2e57e3b0ec41cd339ceeb8f4a8357019364d993e1a2f",
+      "category": "parser-fixture",
+      "rationale": "Verifies that parsed YAML frontmatter remains at the start when generated compatibility guidance is inserted; this protects markdown transformation structure rather than guidance wording.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "ff42dc41e3f0f752af24c35da3df8eab615d3e0b55a8c1da60e9c009417d122b",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that generated compatibility guidance precedes the first incompatible orchestration example, including after stale-section repair; this is required insertion and repair behavior rather than editorial section ordering.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "c22dff3949df1386001c92559e47d9d374a1718d6b39d5c8e733ab66c515d1e7",
+      "category": "runtime-behavior",
+      "rationale": "Compares transformed output with the same dynamic input fixture to prove idempotent no-op behavior when an existing compatibility section is already correctly positioned; this is not shipped-copy equality or a separate authored fragment.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "<expression:content>"
+    },
+    {
+      "fingerprint": "8fc9aa3f67d8e50670c0a6a2e800103ac4ff8d98eee748014d8fa14df2c7afaa",
+      "category": "runtime-behavior",
+      "rationale": "Verifies that content without frontmatter gets the generated compatibility section prepended; the seam is transformer placement using the production-consumed section marker.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "6b4ab2c12986102cf3b1276120ac24b1c95781788dbfb7f82118933719335491",
+      "category": "runtime-behavior",
+      "rationale": "Checks that no-frontmatter input begins with the generated compatibility section; the exact value is the transformer's machine-consumed marker and the behavior under test is placement at offset zero.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "## Senpi Harness Tool Compatibility"
+    },
+    {
+      "fingerprint": "426f3cd486dc00cc3db769b1dac18b67367d5c6326960c5562ee965a6f9ef10e",
+      "category": "parser-fixture",
+      "rationale": "Confirms that original synthetic fixture content survives prepend transformation; the Test Skill heading is fixture payload and is not required in production SKILL copy.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "5ddbaf5d76c86e6c9be6f0d587cb9f79822a467a3294635972d9bbaa732b6127",
+      "category": "parser-fixture",
+      "rationale": "Checks preservation of a synthetic markdown fixture fragment after prepend transformation; it does not require a shipped skill to contain this heading.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "# Test Skill"
+    },
+    {
+      "fingerprint": "44c4b2e93754fdb8fad8ffef91f515ba5b8851edfd8ac7457de164a52fe25716",
+      "category": "machine-sentinel",
+      "rationale": "Checks the sentence-shaped suffix as a production parser sentinel in senpiCompatibilityEndMarkers, where it is consumed to recognize generated guidance and locate section boundaries rather than merely pinning prose.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "<truthy instruction assertion>"
+    },
+    {
+      "fingerprint": "c4d7531bf460933dc175f4924143f653bfc9e2ef75e84455c8d436e37fd12ae6",
+      "category": "machine-sentinel",
+      "rationale": "Uses the production-consumed compatibility-section marker to derive occurrence count after stale-section repair; the regex supports marker-based deduplication rather than an unparsed heading contract.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "/## Senpi Harness Tool Compatibility/g"
+    },
+    {
+      "fingerprint": "a78756933a49d8b314bd1b801de75c97c3332cb33f2369d39440e50ea82aeeef",
+      "category": "runtime-behavior",
+      "rationale": "Verifies deduplication behavior: stale compatibility guidance is removed and exactly one generated section remains after reprocessing.",
+      "path": "packages/omo-senpi/plugin/scripts/senpi-compatibility-guidance.test.mjs",
+      "expected": "<expression:1>"
+    },
+    {
+      "fingerprint": "6b3a36eb3ee77993bec90b3275696e106fb950ffc8f0e8c70f880dec46c1114f",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares staged directive.md bytes with source directive bytes, so it remains valid across editorial rewrites and fails only when the packaged runtime copy diverges from its source.",
+      "path": "packages/omo-senpi/plugin/scripts/stage-agent-toolkit.test.mjs",
+      "expected": "<expression:await readFile(fixture.directiveEntry, \"utf8\")>"
+    }
+  ],
+  "forbidden": []
+}

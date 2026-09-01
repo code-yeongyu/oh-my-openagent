@@ -4,12 +4,11 @@
 
 > The bare `lazycodex` npm name was unpublished on 2026-05-30 and is no longer installable. Use `lazycodex-ai` for all npm/bin references.
 
-The `publish.yml` workflow includes `lazycodex-ai` in trusted-publisher preflight, but that check is soft for first publish.
-If `lazycodex-ai` is not yet claimed on npm, the workflow warns and continues so existing package releases are not blocked.
-To claim the name, run a one-time manual `npm publish` for `lazycodex-ai` from a trusted environment (for example local shell with `NPM_AUTH_TOKEN`).
-After the first manual publish, configure GitHub Actions trusted publishing at:
+The `publish.yml` trusted-publisher preflight is a hard gate for every selected release package, including `lazycodex-ai`. Missing trusted publishing fails preflight and blocks the release.
+
+Before publishing `lazycodex-ai`, configure GitHub Actions trusted publishing at:
 https://www.npmjs.com/package/lazycodex-ai/access
 Set Provider to GitHub Actions, Organization to `code-yeongyu`, Repository to `oh-my-openagent`, and Workflow filename to `publish.yml`.
-After this setup, subsequent releases from `publish.yml` can publish `lazycodex-ai` automatically.
+Publish through `publish.yml`; do not use a one-time manual `npm publish` with `NPM_AUTH_TOKEN`.
 
-The same release workflow prepares `code-yeongyu/lazycodex` from `packages/omo-codex/marketplace.json` and `packages/omo-codex/plugin/`, then compares that generated marketplace payload against the previous published `lazycodex-ai` package. It pushes the marketplace repo and creates a `code-yeongyu/lazycodex` GitHub Release only when that payload changed. That cross-repo push and release requires the `LAZYCODEX_SYNC_TOKEN` repository secret.
+The same release workflow prepares `code-yeongyu/lazycodex` from `packages/omo-codex/marketplace.json` and `packages/omo-codex/plugin/`. It pushes the marketplace repository whenever those generated files differ from the marketplace repository. Separately, it compares the generated marketplace payload with the previous published `lazycodex-ai` package and creates a `code-yeongyu/lazycodex` GitHub Release only when that npm-payload comparison reports a change. The cross-repo push and release require the `LAZYCODEX_SYNC_TOKEN` repository secret.

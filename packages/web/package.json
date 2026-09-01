@@ -28,7 +28,7 @@
     "geist": "^1.7.0",
     "lucide-react": "1.16.0",
     "marked": "^18.0.4",
-    "next": "15.5.18",
+    "next": "15.5.21",
     "next-intl": "^4.12.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -53,7 +53,7 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
+    "@biomejs/biome": "2.4.15",
     "@opennextjs/cloudflare": "^1.19.11",
     "@playwright/test": "1.60.0",
     "@tailwindcss/postcss": "4.3.0",

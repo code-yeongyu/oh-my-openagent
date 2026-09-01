@@ -1,11 +1,13 @@
 import { OmoReasoningSchema } from "@oh-my-opencode/omo-config-core"
 import { z } from "zod"
-import { FallbackModelsSchema } from "./fallback-models"
+import { FallbackModelObjectSchema, FallbackModelsSchema } from "./fallback-models"
 import { AgentPermissionSchema } from "./internal/permission"
 
 export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
+  /** Ordered model chain; the first entry is primary and the rest are fallbacks. */
+  models: z.array(z.union([z.string(), FallbackModelObjectSchema])).optional(),
   fallback_models: FallbackModelsSchema.optional(),
   reasoning: OmoReasoningSchema.optional(),
   /** @deprecated Use `reasoning` instead. */

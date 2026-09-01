@@ -463,6 +463,17 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  test("treats 'upstream request failed' provider error as retryable (issue #6313)", () => {
+    //#given
+    const error = { message: "Error from provider (Console Go): Upstream request failed" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
 })
 
 export {}

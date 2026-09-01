@@ -1,0 +1,22 @@
+# Real opencode serve (1.18.7) + local build, real session, real monitored process
+# command: sh -c 'echo QA_BUILD_LINE; sleep 3; exit 7'
+
+## parent session timeline (v1 message API)
+03:33:36 -> ----  user  ['[OMO MONITOR OUTPUT] monitor_id: mon_f4718d66 batch: 1 command_label: ']
+03:33:38 -> ----  user  ['[OMO MONITOR OUTPUT] monitor_id: mon_f4718d66 batch: 2 command_label: ']
+03:33:38 -> 03:33:47  assistant  ['Monitor `qa-build` (mon_f4718d66) exited with code 7 after emitting a ']
+
+## plugin gate log for this run
+[2026-08-04T03:33:36.060Z] [prompt-async-gate] promptAsync dispatching {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","source":"monitor-output:mon_f4718d66:batch-1"}
+[2026-08-04T03:33:36.064Z] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","source":"monitor-output:mon_f4718d66:batch-1","holdMs":15000}
+[2026-08-04T03:33:36.064Z] [prompt-async-gate] promptAsync dispatched {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","source":"monitor-output:mon_f4718d66:batch-1"}
+[2026-08-04T03:33:36.064Z] [monitor] Sent deferred monitor output: {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","monitorId":"mon_f4718d66","batchSeq":1,"shouldReply":false,"forceActiveDispatch":false}
+[2026-08-04T03:33:38.056Z] [prompt-async-gate] expired reservation released {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","source":"monitor-output:mon_f4718d66:batch-1"}
+[2026-08-04T03:33:38.058Z] [prompt-async-gate] promptAsync dispatching {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","source":"monitor-output:mon_f4718d66:batch-2"}
+[2026-08-04T03:33:38.059Z] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","source":"monitor-output:mon_f4718d66:batch-2","holdMs":15000}
+[2026-08-04T03:33:38.059Z] [prompt-async-gate] promptAsync dispatched {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","source":"monitor-output:mon_f4718d66:batch-2"}
+[2026-08-04T03:33:38.059Z] [monitor] Sent deferred monitor output: {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy","monitorId":"mon_f4718d66","batchSeq":2,"shouldReply":true,"forceActiveDispatch":false}
+[2026-08-04T03:33:47.601Z] [todo-continuation-enforcer] session.idle {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy"}
+[2026-08-04T03:33:47.611Z] [atlas] session.idle {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy"}
+[2026-08-04T03:33:47.602Z] [todo-continuation-enforcer] session.idle {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy"}
+[2026-08-04T03:33:47.613Z] [atlas] session.idle {"sessionID":"ses_0352a89d3ffeux3rZ1hRfePZvy"}

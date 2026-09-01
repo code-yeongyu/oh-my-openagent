@@ -28,6 +28,7 @@ export interface SessionState {
   isRecovering?: boolean
   wasCancelled?: boolean
   tokenLimitDetected?: boolean
+  unrecoverableErrorDetected?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
   lastIncompleteCount?: number
@@ -53,6 +54,7 @@ export interface MessageInfo {
   model?: { providerID: string; modelID: string; variant?: string }
   providerID?: string
   modelID?: string
+  variant?: string
   tools?: Record<string, ToolPermission>
 }
 

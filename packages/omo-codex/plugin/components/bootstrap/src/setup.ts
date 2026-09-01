@@ -224,7 +224,7 @@ async function linkComponentBinsStep(options: WorkerSetupOptions, degraded: Boot
 }
 
 // Older marketplace payloads may not have <pluginRoot>/dist/cli. Keep that
-// degraded path explicit instead of leaving a broken `omo` link.
+// degraded path explicit instead of leaving a broken `omo-agent-toolkit` link.
 async function linkRuntimeWrapperStep(
 	options: WorkerSetupOptions,
 	binDir: string,
@@ -240,18 +240,18 @@ async function linkRuntimeWrapperStep(
 		});
 		if (linked !== null) return;
 		degraded.push({
-			component: "omo-cli",
-			hint: "use npx lazycodex-ai for the omo CLI",
+			component: "omo-agent-toolkit",
+			hint: "use npx lazycodex-ai for the omo-agent-toolkit CLI",
 			reason: "marketplace payload has no dist/cli",
 		});
-		await appendBootstrapLog(options.pluginData, options.now ?? Date.now(), "omo-cli-degraded", {
-			warning: `Warning: skipped the omo runtime wrapper because ${cliPath} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
+		await appendBootstrapLog(options.pluginData, options.now ?? Date.now(), "omo-agent-toolkit-degraded", {
+			warning: `Warning: skipped the omo-agent-toolkit runtime wrapper because ${cliPath} is missing; omo-agent-toolkit ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
 		});
 	} catch (error) {
 		degraded.push({
-			component: "omo-cli",
+			component: "omo-agent-toolkit",
 			hint: BOOTSTRAP_DOCTOR_HINT,
-			reason: `failed to link the omo runtime wrapper into ${binDir}: ${errorMessage(error)}`,
+			reason: `failed to link the omo-agent-toolkit runtime wrapper into ${binDir}: ${errorMessage(error)}`,
 		});
 	}
 }

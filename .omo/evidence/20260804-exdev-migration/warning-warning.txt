@@ -1,0 +1,1 @@
+[config-migration] legacy configuration changes were not applied: EBUSY: resource busy or locked, unlink '/home/node/.config/opencode/oh-my-openagent.json'

@@ -1,0 +1,43 @@
+### NEGATIVE CONTROL - issue #6376 - 2026-07-28T01:52:12Z
+### Method: git checkout upstream/dev -- packages/shared-skills/index.mjs  (the fix is COMMITTED on this branch,
+### so git stash would find nothing and silently produce a false green).
+### The new tests are kept. S2 MUST fail again.
+
+--- product file reverted to base? (diff vs upstream/dev must be empty) ---
+(empty above == product change removed)
+
+--- the base file under test ---
+import { fileURLToPath } from "node:url";
+
+export function sharedSkillsRootPath() {
+	return fileURLToPath(new URL("./skills/", import.meta.url));
+}
+
+=== bun test (expect FAIL) ===
+bun test v1.3.14 (0d9b296a)
+
+packages\shared-skills\shared-skills-root-path.test.ts:
+58 | 		// when
+59 | 		const loaded = await loadFrom(bundleDirectory);
+60 | 		const resolved = loaded.sharedSkillsRootPath();
+61 | 
+62 | 		// then
+63 | 		expect(resolve(resolved)).toBe(resolve(join(root, "skills")));
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: "C:\Users\pss\AppData\Local\Temp\shared-skills-root-cEO6KM\skills"
+Received: "C:\Users\pss\AppData\Local\Temp\shared-skills-root-cEO6KM\cli\skills"
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\shared-skills\shared-skills-root-path.test.ts:63:29)
+(fail) sharedSkillsRootPath > #given a bundle one level below the skills directory #when the root is resolved #then the parent directory is used [40.95ms]
+
+ 2 pass
+ 1 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [502.00ms]
+EXIT=1  (non-zero == control confirmed)
+
+--- fix restored (diff vs upstream/dev must be NON-empty) ---
+ packages/shared-skills/index.mjs | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)

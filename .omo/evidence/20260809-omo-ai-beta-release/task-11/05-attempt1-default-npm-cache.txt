@@ -1,0 +1,19 @@
+# Scenario 05 - live registry bare channel remains closed
+prefix=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-bare.XXXXXX.xK99kGJrYU
++ npm i -g --prefix "$PREFIX" omo-ai
+install_exit=1
+--- stdout ---
+--- stderr ---
+npm error code ETARGET
+npm error notarget No matching version found for omo-ai@*.
+npm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.
+npm error A complete log of this run can be found in: /Users/yeongyu/.npm/_logs/2026-08-09T15_44_24_171Z-debug-0.log
+bare_install_failed=PASS
+bare_stderr_ETARGET=PASS
+no_omo_bin_landed=PASS
+scenario_05=PASS
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-bare.XXXXXX.xK99kGJrYU
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-bare.XXXXXX.xK99kGJrYU; path absent
+
+# cleanup correction
+cleanup_real_npm_log=PASS removed /Users/yeongyu/.npm/_logs/2026-08-09T15_44_24_171Z-debug-0.log

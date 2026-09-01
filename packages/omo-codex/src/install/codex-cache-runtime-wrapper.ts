@@ -3,7 +3,13 @@ import { windowsNodeDiscoveryLines } from "./codex-cache-command-shim"
 
 export const RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER"
 
-export function posixRuntimeWrapper(cliPath: string, codexHome: string, binDir: string, nodeCliPath: string): string {
+export function posixRuntimeWrapper(
+  binName: string,
+  cliPath: string,
+  codexHome: string,
+  binDir: string,
+  nodeCliPath: string,
+): string {
   const ulwLoopBin = toPosixPath(join(binDir, "omo-ulw-loop"))
   const nodeCli = escapePosixDoubleQuoted(toPosixPath(nodeCliPath))
   const escapedCliPath = escapePosixDoubleQuoted(toPosixPath(cliPath))
@@ -13,6 +19,8 @@ export function posixRuntimeWrapper(cliPath: string, codexHome: string, binDir: 
     "#!/bin/sh",
     `# ${RUNTIME_WRAPPER_MARKER}`,
     `export CODEX_HOME="\${CODEX_HOME:-${escapedCodexHome}}"`,
+    `export OMO_INVOCATION_NAME=${binName}`,
+    "export OMO_EDITION=codex",
     'if [ "$1" = "ulw-loop" ] && [ -x "' + escapedUlwLoopBin + '" ]; then',
     "  shift",
     '  exec "' + escapedUlwLoopBin + '" ulw-loop "$@"',
@@ -36,11 +44,11 @@ export function posixRuntimeWrapper(cliPath: string, codexHome: string, binDir: 
     `  if [ -f "${nodeCli}" ] && command -v node >/dev/null 2>&1; then`,
     `    exec node "${nodeCli}" "$@"`,
     "  fi",
-    `  echo "omo: bun runtime not found (checked PATH, ~/.bun/bin, /opt/homebrew/bin, /usr/local/bin) and the node fallback CLI is missing at ${nodeCli}; install bun from https://bun.sh, or reinstall omo and force the fallback with OMO_RUNTIME=node" >&2`,
+    `  echo "${binName}: bun runtime not found (checked PATH, ~/.bun/bin, /opt/homebrew/bin, /usr/local/bin) and the node fallback CLI is missing at ${nodeCli}; install bun from https://bun.sh, or reinstall ${binName} and force the fallback with OMO_RUNTIME=node" >&2`,
     "  exit 127",
     "fi",
     `if [ ! -f "${escapedCliPath}" ]; then`,
-    `  echo "omo: runtime target missing at ${escapedCliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui" >&2`,
+    `  echo "${binName}: runtime target missing at ${escapedCliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui" >&2`,
     "  exit 1",
     "fi",
     `exec "$BUN_BINARY" "${escapedCliPath}" "$@"`,
@@ -48,12 +56,20 @@ export function posixRuntimeWrapper(cliPath: string, codexHome: string, binDir: 
   ].join("\n")
 }
 
-export function windowsRuntimeWrapper(cliPath: string, codexHome: string, binDir: string, nodeCliPath: string): string {
+export function windowsRuntimeWrapper(
+  binName: string,
+  cliPath: string,
+  codexHome: string,
+  binDir: string,
+  nodeCliPath: string,
+): string {
   const ulwLoopBin = join(binDir, "omo-ulw-loop.cmd")
   return [
     "@echo off",
     `rem ${RUNTIME_WRAPPER_MARKER}`,
     `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
+    `set "OMO_INVOCATION_NAME=${binName}"`,
+    'set "OMO_EDITION=codex"',
     ...windowsNodeDiscoveryLines(),
     `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
     "  shift /1",
@@ -71,11 +87,11 @@ export function windowsRuntimeWrapper(cliPath: string, codexHome: string, binDir
     `    "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
     "    exit /b %ERRORLEVEL%",
     "  )",
-    `  echo omo: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
+    `  echo ${binName}: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
     "  exit /b 127",
     ")",
     `if not exist "${cliPath}" (`,
-    `  echo omo: runtime target missing at ${cliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
+    `  echo ${binName}: runtime target missing at ${cliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
     "  exit /b 1",
     ")",
     `"%BUN_BINARY%" "${cliPath}" %*`,

@@ -76,8 +76,7 @@ export function formatStatusTarget(input: StatusTargetInput): string | undefined
 }
 
 // The canonical grammar every live/status row shares:
-//   <identity> · <target (model)> · turn N (M tools) · <verb> · $C (CH: R%) · T tok/s
-// CH is the latest valid assistant request's rate, matching Senpi's root footer.
+//   <identity> · <target (model)> · turn N (M tools) · <verb> · $C · T tok/s
 export function composeStatusLine(input: StatusLineInput): string {
   const tokens = [
     input.identity,
@@ -90,11 +89,9 @@ export function composeStatusLine(input: StatusLineInput): string {
   return tokens.filter((token): token is string => typeof token === "string" && token.length > 0).join(" · ")
 }
 
-// Running rows pair spend with the latest valid request's cache-hit rate, matching Senpi's footer.
-export function formatLiveSpend(
-  stats: Pick<TaskRunStats, "cost_usd" | "cache_hit_rate_last">,
-): string | undefined {
-  return formatSpendFacts(stats.cost_usd, stats.cache_hit_rate_last)
+// Running task rows keep spend compact; cache-hit rate remains available in completed-run details.
+export function formatLiveSpend(stats: Pick<TaskRunStats, "cost_usd">): string | undefined {
+  return formatCostUsd(stats.cost_usd)
 }
 
 // Completed-run summaries pair spend with the cumulative whole-run cache-hit rate.

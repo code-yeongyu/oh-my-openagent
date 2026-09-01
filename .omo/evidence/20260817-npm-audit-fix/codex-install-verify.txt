@@ -1,0 +1,22 @@
+Command:
+cd .agents/skills/codex-qa
+OMO_CODEX_SOURCE_ROOT=<task-worktree> bash scripts/install-verify.sh --self-test
+
+First parallel attempt:
+- exit 1
+- cause: concurrent app-server and install lanes contended on the shared
+  worktree's git config lock
+- disposition: not treated as a pass; rerun alone
+
+Sequential retry:
+- exit 0
+- PASS: plugin cache present (5.0.0-beta.8)
+- PASS: config.toml enables omo@sisyphuslabs
+- PASS: component bins linked in sandbox (10 bins)
+- PASS: agent TOMLs linked in sandbox
+- PASS: real ~/.codex/config.toml unchanged
+- PASS: install-verify
+
+Isolation:
+The helper created and removed its own temporary CODEX_HOME. The host
+`~/.codex/config.toml` SHA-256 was unchanged before and after.

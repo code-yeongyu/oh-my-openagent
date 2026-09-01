@@ -117,7 +117,20 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
         }
       }
       let registration = createRegistration()
-      const emitRegistration = (): void => events.emit(CONFIG_WATCH_REGISTER, registration)
+      // Marks the payload currently being self-emitted: a synchronous rejection
+      // swaps `registration` for a refreshed one BEFORE our own REGISTER
+      // listener sees the original payload, so identity against the current
+      // registration alone would misread our own emission as a foreign one.
+      let emittingRegistration: ConfigWatchRegistration | undefined
+      const emitRegistration = (): void => {
+        const payload = registration
+        emittingRegistration = payload
+        try {
+          events.emit(CONFIG_WATCH_REGISTER, payload)
+        } finally {
+          emittingRegistration = undefined
+        }
+      }
       let retryTimer: ReturnType<typeof setTimeout> | undefined
       let rejectionFingerprint: string | undefined
       let rejectionRetries = 0
@@ -125,8 +138,42 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
         if (retryTimer !== undefined) clearTimeout(retryTimer)
         retryTimer = undefined
       }
+      // Never emit REGISTER from inside a senpi event dispatch: rebuildWatchers
+      // emits READY on the same synchronous stack as REGISTER, so a direct
+      // re-emit recurses until RangeError whenever senpi's identity guard
+      // cannot stop the echo (two live omo extension instances alternate
+      // payload identities). One coalescing timer serves both the READY
+      // re-registration and the rejection retry; the action is identical.
+      // No unref(): a 0ms timer is self-draining (and dispose clears it),
+      // while an unref'd one-shot timer can be starved indefinitely under Bun
+      // on Windows — observed as a senpi-compatibility CI hang.
+      const scheduleEmitRegistration = (): void => {
+        clearRetryTimer()
+        retryTimer = setTimeout(() => {
+          retryTimer = undefined
+          emitRegistration()
+        }, 0)
+      }
       const unsubscribes = [
-        events.on(CONFIG_WATCH_READY, emitRegistration),
+        // senpi emits READY after every watcher rebuild, including the rebuild
+        // caused by this component's own registration; re-register so the watch
+        // survives a config-reload host restart that emptied its registrations.
+        events.on(CONFIG_WATCH_READY, scheduleEmitRegistration),
+        events.on(CONFIG_WATCH_REGISTER, (payload) => {
+          if (payload === registration || payload === emittingRegistration) return
+          if (!isRecord(payload) || payload.id !== OMO_REGISTRATION_ID) return
+          // Another live omo extension instance registered the same id (e.g. a
+          // dev plugin in senpi settings packages plus the omo launcher's
+          // bundled --extension). senpi keeps only the LAST registration and
+          // its re-registration guard compares payload identity, so two live
+          // instances would rebuild-echo forever. The superseded instance
+          // stands down; the last registrant keeps the watch.
+          ctx.logger.warn("omo config-watch superseded by another omo extension instance; standing down", {
+            hint: "two omo extensions are loaded in this senpi process (e.g. a local dev plugin in senpi settings packages plus the omo launcher's bundled extension); remove one",
+          })
+          dispose()
+          if (releasePrevious === dispose) releasePrevious = undefined
+        }),
         events.on(CONFIG_WATCH_RELOADED, (payload) => {
           if (!isReloaded(payload) || payload.registrationId !== OMO_REGISTRATION_ID) return
           ctx.logger.info("omo config hot-reloaded", { paths: payload.paths, pathCount: payload.paths.length })
@@ -162,14 +209,7 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
             return
           }
           rejectionRetries += 1
-          clearRetryTimer()
-          // No unref(): a 0ms retry timer is self-draining (and dispose clears
-          // it), while an unref'd one-shot timer can be starved indefinitely
-          // under Bun on Windows — observed as a senpi-compatibility CI hang.
-          retryTimer = setTimeout(() => {
-            retryTimer = undefined
-            emitRegistration()
-          }, 0)
+          scheduleEmitRegistration()
         }),
       ]
       const dispose = (): void => {

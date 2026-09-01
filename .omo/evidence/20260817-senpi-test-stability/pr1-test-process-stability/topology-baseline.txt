@@ -1,0 +1,83 @@
+BASE
+
+  branch=fix/test-process-stability-20260817-ulw
+  sha=581881f38bd906e3fd1e9f225cf81a35dbcc81db
+  dev_ci_run=https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380
+
+CURRENT TEST OWNERSHIP
+
+  Linux/macOS root:
+    bun --config=bunfig.root.toml test
+
+  Windows root group 1:
+    bun test packages/omo-opencode packages/memory-core
+
+  Windows root group 2:
+    bun --config=bunfig.win2.toml test
+
+  Senpi, every OS:
+    bun test packages/omo-senpi
+
+  `bunfig.root.toml` excludes the dedicated Senpi suite.
+  `bunfig.win2.toml` additionally excludes `packages/omo-opencode` and
+  `packages/memory-core`, making the two Windows groups complementary.
+
+TRACKED FILE COUNTS
+
+  ROOT_GROUP_1_FILES=1051
+  SENPI_FILES=275
+  ROOT_ALL_TRACKED=2303
+
+The exact-union partition contract is machine-checked by
+`script/ci-root-test-partition.test.ts`.
+
+POST-MERGE DEV CI OBSERVATION
+
+  senpi-compatibility (ubuntu-latest):
+    conclusion=success
+    seconds=300
+    https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380/job/95421899150
+
+  senpi-compatibility (macos-latest):
+    conclusion=success
+    seconds=295
+    https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380/job/95421899183
+
+  senpi-compatibility (windows-latest):
+    conclusion=success
+    seconds=872
+    https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380/job/95421899165
+
+  test (ubuntu-latest):
+    conclusion=success
+    seconds=328
+    https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380/job/95421899323
+
+  test (macos-latest):
+    conclusion=success
+    seconds=371
+    https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380/job/95421899235
+
+  test (windows-latest, 1/2):
+    conclusion=failure
+    seconds=553
+    https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380/job/95421899229
+
+  test (windows-latest, 2/2):
+    state=in_progress when this baseline was recorded
+    https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32041361380/job/95421899156
+
+INTERPRETATION
+
+- The merged manual partition replaces the previous two complete Windows suite
+  executions and materially shortens group 1 to 553 seconds.
+- The first post-merge group-1 run is red, so speed is not accepted as success.
+- A monitor is subscribed to run completion and will capture the failed log
+  before any LSP/test-setup implementation.
+- Linux and macOS retain the unsharded root gate.
+- No coverage, OS, runner type, or required job name was removed.
+
+OMITTED
+
+No environment dumps, authentication data, tokens, or secret-bearing logs were
+captured.

@@ -1,0 +1,791 @@
+{
+  "version": 1,
+  "rule": "Natural-language prompt, SKILL, directive, rule, AGENTS, and markdown instruction contracts are forbidden. Allowed candidates require a stable fingerprint, an explicit seam category, and a non-empty rationale.",
+  "allowed": [
+    {
+      "fingerprint": "55b6295d7c202aba25576024faf1a9c72831718842f50dbaa86b0618c0c0b419",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "JSON agent prompt."
+    },
+    {
+      "fingerprint": "33bb7aef6db3c01cfd88d242098ec2775184a55ca98cffda990a6708a33afc5c",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "JSONC prompt."
+    },
+    {
+      "fingerprint": "ea1b2cae98aa1dc5588795aedc1a4908bb1ea123ddb42f886f860e85d4046ed0",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "Markdown agent prompt."
+    },
+    {
+      "fingerprint": "7bb3adc9befaff9242e955fa97ba85f14a9eebcdbb40027d0721b3302f0de76b",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "Prompt."
+    },
+    {
+      "fingerprint": "aaa4951f81a6a6155604f097d420f62529113663d3e1ad1902357829ec636360",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "Second prompt."
+    },
+    {
+      "fingerprint": "473ea6a9ccb2c51377062b26b45ef70f5c46c1f45dec6aab6a345b7194b61b26",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "You are a test agent."
+    },
+    {
+      "fingerprint": "10ca436452a4e5c7d6cd5f9ecb830e43438c4bbc9ff3132ca76854c70eddf532",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/json-agent-loader.test.ts",
+      "expected": "You are a test agent."
+    },
+    {
+      "fingerprint": "eb6052ee2eb81a0d3f517badc46c75bb35f429baa1fe840f039f6af614575b53",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.test.ts",
+      "expected": "Just a prompt with no frontmatter."
+    },
+    {
+      "fingerprint": "b3ab87de32ac7edceeb32cfe3c12636bf07351e4b604959b164738274595f791",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.test.ts",
+      "expected": "You are a test agent."
+    },
+    {
+      "fingerprint": "489837b48f66704a04b5b2e38d2ff97abc26fccf94f16a8712e4a35a390dfedb",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "Custom prompt"
+    },
+    {
+      "fingerprint": "1428c70ac1407ce7b2c50c1f932a2f66f61e7d53156d50b500f9e204e1b89757",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "Default prompt"
+    },
+    {
+      "fingerprint": "587d0b88aeee654fd9e5aa1ddf937953f263fef2d03807246bfebec83858ec6b",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "Fallback prompt"
+    },
+    {
+      "fingerprint": "17b0746e01fd843def7f6aadde35f789a5e7683a874fa79119c1141e01795f3f",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "Inline prompt"
+    },
+    {
+      "fingerprint": "310db2c10660d40f96d339ef93cfef0981901eb15de706e6a189f88946c31943",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "Test prompt"
+    },
+    {
+      "fingerprint": "1e385344fd834218fe8db899cf0e4d96b29369f1f9ee85947ad3329b5f16a8f2",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/claude-code-compat-core/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "You are a helpful assistant"
+    },
+    {
+      "fingerprint": "8226dde2f881e0c58b2b74f250051e654837b7c7e8925922ec811c57af9beab5",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts",
+      "expected": "Body text."
+    },
+    {
+      "fingerprint": "56d138b1990c4bc70f43c2c8e255a5a79e32f8ffe4f22cc2c299b6158f6eb0a5",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts",
+      "expected": "IDENTITY: Senior engineer"
+    },
+    {
+      "fingerprint": "d64623e0e589391bbd64c6fb56ff0f6d13feeb09182761371506671b40fcc4fd",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts",
+      "expected": "aliases:"
+    },
+    {
+      "fingerprint": "c02b00c8b87f40846070c734b1bdcc41823238f8b17fd618f3752bb632ec2a47",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts",
+      "expected": "aliases: [\"Yeongyu\",\"YG\"]"
+    },
+    {
+      "fingerprint": "bbba1d231a3c544c8d1915917850f233077c8846b91902295c9623d41aa6ab88",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts",
+      "expected": "description: Person - Yeongyu"
+    },
+    {
+      "fingerprint": "37b9b11a0398da4b405782e4ec540a10b56fbf6ebffc650522ce1f3c5a438906",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts",
+      "expected": "kind:"
+    },
+    {
+      "fingerprint": "fb8aa5926bfecaab884f963100040256b8a42dd7a7a95224b463c3a4f37e3ae2",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts",
+      "expected": "kind: person"
+    },
+    {
+      "fingerprint": "cd74887859f2994ec4d9b752ad3e0e8b172f11ec5a4f3704492af4357ba897ad",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter.test.ts",
+      "expected": "Body text."
+    },
+    {
+      "fingerprint": "f2bec8f8e781786e3239661fa78bdd580c61df1172ca859547da0f6dad4b16cd",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter.test.ts",
+      "expected": "Body."
+    },
+    {
+      "fingerprint": "a64f6abcc2799595f7a402021e6bab3d77f40f449d5a5f145b21a56432458f85",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter.test.ts",
+      "expected": "CRLF body."
+    },
+    {
+      "fingerprint": "1f1f59e33d986497a6ee9fbc72f900eafc4a1d68ca8e8f2180f5ae7ebfc503a7",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter.test.ts",
+      "expected": "This is the body."
+    },
+    {
+      "fingerprint": "483c0712fbf0de276cf3f074f541f0966a23aa068b05c4898de72f445956cff6",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/memory-core/src/memfs/frontmatter.test.ts",
+      "expected": "Updated body content."
+    },
+    {
+      "fingerprint": "ef8fcc66ddfedcbc6708b29a3c2d95b2a088b2517227de4e7aaadb5fff937fd3",
+      "category": "machine-sentinel",
+      "rationale": "Pins a machine-consumed marker or protocol delimiter, not authored instruction prose.",
+      "path": "packages/omo-codex/plugin/components/rules/test/bundled-rules.test.ts",
+      "expected": "BUNDLED_PERSONA_SENTINEL"
+    },
+    {
+      "fingerprint": "3189855a8bab8d725054acb366d5e8f748f6f7ffce278a4b8051794ee3a462f4",
+      "category": "machine-sentinel",
+      "rationale": "Pins a machine-consumed marker or protocol delimiter, not authored instruction prose.",
+      "path": "packages/omo-codex/plugin/components/rules/test/windows-git-bash-bundled-rule.test.ts",
+      "expected": "OMO_CODEX_GIT_BASH_PATH"
+    },
+    {
+      "fingerprint": "18c0eb4f043894e4ec1eb4e2b2a28ea84bee4caf701a8eb9d5eed1a573bacc82",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/omo-codex/plugin/components/ultrawork/test/directive-source.test.ts",
+      "expected": "<expression:directive>"
+    },
+    {
+      "fingerprint": "4667a3b69f5379590e3b351adec07fb8b44c2878906f91ecfe9935ee71cdfcb2",
+      "category": "machine-sentinel",
+      "rationale": "Pins a machine-consumed marker or protocol delimiter, not authored instruction prose.",
+      "path": "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts",
+      "expected": "OMO_ULW_LOOP_STEER"
+    },
+    {
+      "fingerprint": "31e71826631a223b601a7835acfae5fafe2d3f118a4b72fab82da588e632443a",
+      "category": "machine-sentinel",
+      "rationale": "Pins a machine-consumed marker or protocol delimiter, not authored instruction prose.",
+      "path": "packages/omo-opencode/src/agents/agent-identity.test.ts",
+      "expected": "</agent-identity>"
+    },
+    {
+      "fingerprint": "c3ac32a13b2822ceca90e39a7e20334735e655904ebbb6b2d1fbc7d950d9cc95",
+      "category": "machine-sentinel",
+      "rationale": "Pins a machine-consumed marker or protocol delimiter, not authored instruction prose.",
+      "path": "packages/omo-opencode/src/agents/agent-identity.test.ts",
+      "expected": "</agent-identity>"
+    },
+    {
+      "fingerprint": "2f0944e3dccb009bf81cc3e971f54aafb2969c260820dabdc020e266f06ad2b3",
+      "category": "machine-sentinel",
+      "rationale": "Pins a machine-consumed marker or protocol delimiter, not authored instruction prose.",
+      "path": "packages/omo-opencode/src/agents/agent-identity.test.ts",
+      "expected": "<agent-identity>"
+    },
+    {
+      "fingerprint": "c26c8a5fbc446d55c9c2b41b6860edb38151ae633a8ab3f0eb202a06d29d29c8",
+      "category": "machine-sentinel",
+      "rationale": "Pins a machine-consumed marker or protocol delimiter, not authored instruction prose.",
+      "path": "packages/omo-opencode/src/agents/agent-identity.test.ts",
+      "expected": "<agent-identity>"
+    },
+    {
+      "fingerprint": "93c02b9fd6dd4d7d5c148e0a9b5ecf614dab6c3e61036323f03d7b95917f5e88",
+      "category": "machine-sentinel",
+      "rationale": "Pins a machine-consumed marker or protocol delimiter, not authored instruction prose.",
+      "path": "packages/omo-opencode/src/agents/agent-identity.test.ts",
+      "expected": "SENTINEL_APPEND_CONTENT"
+    },
+    {
+      "fingerprint": "bbce229bcbd732b43c84998f6f0835308d9cef2509d066fd3810b3df81fcb9aa",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "[WARNING: Could not resolve file URI"
+    },
+    {
+      "fingerprint": "8eb64d9a3d9128dcf149068859e0ebbb118c0d867b0cd37b10831611235f20c4",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "[WARNING: Malformed file URI"
+    },
+    {
+      "fingerprint": "3e25f624b869adfd1999087f1ae6f56e5d389dbf86e32efc9a0b5b10e4f7db04",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "[WARNING: Path rejected:"
+    },
+    {
+      "fingerprint": "3ad07d5a4f0d6d556434843daf17fc386efc093b4fcab5d6fe8ddf1564c16ceb",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "absolute-content"
+    },
+    {
+      "fingerprint": "e5961ad35de81208de33b9cfa9a30a1e5db60deb663901e414d63443fb0bc5f8",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "absolute-content"
+    },
+    {
+      "fingerprint": "51a4f5c9c06fe0143d0dbd4e5c9c4211615c532daf83ba35a0620fb104acdf40",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "encoded-content"
+    },
+    {
+      "fingerprint": "5cd29241a331411079efe0a08e239520b192c0e2e4f8101ac6ae957a27a9ee33",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "escaped-content"
+    },
+    {
+      "fingerprint": "9c9d8c5a230d7a4e407029f04498d825287622eeca98233c23b40b164038992e",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "home-prompt-content"
+    },
+    {
+      "fingerprint": "d6e2247b03b61b055b2cd7f480810f5605e3dbacf806f9955040eceb0b631628",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "relative-content"
+    },
+    {
+      "fingerprint": "65ecfcca88f780ac459c6d844072a471667c88871dd94cd6886c302518b52bca",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/agents/builtin-agents/resolve-file-uri.test.ts",
+      "expected": "secret-content"
+    },
+    {
+      "fingerprint": "364727ee22822920269a873b0f4666b55935ba06427b3dd2b900a87dc1c6c4a3",
+      "category": "runtime-behavior",
+      "rationale": "Pins a structured runtime dispatch or boundary payload, not authored prompt prose.",
+      "path": "packages/omo-opencode/src/features/background-agent/spawner.test.ts",
+      "expected": "<expression:promptCalls[0].body.parts>"
+    },
+    {
+      "fingerprint": "ab1b16b4a07915580f1149f0a7caea8365a724dd96f44ce00152f5c3fe48be85",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/omo-opencode/src/features/builtin-skills/shared-skill-extraction.test.ts",
+      "expected": "<expression:source.template>"
+    },
+    {
+      "fingerprint": "7804258b35a766cc80a48eed9467469976362946a4ade43430539ff85d94919b",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/omo-opencode/src/features/builtin-skills/skill-file-loader.test.ts",
+      "expected": "<expression:body>"
+    },
+    {
+      "fingerprint": "97569417c8a488520f5f44039b4a909eaf0e7cb7e4c98d9934c377f0367264e2",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/omo-opencode/src/features/builtin-skills/skill-file-loader.test.ts",
+      "expected": "<expression:body>"
+    },
+    {
+      "fingerprint": "ebc3012c204bbde45e6a1a69504d0c5f028aef677fbb2628558ec1d336785ece",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "JSON agent prompt."
+    },
+    {
+      "fingerprint": "82138877cf078b768edd81b3179bc14e9c8510aa9c90f8cc16e9d0dad1372773",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "JSONC prompt."
+    },
+    {
+      "fingerprint": "eac4f9a0a13fba7627ee0533d2e4e3011ce2cc2d94fbac30316bb88e17111469",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "Markdown agent prompt."
+    },
+    {
+      "fingerprint": "933f869124619d37d123c03d697b2bf31846a134991cbf72fb6fbf4ab584b7b0",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "Prompt."
+    },
+    {
+      "fingerprint": "a9d292e2413f71d59aca8d3ebd8db7e2822dcbf7ae31e16e329ab8763bbe00b0",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "Second prompt."
+    },
+    {
+      "fingerprint": "0985331b5a771de90ddceb25a7eadcb5db4d05c2192b51da9d9ea274f60f6630",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/agent-definitions-loader.test.ts",
+      "expected": "You are a test agent."
+    },
+    {
+      "fingerprint": "c91a679fbcbfc8e71cd8c65f59f7983aa4a28a2f77fba96a87281a0f4576dcde",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/json-agent-loader.test.ts",
+      "expected": "You are a test agent."
+    },
+    {
+      "fingerprint": "220b7d7bc2fd9ea1b2c7cfb764ade2df6c1a89594b5c328069dafc736215c184",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/loader.test.ts",
+      "expected": "Just a prompt with no frontmatter."
+    },
+    {
+      "fingerprint": "9d0bfa5df972d6bfd21a4819435e2a5e98ec20062ebc56c04727e579c92222d0",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/loader.test.ts",
+      "expected": "You are a test agent."
+    },
+    {
+      "fingerprint": "7c1c3d7c07b0264f545485ca5e128d987bcc9fae7d4d0d3de7b22303dea0063a",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "Fallback prompt"
+    },
+    {
+      "fingerprint": "5cf601888e5d565d72d5cb7e247c7644b8fb39374b70833c49352f912d8da923",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "Inline prompt"
+    },
+    {
+      "fingerprint": "b989c1212391e6792efd1ea05cada6cf69921e580994edfd5e8a6a1e164b59e6",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "Test prompt"
+    },
+    {
+      "fingerprint": "0f921aae348c4011aa661ffeb13dc67abde072e43755d31e191976702d4ceabd",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/omo-opencode/src/features/claude-code-agent-loader/opencode-config-agents-reader.test.ts",
+      "expected": "You are a helpful assistant"
+    },
+    {
+      "fingerprint": "12a74f6693703787d1bc7ff1d23d6b46fefc6b18f740475b9968ac8a99b5a0d2",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "(category default)"
+    },
+    {
+      "fingerprint": "1c9c70b7a3971b67b14de15f56b1b340e473191e01a33de1cfd1715c1fb104a9",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "(claude-sonnet-4-6)"
+    },
+    {
+      "fingerprint": "00ee97f860ffd934068e5d94f421ab13317d40a1efacf682561fcaf5d21c1cff",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "(inherited from parent)"
+    },
+    {
+      "fingerprint": "05c9948cb83f0eb5f4d8e6ef2a87e02a6c227c2e50d355ca0a4049ab987088c8",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "(inherited)"
+    },
+    {
+      "fingerprint": "dcef37ba1896d760d6adf3d1c6af0a05862f3e257c4bfa3bc1f7cbf62de9a047",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "(runtime fallback)"
+    },
+    {
+      "fingerprint": "cb2156412d5000cebb875b33be763cfca48fb00c01242a56623514fb88a3344f",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "(system default fallback)"
+    },
+    {
+      "fingerprint": "9332164a60299d23073ef186ddccccd0107a19687f4a41799aa87009264b33dd",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "(system default)"
+    },
+    {
+      "fingerprint": "9704153968231d56681011d8352a4e296b9c3dc896474ab3a1065d6c85957e57",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "/\\d+\\/\\d+/"
+    },
+    {
+      "fingerprint": "7dc9c8d0d116c06b1d1db8504a9ba2a57160c2d58e2f0324d62e7a699833813c",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "Running (1):"
+    },
+    {
+      "fingerprint": "647d6816355b3f7763a8ab08c74f65e40d1a524784aa0fbe904217584e9039bc",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "Running (3):"
+    },
+    {
+      "fingerprint": "ae40d6081a82b268318d021db1e9dec0a45f96a72631bb07e616cbe3bb18c6c6",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "Skills:"
+    },
+    {
+      "fingerprint": "09efd51f4a4f1e2c56197f03d8b284d9cee0693551542b13e34ed960e21be812",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "[FALLBACK]"
+    },
+    {
+      "fingerprint": "c3e297cc7408f2e08b36a539883606a037097f980a6a0cf3bb37dad4d012ec2c",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "[FALLBACK]"
+    },
+    {
+      "fingerprint": "5f1ac61681d7169bce50f327c76edaf9165487e70018141462b69f8ef51db1b3",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "[FALLBACK] Model:"
+    },
+    {
+      "fingerprint": "88eeb07262e3aa6a97ea13602cd180cf5e1d34a09cdbcd118a40f3ab4b5187a2",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "anthropic/claude-sonnet-4-6"
+    },
+    {
+      "fingerprint": "1b686f7e41652f3fe40e9ac60ffdf97cd33d139ff2d6a444263d188836f4750e",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "anthropic/oswe-vscode-prime"
+    },
+    {
+      "fingerprint": "6c77d3803a54d329df306fb1023bf1cee9b38751aab41b62bb70633efccc649b",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "claude-haiku-4-5: quick"
+    },
+    {
+      "fingerprint": "648fc3229d6dff831b6fed959eb28c3edae2439465154c2e1bf42d32c7257273",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "cliproxy/claude-opus-4-7"
+    },
+    {
+      "fingerprint": "fb98c2aa6e15893079af46710834978543b92f3ace36374408c1976404a084e0",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "frontend"
+    },
+    {
+      "fingerprint": "96fc08a376dcc7d729dfb74e9c19ac369d50ece63123dddbb6d282124e0c3628",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "gemini-3.1-pro: visual-engineering"
+    },
+    {
+      "fingerprint": "e5ff29505922bf20fc1640b6921b0636ce00ddc26855c73fdfc19b37e992cef7",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "git-master"
+    },
+    {
+      "fingerprint": "f34843fd10df757a043db940aa41b3bdaa73cc7e4d1745a92c666601b4e2b325",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "gpt-5.4: deep"
+    },
+    {
+      "fingerprint": "7954656f00fdba845a33cb5956920155a1b04cff4a14b6a18e5544a1e32501eb",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "nvidia/stepfun-ai/step-3.5-flash"
+    },
+    {
+      "fingerprint": "25bd776ace21f70bdc6351654321f32a086901920baaa620ccbd7d77c930816d",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "playwright"
+    },
+    {
+      "fingerprint": "433213bf281990ed969c7209c4840e2564fd9af66f9b54764b6f4b6c1501ca0d",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "sisyphus-junior/deep"
+    },
+    {
+      "fingerprint": "bcf16301d0ec2ef88b15f10b53a67097022cdf705a5ac8dc7024afb5c4f1f51c",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-opencode/src/features/task-toast-manager/manager.test.ts",
+      "expected": "sisyphus-junior/quick"
+    },
+    {
+      "fingerprint": "b03c48f60a657247649f0e1222154648ddbb2fa33302380cbb9fc3dc42473f70",
+      "category": "security-boundary",
+      "rationale": "Pins rejection or sanitization behavior at a security boundary, including the surfaced warning.",
+      "path": "packages/omo-opencode/src/hooks/claude-code-hooks/execute-http-hook-security.test.ts",
+      "expected": "HTTP hook URL must use HTTPS"
+    },
+    {
+      "fingerprint": "b1f44e1520b4767b132120d0b0fcd364c86f4ccdf109109a50f46d50acd6bce0",
+      "category": "runtime-behavior",
+      "rationale": "Pins a structured runtime dispatch or boundary payload, not authored prompt prose.",
+      "path": "packages/omo-opencode/src/hooks/shared/prompt-async-gate.test.ts",
+      "expected": "<expression:{ status: \"dispatched\", response: { accepted: true, sessionID: \"ses_bound_prompt\" }, }>"
+    },
+    {
+      "fingerprint": "eff304313b0223dd131cfb187898322f53a72609e124a99beb7ff75847e5a01e",
+      "category": "runtime-behavior",
+      "rationale": "Pins a structured runtime dispatch or boundary payload, not authored prompt prose.",
+      "path": "packages/omo-opencode/src/hooks/shared/prompt-async-gate.test.ts",
+      "expected": "<expression:{ status: \"dispatched\", response: { accepted: true, sessionID: \"ses_bound_prompt_async\" }, }>"
+    },
+    {
+      "fingerprint": "6bdac6f3d0e5e9e246e4e493d37105e1c68682415b31861a20da3010dabdecac",
+      "category": "runtime-behavior",
+      "rationale": "This literal is an input payload fixture used to exercise category resolution; it does not assert emitted instruction wording.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver-unknown-category.test.ts",
+      "expected": "test prompt"
+    },
+    {
+      "fingerprint": "1e67e10459d621257a615125c1efb9911fb1876cab676925b8533a481444103f",
+      "category": "runtime-behavior",
+      "rationale": "This literal is an input payload fixture used to exercise category resolution; it does not assert emitted instruction wording.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "test prompt"
+    },
+    {
+      "fingerprint": "783e594b40e5e998b4fe37d4f8d959b1e3919d5bac996bca1a1b6f16bda6ee6d",
+      "category": "runtime-behavior",
+      "rationale": "This literal is an input payload fixture used to exercise category resolution; it does not assert emitted instruction wording.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "test prompt"
+    },
+    {
+      "fingerprint": "9579a46b1ba83649e0118140eaaa1407268128c043871ea461a53f4d93627ad0",
+      "category": "runtime-behavior",
+      "rationale": "This literal is an input payload fixture used to exercise category resolution; it does not assert emitted instruction wording.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "test prompt"
+    },
+    {
+      "fingerprint": "bc0a705f379eea1ace73dd61a0e1110f6170126cfe9327ed688ddcd9d0d42d84",
+      "category": "runtime-behavior",
+      "rationale": "This literal is an input payload fixture used to exercise category resolution; it does not assert emitted instruction wording.",
+      "path": "packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts",
+      "expected": "test prompt"
+    },
+    {
+      "fingerprint": "bb8086d3ddc7250cd0e489621bbe1b0895303905931d90c52e74d466835de535",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/omo-senpi/src/components/fallback-architect/tip-message.test.ts",
+      "expected": "should not wear you down"
+    },
+    {
+      "fingerprint": "5e0d89b9d3a7b838926ddddf96639b288151f931b610c374c7267fd5cfaf4f87",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/omo-senpi/src/skills-sync.test.ts",
+      "expected": "<expression:[...expectedSkillNames].sort()>"
+    },
+    {
+      "fingerprint": "d9898eaf9d116c1f2b5d6e54dc336b4288e3a0252ba7dd6a672af28e0da929ea",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/omo-senpi/src/skills-sync.test.ts",
+      "expected": "<expression:listDirectoryNames(skillsRoot)>"
+    },
+    {
+      "fingerprint": "66adccca1f3fb6a0404a65cbe6d2e4c84921f7ce1236727063bff43a4f1c3a78",
+      "category": "runtime-behavior",
+      "rationale": "Pins a structured runtime dispatch or boundary payload, not authored prompt prose.",
+      "path": "packages/senpi-task/src/tools/task/argument-normalization.test.ts",
+      "expected": "<expression:{ prompt: \"TASK: Audit the task tool boundary.\", description: \"Audit task tool\", subagent_type: \"explore\", run_in_background: true, name: \"task-padding-audit\", }>"
+    },
+    {
+      "fingerprint": "54a4b0f3b27c3c3448215edab544826f3921b2568a8a7f54d4b807fc273908a8",
+      "category": "user-ui-error",
+      "rationale": "Pins user-visible UI, status, notice, or error copy rather than an agent instruction contract.",
+      "path": "packages/senpi-task/src/tools/task/renderers.test.ts",
+      "expected": "prompt:"
+    },
+    {
+      "fingerprint": "d238ab734d38d735473db43c39a0d0bb5d0e698f31cec578e47de77b05eb434e",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/shared-skills/materialize-frontend-refs.test.ts",
+      "expected": "<expression:upstream>"
+    },
+    {
+      "fingerprint": "0bb1fbf003031603eb7cb95f64916eee0c660989398eab15d6f7ca6b0b84acc1",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/skills-loader-core/src/features/builtin-skills/shared-skill-extraction.test.ts",
+      "expected": "<expression:sharedSkill>"
+    },
+    {
+      "fingerprint": "d19d47ef21e2331bdc23b8ec4f841d85c0ebaaddce932952ae6a6a1eb543f3f4",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/skills-loader-core/src/features/builtin-skills/shared-skill-extraction.test.ts",
+      "expected": "<expression:source.template>"
+    },
+    {
+      "fingerprint": "676532f5cee78f4463c5f69d986f6f1aa4d985580d819476210b614c65fda087",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/skills-loader-core/src/features/builtin-skills/skill-file-loader.test.ts",
+      "expected": "<expression:body>"
+    },
+    {
+      "fingerprint": "b26692be34a2d59c87424065a607b73aa1f97f1be5f601d3fd5cb6a8b5cc7165",
+      "category": "shipped-copy-equality",
+      "rationale": "Verifies identity or byte-equivalent materialization from the checked-in shipped source.",
+      "path": "packages/skills-loader-core/src/features/builtin-skills/skill-file-loader.test.ts",
+      "expected": "<expression:body>"
+    },
+    {
+      "fingerprint": "8d1de588ab68f38bd3df976e036b6286007775193f9baa9f859d673854154afe",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/utils/src/frontmatter.test.ts",
+      "expected": "Body content"
+    },
+    {
+      "fingerprint": "78eca4c41779283f5ddcf9c8e1f4a824aaffbbe855cdf64ec0f3591234e9b34d",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/utils/src/frontmatter.test.ts",
+      "expected": "Execute planning workflow"
+    },
+    {
+      "fingerprint": "ffaa26000834db4f7d463255e20915a9537e501af24acf38cc58f063df5d9b08",
+      "category": "parser-fixture",
+      "rationale": "Asserts a parser fixture field or normalized parser output rather than shipped instruction wording.",
+      "path": "packages/utils/src/frontmatter.test.ts",
+      "expected": "should not fail"
+    },
+    {
+      "fingerprint": "95db63b74234686749c4e2e0eb6f9587bf77be4c8586d9a664105eb0a5f4ec66",
+      "category": "runtime-behavior",
+      "rationale": "Pins a structured runtime dispatch or boundary payload, not authored prompt prose.",
+      "path": "packages/utils/src/prompt-async-gate.test.ts",
+      "expected": "<expression:{ status: \"dispatched\", response: { accepted: true, sessionID: \"ses_bound_prompt\" }, }>"
+    },
+    {
+      "fingerprint": "225ef1764bab72e5a63d9c4166bd2fe79fff8ecae613f29ef4b09e78bfd508e0",
+      "category": "runtime-behavior",
+      "rationale": "Pins a structured runtime dispatch or boundary payload, not authored prompt prose.",
+      "path": "packages/utils/src/prompt-async-gate.test.ts",
+      "expected": "<expression:{ status: \"dispatched\", response: { accepted: true, sessionID: \"ses_bound_prompt_async\" }, }>"
+    }
+  ],
+  "forbidden": []
+}

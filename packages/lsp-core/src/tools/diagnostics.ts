@@ -1,4 +1,4 @@
-import { isDirectoryPath, resolvePathInsideContext, withLspClient } from "../lsp/client-wrapper.js";
+import { isDirectoryPath, resolveReadablePathInsideContext, withLspClient } from "../lsp/client-wrapper.js";
 import { DEFAULT_MAX_DIAGNOSTICS } from "../lsp/constants.js";
 import { aggregateDiagnosticsForDirectory } from "../lsp/directory-diagnostics.js";
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "../lsp/formatters.js";
@@ -23,7 +23,7 @@ export async function executeLspDiagnostics(
 	const severity = severityFilter(params);
 
 	try {
-		const absPath = resolvePathInsideContext(filePath);
+		const absPath = resolveReadablePathInsideContext(filePath);
 		if (isDirectoryPath(absPath)) {
 			const extension = inferExtensionFromDirectory(absPath);
 			if (!extension) {
@@ -62,7 +62,7 @@ export async function executeLspDiagnostics(
 
 		const result = await withLspClient(
 				filePath,
-				async (client) => client.diagnostics(filePath, signal),
+				async (client, _workspaceRoot, resolvedFilePath) => client.diagnostics(resolvedFilePath, signal),
 				"diagnostics",
 				clientOptions(signal),
 			);

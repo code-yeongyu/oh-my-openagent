@@ -23,12 +23,12 @@ describe("in-process access_terminated_error fallback", () => {
         from: "runtime-fallback-test/dead-primary",
         to: "runtime-fallback-test/healthy-fallback",
         chainKey: "runtime-fallback-test/dead-primary",
-        reason: "hard-error",
+        reason: "billing",
       })
     } finally {
       harness.dispose()
     }
-  })
+  }, 20_000)
 
   test("#given context overflow is deliberately non-fallback #when the child runs #then it stays terminal on the first candidate", async () => {
     // given

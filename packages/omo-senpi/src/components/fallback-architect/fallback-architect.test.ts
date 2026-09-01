@@ -171,6 +171,47 @@ describe("fallback-architect component", () => {
     })
   })
 
+  describe("#given the default gate and a live model registry in the event context", () => {
+    describe("#when a refusal fallback happens", () => {
+      it("#then the gate receives the registry from the event context", async () => {
+        const pi = new FakeExtensionAPI()
+        let seenRegistry: unknown
+        const registry = { getAvailable: () => [FABLE], find: () => FABLE }
+        const component = createFallbackArchitectComponent({
+          hasArchitectCategory: (_cwd: string, gateRegistry?: unknown) => {
+            seenRegistry = gateRegistry
+            return true
+          },
+        })
+        await component.register(pi, createTestContext(pi))
+        await endMessage(pi, refusalMessage())
+        await pi.dispatch(
+          "model_select",
+          { type: "model_select", model: OPUS, previousModel: FABLE, source: "fallback" },
+          { cwd: "/tmp/project", modelRegistry: registry },
+        )
+        expect(seenRegistry).toBe(registry)
+        expect(directives(pi)).toHaveLength(1)
+      })
+
+      it("#then a context without a registry still gates on config alone", async () => {
+        const pi = new FakeExtensionAPI()
+        let seenRegistry: unknown
+        const component = createFallbackArchitectComponent({
+          hasArchitectCategory: (_cwd: string, gateRegistry?: unknown) => {
+            seenRegistry = gateRegistry
+            return true
+          },
+        })
+        await component.register(pi, createTestContext(pi))
+        await endMessage(pi, refusalMessage())
+        await selectModel(pi, { model: OPUS, previousModel: FABLE, source: "fallback" })
+        expect(seenRegistry).toBeUndefined()
+        expect(directives(pi)).toHaveLength(1)
+      })
+    })
+  })
+
   describe("#given the component is disabled by flag", () => {
     describe("#when a refusal fallback happens and the user prompts again", () => {
       it("#then neither the directive nor a reminder is injected", async () => {

@@ -1,6 +1,6 @@
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
-import { truncateToWidth } from "@earendil-works/pi-tui"
 
+import { piTui } from "../../lazy/pi-tui"
 import type { TaskToolDetails, TaskToolItemDetail } from "./types"
 import {
   formatTaskMode,
@@ -59,6 +59,7 @@ export function renderTaskResultLines(details: TaskToolDetails, theme: RendererT
 }
 
 export function renderTaskResultComponent(details: TaskToolDetails, theme: RendererTheme): LinesComponent {
+  const { truncateToWidth } = piTui()
   return {
     render: (width: number): string[] => {
       if (width <= 0) return [""]
@@ -75,6 +76,7 @@ export function renderTaskResultComponent(details: TaskToolDetails, theme: Rende
 }
 
 export function linesComponent(lines: readonly string[] | WidthAwareLines): LinesComponent {
+  const { truncateToWidth } = piTui()
   return {
     render: (width: number): string[] => {
       const widthAware = typeof lines === "function"
@@ -178,6 +180,7 @@ function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
   const reason = optionalRendererText(details.reason)
   return [
     taskId === undefined ? undefined : `id:${taskId}`,
+    ...runStatsResultTokens(details.run_stats),
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
   ].filter((token): token is string => token !== undefined)

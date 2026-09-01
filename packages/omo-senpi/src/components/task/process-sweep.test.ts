@@ -8,7 +8,8 @@ import { sweepStaleLspDaemonVersions } from "@oh-my-opencode/utils/process-sweep
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { resolveSenpiDaemonRuntime } from "../lsp/daemon-runtime"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
-import { SENPI_RPC_CHILD_MARKER_ENV, wireSessionStartProcessSweep } from "./process-sweep"
+import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
+import { wireSessionStartProcessSweep } from "./process-sweep"
 
 interface RecordedLog {
   level: "info" | "warn" | "error"
@@ -52,7 +53,6 @@ describe("wireSessionStartProcessSweep()", () => {
       env: {},
       resolveDaemonVersion: () => "9.8.7",
       familySweeps: {
-        sweepCodegraph: async () => undefined,
         sweepLspProxies: async () => undefined,
         sweepStaleLspDaemons: async (options) => {
           resolveStaleSweep(options.currentVersion)
@@ -101,7 +101,6 @@ describe("wireSessionStartProcessSweep()", () => {
           version: "0.1.0",
         }).version,
       familySweeps: {
-        sweepCodegraph: async () => undefined,
         sweepLspProxies: async () => undefined,
         sweepStaleLspDaemons: async ({ currentVersion }) => {
           resolveVersion(currentVersion)
@@ -162,9 +161,6 @@ describe("wireSessionStartProcessSweep()", () => {
         throw new Error("packaged daemon metadata is unreadable")
       },
       familySweeps: {
-        sweepCodegraph: async () => {
-          completedFamilies.push("codegraph")
-        },
         sweepLspProxies: async () => {
           completedFamilies.push("lsp-proxies")
           resolveCleanup()
@@ -185,7 +181,7 @@ describe("wireSessionStartProcessSweep()", () => {
         setTimeout(() => reject(new Error("unrelated cleanup families did not complete")), 1_000)
       }),
     ])
-    expect(completedFamilies).toEqual(["codegraph", "lsp-proxies"])
+    expect(completedFamilies).toEqual(["lsp-proxies"])
     expect(logger.entries).toContainEqual({
       level: "warn",
       message: "lsp-daemon stale-version sweep skipped: packaged daemon metadata is unreadable",
@@ -218,7 +214,7 @@ describe("wireSessionStartProcessSweep()", () => {
     const logger = createLogger()
     let sweepCalls = 0
     wireSessionStartProcessSweep(pi, ctxFor(logger), {
-      env: { [SENPI_RPC_CHILD_MARKER_ENV]: "/tmp/child-session" },
+      env: { [OMO_SENPI_TASK_RPC_CHILD]: "1" },
       sweep: async () => {
         sweepCalls += 1
       },

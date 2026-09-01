@@ -32,6 +32,12 @@ export type CompletionDetails = {
   readonly final_response: string
   readonly final_response_file?: string
   readonly continuation_hint: string
+  // Present only when the completed task was a DAG node child, so the parent can address the exact
+  // node it must re-verify or correct.
+  readonly dag?: {
+    readonly run_id: string
+    readonly node_id: string
+  }
 }
 
 // Structurally compatible with senpi sendMessage(Pick<CustomMessage,"customType"|"content"|"display"|
@@ -56,6 +62,9 @@ export type CompletionNotifierStore = {
   readonly load: (taskId: string) => TaskRecord | null
   readonly list: () => ListTaskRecordsResult
   readonly replace: (record: TaskRecord) => void
+  // Locked re-read + conditional write. Notification bookkeeping MUST go through this so a
+  // concurrent residency/host_pid claim is never erased by a stale whole-record replace.
+  readonly mutate: (taskId: string, mutation: (record: TaskRecord) => TaskRecord) => TaskRecord | null
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
 }
 
@@ -92,10 +101,13 @@ export type FlushInput = {
   readonly replaced: boolean
 }
 
-export type ReconcileFailedNotificationsInput = {
+export type ReconcileUnnotifiedNotificationsInput = {
   readonly sessionId: string
   readonly parentState: ParentState
 }
+
+/** @deprecated Pre-rename alias kept for the omo-senpi caller until todo 18 updates it. */
+export type ReconcileFailedNotificationsInput = ReconcileUnnotifiedNotificationsInput
 
 export type FlushResult =
   | { readonly kind: "flushed"; readonly count: number }
@@ -106,6 +118,8 @@ export type FlushResult =
 export type CompletionNotifier = {
   notifyTerminal(request: CompletionRequest): NotifyResult
   flushBuffered(input: FlushInput): FlushResult
-  reconcileFailedNotifications(input: ReconcileFailedNotificationsInput): void
+  reconcileUnnotifiedNotifications(input: ReconcileUnnotifiedNotificationsInput): void
+  /** Thin alias of reconcileUnnotifiedNotifications for the pre-rename omo-senpi caller (todo 18). */
+  reconcileFailedNotifications(input: ReconcileUnnotifiedNotificationsInput): void
   bufferedCount(sessionId: string): number
 }
