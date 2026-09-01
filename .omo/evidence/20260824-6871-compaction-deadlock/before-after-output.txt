@@ -1,0 +1,5 @@
+[BEFORE FIX (no recovery component registered)]
+  guidance messages emitted: 0
+[AFTER FIX (compaction-recovery registered)]
+  applyCompaction CALLED firstKeptEntryId=e0
+  guidance messages emitted: 0
