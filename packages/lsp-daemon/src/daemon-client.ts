@@ -16,6 +16,7 @@ import { ensureDaemonRunning } from "./ensure-daemon.js";
 import { authEnvelope, isAuthErrorResponse, readAuthToken } from "./ipc-protocol.js";
 import { type DaemonPaths, daemonPaths } from "./paths.js";
 import { CONTEXT_KEY } from "./request-routing.js";
+import { isIdempotentTool } from "./retryable-tools.js";
 import { createLineDecoder, encodeJsonLine } from "./socket-jsonrpc.js";
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
@@ -202,8 +203,14 @@ function sendToolCall(
 			});
 		});
 		socket.on("data", (chunk) => decoder.push(chunk));
-		socket.once("error", (error) => finish(() => reject(new DaemonRequestError(error.message, false))));
-		socket.once("close", () => finish(() => reject(new DaemonRequestError("daemon connection closed", false))));
+		socket.once("error", (error) =>
+			finish(() => reject(new DaemonRequestError(error.message, requestWritten && !isIdempotentTool(name)))),
+		);
+		socket.once("close", () =>
+			finish(() =>
+				reject(new DaemonRequestError("daemon connection closed", requestWritten && !isIdempotentTool(name))),
+			),
+		);
 	});
 }
 
@@ -226,5 +233,5 @@ function allocateProxyRequestId(): number {
 }
 
 function isRetryableTool(name: string): boolean {
-	return name !== "rename" && name !== "lsp_rename";
+	return isIdempotentTool(name);
 }
