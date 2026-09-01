@@ -1,0 +1,38 @@
+WHAT WAS TESTED
+
+- Enumerated every changed non-deleted `.ts`, `.tsx`, `.mts`, `.cts`, `.js`,
+  `.mjs`, and `.cjs` file.
+- Queried `lsp_diagnostics(severity=all)` for all 150 files through a temporary
+  gitignored in-workspace symlink to the task worktree.
+- Re-ran diagnostics on every changed non-generated source/helper file:
+  - `packages/omo-codex/plugin/test/aggregate-plugin-fixture.mjs`
+  - `packages/omo-opencode/src/agents/atlas/agent.ts`
+  - `packages/omo-opencode/src/hooks/atlas/idle-event.ts`
+  - `packages/omo-opencode/src/hooks/atlas/system-reminder-templates.ts`
+
+WHAT WAS OBSERVED
+
+- Initial all-file pass: 98 files returned `No diagnostics found`.
+- All four changed source/helper files returned `No diagnostics found` on the
+  final authoritative pass.
+- The remaining test/generated-file responses were symlink project-inference
+  failures (`bun:test` not resolved), 3-second freshness timeouts, generated
+  bundle hints, or non-blocking unused-code hints. They did not correspond to
+  package typecheck failures.
+- Full affected package typechecks and focused suites are green, including
+  OpenCode, Codex components, Senpi, senpi-task, and changed core packages.
+
+WHY IT IS ENOUGH
+
+The language server was invoked for every changed JavaScript/TypeScript file,
+and every changed source/helper file is clean. Test-file project inference
+through the temporary symlink is not authoritative for this multi-package Bun
+workspace, so clean package typechecks and the final focused test suites are
+the faithful fallback for those files.
+
+CLEANUP RECEIPT
+
+Removed:
+`<lsp-worktree>`
+
+Verified the path is neither a symlink nor a filesystem entry.

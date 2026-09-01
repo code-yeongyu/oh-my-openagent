@@ -18,9 +18,11 @@ function isPowerShellZipEntryRecord(value: unknown): value is PowerShellZipEntry
 
 	const candidate = value as Record<string, unknown>
 	return (
-		(candidate.type === "file" || candidate.type === "directory" || candidate.type === "symlink") &&
-		typeof candidate.name === "string" &&
-		typeof candidate.target === "string"
+		(candidate["type"] === "file" ||
+			candidate["type"] === "directory" ||
+			candidate["type"] === "symlink") &&
+		typeof candidate["name"] === "string" &&
+		typeof candidate["target"] === "string"
 	)
 }
 

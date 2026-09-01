@@ -1,0 +1,92 @@
+TASK 15 - Crash-safe completion notification reconciliation
+Plan: .omo/plans/subagent-session-resume-revival.md (todo 15)
+Scope: packages/senpi-task/src/completion/ (+ type-forced conformance fixes in chaos-invariants.ts,
+team/fallback-notification.test.ts, omo-senpi session-transition-bridge.test.ts, task-component.test.ts)
+
+================================================================================
+RED (failing first, captured before production code)
+================================================================================
+New test file packages/senpi-task/src/completion/notifier-reconcile-unnotified.test.ts written first.
+`bun test packages/senpi-task/src/completion` -> 51 pass, 8 fail:
+  - 6 reconcile-selection tests failed: completion.reconcileUnnotifiedNotifications is not a function
+  - 2 sibling-race tests failed for the RIGHT reason against the old whole-record replace:
+      (fail) #given a residency claim lands between read and notified-epoch persist ... #then the claim survives
+      (fail) #given a residency claim lands before a failed-delivery persist ... #then the claim survives
+      219 | expect(persisted?.host_pid).toBe(4242)
+      error: expect(received).toBe(expected)   <- host_pid erased by stale store.replace
+
+================================================================================
+GREEN
+================================================================================
+$ bun test packages/senpi-task/src/completion
+ 60 pass
+ 0 fail
+ Ran 60 tests across 9 files.
+
+$ bun test packages/senpi-task            (full package)
+ 1292 pass
+ 0 fail
+ Ran 1292 tests across 195 files.
+
+$ ./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json
+ (clean, no output)
+
+Chaos bench (exactly-once inv1 included), 3 seed labels = 600 randomized interleavings:
+ $ SEED=senpi-task-w1-chaos bun test packages/senpi-task/src/__adversarial__/chaos-bench.test.ts  -> 1 pass 0 fail
+ $ SEED=alt-seed-2          bun test packages/senpi-task/src/__adversarial__/chaos-bench.test.ts  -> 1 pass 0 fail
+ $ SEED=w4-reconcile        bun test packages/senpi-task/src/__adversarial__/chaos-bench.test.ts  -> 1 pass 0 fail
+
+Chaos regression found and fixed during GREEN (this is why the bench exists):
+ iter 93 seed=3109004448: inv1 parent enqueued 2 times for (task:epoch) st_01a3185c:0
+ Root cause traced via deterministic replay: a completion BUFFERED in-memory behind a transient
+ parent state (notified_epoch still -1) was delivered by reconcileUnnotifiedNotifications AND
+ again by the later flushBuffered - the flush owns delivery of a live buffered (task_id, run_epoch).
+ Fix: reconcile skips records whose (task_id, run_epoch) is still held in the in-memory buffer;
+ it only recovers notifications whose buffer died with the process. Covered by new unit test
+ "#given a completion buffered behind a transient parent state ... reconcile skips it and the
+ flush delivers exactly once". Replay after fix: violations: [].
+
+================================================================================
+QA (auxiliary) - real record store on a temp state dir
+================================================================================
+happy = simulated crash (buffer lost, store shows unnotified terminal) -> resume delivers exactly one
+failure = duplicate reconcile run -> zero double-delivery
+
+$ bun /tmp/qa-task-15.ts
+PASS A buffers the completion while parent is compacting (expected 1, got 1)
+PASS A persists nothing before the crash (expected -1, got -1)
+PASS B starts with an empty (crash-fresh) buffer (expected 0, got 0)
+PASS happy: resume delivers exactly one notification (expected 1, got 1)
+PASS happy: the delivered notification names the crashed child (expected ["st_0a150001"], got ["st_0a150001"])
+PASS happy: the epoch is stamped notified (expected 0, got 0)
+PASS failure: duplicate reconcile runs add zero deliveries (expected 1, got 1)
+PASS failure: crashed process A never delivered anything (expected 0, got 0)
+QA RESULT: ALL PASS
+
+================================================================================
+ADVERSARIAL PROBES
+================================================================================
+cancel_resume (crash-lost buffer recovery): PROBED PASS - QA happy path above: notifier A buffered
+ the completion then "died" (instance discarded, buffer lost); resumed notifier B over the same
+ store delivered exactly one notification and stamped notified_epoch.
+misleading_success_output (epoch patch is conditional mutate, not whole-record replace): PROBED PASS -
+ sibling-race unit tests inject a residency/host_pid claim at persist time; both the delivered-epoch
+ and failed-epoch stamps preserve the claim (host_pid=4242, residency_state=resident survive), which
+ fails against any store.replace-based bookkeeping. persistNotified/recordFailure now patch ONLY
+ notification epochs through store.mutate (locked re-read, every other field untouched), and skip the
+ write entirely when the epoch is already recorded (conditional - no notified_epoch regression).
+concurrency (sibling race): PROBED PASS - same race tests; plus chaos bench 600 interleavings with
+ cross-process ownership actions green on inv1 (exactly-once per (task_id, run_epoch)).
+Other listed probes: N/A.
+
+================================================================================
+NOTES / PRE-EXISTING FAILURES OBSERVED (not caused by this task, not fixed by it)
+================================================================================
+- During execution, HEAD advanced (eaf22a8c6, todo 12) with reconcile.test.ts failing 9/25
+  ("Expected resumed, received lost"); verified pre-existing by running the same file on a clean
+  checkout of eaf22a8c6 without this task's changes. The concurrent todo-13 work later landed fixes;
+  final full-package run above is 1292 pass / 0 fail.
+- packages/omo-senpi/src/components/task/index.test.ts has 3 wiring failures
+  ("context.store.listExpunging is not a function" from lifecycle/ttl.ts) - todo 16/18's in-flight
+  integration (their store interface gained listExpunging; the omo-senpi fake engine store is theirs
+  to update in todo 18). This task's two omo-senpi test files pass: 8 pass / 0 fail.

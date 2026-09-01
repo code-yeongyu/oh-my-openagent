@@ -164,6 +164,21 @@ describe("resolveCodegraphCommand", () => {
     expect(support).toEqual({ major: 22, override: false, supported: true })
   })
 
+  it("#given Homebrew node@22 exists without a PATH alias #when resolving CodeGraph Node runtime #then it selects the keg runtime", () => {
+    // given
+    const node22 = "/opt/homebrew/opt/node@22/bin/node"
+
+    // when
+    const runtime = resolveCodegraphNodeRuntime({
+      fileExists: (filePath: string) => filePath === node22,
+      nodeVersion: (candidate: string) => (candidate === node22 ? "v22.23.0" : "v26.3.1"),
+      which: () => null,
+    })
+
+    // then
+    expect(runtime).toBe(node22)
+  })
+
   it("#given only Node 26 is on PATH #when resolving CodeGraph Node support #then it reports unsupported", () => {
     // given
     const node = "/usr/local/bin/node"

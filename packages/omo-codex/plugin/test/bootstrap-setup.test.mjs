@@ -127,6 +127,47 @@ test("#given a completed first run #when the worker setup runs again #then confi
 	});
 });
 
+test("#given a config.toml that already declares [agents.explorer] at a different path (Orca mirror) #when the worker setup runs #then no second colliding registration is added for that role", async () => {
+	await withSetupFixture(async (fixture) => {
+		const orcaMirrorPath = "/orca-mirrored-home/.codex/agents/explorer.toml";
+		await writeFile(
+			join(fixture.codexHome, "config.toml"),
+			`[marketplaces.sisyphuslabs]\n${MARKETPLACE_SOURCE_LINE}\n\n[agents.explorer]\nconfig_file = "${orcaMirrorPath}"\n`,
+		);
+
+		const outcome = await runWorkerSetup(setupOptions(fixture));
+
+		assert.deepEqual(outcome.degraded, []);
+		const config = await readConfig(fixture);
+		assert.equal(config.match(/\[agents\.explorer\]/g)?.length, 1, "exactly one [agents.explorer] block");
+		assert.ok(
+			config.includes(`[agents.explorer]\nconfig_file = "${orcaMirrorPath}"`),
+			"the pre-existing mirrored entry stays untouched",
+		);
+		assert.ok(
+			!config.includes('config_file = "./agents/explorer.toml"'),
+			"no colliding ./agents registration for the mirrored role",
+		);
+		assert.match(config, /\[agents\.metis\]\nconfig_file = "\.\/agents\/metis\.toml"/);
+		assert.equal(
+			await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8"),
+			BUNDLED_EXPLORER_TOML,
+			"the linked toml is still staged for Codex directory discovery",
+		);
+	});
+});
+
+test("#given a config.toml with no pre-existing agent entries #when the worker setup runs #then all bundled registrations are written", async () => {
+	await withSetupFixture(async (fixture) => {
+		const outcome = await runWorkerSetup(setupOptions(fixture));
+
+		assert.deepEqual(outcome.degraded, []);
+		const config = await readConfig(fixture);
+		assert.match(config, /\[agents\.explorer\]\nconfig_file = "\.\/agents\/explorer\.toml"/);
+		assert.match(config, /\[agents\.metis\]\nconfig_file = "\.\/agents\/metis\.toml"/);
+	});
+});
+
 test("#given a package-relative CodeGraph MCP path #when worker setup runs #then the path is stamped absolute", async () => {
 	await withSetupFixture(async (fixture) => {
 		await writeFile(
@@ -205,21 +246,15 @@ test("#given an unwritable config.toml #when the worker setup runs #then it degr
 	});
 });
 
-test("#given win32 without Git Bash and auto-install skipped #when the worker setup runs #then it degrades instead of throwing and disables the git_bash MCP", async () => {
+test("#given win32 without Git Bash #when the worker setup runs #then it degrades instead of throwing and disables the git_bash MCP", async () => {
 	await withSetupFixture(async (fixture) => {
-		const commands = [];
 		const outcome = await runWorkerSetup(
 			setupOptions(fixture, {
-				env: { OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL: "1" },
 				platform: "win32",
 				resolveGitBash: () => ({ checkedPaths: [], found: false, installHint: "install git bash" }),
-				runCommand: async (command, args) => {
-					commands.push([command, ...args]);
-				},
 			}),
 		);
 
-		assert.deepEqual(commands, []);
 		const gitBashEntries = outcome.degraded.filter((entry) => entry.component === "git-bash");
 		assert.equal(gitBashEntries.length, 1);
 		const config = await readConfig(fixture);

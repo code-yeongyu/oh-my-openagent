@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { PassThrough } from "node:stream";
 
 import { CODEGRAPH_UNSAFE_NODE_ENV } from "../../../../../utils/src/codegraph/node-support.ts";
 import { runCodegraphServe } from "../src/serve.ts";
@@ -11,6 +12,7 @@ describe("runCodegraphServe node support", () => {
 
 		// when
 		const exitCode = await runCodegraphServe({
+			...closedMcpStdio(),
 			env: { PATH: "/bin" },
 			nodeVersion: "26.3.0",
 			buildEnv: () => ({}),
@@ -23,7 +25,7 @@ describe("runCodegraphServe node support", () => {
 		});
 
 		// then
-		expect(exitCode).toBe(1);
+		expect(exitCode).toBe(0);
 		expect(spawned).toEqual([]);
 		expect(stderr).toHaveLength(1);
 		expect(stderr[0]).toContain("CodeGraph MCP skipped");
@@ -31,3 +33,11 @@ describe("runCodegraphServe node support", () => {
 		expect(stderr[0]).toContain(CODEGRAPH_UNSAFE_NODE_ENV);
 	});
 });
+
+function closedMcpStdio(): { readonly stdin: PassThrough; readonly stdout: PassThrough } {
+	const stdin = new PassThrough();
+	const stdout = new PassThrough();
+	stdout.resume();
+	stdin.end();
+	return { stdin, stdout };
+}

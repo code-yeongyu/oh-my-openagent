@@ -173,6 +173,7 @@ export function formatLazyCodexInstallHelp(): string {
     "Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
     "       lazycodex-ai uninstall [--project <path>]",
     "       lazycodex-ai update [--dry-run] [--repo-root <path>]",
+    "       lazycodex-ai doctor [--source-root <path>] [--model <model>] [--json|--status|--verbose]",
     "       lazycodex-ai version",
     "       lazycodex-ai <command> [args...]",
     "",
@@ -180,6 +181,7 @@ export function formatLazyCodexInstallHelp(): string {
     "`uninstall` removes managed Codex Light state; `cleanup` is a backward-compatible alias.",
     "`update` refreshes the installed Codex Light edition in place.",
     "",
-    `Pass-through commands delegated to the omo CLI: ${passthrough}.`,
+    `Commands supported by lazycodex-ai: ${passthrough}.`,
+    "`doctor` runs the Codex LazyCodex doctor workflow; other pass-through commands delegate to the omo CLI.",
   ].join("\n")
 }

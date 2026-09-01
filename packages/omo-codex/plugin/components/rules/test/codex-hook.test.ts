@@ -28,6 +28,7 @@ type SessionCache = {
 };
 
 const CLI_PATH = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
+const COMPONENT_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 function runHookCli(input: string, subcommand = "post-tool-use", env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
 	return new Promise((resolve, reject) => {
@@ -70,6 +71,16 @@ const RULES_ONLY_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: ".omo/rules",
 };
 
+const DYNAMIC_BUNDLED_ONLY_ENV = {
+	CODEX_RULES_MODE: "dynamic",
+	CODEX_RULES_ENABLED_SOURCES: "plugin-bundled",
+	PLUGIN_ROOT: COMPONENT_ROOT,
+};
+
+// Runtime sentinel: the rules hook emits and re-greps this marker when
+// deduplicating injected rules against the transcript (transcript-rule-filter.ts).
+const INSTRUCTIONS_FROM = "Instructions from: ";
+
 afterEach(() => {
 	for (const directory of tempDirectories.splice(0)) {
 		rmSync(directory, { recursive: true, force: true });
@@ -81,20 +92,13 @@ function makeTempProject(): { root: string; pluginData: string } {
 	const pluginData = mkdtempSync(path.join(tmpdir(), "codex-rules-data-"));
 	tempDirectories.push(root, pluginData);
 	writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fixture" }));
-	writeFileSync(path.join(root, "AGENTS.md"), "Project AGENTS.md should stay Codex-native.");
-	writeFileSync(path.join(root, "CLAUDE.md"), "Project CLAUDE.md should stay outside rules hook context.");
-	writeFileSync(path.join(root, "CONTEXT.md"), "Always wear safety goggles when refactoring.");
+	writeFileSync(path.join(root, "AGENTS.md"), "AGENTS_MD_SENTINEL");
+	writeFileSync(path.join(root, "CLAUDE.md"), "CLAUDE_MD_SENTINEL");
+	writeFileSync(path.join(root, "CONTEXT.md"), "CTX_RULE_SENTINEL");
 	mkdirSync(path.join(root, ".omo", "rules"), { recursive: true });
 	writeFileSync(
 		path.join(root, ".omo", "rules", "typescript.md"),
-		[
-			"---",
-			"description: TypeScript",
-			'globs: ["**/*.ts", "**/*.tsx"]',
-			"---",
-			"",
-			"Prefer strict TypeScript for all source files.",
-		].join("\n"),
+		["---", "description: TypeScript", 'globs: ["**/*.ts", "**/*.tsx"]', "---", "", "TS_RULE_SENTINEL"].join("\n"),
 	);
 	mkdirSync(path.join(root, "src"), { recursive: true });
 	writeFileSync(path.join(root, "src", "app.ts"), "export const app = true;\n");
@@ -217,11 +221,10 @@ describe("codex rules hooks", () => {
 		// then
 		const parsed = parseHookOutput(output);
 		expect(parsed.hookSpecificOutput?.hookEventName).toBe("SessionStart");
-		expect(parsed.hookSpecificOutput?.additionalContext).toContain("## Project Instructions");
 		expect(parsed.hookSpecificOutput?.additionalContext).toContain(
-			`Instructions from: ${path.join(root, "CONTEXT.md")}`,
+			`${INSTRUCTIONS_FROM}${path.join(root, "CONTEXT.md")}`,
 		);
-		expect(parsed.hookSpecificOutput?.additionalContext).toContain("Always wear safety goggles");
+		expect(parsed.hookSpecificOutput?.additionalContext).toContain("CTX_RULE_SENTINEL");
 	});
 
 	it("#given default auto sources #when SessionStart runs #then native Codex AGENTS.md is not duplicated", async () => {
@@ -235,11 +238,11 @@ describe("codex rules hooks", () => {
 
 		// then
 		const parsed = parseHookOutput(output);
-		expect(parsed.hookSpecificOutput?.additionalContext).toContain("## Project Instructions");
-		expect(parsed.hookSpecificOutput?.additionalContext).not.toContain("Project AGENTS.md should stay Codex-native.");
-		expect(parsed.hookSpecificOutput?.additionalContext).not.toContain(
-			"Project CLAUDE.md should stay outside rules hook context.",
+		expect(parsed.hookSpecificOutput?.additionalContext).toContain(
+			`${INSTRUCTIONS_FROM}${path.join(root, "CONTEXT.md")}`,
 		);
+		expect(parsed.hookSpecificOutput?.additionalContext).not.toContain("AGENTS_MD_SENTINEL");
+		expect(parsed.hookSpecificOutput?.additionalContext).not.toContain("CLAUDE_MD_SENTINEL");
 	});
 
 	it("#given project AGENTS.md #when SessionStart runs #then rules hook leaves AGENTS.md to Codex native handling", async () => {
@@ -313,9 +316,8 @@ describe("codex rules hooks", () => {
 		// then
 		expect(resumeOutput).toBe("");
 		const clearContext = parseHookOutput(clearOutput).hookSpecificOutput?.additionalContext ?? "";
-		expect(clearContext).toContain("## Project Instructions");
-		expect(clearContext).toContain(`Instructions from: ${path.join(root, "CONTEXT.md")}`);
-		expect(clearContext).toContain("Always wear safety goggles");
+		expect(clearContext).toContain(`${INSTRUCTIONS_FROM}${path.join(root, "CONTEXT.md")}`);
+		expect(clearContext).toContain("CTX_RULE_SENTINEL");
 	});
 
 	it("#given static context remains in transcript but cache is missing #when SessionStart runs #then it emits no duplicate context", async () => {
@@ -356,10 +358,8 @@ describe("codex rules hooks", () => {
 		// regression line: prior versions emitted "src\\app.ts" on Windows.
 		const parsed = parseHookOutput(output);
 		expect(parsed.hookSpecificOutput?.hookEventName).toBe("PostToolUse");
-		expect(parsed.hookSpecificOutput?.additionalContext).toContain(
-			"Additional project instructions matched for src/app.ts",
-		);
-		expect(parsed.hookSpecificOutput?.additionalContext).toContain("Prefer strict TypeScript");
+		expect(parsed.hookSpecificOutput?.additionalContext).toContain("src/app.ts");
+		expect(parsed.hookSpecificOutput?.additionalContext).toContain("TS_RULE_SENTINEL");
 		expect(parsed.hookSpecificOutput?.additionalContext ?? "").not.toContain("src\\app.ts");
 		expect(output).not.toContain("updatedMCPToolOutput");
 		expect(output).not.toContain("suppressOutput");
@@ -389,9 +389,9 @@ describe("codex rules hooks", () => {
 		const parsed = parseHookOutput(output);
 		const additionalContext = parsed.hookSpecificOutput?.additionalContext ?? "";
 		expect(parsed.hookSpecificOutput?.hookEventName).toBe("PostToolUse");
-		expect(additionalContext).toContain("Additional project instructions matched for src/app.ts");
+		expect(additionalContext).toContain("src/app.ts");
 		expect(additionalContext).not.toContain("src\\app.ts");
-		expect(occurrenceCount(additionalContext, "Prefer strict TypeScript")).toBe(1);
+		expect(occurrenceCount(additionalContext, "TS_RULE_SENTINEL")).toBe(1);
 	});
 
 	it("#given dynamic context already injected #when PostToolUse repeats #then emits no duplicate context", async () => {
@@ -409,6 +409,31 @@ describe("codex rules hooks", () => {
 		expect(output).toBe("");
 		expect(Object.keys(cachedState.dynamicTargetFingerprints ?? {})).toHaveLength(1);
 		expect(readSessionCache(pluginData).dynamicTargetFingerprints).toEqual(cachedState.dynamicTargetFingerprints);
+	});
+
+	it("#given bundled dynamic rules already injected for gpt-5.5 #when same target switches to gpt-5.6 #then emits the gpt-5.6 rule", async () => {
+		// given
+		const { root, pluginData } = makeTempProject();
+		const filePath = path.join(root, "src", "app.ts");
+		const input = postToolUseInput(root, filePath);
+		const firstOutput = await runPostToolUseHook(input, {
+			pluginDataRoot: pluginData,
+			env: DYNAMIC_BUNDLED_ONLY_ENV,
+		});
+
+		// when
+		const secondOutput = await runPostToolUseHook(
+			{ ...input, model: "gpt-5.6-codex" },
+			{ pluginDataRoot: pluginData, env: DYNAMIC_BUNDLED_ONLY_ENV },
+		);
+
+		// then
+		const firstContext = parseHookOutput(firstOutput).hookSpecificOutput?.additionalContext ?? "";
+		const secondContext = parseHookOutput(secondOutput).hookSpecificOutput?.additionalContext ?? "";
+		expect(firstContext).toContain("bundled-rules/hephaestus/gpt-5.5.md");
+		expect(firstContext).not.toContain("bundled-rules/hephaestus/gpt-5.6.md");
+		expect(secondContext).toContain("bundled-rules/hephaestus/gpt-5.6.md");
+		expect(secondContext).not.toContain("bundled-rules/hephaestus/gpt-5.5.md");
 	});
 
 	it("#given default auto sources #when excluded AGENTS.md changes #then PostToolUse fingerprint stays stable", async () => {
@@ -464,7 +489,7 @@ describe("codex rules hooks", () => {
 		);
 
 		// then
-		expect(parseHookOutput(output).hookSpecificOutput?.additionalContext).toContain("Prefer strict TypeScript");
+		expect(parseHookOutput(output).hookSpecificOutput?.additionalContext).toContain("TS_RULE_SENTINEL");
 	});
 
 	it("#given cached dynamic target #when rule frontmatter changes #then PostToolUse rechecks the target", async () => {
@@ -473,15 +498,13 @@ describe("codex rules hooks", () => {
 		const filePath = path.join(root, "src", "app.ts");
 		const input = postToolUseInput(root, filePath);
 		await runPostToolUseHook(input, { pluginDataRoot: pluginData, env: RULES_ONLY_ENV });
-		writeTypeScriptRule(root, '"**/*.ts"', "Prefer readonly TypeScript after rule edits.");
+		writeTypeScriptRule(root, '"**/*.ts"', "TS_RULE_V2_SENTINEL");
 
 		// when
 		const output = await runPostToolUseHook(input, { pluginDataRoot: pluginData, env: RULES_ONLY_ENV });
 
 		// then
-		expect(parseHookOutput(output).hookSpecificOutput?.additionalContext).toContain(
-			"Prefer readonly TypeScript after rule edits.",
-		);
+		expect(parseHookOutput(output).hookSpecificOutput?.additionalContext).toContain("TS_RULE_V2_SENTINEL");
 	});
 
 	it("#given cached dynamic context #when PostCompact runs #then PostToolUse emits no duplicate dynamic context", async () => {
@@ -601,7 +624,7 @@ describe("codex rules hooks", () => {
 		});
 
 		// then
-		expect(parseHookOutput(output).hookSpecificOutput?.additionalContext).toContain("Prefer strict TypeScript");
+		expect(parseHookOutput(output).hookSpecificOutput?.additionalContext).toContain("TS_RULE_SENTINEL");
 	});
 
 	it("#given static-only mode #when PostToolUse runs #then emits no dynamic context", async () => {

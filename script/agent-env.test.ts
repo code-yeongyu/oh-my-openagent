@@ -5,34 +5,23 @@ import { join } from "node:path"
 const AGENT_DIR = join(import.meta.dir, "agent")
 const REPO_ROOT = join(import.meta.dir, "..")
 
-function read(path: string): string {
-  return readFileSync(path, "utf8")
-}
-
-function isExecutable(path: string): boolean {
-  return (statSync(path).mode & 0o111) !== 0
-}
-
 describe("agent dev-environment scripts", () => {
   describe("setup.sh", () => {
     const setup = join(AGENT_DIR, "setup.sh")
 
     test("#given the shared bootstrap #when inspected #then it is an executable strict bash script", () => {
-      // given / when / then
       expect(existsSync(setup), "script/agent/setup.sh must exist").toBe(true)
       if (process.platform !== "win32") {
-        expect(isExecutable(setup), "setup.sh must be executable").toBe(true)
+        expect((statSync(setup).mode & 0o111) !== 0, "setup.sh must be executable").toBe(true)
       }
-      const body = read(setup)
+      const body = readFileSync(setup, "utf8")
       expect(body.startsWith("#!/usr/bin/env bash")).toBe(true)
       expect(body).toContain("set -euo pipefail")
     })
 
     test("#given the bootstrap #when it runs #then it verifies tools, installs, and conditionally builds", () => {
-      // given
-      const body = read(join(AGENT_DIR, "setup.sh"))
+      const body = readFileSync(setup, "utf8")
 
-      // then
       expect(body).toContain("command -v") // tool presence check
       expect(body).toContain("bun node git") // required toolchain verified
       expect(body).toContain("tmux") // non-fatal warning path
@@ -41,35 +30,32 @@ describe("agent dev-environment scripts", () => {
       expect(body).toContain("OMO_AGENT_FORCE_BUILD") // idempotent skip-build guard
       expect(body).toContain(".env") // credential sourcing
       expect(body).toContain("--ignore-scripts")
-      expect(body).toContain("1.3.12")
-    })
-  })
-
-  describe("cleanup.sh", () => {
-    const cleanup = join(AGENT_DIR, "cleanup.sh")
-
-    test("#given the teardown #when inspected #then it is an executable strict bash script with a --deep mode", () => {
-      // given / when / then
-      expect(existsSync(cleanup), "script/agent/cleanup.sh must exist").toBe(true)
-      if (process.platform !== "win32") {
-        expect(isExecutable(cleanup), "cleanup.sh must be executable").toBe(true)
-      }
-      const body = read(cleanup)
-      expect(body.startsWith("#!/usr/bin/env bash")).toBe(true)
-      expect(body).toContain("set -euo pipefail")
-      expect(body).toContain("--deep")
+      expect(body).toMatch(/expected_bun="\d+\.\d+\.\d+"/) // drift warning is version-pinned
+      expect(body).toContain("submodule update --init") // provenance submodules
+      expect(body).toContain("materialize-frontend-refs") // frontend ref materialize
     })
 
-    test("#given the teardown #when inspected for safety #then it guards repo root and never nukes source or host", () => {
+    test("#given the CI-pinned Bun version #when setup.sh, the devcontainer image, and CI are compared #then all three pin the same version", () => {
       // given
-      const body = read(join(AGENT_DIR, "cleanup.sh"))
+      const setupPin = readFileSync(setup, "utf8").match(/expected_bun="([^"]+)"/)?.[1]
+      const dockerfilePin = readFileSync(join(REPO_ROOT, ".devcontainer", "Dockerfile"), "utf8").match(
+        /bash -s "bun-v([^"]+)"/,
+      )?.[1]
+      const ciPins = [
+        ...readFileSync(join(REPO_ROOT, ".github", "workflows", "ci.yml"), "utf8").matchAll(
+          /bun-version:\s*"([^"]+)"/g,
+        ),
+      ].map((match) => match[1])
 
       // then
-      expect(body).toContain("oh-my-openagent") // package-name repo-root guard
-      const dangerous = ["rm -rf /", "rm -rf ~", "rm -rf $HOME", "rm -rf src", "rm -rf packages"]
-      for (const pattern of dangerous) {
-        expect(body, `cleanup must never contain '${pattern}'`).not.toContain(pattern)
+      expect(setupPin, "setup.sh must declare expected_bun").toBeDefined()
+      expect(dockerfilePin, ".devcontainer/Dockerfile must pin an explicit bun-v<version>").toBeDefined()
+      expect(ciPins.length, "ci.yml must pin bun-version").toBeGreaterThan(0)
+      // The devcontainer image and the setup.sh drift warning must both track CI.
+      for (const ciPin of new Set(ciPins)) {
+        expect(ciPin, "every ci.yml bun-version must match the devcontainer pin").toBe(dockerfilePin as string)
       }
+      expect(setupPin).toBe(dockerfilePin as string)
     })
   })
 
@@ -77,9 +63,8 @@ describe("agent dev-environment scripts", () => {
     const sandbox = join(AGENT_DIR, "qa-sandbox.sh")
 
     test("#given the QA isolation helper #when inspected #then it isolates XDG + CODEX_HOME and injects creds", () => {
-      // given / when / then
       expect(existsSync(sandbox), "script/agent/qa-sandbox.sh must exist").toBe(true)
-      const body = read(sandbox)
+      const body = readFileSync(sandbox, "utf8")
       expect(body.startsWith("#!/usr/bin/env bash")).toBe(true)
       expect(body).toContain("mktemp")
       for (const xdg of ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME"]) {
@@ -95,12 +80,10 @@ describe("agent dev-environment scripts", () => {
 
   describe(".env.example", () => {
     test("#given the credential template #when inspected #then it documents the injection points without real secrets", () => {
-      // given
       const example = join(REPO_ROOT, ".env.example")
 
-      // when / then
       expect(existsSync(example), ".env.example must exist (committed injection point)").toBe(true)
-      const body = read(example)
+      const body = readFileSync(example, "utf8")
       expect(body).toContain("ANTHROPIC_API_KEY")
       expect(body).toContain("OPENAI_API_KEY")
       expect(body).toContain("#") // documented with comments

@@ -1,0 +1,68 @@
+# Review blocker: connected IC-8 process-group teardown
+
+## RED
+
+Command:
+
+  bun test \
+    packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts \
+    --test-name-pattern 'connected model child'
+
+Before the fix:
+
+  external_watchdog=25s
+  exit=124
+
+Surviving process group:
+
+  memory-run-supervisor.ts --child-bootstrap
+  supervisor-child.ts graceful
+  process_group=42735
+
+The connected model child retained the accepted socket. Cleanup killed only
+the supervisor PID, then waited indefinitely for `server.close()`.
+
+The RED process group and temporary root were manually removed before GREEN.
+
+## GREEN
+
+The test harness now:
+
+- reads each run ledger for the detached child/bootstrap group PID;
+- validates every process-group PID as a positive integer;
+- uses negative-PID `SIGKILL` on POSIX and `taskkill /T /F` on Windows;
+- tracks accepted sockets and exact close signals;
+- kills supervisor and child groups before exit-resource cleanup;
+- bounds socket and server close;
+- destroys remaining sockets and removes listeners;
+- clears server, socket, timeout, process, and root registries.
+
+Command:
+
+  npm exec --yes --package=bun@1.3.12 -- bun test \
+    packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts
+
+Observed:
+
+  7 pass
+  0 fail
+  20 expect() calls
+  Ran 7 tests across 1 file. [1118.00ms]
+
+Typecheck:
+
+  bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+  exit=0
+
+Pure LOC after mandatory split:
+
+  memory-run-supervisor.ic8.test.ts=125
+  memory-run-supervisor-ic8-harness.ts=201
+  memory-run-supervisor-ic8-exit-resources.ts=160
+
+Cleanup:
+
+- no supervisor/bootstrap/model process remains;
+- no IC-8 temporary root remains;
+- no generated JavaScript remains;
+- diff-check exits 0.

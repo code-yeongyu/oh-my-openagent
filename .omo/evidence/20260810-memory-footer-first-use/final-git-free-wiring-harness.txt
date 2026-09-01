@@ -1,0 +1,30 @@
+Final Git-free wiring harness
+
+Why:
+- Three bounded-removal variants still failed on Windows with transient Git handle retention.
+- The wiring tests validate lifecycle ordering, not Git implementation.
+
+Implementation:
+- `MemoryComponentOptions` and `MemoryWiringOptions` accept an optional status refresher.
+- Production defaults remain `refreshMemoryStatus`.
+- `wiring.test.ts` injects a deterministic refresher that renders the expected relative footer.
+- The wiring fixture no longer initializes, commits, or removes a Git repository.
+- Real Git behavior remains covered by repository and status tests.
+
+Verification:
+- Focused status+wiring: 15 pass, 0 fail, 45 assertions.
+- Cleanup plus focused memory: 25 pass, 0 fail, 80 assertions.
+- Full memory component: 251 pass, 0 fail, 835 assertions across 40 files.
+- Omo-senpi typecheck: exit 0.
+- TypeScript no-excuse audit: no violations.
+- Senpi plugin build and extension freshness: exit 0.
+
+Real xterm:
+- Before first memory use: footer count 0.
+- After real `memory create`: one `mem:<identity> just now` footer.
+- `@uncommitted`: count 0.
+- PTYs 21391 and 21392 killed.
+- QA runtime removed and no matching process remained.
+
+Remaining proof:
+- The replacement Windows root and Senpi jobs must pass before merge.

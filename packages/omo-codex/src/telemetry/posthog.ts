@@ -42,6 +42,7 @@ type CreatePostHogClientOptions = {
 
 let osProviderOverride: TelemetryOsProvider | null = null
 let activityStateProviderOverride: ActivityStateProvider | null = null
+let transportFactoryOverride: TelemetryTransportFactory | null = null
 
 const NO_OP_POSTHOG: PostHogClient = {
   trackActive: () => undefined,
@@ -78,7 +79,7 @@ function createPostHogClient(
     osProvider: options.osProvider ?? resolveOsProvider(),
     product: createCodexTelemetryProductConfig(),
     source,
-    transportFactory: options.transportFactory,
+    transportFactory: options.transportFactory ?? transportFactoryOverride ?? undefined,
   })
 
   if (!client.enabled) {
@@ -149,4 +150,12 @@ export function __setActivityStateProviderForTesting(provider: ActivityStateProv
 
 export function __resetActivityStateProviderForTesting(): void {
   activityStateProviderOverride = null
+}
+
+export function __setTransportFactoryForTesting(factory: TelemetryTransportFactory): void {
+  transportFactoryOverride = factory
+}
+
+export function __resetTransportFactoryForTesting(): void {
+  transportFactoryOverride = null
 }

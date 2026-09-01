@@ -1,0 +1,63 @@
+# Failing-first: the conversion-invariant gate run against origin/dev's tool-pair-validator sources.
+# hook.test.ts is intentionally NOT part of this run: it asserts INTERRUPTED_TOOL_ERROR, a symbol
+# that only exists after the fix, so it cannot execute against the old implementation.
+
+$ git checkout origin/dev -- packages/omo-opencode/src/hooks/tool-pair-validator/{types,tool-part-ids,tool-result-repair,message-transform}.ts
+$ bun test packages/omo-opencode/src/hooks/tool-pair-validator/conversion-invariant.test.ts --timeout 20000
+
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:1 char:1114
++ ... ii -Append; bun test packages/omo-opencode/src/hooks/tool-pair-valida ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-opencode\src\hooks\tool-pair-validator\conversion-invariant.test.ts:
+123 | 
+124 |       // when
+125 |       await runToolPairValidator(createToolPairValidatorHook(), messages)
+126 | 
+127 |       // then
+128 |       expect(findOrphanedToolCalls(convertToModelMessages(messages))).toEqual([])
+                                                                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "toolu_stuck",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (C:\Users\pss\OneDrive\Documents\github\oh-my-openagent-wt\fix-tool-pair-validator-real-part-model
+\packages\omo-opencode\src\hooks\tool-pair-validator\conversion-invariant.test.ts:128:71)
+(fail) tool-pair-validator conversion invariant > #given an assistant turn with a stuck tool part > #then the 
+converted request has no orphaned tool_use [11.96ms]
+143 | 
+144 |       // when
+145 |       await runToolPairValidator(createToolPairValidatorHook(), messages)
+146 | 
+147 |       // then
+148 |       expect(collectForeignPartTypes(messages)).toEqual([])
+                                                      ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "tool_result",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (C:\Users\pss\OneDrive\Documents\github\oh-my-openagent-wt\fix-tool-pair-validator-real-part-model
+\packages\omo-opencode\src\hooks\tool-pair-validator\conversion-invariant.test.ts:148:49)
+(fail) tool-pair-validator conversion invariant > #given the hook repaired a turn > #then it added no part type that 
+the conversion would discard [4.05ms]
+
+ 1 pass
+ 2 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [1.84s]

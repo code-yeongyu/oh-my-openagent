@@ -1,0 +1,18 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts:
+(pass) createSessionStatusHandler > #given model-core retryable patterns #when the adapter status fallback patterns are loaded #then they share the canonical pattern set [1.39ms]
+(pass) createSessionStatusHandler > #given a free usage retry status #when the handler receives it #then it dispatches the fallback immediately [2.25ms]
+(pass) createSessionStatusHandler > #given identical retry messages across models #when retries repeat #then same-model events dedupe and the new model advances [0.28ms]
+(pass) createSessionStatusHandler > #given interleaved retry statuses across models #when a stale model repeats #then every active model key remains deduped [0.19ms]
+(pass) createSessionStatusHandler > #given identical retry messages across variants #when retries repeat #then same-variant events dedupe and the new variant advances [0.26ms]
+(pass) createSessionStatusHandler > #given repeated retry status without model metadata #when fallback mutates the current model #then the duplicate remains deduped [0.24ms]
+(pass) createSessionStatusHandler > #given model-less retries in consecutive fallback generations #when the fallback genuinely fails #then the next model advances [0.43ms]
+(pass) createSessionStatusHandler > #given a no-timeout fallback dispatch is in flight #when the fallback retry status repeats after acknowledgement #then it advances instead of retaining the skipped key [0.30ms]
+(pass) createSessionStatusHandler > #given pending fallback prompt may already be accepted #when provider retry status arrives #then it keeps waiting for that accepted prompt [0.14ms]
+(pass) createSessionStatusHandler > #given a pending fallback model #when a new provider cooldown retry arrives #then the handler overrides the pending fallback and advances the chain [0.15ms]
+
+ 10 pass
+ 0 fail
+ 24 expect() calls
+Ran 10 tests across 1 file. [217.00ms]

@@ -1,0 +1,22 @@
+{
+  "markdownFilesScanned": 308,
+  "allowedAgents": [
+    "explore",
+    "librarian",
+    "metis",
+    "momus"
+  ],
+  "allowedCategories": [
+    "architect",
+    "artistry",
+    "deep",
+    "quick",
+    "ultrabrain",
+    "unspecified-high",
+    "unspecified-low",
+    "visual-engineering",
+    "writing"
+  ],
+  "invalidTargets": [],
+  "staleSkillFiles": []
+}

@@ -68,6 +68,31 @@ test("#given bootstrap.ps1 #when environment writes are scanned #then no Machine
 	assert.deepEqual(offenders, [], "bootstrap.ps1 must only touch User-scope environment values (Machine scope needs elevation)");
 });
 
+test("#given bootstrap.ps1 #when dependency discovery misses #then it never invokes winget or mutates user PATH", async () => {
+	// given
+	const content = await readBootstrapScript();
+
+	// then
+	assert.doesNotMatch(content, /&\s*winget\s+install/i, "bootstrap.ps1 must not install system dependencies with winget");
+	assert.doesNotMatch(
+		content,
+		/SetEnvironmentVariable\("Path"/,
+		"bootstrap.ps1 must not mutate the user PATH when Codex Desktop misses PATH entries",
+	);
+});
+
+test("#given bootstrap.ps1 #when resolving Node #then Codex NODE_REPL_NODE_PATH is checked before PATH", async () => {
+	// given
+	const content = await readBootstrapScript();
+
+	// then
+	assert.match(content, /NODE_REPL_NODE_PATH/, "bootstrap.ps1 must know how to read the Codex bundled Node setting");
+	assert(
+		content.indexOf("NODE_REPL_NODE_PATH") < content.indexOf("Get-Command node"),
+		"bootstrap.ps1 must prefer Codex bundled Node config before probing PATH",
+	);
+});
+
 test("#given bootstrap.ps1 #when execution policy mutations are scanned #then Set-ExecutionPolicy is never invoked", async () => {
 	// given
 	const content = await readBootstrapScript();

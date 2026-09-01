@@ -5,14 +5,13 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
-import { prepareCodegraphWorkspace } from "@oh-my-opencode/utils"
+import { prepareCodegraphWorkspace, shouldExcludeCodegraphProject } from "@oh-my-opencode/utils"
 
 import {
   clearCodegraphBootstrapProjectsForTesting,
   createCodegraphBootstrapHook,
   type CodegraphBootstrapDeps,
 } from "./index"
-import { resolveCodegraphCommandInvocation } from "./command-runner"
 
 function createDeps(events: string[], overrides: Partial<CodegraphBootstrapDeps> = {}): CodegraphBootstrapDeps {
   return {
@@ -21,6 +20,7 @@ function createDeps(events: string[], overrides: Partial<CodegraphBootstrapDeps>
       events.push(`gitignore:${projectRoot}`)
       return true
     },
+    excludeProject: () => ({ excluded: false }),
     ensureProvisioned: async () => {
       events.push("provision")
       return { binPath: "/bin/codegraph", provisioned: true }
@@ -64,31 +64,6 @@ afterEach(() => {
 })
 
 describe("createCodegraphBootstrapHook", () => {
-  test("#given Windows codegraph.cmd #when command runner builds invocation #then it runs through cmd.exe", () => {
-    // given
-    const command = "C:\\Users\\test\\.omo\\codegraph\\bin\\codegraph.cmd"
-
-    // when
-    const invocation = resolveCodegraphCommandInvocation(command, ["status", "--json"], "win32")
-
-    // then
-    expect(invocation).toEqual({
-      args: ["/d", "/s", "/c", command, "status", "--json"],
-      command: "cmd.exe",
-    })
-  })
-
-  test("#given non-Windows codegraph command #when command runner builds invocation #then it executes directly", () => {
-    // given
-    const command = "/home/test/.omo/codegraph/bin/codegraph"
-
-    // when
-    const invocation = resolveCodegraphCommandInvocation(command, ["sync"], "linux")
-
-    // then
-    expect(invocation).toEqual({ args: ["sync"], command })
-  })
-
   test("#given a non-session-created event #when event fires #then it does nothing", () => {
     // given
     const events: string[] = []
@@ -214,6 +189,7 @@ describe("createCodegraphBootstrapHook", () => {
         log: (message) => {
           events.push(`log:${message}`)
         },
+        excludeProject: () => ({ excluded: false }),
         nodeSupport: () => ({ major: 26, override: false, reason: "too-new", supported: false }),
         prepareWorkspace: (projectRoot) => prepareCodegraphWorkspace(projectRoot, { homeDir }),
         resolveCommand: () => ({ argsPrefix: [], command: "/usr/local/bin/codegraph", exists: true, source: "path" }),
@@ -253,6 +229,7 @@ describe("createCodegraphBootstrapHook", () => {
         ensureProvisioned: async () => {
           throw new Error("codegraph provisioning should not run")
         },
+        excludeProject: () => ({ excluded: false }),
         log: (message) => {
           events.push(`log:${message}`)
         },
@@ -295,6 +272,7 @@ describe("createCodegraphBootstrapHook", () => {
         log: (message) => {
           events.push(`log:${message}`)
         },
+        excludeProject: () => ({ excluded: false }),
         prepareWorkspace: (projectRoot) => prepareCodegraphWorkspace(projectRoot, { homeDir }),
         resolveCommand: () => ({ argsPrefix: [], command: "missing-codegraph", exists: false, source: "path" }),
         runCommand: async () => {
@@ -340,5 +318,47 @@ describe("createCodegraphBootstrapHook", () => {
 
     // then
     expect(events).toContain("log:[codegraph-bootstrap] Bootstrap failed")
+  })
+
+  test("#given the project is under an excluded root #when session.created fires #then bootstrap is skipped and not scheduled", async () => {
+    // given
+    const events: string[] = []
+    const hook = createCodegraphBootstrapHook(
+      { directory: "/excluded/project" },
+      { enabled: true, excluded_roots: ["/excluded"] },
+      createDeps(events, { excludeProject: shouldExcludeCodegraphProject }),
+    )
+
+    // when
+    hook.event({ event: { type: "session.created", properties: {} } })
+    await waitForBackground()
+
+    // then
+    expect(events).not.toContain("scheduled")
+    expect(events.some((event) => event.startsWith("run:"))).toBe(false)
+    expect(events).toContain("log:[codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap")
+  })
+
+  test("#given the real exclusion defaults #when the project lives under the OS tmpdir #then bootstrap is skipped", async () => {
+    // given
+    const events: string[] = []
+    const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-excluded-"))
+    const hook = createCodegraphBootstrapHook(
+      { directory: workspace },
+      { enabled: true },
+      createDeps(events, { excludeProject: shouldExcludeCodegraphProject }),
+    )
+
+    // when
+    try {
+      hook.event({ event: { type: "session.created", properties: {} } })
+      await waitForBackground()
+
+      // then
+      expect(events).not.toContain("scheduled")
+      expect(events).toContain("log:[codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap")
+    } finally {
+      rmSync(workspace, { force: true, recursive: true })
+    }
   })
 })

@@ -10,40 +10,50 @@ type WorkflowExpectation = {
 }
 
 const workflowDirectory = ".github/workflows"
+const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
 const workflowExpectations = [
   {
     path: ".github/workflows/ci.yml",
     jobs: [
+      "ci-mode",
       "block-master-pr",
       "test",
       "typecheck",
       "codex-compatibility",
+      "senpi-compatibility",
       "lazycodex-published-smoke",
       "build",
+      "omo-ai-payload-check",
       "auto-commit-schema",
       "draft-release",
     ],
   },
   { path: ".github/workflows/cla.yml", jobs: ["cla"] },
+  { path: ".github/workflows/bot-merge.yml", jobs: ["merge"] },
   { path: ".github/workflows/lint-workflows.yml", jobs: ["actionlint"] },
   { path: ".github/workflows/package-labels.yml", jobs: ["ensure-labels", "label-pull-request", "label-issue"] },
-  { path: ".github/workflows/publish-platform.yml", jobs: ["build", "publish"] },
+  { path: ".github/workflows/publish-platform.yml", jobs: ["build", "publish", "smoke-linux-arm64"] },
   {
     path: ".github/workflows/publish.yml",
     jobs: [
-      "test",
-      "typecheck",
-      "codex-compatibility",
+      "gate-reuse",
       "preflight-trust",
       "release-metadata",
       "prepare-release-state",
+      "dispatch-provenance-safe-publish",
       "publish-main",
       "release",
+      "post-publish-verify",
     ],
+  },
+  {
+    path: ".github/workflows/review-claims.yml",
+    jobs: ["gate", "claim", "release-claim", "stale-sweep"],
   },
   { path: ".github/workflows/refresh-model-capabilities.yml", jobs: ["refresh"] },
   { path: ".github/workflows/sisyphus-agent.yml", jobs: ["agent"] },
+  { path: ".github/workflows/stats.yml", jobs: ["stats"] },
   { path: ".github/workflows/web-ci.yml", jobs: ["format-lint-typecheck-build"] },
   { path: ".github/workflows/web-deploy.yml", jobs: ["deploy"] },
 ] as const satisfies readonly WorkflowExpectation[]
@@ -201,5 +211,5 @@ describe("GitHub workflow job summaries", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 })

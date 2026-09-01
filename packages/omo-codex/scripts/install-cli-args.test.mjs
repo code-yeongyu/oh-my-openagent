@@ -88,7 +88,7 @@ test("#given installer help #when formatting usage #then includes uninstall", ()
 	assert.equal(includesUninstall, true);
 });
 
-test("#given installer help #when formatting usage #then advertises every pass-through command it actually delegates", () => {
+test("#given installer help #when formatting usage #then advertises every supported command", () => {
 	// given
 	const help = formatLazyCodexInstallHelp();
 

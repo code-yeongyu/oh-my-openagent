@@ -1,7 +1,7 @@
 import { spawn } from "../../../omo-opencode/src/shared/bun-spawn-shim"
 import type { RunCommand } from "./types"
 
-const WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"])
+const WINDOWS_CMD_SHIM_COMMANDS = new Set(["codex", "npm", "npx"])
 
 export type RunCommandInvocation = {
   readonly command: string

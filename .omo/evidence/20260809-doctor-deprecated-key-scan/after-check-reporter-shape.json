@@ -1,0 +1,9 @@
+{
+  "name": "Configuration",
+  "status": "pass",
+  "message": "No deprecated config keys found",
+  "details": [
+    "Scanned: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-reporter-edobzybf/.omo/omo.jsonc"
+  ],
+  "issues": []
+}

@@ -10,7 +10,7 @@ import {
   loadOpencodeProjectCommands,
 } from "../features/claude-code-command-loader";
 import { loadBuiltinCommands } from "../features/builtin-commands";
-import { resolveActiveBuiltinSkills } from "../features/builtin-skills";
+import { resolveActiveBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills";
 import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader";
 import {
   builtinSkillsToCommandDefinitionRecord,
@@ -122,7 +122,10 @@ export async function applyCommandConfig(params: {
     ...filterDisabledSkillCommandRecord(params.pluginComponents.skills, disabledSkills),
   };
 
-  remapCommandAgentFields(params.config.command as Record<string, Record<string, unknown>>);
+  remapCommandAgentFields(
+    params.config.command as Record<string, Record<string, unknown>>,
+    params.pluginConfig.agents,
+  );
 }
 
 function filterDisabledLoadedSkills(
@@ -148,10 +151,13 @@ function filterDisabledSkillCommandRecord<T>(
   return activeCommands;
 }
 
-function remapCommandAgentFields(commands: Record<string, Record<string, unknown>>): void {
+function remapCommandAgentFields(
+  commands: Record<string, Record<string, unknown>>,
+  overrides?: Record<string, { displayName?: string } | undefined>,
+): void {
   for (const cmd of Object.values(commands)) {
     if (cmd?.agent && typeof cmd.agent === "string") {
-      cmd.agent = getAgentListDisplayName(getAgentConfigKey(cmd.agent));
+      cmd.agent = getAgentListDisplayName(getAgentConfigKey(cmd.agent), overrides);
     }
   }
 }

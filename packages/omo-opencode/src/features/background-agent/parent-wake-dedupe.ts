@@ -11,10 +11,12 @@ export type PendingParentWake = {
   promptContext: ParentWakePromptContext
   notifications: string[]
   shouldReply: boolean
+  queuedAt?: number
   dispatchedAt?: number
   noReplyAdmittedAt?: number
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
+  noAssistantOutputRetryCount?: number
 }
 
 export function resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
@@ -33,6 +35,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     promptContext,
     notifications: [...wake.notifications],
     shouldReply: wake.shouldReply,
+    ...(wake.queuedAt !== undefined ? { queuedAt: wake.queuedAt } : {}),
     ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
     ...(wake.noReplyAdmittedAt !== undefined ? { noReplyAdmittedAt: wake.noReplyAdmittedAt } : {}),
     ...(wake.toolCallDeferralStartedAt !== undefined
@@ -40,6 +43,9 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
       : {}),
     ...(wake.allowEmptyAssistantTurnRetry !== undefined
       ? { allowEmptyAssistantTurnRetry: wake.allowEmptyAssistantTurnRetry }
+      : {}),
+    ...(wake.noAssistantOutputRetryCount !== undefined
+      ? { noAssistantOutputRetryCount: wake.noAssistantOutputRetryCount }
       : {}),
   }
 }

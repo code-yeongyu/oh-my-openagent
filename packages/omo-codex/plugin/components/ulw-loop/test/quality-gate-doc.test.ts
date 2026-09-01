@@ -8,8 +8,8 @@ import { describe, expect, it } from "vitest";
 import { validateQualityGate } from "../src/quality-gate.js";
 
 const FULL_WORKFLOW_URL = new URL("../skills/ulw-loop/references/full-workflow.md", import.meta.url);
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
-const FS_OPTS = { repoRoot: REPO_ROOT, fs: { existsSync, statSync } } as const;
+const COMPONENT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const FS_OPTS = { repoRoot: COMPONENT_ROOT, fs: { existsSync, statSync } } as const;
 
 function extractQualityGateSample(workflow: string): unknown {
 	const sectionStart = workflow.indexOf("`--quality-gate-json` shape:");

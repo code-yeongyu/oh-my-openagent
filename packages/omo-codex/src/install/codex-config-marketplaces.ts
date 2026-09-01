@@ -1,5 +1,5 @@
 import { appendBlock, findTomlSection } from "./toml-section-editor"
-import { parseJsonString, parsePluginHeaderKey, removeTomlSections } from "./codex-config-toml-sections"
+import { parseHookStateHeaderKey, parsePluginHeaderKey, removeTomlSections } from "./codex-config-toml-sections"
 import type { CodexMarketplaceSource } from "./types"
 
 const SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
@@ -36,9 +36,7 @@ export function removeStaleMarketplaceHookStateBlocks(
   keepPluginNames: Set<string>,
 ): string {
   return removeTomlSections(config, (header) => {
-    const prefix = "hooks.state."
-    if (!header.startsWith(prefix)) return false
-    const hookKey = parseJsonString(header.slice(prefix.length))
+    const hookKey = parseHookStateHeaderKey(header)
     if (hookKey === null) return false
     const separator = hookKey.indexOf(":")
     if (separator === -1) return false

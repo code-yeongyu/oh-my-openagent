@@ -25,6 +25,10 @@
       "types": "./src/mcp.ts",
       "import": "./src/mcp.ts"
     },
+    "./post-edit": {
+      "types": "./src/post-edit/index.ts",
+      "import": "./src/post-edit/index.ts"
+    },
     "./lsp/*": {
       "types": "./src/lsp/*.ts",
       "import": "./src/lsp/*.ts"

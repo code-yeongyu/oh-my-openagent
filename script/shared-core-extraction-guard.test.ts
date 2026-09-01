@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test"
 const corePackages = [
   "packages/utils",
   "packages/model-core",
+  "packages/omo-config-core",
   "packages/delegate-core",
   "packages/prompts-core",
   "packages/rules-engine",
@@ -18,6 +19,7 @@ const corePackages = [
   "packages/team-core",
   "packages/openclaw-core",
   "packages/boulder-state",
+  "packages/memory-core",
   "packages/telemetry-core",
   "packages/claude-code-compat-core",
   "packages/skills-loader-core",
@@ -30,7 +32,11 @@ type ForbiddenSourcePattern = {
 
 const forbiddenSourcePatterns: readonly ForbiddenSourcePattern[] = [
   { pattern: /@opencode-ai\// },
+  { pattern: /@code-yeongyu\/senpi/ },
   { pattern: /packages\/omo-codex\/plugin/ },
+  { pattern: /packages\/omo-senpi\/plugin/ },
+  { pattern: /@earendil-works\/pi-/ },
+  { pattern: /@mariozechner\/pi-/ },
   { pattern: /plugin\/components/ },
   {
     pattern: /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,

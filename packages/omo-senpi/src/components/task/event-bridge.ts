@@ -1,0 +1,174 @@
+import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
+import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
+import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
+import type { TaskEngine } from "./engine"
+import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
+import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
+import type { LiveTaskContext } from "./runtime-context"
+import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
+import type { SessionTransitionBridge } from "./session-transition-bridge"
+import type { TaskStatusUi } from "./status-ui"
+import { wireTaskRpcBridge } from "./task-rpc-bridge"
+import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
+
+export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
+
+type EventBridgeState = {
+  readonly reconcileTeamMailbox: () => Promise<void>
+  readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
+  readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
+  // Live DAG runs veto a reload alongside running children: a reload pauses them mid-flight.
+  readonly dagReloadSource?: ReloadGuardDagSource
+}
+
+// Session start runs the durable recovery chain in strict order: flush/drop buffered completions
+// BEFORE reconcile (revived children must not double-deliver buffered terminals), revive/reattach
+// the resumed session's children (undefined session id still runs the legacy crash-orphan sweep),
+// re-observe owned-member liveness, reclaim mailbox reservations, redeliver unnotified completions,
+// await TTL cleanup (its retention predicate keeps anything with an undelivered notification, so
+// cleanup cannot delete what the previous step just queued), then poll owned leads and sync status.
+export function wireEventBridge(
+  pi: SenpiExtensionAPI,
+  ctx: ComponentContext,
+  engine: TaskEngine,
+  statusUi: TaskStatusUi,
+  transitions: SessionTransitionBridge,
+  state: EventBridgeState,
+): void {
+  const guidanceGuard = createOncePerSessionGuard()
+  const taskRpc = wireTaskRpcBridge(pi, engine)
+  const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
+  wireReloadGuard(pi, engine.manager, state.dagReloadSource)
+
+  pi.on("session_start", async (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    const sessionId = engine.runtime.sessionId()
+    if (process.env[OMO_SENPI_TASK_RPC_CHILD] === "1" && sessionId === undefined) return
+    transitions.onSessionStart(sessionId)
+    const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
+    const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
+    for (const outcome of reconciliation.outcomes) {
+      const record = engine.manager.get(outcome.task_id)
+      // A previous process can persist the terminal transition before its queued team-liveness steer
+      // flushes. Re-observe every reconciled record; the notifier filters non-team/non-error states and
+      // its persisted liveness epoch suppresses records already delivered in an earlier process.
+      if (record !== undefined) livenessRecords.set(record.task_id, record)
+    }
+    if (sessionId !== undefined) {
+      for (const { record } of engine.manager.list({ scope: "parent-session", session_id: sessionId })) {
+        livenessRecords.set(record.task_id, record)
+      }
+    }
+    for (const record of livenessRecords.values()) {
+      if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
+    }
+    await state.resumptionChannels.emitSessionStart()
+    await reconcileTeamMailboxBestEffort(ctx, state)
+    if (sessionId !== undefined) {
+      engine.notifier.reconcileUnnotifiedNotifications({ sessionId, parentState: engine.runtime.parentState() })
+    }
+    const cleanup = await engine.lifecycle.cleanupExpiredRecords()
+    if (cleanup.deleted.length > 0) {
+      ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
+    }
+    await tickLeadPollersBestEffort(ctx, state)
+    statusUi.scheduleSync()
+    taskRpc.attach()
+  })
+
+  pi.on("session_before_switch", (_payload, eventCtx) => {
+    taskRpc.detach()
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onBeforeSwitch(engine.runtime.sessionId())
+    engine.runtime.clearUi()
+  })
+
+  pi.on("session_before_compact", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onBeforeCompact(engine.runtime.sessionId())
+  })
+
+  pi.on("session_compact", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onCompact(engine.runtime.sessionId())
+    statusUi.scheduleSync()
+  })
+
+  pi.on("session_shutdown", async (payload, eventCtx) => {
+    unsubscribeTaskSnapshots()
+    taskRpc.dispose()
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onShutdown(engine.runtime.sessionId())
+    engine.runtime.clearUi()
+    statusUi.dispose()
+    state.leadPollers.shutdown()
+    await state.resumptionChannels.emitShutdown()
+    const shutdownEvent = payload as SessionShutdownEvent
+    const parentSessionId = engine.runtime.sessionId()
+    const reason = shutdownEvent.reason
+    engine.lifecycle.dispose?.()
+    if (parentSessionId === undefined || typeof reason !== "string") {
+      ctx.logger.warn(
+        "omo-senpi task session_shutdown skipped: no captured session id or malformed reason",
+        { parentSessionId, reason },
+      )
+      return
+    }
+    await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId, reason })
+  })
+
+  pi.on("model_select", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    statusUi.scheduleSync()
+  })
+
+  pi.on("agent_end", async (_payload, eventCtx) => {
+    const liveContext = asLiveContext(eventCtx)
+    engine.runtime.captureFrom(liveContext)
+    const coordinator = ctx.idleCoordinator
+    if (coordinator !== undefined) queueMicrotask(() => coordinator.flushOnIdle())
+    await engine.memberLiveness.acknowledgePersisted(
+      () => liveContext.sessionManager?.getSessionFile?.() ?? engine.runtime.sessionFile(),
+    )
+  })
+
+  pi.on("before_agent_start", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
+    const sessionId = engine.runtime.sessionId() ?? "unknown-session"
+    if (!guidanceGuard(sessionId)) return undefined
+    pi.sendMessage(
+      { customType: "senpi-task.usage", content: TASK_USAGE_GUIDANCE, display: false, details: {} },
+      {},
+    )
+    return undefined
+  })
+}
+
+async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
+  try {
+    await state.reconcileTeamMailbox()
+  } catch (error) {
+    ctx.logger.warn("omo-senpi task session-start team mailbox reclaim failed", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
+async function tickLeadPollersBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
+  try {
+    await state.leadPollers.tick()
+  } catch (error) {
+    ctx.logger.warn("omo-senpi task session-start lead poll failed", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
+function asLiveContext(value: unknown): LiveTaskContext {
+  return isLiveContext(value) ? value : {}
+}
+
+function isLiveContext(value: unknown): value is LiveTaskContext {
+  return typeof value === "object" && value !== null
+}

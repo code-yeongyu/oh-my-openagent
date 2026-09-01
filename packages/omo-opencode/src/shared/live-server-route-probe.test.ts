@@ -30,7 +30,10 @@ describe("live-server-route probe endpoint", () => {
     //#when
     await resolveDispatchClient(inProcessClient, "ses_probe_endpoint")
 
-    //#then
-    expect(fetchedUrls).toEqual(["http://127.0.0.1:4096/global/health"])
+    //#then — health probe first, then per-session affinity verification (#5569)
+    expect(fetchedUrls).toEqual([
+      "http://127.0.0.1:4096/global/health",
+      "http://127.0.0.1:4096/session/ses_probe_endpoint",
+    ])
   })
 })

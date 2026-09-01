@@ -8,6 +8,8 @@ import { join } from "node:path"
 import { CODEGRAPH_PROVISION_MANIFEST } from "./codegraph/manifest"
 import { ensureCodegraphProvisioned } from "./codegraph/provision"
 
+const ARCHIVE_EXTRACTION_TEST_TIMEOUT_MS = 15_000
+
 function tempDir(name: string): string {
   return join(tmpdir(), `omo-${name}-${crypto.randomUUID()}`)
 }
@@ -41,13 +43,13 @@ describe("ensureCodegraphProvisioned", () => {
       installDir,
       lockDir: tempDir("locks"),
       platformKey: "darwin-arm64",
-      version: "1.0.1",
+      version: "1.5.0",
     })
 
     // then
     expect(result.provisioned).toBe(false)
     expect(result.error).toContain("checksum mismatch")
-    expect(result.error).not.toContain("no CodeGraph 1.0.1 asset")
+    expect(result.error).not.toContain("no CodeGraph 1.5.0 asset")
 
     rmSync(installDir, { force: true, recursive: true })
   })
@@ -70,10 +72,10 @@ describe("ensureCodegraphProvisioned", () => {
             url: "memory://codegraph-darwin-arm64.tar.gz",
           },
         },
-        version: "1.0.1",
+        version: "1.5.0",
       },
       platformKey: "darwin-arm64",
-      version: "1.0.1",
+      version: "1.5.0",
     })
 
     // then
@@ -81,7 +83,7 @@ describe("ensureCodegraphProvisioned", () => {
     expect(readFileSync(join(installDir, "bin", "codegraph"), "utf8")).toContain("codegraph fixture")
 
     rmSync(installDir, { force: true, recursive: true })
-  })
+  }, { timeout: ARCHIVE_EXTRACTION_TEST_TIMEOUT_MS })
 
   it("declares pinned Windows npm package assets in the default manifest", () => {
     // given
@@ -94,13 +96,13 @@ describe("ensureCodegraphProvisioned", () => {
     // then
     expect(win32X64).toEqual({
       executableName: "codegraph.cmd",
-      sha256: "52607fe73b05e741fd1087da2ceca9d3c8f565e36bf1a7070600bdbdf3931e32",
-      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.0.1.tgz",
+      sha256: "ef64c878acb129885c2d8306ddec6674af865810b4c0f6a9ba9fcd61e21ff9d8",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.5.0.tgz",
     })
     expect(win32Arm64).toEqual({
       executableName: "codegraph.cmd",
-      sha256: "8d57ced73b24d35f758f2ede2318e80e1d7241987f37a999e3d80edb6fddf961",
-      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.0.1.tgz",
+      sha256: "19e0237ea5d8928f705d60e339eb319e7ec37490a69585712933c1534f3c0bc2",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.5.0.tgz",
     })
   })
 
@@ -119,13 +121,13 @@ describe("ensureCodegraphProvisioned", () => {
           "win32-x64": {
             executableName: "codegraph.cmd",
             sha256: archive.sha256,
-            url: "memory://codegraph-win32-x64-1.0.1.tgz",
+            url: "memory://codegraph-win32-x64-1.5.0.tgz",
           },
         },
-        version: "1.0.1",
+        version: "1.5.0",
       },
       platformKey: "win32-x64",
-      version: "1.0.1",
+      version: "1.5.0",
     })
 
     // then
@@ -157,20 +159,20 @@ describe("ensureCodegraphProvisioned", () => {
             url: "memory://codegraph-darwin-arm64.tar.gz",
           },
         },
-        version: "1.0.1",
+        version: "1.5.0",
       },
       platformKey: "darwin-arm64",
-      version: "1.0.1",
+      version: "1.5.0",
     })
     const second = await ensureCodegraphProvisioned({
       installDir,
       lockDir: tempDir("locks-2"),
       manifest: {
         assets: {},
-        version: "1.0.1",
+        version: "1.5.0",
       },
       platformKey: "darwin-arm64",
-      version: "1.0.1",
+      version: "1.5.0",
     })
 
     // then
@@ -208,10 +210,10 @@ describe("ensureCodegraphProvisioned", () => {
             url: "memory://codegraph-darwin-arm64.tar.gz",
           },
         },
-        version: "1.0.1",
+        version: "1.5.0",
       },
       platformKey: "darwin-arm64",
-      version: "1.0.1",
+      version: "1.5.0",
     })
     const releaseDownload = await releaseDownloadReady
     const second = ensureCodegraphProvisioned({
@@ -225,10 +227,10 @@ describe("ensureCodegraphProvisioned", () => {
             url: "memory://codegraph-darwin-arm64.tar.gz",
           },
         },
-        version: "1.0.1",
+        version: "1.5.0",
       },
       platformKey: "darwin-arm64",
-      version: "1.0.1",
+      version: "1.5.0",
     })
 
     // when
@@ -261,10 +263,10 @@ describe("ensureCodegraphProvisioned", () => {
             url: "memory://codegraph",
           },
         },
-        version: "1.0.1",
+        version: "1.5.0",
       },
       platformKey: "darwin-arm64",
-      version: "1.0.1",
+      version: "1.5.0",
     })
 
     // then

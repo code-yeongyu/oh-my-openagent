@@ -1,3 +1,5 @@
+// allow: SIZE_OK - bin link installer tests share one cross-platform link fixture; this release adds narrow link cases and future additions should split by platform family.
+
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmod, lstat, mkdir, readFile, readlink, symlink, writeFile } from "node:fs/promises";
@@ -24,14 +26,61 @@ async function writeRuntimeWrapperFixture({ withNodeCli = false } = {}) {
 	}
 	await mkdir(homeDir, { recursive: true });
 	const link = await linkRootRuntimeBin({ binDir, codexHome, repoRoot, platform: "linux" });
-	return { homeDir, link, repoRoot };
+	return { binDir, codexHome, homeDir, link, repoRoot };
 }
 
 function runtimeWrapperEnv(homeDir) {
 	return { PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, HOME: homeDir };
 }
 
-test("#given bun absent from PATH but present in ~/.bun/bin #when running the omo runtime wrapper #then resolves the bun fallback", async (t) => {
+test("#given the generated installer #when linking the root runtime #then writes only the canonical wrapper with marker and edition exports", async () => {
+	const { binDir, link } = await writeRuntimeWrapperFixture();
+
+	assert.equal(link.name, "omo-agent-toolkit");
+	assert.equal(link.path, join(binDir, "omo-agent-toolkit"));
+	const wrapper = await readFile(link.path, "utf8");
+	assert.match(wrapper, /OMO_GENERATED_RUNTIME_WRAPPER/);
+	assert.match(wrapper, /export OMO_INVOCATION_NAME=omo-agent-toolkit/);
+	assert.match(wrapper, /export OMO_EDITION=codex/);
+	await assert.rejects(lstat(join(binDir, "omo")));
+});
+
+test("#given a marker-bearing legacy omo #when linking the root runtime #then deletes it", async () => {
+	const root = await makeTempDir();
+	const repoRoot = join(root, "repo");
+	const binDir = join(root, "bin");
+	await mkdir(join(repoRoot, "dist", "cli"), { recursive: true });
+	await mkdir(binDir, { recursive: true });
+	await writeFile(join(repoRoot, "dist", "cli", "index.js"), "");
+	await writeFile(join(binDir, "omo"), "#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\n");
+
+	await linkRootRuntimeBin({ binDir, codexHome: join(root, "codex"), repoRoot, platform: "linux" });
+
+	await assert.rejects(lstat(join(binDir, "omo")));
+	assert.match(await readFile(join(binDir, "omo-agent-toolkit"), "utf8"), /OMO_GENERATED_RUNTIME_WRAPPER/);
+});
+
+test("#given an unmarked user-owned omo #when linking twice #then preserves it byte-identical and remains idempotent", async () => {
+	const root = await makeTempDir();
+	const repoRoot = join(root, "repo");
+	const binDir = join(root, "bin");
+	const legacyPath = join(binDir, "omo");
+	const canonicalPath = join(binDir, "omo-agent-toolkit");
+	const userContent = Buffer.from("#!/bin/sh\necho user-owned\n");
+	await mkdir(join(repoRoot, "dist", "cli"), { recursive: true });
+	await mkdir(binDir, { recursive: true });
+	await writeFile(join(repoRoot, "dist", "cli", "index.js"), "");
+	await writeFile(legacyPath, userContent);
+
+	await linkRootRuntimeBin({ binDir, codexHome: join(root, "codex"), repoRoot, platform: "linux" });
+	const firstCanonical = await readFile(canonicalPath);
+	await linkRootRuntimeBin({ binDir, codexHome: join(root, "codex"), repoRoot, platform: "linux" });
+
+	assert.deepEqual(await readFile(legacyPath), userContent);
+	assert.deepEqual(await readFile(canonicalPath), firstCanonical);
+});
+
+test("#given bun absent from PATH but present in ~/.bun/bin #when running the omo-agent-toolkit runtime wrapper #then resolves the bun fallback", async (t) => {
 	if (process.platform === "win32") return t.skip("posix wrapper execution");
 	const { homeDir, link } = await writeRuntimeWrapperFixture();
 	await mkdir(join(homeDir, ".bun", "bin"), { recursive: true });
@@ -112,7 +161,12 @@ test("#given Windows platform #when writing the omo runtime wrapper #then embeds
 
 	const link = await linkRootRuntimeBin({ binDir, codexHome: join(root, "codex"), repoRoot, platform: "win32" });
 
+	assert.equal(link.name, "omo-agent-toolkit");
+	assert.equal(link.path, join(binDir, "omo-agent-toolkit.cmd"));
 	const wrapper = await readFile(link.path, "utf8");
+	assert.match(wrapper, /OMO_GENERATED_RUNTIME_WRAPPER/);
+	assert.match(wrapper, /set "OMO_INVOCATION_NAME=omo-agent-toolkit"/);
+	assert.match(wrapper, /set "OMO_EDITION=codex"/);
 	assert.match(wrapper, /OMO_RUNTIME/);
 	assert.match(wrapper, /dist[\\/]cli-node[\\/]index\.js/);
 	assert.ok(wrapper.indexOf("OMO_RUNTIME") < wrapper.indexOf("where bun"), "node override must precede bun discovery");
@@ -154,7 +208,10 @@ test("#given Windows platform #when linking cached plugin bins #then writes comm
 	assert.deepEqual(linked, [{ name: "alpha", path: join(binDir, "alpha.cmd"), target: join(pluginRoot, "dist", "cli.js") }]);
 	const shim = await readFile(join(binDir, "alpha.cmd"), "utf8");
 	assert.match(shim, /@echo off/);
-	assert.match(shim, new RegExp(`node "${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
+	assert.match(shim, /NODE_REPL_NODE_PATH/);
+	assert.match(shim, /"%OMO_NODE_BINARY%"/);
+	assert.match(shim, new RegExp(`"${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
+	assert.doesNotMatch(shim, new RegExp(`node "${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
 });
 
 test("#given existing custom Windows command shim #when linking bins #then rejects without overwriting", async () => {
@@ -241,7 +298,10 @@ test("#given nested component declares reserved omo bin #when linking bins #then
 		name: "@example/ulw-loop",
 		bin: {
 			omo: "./dist/cli.js",
+			"omo-agent-toolkit": "./dist/cli.js",
 			"omo-ulw-loop": "./dist/cli.js",
+			ulw: "./dist/cli.js",
+			"ulw-loop": "./dist/cli.js",
 		},
 	});
 	await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
@@ -250,9 +310,14 @@ test("#given nested component declares reserved omo bin #when linking bins #then
 
 	assert.deepEqual(linked, [
 		{ name: "omo-ulw-loop", path: join(binDir, "omo-ulw-loop"), target: join(componentRoot, "dist", "cli.js") },
+		{ name: "ulw", path: join(binDir, "ulw"), target: join(componentRoot, "dist", "cli.js") },
+		{ name: "ulw-loop", path: join(binDir, "ulw-loop"), target: join(componentRoot, "dist", "cli.js") },
 	]);
 	await assert.rejects(readlink(join(binDir, "omo")));
+	await assert.rejects(readlink(join(binDir, "omo-agent-toolkit")));
 	assert.equal(await readlink(join(binDir, "omo-ulw-loop")), join(componentRoot, "dist", "cli.js"));
+	assert.equal(await readlink(join(binDir, "ulw")), join(componentRoot, "dist", "cli.js"));
+	assert.equal(await readlink(join(binDir, "ulw-loop")), join(componentRoot, "dist", "cli.js"));
 });
 
 test("#given stale managed ulw-loop omo symlink #when linking bins #then removes it without touching user-owned omo", async () => {

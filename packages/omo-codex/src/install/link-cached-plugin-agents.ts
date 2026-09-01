@@ -1,6 +1,10 @@
-import { copyFile, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { copyFile, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
+import type { PreservedAgentReasoning } from "./managed-agent-reasoning-defaults"
+import { restorePreservedReasoning, restorePreservedServiceTier } from "./preserved-agent-settings"
 import { purgeRetiredManagedAgentFiles } from "./retired-managed-agent-purge"
+
+export { capturePreservedAgentReasoning, capturePreservedAgentServiceTier } from "./preserved-agent-settings"
 
 const MANIFEST_FILE = ".installed-agents.json"
 
@@ -12,46 +16,11 @@ export interface LinkedAgent {
 
 type LinkPlatform = NodeJS.Platform
 
-export async function capturePreservedAgentReasoning(input: {
-  readonly codexHome: string
-}): Promise<ReadonlyMap<string, string>> {
-  const agentsDir = join(input.codexHome, "agents")
-  if (!(await exists(agentsDir))) return new Map()
-
-  const preserved = new Map<string, string>()
-  const agentEntries = await readdir(agentsDir, { withFileTypes: true })
-  for (const entry of agentEntries) {
-    if (!entry.name.endsWith(".toml")) continue
-    const content = await readTextIfExists(join(agentsDir, entry.name))
-    if (content === null) continue
-    const effort = extractReasoningEffort(content)
-    if (effort !== null) preserved.set(agentNameFromToml(entry.name), effort)
-  }
-  return preserved
-}
-
-export async function capturePreservedAgentServiceTier(input: {
-  readonly codexHome: string
-}): Promise<ReadonlyMap<string, string | null>> {
-  const agentsDir = join(input.codexHome, "agents")
-  if (!(await exists(agentsDir))) return new Map()
-
-  const preserved = new Map<string, string | null>()
-  const agentEntries = await readdir(agentsDir, { withFileTypes: true })
-  for (const entry of agentEntries) {
-    if (!entry.name.endsWith(".toml")) continue
-    const content = await readTextIfExists(join(agentsDir, entry.name))
-    if (content === null) continue
-    preserved.set(agentNameFromToml(entry.name), extractServiceTier(content))
-  }
-  return preserved
-}
-
 export async function linkCachedPluginAgents(input: {
   readonly codexHome: string
   readonly pluginRoot: string
   readonly platform?: LinkPlatform
-  readonly preservedReasoning?: ReadonlyMap<string, string>
+  readonly preservedReasoning?: ReadonlyMap<string, PreservedAgentReasoning>
   readonly preservedServiceTier?: ReadonlyMap<string, string | null>
 }): Promise<readonly LinkedAgent[]> {
   const bundledAgents = await discoverBundledAgents(input.pluginRoot)
@@ -86,19 +55,6 @@ export async function linkCachedPluginAgents(input: {
     linked.map((entry) => entry.path),
   )
   return linked
-}
-
-async function restorePreservedServiceTier(input: {
-  readonly linkPath: string
-  readonly preserved: boolean
-  readonly value: string | null
-}): Promise<void> {
-  if (!input.preserved) return
-  const content = await readFile(input.linkPath, "utf8")
-  if (extractServiceTier(content) === input.value) return
-  const replacement = replaceServiceTier(content, input.value)
-  if (!replacement.replaced) return
-  await writeFile(input.linkPath, replacement.content)
 }
 
 async function discoverBundledAgents(pluginRoot: string): Promise<readonly string[]> {
@@ -140,117 +96,8 @@ async function writeManifest(pluginRoot: string, agentPaths: readonly string[]):
   await writeFile(manifestPath, `${JSON.stringify(payload, null, "\t")}\n`)
 }
 
-async function restorePreservedReasoning(input: {
-  readonly agentName: string
-  readonly linkPath: string
-  readonly target: string
-  readonly value: string | undefined
-}): Promise<void> {
-  if (input.value === undefined) return
-  const content = await readFile(input.target, "utf8")
-  const bundledEffort = extractReasoningEffort(content)
-  if (bundledEffort === input.value) return
-  const replacement = replaceReasoningEffort(content, input.value)
-  if (!replacement.replaced) return
-  await writeFile(input.linkPath, replacement.content)
-}
-
-async function readTextIfExists(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, "utf8")
-  } catch (error) {
-    if (nodeErrorCode(error) === "ENOENT") return null
-    throw error
-  }
-}
-
-function extractReasoningEffort(content: string): string | null {
-  return extractTopLevelStringSetting(content, "model_reasoning_effort")
-}
-
-function extractServiceTier(content: string): string | null {
-  return extractTopLevelStringSetting(content, "service_tier")
-}
-
-function extractTopLevelStringSetting(content: string, key: string): string | null {
-  for (const line of content.split(/\n/)) {
-    if (isSectionHeader(line)) return null
-    const rawValue = topLevelStringSettingRawValue(line, key)
-    if (rawValue === undefined) continue
-    const parsed = parseJsonString(rawValue)
-    if (parsed !== null) return parsed
-  }
-  return null
-}
-
-function replaceReasoningEffort(content: string, value: string): { readonly content: string; readonly replaced: boolean } {
-  return replaceTopLevelStringSetting(content, "model_reasoning_effort", value, { insertIfMissing: false })
-}
-
-function replaceServiceTier(content: string, value: string | null): { readonly content: string; readonly replaced: boolean } {
-  return replaceTopLevelStringSetting(content, "service_tier", value, { insertIfMissing: true })
-}
-
-function replaceTopLevelStringSetting(
-  content: string,
-  key: string,
-  value: string | null,
-  options: { readonly insertIfMissing: boolean },
-): { readonly content: string; readonly replaced: boolean } {
-  const lines = content.split(/\n/)
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]
-    if (line === undefined || isSectionHeader(line)) break
-    if (topLevelStringSettingRawValue(line, key) === undefined) continue
-    if (value === null) {
-      lines.splice(index, 1)
-      return { content: lines.join("\n"), replaced: true }
-    }
-    lines[index] = line.replace(/=\s*"(?:[^"\\]|\\.)*"/, `= ${JSON.stringify(value)}`)
-    return { content: lines.join("\n"), replaced: true }
-  }
-
-  if (value === null || !options.insertIfMissing) return { content, replaced: false }
-  lines.splice(topLevelInsertionIndex(lines), 0, `${key} = ${JSON.stringify(value)}`)
-  return { content: lines.join("\n"), replaced: true }
-}
-
-function topLevelStringSettingRawValue(line: string, key: string): string | undefined {
-  const match = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*("(?:[^"\\]|\\.)*")/)
-  if (match === null) return undefined
-  const settingKey = match[1]
-  const rawValue = match[2]
-  if (settingKey !== key || rawValue === undefined) return undefined
-  return rawValue
-}
-
-function topLevelInsertionIndex(lines: readonly string[]): number {
-  const sectionIndex = lines.findIndex((line) => isSectionHeader(line))
-  const topLevelEnd = sectionIndex === -1 ? lines.length : sectionIndex
-  let insertionIndex = topLevelEnd
-  while (insertionIndex > 0 && lines[insertionIndex - 1] === "") {
-    insertionIndex -= 1
-  }
-  return insertionIndex
-}
-
-function isSectionHeader(line: string): boolean {
-  const trimmed = line.trim()
-  return trimmed.startsWith("[") && trimmed.endsWith("]")
-}
-
 function agentNameFromToml(fileName: string): string {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName
-}
-
-function parseJsonString(value: string): string | null {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    return typeof parsed === "string" ? parsed : null
-  } catch (error) {
-    if (error instanceof Error) return null
-    return null
-  }
 }
 
 async function exists(path: string): Promise<boolean> {

@@ -1,11 +1,22 @@
-import { readFile, readdir, stat } from "node:fs/promises"
-import { basename, dirname, join, resolve, sep } from "node:path"
+import { readFile, readdir, realpath, stat } from "node:fs/promises"
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path"
 import { isPlainRecord } from "@oh-my-opencode/utils"
 
-export async function validateLazycodexPluginBundle(pluginRoot: string): Promise<void> {
+export interface ValidateLazycodexPluginBundleOptions {
+  readonly requireRootCliRuntime?: boolean
+}
+
+export async function validateLazycodexPluginBundle(
+  pluginRoot: string,
+  options: ValidateLazycodexPluginBundleOptions = {},
+): Promise<void> {
   const issues: string[] = []
+  if (options.requireRootCliRuntime !== false) {
+    await validateRootCliRuntime(pluginRoot, issues)
+  }
   await validatePluginMcpManifests(pluginRoot, issues)
   await validatePluginHookCommands(pluginRoot, issues)
+  await validatePluginManagedBins(pluginRoot, issues)
   if (issues.length > 0) {
     throw new Error(
       `lazycodex plugin bundle validation failed with ${issues.length} broken referenced target(s):\n${issues
@@ -13,6 +24,15 @@ export async function validateLazycodexPluginBundle(pluginRoot: string): Promise
         .join("\n")}`,
     )
   }
+}
+
+async function validateRootCliRuntime(pluginRoot: string, issues: string[]): Promise<void> {
+  await collectBundleFileIssue(pluginRoot, pluginRoot, "dist/cli/index.js", "missing root CLI runtime path", issues, {
+    allowEscape: false,
+  })
+  await collectBundleFileIssue(pluginRoot, pluginRoot, "dist/cli-node/index.js", "missing root CLI runtime path", issues, {
+    allowEscape: false,
+  })
 }
 
 async function validatePluginMcpManifests(pluginRoot: string, issues: string[]): Promise<void> {
@@ -61,6 +81,42 @@ async function validatePluginHookCommands(pluginRoot: string, issues: string[]):
       }
     }
   }
+}
+
+// Codex links every component package.json "bin" as a managed bin; a missing target leaves the
+// installer repairing a dangling bin on every session even when no hook references the CLI
+// (lazycodex#108: omo-ulw-execute-continuation, omo-ulw-loop, ulw, ulw-loop).
+async function validatePluginManagedBins(pluginRoot: string, issues: string[]): Promise<void> {
+  const componentsRoot = join(pluginRoot, "components")
+  let entries
+  try {
+    entries = await readdir(componentsRoot, { withFileTypes: true })
+  } catch (error) {
+    if (error instanceof Error) return
+    return
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    for (const binTarget of await readBinTargets(join(componentsRoot, entry.name, "package.json"))) {
+      // Marketplace payload paths are POSIX; join() would emit backslashes on win32.
+      const relativePath = join("components", entry.name, binTarget).split(sep).join("/")
+      await collectBundleFileIssue(pluginRoot, pluginRoot, relativePath, "missing managed bin target", issues, {
+        allowEscape: false,
+      })
+    }
+  }
+}
+
+async function readBinTargets(manifestPath: string): Promise<string[]> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await readFile(manifestPath, "utf8"))
+  } catch (error) {
+    if (error instanceof Error) return []
+    return []
+  }
+  if (!isPlainRecord(parsed) || !isPlainRecord(parsed.bin)) return []
+  return Object.values(parsed.bin).filter((target): target is string => typeof target === "string")
 }
 
 async function findHookManifestPaths(root: string): Promise<string[]> {
@@ -138,7 +194,15 @@ function extractPluginRootPaths(command: string): string[] {
 }
 
 function isPluginRuntimePathArg(arg: string): boolean {
-  return (arg.startsWith("./") || arg.startsWith("../")) && arg.endsWith("/dist/cli.js")
+  const normalized = arg.split("\\").join("/")
+  return (
+    normalized.endsWith(".js") &&
+    normalized.includes("/dist/") &&
+    (normalized.startsWith("./") ||
+      normalized.startsWith("../") ||
+      normalized.startsWith("components/") ||
+      normalized.startsWith("/") || isAbsolute(arg))
+  )
 }
 
 interface BundleFileCheckOptions {
@@ -166,6 +230,10 @@ async function collectBundleFileIssue(
     pushIssue(issues, `${message}: ${relativePath}`)
     return
   }
+  if (!options.allowEscape && !(await isRealPathWithinRoot(bundleRoot, targetPath))) {
+    pushIssue(issues, `${message}: ${relativePath} escapes plugin root`)
+    return
+  }
   if (size === 0) {
     pushIssue(issues, `${message}: ${relativePath} is zero bytes`)
   }
@@ -183,5 +251,17 @@ async function fileSize(path: string): Promise<number | undefined> {
   } catch (error) {
     if (error instanceof Error) return undefined
     return undefined
+  }
+}
+
+async function isRealPathWithinRoot(root: string, target: string): Promise<boolean> {
+  try {
+    const rootPath = await realpath(root)
+    const targetPath = await realpath(target)
+    const rootPrefix = rootPath.endsWith(sep) ? rootPath : `${rootPath}${sep}`
+    return targetPath === rootPath || targetPath.startsWith(rootPrefix)
+  } catch (error) {
+    if (error instanceof Error) return false
+    return false
   }
 }

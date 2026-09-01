@@ -1,4 +1,4 @@
-import type { PromptDispatchClient, PromptMessagesQuery } from "../../shared/prompt-async-gate/types"
+import type { PromptDispatchClient, PromptMessagesQuery } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import type { ParentWakePromptContext } from "./parent-wake-dedupe"
 
 type ParentWakePromptBody = ParentWakePromptContext & {
@@ -29,6 +29,8 @@ export type ParentWakeNotifierDeps = {
     parentSessionID: string | undefined,
     operation: () => Promise<void>,
   ) => Promise<void>
+  readonly onPendingWakeRequeued?: (sessionID: string) => void
+  readonly onScheduledFlushSettled?: (sessionID: string) => void
 }
 
 export type ParentWakeNotifierOptions = {

@@ -1,0 +1,3 @@
+MKT=/tmp/omo-6395-mkt-2o5YGp
+SANDBOX=/tmp/omo-6395-sandbox-xP2nSx
+MKT_SYNC=/tmp/omo-6395-sync-yPTvbH

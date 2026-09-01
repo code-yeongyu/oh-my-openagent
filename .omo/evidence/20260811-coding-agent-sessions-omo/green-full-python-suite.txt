@@ -1,0 +1,17 @@
+WHAT WAS TESTED
+Command:
+  cd packages/shared-skills/skills/coding-agent-sessions
+  uv run --with pytest pytest scripts/tests -q
+
+WHAT WAS OBSERVED
+Exit code: 0
+Result: 37 passed in 1.30s
+
+WHY IT IS ENOUGH
+This executes every Python test shipped with the coding-agent-sessions skill,
+covering CLI contracts, transcript parsing, all registered scanners, optional
+SQLite stores, pi-family products, and the new `.omo` behavior.
+
+WHAT WAS OMITTED
+The repeated dot-progress line was summarized. No secrets or private session
+contents were captured.

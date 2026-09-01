@@ -28,6 +28,8 @@ describe("LazyCodex marketplace sync workflow", () => {
     const gitBashBuildIndex = syncStep.indexOf("bun run build:git-bash-mcp")
     const lspBuildIndex = syncStep.indexOf("bun run build:lsp-tools-mcp")
     const lspDaemonBuildIndex = syncStep.indexOf("bun run build:lsp-daemon")
+    const rootCliBuildIndex = syncStep.indexOf("bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm")
+    const nodeCliBuildIndex = syncStep.indexOf("bun run build:cli-node")
     const codexPluginBuildIndex = syncStep.indexOf("bun run --cwd packages/omo-codex/plugin build")
     const syncScriptIndex = syncStep.indexOf("bun run script/sync-lazycodex-marketplace.ts")
     const buildsMcpDistsBeforeCodexPlugin =
@@ -40,6 +42,8 @@ describe("LazyCodex marketplace sync workflow", () => {
       lspDaemonBuildIndex < codexPluginBuildIndex
     const buildsCodexPluginBeforeMarketplaceSync =
       codexPluginBuildIndex >= 0 && syncScriptIndex > codexPluginBuildIndex
+    const buildsRootCliBeforeMarketplaceSync =
+      rootCliBuildIndex >= 0 && nodeCliBuildIndex > rootCliBuildIndex && syncScriptIndex > nodeCliBuildIndex
 
     // #then
     expect(
@@ -47,6 +51,7 @@ describe("LazyCodex marketplace sync workflow", () => {
       "release marketplace sync must build bundled MCP dists before the Codex plugin build consumes them",
     ).toBe(true)
     expect(buildsCodexPluginBeforeMarketplaceSync, "release marketplace sync must build the Codex plugin before copying it").toBe(true)
+    expect(buildsRootCliBeforeMarketplaceSync, "release marketplace sync must build root omo CLI dists before copying it").toBe(true)
   })
 
   test("uses the vendored LSP tools package directly during release marketplace sync", () => {

@@ -15,14 +15,13 @@ import {
   discoverProjectAgentsSkills,
   discoverGlobalAgentsSkills,
   discoverSharedSkills,
-  createSharedCanonicalAliases,
   collectDisabledSkillAliases,
   isDisabledSkillAlias,
   mergeSkills,
   normalizeSkillAliasName,
   readOpencodeConfigSkills,
 } from "../features/opencode-skill-loader"
-import { resolveActiveBuiltinSkills } from "../features/builtin-skills"
+import { resolveActiveBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills"
 import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
 import { adaptHostSkillConfig } from "../shared/host-skill-config"
 
@@ -65,18 +64,6 @@ function filterDisabledSkills(
   return skills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills))
 }
 
-function filterProtectedSharedAliasCollisions(
-  skills: LoadedSkill[],
-  protectedSharedAliasNames: ReadonlySet<string>,
-): LoadedSkill[] {
-  if (protectedSharedAliasNames.size === 0) return skills
-
-  return skills.filter((skill) => {
-    if (skill.scope === "shared") return true
-    return !protectedSharedAliasNames.has(normalizeSkillAliasName(skill.name))
-  })
-}
-
 function isDisabledConfigSkillEntryName(
   name: string,
   disabledSkills: ReadonlySet<string>,
@@ -87,11 +74,18 @@ function isDisabledConfigSkillEntryName(
 export async function createSkillContext(args: {
   directory: string
   pluginConfig: OhMyOpenCodeConfig
+  /**
+   * Host skill config from opencode's merged runtime config (e.g. fetched via
+   * the plugin client). Includes runtime-injected `skills.paths` from other
+   * plugins. When omitted, falls back to reading the on-disk opencode config.
+   */
+  hostSkills?: { paths?: string[]; urls?: string[] }
 }): Promise<SkillContext> {
-  const { directory, pluginConfig } = args
+  const { directory, pluginConfig, hostSkills } = args
 
   const browserProvider: BrowserAutomationProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright"
+  const playwrightMcpArgs = pluginConfig.browser_automation_engine?.playwright_mcp_args
 
   const disabledSkills = collectDisabledSkillAliases(pluginConfig)
 
@@ -99,11 +93,12 @@ export async function createSkillContext(args: {
     browserProvider,
     disabledSkills,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
+    playwrightMcpArgs,
     systemMcpNames: getSystemMcpServerNames(),
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const hostSkillConfig = adaptHostSkillConfig(readOpencodeConfigSkills(directory))
+  const hostSkillConfig = adaptHostSkillConfig(hostSkills ?? readOpencodeConfigSkills(directory))
   const [
     configSourceSkills,
     hostConfigSkills,
@@ -177,41 +172,21 @@ export async function createSkillContext(args: {
     filteredAgentsGlobalSkills,
     disabledSkills,
   )
-  const sharedSkillAliases = createSharedCanonicalAliases(sharedSkills)
-  const protectedSharedAliasNames = new Set(
-    sharedSkillAliases.map((skill) => normalizeSkillAliasName(skill.name)),
-  )
   const filteredSharedSkills = filterDisabledSkills(
     filterProviderGatedSkills(sharedSkills, browserProvider),
-    disabledSkills,
-  )
-  const filteredSharedSkillAliases = filterDisabledSkills(
-    filterProviderGatedSkills(sharedSkillAliases, browserProvider),
     disabledSkills,
   )
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
-    filterProtectedSharedAliasCollisions(activeConfigSourceSkills, protectedSharedAliasNames),
-    [
-      ...filterProtectedSharedAliasCollisions(
-        [...activeUserSkills, ...activeAgentsGlobalSkills],
-        protectedSharedAliasNames,
-      ),
-      ...filteredSharedSkillAliases,
-      ...filteredSharedSkills,
-    ],
-    filterProtectedSharedAliasCollisions(activeGlobalSkills, protectedSharedAliasNames),
-    filterProtectedSharedAliasCollisions(
-      [...activeProjectSkills, ...activeAgentsProjectSkills],
-      protectedSharedAliasNames,
-    ),
-    filterProtectedSharedAliasCollisions(activeOpencodeProjectSkills, protectedSharedAliasNames),
+    activeConfigSourceSkills,
+    [...activeUserSkills, ...activeAgentsGlobalSkills, ...filteredSharedSkills],
+    activeGlobalSkills,
+    [...activeProjectSkills, ...activeAgentsProjectSkills],
+    activeOpencodeProjectSkills,
     {
       configDir: directory,
-      isConfigEntryAllowed: (name) =>
-        !protectedSharedAliasNames.has(normalizeSkillAliasName(name)) &&
-        !isDisabledConfigSkillEntryName(name, disabledSkills),
+      isConfigEntryAllowed: (name) => !isDisabledConfigSkillEntryName(name, disabledSkills),
     },
   )
 

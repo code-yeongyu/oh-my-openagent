@@ -1,3 +1,0 @@
-{"error":"checksum mismatch for bad: expected 0000, got fa4b910ea2ee3c8ea08abc1bfec5d12089a527ec277459201c75a597eaa8b2a4","provisioned":false}
-LOCK_DIR:/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.jIeYkm88fN
-NO_PARTIAL

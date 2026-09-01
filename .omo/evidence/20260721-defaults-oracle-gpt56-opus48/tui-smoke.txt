@@ -1,0 +1,5 @@
+PASS: TUI rendered under tmux (marker found; version 1.18.3)
+PASS: send-keys reached the TUI composer (sentinel echoed)
+PASS: tmux session torn down (has-session false)
+PASS: real DB untouched (session count 0 unchanged)
+PASS: tui-smoke

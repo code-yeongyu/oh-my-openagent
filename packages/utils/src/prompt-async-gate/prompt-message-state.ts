@@ -1,4 +1,5 @@
 import {
+  hasInternalInitiatorMarker,
   isSyntheticOrInternalUserMessage,
   isTerminalNoReplyUserMessage,
   type InternalInitiatorMessageLike,
@@ -105,6 +106,16 @@ export function messageIsSyntheticOrInternalUser(message: unknown): boolean {
 export function messageIsTerminalNoReplyUser(message: unknown): boolean {
   const initiatorMessage = toInternalInitiatorMessageLike(message)
   return initiatorMessage !== undefined && isTerminalNoReplyUserMessage(initiatorMessage)
+}
+
+export function messageHasInternalInitiatorMarker(message: unknown): boolean {
+  const initiatorMessage = toInternalInitiatorMessageLike(message)
+  if (initiatorMessage === undefined) {
+    return false
+  }
+  return (initiatorMessage.parts ?? []).some(
+    (part) => part.type === "text" && typeof part.text === "string" && hasInternalInitiatorMarker(part.text)
+  )
 }
 
 const QUESTION_TOOL_NAMES = new Set(["question", "ask_user_question", "askuserquestion"])

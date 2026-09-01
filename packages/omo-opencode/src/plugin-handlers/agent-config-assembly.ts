@@ -140,20 +140,21 @@ async function createCoreAgentConfig(
 function applyDefaultAgent(
   config: Record<string, unknown>,
   configuredDefaultAgent: string | undefined,
+  pluginConfig?: OhMyOpenCodeConfig,
 ): void {
   if (configuredDefaultAgent) {
     const configKey = getAgentConfigKey(configuredDefaultAgent);
     const runtimeConfigKey = normalizeAgentForPromptKey(configuredDefaultAgent) ?? configKey;
-    config.default_agent = getAgentDisplayName(runtimeConfigKey);
+    config.default_agent = getAgentDisplayName(runtimeConfigKey, pluginConfig?.agents);
     return;
   }
 
-  config.default_agent = getAgentDisplayName("sisyphus");
+  config.default_agent = getAgentDisplayName("sisyphus", pluginConfig?.agents);
 }
 
 async function assembleSisyphusEnabledConfig(params: AssembleAgentConfigParams): Promise<void> {
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
-  applyDefaultAgent(params.config, configuredDefaultAgent);
+  applyDefaultAgent(params.config, configuredDefaultAgent, params.pluginConfig);
 
   const agentConfig = await createCoreAgentConfig(params);
   const { configAgent } = params.sources;

@@ -101,6 +101,7 @@ function createDeps(pluginConfig: HookDeps["pluginConfig"] = undefined): HookDep
       cooldown_seconds: 60,
       timeout_seconds: 30,
       notify_on_fallback: false,
+      restore_primary_after_cooldown: false,
     },
     options: undefined,
     pluginConfig,
@@ -135,7 +136,7 @@ function createHelpers(calls: RecordedCalls, resolvedAgentName?: string): AutoRe
 }
 
 const AGENT = "sisyphus-junior"
-const PRIMARY_MODEL = "openai/gpt-5.4-mini"
+const PRIMARY_MODEL = "openai/gpt-5.6-luna-fast"
 const FALLBACK_MODEL = "anthropic/claude-haiku-4-5"
 const PLUGIN_CONFIG_WITH_FALLBACK = {
   git_master: {
@@ -377,11 +378,11 @@ describe("observeEventForWatchdog", () => {
     observeEventForWatchdog(
       {
         type: "message.updated",
-        properties: { info: { sessionID, role: "user", model: "openai/gpt-5.4-mini", agent: "sisyphus-junior" } },
+        properties: { info: { sessionID, role: "user", model: "openai/gpt-5.6-luna-fast", agent: "sisyphus-junior" } },
       },
       createRecordingWatchdog(calls),
     )
-    expect(calls.user).toEqual([{ sessionID, model: "openai/gpt-5.4-mini", agent: "sisyphus-junior" }])
+    expect(calls.user).toEqual([{ sessionID, model: "openai/gpt-5.6-luna-fast", agent: "sisyphus-junior" }])
     expect(calls.progress).toEqual([])
     expect(calls.terminal).toEqual([])
   })

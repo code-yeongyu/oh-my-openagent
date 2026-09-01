@@ -1,3 +1,7 @@
+import type { ServerLookupResult } from "./types.js";
+
+export type FailedServerLookupResult = Exclude<ServerLookupResult, { status: "found" }>;
+
 export class LspConnectionClosedError extends Error {
 	override readonly name = "LspConnectionClosedError";
 
@@ -42,6 +46,13 @@ export class LspInvalidPathError extends Error {
 
 export class LspServerLookupError extends Error {
 	override readonly name = "LspServerLookupError";
+
+	constructor(
+		message: string,
+		readonly lookup?: FailedServerLookupResult,
+	) {
+		super(message);
+	}
 }
 
 export class LspServerInitializingError extends Error {
@@ -56,6 +67,21 @@ export class LspServerInitializingError extends Error {
 
 export class LspProcessSpawnError extends Error {
 	override readonly name = "LspProcessSpawnError";
+}
+
+export class LspClientRespawnBudgetExceededError extends Error {
+	override readonly name = "LspClientRespawnBudgetExceededError";
+
+	constructor(
+		readonly serverId: string,
+		readonly root: string,
+		readonly retryLimit: number,
+	) {
+		super(
+			`LSP server ${serverId} at ${root} failed to stay alive; respawn budget exhausted ` +
+				`(${retryLimit} consecutive dead generations). Retrying after the cooldown may succeed.`,
+		);
+	}
 }
 
 export function isLspDeadConnectionError(err: unknown): err is LspConnectionClosedError | LspProcessExitedError {

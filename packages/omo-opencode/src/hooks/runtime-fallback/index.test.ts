@@ -97,6 +97,7 @@ describe("runtime-fallback", () => {
       max_fallback_attempts: 3,
       cooldown_seconds: 60,
       notify_on_fallback: true,
+      restore_primary_after_cooldown: false,
       ...overrides,
     }
   }
@@ -2642,7 +2643,7 @@ describe("runtime-fallback", () => {
 
     test("should restore configured primary when reopened on a configured fallback model", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
-        config: createMockConfig({ notify_on_fallback: false }),
+        config: createMockConfig({ notify_on_fallback: false, restore_primary_after_cooldown: true }),
         pluginConfig: createMockPluginConfigWithCategoryModel(
           "test",
           "anthropic/claude-opus-4-5",

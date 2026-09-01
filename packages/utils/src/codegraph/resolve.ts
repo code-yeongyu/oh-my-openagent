@@ -5,6 +5,7 @@ import { basename, dirname, join } from "node:path"
 import { createRequire } from "node:module"
 
 import { bunWhich } from "../runtime/which"
+import { resolvePinnedCodegraphBin } from "./managed-runtime"
 import { CODEGRAPH_NODE_BIN_ENV, evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "./node-support"
 
 export type CodegraphCommandSource = "bundled" | "env" | "path" | "provisioned"
@@ -44,6 +45,14 @@ const CODEGRAPH_PACKAGE = "@colbymchenry/codegraph"
 const CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN"
 const CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN"
 const CODEGRAPH_NODE_CANDIDATES = ["node24", "node22", "node20", "node"] as const
+const CODEGRAPH_NODE_PATH_CANDIDATES = [
+  "/opt/homebrew/opt/node@24/bin/node",
+  "/opt/homebrew/opt/node@22/bin/node",
+  "/opt/homebrew/opt/node@20/bin/node",
+  "/usr/local/opt/node@24/bin/node",
+  "/usr/local/opt/node@22/bin/node",
+  "/usr/local/opt/node@20/bin/node",
+] as const
 const requireFromHere = createRequire(import.meta.url)
 
 function defaultRequireResolve(specifier: string): string {
@@ -111,6 +120,7 @@ function defaultNodeRuntime(
   const candidates = [
     ...(isNodeExecutableName(process.execPath) ? [process.execPath] : []),
     ...CODEGRAPH_NODE_CANDIDATES.map((commandName) => which(commandName)).filter((candidate) => candidate !== null),
+    ...CODEGRAPH_NODE_PATH_CANDIDATES.filter((candidate) => fileExists(candidate)),
   ]
   const seen = new Set<string>()
   for (const candidate of candidates) {
@@ -147,12 +157,7 @@ export function resolveCodegraphNodeSupport(
 }
 
 function defaultProvisionedBin(homeDir: string, fileExists: (filePath: string) => boolean): string | null {
-  const binaryName = process.platform === "win32" ? "codegraph.cmd" : "codegraph"
-  const candidates = [
-    join(homeDir, ".omo", "codegraph", "bin", binaryName),
-    join(homeDir, ".omo", "codegraph", "node-servers", "node_modules", ".bin", binaryName),
-  ]
-  return candidates.find((candidate) => fileExists(candidate)) ?? null
+  return resolvePinnedCodegraphBin(join(homeDir, ".omo", "codegraph"), { fileExists })
 }
 
 function resolveBundledShim(

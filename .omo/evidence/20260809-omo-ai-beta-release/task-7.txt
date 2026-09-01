@@ -1,0 +1,516 @@
+$ bun test packages/omo-native
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/launcher.test.ts:
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:87:25)
+(fail) omo launcher > #given a fake senpi package > #when the default command is launched > #then the packaged extension precedes user extension arguments [2.49ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:96:25)
+(fail) omo launcher > #given a fake senpi package > #when the default command is launched > #then launcher environment points to existing hoisted shims [0.43ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:110:25)
+(fail) omo launcher > #given a fake senpi package > #when the default command is launched > #then SENPI_BIN stays absent when no shim exists [0.23ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:124:27)
+(fail) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then install passes through without an extension argument [0.28ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:124:27)
+(fail) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then remove passes through without an extension argument [0.29ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:124:27)
+(fail) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then list passes through without an extension argument [0.25ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:124:27)
+(fail) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then config passes through without an extension argument [0.26ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:124:27)
+(fail) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then auth passes through without an extension argument [0.27ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:124:27)
+(fail) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then app-server passes through without an extension argument [0.18ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:124:27)
+(fail) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update passes through without an extension argument [0.35ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:135:25)
+(fail) omo launcher > #given a fake senpi package > #when bare update is requested > #then npm beta guidance is printed without spawning senpi [0.30ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:145:25)
+(fail) omo launcher > #given a fake senpi package > #when ulw-loop is requested > #then the staged runtime CLI receives the remaining arguments [0.26ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:154:25)
+(fail) omo launcher > #given a fake senpi package > #when the child terminates > #then exit zero and exit seven propagate [0.21ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:160:25)
+(fail) omo launcher > #given a fake senpi package > #when the child terminates > #then SIGINT is re-raised by the launcher [0.21ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:30:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/launcher.test.ts:168:25)
+(fail) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then resolution fails with actionable reinstall guidance [0.21ms]
+
+packages/omo-native/test/senpi-pin.test.ts:
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [0.10ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.06ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.09ms]
+
+packages/omo-native/test/doctor.test.ts:
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:65:25)
+(fail) omo doctor > #given a complete packaged installation > #when diagnostics run > #then every required check passes [0.32ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:79:25)
+(fail) omo doctor > #given a required packaged artifact is missing > #then missing plugin manifest fails diagnostics and names the path [0.23ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:79:25)
+(fail) omo doctor > #given a required packaged artifact is missing > #then missing extension fails diagnostics and names the path [0.20ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:79:25)
+(fail) omo doctor > #given a required packaged artifact is missing > #then missing lsp-daemon runtime fails diagnostics and names the path [0.19ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:79:25)
+(fail) omo doctor > #given a required packaged artifact is missing > #then missing agent-toolkit runtime fails diagnostics and names the path [0.19ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:91:23)
+(fail) omo doctor > #given the installed senpi version differs from the packaged pin > #then the version check fails with both versions [0.20ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:112:25)
+(fail) omo doctor > #given settings contain the legacy package entry > #then the string shape warns without changing settings [0.22ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:112:25)
+(fail) omo doctor > #given settings contain the legacy package entry > #then the object shape warns without changing settings [0.19ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:127:23)
+(fail) omo doctor > #given settings JSON is malformed > #then diagnostics warn and continue without changing settings [0.26ms]
+131 |       errno: EINVAL,
+132 |       code: "EINVAL"
+133 |     });
+134 |   return { __proto__: null, srcStat, destStat, skipped: !1 };
+135 | }
+136 |   let destStat, statFunc = opts.dereference ? (file) => statSync(file, { bigint: !0 }) : (file) => lstatSync(file, { bigint: !0 }), srcStat = statFunc(src);
+                                                                                                                                                            ^
+error: ENOENT: no such file or directory, lstat '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin'
+      at getStatsSync (internal:fs/cp-sync:136:151)
+      at checkPathsSync (internal:fs/cp-sync:98:43)
+      at tryNativeFastPathSync (internal:fs/cp-sync:188:31)
+      at cpSync (node:fs:335:48)
+      at createFixture (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:28:3)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/doctor.test.ts:140:23)
+(fail) omo doctor > #given SENPI_CODING_AGENT_DIR points to an alternate agent directory > #then doctor reads settings from that directory first [0.21ms]
+
+ 3 pass
+ 25 fail
+ 7 expect() calls
+Ran 28 tests across 3 files. [112.00ms]
+RED_EXIT=1
+
+$ bun test packages/omo-native
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/launcher.test.ts:
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then the packaged extension precedes user extension arguments [51.78ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then launcher environment points to existing hoisted shims [48.65ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then SENPI_BIN stays absent when no shim exists [48.53ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then install passes through without an extension argument [48.60ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then remove passes through without an extension argument [102.14ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then list passes through without an extension argument [61.64ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then config passes through without an extension argument [48.87ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then auth passes through without an extension argument [49.41ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then app-server passes through without an extension argument [48.62ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update with flags passes through without an extension argument [49.08ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update with a source passes through without an extension argument [48.19ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then npm beta guidance is printed without spawning senpi [25.01ms]
+(pass) omo launcher > #given a fake senpi package > #when ulw-loop is requested > #then the staged runtime CLI receives the remaining arguments [47.10ms]
+(pass) omo launcher > #given a fake senpi package > #when the committed agent-toolkit delegate is launched > #then the staged dispatcher receives all arguments [50.60ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then exit zero and exit seven propagate [129.19ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then SIGINT is re-raised by the launcher [51.43ms]
+(pass) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then resolution fails with actionable reinstall guidance [26.03ms]
+(pass) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then a missing dependency fails with the same reinstall guidance [26.35ms]
+
+packages/omo-native/test/senpi-pin.test.ts:
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [0.33ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.06ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.10ms]
+
+packages/omo-native/test/doctor.test.ts:
+(pass) omo doctor > #given a complete packaged installation > #when diagnostics run > #then every required check passes [25.87ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing plugin manifest fails diagnostics and names the path [26.66ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing extension fails diagnostics and names the path [26.62ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing lsp-daemon runtime fails diagnostics and names the path [26.15ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing agent-toolkit runtime fails diagnostics and names the path [26.17ms]
+(pass) omo doctor > #given the installed senpi version differs from the packaged pin > #then the version check fails with both versions [25.61ms]
+(pass) omo doctor > #given settings contain the legacy package entry > #then the string shape warns without changing settings [26.09ms]
+(pass) omo doctor > #given settings contain the legacy package entry > #then the object shape warns without changing settings [31.02ms]
+(pass) omo doctor > #given settings JSON is malformed > #then diagnostics warn and continue without changing settings [27.67ms]
+(pass) omo doctor > #given SENPI_CODING_AGENT_DIR points to an alternate agent directory > #then doctor reads settings from that directory first [26.76ms]
+
+ 31 pass
+ 0 fail
+ 117 expect() calls
+Ran 31 tests across 3 files. [1327.00ms]
+
+$ node packages/omo-native/bin/omo.js --version
+2026.8.9
+VERSION_EXIT=0
+
+$ find packages/omo-native/bin -name "*.js" -print0 | xargs -0 wc -l
+       9 packages/omo-native/bin/omo.js
+      14 packages/omo-native/bin/omo-agent-toolkit.js
+      18 packages/omo-native/bin/lib/child-process.js
+      81 packages/omo-native/bin/lib/doctor.js
+      39 packages/omo-native/bin/lib/package-paths.js
+      59 packages/omo-native/bin/lib/launcher.js
+     220 total
+
+$ node --check launcher files
+NODE_CHECK_EXIT=0
+
+$ bun test packages/omo-native (final)
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/launcher.test.ts:
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then the packaged extension precedes user extension arguments [52.71ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then launcher environment points to existing hoisted shims [49.21ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then SENPI_BIN stays absent when no shim exists [49.65ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then install passes through without an extension argument [49.80ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then remove passes through without an extension argument [51.24ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then list passes through without an extension argument [47.82ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then config passes through without an extension argument [49.57ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then auth passes through without an extension argument [50.80ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then app-server passes through without an extension argument [51.17ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update with flags passes through without an extension argument [50.34ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update with a source passes through without an extension argument [52.84ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then npm beta guidance is printed without spawning senpi [27.32ms]
+(pass) omo launcher > #given a fake senpi package > #when ulw-loop is requested > #then the staged runtime CLI receives the remaining arguments [53.82ms]
+(pass) omo launcher > #given a fake senpi package > #when the committed agent-toolkit delegate is launched > #then the staged dispatcher receives all arguments [46.33ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then exit zero and exit seven propagate [95.64ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then SIGINT is re-raised by the launcher [47.38ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then child stdio remains inherited [48.56ms]
+(pass) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then resolution fails with actionable reinstall guidance [26.59ms]
+(pass) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then a missing dependency fails with the same reinstall guidance [26.25ms]
+
+packages/omo-native/test/senpi-pin.test.ts:
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [0.09ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.06ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.09ms]
+
+packages/omo-native/test/doctor.test.ts:
+(pass) omo doctor > #given a complete packaged installation > #when diagnostics run > #then every required check passes [26.32ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing plugin manifest fails diagnostics and names the path [27.07ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing extension fails diagnostics and names the path [26.32ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing lsp-daemon runtime fails diagnostics and names the path [26.48ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing agent-toolkit runtime fails diagnostics and names the path [25.41ms]
+(pass) omo doctor > #given the installed senpi version differs from the packaged pin > #then the version check fails with both versions [26.40ms]
+(pass) omo doctor > #given settings contain the legacy package entry > #then the string shape warns without changing settings [26.34ms]
+(pass) omo doctor > #given settings contain the legacy package entry > #then the object shape warns without changing settings [26.48ms]
+(pass) omo doctor > #given settings JSON is malformed > #then diagnostics warn and continue without changing settings [25.82ms]
+(pass) omo doctor > #given SENPI_CODING_AGENT_DIR points to an alternate agent directory > #then doctor reads settings from that directory first [26.02ms]
+
+ 32 pass
+ 0 fail
+ 119 expect() calls
+Ran 32 tests across 3 files. [1287.00ms]
+FINAL_TEST_EXIT=0
+
+$ tsgo --noEmit -p packages/omo-native/tsconfig.json
+TSGO_EXIT=0
+
+Verification summary:
+- RED: 3 pass, 25 fail because packages/omo-native/bin did not exist; RED_EXIT=1.
+- GREEN: 32 pass, 0 fail, 119 assertions.
+- tsgo: clean with exit 0.
+- node --version smoke: 2026.8.9, exit 0.
+- launcher JavaScript modules: every file below 250 lines; node --check clean.
+- LSP diagnostics: bin and doctor test clean; launcher test covered by clean tsgo after the LSP refresh timed out.
+
+Spec interpretation:
+- Bare update means exactly `omo update`; any following flag or source argument passes through to senpi.
+- A missing valid senpi shim removes an inherited SENPI_BIN so the child receives it unset, matching the no-shim fallback contract.
+- Duplicate and malformed settings warnings are non-failing and settings remain byte-identical.
