@@ -17,7 +17,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.6-sol",
         variant: "medium",
       },
-      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan"], model: "glm-5.2" },
+      { providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode", "bailian-coding-plan"], model: "glm-5.2" },
       { providers: ["opencode"], model: "big-pickle" }
     ],
     requiresAnyModel: true,
@@ -47,7 +47,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-5",
         variant: "max",
       },
-      { providers: ["opencode-go"], model: "glm-5.2" }
+      { providers: ["opencode-go", "zai-coding-plan", "zhipuai-coding-plan"], model: "glm-5.2" }
     ],
   },
   librarian: {
@@ -78,7 +78,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["openai", "openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "low" },
       { providers: ["opencode-go"], model: "kimi-k3" },
-      { providers: ["zai-coding-plan"], model: "glm-4.6v" },
+      { providers: ["zai-coding-plan", "zhipuai-coding-plan"], model: "glm-4.6v" },
       { providers: ["openai", "openai-codex", "github-copilot", "opencode"], model: "gpt-5-nano" }
     ],
   },
@@ -126,7 +126,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gemini-3.1-pro",
         variant: "high",
       },
-      { providers: ["opencode-go"], model: "glm-5.2" }
+      { providers: ["opencode-go", "zai-coding-plan", "zhipuai-coding-plan"], model: "glm-5.2" }
     ],
   },
   "omo-senpi-code-reviewer": {

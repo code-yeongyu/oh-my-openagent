@@ -95,7 +95,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
         { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
         { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
-        { providers: ["opencode-go"], model: "glm-5.2" }
+        { providers: ["opencode-go", "zai-coding-plan", "zhipuai-coding-plan"], model: "glm-5.2" }
       ],
       "omo-senpi-code-reviewer": [
         { providers: ["openai", "openai-codex"], model: "gpt-5.6-terra", variant: "medium" },

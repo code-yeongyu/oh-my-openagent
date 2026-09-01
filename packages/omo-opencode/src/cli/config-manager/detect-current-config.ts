@@ -10,6 +10,7 @@ function detectProvidersFromOmoConfig(): {
   hasOpenAI: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
+  hasZhipuaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasBailianCodingPlan: boolean
@@ -23,6 +24,7 @@ function detectProvidersFromOmoConfig(): {
       hasOpenAI: true,
       hasOpencodeZen: true,
       hasZaiCodingPlan: false,
+      hasZhipuaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
       hasBailianCodingPlan: false,
@@ -40,6 +42,7 @@ function detectProvidersFromOmoConfig(): {
         hasOpenAI: true,
         hasOpencodeZen: true,
         hasZaiCodingPlan: false,
+        hasZhipuaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
         hasBailianCodingPlan: false,
@@ -53,6 +56,7 @@ function detectProvidersFromOmoConfig(): {
     const hasOpenAI = configStr.includes('"openai/')
     const hasOpencodeZen = configStr.includes('"opencode/')
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
+    const hasZhipuaiCodingPlan = configStr.includes('"zhipuai-coding-plan/')
     const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
     const hasOpencodeGo = configStr.includes('"opencode-go/')
     const hasBailianCodingPlan = configStr.includes('"bailian-coding-plan/')
@@ -64,6 +68,7 @@ function detectProvidersFromOmoConfig(): {
       hasOpenAI,
       hasOpencodeZen,
       hasZaiCodingPlan,
+      hasZhipuaiCodingPlan,
       hasKimiForCoding,
       hasOpencodeGo,
       hasBailianCodingPlan,
@@ -77,6 +82,7 @@ function detectProvidersFromOmoConfig(): {
         hasOpenAI: true,
         hasOpencodeZen: true,
         hasZaiCodingPlan: false,
+        hasZhipuaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
         hasBailianCodingPlan: false,
@@ -89,6 +95,7 @@ function detectProvidersFromOmoConfig(): {
       hasOpenAI: true,
       hasOpencodeZen: true,
       hasZaiCodingPlan: false,
+      hasZhipuaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
       hasBailianCodingPlan: false,
@@ -122,6 +129,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasCodex: false,
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
+    hasZhipuaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
     hasBailianCodingPlan: false,
@@ -160,6 +168,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasOpenAI,
     hasOpencodeZen,
     hasZaiCodingPlan,
+    hasZhipuaiCodingPlan,
     hasKimiForCoding,
     hasOpencodeGo,
     hasBailianCodingPlan,
@@ -170,6 +179,7 @@ export function detectCurrentConfig(): DetectedConfig {
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
+  result.hasZhipuaiCodingPlan = hasZhipuaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
   result.hasOpencodeGo = hasOpencodeGo
   result.hasBailianCodingPlan = hasBailianCodingPlan

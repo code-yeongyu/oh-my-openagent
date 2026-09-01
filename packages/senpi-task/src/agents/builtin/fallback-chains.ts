@@ -74,6 +74,6 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       model: "gemini-3.1-pro",
       variant: "high",
     },
-    { providers: ["opencode-go"], model: "glm-5.2" }
+    { providers: ["opencode-go", "zai-coding-plan", "zhipuai-coding-plan"], model: "glm-5.2" }
   ],
 }
