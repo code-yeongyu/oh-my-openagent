@@ -48,6 +48,17 @@ describe("parseGitStatusPorcelainLine", () => {
 		expect(result).toEqual({ filePath: "src/d.ts", status: "deleted" })
 	})
 
+	test("#given renamed porcelain line #when parsing #then returns the destination path", () => {
+		//#given
+		const line = "R  src/old.ts -> src/new.ts"
+
+		//#when
+		const result = parseGitStatusPorcelainLine(line)
+
+		//#then
+		expect(result).toEqual({ filePath: "src/new.ts", status: "modified" })
+	})
+
 	test("#given empty line #when parsing #then returns null", () => {
 		//#given
 		const line = ""

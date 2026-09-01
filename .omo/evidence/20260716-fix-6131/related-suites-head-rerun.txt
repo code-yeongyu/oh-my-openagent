@@ -1,0 +1,8 @@
+bun test v1.3.14 (0d9b296a)
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at C:\Users\pss\AppData\Local\Temp\lsp-apply-edit-V5PfHw exited with code 0
+
+ 90 pass
+ 0 fail
+ 268 expect() calls
+Ran 90 tests across 21 files. [26.93s]
+exit=0

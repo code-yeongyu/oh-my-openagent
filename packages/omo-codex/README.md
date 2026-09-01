@@ -1,6 +1,6 @@
 # @oh-my-opencode/omo-codex
 
-Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, plugin-scoped MCPs, ultrawork, ulw-loop, start-work continuation, telemetry) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
+Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, plugin-scoped MCPs, ultrawork, ulw-loop, ulw-execute continuation, telemetry) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
 
 ## Layout
 
@@ -19,8 +19,8 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 - `lsp` (TypeScript + LSP MCP) - exposes LSP diagnostics, navigation, symbols, rename via MCP + post-edit hooks.
 - `git-bash` (TypeScript + Git Bash MCP) - exposes the Windows-only `git_bash` MCP and reminds Codex on the first shell-like call, including the first one after compaction.
 - `ultrawork` (TypeScript) - keyword detector (`ulw` / `ultrawork`) that injects the full ultrawork directive; bundled agent TOML files are installed into `CODEX_HOME/agents`.
-- `ulw-loop` (TypeScript) - durable multi-goal orchestration backed by `.omo/ulw-loop/` evidence audit.
-- `start-work-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` start-work plans.
+- `ulw-loop` (TypeScript) - durable multi-goal orchestration backed by `.omo/ulw-loop/` evidence audit; `PreToolUse` spawn guards (fan-out cap + gate-artifact preflight) and a `Stop` auto-resume hook.
+- `ulw-execute-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` ulw-execute plans.
 - `telemetry` (TypeScript) - anonymous daily active telemetry hook.
 
 ## Install
@@ -39,8 +39,90 @@ The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/
 
 To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
+### Local dev install (dogfood the source build)
+
+To run **this repo's local build** on your real `~/.codex` instead of the published package, stamped so you can see at a glance you're on a dev build:
+
+```bash
+bun run install:codex-dev            # uninstalls current, installs repo HEAD as version "dev"
+bun run script/install-codex-dev.ts --version=dev-$(git rev-parse --short HEAD)  # custom stamp
+bun run script/install-codex-dev.ts --no-uninstall   # skip the uninstall step
+```
+
+This sets `LAZYCODEX_DEV_VERSION` (default `dev`), which threads through `resolveLazyCodexPluginVersion` so the plugin version stamp becomes that value everywhere it appears: the cache dir (`~/.codex/plugins/cache/sisyphuslabs/omo/dev/`), `.codex-plugin/plugin.json`, the stamped `package.json`, and — most visibly — the hook status prefix Codex prints every turn (`(OmO dev) ...`). `omo get-local-version` renders a `[DEV]` badge and skips the npm update check for any non-semver stamp. A plain `LAZYCODEX_DEV_VERSION`-less `lazycodex install` is unchanged. This writes to your REAL `~/.codex`; for isolated QA use the throwaway-`CODEX_HOME` flow instead.
+
+
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
 The same plugin-scoped MCP manifest also bundles `grep_app`, `git_bash`, `lsp`, and `codegraph`. The ast-grep capability ships as the `ast-grep` skill and provisions `sg` into the Codex runtime. `git_bash` is enabled only on Windows by default. `codegraph` is enabled only when the installer can resolve a supported local Node runtime for CodeGraph; unsupported runtimes disable that MCP policy while keeping `omo@sisyphuslabs` enabled.
+
+### CodeGraph exclusions
+
+CodeGraph is skipped for project roots under default ephemeral/state locations: POSIX `/tmp`, POSIX `/private/tmp`, the current OS temp directory on every platform, and any path containing a `.omo` segment. Skipped projects do not run the `SessionStart` bootstrap worker and the MCP exposes an unavailable stub instead of starting CodeGraph.
+
+Add extra exclude-only roots with `codegraph.excluded_roots`:
+
+```jsonc
+{
+  "codegraph": {
+    "excluded_roots": ["~/scratch/codegraph", "relative-cache-root"]
+  }
+}
+```
+
+Entries may be absolute, `~`-relative, or relative to the configured home directory. OMO expands `~`, realpath-canonicalizes each configured root when possible, and compares descendants after platform-aware normalization. There is no include override.
+
+CodeGraph runs with `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment. The shared daemon is enabled by default; setting `codegraph.daemon` to `false` adds `CODEGRAPH_NO_DAEMON=1`. OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
+
+### CodeGraph SessionStart bootstrap
+
+The Codex `SessionStart` hook never runs `codegraph status`. It judges a project initialized only when `<projectRoot>/.codegraph/codegraph.db` exists. If an ancestor directory has that database, the nested project is treated as covered and no duplicate child index is initialized.
+
+Only a definitively uninitialized project may spawn the background initializer. OMO serializes attempts with an atomic per-project lock under `~/.omo/codegraph/session-start/locks/`, recovers stale locks, and records worker failures in an exponential cooldown stamp. The default cooldown starts at 15 minutes, doubles after consecutive failures, and caps at 24 hours. Configure the base interval for Codex with `codegraph.session_start_cooldown_ms` (minimum 60000):
+
+```jsonc
+{
+  "[codex]": {
+    "codegraph": {
+      "session_start_cooldown_ms": 900000
+    }
+  }
+}
+```
+
+Suppressed attempts are auditable in `~/.omo/codegraph/session-start.jsonl` through actions such as `skipped-cooldown`, `skipped-locked`, and `skipped-nested-root`. The worker invokes only bounded `codegraph init` and records success only when the exact project database appears afterward; probe errors and timeouts never mean "uninitialized".
+
+### CodeGraph daemon
+
+By default CodeGraph uses the upstream shared daemon. Set `codegraph.daemon` to `false` in the unified OMO config (`~/.omo/omo.jsonc`, or `.omo/omo.jsonc` in a project) to keep each MCP process in-process:
+
+```jsonc
+{
+  "codegraph": {
+    // Default true. Set false to keep the index inside each MCP client.
+    "daemon": false
+  }
+}
+```
+
+With the daemon enabled, upstream CodeGraph spawns one detached daemon per project, rooted at the nearest ancestor holding `.codegraph/codegraph.db`, and every client for that project talks to it over a local socket. The daemon records itself in `.codegraph/daemon.pid`, exits after about five minutes idle, and runs under an upstream PPID watchdog. The default trades a detached background process for lower first-query latency once any client has warmed the daemon, plus one shared index across concurrent clients. Set `daemon: false` when strict client-scoped process lifetime is preferred.
+
+Inspect or stop running daemons with the upstream manager:
+
+```bash
+codegraph daemon   # interactive list of running daemons; pick one and press enter to stop it
+```
+
+An ambient `CODEGRAPH_NO_DAEMON=1` in the environment still forces daemon-off when `codegraph.daemon` is `true`.
+
+### Process hygiene and the CodeGraph 1.5.0 upgrade
+
+CodeGraph is pinned to 1.5.0. Managed installs provisioned at 1.0.1 or 1.4.1 upgrade automatically, and project stores built by older versions remain compatible without a manual re-index.
+
+Process lifecycle is self-cleaning and always on (no config keys):
+
+- MCP server processes (`codegraph`, `lsp`, `git_bash`) run a parent-liveness watchdog and exit when their parent process dies, so a crashed harness does not leave servers behind.
+- A newly started lsp daemon reaps running daemons left over from older versions at startup.
+- A best-effort family sweep removes orphaned codegraph and lsp processes at startup on every adapter (the Codex `SessionStart` hook, OpenCode plugin startup, and Senpi session start) and self-throttles via stamp files.
 
 Native Windows installs discover Git Bash before the installer mutates `~/.codex/`. The installer checks `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations such as `C:\Program Files\Git\bin\bash.exe`, and then PATH. If Git Bash is still missing, it prints the install guidance shown here and stops without running `winget` or changing system dependencies:
 
@@ -62,6 +144,17 @@ $env:OMO_CODEX_GIT_BASH_PATH = "C:\Program Files\Git\bin\bash.exe"
 The installer does not write a global Codex shell config. On Windows it enables the plugin MCP policy for `git_bash`; on non-Windows it keeps the manifest bundled but writes `enabled = false` for that MCP server. The Git Bash hook injects fixed guidance before the first Codex shell-like `Bash` hook call in a session, and again before the first shell-like call after `PostCompact`, recommending `git_bash` before built-in `exec_command`.
 
 To install both editions in one command, use `--platform=both`.
+
+### Subagent service tier (explorer/librarian)
+
+The bundled `explorer` and `librarian` agent TOMLs ship with `service_tier = "fast"` so recon subagents run on the cheaper Fast tier by default. To opt out, edit the tier in your installed agent files and the installer will preserve your choice across every reinstall and bootstrap:
+
+```toml
+# ~/.codex/agents/explorer.toml (and librarian.toml)
+service_tier = "standard"   # use the default/parent tier instead of Fast
+```
+
+Delete the `service_tier` line entirely to inherit the parent session's tier. On reinstall the bootstrap captures your current tier and re-applies it after relinking the bundled agents, so a changed or removed tier is never silently reset back to `fast`.
 
 ## Telemetry
 
@@ -101,4 +194,4 @@ The bundled component implementations come from the Sisyphus Labs Codex plugin f
 - [code-yeongyu/codex-lsp](https://github.com/code-yeongyu/codex-lsp)
 - [code-yeongyu/codex-ultrawork](https://github.com/code-yeongyu/codex-ultrawork)
 - [code-yeongyu/codex-ulw-loop](https://github.com/code-yeongyu/codex-ulw-loop)
-- [code-yeongyu/codex-start-work-continuation](https://github.com/code-yeongyu/codex-start-work-continuation)
+- [code-yeongyu/codex-ulw-execute-continuation](https://github.com/code-yeongyu/codex-ulw-execute-continuation)

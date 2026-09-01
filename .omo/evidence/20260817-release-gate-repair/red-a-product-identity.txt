@@ -1,0 +1,30 @@
+bun test v1.3.12 (700fc117)
+
+packages/omo-senpi/src/components/telemetry/product-identity.test.ts:
+43 | 
+44 |     expect(OMO_NATIVE_POSTHOG_API_KEY).not.toBe(UNCONFIGURED_POSTHOG_API_KEY)
+45 |     expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
+46 |     expect(config.platform).toBe("omo-senpi")
+47 |     expect(config.machineIdPrefix).toBe("omo-senpi:")
+48 |     expect(config.packageVersion).toBe("5.0.0-beta.7")
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "5.0.0-beta.7"
+Received: "5.0.0-beta.8"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/diag-publish-parity/packages/omo-senpi/src/components/telemetry/product-identity.test.ts:48:35)
+(fail) OmO Native product identity > #given the native product #when config is created #then identity derivation and effective geoip settings are fixed [5.56ms]
+(pass) OmO Native product identity > #given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi [0.65ms]
+(pass) OmO Native product identity > #given a machine state directory #when session ids are hashed #then the persisted salt is stable and raw ids stay distinct [1.25ms]
+(pass) OmO Native product identity > #given a deleted salt #when another session id is hashed #then the salt is recreated without throwing [1.02ms]
+(pass) OmO Native product identity > #given an unwritable state path #when a session id is hashed #then fallback identity stays stable without throwing [0.10ms]
+(pass) OmO Native product identity > #given a known provider with an unknown custom model #when masked #then only model_id becomes custom [0.26ms]
+(pass) OmO Native product identity > #given senpi-task builtins #when telemetry allowlists are loaded #then names exactly match imported sources [0.12ms]
+(pass) OmO Native product identity > #given the tracked-call cap #when the widest wave histogram is encoded #then it stays inside the 64 character privacy limit [0.29ms]
+(pass) OmO Native product identity > #given static telemetry inventories #when inspected #then they and every property allowlist are frozen [0.29ms]
+
+ 8 pass
+ 1 fail
+ 158 expect() calls
+Ran 9 tests across 1 file. [1313.00ms]

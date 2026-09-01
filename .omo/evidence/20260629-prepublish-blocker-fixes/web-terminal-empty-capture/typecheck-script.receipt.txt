@@ -1,2 +1,0 @@
-command: bun run typecheck:script
-exit_code: 0

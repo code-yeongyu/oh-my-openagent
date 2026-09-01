@@ -1,2 +1,0 @@
-$ test -f ~/.codex/config.toml && shasum -a 256 ~/.codex/config.toml || echo missing
-6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c  /Users/yeongyu/.codex/config.toml

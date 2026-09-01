@@ -1,4 +1,4 @@
-import { isGpt5_5Model } from "../../agents/types"
+import { isGpt5_5Model, isGpt5_6Model } from "../../agents/types"
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 
 const ULTRABRAIN_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -67,7 +67,7 @@ The orchestrator chose this category because the task benefits from depth over s
 </Category_Context>`
 
 export function resolveDeepCategoryPromptAppend(model: string | undefined): string {
-  if (model && isGpt5_5Model(model)) {
+  if (model && (isGpt5_5Model(model) || isGpt5_6Model(model))) {
     return DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5
   }
   return DEEP_CATEGORY_PROMPT_APPEND
@@ -86,62 +86,44 @@ Approach:
 - Minimal viable implementation
 - Skip unnecessary abstractions
 - Direct and concise
-</Category_Context>
+</Category_Context>`
 
-<Caller_Warning>
-THIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.4-mini).
+const QUICK_CATEGORY_CALLER_GUIDANCE = `<Caller_Warning>Small/fast model: before delegating, write an explicit prompt with numbered must-do steps, forbidden deviations, and concrete success criteria.</Caller_Warning>`
 
-The model executing this task is optimized for speed over depth. Your prompt MUST be:
+const UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on tasks that don't fit specific categories but require moderate effort.
+</Category_Context>`
 
-**EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:
-1. MUST DO: List every required action as atomic, numbered steps
-2. MUST NOT DO: Explicitly forbid likely mistakes and deviations
-3. EXPECTED OUTPUT: Describe exact success criteria with concrete examples
-
-**WHY THIS MATTERS:**
-- Smaller models benefit from explicit guardrails
-- Vague instructions may lead to unpredictable results
-- Implicit expectations may be missed
-**PROMPT STRUCTURE (MANDATORY):**
-\`\`\`
-TASK: [One-sentence goal]
-
-MUST DO:
-1. [Specific action with exact details]
-2. [Another specific action]
-...
-
-MUST NOT DO:
-- [Forbidden action + why]
-- [Another forbidden action]
-...
-
-EXPECTED OUTPUT:
-- [Exact deliverable description]
-- [Success criteria / verification method]
-\`\`\`
-
-If your prompt lacks this structure, REWRITE IT before delegating.
-</Caller_Warning>`
+const UNSPECIFIED_LOW_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Use only when no specialist category fits, effort is moderate, and scope stays within a few files/modules. Prefer any matching specialist category.</Selection_Gate>
+<Caller_Warning>Provide explicit must-do steps, forbidden scope, and concrete success criteria.</Caller_Warning>`
 
 export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
     name: "ultrabrain",
-    config: { model: "openai/gpt-5.5", variant: "xhigh" },
+    config: { model: "openai/gpt-5.6-sol", variant: "xhigh" },
     description: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     promptAppend: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "deep",
-    config: { model: "openai/gpt-5.5", variant: "medium" },
+    config: { model: "openai/gpt-5.6-sol", variant: "medium" },
     description: "Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.",
     promptAppend: DEEP_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepCategoryPromptAppend,
+    requiresModel: "gpt-5.6-sol",
   },
   {
     name: "quick",
-    config: { model: "openai/gpt-5.4-mini" },
+    config: { model: "kimi-for-coding/kimi-for-coding-highspeed" },
     description: "Trivial tasks - single file changes, typo fixes, simple modifications",
+    callerGuidance: QUICK_CATEGORY_CALLER_GUIDANCE,
     promptAppend: QUICK_CATEGORY_PROMPT_APPEND,
+  },
+  {
+    name: "unspecified-low",
+    config: { model: "xai/grok-4.6", variant: "xhigh" },
+    description: "Tasks that don't fit other categories, low effort required",
+    callerGuidance: UNSPECIFIED_LOW_CATEGORY_CALLER_GUIDANCE,
+    promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   },
 ]

@@ -1,9 +1,17 @@
 ---
 name: publish
-description: "Publish oh-my-opencode to npm via GitHub Actions workflow. Argument: <patch|minor|major>. Triggers: publish, release, deploy, npm publish."
+description: "Publish oh-my-opencode to npm by triggering the GitHub Actions publish workflow and verifying its artifacts. Ship-only: never runs pre-publish-review or re-reviews merged code unless the user explicitly asks. Argument: <patch|minor|major|explicit-semver>. Triggers: publish, release, deploy, npm publish."
 ---
 
 You are the release manager for oh-my-opencode. Execute the FULL publish workflow from start to finish.
+
+## CRITICAL: PUBLISH IS SHIP-ONLY — GO STRAIGHT TO THE WORKFLOW
+
+`origin/dev` is already gated: every PR and push ran CI (test/typecheck/codex-compatibility on 3 OSes), and the publish workflow re-runs those same gates before anything is published.
+
+- **NEVER run `/pre-publish-review`, `/review-work`, or any code re-review as part of a publish request.** Those run ONLY when the user explicitly asks for a review.
+- **NEVER "fix" code, open PRs, or enter fix-and-re-audit loops during a publish.** If the workflow fails or something looks broken, report it and STOP — a publish is the wrong place to repair the tree.
+- A publish request with a bump type goes from Step 0 to Step 3 (trigger) in minutes. The only human-scale work is release notes, drafted while CI runs.
 
 ## CRITICAL: FULL WORKFLOW MEANS THREE RELEASE SURFACES
 
@@ -11,7 +19,7 @@ Publishing is complete only after all release surfaces are verified:
 
 | Release layer | Surface | Required proof |
 |---|---|---|
-| `omo pure components` | Core/MCP/shared-skill changes inside the published package payload | `/get-unpublished-changes` and pre-publish review include layer-specific version impact. |
+| `omo pure components` | Core/MCP/shared-skill changes inside the published package payload | Release notes call out layer-specific version impact (from the workflow changelog, or `/get-unpublished-changes` when the user requested it). |
 | `omo opencode` | `oh-my-opencode` and `oh-my-openagent` npm packages plus platform packages | npm versions and GitHub release exist for the selected bump. |
 | `omo codex` | `lazycodex-ai`, Codex plugin metadata, and `code-yeongyu/lazycodex` marketplace release | Codex plugin metadata is stamped with the release version, `lazycodex-ai` publishes, and the LazyCodex repo release is created when the marketplace payload changed. |
 
@@ -27,17 +35,34 @@ Publishing is not complete until the Discord release announcement has been attem
 - After the release notes are finalized, immediately run Step 7.5 and post to Discord.
 - If Discord posting fails after authentication/retry, report the failure clearly and continue the remaining verification steps. A skipped Discord step is a workflow failure.
 
+## CRITICAL: NO EARLY TURN-END AFTER TRIGGER (COMPLETION CONTRACT)
+
+Once `gh workflow run publish` succeeds, the publish is NOT done. A prior session forgot this: it triggered the workflow and ended its turn, leaving the release unverified, the enhanced summary unwritten, and the Discord announcement unsent. That mistake is why this section exists.
+
+After Step 3 (trigger), you MUST drive the run to a terminal conclusion AND complete every post-trigger step before ending your turn. You may NOT end the turn, hand off, or stop for the day while ANY of these is unresolved:
+
+1. **Run conclusion** — `gh run view <id> --json conclusion` must return `success` (poll while drafting notes; never sleep idle).
+2. **Release exists** — Step 5: `gh release view v${NEW_VERSION}` resolves.
+3. **Enhanced summary applied** — Step 6 + Step 7: draft (mandatory for patch/minor/major) AND `gh release edit --notes-file` applied. "Patch is optional" is wrong; patch summaries are MANDATORY.
+4. **Discord announced** — Step 7.5: `agent-discordbot message send` attempted; either a message id is recorded OR a clear failure is reported to the user. A skipped Discord step is a workflow failure.
+5. **npm verified** — Step 8: `npm view oh-my-opencode version` (and oh-my-openagent, lazycodex-ai) shows `${NEW_VERSION}`.
+
+Only after all five are green may you end the turn. If the run fails, run `gh run view <id> --log-failed`, report it, and STOP (do not repair the tree mid-publish). If a post-trigger step fails for an external reason (npm propagation, Discord auth), report it clearly and continue the remaining steps — do not let one failure abort the rest.
+
+This contract applies to the slash-command copies (`.agents/command/publish.md`, `.opencode/command/publish.md`) too; they are kept byte-identical to this skill per the `.agents/AGENTS.md` drift rule.
+
 ## CRITICAL: ARGUMENT REQUIREMENT
 
-**You MUST receive a version bump type from the user.** Valid options:
+**You MUST receive one release selector from the user.** Valid options:
 - `patch`: Bug fixes, backward-compatible (1.1.7 → 1.1.8)
 - `minor`: New features, backward-compatible (1.1.7 → 1.2.0)
 - `major`: Breaking changes (1.1.7 → 2.0.0)
+- An explicit valid semantic version, including a prerelease such as `5.0.0-beta.9`
 
-**If the user did not provide a bump type argument, STOP IMMEDIATELY and ask:**
-> "To proceed with deployment, please specify a version bump type: `patch`, `minor`, or `major`"
+**If the user did not provide a release selector, STOP IMMEDIATELY and ask:**
+> "To proceed with deployment, specify `patch`, `minor`, `major`, or an explicit semantic version such as `5.0.0-beta.9`."
 
-**DO NOT PROCEED without explicit user confirmation of bump type.**
+Reject any other value. Do not infer or repair malformed versions.
 
 ---
 
@@ -47,7 +72,7 @@ Publishing is not complete until the Discord release announcement has been attem
 
 ```
 [
-  { "id": "confirm-bump", "content": "Confirm version bump type with user (patch/minor/major)", "status": "in_progress", "priority": "high" },
+  { "id": "confirm-release-input", "content": "Confirm release selector with user (patch/minor/major or explicit semver)", "status": "in_progress", "priority": "high" },
   { "id": "check-uncommitted", "content": "Check for uncommitted changes and commit if needed", "status": "pending", "priority": "high" },
   { "id": "sync-remote", "content": "Sync with remote (pull --rebase && push if unpushed commits)", "status": "pending", "priority": "high" },
   { "id": "run-workflow", "content": "Trigger GitHub Actions publish workflow", "status": "pending", "priority": "high" },
@@ -58,8 +83,7 @@ Publishing is not complete until the Discord release announcement has been attem
   { "id": "discord-announce", "content": "MANDATORY: post release announcement to Discord channel immediately after release notes are finalized", "status": "pending", "priority": "high" },
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
   { "id": "verify-lazycodex", "content": "Verify lazycodex-ai publish, Codex plugin metadata version stamp, and code-yeongyu/lazycodex release/sync", "status": "pending", "priority": "high" },
-  { "id": "wait-platform-workflow", "content": "Wait for publish-platform workflow completion", "status": "pending", "priority": "high" },
-  { "id": "verify-platform-binaries", "content": "Verify all 7 platform binary packages published", "status": "pending", "priority": "high" },
+  { "id": "verify-platform-binaries", "content": "Spot-check platform binary packages on npm", "status": "pending", "priority": "high" },
   { "id": "final-confirmation", "content": "Final confirmation to user with links", "status": "pending", "priority": "low" }
 ]
 ```
@@ -68,12 +92,23 @@ Publishing is not complete until the Discord release announcement has been attem
 
 ---
 
-## STEP 1: CONFIRM BUMP TYPE
+## STEP 1: CONFIRM AND CLASSIFY THE RELEASE SELECTOR
 
-If bump type provided as argument, confirm with user:
-> "Version bump type: `{bump}`. Proceed? (y/n)"
+If the user already supplied the selector in the command argument or message, that IS the confirmation. Parse it exactly once:
 
-Wait for user confirmation before proceeding.
+```bash
+RELEASE_INPUT="${ARGUMENTS}"
+if [[ "$RELEASE_INPUT" =~ ^(patch|minor|major)$ ]]; then
+  RELEASE_KIND=bump
+elif [[ "$RELEASE_INPUT" =~ ^([0-9]+\.){2}[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+  RELEASE_KIND=version
+else
+  echo "Invalid release selector: $RELEASE_INPUT" >&2
+  exit 1
+fi
+```
+
+Only ask and wait when no selector was provided.
 
 ---
 
@@ -90,7 +125,7 @@ Run: `git status --porcelain`
 
 Check if there are unpushed commits:
 ```bash
-git log origin/master..HEAD --oneline
+git log @{u}..HEAD --oneline
 ```
 
 **If there are unpushed commits, you MUST sync before triggering workflow:**
@@ -104,32 +139,52 @@ This ensures the GitHub Actions workflow runs on the latest code including all l
 
 ## STEP 3: TRIGGER GITHUB ACTIONS WORKFLOW
 
-Run the publish workflow:
+Dispatch from `dev`, pass bump selectors through `bump`, and pass exact versions through `version`. The required `bump` input remains `patch` for explicit-version dispatches but is ignored by the workflow because `version` takes precedence.
+
 ```bash
-gh workflow run publish -f bump={bump_type}
+if [ "$RELEASE_KIND" = bump ]; then
+  RUN_URL="$(gh workflow run publish.yml --ref dev -f "bump=${RELEASE_INPUT}")"
+else
+  RUN_URL="$(gh workflow run publish.yml --ref dev -f bump=patch -f "version=${RELEASE_INPUT}")"
+fi
+
+if ! [[ "$RUN_URL" =~ ^https://github.com/code-yeongyu/oh-my-openagent/actions/runs/[0-9]+$ ]]; then
+  echo "Publish dispatch did not return an exact workflow run URL: $RUN_URL" >&2
+  exit 1
+fi
+RUN_ID="${RUN_URL##*/}"
+if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+  echo "Publish dispatch returned an invalid run ID: $RUN_ID" >&2
+  exit 1
+fi
+gh run view "${RUN_ID}" --json databaseId,status,url --jq '{databaseId,status,url}'
 ```
 
-Wait 3 seconds, then get the run ID:
-```bash
-gh run list --workflow=publish --limit=1 --json databaseId,status --jq '.[0]'
-```
+The returned run ID owns this release attempt. Never replace it with a latest-run lookup.
 
 ---
 
 ## STEP 4: WAIT FOR WORKFLOW COMPLETION
 
-Poll workflow status every 30 seconds until completion:
+The publish run is a single workflow with sequential stages. Expected timeline (from recent real runs, ~30 min total):
+
+| Stage (job) | What it does | Typical |
+|---|---|---|
+| `test` / `typecheck` / `codex-compatibility` (3 OS) | Re-runs the CI gates on the release source | 4–8 min (Windows is the long pole) |
+| `prepare-release-state` | Stamps versions, opens + auto-merges the `release: vX.Y.Z` PR, waits for that PR's required CI checks | 10–15 min (dominant stage) |
+| `publish-platform` (build + publish, 12 targets) | Builds and publishes both platform package families | 3–4 min |
+| `publish-main` → `release` | Publishes `oh-my-opencode` / `oh-my-openagent` / `lazycodex-ai`, creates the GitHub release, syncs `code-yeongyu/lazycodex` | 4–6 min |
+
+Poll job-level status every 30 seconds and report stage transitions to the user:
 ```bash
-gh run view {run_id} --json status,conclusion --jq '{status: .status, conclusion: .conclusion}'
+gh run view "${RUN_ID}" --json status,conclusion,jobs --jq '{status, conclusion, stage: ([.jobs[] | select(.status=="in_progress") | .name] | join(", "))}'
 ```
 
-Status flow: `queued` → `in_progress` → `completed`
-
-**IMPORTANT: Use polling loop, NOT sleep commands.**
+**IMPORTANT: Use polling loop, NOT sleep commands.** Use the waiting time to draft the enhanced release summary (Step 6) — do not sit idle, and do not start any review activity.
 
 If conclusion is `failure`, show error and stop:
 ```bash
-gh run view {run_id} --log-failed
+gh run view "${RUN_ID}" --log-failed
 ```
 
 ---
@@ -164,9 +219,7 @@ After running the preview, present the output to the user and say:
 >
 > **For all release types**, an enhanced summary is **required** — I'll draft one in the next step.
 
-Wait for the user to acknowledge before proceeding.
-
-If the user already confirmed the publish workflow and did not explicitly ask to review the generated changelog before release-note editing, treat the publish confirmation as sufficient acknowledgement and continue. Do not end the assistant turn here.
+**APPROVAL GATE (single, binary):** The user's initial publish request with a named bump type IS the only approval this workflow requires. Do NOT wait for a separate acknowledgement here. Present the preview, then IMMEDIATELY proceed to Step 6. The only exception: if the user explicitly said "let me review the changelog before you continue" (or equivalent), stop and wait. Otherwise continue without ending the turn.
 </agent-instruction>
 
 ---
@@ -183,6 +236,12 @@ If the user already confirmed the publish workflow and did not explicitly ask to
 
 </decision-gate>
 
+### LAST RELEASE BEFORE THE OMO NATIVE CLI PUBLIC RELEASE
+
+When the user identifies this as the final release before the OmO Native CLI public release, the GitHub summary MUST begin with this dedicated heading and the Discord announcement MUST repeat it as a dedicated heading immediately after `@here`:
+
+`## LAST RELEASE BEFORE THE OMO NATIVE CLI PUBLIC RELEASE`
+
 ### What You're Writing (and What You're NOT)
 
 You are writing the **headline layer** — a product announcement that sits ABOVE the auto-generated commit log. Think "release blog post", not "git log".
@@ -193,6 +252,7 @@ You are writing the **headline layer** — a product announcement that sits ABOV
 - ALWAYS focus on USER IMPACT: what can users DO now that they couldn't before?
 - ALWAYS group by THEME or CAPABILITY, not by commit type (feat/fix/refactor).
 - ALWAYS use concrete language: "You can now do X" not "Added X feature".
+- NEVER include internal adapter changes matching `senpi`, `omo-senpi`, `senpi-task`, `pi-goal`, or `pi-webfetch` in either release-note variant.
 </rules>
 
 <examples>
@@ -238,10 +298,10 @@ cat /tmp/release-summary-v${NEW_VERSION}.md
 ```
 
 <agent-instruction>
-After drafting, ask the user:
-> "Here's the release summary I drafted. This will appear AT THE TOP of the release notes, above the auto-generated commit changelog and contributor thanks. Want me to adjust anything before applying?"
+Present the draft to the user:
+> "Here's the release summary I drafted. This will appear AT THE TOP of the release notes, above the auto-generated commit changelog and contributor thanks."
 
-If the user already confirmed the publish workflow and did not explicitly request a release-note review hold, proceed to Step 7 after presenting the draft. Do not stop before Step 7.5, because the Discord announcement is mandatory.
+**APPROVAL GATE (same single gate):** The initial publish confirmation covers this step too. Present the draft, then IMMEDIATELY proceed to Step 7 (apply) and Step 7.5 (Discord). Do NOT stop to wait for approval unless the user explicitly requested a release-note review hold before the publish started. The Discord announcement (Step 7.5) is mandatory and must not be blocked by a review hold that was never requested.
 </agent-instruction>
 
 ---
@@ -366,54 +426,17 @@ Compare with expected version. If not matching after 2 minutes, warn user about 
 
 ---
 
-## STEP 8.5: WAIT FOR PLATFORM WORKFLOW COMPLETION
+## STEP 8.5: SPOT-CHECK PLATFORM BINARY PACKAGES
 
-The main publish workflow triggers a separate `publish-platform` workflow for platform-specific binaries.
-
-1. Find the publish-platform workflow run triggered by the main workflow:
-```bash
-gh run list --workflow=publish-platform --limit=1 --json databaseId,status,conclusion --jq '.[0]'
-```
-
-2. Poll workflow status every 30 seconds until completion:
-```bash
-gh run view {platform_run_id} --json status,conclusion --jq '{status: .status, conclusion: .conclusion}'
-```
-
-**IMPORTANT: Use polling loop, NOT sleep commands.**
-
-If conclusion is `failure`, show error logs:
-```bash
-gh run view {platform_run_id} --log-failed
-```
-
----
-
-## STEP 8.6: VERIFY PLATFORM BINARY PACKAGES
-
-After publish-platform workflow completes, verify all 7 platform packages are published:
+Platform packages are built and published by the `publish-platform` jobs INSIDE the same publish run — there is no separate workflow to wait for, and `publish-main` already refuses to publish unless matching platform binaries exist. Spot-check a representative sample:
 
 ```bash
-PLATFORMS="darwin-arm64 darwin-x64 linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl windows-x64"
-for PLATFORM in $PLATFORMS; do
-  npm view "oh-my-opencode-${PLATFORM}" version
+for PKG in oh-my-opencode-darwin-arm64 oh-my-openagent-linux-x64 oh-my-opencode-windows-x64; do
+  npm view "$PKG" version
 done
 ```
 
-All 7 packages should show the same version as the main package (`${NEW_VERSION}`).
-
-**Expected packages:**
-| Package | Description |
-|---------|-------------|
-| `oh-my-opencode-darwin-arm64` | macOS Apple Silicon |
-| `oh-my-opencode-darwin-x64` | macOS Intel |
-| `oh-my-opencode-linux-x64` | Linux x64 (glibc) |
-| `oh-my-opencode-linux-arm64` | Linux ARM64 (glibc) |
-| `oh-my-opencode-linux-x64-musl` | Linux x64 (musl/Alpine) |
-| `oh-my-opencode-linux-arm64-musl` | Linux ARM64 (musl/Alpine) |
-| `oh-my-opencode-windows-x64` | Windows x64 |
-
-If any platform package version doesn't match, warn the user and suggest checking the publish-platform workflow logs.
+Each should show `${NEW_VERSION}`. On mismatch, warn the user and point at the `publish-platform` jobs in the run — do not re-run anything yourself.
 
 ---
 
@@ -423,7 +446,7 @@ Report success to user with:
 - New version number
 - GitHub release URL: https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v{version}
 - npm package URL: https://www.npmjs.com/package/oh-my-opencode
-- Platform packages status: List all 7 platform packages with their versions
+- Platform packages status: spot-checked platform package versions
 
 ---
 
@@ -433,8 +456,7 @@ Report success to user with:
 - **Release not found**: Wait and retry, may be propagation delay
 - **npm not updated**: npm can take 1-5 minutes to propagate, inform user
 - **Permission denied**: User may need to re-authenticate with `gh auth login`
-- **Platform workflow fails**: Show logs from publish-platform workflow, check which platform failed
-- **Platform package missing**: Some platforms may fail due to cross-compilation issues, suggest re-running publish-platform workflow manually
+- **Platform jobs fail**: Show logs from the `publish-platform` jobs in the same run, name the failing target, and stop — `publish-main` is blocked by design until they pass
 
 ## LANGUAGE
 

@@ -5,7 +5,7 @@ import path from "node:path"
 
 import type { TeamModeConfig } from "../config"
 import { log } from "../logger"
-import { type RuntimeState, RuntimeStateSchema, type TeamSpec } from "../types"
+import { type ActiveTeamSummary, type RuntimeState, RuntimeStateSchema, type TeamSpec } from "../types"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { atomicWrite, withLock } from "./locks"
 
@@ -202,13 +202,13 @@ export async function transitionRuntimeState(
 
 export async function listActiveTeams(
   config: TeamModeConfig,
-): Promise<Array<{ teamRunId: string; teamName: string; status: string; memberCount: number; scope: "project" | "user" }>> {
+): Promise<ActiveTeamSummary[]> {
   const baseDir = resolveBaseDir(config)
   const now = Date.now()
 
   try {
     const runtimeEntries = await readdir(path.join(baseDir, "runtime"), { withFileTypes: true })
-    const activeTeams: Array<{ teamRunId: string; teamName: string; status: string; memberCount: number; scope: "project" | "user" }> = []
+    const activeTeams: ActiveTeamSummary[] = []
 
     for (const runtimeEntry of runtimeEntries) {
       if (!runtimeEntry.isDirectory()) continue
@@ -232,6 +232,7 @@ export async function listActiveTeams(
           status: runtimeState.status,
           memberCount: runtimeState.members.length,
           scope: runtimeState.specSource,
+          ...(runtimeState.leadSessionId !== undefined ? { leadSessionId: runtimeState.leadSessionId } : {}),
         })
       } catch (error) {
         log("team runtime state skipped", {

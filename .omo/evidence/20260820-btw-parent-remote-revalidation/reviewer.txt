@@ -1,0 +1,10 @@
+APPROVED
+
+- C1: Genuine RED/GREEN, two remote checks, and deletion-tombstone race proof are present.
+- C2: Domain tests, typechecks, production build, and task-only diff evidence are clean.
+- C3: Passing xterm.js side and switch/close artifacts verify the real TUI flow.
+- C4: Mock sentinel, isolated transcripts, host DB count, and cleanup receipts verify isolation.
+- C5: The three-file delta removes only the stale local-existence short-circuit.
+
+Reviewer: Momus task st_01a01fec
+Verdict: unconditional approval

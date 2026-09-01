@@ -4,7 +4,7 @@ import {
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
-import { buildFallbackBody, createTask, isAgentNotFoundError, startTask } from "./spawner"
+import { buildFallbackBody, createTask, isAgentNotFoundError, resumeTask, startTask } from "./spawner"
 import type { BackgroundTask } from "./types"
 
 type PromptRequest = {
@@ -38,6 +38,50 @@ async function waitForCondition(
     await new Promise((r) => setTimeout(r, intervalMs))
   }
 }
+
+describe("background-agent spawner resume guard", () => {
+  test("rejects a running task before acquiring concurrency or dispatching a prompt", async () => {
+    //#given
+    const acquire = mock(async () => {})
+    const promptAsync = mock(async () => ({}))
+    const sessionId = "session-running-resume"
+    const task: BackgroundTask = {
+      id: "task-running-resume",
+      sessionId,
+      parentSessionId: "parent-session-original",
+      parentMessageId: "parent-message-original",
+      description: "running task",
+      prompt: "original prompt",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+      concurrencyGroup: "explore",
+    }
+    const input = {
+      sessionId,
+      prompt: "continuation prompt",
+      parentSessionId: "parent-session-new",
+      parentMessageId: "parent-message-new",
+    }
+
+    //#when
+    await expect(resumeTask(task, input, {
+      client: { session: { promptAsync } },
+      concurrencyManager: { acquire, release: () => {} },
+      directory: "/tmp/test",
+      onTaskError: () => {},
+    } as never)).rejects.toThrow(
+      "Task task-running-resume is currently running and cannot accept a continuation prompt",
+    )
+
+    //#then
+    expect(acquire).not.toHaveBeenCalled()
+    expect(promptAsync).not.toHaveBeenCalled()
+    expect(task.status).toBe("running")
+    expect(task.parentSessionId).toBe("parent-session-original")
+    expect(task.parentMessageId).toBe("parent-message-original")
+  })
+})
 
 describe("background-agent spawner agent-not-found fallback", () => {
   afterEach(() => {

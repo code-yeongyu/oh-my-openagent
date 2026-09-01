@@ -6,9 +6,7 @@ declare function setInterval(callback: () => void, delay?: number): TimerHandle
 declare function clearInterval(timeout: TimerHandle): void
 declare function clearTimeout(timeout: TimerHandle): void
 
-// TTL for idle session state entries (10 minutes)
 const SESSION_STATE_TTL_MS = 10 * 60 * 1000
-// Prune interval (every 2 minutes)
 const SESSION_STATE_PRUNE_INTERVAL_MS = 2 * 60 * 1000
 
 interface TrackedSessionState {
@@ -160,6 +158,9 @@ export function createSessionStateStore(): SessionStateStore {
     if (hasProgressed) {
       state.stagnationCount = 0
       state.awaitingPostInjectionProgressCheck = false
+      state.continuationResponseObserved = false
+      state.continuationBlockReason = undefined
+      state.pendingUserMessageID = undefined
       return {
         previousIncompleteCount,
         previousStagnationCount,
@@ -180,6 +181,14 @@ export function createSessionStateStore(): SessionStateStore {
     }
 
     state.awaitingPostInjectionProgressCheck = false
+    if (
+      state.continuationResponseObserved === true
+      && state.continuationBlockReason !== "user-interruption"
+    ) {
+      state.continuationBlockReason = "directive-response"
+    }
+    state.continuationResponseObserved = false
+    state.pendingUserMessageID = undefined
     state.stagnationCount += 1
     return {
       previousIncompleteCount,
@@ -201,6 +210,9 @@ export function createSessionStateStore(): SessionStateStore {
     state.lastIncompleteCount = undefined
     state.stagnationCount = 0
     state.awaitingPostInjectionProgressCheck = false
+    state.continuationResponseObserved = false
+    state.continuationBlockReason = undefined
+    state.pendingUserMessageID = undefined
     state.allTodosCompletedAt = undefined
     trackedSession.lastCompletedCount = undefined
     trackedSession.lastTodoSnapshot = undefined

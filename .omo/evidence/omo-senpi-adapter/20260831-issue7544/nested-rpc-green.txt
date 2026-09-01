@@ -1,0 +1,13 @@
+Command:
+bun test packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts packages/omo-senpi/src/components/task/process-sweep.test.ts packages/senpi-task/src/runners/rpc/spawn-marker.test.ts packages/omo-senpi/src/components/task/index.test.ts
+
+Machine: gorky (Bun 1.4.0)
+Result: exit 0
+
+The captured test output includes:
+- marked RPC child with a captured session reconciles `child-session`;
+- its unnotified notification reconciliation remains enabled;
+- cleanup, lead polling, and status sync remain in the recovery chain;
+- marked RPC child with no captured session skips parent recovery.
+
+Remote cleanup receipt: `NESTED_GREEN_CLEAN`; no task-owned remote directory remained.

@@ -19,7 +19,7 @@ function throwOnNonFallbackableSdkError(response: unknown): void {
 
 const SDK_TRANSIENT_RETRY_ATTEMPTS = 3
 
-// session_read issues two SDK calls (session.list for existence + session.messages),
+// session_read checks existence and then reads messages through SDK calls,
 // so a single transient HTTP failure on either call would fall back to file storage,
 // which does not exist for pure-sqlite sessions and surfaces a false "Session not found".
 // Retry only on transient/unavailable errors; semantic errors (e.g. "session not found")
@@ -59,13 +59,15 @@ export async function getSdkMainSessions(
 export async function getSdkAllSessions(client: PluginInput["client"]): Promise<string[]> {
   const response = await fetchSdkResponse(() => client.session.list())
   const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
-  return sessions.map((session) => session.id)
+  return sessions
+    .slice()
+    .sort((a, b) => b.time.updated - a.time.updated)
+    .map((session) => session.id)
 }
 
 export async function sdkSessionExists(client: PluginInput["client"], sessionID: string): Promise<boolean> {
-  const response = await fetchSdkResponse(() => client.session.list())
-  const sessions = normalizeSDKResponse(response, [] as Array<{ id?: string }>)
-  return sessions.some((session) => session.id === sessionID)
+  const messages = await getSdkSessionMessages(client, sessionID)
+  return messages.length > 0
 }
 
 export async function getSdkSessionMessages(

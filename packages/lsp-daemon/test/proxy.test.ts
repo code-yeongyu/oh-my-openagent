@@ -1,12 +1,13 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { PassThrough, Readable, Writable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type DaemonServerHandle, startDaemonServer } from "../src/daemon-server.js";
-import { type DaemonPaths, daemonPaths } from "../src/paths.js";
+import type { DaemonPaths } from "../src/paths.js";
 import { runMcpStdioProxy } from "../src/proxy.js";
+import { daemonTestPaths } from "./daemon-path-fixture.js";
 
 const tempDirectories: string[] = [];
 const servers: DaemonServerHandle[] = [];
@@ -19,7 +20,7 @@ afterEach(async () => {
 function tempPaths(): DaemonPaths {
 	const dir = mkdtempSync(join(tmpdir(), "lsp-daemon-proxy-"));
 	tempDirectories.push(dir);
-	return daemonPaths({ CODEX_LSP_DAEMON_DIR: dir }, "test");
+	return daemonTestPaths(dir);
 }
 
 function inputStream(messages: object[]): Readable {
@@ -69,6 +70,68 @@ describe("mcp stdio proxy", () => {
 		expect(toolResult.content[0]?.text).toContain("Configured LSP servers");
 	});
 
+	it("#given OpenCode LSP env #when tools are proxied #then daemon requests use the env-derived typed context", async () => {
+		const paths = tempPaths();
+		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
+		servers.push(server);
+		const projectRoot = mkdtempSync(join(tmpdir(), "lsp-daemon-opencode-context-"));
+		const homeRoot = mkdtempSync(join(tmpdir(), "lsp-daemon-opencode-home-"));
+		tempDirectories.push(projectRoot, homeRoot);
+		const opencodeConfig = join(projectRoot, ".opencode", "lsp.json");
+		const omoConfig = join(projectRoot, ".omo", "lsp.json");
+		const omoClientConfig = join(projectRoot, ".omo", "lsp-client.json");
+		const userConfig = join(homeRoot, "opencode", "lsp.json");
+		const decisionsPath = join(homeRoot, "opencode", "lsp-install-decisions.json");
+		mkdirSync(join(projectRoot, ".opencode"), { recursive: true });
+		mkdirSync(join(projectRoot, ".omo"), { recursive: true });
+		mkdirSync(join(homeRoot, "opencode"), { recursive: true });
+		writeFileSync(opencodeConfig, JSON.stringify({ lsp: { typescript: { disabled: true } } }));
+		writeFileSync(omoConfig, JSON.stringify({ lsp: { typescript: { priority: 99 } } }));
+		writeFileSync(omoClientConfig, JSON.stringify({ lsp: { deno: { disabled: true } } }));
+		writeFileSync(userConfig, JSON.stringify({ lsp: { "user-context-proof": { command: ["user-ls"], extensions: [".user"] } } }));
+		const previousProject = process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
+		const previousUser = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
+		const previousDecisions = process.env["LSP_TOOLS_MCP_INSTALL_DECISIONS"];
+		process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = [opencodeConfig, omoConfig, omoClientConfig].join(delimiter);
+		process.env["LSP_TOOLS_MCP_USER_CONFIG"] = userConfig;
+		process.env["LSP_TOOLS_MCP_INSTALL_DECISIONS"] = decisionsPath;
+		try {
+			const out: string[] = [];
+			await runMcpStdioProxy({
+				input: inputStream([
+					{ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "status", arguments: {} } },
+					{
+						jsonrpc: "2.0",
+						id: 4,
+						method: "tools/call",
+						params: { name: "install_decision", arguments: { server_id: "deno", decision: "declined" } },
+					},
+				]),
+				output: collectingWritable(out),
+				paths,
+				ensure: noSpawn,
+			});
+
+			const responses = parseResponses(out);
+			const status = responses.find((response) => response["id"] === 3)?.["result"] as
+				| { readonly content: readonly { readonly text: string }[] }
+				| undefined;
+			const decision = responses.find((response) => response["id"] === 4)?.["result"] as
+				| { readonly isError?: boolean }
+				| undefined;
+			const statusText = status?.content[0]?.text ?? "";
+			expect(statusText).toContain("- typescript: disabled");
+			expect(statusText).toContain("- user-context-proof: missing; source=user");
+			expect(decision?.isError).toBe(false);
+			expect(existsSync(decisionsPath)).toBe(true);
+			expect(readFileSync(decisionsPath, "utf8")).toContain("deno");
+		} finally {
+			restoreEnv("LSP_TOOLS_MCP_PROJECT_CONFIG", previousProject);
+			restoreEnv("LSP_TOOLS_MCP_USER_CONFIG", previousUser);
+			restoreEnv("LSP_TOOLS_MCP_INSTALL_DECISIONS", previousDecisions);
+		}
+	});
+
 	it("#given an unreachable daemon #when a tool is proxied #then it returns a structured error instead of running locally", async () => {
 		const paths = tempPaths();
 		const out: string[] = [];
@@ -104,7 +167,7 @@ describe("mcp stdio proxy", () => {
 		expect((responses[0]?.["error"] as { code: number }).code).toBe(-32700);
 	});
 
-	it("#given an idle proxy #when the next request arrives after ten minutes #then it still responds", async () => {
+	it("#given an initialized idle proxy #when the next request arrives after ten minutes #then it still responds", async () => {
 		vi.useFakeTimers();
 		try {
 			const paths = tempPaths();
@@ -117,12 +180,14 @@ describe("mcp stdio proxy", () => {
 				ensure: noSpawn,
 			});
 
+			input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 6, method: "initialize", params: {} })}\n`);
 			await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1);
-			input.end(`${JSON.stringify({ jsonrpc: "2.0", id: 6, method: "initialize", params: {} })}\n`);
+			input.end(`${JSON.stringify({ jsonrpc: "2.0", id: 7, method: "initialize", params: {} })}\n`);
 			await server;
 
 			const responses = parseResponses(out);
 			expect((responses[0]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
+			expect((responses[1]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
 		} finally {
 			vi.useRealTimers();
 		}
@@ -151,3 +216,11 @@ describe("mcp stdio proxy", () => {
 		expect(secondResult?.content[0]?.text).toContain("LSP daemon unreachable");
 	});
 });
+
+function restoreEnv(name: string, previous: string | undefined): void {
+	if (previous === undefined) {
+		delete process.env[name];
+		return;
+	}
+	process.env[name] = previous;
+}

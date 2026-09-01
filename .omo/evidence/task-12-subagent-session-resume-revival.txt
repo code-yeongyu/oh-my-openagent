@@ -1,0 +1,49 @@
+Task 12 - mode-dispatched respawn with guarded reattach and typed failures
+Date: 2026-08-04
+Branch: feat/subagent-session-resume-revival
+
+TDD RED
+- Command: bun test packages/senpi-task/src/manager
+- Initial result: 185 pass, 9 fail.
+- Expected failures proved the missing behavior: typed RespawnResult fields, in-process resume dispatch, aborted assistant continuation, terminal continuation suppression, reattach ownership rejection, terminal epoch preservation, and managed-runner resume exposure.
+
+GREEN - focused manager domain
+- Command: bun test packages/senpi-task/src/manager
+- Result: 195 pass, 0 fail, 491 expectations.
+- Follow-up focused command after the non-terminal epoch assertion:
+  bun test packages/senpi-task/src/manager/manager-respawn-cleanup.test.ts packages/senpi-task/src/manager/runner.test.ts
+- Result: 27 pass, 0 fail, 60 expectations.
+
+Typecheck
+- Command: ./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json
+- Result: clean (no output, exit 0).
+
+Full package including chaos
+- Command: bun test packages/senpi-task
+- Result after concurrent todo-15 edits settled: 1251 pass, 10 fail, 1 snapshot, 3921 expectations.
+- All 10 remaining failures are downstream todo-13 integration gaps: nine legacy reconcile tests call reattach without first landing the required host_pid/resident ownership claim, and the chaos bench exercises the same unclaimed legacy reconcile path. Task 12 intentionally rejects these calls per its acceptance contract; lifecycle/reconcile.ts is explicitly todo 13 scope and was not edited here.
+
+Manual QA (auxiliary)
+- Happy: manager-respawn-cleanup.test.ts drives a fake in-process record through respawn -> rebuilt ManagedStartSpec -> restored handle, then guarded reattach proves a claimed non-terminal resident becomes steerable/running with stale output cleared and run_epoch incremented exactly once. PASS.
+- Failure: createParentRegistrySessionContext(() => undefined) drives resolveResumeContext to model_unavailable; manager respawn returns {ok:false, disposition:"retryable", code:"model_unavailable"} and the underlying child resume call count remains zero. PASS.
+
+Continuation fixtures
+- assistant with toolCall -> exactly one followUp: PASS
+- trailing toolResult -> exactly one followUp: PASS
+- trailing user -> exactly one followUp: PASS
+- assistant text only -> no followUp: PASS
+- assistant stopReason:"aborted" -> exactly one followUp: PASS
+- terminal record with user tail -> no followUp: PASS
+- completed assistant JSON line >64 KiB -> no followUp: PASS
+
+Adversarial probes
+- cancel_resume: PASS - persisted aborted assistant tail is classified interrupted and continued once.
+- malformed_input: PASS - actual final JSONL record is found by backward/growing-window scan; unreadable/malformed final input fails closed without reinterpreting an earlier user line.
+- misleading_success_output: PASS - every terminal status is gated before continuation, regardless of tail shape.
+- Other adversarial categories: N/A for this manager-local change.
+
+Hygiene
+- manager-respawn.ts: 185 LOC (under 250).
+- manager.ts shrank from 866 to 796 LOC.
+- git diff --check: clean.
+- No as any, no fixed sleeps/polling tests, no lifecycle/residency.ts or admission-lease.ts edits.

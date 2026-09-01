@@ -1,0 +1,40 @@
+commit c0c1e0d50c786243364d61485bfe9ec90666f6e2 (HEAD -> main)
+Author:     project-a050c3a7 <project-a050c3a7@omo.local>
+AuthorDate: 2026-08-10T19:46:54+09:00
+Commit:     project-a050c3a7 <project-a050c3a7@omo.local>
+CommitDate: 2026-08-10T19:46:54+09:00
+
+    F3 soul edit notice
+
+M	system/persona.md
+
+commit 3f36323f4b62c36f3f63bdb38dd37730eced70d5
+Author:     project-a050c3a7 <project-a050c3a7@omo.local>
+AuthorDate: 2026-08-10T19:46:49+09:00
+Commit:     project-a050c3a7 <project-a050c3a7@omo.local>
+CommitDate: 2026-08-10T19:46:49+09:00
+
+    F3 nudge self-clear save
+
+A	notes/f3-save.md
+
+commit cad1f8904c314dec03c0a4742f904a93281e36a5
+Author:     project-a050c3a7 <project-a050c3a7@omo.local>
+AuthorDate: 2026-08-10T19:46:43+09:00
+Commit:     project-a050c3a7 <project-a050c3a7@omo.local>
+CommitDate: 2026-08-10T19:46:43+09:00
+
+    F3 initialize isolated memory
+
+A	notes/f3-initial.md
+
+commit 29706fa0689b59acb9b777d43b0a8cbff3344ab1
+Author:     Omo Agent <project-a050c3a7@omo.local>
+AuthorDate: 2026-08-10T19:46:42+09:00
+Commit:     Omo Agent <project-a050c3a7@omo.local>
+CommitDate: 2026-08-10T19:46:42+09:00
+
+    chore: initialize local memory
+
+A	system/human.md
+A	system/persona.md

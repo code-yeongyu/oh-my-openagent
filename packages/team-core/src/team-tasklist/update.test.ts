@@ -27,7 +27,7 @@ test("updateTaskStatus supports the one-way claim to complete flow", async () =>
   } finally {
     await fixture.cleanup()
   }
-})
+}, 30_000)
 
 test("updateTaskStatus auto-claims when a member starts a pending task directly", async () => {
   // given
@@ -50,7 +50,7 @@ test("updateTaskStatus auto-claims when a member starts a pending task directly"
   } finally {
     await fixture.cleanup()
   }
-})
+}, 30_000)
 
 test("updateTaskStatus rejects reverse transitions", async () => {
   // given

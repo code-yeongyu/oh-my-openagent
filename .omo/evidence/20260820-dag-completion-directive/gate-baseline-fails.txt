@@ -1,0 +1,25 @@
+(fail) assembled DAG runtime > #given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then shipped RPC receives the recovery scheduler overflow
+(fail) cli-local > #given isolated agent dir #when install then uninstall are invoked #then stdout is one-line JSON and settings round-trip
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is tracked #when Run now is chosen #then suggestedMode is committed
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is untracked #when Run now is chosen #then suggestedMode is local
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never anywhere #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never in this project #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Run now #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Skip this time #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the advisor opens #then last proposed HEAD is written first
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the dialog times out #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given fake timers #when session_start fires #then ui.select waits for setTimeout zero
+(fail) createInitDeepAdvisorComponent > #given session_start #when the handler returns #then ui.select has not run synchronously
+(fail) OmO Native product identity > #given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi
+(fail) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist
+(fail) OMO Senpi scoped skill sync > #given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom
+(fail) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 24 roots exist with valid names
+(fail) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values
+(fail) OMO Senpi scoped skill sync > #given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen
+(fail) palace entry collector > #given a dirty working tree #when core entries are collected #then uncommitted files are labelled as absent from the system prompt
+(fail) runSenpiInstaller source refresh > #given an older local OMO package entry #when installing the current source #then the stale package is replaced
+(fail) runSenpiInstaller source refresh > #given complete generated artifacts #when installing from source #then every build step still refreshes them
+(fail) runSenpiInstaller source refresh > #given current and stale OMO entries #when refreshing #then the current package keeps its precedence
+(fail) session_start component ordering > #given real onboarding state and an active ulw loop #when startup then agent_end fire #then onboarding is preserved and the first-session advisor stays detached and suppressed

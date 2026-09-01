@@ -180,12 +180,12 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
-			name: "lazycodex executor verifier subagent-stop blocks missing evidence",
+			name: "lazycodex worker verifier subagent-stop blocks missing evidence",
 			component: "lazycodex-executor-verify",
 			event: "subagent-stop",
 			payload: {
 				hook_event_name: "SubagentStop",
-				agent_type: "lazycodex-executor",
+				agent_type: "lazycodex-worker-medium",
 				agent_id: "agent-task12",
 				session_id: "s-task12",
 				transcript_path: join(tempRoot, "transcript.jsonl"),
@@ -202,8 +202,8 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
-			name: "start-work-continuation stop no state",
-			component: "start-work-continuation",
+			name: "ulw-execute-continuation stop no state",
+			component: "ulw-execute-continuation",
 			event: "stop",
 			payload: {
 				hook_event_name: "Stop",

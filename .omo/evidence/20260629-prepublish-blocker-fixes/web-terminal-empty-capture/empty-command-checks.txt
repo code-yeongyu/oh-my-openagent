@@ -1,8 +1,0 @@
-scenario: command mode rejects empty tmux capture
-invocation: PATH=<fake-empty-tmux> node script/qa/web-terminal-visual-qa.mjs --title "Empty Command QA" --command "printf 'hidden
-'" --source-label "fake empty tmux" --evidence-dir .omo/evidence/20260629-prepublish-blocker-fixes/web-terminal-empty-capture/empty-command-artifacts --dwell-ms 1 --no-browser
-exit_code: 1
-stderr contains clear error: 1:tmux capture was empty
-artifact files written:
-cleanup: rm -rf /tmp/omo-webterm-empty-fake.V1B4aa; fake tmux temp dir removed: yes
-verdict: passed; empty capture rejected with non-zero exit

@@ -1,0 +1,47 @@
+Final Windows memory wiring fixture cleanup
+
+Observed failure:
+- Run: 31385945591
+- Job: `senpi-compatibility (windows-latest)` 93446265992
+- Test body: `#given bind reconciliation is pending #when a footer publishes #then bind completion does not erase it`
+- The behavior assertion completed; the test failed in `afterEach`.
+- Exact error: Windows `EPERM` while `fs.rm` unlinked the temporary Git repository's `.git/config`.
+
+Root cause:
+- The fixture creates and mutates a real Git repository.
+- The one-shot recursive removal had no bounded retry for transient Windows file-handle release.
+- This was cleanup nondeterminism, not a footer ordering assertion failure or timeout.
+
+Fix:
+- Keep the exact event-driven behavior test.
+- Inject a deterministic status refresher into the wiring lifecycle tests.
+- Stop creating real Git repositories in `wiring.test.ts`.
+- Keep real Git HEAD and timestamp coverage in `repo.test.ts` and `status.test.ts`.
+- No sleeps, assertion retries, skipped checks, or weakened behavior.
+
+Local verification:
+- Cleanup plus focused memory tests: 25 pass, 0 fail, 80 assertions.
+- Full memory suite: 251 pass, 0 fail, 835 assertions.
+- Omo-senpi typecheck: exit 0.
+
+Second Windows observation:
+- Run 31387195794, job 93450243823, still failed in `afterEach`: `EBUSY` removing the temporary fixture root after the five-retry budget.
+- The reset test passed in that run; no sequence assertion failed.
+- The event-bound reset-test restructure is retained as a clarity improvement, not claimed as the Windows failure fix.
+- The actual teardown fix now matches the repository's memory-server and memfs convention: ten Windows retries with a 50 ms linear backoff.
+
+Third Windows observation:
+- Run 31388591913 still reported `EBUSY` in both the Windows root and Senpi Windows jobs with the 10×50 budget.
+- The reset test passed in both logs; no shared-buffer assertion failed.
+- The Windows root job also exposed backslash-separated cleanup report paths from `removeStaleSelfPackageTests`.
+- Cleanup report paths are now constructed with forward slashes on every OS.
+
+Fourth Windows observation:
+- Run 31390931111 still reported `EBUSY` after the `.git`-first 20×100 cleanup attempt.
+- Bun's Windows `fs.rm` path did not honor the configured retry budget long enough to remove the fixture root reliably.
+- The same Windows root job also timed out the pre-existing `/memory-repository set` usage-error case at 5203 ms after dangling-process cleanup; that test is outside this branch's diff and remains a replacement-matrix gate rather than a claimed fix here.
+- The final approach removes the Git handle source entirely from wiring lifecycle tests through dependency injection.
+- The dedicated Git repository and status suites continue to cover committed HEAD, commit timestamps, and unavailable-commit behavior.
+
+Remaining proof:
+- The replacement Senpi Windows job and Windows root job must pass before merge.

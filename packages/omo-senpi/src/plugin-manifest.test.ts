@@ -77,7 +77,7 @@ describe("OMO Senpi plugin manifest", () => {
     expect(manifest.keywords).toContain("omo")
     expect(manifest.keywords).toContain("oh-my-openagent")
     expect(manifest.keywords).toContain("pi")
-    expect(manifest.files).toEqual(["extensions", "skills", "README.md", "LICENSE"])
+    expect(manifest.files).toEqual(["extensions", "skills", "runtime", "scripts/install.mjs", "README.md", "NOTICE", "LICENSE"])
   })
 
   it("#given root and adapter versions #when compared #then the plugin manifest stays in lockstep", () => {

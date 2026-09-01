@@ -1,2 +1,0 @@
-CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
-exit=1

@@ -1,0 +1,22 @@
+{
+  "result": "PASS",
+  "checks": {
+    "createTwoMembersActive": true,
+    "createListsActiveMembers": true,
+    "leadToMemberEnqueued": true,
+    "memberEnvelopeEchoed": true,
+    "memberToLeadInjected": true,
+    "leadInboxDrained": true,
+    "noBlockingTeamWaitCalls": true,
+    "crashHoldReached": true,
+    "crashKilledMemberAtHold": true,
+    "crashReservationUncommittedAtKill": true,
+    "crashRestartExitClean": true,
+    "crashLivenessInjectedToLead": true
+  },
+  "failed": [],
+  "credentialIsolationClean": true,
+  "wholeDirUnchanged": false,
+  "leakedPids": 0,
+  "outDir": "/Users/yeongyu/local-workspaces/omo-wt/feat-team-steer-only/.omo/evidence/20260726-team-steer-only/team-e2e-artifacts"
+}

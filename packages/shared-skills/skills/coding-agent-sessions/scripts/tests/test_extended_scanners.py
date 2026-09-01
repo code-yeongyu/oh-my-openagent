@@ -37,6 +37,8 @@ def test_default_platforms_are_canonical_transcript_sources() -> None:
         "codex",
         "claude",
         "senpi",
+        "oh-my-pi",
+        "gajae-code",
         "opencode",
         "openclaw",
         "droid",
@@ -57,6 +59,7 @@ def test_default_platforms_are_canonical_transcript_sources() -> None:
         "crush",
         "zed",
         "kiro",
+        "aside",
     }
     forbidden = {"copilot", "mux", "antigravity", "synthetic", "cursor"}
 

@@ -5,7 +5,7 @@ All reference files live flat in this directory. Three layers:
 - **Layer A — taste skills** (12 files): how to execute. Discipline, motion, spacing, anti-slop, output completeness.
 - **Layer B — design systems** (70 files): what it should look like. Brand-specific color/type/component tokens.
 
-**Phase 0 runs first** (check/create `DESIGN.md`), then most non-trivial tasks load **one Layer A + one Layer B** together. See the routing flow in the sibling `README.md`.
+**Phase 0 runs first** (check/create `DESIGN.md`), then most non-trivial tasks load **one Layer A + one Layer B** together. See the routing flow in the sibling `README.md`. Specialized phases (interaction and motion, app-shell layout, URL clones, real-product screen research) load the matching project-original operating reference — see the final section of this index.
 
 ---
 
@@ -13,7 +13,7 @@ All reference files live flat in this directory. Three layers:
 
 | File | Purpose | Load when |
 |---|---|---|
-| `design-system-architecture.md` | Defines the 7-section `DESIGN.md` structure (atmosphere, color tokens, typography scale, spacing system, components, motion, depth). Creation workflow for new and existing projects. Validation rules and memory management. | Phase 0 fires and no `DESIGN.md` exists in the project. Also load when extracting a design system from existing code. |
+| `design-system-architecture.md` | Defines the `DESIGN.md` structure — 8 sections plus a greenfield-only `## 0. Research Log` (atmosphere, color tokens, typography scale, spacing system, components, motion, depth, accessibility constraints & accepted debt). Creation workflow for new and existing projects. Validation rules and memory management. | Phase 0 fires and no `DESIGN.md` exists in the project. Also load when extracting a design system from existing code. |
 
 ---
 
@@ -33,7 +33,7 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 | `minimalist-skill.md` | Editorial product UI inspired by Notion/Linear. Restrained monochrome palette, crisp structure, generous whitespace. | The user says "minimal", "clean", "Notion-style", "Linear-style", "editorial", "boring is good", "remove decoration". |
 | `brutalist-skill.md` | BETA. Mechanical visual language. Swiss typography, sharp contrast, raw structure, experimental composition. | The user says "brutalist", "raw", "Swiss", "experimental", "industrial", "unstyled", "anti-design". |
 | `output-skill.md` | Pushes for complete output: no placeholder comments, no `// TODO`, no skipped implementation, no half-done components. | Stack on top of any other skill when the agent has been lazy or the user complains "you keep leaving things undone". Do not use alone. |
-| `stitch-skill.md` | Google Stitch-compatible semantic design rules. Includes the extra DESIGN.md export format. | The user is working with Google Stitch, or explicitly wants Stitch-format output, or wants a DESIGN.md alongside the code. |
+| `stitch-skill.md` | Google Stitch-compatible semantic design rules. Includes the extra DESIGN.md export format; a complete worked export ships alongside as `stitch-design-example.md`. | The user is working with Google Stitch, or explicitly wants Stitch-format output, or wants a DESIGN.md alongside the code. |
 
 ### Image-generation skills (do NOT write code, only produce reference imagery)
 
@@ -49,6 +49,20 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 2. **`output-skill.md` and `stitch-skill.md` stack on top of any style skill.** They add discipline and output format, not visual direction.
 3. **`image-to-code-skill.md` pairs with one imagegen skill** for the full flow.
 4. **Imagegen skills are image-only.** Do not load them when the user actually wants code.
+
+---
+
+## Operating references — interaction, layout, and research workflows (project-original)
+
+Beyond the 12-file Layer A library, the design ruleset carries project-original operating references for specialized phases. They stack on the routed Layer A + Layer B pair; they never replace a style skill, and they are not counted in the library totals above.
+
+| File | Purpose | Load when |
+|---|---|---|
+| `interaction-skill.md` | Interaction mechanics anchored to the beui.dev catalog: find the nearest pattern, read its real source through the curl recipe, extract the mechanism (spring config, layout strategy, enter/exit order, reduced-motion path), and adapt it to `DESIGN.md` motion tokens. | Any work adding or changing interaction or motion — micro-interactions, animated components, transitions, gestures, hover/press/state feedback, loading/success/error morphs, "make it feel alive". |
+| `layout-skill.md` | Layout mechanics: scroll ownership, the two silent CSS contracts, named primitives, content-stress matrix. Zero visual direction. | App shells, dashboards, split panes, or a layout that breaks under real content. |
+| `lazyweb.md` | Curl-only real-product screen research for design direction. | Greenfield design research lanes. |
+| `stylegallery.md` | Curl-only lookup of named spatial pattern contracts: primary problem, constraints, scroll ownership, anti-patterns. | A concrete spatial problem needs a documented pattern, alongside `layout-skill.md` mechanics. |
+| `clone-from-url.md` | Runtime extraction workflow (browser + `getComputedStyle`) for cloning a named site. | A live site or URL is the visual reference. |
 
 ---
 

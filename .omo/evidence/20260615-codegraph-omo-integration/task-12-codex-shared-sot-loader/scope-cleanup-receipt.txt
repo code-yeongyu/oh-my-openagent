@@ -1,5 +1,0 @@
-Scope cleanup:
-- Only TODO 12 source/scaffold files, root package.json typecheck registration, and task-12 evidence were prepared for staging.
-- OpenCode MCP files already modified by other workers were left untouched.
-- An accidental RED-test file initially created in /Users/yeongyu/local-workspaces/omo was deleted, and the empty shared/test/src dirs there were removed. `git -C /Users/yeongyu/local-workspaces/omo status --short packages/omo-codex/plugin/shared` returned no changes afterward.
-- tmux task12 sessions were killed; `tmux list-sessions | rg task12-codex-sot` returned no matches.

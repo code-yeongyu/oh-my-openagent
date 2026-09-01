@@ -1,0 +1,23 @@
+initialize: {"name":"lsp","version":"0.1.0"}
+workspace: C:\Users\pss\AppData\Local\Temp\omo-6131-live-ntXEV5
+marksman: C:/Users/pss/.omo-contrib/tools/marksman.exe
+elapsedMs: 3890
+lsp_diagnostics result:
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "No diagnostics found"
+    }
+  ],
+  "isError": false,
+  "details": {
+    "filePath": "C:\\Users\\pss\\AppData\\Local\\Temp\\omo-6131-live-ntXEV5\\README.md",
+    "severity": "all",
+    "mode": "file",
+    "diagnostics": [],
+    "totalDiagnostics": 0,
+    "truncated": false
+  }
+}
+exit=0

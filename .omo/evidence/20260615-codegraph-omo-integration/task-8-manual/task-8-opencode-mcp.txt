@@ -1,2 +1,0 @@
-{"present":true,"cmd":["/Users/yeongyu/.omo/codegraph/bin/codegraph","serve","--mcp"],"enabled":true,"env":{"CODEGRAPH_INSTALL_DIR":"/Users/yeongyu/.omo/codegraph","CODEGRAPH_NO_DOWNLOAD":"1","CODEGRAPH_TELEMETRY":"0","DO_NOT_TRACK":"1"}}
-EXIT:0

@@ -1,0 +1,8 @@
+host_database=host-opencode-db
+host_session_count_before=21875
+sandbox_database=isolated-opencode-db
+sandbox_session_count_after_registry_probe=0
+host_session_count_after=21875
+host_session_count_unchanged=true
+sandbox_uses_dist_plugin=true
+sandbox_removed=true

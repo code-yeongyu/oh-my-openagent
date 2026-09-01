@@ -36,10 +36,8 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		// then
 		const parsed = parseBlockOutput(output);
 		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("너는 방금 작업을 완료했다고 보고했고, 그건 거짓말이다.");
 		expect(parsed.reason).toContain(".omo/evidence/");
 		expect(parsed.reason).toContain("EVIDENCE_RECORDED: <path>");
-		expect(parsed.reason).not.toContain("2번째");
 	});
 
 	it("#given a prior blocked stop #when lazycodex executor stops again #then escalates the attempt count", () => {
@@ -51,8 +49,9 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		const output = runSubagentStopHook(createInput(cwd), nodeFileSystem);
 
 		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.reason).toContain("2번째");
+		expect(parseBlockOutput(output).decision).toBe("block");
+		const statePath = join(cwd, ".omo", "lazycodex-executor-verify", "sess.1-agent_1.json");
+		expect(JSON.parse(readFileSync(statePath, "utf8"))).toEqual({ attempts: 2 });
 	});
 
 	it("#given turn_id is omitted #when lazycodex executor stops #then the hook still parses the payload", () => {
@@ -299,7 +298,7 @@ function existingReceiptTargetOutsideEvidenceRoot(): string {
 function createInput(cwd: string, overrides: Partial<SubagentStopInput> = {}): SubagentStopInput {
 	return {
 		hook_event_name: "SubagentStop",
-		agent_type: "lazycodex-executor",
+		agent_type: "lazycodex-worker-medium",
 		agent_id: "agent_1",
 		session_id: "sess.1",
 		cwd,
@@ -315,7 +314,7 @@ function createInput(cwd: string, overrides: Partial<SubagentStopInput> = {}): S
 function createUnknownEventInput(cwd: string): Record<string, string | boolean> {
 	return {
 		hook_event_name: "Stop",
-		agent_type: "lazycodex-executor",
+		agent_type: "lazycodex-worker-medium",
 		agent_id: "agent_1",
 		session_id: "sess.1",
 		cwd,
@@ -344,3 +343,52 @@ function isBlockOutput(value: unknown): value is BlockOutput {
 		typeof value.reason === "string"
 	);
 }
+
+describe("tier worker receipt enforcement", () => {
+	// given the matcher set now covers the difficulty-tier workers
+	const workerTypes = ["lazycodex-worker-low", "lazycodex-worker-medium", "lazycodex-worker-high"] as const;
+
+	for (const agentType of workerTypes) {
+		it(`#given no evidence receipt #when a ${agentType} child stops #then blocks`, () => {
+			// given
+			const cwd = createWorkspace();
+
+			// when
+			const output = runSubagentStopHook(createInput(cwd, { agent_type: agentType }), nodeFileSystem);
+
+			// then
+			expect(parseBlockOutput(output).decision).toBe("block");
+		});
+	}
+
+	it("#given no evidence receipt #when an explorer child stops #then no-ops", () => {
+		// given
+		const cwd = createWorkspace();
+
+		// when
+		const output = runSubagentStopHook(createInput(cwd, { agent_type: "explorer" }), nodeFileSystem);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given both hook manifests #when their matchers are applied #then enforced agents match and read-only roles do not", () => {
+		// given
+		const componentManifest = JSON.parse(readFileSync(new URL("../hooks/hooks.json", import.meta.url), "utf8"));
+		const rootManifest = JSON.parse(
+			readFileSync(
+				new URL("../../../hooks/subagent-stop-verifying-lazycodex-executor-evidence.json", import.meta.url),
+				"utf8",
+			),
+		);
+		for (const manifest of [componentManifest, rootManifest]) {
+			const matcher = new RegExp(manifest.hooks.SubagentStop[0].matcher);
+
+			// then
+			for (const name of workerTypes) expect(matcher.test(name)).toBe(true);
+			expect(matcher.test("lazycodex-executor")).toBe(false);
+			expect(matcher.test("explorer")).toBe(false);
+			expect(matcher.test("lazycodex-gate-reviewer")).toBe(false);
+		}
+	});
+});

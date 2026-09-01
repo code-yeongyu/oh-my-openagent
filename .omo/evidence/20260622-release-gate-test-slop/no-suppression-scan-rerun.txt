@@ -1,1 +1,0 @@
-$ rg -n "as any|@ts-ignore|@ts-expect-error|catch\s*\([^)]*\)\s*\{\s*\}" script/agent-env.test.ts script/agent-setup-offline.test.ts packages/omo-codex/plugin/test/auto-update-restart-notice.test.mjs
