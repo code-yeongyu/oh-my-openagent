@@ -166,6 +166,7 @@ function describeStartResult(result: Exclude<StartResult, { kind: "started" }>):
     case "start_failed":
       return result.error_message
     case "residency_denied":
+    case "admission_paused":
       return result.reason
     default:
       return assertNever(result)

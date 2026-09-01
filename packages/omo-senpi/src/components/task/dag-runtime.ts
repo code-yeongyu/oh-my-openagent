@@ -195,8 +195,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
    * next cancel/wait would silently build a THIRD scheduler over a live run. The admission latch is
    * cleared for the same reason it must be cleared at all: only recovery's shutdown pause ever sets
    * it, it lives in this closure so it outlives every scheduler, and nothing else ever deletes it -
-   * a retry after a pause+resume in the SAME process would otherwise hang forever on the
-   * never-resolving admission promise instead of starting a child.
+   * a retry after a pause+resume in the SAME process would otherwise deny every admission instead of
+   * starting a child.
    */
   const adoptReentry = (runId: DagRunId, reentry: DagRunReentry): void => {
     const owned: { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> } = { scheduler: reentry.scheduler }
@@ -500,7 +500,7 @@ function admissionTaskManager(
     get(target, property) {
       if (property === "startOwned") {
         return (spec: Parameters<TaskManager["startOwned"]>[0], owner: Parameters<TaskManager["startOwned"]>[1]) => {
-          if (admissionStopped(owner.runId)) return stoppedAdmission()
+          if (admissionStopped(owner.runId)) return stoppedAdmission(owner.runId)
           return target.startOwned({ ...spec, run_in_background: false }, owner)
         }
       }
@@ -510,8 +510,16 @@ function admissionTaskManager(
   })
 }
 
-function stoppedAdmission(): Promise<OwnedStartResult> {
-  return new Promise<OwnedStartResult>(() => undefined)
+function stoppedAdmission(runId: DagRunId): Promise<OwnedStartResult> {
+  // A latched (paused) run identifier must SETTLE, never hang. It must NOT reuse residency_denied:
+  // that outcome means transient resident-cap pressure, and the scheduler terminalizes it once no
+  // attached task can free a slot - which is always true during a shutdown pause, so the run would
+  // fail instead of suspending. admission_paused parks the nodes back to pending and leaves the run
+  // resumable.
+  return Promise.resolve({
+    kind: "admission_paused",
+    reason: `dag run "${runId}" is paused; admission stays stopped until the run is resumed or retried`,
+  })
 }
 
 function removeListeners(

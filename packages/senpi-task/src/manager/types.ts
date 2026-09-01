@@ -143,6 +143,7 @@ export type StartResult =
       readonly error_message: string
     }
   | { readonly kind: "residency_denied"; readonly reason: string }
+  | { readonly kind: "admission_paused"; readonly reason: string }
 
 export type ContinueDelivery = "steer" | "followUp" | "revive"
 

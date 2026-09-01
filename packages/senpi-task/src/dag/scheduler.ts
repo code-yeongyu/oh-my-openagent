@@ -13,6 +13,7 @@ import {
   dagRunCancelledEvent,
   dagRunCompletedEvent,
   dagRunFailedEvent,
+  dagRunPausedEvent,
   dagRunStartedEvent,
   dagWaveCompletedEvent,
   dagWaveStartedEvent,
@@ -163,6 +164,7 @@ type SchedulerContext = {
   readonly cancellationCompleted: Promise<void>
   readonly resolveCancellationCompleted: () => void
   cancellationStarted: boolean
+  admissionPaused: boolean
   // #7412: set by the foreign-commit subscription so a wake that fired while no settle race was
   // armed is not lost - settleOne consumes it level-triggered.
   foreignSettlement: boolean
@@ -222,6 +224,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     cancellationCompleted: cancellationCompleted.promise,
     resolveCancellationCompleted: cancellationCompleted.resolve,
     cancellationStarted: false,
+    admissionPaused: false,
     foreignSettlement: false,
     admissionInProgress: false,
     admissionIdleWaiters: new Set(),
@@ -471,6 +474,13 @@ async function cancelledSnapshot(context: SchedulerContext): Promise<DagRunRecor
   return context.journal.snapshot()
 }
 
+function pausedSnapshot(context: SchedulerContext): DagRunRecordV1 {
+  if (context.journal.snapshot().status !== "paused") {
+    context.journal.append(dagRunPausedEvent({ reason: "session_shutdown" }))
+  }
+  return context.journal.snapshot()
+}
+
 function whenAdmissionIdle(context: SchedulerContext): Promise<void> {
   if (!context.admissionInProgress) return Promise.resolve()
   return new Promise<void>((resolve) => context.admissionIdleWaiters.add(resolve))
@@ -503,6 +513,9 @@ async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
     // settled before later-wave nodes it unblocked start interleaving their own events.
     emitCompletedWaves(context)
     if (!await admitFrontier(context)) return cancelledSnapshot(context)
+    // A shutdown pause is a resumable suspension, not a terminal outcome: leave the parked nodes
+    // pending and settle the run as paused so wait/cancel resolve and a later adapter can resume.
+    if (context.admissionPaused) return pausedSnapshot(context)
     const current = context.journal.snapshot()
     if (current.nodes.every((node) => TERMINAL_NODE_STATES.has(node.state))) break
     if (context.attachedTasks.size === 0) {
@@ -556,6 +569,7 @@ async function admitFrontier(context: SchedulerContext): Promise<boolean> {
       resolveAdmissionIdle(context)
     }
     const nextDenied: DagNodeId[] = []
+    const paused: DagNodeId[] = []
     for (let index = 0; index < results.length; index += 1) {
       const settled = results[index]
       const nodeId = awaitingAdmission[index]
@@ -567,6 +581,8 @@ async function admitFrontier(context: SchedulerContext): Promise<boolean> {
       const { result } = settled.value
       if (context.cancellationStarted) {
         if (result.kind === "started") attachStarted(context, nodeId, result)
+      } else if (result.kind === "admission_paused") {
+        paused.push(nodeId)
       } else if (result.kind === "residency_denied") {
         nextDenied.push(nodeId)
       } else {
@@ -574,6 +590,14 @@ async function admitFrontier(context: SchedulerContext): Promise<boolean> {
       }
     }
     if (context.cancellationStarted) return false
+    // A paused run is suspended, not out of capacity: return every node this pass touched to
+    // pending so a later resume re-admits it, and stop admitting without failing anything.
+    if (paused.length > 0) {
+      for (const nodeId of [...paused, ...nextDenied]) transition(context, nodeId, "pending", { kind: "resumed" })
+      context.pendingAdmission.length = 0
+      context.admissionPaused = true
+      return true
+    }
     context.pendingAdmission.push(...nextDenied)
     if (nextDenied.length === 0) return true
     if (context.attachedTasks.size === 0) {
@@ -640,7 +664,7 @@ function waveIndexByNodeId(record: DagRunRecordV1): ReadonlyMap<DagNodeId, numbe
 function attachOrFail(
   context: SchedulerContext,
   nodeId: DagNodeId,
-  result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
+  result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" | "admission_paused" }>,
 ): void {
   if (result.kind === "owner_conflict") {
     attachStarted(context, nodeId, {
@@ -885,7 +909,7 @@ function owner(context: SchedulerContext, nodeId: DagNodeId) {
   }
 }
 
-function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" }>): {
+function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" | "admission_paused" }>): {
   readonly code: DagNodeErrorCode
   readonly message: string
 } {

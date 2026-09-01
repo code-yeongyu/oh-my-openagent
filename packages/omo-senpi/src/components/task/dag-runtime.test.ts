@@ -1051,6 +1051,53 @@ describe("assembled DAG runtime control verbs", () => {
     runtime.dispose()
   }, { timeout: 20_000 })
 
+  test("#given a run paused for shutdown with a queued dependent wave #when the finished node settles while the run identifier is latched #then the run suspends as resumable instead of pinning the pipeline or failing the dependent", async () => {
+    // given
+    const { cwd, runner, runtime, runId, whenState } = await controlFixture("admission-latch-denial", [
+      { id: "solo" },
+      { id: "next", dependsOn: ["solo"] },
+    ])
+    await within(runner.whenStarted(1))
+    // Pausing latches admission for this run identifier while the scheduler keeps running its loop.
+    runtime.pauseForShutdown()
+
+    // when the first-wave child completes and the scheduler admits the dependent next wave
+    runner.handles[0]?.settle("solo output")
+
+    // then the latched admission settles WITHOUT pinning the pipeline, and the run suspends rather
+    // than failing: a shutdown pause must stay resumable, so the dependent node keeps a non-terminal
+    // state that a later adapter can re-admit. Overloading residency_denied here would terminalize
+    // it, because the scheduler fails denied nodes once no attached task can free a slot.
+    await within(whenState("next", "pending"), 5_000)
+    const record = dagStore(cwd).readCheckpoint<DagRunRecordV1>(runId)
+    expect(record?.status).toBe("paused")
+    const solo = record?.nodes.find((node) => node.id === "solo")
+    const next = record?.nodes.find((node) => node.id === "next")
+    expect(solo?.state).toBe("completed")
+    expect(next?.state).toBe("pending")
+    expect(next?.state).not.toBe("failed")
+    expect(runner.handles).toHaveLength(1)
+    runtime.dispose()
+  }, { timeout: 20_000 })
+
+  test("#given a run paused for shutdown with a queued dependent wave #when the caller cancels the paused run #then cancel settles instead of deadlocking on the latched admission", async () => {
+    // given
+    const { runner, runtime, sessionId, runId } = await controlFixture("admission-latch-cancel", [
+      { id: "solo" },
+      { id: "next", dependsOn: ["solo"] },
+    ])
+    await within(runner.whenStarted(1))
+    runtime.pauseForShutdown()
+
+    // when
+    runner.handles[0]?.settle("solo output")
+
+    // then cancel resolves; the latch must never leave a control verb waiting on an unresolved promise
+    await within(runtime.cancel(runId, sessionId), 5_000)
+    expect(runner.handles).toHaveLength(1)
+    runtime.dispose()
+  }, { timeout: 20_000 })
+
   test("#given a run resumed by retry #when attach re-runs the schedulable gate #then the re-registered scheduler is reused instead of a second one starting the node twice", async () => {
     // given
     const { runner, runtime, sessionId, runId, whenAttached } = await controlFixture("retry-registration", [{ id: "solo" }])

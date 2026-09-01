@@ -246,7 +246,7 @@ async function reconcileNodes(
         startSpec(journal.snapshot(), observed.id),
         taskOwner(journal.snapshot(), observed.id),
       )
-      if (result.kind === "residency_denied") {
+      if (result.kind === "residency_denied" || result.kind === "admission_paused") {
         journal.append(dagNodeTransitionedEvent({
           nodeId: observed.id,
           from: "scheduled",
@@ -300,7 +300,7 @@ async function reconcileNodes(
 function attachStartedOrFail(
   journal: DagJournal<DagRunRecordV1>,
   nodeId: DagNodeId,
-  result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
+  result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" | "admission_paused" }>,
   now: () => number,
   pendingErrors: Map<DagNodeId, DagNodeError>,
 ): TaskRecord | undefined {
@@ -478,7 +478,7 @@ function persistedNode(record: DagRunRecordV1, nodeId: DagNodeId): DagPersistedN
   return node
 }
 
-function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" }>): {
+function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" | "admission_paused" }>): {
   readonly code: DagNodeErrorCode
   readonly message: string
 } {

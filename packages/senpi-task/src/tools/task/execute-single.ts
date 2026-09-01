@@ -106,7 +106,7 @@ export async function runSpawn(
       ...(spec.skills === undefined ? {} : { skills: spec.skills }),
     })
   }
-  if (started.kind === "residency_denied") {
+  if (started.kind === "residency_denied" || started.kind === "admission_paused") {
     return result(started.reason, { task_id: "", status: "residency_denied", mode: "spawn", reason: started.reason })
   }
   if (params.run_in_background === true) {

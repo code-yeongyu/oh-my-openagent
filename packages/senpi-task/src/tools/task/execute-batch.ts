@@ -56,6 +56,7 @@ function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult, sk
         ...(skills === undefined ? {} : { skills }),
       }
     case "residency_denied":
+    case "admission_paused":
       return itemError(item, "", start.reason, skills)
   }
 }
