@@ -18,7 +18,7 @@ import { createToolExecuteBeforeHandler } from "./tool-execute-before"
 type StopCalls = {
   readonly stoppedSessions: string[]
   readonly cancelledCountdowns: string[]
-  readonly cancelledLoops: string[]
+  readonly clearedGoals: string[]
 }
 
 function createStopHooks(): {
@@ -28,7 +28,7 @@ function createStopHooks(): {
   const calls: StopCalls = {
     stoppedSessions: [],
     cancelledCountdowns: [],
-    cancelledLoops: [],
+    clearedGoals: [],
   }
 
   return {
@@ -43,12 +43,17 @@ function createStopHooks(): {
       todoContinuationEnforcer: {
         cancelAllCountdowns: () => calls.cancelledCountdowns.push("cancelled"),
       },
-      ralphLoop: {
-        startLoop: () => true,
-        cancelLoop: (sessionID: string) => {
-          calls.cancelledLoops.push(sessionID)
+      goal: {
+        setGoal: () => ({ id: "goal-id", status: "active", objective: "" }),
+        getGoal: () => null,
+        pauseGoal: () => null,
+        resumeGoal: () => null,
+        clearGoal: (sessionID: string) => {
+          calls.clearedGoals.push(sessionID)
           return true
         },
+        markComplete: () => null,
+        event: async () => {},
       },
     },
   }
@@ -91,7 +96,7 @@ describe("stop continuation entrypoints", () => {
     // then
     expect(calls.stoppedSessions).toEqual(["ses-stop"])
     expect(calls.cancelledCountdowns).toEqual(["cancelled"])
-    expect(calls.cancelledLoops).toEqual(["ses-stop"])
+    expect(calls.clearedGoals).toEqual(["ses-stop"])
     expect(readBoulderState(testDirectory)).toBeNull()
   })
 
@@ -127,7 +132,7 @@ describe("stop continuation entrypoints", () => {
     // then
     expect(calls.stoppedSessions).toEqual(["ses-stop"])
     expect(calls.cancelledCountdowns).toEqual(["cancelled"])
-    expect(calls.cancelledLoops).toEqual(["ses-stop"])
+    expect(calls.clearedGoals).toEqual(["ses-stop"])
     expect(readBoulderState(testDirectory)).toBeNull()
   })
 
@@ -160,7 +165,7 @@ describe("stop continuation entrypoints", () => {
     // then
     expect(calls.stoppedSessions).toHaveLength(0)
     expect(calls.cancelledCountdowns).toHaveLength(0)
-    expect(calls.cancelledLoops).toHaveLength(0)
+    expect(calls.clearedGoals).toHaveLength(0)
     expect(readBoulderState(testDirectory)).not.toBeNull()
   })
 
@@ -182,7 +187,7 @@ describe("stop continuation entrypoints", () => {
     // then
     expect(calls.stoppedSessions).toEqual(["ses-stop"])
     expect(calls.cancelledCountdowns).toEqual(["cancelled"])
-    expect(calls.cancelledLoops).toEqual(["ses-stop"])
+    expect(calls.clearedGoals).toEqual(["ses-stop"])
     expect(readBoulderState(testDirectory)).toBeNull()
   })
 })

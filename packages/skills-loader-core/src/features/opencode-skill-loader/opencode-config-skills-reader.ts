@@ -2,7 +2,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 
 import { parseJsoncSafe } from "@oh-my-opencode/utils"
-import { getOpenCodeConfigDir } from "../../shared"
+import { getOpenCodeConfigDirs } from "../../shared"
 
 interface OpencodeConfigWithSkills {
   skills?: { paths?: unknown; urls?: unknown }
@@ -14,12 +14,14 @@ export interface HostSkillConfigShape {
 }
 
 function getConfigPaths(directory: string): string[] {
-  const globalConfigDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const globalConfigDirs = getOpenCodeConfigDirs({ binary: "opencode" })
   return [
     path.join(directory, ".opencode", "opencode.json"),
     path.join(directory, ".opencode", "opencode.jsonc"),
-    path.join(globalConfigDir, "opencode.json"),
-    path.join(globalConfigDir, "opencode.jsonc"),
+    ...globalConfigDirs.flatMap((dir) => [
+      path.join(dir, "opencode.json"),
+      path.join(dir, "opencode.jsonc"),
+    ]),
   ]
 }
 

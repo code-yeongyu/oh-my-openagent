@@ -40,7 +40,7 @@ xhs favorites              # 可能返回 API error
 >
 > **频率控制**: 高频请求（批量搜索、深翻评论）会触发验证码，这是平台限制无法绕过。建议每次操作间隔 2-3 秒。
 >
-> **POST 操作风险**: 发帖(post)、评论(comment)、点赞(like) 等写操作在 v0.6.x 可能因签名问题返回 406。如需使用，建议降级到 v0.3.5 (`pipx install xiaohongshu-cli==0.3.5`)。
+> **POST 操作**: 发帖(post)、评论(comment)、点赞(like) 等写操作在 v0.6.4 已修复签名问题 (PR [#19](https://github.com/jackwener/xiaohongshu-cli/pull/19))，可正常使用。
 
 ## 抖音 / Douyin
 

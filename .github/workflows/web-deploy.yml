@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-latest
     environment:
       name: web-production
@@ -31,11 +32,11 @@ jobs:
       contents: read
       deployments: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.4.0"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

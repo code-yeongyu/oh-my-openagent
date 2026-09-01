@@ -7,6 +7,8 @@ import {
 	runJsonRpcStdioServer,
 	successResponse,
 	type JsonRpcResponse,
+	type McpLifecycleLog,
+	type ParentWatchdogConfig,
 } from "../../../../../mcp-stdio-core/src/index.ts";
 
 export interface UnavailableCodegraphMcpOptions {
@@ -14,6 +16,12 @@ export interface UnavailableCodegraphMcpOptions {
 	readonly output: Writable;
 	readonly reason: string;
 	readonly serverVersion: string;
+	// Test seam: production callers leave this unset so the watchdog uses its
+	// defaults (parentPid = process.ppid, 30s poll).
+	readonly parentWatchdog?: ParentWatchdogConfig;
+	// Test seam: surfaces the mcp-stdio-core lifecycle log so tests can pin the
+	// resolved idle timeout without waiting a real timeout out.
+	readonly lifecycleLog?: McpLifecycleLog;
 }
 
 interface UnavailableCodegraphMcpHandlerOptions {
@@ -32,6 +40,15 @@ export async function runUnavailableCodegraphMcpServer(
 		},
 		input: options.input,
 		output: options.output,
+		// Idle stays disabled: the codex host never respawns an exited stdio
+		// MCP server (codex-rs auto-reconnects only its own codex_apps server),
+		// and since #6548 the default idle timer actually destroys stdin — so an
+		// inherited 10-minute default would silently kill this stub mid-session
+		// and turn later codegraph tool calls into dead-connection errors.
+		idleTimeoutMs: 0,
+		parentWatchdog: options.parentWatchdog ?? {},
+		// Conditional spread keeps this assignable under exactOptionalPropertyTypes.
+		...(options.lifecycleLog === undefined ? {} : { log: options.lifecycleLog }),
 	});
 }
 

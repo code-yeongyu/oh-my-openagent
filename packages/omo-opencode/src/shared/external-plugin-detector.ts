@@ -5,7 +5,7 @@
 
 import { loadOpencodePlugins } from "./load-opencode-plugins"
 import { log } from "./logger"
-import { CONFIG_BASENAME, PLUGIN_NAME } from "./plugin-identity"
+import { PLUGIN_NAME } from "./plugin-identity"
 
 /**
  * Known notification plugins that conflict with oh-my-opencode's session-notification.
@@ -173,7 +173,7 @@ Both ${PLUGIN_NAME} and ${pluginName} listen to session.idle events.
 
    To use ${PLUGIN_NAME}'s notifications instead, either:
    1. Remove ${pluginName} from your opencode.json plugins
-   2. Or set "notification": { "force_enable": true } in ${CONFIG_BASENAME}.json`
+   2. Or set "notification": { "force_enable": true } in .omo/omo.jsonc`
 }
 
 /**
@@ -187,7 +187,7 @@ Both ${PLUGIN_NAME} and ${pluginName} scan ~/.config/opencode/skills/ and regist
 
    Consider either:
    1. Remove ${pluginName} from your opencode.json plugins to use ${PLUGIN_NAME}'s skill loading
-   2. Or disable ${PLUGIN_NAME}'s skill loading by setting "claude_code.skills": false in ${CONFIG_BASENAME}.json
+   2. Or disable ${PLUGIN_NAME}'s skill loading by setting "claude_code.skills": false in .omo/omo.jsonc
    3. Or uninstall ${PLUGIN_NAME} if you prefer ${pluginName}'s skill management`
 }
 

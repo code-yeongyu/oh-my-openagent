@@ -182,9 +182,9 @@ try {
 		outcome: "silent",
 		items: silentResult.items.map((entry) => entry.message),
 		transientError: silentResult.transientError ?? null,
-		ok: silentResult.items.length === 0 && silentResult.transientError?.kind === "freshness_timeout",
+		ok: silentResult.items.length === 0 && silentResult.transientError === undefined,
 	};
-	requireProbe(silentEvidence.ok, "silent diagnostics were labeled clean instead of timing out transiently");
+	requireProbe(silentEvidence.ok, "silent no-pull server that never published did not resolve clean after the freshness window");
 
 	const closedServer = await harness.makeClient(
 		{

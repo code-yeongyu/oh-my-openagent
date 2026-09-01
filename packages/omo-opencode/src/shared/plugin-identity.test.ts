@@ -2,8 +2,6 @@ import { describe, it, expect } from "bun:test"
 import {
   ACCEPTED_PACKAGE_NAMES,
   CACHE_DIR_NAME,
-  CONFIG_BASENAME,
-  LEGACY_CONFIG_BASENAME,
   LEGACY_PLUGIN_NAME,
   LOG_FILENAME,
   PLUGIN_NAME,
@@ -50,28 +48,6 @@ describe("plugin-identity constants", () => {
 
       // then
       expect(ACCEPTED_PACKAGE_NAMES).toEqual([PLUGIN_NAME, LEGACY_PLUGIN_NAME])
-    })
-  })
-
-  describe("CONFIG_BASENAME", () => {
-    it("equals oh-my-openagent", () => {
-      // given
-
-      // when
-
-      // then
-      expect(CONFIG_BASENAME).toBe("oh-my-openagent")
-    })
-  })
-
-  describe("LEGACY_CONFIG_BASENAME", () => {
-    it("equals oh-my-opencode", () => {
-      // given
-
-      // when
-
-      // then
-      expect(LEGACY_CONFIG_BASENAME).toBe("oh-my-opencode")
     })
   })
 

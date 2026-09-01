@@ -24,6 +24,7 @@ function baseRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
     created_at: "2026-07-06T01:00:00.000Z",
     updated_at: "2026-07-06T01:00:03.000Z",
     final_response: "done",
+    notify_on_terminal: false,
     notification: { run_epoch: 0, notified_epoch: -1 },
     ...overrides,
   }
@@ -35,6 +36,13 @@ function fakeStore(record: TaskRecord) {
     load: (taskId: string): TaskRecord | null => records.get(taskId) ?? null,
     replace: (next: TaskRecord): void => {
       records.set(next.task_id, next)
+    },
+    mutate: (taskId: string, mutation: (record: TaskRecord) => TaskRecord): TaskRecord | null => {
+      const current = records.get(taskId)
+      if (current === undefined) return null
+      const next = mutation(current)
+      if (next !== current) records.set(taskId, next)
+      return next
     },
     appendEvent: (_taskId: string, _event: PersistedTaskEvent): string => "log.jsonl",
     list: () => ({ records: [...records.values()], diagnostics: [] }),

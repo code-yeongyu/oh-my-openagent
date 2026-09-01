@@ -1,0 +1,32 @@
+LSP workspace bridge:
+
+  /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/lsp-test-process-stability-20260817
+
+Final diagnostics:
+
+  test-setup.ts
+    diagnostics=0
+    result=No diagnostics found
+
+  script/ensure-vendored-lsp-daemon.ts
+    diagnostics=0
+    result=No diagnostics found
+
+  script/ensure-vendored-lsp-daemon.test.ts
+    diagnostics=0
+    result=No diagnostics found
+
+  packages/omo-opencode/src/cli/run/on-complete-hook.test.ts
+    diagnostics=0
+    result=No diagnostics found
+
+  packages/omo-senpi/src/components/onboarding/state.test.ts
+    diagnostics=0
+    result=No diagnostics found
+
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts
+    diagnostics=0
+    result=No diagnostics found
+
+The temporary bridge is tracked by a cleanup todo and will be removed before
+the task worktree is deleted.

@@ -72,6 +72,14 @@ export interface Diagnostic {
 	message: string;
 }
 
+export interface FormattingOptions {
+	tabSize: number;
+	insertSpaces: boolean;
+	trimTrailingWhitespace?: boolean;
+	insertFinalNewline?: boolean;
+	trimFinalNewlines?: boolean;
+}
+
 export interface TextDocumentIdentifier {
 	uri: string;
 }

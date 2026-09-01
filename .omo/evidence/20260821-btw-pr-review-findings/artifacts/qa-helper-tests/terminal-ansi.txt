@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="7" assertions="38" failures="0" skipped="0" time="0.381515">
+  <testsuite name="script/web-terminal-visual-qa.test.ts" file="script/web-terminal-visual-qa.test.ts" tests="7" assertions="38" failures="0" skipped="0" time="0" hostname="[REDACTED]">
+    <testsuite name="web terminal visual QA helper" file="script/web-terminal-visual-qa.test.ts" line="54" tests="7" assertions="38" failures="0" skipped="0" time="0.149" hostname="[REDACTED]">
+      <testcase name="#given a transcript #when rendering evidence #then files and xterm.js color-path metadata are written" classname="web terminal visual QA helper" time="0.041088" file="script/web-terminal-visual-qa.test.ts" line="55" assertions="5" />
+      <testcase name="#given ANSI escapes #when rendering #then the raw stream is preserved and text is plain" classname="web terminal visual QA helper" time="0.036359" file="script/web-terminal-visual-qa.test.ts" line="71" assertions="4" />
+      <testcase name="#given secret-bearing output #when rendering #then text ansi and metadata are redacted" classname="web terminal visual QA helper" time="0.0241" file="script/web-terminal-visual-qa.test.ts" line="80" assertions="8" />
+      <testcase name="#given help output #when inspecting the helper #then it documents the xterm.js color path and forbids tmux" classname="web terminal visual QA helper" time="0.027762" file="script/web-terminal-visual-qa.test.ts" line="107" assertions="9" />
+      <testcase name="#given wheel input tokens #when driving the browser terminal #then mouse wheel events target the xterm viewport" classname="web terminal visual QA helper" time="0.00143" file="script/web-terminal-visual-qa.test.ts" line="123" assertions="6" />
+      <testcase name="#given the Ctrl slash byte token #when driving the browser bridge #then the exact terminal control sequence reaches the PTY" classname="web terminal visual QA helper" time="0.000203" file="script/web-terminal-visual-qa.test.ts" line="172" assertions="4" />
+      <testcase name="#given conflicting sources #when both --from-file and --command are given #then it errors" classname="web terminal visual QA helper" time="0.020769" file="script/web-terminal-visual-qa.test.ts" line="204" assertions="2" />
+    </testsuite>
+  </testsuite>
+</testsuites>

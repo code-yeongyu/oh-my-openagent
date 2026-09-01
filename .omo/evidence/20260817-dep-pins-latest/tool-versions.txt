@@ -1,0 +1,25 @@
+=== real-surface tool version capture ===
+host: mengmotaHost Mac16,11
+date: 2026-08-17T09:48:58Z
+
+--- tsgo (the pin this PR advances) ---
+$ ./node_modules/.bin/tsgo --version
+Version 7.0.0-dev.20260707.2
+$ pin in package.json
+"@typescript/native-preview": "7.0.0-dev.20260707.2"
+
+--- typescript (unchanged, caret already current) ---
+$ node_modules/typescript version
+7.0.2
+"typescript": "^7.0.2"
+
+--- senpi engine the launcher spawns ---
+$ node_modules/@code-yeongyu/senpi version
+2026.8.16
+$ pins across 4 manifests
+  package.json                             "@code-yeongyu/senpi": "2026.8.16" 
+  packages/omo-senpi/package.json          "@code-yeongyu/senpi": "2026.8.16" 
+  packages/senpi-task/package.json         "@code-yeongyu/senpi": "2026.8.16" 
+  packages/omo-native/package.json         "@code-yeongyu/senpi": "2026.8.16" 
+$ bun.lock senpi entries (must be exactly one)
+@code-yeongyu/senpi@2026.8.16

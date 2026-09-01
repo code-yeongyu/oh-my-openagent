@@ -6,7 +6,7 @@ import { homedir, hostname } from "node:os"
 import { basename, join } from "node:path"
 import { promisify } from "node:util"
 
-import { CODEGRAPH_PROVISION_MANIFEST } from "./manifest"
+import { CODEGRAPH_PINNED_VERSION, CODEGRAPH_PROVISION_MANIFEST } from "./manifest"
 
 export interface CodegraphProvisionAsset {
   readonly executableName: string
@@ -29,7 +29,7 @@ export interface EnsureCodegraphProvisionedOptions {
   readonly lockWaitMs?: number
   readonly manifest?: CodegraphProvisionManifest
   readonly platformKey?: string
-  readonly version: "1.0.1"
+  readonly version: typeof CODEGRAPH_PINNED_VERSION
 }
 
 export interface CodegraphProvisionResult {
@@ -104,13 +104,13 @@ function forcedBadChecksumOptions(options: EnsureCodegraphProvisionedOptions): {
   }
 }
 
-async function readMarker(path: string): Promise<string | null> {
+async function readMarker(path: string, version: string): Promise<string | null> {
   if (!existsSync(path)) return null
   try {
     const raw = JSON.parse(await readFile(path, "utf8"))
-    if (typeof raw === "object" && raw !== null && "binPath" in raw) {
-      const value = raw.binPath
-      return typeof value === "string" && existsSync(value) ? value : null
+    if (typeof raw === "object" && raw !== null && "binPath" in raw && "version" in raw) {
+      const binPath = raw.binPath
+      return raw.version === version && typeof binPath === "string" && existsSync(binPath) ? binPath : null
     }
     return null
   } catch (error) {
@@ -205,7 +205,7 @@ export async function ensureCodegraphProvisioned(
   const downloader =
     forced?.downloader ?? options.downloader ?? ((asset) => defaultDownloader(asset, options.downloadTimeoutMs))
   const marker = markerPath(installDir, options.version)
-  const existing = await readMarker(marker)
+  const existing = await readMarker(marker, options.version)
   if (existing !== null) return { binPath: existing, provisioned: true }
 
   const lockPath = join(options.lockDir, `codegraph-${hostname()}.lock`)
@@ -217,7 +217,7 @@ export async function ensureCodegraphProvisioned(
   if (release === null) return { error: "timed out waiting for codegraph provisioning lock", provisioned: false }
 
   try {
-    const lockedExisting = await readMarker(marker)
+    const lockedExisting = await readMarker(marker, options.version)
     if (lockedExisting !== null) return { binPath: lockedExisting, provisioned: true }
 
     if (manifest.version !== options.version) {

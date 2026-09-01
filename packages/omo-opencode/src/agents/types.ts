@@ -7,11 +7,15 @@ import {
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
+  isClaudeOpus5Model,
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isGrok45Model,
+  isGrok46Model,
   isKimiK2Model,
   isKimiK27Model,
+  isKimiK3Model,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core";
 
@@ -22,11 +26,15 @@ export {
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
+  isClaudeOpus5Model,
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isGrok45Model,
+  isGrok46Model,
   isKimiK2Model,
   isKimiK27Model,
+  isKimiK3Model,
   isMiniMaxModel,
 };
 

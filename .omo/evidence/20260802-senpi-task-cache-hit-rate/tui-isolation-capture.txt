@@ -1,0 +1,5 @@
+ Spawn one active background task, then stop so the task footer and widget can be captured while the child is still running.
+ task category:ultrabrain(omo-mock/mock-1:xhigh) background running id:st_019fc126
+ active scenario parent stopped while active-child continues
+ ⠋ active-c... · category:ultrabrain(omo-mock/mock-1:xhigh) · turn 2 (2 tools) · $0.0481 (CH: 81%) · bash sleep 30 · 0s
+(🏴‍☠️ OmO Native) • /private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-L8fEQ8/project • 292/200K (0.1%) (auto)                (omo-mock) mock-1

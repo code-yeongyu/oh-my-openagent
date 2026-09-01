@@ -1,0 +1,107 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/locks/domains.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'noticeLockPath' not found in module '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/locks/index.ts'.
+-------------------------------
+
+
+packages/memory-core/src/tools/soul-edit.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '../soul' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/tools/soul-edit.test.ts'
+-------------------------------
+
+
+packages/memory-core/src/identity/layout.test.ts:
+17 |     // given / when / then
+18 |     expect(MEMORY_ROOT_ENV_VAR).toBe("OMO_MEMORY_HOME")
+19 |     expect(AGENTS_DIRNAME).toBe("agents")
+20 |     expect(REPO_DIRNAME).toBe("repo")
+21 |     expect(RUNTIME_DIRNAME).toBe("runtime")
+22 |     expect([...RUNTIME_SUBDIRNAMES]).toEqual([
+                                          ^
+error: expect(received).toEqual(expected)
+
+  [
+    "locks",
+    "transcripts",
+    "reflection",
+    "reflection-sessions",
+    "worktrees",
+    "viewers",
+    "push-queue",
+    "facts-queue",
+    "facts",
+-   "notices",
+-   "tool-receipts",
+  ]
+
+- Expected  - 2
++ Received  + 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/identity/layout.test.ts:22:38)
+(fail) memory identity layout constants > #given the layout module #when constants are inspected #then they pin the decided directory names [0.52ms]
+(pass) defaultMemoryRoot > #given no override #when the default root is computed #then it is ~/.omo/memory [0.07ms]
+(pass) resolveMemoryRoot > #given an absolute OMO_MEMORY_HOME #when the root is resolved #then the override is used verbatim [0.07ms]
+(pass) resolveMemoryRoot > #given a relative OMO_MEMORY_HOME #when the root is resolved #then it resolves against the given cwd [0.06ms]
+(pass) resolveMemoryRoot > #given an empty or whitespace OMO_MEMORY_HOME #when the root is resolved #then the default root is used [0.06ms]
+94 |     expect(paths.worktrees).toBe(join(runtime, "worktrees"))
+95 |     expect(paths.viewers).toBe(join(runtime, "viewers"))
+96 |     expect(paths.pushQueue).toBe(join(runtime, "push-queue"))
+97 |     expect(paths.factsQueue).toBe(join(runtime, "facts-queue"))
+98 |     expect(paths.facts).toBe(join(runtime, "facts"))
+99 |     expect(paths.notices).toBe(join(runtime, "notices"))
+                               ^
+error: expect(received).toBe(expected)
+
+Expected: "/mem/agents/backend-lead-0123abcd/runtime/notices"
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/identity/layout.test.ts:99:27)
+(fail) buildIdentityPaths > #given a memory root and id #when paths are built #then the decided layout shape is produced [0.15ms]
+(pass) buildIdentityPaths > #given built paths #when runtime subdirs are enumerated #then every declared subdir is present under runtime [0.07ms]
+
+packages/memory-core/src/compile/cache.test.ts:
+(pass) MemoryBlockCache > #given the same template and HEAD #when compiled twice #then the cached block and timestamp are reused [242.50ms]
+(pass) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each logical session key retains only its latest variant [378.36ms]
+(pass) MemoryBlockCache > #given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry [3765.81ms]
+108 |     })
+109 |     const quiet = await cache.compile(repo, "template", base)
+110 |     const quietAgain = await cache.compile(repo, "template", base)
+111 | 
+112 |     // then
+113 |     expect(noticed).not.toBe(quiet)
+                              ^
+error: expect(received).not.toBe(expected)
+
+Expected: not "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md).\n\n<self>\n<projection>$MEMORY_DIR/system/persona.md</projection>\nfirst\n</self>\n\n<memory_metadata>\n- AGENT_ID: cache-agent\n- CONVERSATION_ID: soul-session\n- System prompt last recompiled: 2026-08-10 07:54:10 AM UTC+0000\n- 1 previous messages between you and the user are stored in recall memory\n</memory_metadata>"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/compile/cache.test.ts:113:25)
+(fail) MemoryBlockCache > #given a consumed soul notice at an unchanged HEAD #when compiled again #then the notice variant is replaced and the line is gone [313.06ms]
+(pass) MemoryBlockCache > #given template content #when hashed #then the structure version participates in sha256 [0.45ms]
+
+packages/memory-core/src/compile/compile.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'MEMORY_SOUL_METADATA_TOKEN' not found in module '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/compile/compile.ts'.
+-------------------------------
+
+
+packages/memory-core/src/soul/watermark.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './watermark' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/soul/watermark.test.ts'
+-------------------------------
+
+
+ 9 pass
+ 7 fail
+ 4 errors
+ 45 expect() calls
+Ran 16 tests across 6 files. [4.85s]

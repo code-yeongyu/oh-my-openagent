@@ -1,0 +1,103 @@
+=== RED: budget-pin + drain tests before implementation ===
+$ bun test packages/omo-senpi/src/components/memory/shutdown-drain.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/shutdown-drain.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './shutdown-drain' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/shutdown-drain.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [99.00ms]
+
+=== RED: IC-11 cancellable journal lock + TranscriptJournal.flush before implementation ===
+$ bun test packages/memory-core/src/journal/store.test.ts
+(pass) transcript journal store > #given three completed assistant messages #when reconciled twice #then rows are idempotent and steps stay derived [3.38ms]
+(pass) transcript journal store > #given a stale derived counter on disk #when state is written #then the counter is recomputed [1.66ms]
+(fail) cancellable journal flush > #given a journal with rows #when flush runs #then it settles and leaves no lock behind [0.83ms]
+(fail) cancellable journal flush > #given a signal aborted before acquisition #when flush runs #then it throws AbortError and creates no lock file [0.89ms]
+(fail) cancellable journal flush > #given an abort during the acquisition retry loop #when the lock is contended #then it throws without acquiring [5001.88ms]
+(pass) cancellable journal flush > #given an abort raised while the task holds the lock #when the task settles #then the lock file is released anyway [1.59ms]
+(fail) cancellable journal flush > #given a signal aborted mid-flush #when the remaining fsyncs are reached #then flush returns early without throwing [1.82ms]
+ 3 pass
+ 4 fail
+Ran 7 tests across 1 file. [5.11s]
+
+=== GREEN: drain + IC-11 + integration after implementation ===
+$ bun test packages/omo-senpi/src/components/memory/shutdown-drain.test.ts packages/memory-core/src/journal/store.test.ts
+(pass) transcript journal store > #given three completed assistant messages #when reconciled twice #then rows are idempotent and steps stay derived [3.73ms]
+(pass) transcript journal store > #given a stale derived counter on disk #when state is written #then the counter is recomputed [2.14ms]
+(pass) cancellable journal flush > #given a journal with rows #when flush runs #then it settles and leaves no lock behind [1.48ms]
+(pass) cancellable journal flush > #given a signal aborted before acquisition #when flush runs #then it throws AbortError and creates no lock file [0.80ms]
+(pass) cancellable journal flush > #given an abort during the acquisition retry loop #when the lock is contended #then it throws without acquiring [0.44ms]
+(pass) cancellable journal flush > #given an abort raised while the task holds the lock #when the task settles #then the lock file is released anyway [0.41ms]
+(pass) cancellable journal flush > #given a signal aborted mid-flush #when the remaining fsyncs are reached #then flush returns early without throwing [1.04ms]
+(pass) session shutdown drain budget > #given the drain budget #when a handler derives its deadline #then it is exactly 1500ms after the start instant [1.11ms]
+(pass) session shutdown drain budget > #given a quit shutdown #when the drain runs #then steps run in the a, b, c-prime, c, d order [0.51ms]
+(pass) session shutdown drain budget > #given a reload shutdown #when the drain runs #then only the journal flush and the final enqueue run [0.14ms]
+(pass) session shutdown drain budget > #given a step that stalls two seconds on the injected clock #when quit drains #then it returns inside the budget and no later step starts [1.55ms]
+(pass) session shutdown drain budget > #given an aborted budget #when the stalled step finally settles #then no step that had not started ever starts [5.29ms]
+(pass) session shutdown drain budget > #given an evaluator that throws #when quit drains #then the throw is logged and the next evaluator still runs [0.27ms]
+(pass) session shutdown drain budget > #given a bound session with journal rows #when session_shutdown fires #then the drain runs before the session is released [13.22ms]
+(pass) session shutdown drain budget > #given a step that rejects #when the drain runs #then the drain still completes the remaining steps [0.20ms]
+ 15 pass
+ 0 fail
+Ran 15 tests across 2 files. [987.00ms]
+
+=== GREEN: full affected suites in one run ===
+$ bun test packages/memory-core/ packages/omo-senpi/src/components/memory/
+(fail) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [0.57ms]
+(fail) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [0.57ms]
+ 783 pass
+ 1 fail
+Ran 784 tests across 94 files. [124.92s]
+
+=== typecheck (touched packages) ===
+$ tsgo --noEmit -p packages/memory-core/tsconfig.json
+rc=0
+$ tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+rc=0
+
+=== NOTE: the single createMemoryPromptHandler failure above was captured while a concurrent agent (todos 17/18) had half-committed tree state; it is not a file this task touches. Same command, same task-10 diff, after their tree settled:
+
+=== GREEN (stable rerun 1): full affected suites in one run ===
+ 773 pass
+ 0 fail
+Ran 773 tests across 94 files. [121.23s]
+
+=== RED: bind-time reconcile rejection test without the afterBind catch (index.ts) ===
+unhandled ENOTDIR rejection, 1 fail (verified by temporarily reverting the catch)
+
+=== GREEN: full drain suite after the catch ===
+$ bun test packages/omo-senpi/src/components/memory/shutdown-drain.test.ts
+(pass) session shutdown drain budget > #given the drain budget #when a handler derives its deadline #then it is exactly 1500ms after the start instant [0.44ms]
+(pass) session shutdown drain budget > #given a quit shutdown #when the drain runs #then steps run in the a, b, c-prime, c, d order [0.52ms]
+(pass) session shutdown drain budget > #given a reload shutdown #when the drain runs #then only the journal flush and the final enqueue run [0.14ms]
+(pass) session shutdown drain budget > #given a step that stalls two seconds on the injected clock #when quit drains #then it returns inside the budget and no later step starts [1.48ms]
+(pass) session shutdown drain budget > #given an aborted budget #when the stalled step finally settles #then no step that had not started ever starts [1.46ms]
+(pass) session shutdown drain budget > #given an evaluator that throws #when quit drains #then the throw is logged and the next evaluator still runs [0.23ms]
+(pass) session shutdown drain budget > #given a bound session with journal rows #when session_shutdown fires #then the drain runs before the session is released [13.74ms]
+(pass) session shutdown drain budget > #given a memory home that is not a directory #when bind-time reconcile rejects #then it is logged instead of crashing the host [3.14ms]
+(pass) session shutdown drain budget > #given a step that rejects #when the drain runs #then the drain still completes the remaining steps [0.16ms]
+ 9 pass
+ 0 fail
+Ran 9 tests across 1 file. [878.00ms]
+
+=== GREEN (final gate): affected suites in one run, with the afterBind catch ===
+$ bun test packages/memory-core/ packages/omo-senpi/src/components/memory/
+ 785 pass
+ 0 fail
+Ran 785 tests across 94 files. [119.14s]
+
+=== typecheck (final) ===
+tsgo --noEmit -p packages/memory-core/tsconfig.json: clean
+tsgo --noEmit -p packages/omo-senpi/tsconfig.json: clean
+
+=== known pre-existing issues observed during verification (not this task's) ===
+- SenpiSubprocessRunner integration 'child sleeping beyond an injected hard deadline' flaked twice in ten full-suite runs with 'spawn_failed: memory run supervisor exited with 1' under parallel load; the same flake is recorded in task-9's evidence. Real-process 100ms-deadline test; passes 3/3 in isolation; code paths (worker/spawn + prebuilt supervisor bundle) untouched by this task.
+- index.test.ts floating afterBind vs afterEach rmSync race (unhandled rejection attributed to prompt.test.ts) was exposed by this task's fsync-heavy drain; fixed within scope by handling the rejection in index.ts (logged warning). Five full-suite runs since: zero recurrences.

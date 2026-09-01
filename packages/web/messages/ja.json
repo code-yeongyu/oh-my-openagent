@@ -47,7 +47,7 @@
       "light": {
         "name": "Light",
         "platform": "Codex CLI",
-        "description": "8コンポーネント — comment-checker, git-bash, LSP, rules, start-work-continuation, telemetry, ultrawork, ulw-loop — Codexイベントに接続。",
+        "description": "8コンポーネント — comment-checker, git-bash, LSP, rules, ulw-execute-continuation, telemetry, ultrawork, ulw-loop — Codexイベントに接続。",
         "install": "npx lazycodex-ai install"
       }
     },
@@ -97,7 +97,7 @@
       },
       "boulderTitle": "Session Continuity",
       "boulderDescription": "アクティブな作業はboulder.jsonに追跡されます。停電？システムクラッシュ？関係ありません。止まったそのままの場所から再開できます。",
-      "model": "Claude Opus 4.7 Max"
+      "model": "Claude Opus 5 High"
     },
     "prometheusAtlas": {
       "badge": "オーケストレーションワークフロー",
@@ -106,7 +106,7 @@
       "prometheus": {
         "name": "Prometheus",
         "role": "Strategic Planner",
-        "model": "Claude Opus 4.7 Max",
+        "model": "Claude Fable 5 XHigh",
         "description": "設計者。あなたとインタビューし、コードベースを探索し、詳細な実行計画を作成します。コードは絶対に書きません。MetisとMomusを品質ゲートとして使用します。",
         "features": [
           "知的なインタビューモード",
@@ -208,13 +208,13 @@
       "librarian": {
         "name": "Librarian",
         "role": "Docs & Code Search",
-        "model": "GPT 5.4 Mini Fast",
+        "model": "GPT 5.6 Luna Fast",
         "description": "実際のGitHub例と公式ドキュメントを見つける。証拠ベース、パーマリンク付き。"
       },
       "explore": {
         "name": "Explore",
         "role": "Codebase Grep",
-        "model": "GPT 5.4 Mini Fast",
+        "model": "GPT 5.6 Luna Fast",
         "description": "超高速コードベース検索。安価で、並列で、常にバックグラウンドで。"
       },
       "metis": {

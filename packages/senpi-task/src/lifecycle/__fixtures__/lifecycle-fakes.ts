@@ -34,6 +34,12 @@ export type SeedInput = {
   readonly updated_at?: string
   readonly pid?: number
   readonly child_session_id?: string
+  readonly host_pid?: number
+  readonly killed?: boolean
+  readonly run_epoch?: number
+  readonly notify_on_terminal?: boolean
+  readonly notified_epoch?: number
+  readonly notification_failed_epoch?: number
 }
 
 // Write a persisted record at an exact status/residency/timestamp so lifecycle logic can be driven
@@ -52,9 +58,18 @@ export function seedRecord(store: TaskRecordStore, input: SeedInput): TaskRecord
     residency_state: input.residency_state ?? "resident",
     created_at: timestamp,
     updated_at: timestamp,
-    notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: input.notify_on_terminal ?? false,
+    notification: {
+      run_epoch: input.run_epoch ?? 0,
+      notified_epoch: input.notified_epoch ?? -1,
+      ...(input.notification_failed_epoch !== undefined
+        ? { notification_failed_epoch: input.notification_failed_epoch }
+        : {}),
+    },
+    ...(input.killed === true ? { killed: true } : {}),
     ...(input.pid !== undefined ? { pid: input.pid } : {}),
     ...(input.child_session_id !== undefined ? { child_session_id: input.child_session_id } : {}),
+    ...(input.host_pid !== undefined ? { host_pid: input.host_pid } : {}),
   }
   store.save(record)
   return record
@@ -72,7 +87,7 @@ export function fakeHandle(
   taskId: string,
   kind: "in-process" | "rpc",
   order: CallLog,
-  options: { pid?: number; abortRejects?: boolean } = {},
+  options: { pid?: number; abortRejects?: boolean; disposeRejects?: boolean } = {},
 ): FakeHandle {
   let didAbort = false
   let didDispose = false
@@ -89,6 +104,7 @@ export function fakeHandle(
     dispose: async () => {
       didDispose = true
       order.push(`dispose:${taskId}`)
+      if (options.disposeRejects === true) throw new Error("dispose exploded")
     },
     terminate: async () => {
       didTerminate = true
@@ -103,6 +119,8 @@ export function fakeHandle(
 export class FakeRegistry implements ResidencyRegistry {
   readonly #handles = new Map<string, ResidentHandle>()
   readonly #pending = new Set<string>()
+  readonly #evicting = new Set<string>()
+  readonly #sends = new Map<string, number>()
   readonly forgotten: string[] = []
 
   add(handle: ResidentHandle): void {
@@ -127,7 +145,33 @@ export class FakeRegistry implements ResidencyRegistry {
   }
 
   hasPendingSends(taskId: string): boolean {
-    return this.#pending.has(taskId)
+    return this.#pending.has(taskId) || (this.#sends.get(taskId) ?? 0) > 0
+  }
+
+  tryClaimEviction(taskId: string): boolean {
+    if (this.#evicting.has(taskId) || (this.#sends.get(taskId) ?? 0) > 0) return false
+    this.#evicting.add(taskId)
+    return true
+  }
+
+  releaseEviction(taskId: string): void {
+    this.#evicting.delete(taskId)
+  }
+
+  isEvicting(taskId: string): boolean {
+    return this.#evicting.has(taskId)
+  }
+
+  tryBeginSend(taskId: string): boolean {
+    if (this.#evicting.has(taskId)) return false
+    this.#sends.set(taskId, (this.#sends.get(taskId) ?? 0) + 1)
+    return true
+  }
+
+  endSend(taskId: string): void {
+    const count = this.#sends.get(taskId) ?? 0
+    if (count <= 1) this.#sends.delete(taskId)
+    else this.#sends.set(taskId, count - 1)
   }
 }
 

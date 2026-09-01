@@ -1,0 +1,22 @@
+Manifest diff audit:
+- package.json: only devDependencies.@code-yeongyu/senpi changed 2026.8.11-2 -> 2026.8.11-4
+- packages/omo-senpi/package.json: only peerDependencies and devDependencies Senpi slots changed
+- packages/senpi-task/package.json: only peerDependencies and devDependencies Senpi slots changed
+- packages/omo-native/package.json: only dependencies.@code-yeongyu/senpi changed
+
+Lock diff audit:
+- 24 changed lock lines
+- 0 unexpected changed lines outside the Senpi family, aliased pi packages, expected versions, and integrity hashes
+
+Whitespace:
+- git diff --check exited 0 with no output
+
+Changed machine-consumed files:
+- bun.lock
+- package.json
+- packages/omo-native/package.json
+- packages/omo-senpi/package.json
+- packages/senpi-task/package.json
+
+PASS: true
+

@@ -1,0 +1,272 @@
+{
+  "version": 1,
+  "domain": "scripts-tests",
+  "rule": "Allow machine-consumed workflow, configuration, schema, path, hook, and CLI tokens; source/artifact equality; runtime behavior; security boundaries; and user-facing UI, help, summary, or issue-template copy. Forbid exact authored wording pins in AGENTS.md, SKILL.md, and human instruction markdown when no runtime parser or enforcement mechanism consumes the asserted phrase.",
+  "candidate_occurrence_count": 29,
+  "candidate_fingerprint_count": 29,
+  "allowed": [
+    {
+      "fingerprint": "0a951b59b61e3819324ec5879077e1691de456f214ba46bcf3a2639c9c2e7061",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "sessionStart is a serialized Codex hook eventName parsed from the --expect-hook CLI value and matched against app-server hook/completed notifications; it is a machine-facing protocol token, not instruction prose.",
+      "path": ".agents/skills/codex-qa/scripts/lib/app-server-client.test.js",
+      "line": 46,
+      "expected": "sessionStart"
+    },
+    {
+      "fingerprint": "d899b8ea7b07929c3863138862e96d1256f75c99744ed9fa2fec618d8fcf8981",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "userPromptSubmit is a serialized Codex hook eventName parsed from the --expect-hook CLI value and matched against app-server hook/completed notifications; it is a machine-facing protocol token, not instruction prose.",
+      "path": ".agents/skills/codex-qa/scripts/lib/app-server-client.test.js",
+      "line": 46,
+      "expected": "userPromptSubmit"
+    },
+    {
+      "fingerprint": "f4cb5edfdb7af551cae8d38a1318e319252d1100fb7ad72c5e18c7a87ca35b72",
+      "status": "allowed",
+      "category": "security-boundary",
+      "rationale": "The commented ANTHROPIC_API_KEY assignment is configuration-template syntax proving the committed credential injection point remains inert and contains no live secret; the assertion protects a security boundary rather than authored agent guidance.",
+      "path": "script/agent-env.test.ts",
+      "line": 67,
+      "expected": "# ANTHROPIC_API_KEY"
+    },
+    {
+      "fingerprint": "8d385ccf0cb64e266299622828888dab9e4971a7b416c5f3d6f4c346b5ecab61",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "The heading contains the JOB_SUMMARY_TITLE fixture rendered into GITHUB_STEP_SUMMARY for a human CI reader; it verifies user-visible GitHub Actions summary output, not an agent prompt or instruction document.",
+      "path": "script/ci-job-summary-workflow.test.ts",
+      "line": 197,
+      "expected": "## Root CI tests"
+    },
+    {
+      "fingerprint": "a1fafa6453f813a2cf8bd6217db7038c180846f7bdf884c180b89d586a070ad1",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "This is the rendered workflow metadata row in the human-facing GitHub job summary and proves environment data reaches the UI table.",
+      "path": "script/ci-job-summary-workflow.test.ts",
+      "line": 200,
+      "expected": "| Workflow | `CI` |"
+    },
+    {
+      "fingerprint": "cd40348d6eabe52931ba48b8d51115c6fae3d6b97462000fe119dbdaec65093a",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "This heading is stable user-facing structure emitted by the shared GitHub job-summary renderer so CI details are legible to human operators; it is not model instruction prose.",
+      "path": "script/ci-job-summary-workflow.test.ts",
+      "line": 201,
+      "expected": "### What this job checks"
+    },
+    {
+      "fingerprint": "64370ba8b34bbca84403d28db9a1214effe61ad5a7903083e4a45722ce18cdd3",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "This heading is stable user-facing failure guidance emitted by the shared GitHub job-summary renderer for human CI operators, not authored instructions injected into an agent.",
+      "path": "script/ci-job-summary-workflow.test.ts",
+      "line": 203,
+      "expected": "### If this fails"
+    },
+    {
+      "fingerprint": "c623fe2a2a09e023b61006cb3b735b199169f72b3d5b8479448b4282b3ae7a3e",
+      "status": "allowed",
+      "category": "shipped-copy-equality",
+      "rationale": "Compares the SHA-256 marker embedded in the tracked generated Codex installer with a fresh digest of that artifact body, proving the shipped bundle is internally byte-consistent.",
+      "path": "script/codex-install-bundle-freshness.test.ts",
+      "line": 32,
+      "expected": "<expression:bodyDigest>"
+    },
+    {
+      "fingerprint": "0adbee2c78c17e81f15f52ec5d613f18353c0505f00236f78d13a0cc23607a4e",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "This exact package.json files-negation path is consumed by npm packing to exclude a retired component from the published payload; it is machine configuration, not markdown or prompt wording.",
+      "path": "script/npm-payload-containment.test.ts",
+      "line": 31,
+      "expected": "!packages/omo-codex/plugin/components/workflow-selector"
+    },
+    {
+      "fingerprint": "d2968e5ac135b8ecb22c8ed67121f3081eedbe3a7410f703d6904f224a743867",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "This quoted files-negation token is embedded in the publish workflow's generated package manifest and is consumed by npm packing to exclude a retired component.",
+      "path": "script/npm-payload-containment.test.ts",
+      "line": 56,
+      "expected": "\"!packages/omo-codex/plugin/components/workflow-selector\""
+    },
+    {
+      "fingerprint": "73fe6fc66e60f08b7cff0d4dbc3ca8f5afeac2d0faefcb2a371e4c50cbe9ed58",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "The issue-template name is GitHub UI copy shown to users selecting a report form; it is not agent-facing instruction prose.",
+      "path": "script/package-labels-workflow.test.ts",
+      "line": 45,
+      "expected": "name: LazyCodex Bug Report"
+    },
+    {
+      "fingerprint": "846691269009f5f901fc38f43e885cc05eecc7c4359f23a5439f2d07d73063dc",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "The labels array is machine-consumed GitHub issue-template configuration that applies routing labels to newly submitted reports.",
+      "path": "script/package-labels-workflow.test.ts",
+      "line": 46,
+      "expected": "labels: [\"bug\", \"needs-triage\", \"lazycodex\"]"
+    },
+    {
+      "fingerprint": "d58f6edd6d1efc03f0a97923c670656f41b0c998e2d3681f9f1dd2a129f02f1a",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "LazyCodex version is a user-facing issue-form field label needed to collect diagnostic version data; it is UI copy rather than agent guidance.",
+      "path": "script/package-labels-workflow.test.ts",
+      "line": 47,
+      "expected": "LazyCodex version"
+    },
+    {
+      "fingerprint": "c02dfef4da594557a92f5829bcc542bcbb82d08801be41c134f3f2463d98d913",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "Codex version is a user-facing issue-form field label needed to collect diagnostic version data; it is UI copy rather than agent guidance.",
+      "path": "script/package-labels-workflow.test.ts",
+      "line": 48,
+      "expected": "Codex version"
+    },
+    {
+      "fingerprint": "7de7446a61853c2dcd221c21f20ec17b8f7877b3b3b65b5c82af7e3ae7d0b7aa",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "Compares the filesystem paths of test-created internal skill artifacts with the complete exclusion fixture inventory before npm pack runs; it validates package-containment setup, not the SKILL.md prose inside those files.",
+      "path": "script/package-layout-exclusion.test.ts",
+      "line": 210,
+      "expected": "<expression:fakeInternalSkillArtifactPaths.toSorted()>"
+    },
+    {
+      "fingerprint": "8b45225ad3fa2acedbe81f543a5a2af9a96274fae1df066fca0480778725a1a2",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "The assertion checks that an exact SKILL.md asset path enters the npm package layout; only the path and shipping behavior are contracted, not any wording in the skill.",
+      "path": "script/package-layout.test.ts",
+      "line": 264,
+      "expected": ".agents/skills/security-research/SKILL.md"
+    },
+    {
+      "fingerprint": "41d2a8d53fc0fc388e1695f1a093a733301dcf0b65b9296edec7774a64abd365",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "This GitHub Actions if expression is machine-evaluated workflow control flow that gates restoration after an attempted LazyCodex publish.",
+      "path": "script/publish-lazycodex-workflow.test.ts",
+      "line": 228,
+      "expected": "if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'"
+    },
+    {
+      "fingerprint": "71154692fc7f5a5c489e4425e211a97f03cea44f10e45a7ab0051d638c6678d8",
+      "status": "allowed",
+      "category": "machine-sentinel",
+      "rationale": "OMO_GENERATED_RUNTIME_WRAPPER is a marker token consumed by upgrade logic to distinguish a generated legacy executable from a user-owned file before replacement.",
+      "path": "script/publish-lazycodex-workflow.test.ts",
+      "line": 348,
+      "expected": "# OMO_GENERATED_RUNTIME_WRAPPER"
+    },
+    {
+      "fingerprint": "1d91cdaf09ceb5cf459f2a0b3e53ab941fb094cfda6daeb12a7f53b3b21352f6",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "This GitHub Actions if expression is machine-evaluated release control flow ensuring the renamed platform package can publish after the legacy step while still requiring a downloaded artifact.",
+      "path": "script/publish-release-platform-workflow.test.ts",
+      "line": 86,
+      "expected": "if: always() && steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'"
+    },
+    {
+      "fingerprint": "f9632f33c78b5afc4184432c650487b90b5bdb0a452629c8d667bc63c3c7eec2",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "This is the exact GitHub CLI command executed by release automation to redispatch publish.yml from the version tag; command and ref syntax are machine-facing workflow behavior.",
+      "path": "script/publish-release-platform-workflow.test.ts",
+      "line": 156,
+      "expected": "gh workflow run publish.yml --ref \"v${VERSION}\""
+    },
+    {
+      "fingerprint": "6bbd3d3c28a350de202f37aa64409a3db357f85b3cc4c96fd1c438980a0698bd",
+      "status": "allowed",
+      "category": "runtime-behavior",
+      "rationale": "This is the exact GitHub CLI command executed by release automation to dispatch the provenance-bearing publish run from the verified release tag.",
+      "path": "script/publish-workflow.test.ts",
+      "line": 138,
+      "expected": "gh workflow run publish.yml --ref \"v${VERSION}\""
+    },
+    {
+      "fingerprint": "1c9335174a570e6d906be2d7bd68bbcecca5574cd74ff6ba359f56ffb73f8efd",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "NEVER tmux is CLI --help copy presented to a human operator to prevent using an incompatible capture path; the test exercises the helper's user-visible help surface, not an AGENTS.md or SKILL.md instruction contract.",
+      "path": "script/web-terminal-visual-qa.test.ts",
+      "line": 118,
+      "expected": "NEVER tmux"
+    },
+    {
+      "fingerprint": "2fc1bfcbd6d31ed0b5bed2c7b74f5c2e61085319aec17f94407e88d899886325",
+      "status": "allowed",
+      "category": "user-ui-error",
+      "rationale": "This privacy statement is CLI --help copy shown to human operators and documents the helper's security behavior that raw command text is not retained in evidence artifacts.",
+      "path": "script/web-terminal-visual-qa.test.ts",
+      "line": 119,
+      "expected": "The raw --command string is never stored"
+    }
+  ],
+  "forbidden": [
+    {
+      "fingerprint": "be659af5ec5ea2e0d50347263f3e59d8932a05e3c7ea97341f4c0f7b46cf8bc1",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins the exact natural-language phrase of a root AGENTS.md maintenance directive. No runtime parser consumes 'and the matching skill'; path and wiring behavior can be tested without contracting this authored instruction wording.",
+      "path": "script/agents-md-dev-env.test.ts",
+      "line": 49,
+      "expected": "and the matching skill"
+    },
+    {
+      "fingerprint": "b114068e76a4502edaaee1a549edab8c95456b17ab1699a86e9550d3d7418352",
+      "status": "forbidden",
+      "category": "security-boundary",
+      "rationale": "Pins an exact prohibition sentence in human-authored markdown attachment guidance. The phrase itself is not consumed by upload code or a security parser, so security behavior must be tested at the executable boundary rather than by wording contract.",
+      "path": "script/web-terminal-guidance.test.ts",
+      "line": 54,
+      "expected": "Never use GitHub Releases"
+    },
+    {
+      "fingerprint": "d94fe98479b1fc4845d8ba65460e6b81f0778ddf66073ef0fcb8aea2ea469a6a",
+      "status": "forbidden",
+      "category": "security-boundary",
+      "rationale": "Pins exact natural-language wording in a human instruction markdown file. No runtime policy mechanism parses 'Never use external image hosters', so this authored guidance must remain editable prose.",
+      "path": "script/web-terminal-guidance.test.ts",
+      "line": 55,
+      "expected": "Never use external image hosters"
+    },
+    {
+      "fingerprint": "df5a79f8a982f36208322e44133bfeb03dd5884fbfec443d8a98c4293338a7db",
+      "status": "forbidden",
+      "category": "security-boundary",
+      "rationale": "Pins exact cookie-handling wording in human-authored markdown guidance. The test does not exercise redaction or cookie suppression behavior, and no machine consumer depends on this sentence.",
+      "path": "script/web-terminal-guidance.test.ts",
+      "line": 56,
+      "expected": "Do not print cookies"
+    },
+    {
+      "fingerprint": "98b44c5d6204f9121d5689be4cd240ad0a3d7cb3f96ea753302df5be804b9625",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins a reference-path fragment inside authored SKILL.md goal instructions. Skill discovery does not parse this markdown link as configuration; existence and cross-package byte equality already cover the shippable artifacts without fixing instructional wording.",
+      "path": "tests/ulw-loop-define-goal-reference.test.ts",
+      "line": 31,
+      "expected": "references/define-goal.md"
+    },
+    {
+      "fingerprint": "1a62d97deb708cbc141cec91b45b8af103618dab2bce6d7d6e20748e70dada5d",
+      "status": "forbidden",
+      "category": "runtime-behavior",
+      "rationale": "Pins a filename mention inside the authored full-workflow markdown instructions. No runtime parser follows this prose reference, while the referenced file's existence and shipped-copy equality can be verified independently.",
+      "path": "tests/ulw-loop-define-goal-reference.test.ts",
+      "line": 42,
+      "expected": "define-goal.md"
+    }
+  ]
+}

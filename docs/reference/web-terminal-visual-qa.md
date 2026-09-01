@@ -70,6 +70,6 @@ node script/qa/web-terminal-visual-qa.mjs --title "Replay" \
 2. Store the output under `.omo/evidence/<YYYYMMDD>-<slug>/`.
 3. Review `terminal.txt` and `terminal-ansi.txt` for accidental secrets before citing them.
 4. Include `terminal.png`, `terminal.txt`, and `metadata.json` in the evidence summary.
-5. Verify the cleanup receipt in `metadata.json`: no leftover pty, Chrome, PIDs, ports, or temp state.
+5. Review the cleanup receipt in `metadata.json`. It records the pty cleanup action and browser closure attempt; it does not audit ports, temporary state, or all leftover processes.
 
 Tests alone are not TUI visual QA. The passing artifact is the xterm.js-rendered `terminal.png` plus a binary observation - expected text present, colors correct, no overflow, no border or CJK-width misalignment.

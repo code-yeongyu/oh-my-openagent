@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { effectiveExtension } from "./effective-extension.js";
 import { getLanguageId } from "./language-mappings.js";
 import type { Diagnostic } from "./types.js";
+import type { TimerProvider } from "./timer-provider.js";
 import type { PlannedWorkspaceOperation, WorkspaceMutation, WorkspaceMutationDelta } from "./workspace-edit-types.js";
 
 const WATCHED_FILE_BATCH_SIZE = 128;
@@ -76,6 +77,7 @@ export type PushDiagnosticsResolution =
 
 export interface WorkspaceDocumentStateOptions {
 	readonly now?: () => number;
+	readonly timerProvider?: TimerProvider;
 	readonly versionlessPublishQuiescenceMs?: number;
 }
 
@@ -86,6 +88,17 @@ function canonicalPath(filePath: string): string {
 	} catch {
 		return absolute;
 	}
+}
+
+function normalizeDocumentUri(uri: string): string {
+	let decoded = uri;
+	try {
+		decoded = decodeURIComponent(uri);
+	} catch {
+		decoded = uri;
+	}
+	if (process.platform !== "win32") return decoded;
+	return decoded.replace(/^(file:\/\/\/)([a-z]):/, (_match, prefix: string, drive: string) => `${prefix}${drive.toUpperCase()}:`);
 }
 
 function isSameOrDescendant(candidate: string, parent: string): boolean {
@@ -103,6 +116,7 @@ export class WorkspaceDocumentState {
 	private readonly openByUri = new Map<string, OpenDocumentState>();
 	private readonly openPromises = new Map<string, Promise<void>>();
 	private readonly now: () => number;
+	private readonly timerProvider: TimerProvider;
 	private readonly versionlessPublishQuiescenceMs: number;
 
 	constructor(
@@ -110,7 +124,12 @@ export class WorkspaceDocumentState {
 		private readonly clearDiagnostics: (uri: string) => void,
 		options: WorkspaceDocumentStateOptions = {},
 	) {
-		this.now = options.now ?? (() => Date.now());
+		this.timerProvider = options.timerProvider ?? {
+			now: options.now ?? (() => Date.now()),
+			setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
+			clearTimeout: (handle) => clearTimeout(handle),
+		};
+		this.now = () => this.timerProvider.now();
 		this.versionlessPublishQuiescenceMs =
 			options.versionlessPublishQuiescenceMs ?? DEFAULT_VERSIONLESS_PUBLISH_QUIESCENCE_MS;
 	}
@@ -135,7 +154,7 @@ export class WorkspaceDocumentState {
 	}
 
 	getStoredDiagnostics(uri: string): readonly Diagnostic[] {
-		const state = this.openByUri.get(uri);
+		const state = this.openByUri.get(normalizeDocumentUri(uri));
 		if (!state) return [];
 		return state.lastPublish?.diagnostics ?? state.pullCache?.diagnostics ?? [];
 	}
@@ -163,13 +182,13 @@ export class WorkspaceDocumentState {
 	}
 
 	getPullCache(snapshot: DiagnosticSnapshot): PullDiagnosticsCacheHit | null {
-		const state = this.openByUri.get(snapshot.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state?.pullCache || state.pullCache.documentVersion !== snapshot.version) return null;
 		return state.pullCache;
 	}
 
 	recordPullDiagnostics(snapshot: DiagnosticSnapshot, report: PullDiagnosticsReport): void {
-		const state = this.openByUri.get(snapshot.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state) return;
 		state.pullCache = {
 			documentVersion: snapshot.version,
@@ -183,7 +202,7 @@ export class WorkspaceDocumentState {
 		readonly diagnostics: readonly Diagnostic[];
 		readonly version?: number;
 	}): void {
-		const state = this.openByUri.get(params.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(params.uri));
 		if (!state) return;
 		state.publishGeneration += 1;
 		state.lastPublish = {
@@ -197,7 +216,7 @@ export class WorkspaceDocumentState {
 	}
 
 	resolvePushDiagnostics(snapshot: DiagnosticSnapshot): PushDiagnosticsResolution {
-		const state = this.openByUri.get(snapshot.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state?.lastPublish) return { status: "missing" };
 		const publish = state.lastPublish;
 		if (publish.version !== undefined) {
@@ -214,18 +233,18 @@ export class WorkspaceDocumentState {
 	}
 
 	waitForDiagnosticsActivity(snapshot: DiagnosticSnapshot, timeoutMs: number): Promise<void> {
-		const state = this.openByUri.get(snapshot.uri);
+		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state || timeoutMs <= 0) return Promise.resolve();
 		return new Promise((resolveActivity) => {
 			let settled = false;
 			const finish = () => {
 				if (settled) return;
 				settled = true;
-				clearTimeout(timer);
+				this.timerProvider.clearTimeout(timer);
 				state.waiters.delete(finish);
 				resolveActivity();
 			};
-			const timer = setTimeout(finish, timeoutMs);
+			const timer = this.timerProvider.setTimeout(finish, timeoutMs);
 			if (typeof timer.unref === "function") timer.unref();
 			state.waiters.add(finish);
 		});
@@ -329,7 +348,7 @@ export class WorkspaceDocumentState {
 				waiters: new Set(),
 			};
 			this.openDocuments.set(path, state);
-			this.openByUri.set(state.uri, state);
+			this.openByUri.set(normalizeDocumentUri(state.uri), state);
 			this.notifyWaiters(state);
 			await this.sendNotification("textDocument/didOpen", {
 				textDocument: { uri: state.uri, languageId: state.languageId, version: state.version, text },
@@ -356,7 +375,7 @@ export class WorkspaceDocumentState {
 
 	private async closeDocument(state: OpenDocumentState): Promise<void> {
 		this.openDocuments.delete(state.path);
-		this.openByUri.delete(state.uri);
+		this.openByUri.delete(normalizeDocumentUri(state.uri));
 		this.clearDiagnostics(state.uri);
 		this.notifyWaiters(state);
 		await this.sendNotification("textDocument/didClose", { textDocument: { uri: state.uri } });

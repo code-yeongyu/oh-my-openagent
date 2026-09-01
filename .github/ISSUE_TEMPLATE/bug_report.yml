@@ -73,7 +73,7 @@ body:
         Paste the output of: bunx oh-my-openagent doctor
         
         Example:
-        ✓ OpenCode version: 1.0.150
+        ✓ OpenCode version: 1.18.10
         ✓ oh-my-openagent version: 1.2.3
         ✓ Plugin loaded successfully
         ...
@@ -126,6 +126,6 @@ body:
     attributes:
       label: OpenCode Version
       description: Run `opencode --version` to get your version
-      placeholder: "1.0.150"
+      placeholder: "1.18.10"
     validations:
       required: true

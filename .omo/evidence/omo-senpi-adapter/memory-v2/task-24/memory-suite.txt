@@ -1,0 +1,399 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/tool-surface.test.ts:
+(pass) registerMemoryToolSurface > #given the default surface > #when the host supports MCP servers #then the tools STILL register directly [0.48ms]
+(pass) registerMemoryToolSurface > #given the explicit search exposure opt-in > #when the host supports MCP servers #then the server registers enabled with search exposure [0.09ms]
+(pass) registerMemoryToolSurface > #given the explicit search exposure opt-in > #when the host lacks registerMcpServer #then direct registration is the fallback [0.07ms]
+
+packages/omo-senpi/src/components/memory/capabilities.test.ts:
+(pass) missingMemoryCapabilities > #given the real memory persistence surface #when checked #then no capability is missing [0.16ms]
+(pass) missingMemoryCapabilities > #given the base fake without custom-entry APIs #when checked #then both required capabilities are reported [0.06ms]
+
+packages/omo-senpi/src/components/memory/skills-usage.test.ts:
+(pass) extractSkillId > #given a path inside skills/foo #when extracted #then returns the skill id [1.86ms]
+(pass) extractSkillId > #given a path inside notes #when extracted #then returns undefined [1.35ms]
+(pass) extractSkillId > #given a path outside the repo #when extracted #then returns undefined [1.32ms]
+(pass) incrementSkillUsage > #given a fresh ledger #when incrementing skill foo #then count is 1 and lastUsedAt is set [6.85ms]
+(pass) incrementSkillUsage > #given an existing ledger with count 1 #when incrementing foo again #then count is 2 [8.07ms]
+(pass) incrementSkillUsage > #given non-skill reads #when checking the ledger #then no entries are created [4.90ms]
+(pass) incrementSkillUsage > #given concurrent two-session interleaving #when both sessions increment different skills under lock #then no increment is lost [13.14ms]
+(pass) incrementSkillUsage > #given two sessions incrementing the SAME skill concurrently #when both acquire the lock serially #then count is 2 (no lost update) [33.93ms]
+(pass) SkillsUsageTracker > #given a read of skills/foo/SKILL.md #when recordRead is called then flushed #then foo.count is 1 [5.21ms]
+(pass) SkillsUsageTracker > #given a non-skill read #when recordRead is called then flushed #then ledger is empty [1.54ms]
+(pass) SkillsUsageTracker > #given multiple reads of the same skill before flush #when flushed #then count reflects all reads [4.93ms]
+(pass) SkillsUsageTracker > #given reads of multiple skills #when flushed #then all skills are present [4.92ms]
+(pass) registerSkillsUsage > #given a read tool targeting skills/foo/SKILL.md #when dispatched then flushed #then foo.count is 1 [4.94ms]
+(pass) registerSkillsUsage > #given a read tool targeting notes/facts.md #when dispatched then flushed #then ledger is empty [1.64ms]
+(pass) registerSkillsUsage > #given a write tool targeting skills/foo/SKILL.md #when dispatched then flushed #then ledger is empty (only read tools tracked) [1.61ms]
+(pass) registerSkillsUsage > #given an unbound session #when dispatched #then no tracker is created [0.08ms]
+(pass) readSkillsUsageLedger > #given a missing ledger file #when read #then returns empty object [1.52ms]
+(pass) readSkillsUsageLedger > #given a ledger with valid entries #when read #then returns parsed entries [1.75ms]
+(pass) readSkillsUsageLedger > #given a corrupted ledger file #when read #then returns empty object (write never blocks or fails the tool) [1.62ms]
+
+packages/omo-senpi/src/components/memory/sandbox.test.ts:
+(pass) reflection worker OS sandbox > #given the real Darwin seatbelt #when a child writes inside the worktree and its parent repo #then only the worktree write succeeds [22.48ms]
+(pass) reflection worker OS sandbox > #given Darwin payloads and a foreign agent root #when the profile is generated #then payload reads and network remain allowed while foreign reads are denied [1.14ms]
+(pass) reflection worker OS sandbox > #given the Darwin profile #when git-shell children run inside it #then device nodes they stream through stay writable [1.00ms]
+(pass) reflection worker OS sandbox > #given Linux with bwrap available #when spawn arguments are transformed #then the root is read-only while worktree and git state are rebound writable [0.97ms]
+(pass) reflection worker OS sandbox > #given required policy without a platform sandbox #when the transform is built #then a typed unavailable error is thrown [0.86ms]
+(pass) reflection worker OS sandbox > #given auto policy without a platform sandbox #when spawn arguments are transformed #then they pass through with an explicit warning [0.88ms]
+(pass) reflection worker OS sandbox > #given off policy #when the transform is built and used #then detection is skipped and spawn arguments pass through [0.85ms]
+
+packages/omo-senpi/src/components/memory/index.test.ts:
+(pass) createMemoryComponent > #given missing custom-entry capabilities #when registered #then it warns once and registers nothing [0.42ms]
+(pass) createMemoryComponent > #given no memory section #when config resolves #then memory defaults enabled with the auto identity [0.07ms]
+(pass) createMemoryComponent > #given no memory key in config #when resolved through adapter fallback #then it matches parsing {} through the schema [0.38ms]
+(pass) createMemoryComponent > #given disabled config or a global/component disable flag #when registered #then the host registration surface is byte-identical [0.12ms]
+(pass) createMemoryComponent > #given enabled memory #when session_start binds an auto identity #then it appends a hidden binding and performs no filesystem writes [1.41ms]
+(pass) createMemoryComponent > #given a resumed session bound to another identity #when session_start resolves fresh config #then it notifies an error and fails closed without rebinding [5.75ms]
+(pass) createMemoryComponent > #given enablement latched false or true at session_start #when config reload flips it #then registration stays fixed and restart notice appears once [0.67ms]
+(pass) createMemoryComponent > #given per-instance module state #when session_shutdown fires #then the identity context and supervisor reference are released [0.26ms]
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+(pass) MEMORY_PROMPT_TEMPLATE > #given the compiled-block cache key #when the template id is read #then it is the v2 soul template [0.15ms]
+(pass) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [202.90ms]
+(pass) createMemoryPromptHandler > #given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined [203.50ms]
+(pass) createMemoryPromptHandler > #given a bound identity #when before_agent_start dispatches #then the prompt gains a sentinel block with identity, session, and branch metadata [237.75ms]
+(pass) createMemoryPromptHandler > #given nudge state at the threshold #when before_agent_start compiles #then the memory metadata carries the behavioral nudge token [214.18ms]
+(pass) createMemoryPromptHandler > #given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended [218.23ms]
+(pass) createMemoryPromptHandler > #given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once [223.67ms]
+(pass) createMemoryPromptHandler > #given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content [321.26ms]
+(pass) createMemoryPromptHandler > #given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated [229.16ms]
+
+packages/omo-senpi/src/components/memory/status.test.ts:
+(pass) refreshMemoryStatus > #given a bound identity with a committed HEAD #when refresh runs #then footer shows mem:<identity> @<short-sha> [214.89ms]
+(pass) refreshMemoryStatus > #given system markdown under the advisory threshold #when refresh runs #then no advisory notify fires [220.03ms]
+(pass) refreshMemoryStatus > #given system markdown at or above the advisory threshold #when refresh runs #then one warning notify fires with token estimate [241.82ms]
+(pass) refreshMemoryStatus > #given an already-notified session #when refresh runs again over threshold #then no second notify fires [212.79ms]
+(pass) refreshMemoryStatus > #given a repo with no HEAD (uninitialized) #when refresh runs #then status shows uncommitted sentinel and no notify fires [179.16ms]
+(pass) refreshMemoryStatus > #given a custom git repo adapter #when refresh runs #then it uses the adapter instead of spawning git [0.25ms]
+(pass) refreshMemoryStatus > #given system files with non-system markdown excluded #when refresh estimates tokens #then only system/**/*.md counts [228.76ms]
+
+packages/omo-senpi/src/components/memory/facts-wiring.test.ts:
+(pass) facts wiring settle enqueue > #given facts enabled and a new journal delta #when settle runs #then one queue file is published [7.76ms]
+(pass) facts wiring settle enqueue > #given the same cursor #when settle runs twice #then no duplicate entry is published [10.40ms]
+(pass) facts wiring settle enqueue > #given facts disabled #when settle runs #then nothing is enqueued [1.69ms]
+(pass) facts wiring settle enqueue > #given an empty journal #when settle runs #then nothing is enqueued [1.42ms]
+(pass) facts wiring session_start reconcile > #given a leftover queue file from a crashed run #when reconcile runs #then it is reported launchable [8.91ms]
+(pass) facts wiring session_start reconcile > #given facts disabled #when reconcile runs #then no leftover work is reported [5.87ms]
+(pass) facts wiring session_start reconcile > #given a consumed batch #when reconcile runs #then nothing is left to relaunch [13.29ms]
+
+packages/omo-senpi/src/components/memory/guard.test.ts:
+(pass) memory cross-identity guard > #given a bound identity #when read targets a foreign identity file #then the call is blocked with the stable reason [1.98ms]
+(pass) memory cross-identity guard > #given a bound identity #when write targets its own repo or worktree #then both calls are allowed [1.51ms]
+(pass) memory cross-identity guard > #given no bound identity #when a file tool targets another identity #then the guard never blocks [1.38ms]
+(pass) memory cross-identity guard > #given a bound identity #when unknown tools or file tools without path arguments run #then they are allowed [1.47ms]
+(pass) memory cross-identity guard > #given a relative traversal from the workspace #when a suffixed case-variant file tool resolves into foreign memory #then it is blocked [1.19ms]
+(pass) memory cross-identity guard > #given paths contains own and foreign targets #when glob runs #then the foreign array member is blocked [1.60ms]
+(pass) memory cross-identity guard > #given an outside symlink points into foreign memory #when a file and a not-yet-created descendant are targeted #then realpath and nearest-real-parent both block [1.74ms]
+(pass) memory cross-identity guard > #given the identities root and one of its ancestors #when enumeration tools target them #then cross-identity enumeration is blocked [1.53ms]
+(pass) memory cross-identity guard > #given a namespaced apply-patch variant #when its patch directives touch foreign memory #then every directive path is guarded [1.75ms]
+(pass) memory cross-identity guard > #given bash contains a forbidden foreign-root literal #when invoked repeatedly in one session #then it warns once and never blocks [1.39ms]
+(pass) memory cross-identity guard > #given separate sessions invoke bash with a forbidden root #when advisory state is tracked #then each session receives one warning [1.15ms]
+
+packages/omo-senpi/src/components/memory/compaction-survival.test.ts:
+(pass) compaction survival + trigger integration > #given a bound session with committed memory #when an accepted compaction settles successfully #then exactly one reflection launches and the sentinel block survives byte-identical [347.49ms]
+(pass) compaction survival + trigger integration > #given a bound session #when compaction is rejected #then no flag is recorded and settle launches nothing [183.40ms]
+(pass) compaction survival + trigger integration > #given compaction accepted mid-run #when the retried turn chain settles #then exactly one launch fires across all settles [207.14ms]
+(pass) compaction survival + trigger integration > #given two consecutive accepted compactions #when the run settles #then the flag is consumed once with exactly one launch [225.67ms]
+
+packages/omo-senpi/src/components/memory/context.test.ts:
+(pass) memory identity context > #given a resolved identity #when its context and repo getter are read #then no repository or runtime directory is created [0.37ms]
+(pass) memory identity context > #given untouched identity paths #when first-write setup runs #then only runtime structure is ensured idempotently [2.75ms]
+
+packages/omo-senpi/src/components/memory/policy-guard.test.ts:
+(pass) memory filesystem policy guard > #given a bound identity on a policy-capable host #when registration runs #then exactly one policy is registered with foreign-only denied roots [2.21ms]
+(pass) memory filesystem policy guard > #given the registered policy #when read and write target a foreign identity file #then both are denied with the stable reason [1.66ms]
+(pass) memory filesystem policy guard > #given the registered policy #when enumeration targets the agents root or a foreign root #then both are denied [1.51ms]
+(pass) memory filesystem policy guard > #given the registered policy #when operations target the bound identity repo and worktrees #then they are allowed [1.52ms]
+(pass) memory filesystem policy guard > #given the registered policy #when an operation targets a path outside the agents root #then it is allowed [1.52ms]
+(pass) memory filesystem policy guard > #given the registered policy #when a sibling identity appears after registration #then its files are still denied [2.21ms]
+(pass) memory filesystem policy guard > #given an unbound identity on a policy-capable host #when registration runs #then no policy is registered [1.66ms]
+(pass) memory filesystem policy guard > #given a host without the policy API #when registration runs #then nothing is registered and the soft guard stays the enforcement layer [1.89ms]
+(pass) memory filesystem policy guard > #given the capability check #when the host exposes the policy API #then support is detected without any cast [1.61ms]
+(pass) memory filesystem policy guard > #given the policy guard module source #when imports are audited #then senpi references are type-only with no runtime import or any-cast [0.17ms]
+
+packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:
+(pass) createMemoryNudgeWiring > #given a fresh session #when two interactive inputs are accepted while extension and rejected inputs occur #then only the accepted interactive turns reach the threshold [206.72ms]
+(pass) createMemoryNudgeWiring > #given a durable accepted-turn record and contaminated branch users #when a session resumes #then hydration uses only the durable baseline [191.57ms]
+(pass) createMemoryNudgeWiring > #given one durable accepted turn and a second admitted input awaiting its started disposition #when the prompt compiles #then the projected accepted turn reaches the threshold [213.00ms]
+(pass) createMemoryNudgeWiring > #given a threshold on an identity with no repository yet #when nudge state resolves #then the fresh-session baseline is used without requiring git history [172.84ms]
+(pass) createMemoryNudgeWiring > #given a threshold nudge #when an in-band memory commit lands #then the next compile state self-clears and disabled settings remain quiet [259.07ms]
+(pass) createMemoryNudgeWiring > #given a bound non-auto identity #when a memory MCP tool call starts #then unforgeable identity and accepted-turn provenance are injected in place [154.91ms]
+
+packages/omo-senpi/src/components/memory/tools.test.ts:
+(pass) memory tool registration > #given a context resolver #when registerMemoryTools runs #then both tools are captured with sequential execution and prompt metadata [0.20ms]
+(pass) memory tool registration > #given the memory tool description #when inspected #then it documents omo identity, frontmatter rules, and result strings [0.08ms]
+(pass) memory tool activation > #given no bound identity #when either tool executes #then an actionable initialization error is returned [0.25ms]
+(pass) memory tool activation > #given a resolver that binds after registration #when the tool executes #then activation follows binding [238.73ms]
+(pass) memory tool execution > #given a bound identity #when memory create executes #then the engine commits and reports the short sha [262.56ms]
+(pass) memory tool execution > #given a bound identity #when memory_apply_patch executes #then the patch is applied and committed [321.42ms]
+(pass) memory tool execution > #given a bound identity #when the engine rejects the change #then the memory error maps to an error result [240.09ms]
+(pass) memory tool execution > #given a bound identity #when memory_apply_patch receives a malformed patch #then the parse error maps to an error result [167.18ms]
+(pass) memory tool execution > #given the writer lock is held #when a tool executes #then the contention surfaces as an error result [199.60ms]
+(pass) memory tool execution > #given concurrent executions #when both commit #then they serialize through the writer lock [332.33ms]
+(pass) memory tool execution > #given no repo exists yet #when the memory tool executes #then it lazily initializes with hooks and seeds [723.88ms]
+
+packages/omo-senpi/src/components/memory/dream-selector.test.ts:
+(pass) dream conversation scoring > #given a fixed scoring vector #when scored #then every normalized operand and the exact total match [0.21ms]
+(pass) dream conversation scoring > #given three equal scores #when ranked #then unreflected steps recency and conversation id break ties in order [0.12ms]
+(pass) dream conversation packing > #given an oversized middle candidate #when packed #then it is skipped and a later fitting candidate is selected [0.10ms]
+(pass) dream journal selection > #given UTF-8 journals with one fully reflected conversation #when volume and selection run twice #then bytes snapshots ranking and output stay deterministic [3.77ms]
+
+packages/omo-senpi/src/components/memory/skills-scope.test.ts:
+(pass) memorySkillsDir > resolves to the identity repo skills dir [0.40ms]
+(pass) createMemorySkillsScopeHandler > returns the bound identity skills dir on startup [0.29ms]
+(pass) createMemorySkillsScopeHandler > returns the bound identity skills dir on reload [0.23ms]
+(pass) createMemorySkillsScopeHandler > resolves the context by event session id [0.22ms]
+(pass) createMemorySkillsScopeHandler > returns undefined for an unbound session so the chain passes through [0.05ms]
+(pass) createMemorySkillsScopeHandler > returns the skills dir even when it does not exist on disk (create-free) [0.22ms]
+(pass) createMemorySkillsScopeHandler > ignores non-resources_discover payloads [0.21ms]
+(pass) createMemorySkillsScopeHandler > returns undefined when the event context has no readable session id [0.19ms]
+(pass) createMemorySkillsScopeHandler > returned path survives into discovery additively without displacing existing paths [0.24ms]
+(pass) createMemorySkillsScopeHandler > merge dedupes a skills dir already present in discovery [0.19ms]
+(pass) registerMemorySkillsScope > registers a resources_discover handler that dispatches the bound skills dir [0.21ms]
+(pass) registerMemorySkillsScope > contributes nothing for an unbound session during dispatch [0.06ms]
+
+packages/omo-senpi/src/components/memory/supervisor.test.ts:
+(pass) memoryModuleSupervisor > #given multiple component sessions #when references acquire and release #then the placeholder remains ref-counted [0.09ms]
+
+packages/omo-senpi/src/components/memory/binding.test.ts:
+(pass) memory binding > #given an identity repo and clock #when a binding is created #then it carries a stable path hash without exposing the path [0.15ms]
+(pass) memory binding > #given multiple session entries #when the latest valid binding is found #then malformed and older bindings are ignored [0.07ms]
+
+packages/omo-senpi/src/components/memory/trigger-wiring.test.ts:
+(pass) reflection trigger wiring > #given a met step threshold #when a clean run settles #then exactly one step-count launch fires with no visible message [11.90ms]
+(pass) reflection trigger wiring > #given the wiring #when registered #then it observes only agent_end, agent_settled and session_compact [1.54ms]
+(pass) reflection trigger wiring > #given a zero step threshold #when a clean run settles #then nothing ever launches [7.41ms]
+(pass) reflection trigger wiring > #given an unsuccessful or missing run outcome #when settled #then no launch is attempted [16.25ms]
+(pass) reflection trigger wiring > #given a retried run #when the final agent_end is clean #then the settle counts as success [8.69ms]
+(pass) reflection trigger wiring > #given a settled run outcome #when a second settle arrives without a new run #then the stale outcome cannot relaunch [9.36ms]
+(pass) reflection trigger wiring > #given an accepted compaction #when the event fires #then it only records the pending flag and never launches [4.79ms]
+(pass) reflection trigger wiring > #given a rejected compaction #when the event fires #then no pending flag is recorded [4.98ms]
+(pass) reflection trigger wiring > #given a pending compaction #when the next settle fails and only then succeeds #then the flag is consumed exactly once [14.01ms]
+(pass) reflection trigger wiring > #given compaction and the step threshold ready in the same settle #when it is evaluated #then exactly one run launches [15.27ms]
+(pass) reflection trigger wiring > #given repeated successful settles before the active run completes #when they are evaluated #then one launch fires and pending collapses to a single record [23.52ms]
+(pass) reflection trigger wiring > #given a manual request #when it is made outside any event #then it launches with its focus and journal filters [8.38ms]
+(pass) reflection trigger wiring > #given a manual request without arguments #when it is made #then it targets the bound conversation without a focus [7.24ms]
+(pass) reflection trigger wiring > #given an active run #when a manual request queues behind it #then it is reserved as pending without launching [16.57ms]
+(pass) reflection trigger wiring > #given a launch handler that never settles #when a run settles #then the event handler still completes [7.89ms]
+(pass) reflection trigger wiring > #given no launch handler #when a run settles #then the reservation still happens without throwing [9.44ms]
+(pass) reflection trigger wiring > #given no bound memory session #when events fire #then the wiring stays inert [1.24ms]
+(pass) reflection trigger wiring > #given an engine failure #when a run settles #then the host handler resolves and the failure is logged once [1.16ms]
+(pass) reflection trigger wiring > #given reflection disabled #when a clean run settles #then no reservation is made and no launch fires [4.07ms]
+(pass) reflection trigger wiring > #given reflection disabled #when a pending compaction is consumed at settle #then no compaction launch fires [3.58ms]
+(pass) reflection trigger wiring > #given reflection disabled #when a manual request is made #then no launch fires [1.07ms]
+(pass) reflection trigger wiring > #given reflection enabled #when a clean run settles #then the launch fires exactly as before [7.39ms]
+(pass) resolveReflectionTriggerConfig > #given resolved memory settings #when no agent override applies #then the base trigger config is used [0.10ms]
+(pass) resolveReflectionTriggerConfig > #given a per-agent override #when the bound agent matches #then its trigger fields win field by field [0.07ms]
+(pass) resolveReflectionTriggerConfig > #given reflection disabled in base settings #when no agent override applies #then enabled is false [0.05ms]
+(pass) resolveReflectionTriggerConfig > #given reflection enabled in base but disabled by per-agent override #when the bound agent matches #then enabled is false [0.05ms]
+(pass) resolveReflectionTriggerConfig > #given reflection disabled in base but enabled by per-agent override #when the bound agent matches #then enabled is true [0.05ms]
+
+packages/omo-senpi/src/components/memory/journal-wiring.test.ts:
+(pass) memory journal wiring > #given a 3-turn session with a tool call #when agent_settled fires #then rows are projected and steps equal 3 [2.40ms]
+(pass) memory journal wiring > #given turn 1 journaled before a crash #when session_start reconciles the full branch #then only missing rows are appended [2.39ms]
+(pass) memory journal wiring > #given a tool-only assistant message #when settled #then no assistant row and no step increment [1.57ms]
+(pass) memory journal wiring > #given redacted and visible thinking blocks #when settled #then reasoning rows use the placeholder and source index [1.18ms]
+(pass) memory journal wiring > #given an aborted run with an error message #when settled #then rows still journal including an error row [1.57ms]
+(pass) memory journal wiring > #given message_end and turn_end #when dispatched #then nothing is written and only settle/start handlers exist [0.82ms]
+(pass) memory journal wiring > #given block-structured user content and split assistant texts #when settled #then texts concatenate canonically [1.41ms]
+(pass) memory journal wiring > #given a fresh session #when session_start fires #then the branch reconciles like a settle [1.53ms]
+(pass) memory journal wiring > #given an errored tool result #when settled #then the tool_call row joins resultOk false [1.35ms]
+(pass) memory journal wiring > #given a malformed event context #when handlers fire #then the reconcile is a no-op [0.25ms]
+
+packages/omo-senpi/src/components/memory/palace/people.test.ts:
+(pass) palace people graph > #given committed people cards #when the graph is collected #then nodes carry slug, name and kind from card frontmatter [375.01ms]
+(pass) palace people graph > #given RELATIONSHIP card lines #when the graph is collected #then edges match those lines and resolve to known slugs [364.11ms]
+(pass) palace people graph > #given a card line that is not a RELATIONSHIP #when the graph is collected #then it produces no edge [368.53ms]
+(pass) palace people graph > #given an uncommitted people card #when the graph is collected #then the node is labelled as absent from the system prompt [367.33ms]
+(pass) palace people graph > #given a repo without a people directory #when the graph is collected #then only the primary human node is present and no edges are derived [287.08ms]
+(pass) palace people graph > #given people.enabled false #when the graph is collected #then no people section is produced [349.08ms]
+(pass) palace people graph > #given a card whose entry exceeds the configured limit #when the graph is collected #then the diagnostic is surfaced with its card path [396.65ms]
+(pass) palace people graph > #given people.enabled true #when the palace is generated #then the inline payload carries the derived graph [470.59ms]
+(pass) palace people graph > #given people.enabled false #when the palace is generated #then the panel and its tab are absent [467.12ms]
+(pass) palace people graph > #given a people card carrying a script-breakout payload #when the palace is generated #then the raw payload never reaches the document [449.29ms]
+
+packages/omo-senpi/src/components/memory/palace/command.test.ts:
+(pass) palace command > #given a bound identity #when the palace command is registered #then it exposes a description and handler [0.18ms]
+(pass) palace command > #given darwin without remote-session env #when /palace runs #then the generated file is opened with open [325.09ms]
+(pass) palace command > #given linux and win32 hosts #when /palace runs #then the platform opener is used [410.82ms]
+(pass) palace command > #given a tmux or ssh session #when /palace runs #then the path is printed instead of opened [401.55ms]
+(pass) palace command > #given a headless context #when /palace runs #then the path is returned as command output text [338.25ms]
+(pass) palace command > #given no bound memory identity #when /palace runs #then it reports the unbound state without generating a file [0.21ms]
+
+packages/omo-senpi/src/components/memory/palace/collectors.test.ts:
+(pass) palace collectors > #given a committed memory repo #when core entries are collected #then system files carry projection paths and bodies [296.70ms]
+(pass) palace collectors > #given committed binary and text assets #when external entries are collected #then binaries report size only and never content [332.24ms]
+(pass) palace collectors > #given a dirty working tree #when core entries are collected #then uncommitted files are labelled as absent from the system prompt [303.91ms]
+(pass) palace collectors > #given reflection and ordinary commits #when history is collected #then reflection commits are tagged and caps are declared [324.68ms]
+(pass) palace collectors > #given merge and chore reflection subjects #when matched against the reflection pattern #then only reflection-scoped commits match [0.07ms]
+(pass) palace collectors > #given journal state and completion records #when reflection data is collected #then cursor state and recent outcomes are returned newest first [253.91ms]
+(pass) palace collectors > #given more completion records than the limit #when reflection data is collected #then only the newest N are kept [259.97ms]
+
+packages/omo-senpi/src/components/memory/palace/generator.test.ts:
+(pass) palace generator machine gate > #given a fixture memory repo #when the palace is generated #then inline data pins the persona entry, HEAD sha and identity metadata [339.67ms]
+(pass) palace generator machine gate > #given the default people gate #when the palace markup is parsed #then every tab has a matching panel [342.61ms]
+(pass) palace generator machine gate > #given people collection disabled #when the palace markup is parsed #then only the four always-on tabs remain [340.73ms]
+(pass) palace generator machine gate > #given the viewers runtime directory #when the palace is written #then the file is 0600 inside a 0700 directory [322.05ms]
+(pass) palace generator machine gate > #given memory content carrying a script-breakout payload #when the palace is generated #then the raw payload never appears and the escaped form does [329.30ms]
+(pass) palace generator machine gate > #given line-separator characters in memory content #when the palace is generated #then U+2028 and U+2029 are escaped in the inline payload [384.07ms]
+(pass) palace generator machine gate > #given a self-contained requirement #when the palace html is inspected #then it references no external fonts or CDNs [338.45ms]
+(pass) palace generator machine gate > #given a committed binary asset #when the palace is generated #then the external tab lists name and size but no binary body [336.38ms]
+
+packages/omo-senpi/src/components/memory/commands/memfs.test.ts:
+(pass) /memfs status > #given a clean repo #when status runs #then HEAD and a clean tree are reported at info level [577.02ms]
+(pass) /memfs status > #given uncommitted changes #when status runs #then the dirty state is reported as a warning [561.32ms]
+(pass) /memfs status > #given no repository #when status runs #then an actionable error is returned [0.47ms]
+(pass) /memfs init > #given no repository #when init runs #then the repository is created [504.78ms]
+(pass) /memfs init > #given an existing repository #when init runs #then it reports idempotently without error [567.91ms]
+(pass) /memfs init > #given an unbound session with a config-resolved identity #when init runs #then it still initializes [544.77ms]
+(pass) /memfs sync > #given no configured mirror #when sync runs #then an actionable error names /memory-repository [557.68ms]
+(pass) /memfs sync > #given a reachable mirror #when sync runs #then the push is reported as successful [641.00ms]
+(pass) /memfs repair > #given a skill missing name frontmatter #when repair runs #then hooks are reinstalled and the skill is repaired [492.52ms]
+(pass) /memfs reset > #given interactive confirmation #when reset runs #then a backup is taken first and the repo is re-initialized [960.94ms]
+(pass) /memfs reset > #given a declined confirmation #when reset runs #then nothing is destroyed and no backup is written [522.38ms]
+(pass) /memfs reset > #given a noninteractive session without --force #when reset runs #then it refuses and preserves the repo [515.38ms]
+(pass) /memfs reset > #given a noninteractive session with --force #when reset runs #then the repo is backed up and reset [955.91ms]
+(pass) /memfs dispatch > #given no subcommand #when invoked #then usage lists every subcommand [516.36ms]
+(pass) /memfs dispatch > #given an unknown subcommand #when invoked #then an actionable error is returned [509.55ms]
+
+packages/omo-senpi/src/components/memory/commands/sleeptime.test.ts:
+(pass) /sleeptime > #given default settings #when invoked #then resolved reflection, nudge, facts, dream, people, soul settings, the config path, and the reflect and dream hints render [0.71ms]
+(pass) /sleeptime > #given per-agent overrides on reflection, nudge, facts, dream, people, soul #when invoked #then overridden fields are marked and applied [0.32ms]
+(pass) /sleeptime > #given an unbound session #when invoked #then an actionable error is returned [0.11ms]
+
+packages/omo-senpi/src/components/memory/commands/skill-frontmatter.test.ts:
+(pass) repairSkillNameFrontmatterContent > #given frontmatter without a name key #when repaired #then the directory name is inserted first [0.16ms]
+(pass) repairSkillNameFrontmatterContent > #given an existing non-empty name #when repaired #then the content is untouched [0.09ms]
+(pass) repairSkillNameFrontmatterContent > #given an empty name value #when repaired #then the line is replaced in place [0.05ms]
+(pass) repairSkillNameFrontmatterContent > #given no frontmatter at all #when repaired #then the file is skipped with a reason [0.04ms]
+(pass) repairSkillNameFrontmatterContent > #given a name needing quoting #when repaired #then the scalar is quoted [0.04ms]
+(pass) repairMissingSkillNameFrontmatter > #given no skills directory #when repaired #then nothing is scanned [0.35ms]
+(pass) repairMissingSkillNameFrontmatter > #given skill files in nested directories #when repaired #then only name-less files change [1.54ms]
+(pass) repairMissingSkillNameFrontmatter > #given a repaired file and a skipped file #when the report is formatted #then both sections render [0.94ms]
+
+packages/omo-senpi/src/components/memory/commands/init.test.ts:
+(pass) /init > #given no repository #when invoked #then the repo is initialized and a standardized instruction turn follows waitForIdle [466.79ms]
+(pass) /init > #given an existing repository #when invoked #then it refuses without overwriting and sends nothing [544.08ms]
+(pass) /init > #given an unbound session #when invoked #then an actionable error is returned [0.16ms]
+
+packages/omo-senpi/src/components/memory/commands/register.test.ts:
+(pass) registerMemoryCommands > #given a fresh extension api #when the suite registers #then exactly the documented commands appear [0.47ms]
+(pass) registerMemoryCommands > #given the registered suite #when each registration is inspected #then description, argumentHint, and handler are present [0.48ms]
+(pass) registerMemoryCommands > #given a bound identity with a repository #when a registered handler runs #then it renders through the shared seams [544.41ms]
+
+packages/omo-senpi/src/components/memory/commands/reflect.test.ts:
+(pass) /reflect > #given free-text focus #when invoked #then a manual request is reserved and reported with its run id [0.63ms]
+(pass) /reflect > #given --recent N #when invoked #then the journal filter carries the count [0.28ms]
+(pass) /reflect > #given --conversation with ids #when invoked #then the ids are split into the request [0.28ms]
+(pass) /reflect > #given an active run #when the sink queues the request #then the pending disposition is reported [0.24ms]
+(pass) /reflect > #given a non-numeric --recent #when invoked #then a usage error is returned and no request is made [0.19ms]
+(pass) /reflect > #given no reflection sink #when invoked #then an actionable error is returned [0.19ms]
+(pass) /reflect > #given an unbound session #when invoked #then an actionable error is returned [0.06ms]
+(pass) /reflect > #given reflection.enabled false #when invoked #then an error is returned and no request is submitted [0.23ms]
+(pass) /reflect > #given reflection enabled in base but disabled by per-agent override #when invoked #then an error is returned and no request is submitted [0.20ms]
+
+packages/omo-senpi/src/components/memory/commands/search.test.ts:
+(pass) /search > #given sessions on disk #when queried #then numbered results carry session id, date, role, snippet, and entry id [2.02ms]
+(pass) /search > #given a hidden session #when queried with --include-hidden #then hidden results appear [1.21ms]
+(pass) /search > #given no matching documents #when queried #then a no-results message is returned [1.20ms]
+(pass) /search > #given an empty query #when invoked #then a usage error is returned [0.93ms]
+(pass) /search > #given a missing sessions directory #when invoked #then an actionable error is returned [0.09ms]
+
+packages/omo-senpi/src/components/memory/commands/args.test.ts:
+(pass) parseCommandArgs > #given empty input #when parsed #then positionals and flags are empty [0.09ms]
+(pass) parseCommandArgs > #given positionals and a valued flag #when parsed #then flag captures the next token [0.05ms]
+(pass) parseCommandArgs > #given an equals-style flag #when parsed #then the inline value is used [0.04ms]
+(pass) parseCommandArgs > #given a declared boolean flag before a positional #when parsed #then the positional is not swallowed [0.04ms]
+(pass) parseCommandArgs > #given a flag at the end of input #when parsed #then it degrades to a boolean [0.04ms]
+
+packages/omo-senpi/src/components/memory/commands/memory-repository.test.ts:
+(pass) /memory-repository > #given a credentialed url #when set runs #then config is written and output is redacted [581.39ms]
+(pass) /memory-repository > #given a configured mirror #when status runs #then the redacted url and ahead count render [561.31ms]
+(pass) /memory-repository > #given no configured mirror #when status runs #then it reports the unconfigured state [513.46ms]
+(pass) /memory-repository > #given a configured mirror #when unset runs #then the config key is removed [538.48ms]
+(pass) /memory-repository > #given no configured mirror #when push runs #then an actionable error is returned [516.71ms]
+(pass) /memory-repository > #given an unreachable mirror #when push runs #then the failure is reported with a redacted detail [594.92ms]
+(pass) /memory-repository > #given set without a url #when invoked #then a usage error is returned [505.45ms]
+(pass) /memory-repository > #given an unknown subcommand #when invoked #then an actionable error is returned [512.84ms]
+(pass) /memory-repository > #given an unbound session #when invoked #then an actionable error is returned [0.16ms]
+
+packages/omo-senpi/src/components/memory/commands/recompile.test.ts:
+(pass) /recompile > #given a bound identity #when invoked #then the prompt cache is busted for the next run [0.53ms]
+(pass) /recompile > #given an unbound session #when invoked #then nothing is busted and an error is returned [0.12ms]
+
+packages/omo-senpi/src/components/memory/commands/memory.test.ts:
+(pass) /memory > #given a clean committed repo #when invoked #then the viewer lists HEAD, system bodies, and external names [609.80ms]
+(pass) /memory > #given a dirty working tree #when invoked #then uncommitted changes render in a separate section [592.67ms]
+(pass) /memory > #given no repository #when invoked #then an actionable error is returned [0.39ms]
+(pass) /memory > #given an unbound session #when invoked #then an actionable error is returned [0.08ms]
+
+packages/omo-senpi/src/components/memory/commands/doctor.test.ts:
+(pass) /doctor > #given a healthy repository #when doctor runs #then every deterministic check passes [532.12ms]
+(pass) /doctor > #given no repository #when doctor runs #then the repository check fails with an actionable hint [0.32ms]
+(pass) /doctor > #given a memory file with invalid frontmatter #when doctor runs #then the sweep fails and names the file [523.96ms]
+(pass) /doctor > #given a missing persona file #when doctor runs #then a persona warning is reported [474.28ms]
+(pass) /doctor > #given a lock owned by a dead pid #when doctor runs #then the stale lock is reported with its path [523.88ms]
+(pass) /doctor > #given a lock owned by a live pid #when doctor runs #then no stale lock is reported [517.09ms]
+(pass) /doctor > #given an unregistered worktree directory #when doctor runs #then the orphan is reported [507.34ms]
+(pass) /doctor > #given a system estimate over the warn threshold #when doctor runs #then a token advisory is reported [510.23ms]
+(pass) /doctor > #given a skill missing name frontmatter #when doctor runs #then the repair helper reports the fix [496.57ms]
+(pass) /doctor > #given an unbound session #when doctor runs #then an actionable error is returned [0.16ms]
+
+packages/omo-senpi/src/components/memory/commands/remember.test.ts:
+(pass) /remember > #given a bound identity #when invoked with text #then waitForIdle precedes a REMEMBER-style user turn [0.48ms]
+(pass) /remember > #given empty text #when invoked #then a usage error is returned and nothing is sent [0.25ms]
+(pass) /remember > #given an unbound session #when invoked #then an actionable error is returned and nothing is sent [0.07ms]
+
+packages/omo-senpi/src/components/memory/commands/memfs-extra.test.ts:
+(pass) /memfs backup > #given a repository #when backup runs #then a sibling memory-backup dir holds a copy [520.86ms]
+(pass) /memfs backup > #given a backup already exists for the same clock #when backup runs again #then the existing backup is not clobbered [517.82ms]
+(pass) /memfs restore > #given a named backup #when restore runs #then repo content is replaced and a safety backup is kept [507.88ms]
+(pass) /memfs restore > #given no backups #when restore runs #then an actionable error is returned [492.19ms]
+(pass) /memfs restore > #given backups and an interactive session #when restore runs without a name #then the user selects one [500.16ms]
+(pass) /memfs restore > #given backups and a noninteractive session #when restore runs without a name #then available backups are listed [494.67ms]
+(pass) /memfs restore > #given an unknown backup name #when restore runs #then an actionable error is returned [498.74ms]
+(pass) /memfs diff > #given a clean tree #when diff runs #then no changes are reported at info level [499.62ms]
+(pass) /memfs diff > #given tracked modifications #when diff runs #then the diff is returned as a warning [511.33ms]
+(pass) /memfs tokens > #given system files #when tokens runs #then a bytes/4 estimate and per-file rows render [503.40ms]
+(pass) /memfs tokens > #given no repository #when tokens runs #then an actionable error is returned [0.35ms]
+
+packages/omo-senpi/src/components/memory/commands/tokens.test.ts:
+(pass) estimateSystemTokens > #given no system directory #when estimated #then the total is zero [0.98ms]
+(pass) estimateSystemTokens > #given system files including nested paths #when estimated #then tokens are bytes/4 per file sorted by size [1.26ms]
+(pass) estimateSystemTokens > #given a file whose byte length is not divisible by four #when estimated #then the file rounds up [0.48ms]
+
+packages/omo-senpi/src/components/memory/bindings/entry-renderer.test.ts:
+(pass) renderMemoryBindingEntry > #given a persisted identity binding #when the TUI asks to render it #then it stays hidden and cannot produce model text [0.04ms]
+
+packages/omo-senpi/src/components/memory/worker/completion.test.ts:
+(pass) reflection completion flow > #given no live source session #when completion is recorded #then it remains durable and pending [3.72ms]
+(pass) reflection completion flow > #given a worker completion record #when the landed palace collector reads reflection outcomes #then runId outcome and finishedAt match its contract [1.20ms]
+(pass) reflection completion flow > #given a pending offline completion #when its source session starts #then appendEntry notify and consumed state happen without a model message [0.94ms]
+
+packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.integration.test.ts:
+(pass) memory run supervisor > #given a fixture launch manifest #when supervised #then identity is durable before the command starts and the outcome is published once [118.49ms]
+(pass) memory run supervisor > #given a detached supervisor launched by a parent #when the parent is killed #then the supervisor still publishes the child outcome [124.67ms]
+(pass) memory run supervisor > #given a bootstrap waiting for release #when its parent pipe closes #then it exits without starting the manifest command [17.19ms]
+(pass) memory run supervisor > #given a released child #when the supervisor is killed abruptly #then the recorded live process group can be terminated [132.14ms]
+(pass) memory run supervisor > #given a child that exits during termination grace #when the absolute deadline arrives #then timeout is recorded without escalation [166.16ms]
+(pass) memory run supervisor > #given a child that ignores SIGTERM #when termination grace expires #then the process group is killed [265.42ms]
+
+packages/omo-senpi/src/components/memory/worker/runner.integration.test.ts:
+(pass) SenpiSubprocessRunner integration > #given a stub child that commits in its reflection worktree #when launched #then it merges records notifies and advances the cursor [588.57ms]
+(pass) SenpiSubprocessRunner integration > #given a child sleeping beyond an injected hard deadline #when launched #then the process group times out and cleanup leaves the cursor retryable [458.71ms]
+(pass) SenpiSubprocessRunner integration > #given empty categories and no quick model #when launched twice in one session #then both fail without spawning and only one unsuppressed warning appears [200.90ms]
+(pass) SenpiSubprocessRunner integration > #given a zero-exit child that modifies linked-worktree git administration #when completion validates #then it fails cleans up and leaves the cursor unmoved [427.23ms]
+
+packages/omo-senpi/src/components/memory/worker/resolve-model.test.ts:
+(pass) resolveReflectionModel > #given quick category model and reasoning #when resolved #then it returns the Senpi model selector and thinking level [0.22ms]
+(pass) resolveReflectionModel > #given an empty model registry #when quick cannot resolve #then it fails closed as category_unavailable [0.08ms]
+(pass) resolveReflectionModel > #given a pinned user model with a stale availability snapshot #when resolved #then find() wins over the gate [0.10ms]
+(pass) resolveReflectionModel > #given a pinned model that find() cannot locate #when resolved #then it still fails closed [0.08ms]
+(pass) resolveReflectionModel > #given the task warning suppression convention #when evaluated #then global opt-out and per-category opt-in retain their precedence [0.13ms]
+
+ 305 pass
+ 0 fail
+ 964 expect() calls
+Ran 305 tests across 44 files. [46.75s]

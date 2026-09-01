@@ -1,0 +1,72 @@
+bun test v1.4.0-canary.1 (54bbd5dd9)
+
+packages/omo-opencode/src/startup-migration.test.ts:
+(pass) runOpenCodeStartupMigration > #given both legacy source groups #when startup migration runs #then it migrates, moves, and reports that the chain must reload [6.14ms]
+(pass) runOpenCodeStartupMigration > #given a legacy source on another filesystem #when its backup rename throws EXDEV #then startup copies and removes the source [0.65ms]
+(pass) runOpenCodeStartupMigration > #given a backup rename fails for another reason #when startup migration runs #then it preserves the source and reports the error [0.39ms]
+(pass) runOpenCodeStartupMigration > #given no legacy source #when startup migration runs #then it does not create a target or backups [0.13ms]
+(pass) runOpenCodeStartupMigration > #given an invalid transformed document #when startup migration runs #then validation aborts before target and source changes [0.63ms]
+(pass) runOpenCodeStartupMigration > #given a journal recorded the target write #when recovery crosses filesystems #then it copies the backup before evaluating migration sources [0.76ms]
+
+packages/omo-config-core/src/migration/transaction.test.ts:
+(pass) runMigration transaction ownership > #given two callers overlap #when one holds the exclusive lock #then one migration commits and the other observes completed state on retry [1.64ms]
+(pass) runMigration transaction ownership > #given a live owner whose lease is fresh #when another caller attempts takeover #then the lock is not stolen [0.09ms]
+(pass) runMigration transaction ownership > #given a migration lasts beyond its initial lease #when it renews at transaction boundaries #then fresh ownership is never stolen [0.25ms]
+(pass) runMigration transaction ownership > #given a false predicate and no journal #when entering the transaction #then no target or source is written [0.11ms]
+
+packages/omo-config-core/src/migration/in-place.test.ts:
+(pass) runMigration replace-target mode > #given a crash after journaling an in-place rewrite #when migration resumes #then deletions, additions, and the marker are replayed exactly [0.74ms]
+
+packages/omo-config-core/src/migration/merge-commit.test.ts:
+(pass) runMigration > #given a legacy value collides with a target value #when migrating #then the target value wins with a skipped diagnostic [0.77ms]
+(pass) runMigration > #given a user target marker #when a project target is discovered later #then the project target migrates independently [0.17ms]
+(pass) runMigration > #given distinct migration ids for one target #when each group has a source #then each id runs once without suppressing the other [0.39ms]
+(pass) runMigration > #given a transformed document rejected by OmoConfigSchema #when migrating #then target and sources are untouched [0.15ms]
+
+packages/omo-config-core/src/migration/lock.test.ts:
+(pass) acquireMigrationLock > #given an expired lock owned by a dead process #when acquiring #then compare-and-remove takeover creates a new owner lease [0.12ms]
+(pass) acquireMigrationLock > #given a fresh lock owned by a live process #when acquiring #then the active owner is not displaced [0.07ms]
+(pass) acquireMigrationLock > #given a live owner whose lease only just expired #when acquiring #then the safety margin prevents premature takeover [0.07ms]
+(pass) acquireMigrationLock > #given a lock owner #when the lease is renewed #then its timestamp is replaced before release [0.06ms]
+(pass) acquireMigrationLock > #given transient mutation guard contention #when the owner releases #then it retries and removes the lock [2.69ms]
+(pass) acquireMigrationLock > #given persistent mutation guard contention #when release retries are exhausted #then the ownership-matched fallback removes the lock [71.18ms]
+(pass) acquireMigrationLock > #given a stale mutation guard owned by a live process #when taking over and releasing #then the guard cannot wedge either mutation [5.30ms]
+
+packages/omo-config-core/src/migration/predicate.test.ts:
+(pass) shouldRunMigration > #given no legacy sources #when evaluating a target without a marker #then migration is not triggered [0.69ms]
+(pass) shouldRunMigration > #given a target marker for this migration #when legacy sources exist #then migration is not triggered [0.06ms]
+(pass) shouldRunMigration > #given legacy sources and no target marker #when evaluating a distinct target migration pair #then migration is triggered [0.04ms]
+
+packages/omo-config-core/src/migration/recovery.test.ts:
+(pass) runMigration recovery > #given a crash after journal-written #when the next entrypoint runs #then it resumes before predicate evaluation [0.51ms]
+(pass) runMigration recovery > #given a crash after target-written #when the next entrypoint runs #then it resumes before predicate evaluation [0.18ms]
+(pass) runMigration recovery > #given a crash after target-recorded #when the next entrypoint runs #then it resumes before predicate evaluation [0.17ms]
+(pass) runMigration recovery > #given a crash after source-moved #when the next entrypoint runs #then it resumes before predicate evaluation [0.15ms]
+(pass) runMigration recovery > #given a crash after source-recorded #when the next entrypoint runs #then it resumes before predicate evaluation [0.14ms]
+
+packages/omo-config-core/src/migration/batch.test.ts:
+(pass) runMigrations > #given a long-expired lock owned by a live process #when the next batch starts #then it reclaims the stale lease and completes [0.99ms]
+(pass) runMigrations > #given a pending journal #when plans are discovered #then recovery finishes before discovery and dry run creates no new migration writes [0.22ms]
+
+packages/omo-opencode/src/testing/create-plugin-module.test.ts:
+(pass) createPluginModule() > #given plugin config sets i18n.locale to zh > #then production startup applies the configured locale [8.00ms]
+(pass) createPluginModule() > #given OpenCode server config is present > #then startup self-heals the matching TUI plugin entry [2.30ms]
+(pass) createPluginModule() > #given OpenCode server config is present > #given sidebar is disabled #then startup does not write a TUI plugin entry [1.93ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #then startup exposes them through a runtime skill source URL [3.84ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #given the runtime skill source server is unavailable #then startup continues without a source URL [4.25ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #then dispose stops the runtime skill source [3.65ms]
+(pass) createPluginModule() > #given security-research is disabled > #then startup still exposes security-review through the runtime skill source [4.58ms]
+(pass) createPluginModule() > #given duplicate OMO plugin entries are configured > #then startup warns and returns no prompt-producing hooks [5.74ms]
+(pass) createPluginModule() > #given startup migration consumes legacy configuration > #then startup reloads the config and emits one migration summary toast [3.65ms]
+(pass) createPluginModule() > #given serverPlugin is initialized twice in one process > #then startup migration predicates run only once [5.25ms]
+(pass) createPluginModule() > #given startup migration fails > #then startup keeps defaults and reports one loud error toast [3.35ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep never resolves #then startup still completes fire-and-forget [1.19ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep rejects #then the failure is logged and cannot propagate into startup [1.27ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep throws synchronously #then startup still completes [1.09ms]
+
+ 46 pass
+ 0 fail
+ 172 expect() calls
+Ran 46 tests across 9 files. [559.00ms]
+
+EXIT_CODE=0

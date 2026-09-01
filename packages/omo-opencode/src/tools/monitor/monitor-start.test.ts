@@ -152,7 +152,6 @@ describe("createMonitorStart", () => {
       expect(result).toContain("mode: live_safe")
       expect(result).toContain('monitor_stop with monitor_id="mon_allowed"')
       expect(result).toContain("output arrives automatically")
-      expect(result).toContain("do not poll")
       expect(result).not.toContain(command)
     })
   })

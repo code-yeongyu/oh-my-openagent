@@ -7,14 +7,12 @@ import { OmoConfigWriteError, updateOmoConfig } from "../index"
 function makeFixture(): {
   readonly homeDir: string
   readonly projectDir: string
-  readonly xdgConfigHome: string
 } {
   const root = mkdtempSync(join(tmpdir(), "omo-config-writer-security-"))
   const homeDir = join(root, "home")
   const projectDir = join(homeDir, "project")
-  const xdgConfigHome = join(root, "xdg")
   mkdirSync(projectDir, { recursive: true })
-  return { homeDir, projectDir, xdgConfigHome }
+  return { homeDir, projectDir }
 }
 
 function updateProjectConfig(fixture: ReturnType<typeof makeFixture>): void {
@@ -22,7 +20,7 @@ function updateProjectConfig(fixture: ReturnType<typeof makeFixture>): void {
     scope: "project",
     projectDir: fixture.projectDir,
     edits: [{ path: ["task", "default_concurrency"], value: 4 }],
-    env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+    env: { HOME: fixture.homeDir },
     platform: "linux",
   })
 }
@@ -88,7 +86,7 @@ describe("updateOmoConfig filesystem safety", () => {
   test("#given symlinked project omo directory #when editing project config #then global target is rejected without backup", () => {
     // given
     const fixture = makeFixture()
-    const targetConfigDir = join(fixture.xdgConfigHome, "omo")
+    const targetConfigDir = join(fixture.homeDir, ".omo")
     const targetConfigPath = join(targetConfigDir, "omo.jsonc")
     const original = `{"task":{"default_concurrency":8}}\n`
     mkdirSync(targetConfigDir, { recursive: true })
