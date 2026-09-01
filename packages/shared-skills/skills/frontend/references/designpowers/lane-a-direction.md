@@ -61,4 +61,4 @@ Lane A passes only when the plan has inspectable design context, not vague inten
 
 PASS when `ulw-plan` receives this lane context and produces a decision-complete plan whose tasks are design-aware, persona-aware, and evidence-bound.
 
-FAIL when the plan skips inclusive-personas, buries accessibility as a final polish item, treats taste as generic style, writes a parallel design plan, or leaves design decisions for start-work workers to invent.
+FAIL when the plan skips inclusive-personas, buries accessibility as a final polish item, treats taste as generic style, writes a parallel design plan, or leaves design decisions for ulw-execute workers to invent.

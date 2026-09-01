@@ -10,6 +10,7 @@ import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES } from "../../te
 const require = createRequire(import.meta.url)
 
 const SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
+export const OMO_SENPI_TASK_RPC_CHILD = "OMO_SENPI_TASK_RPC_CHILD"
 const SENPI_BIN_ENV = "SENPI_BIN"
 const RPC_ENTRY_SPECIFIER = "@code-yeongyu/senpi/rpc-entry"
 
@@ -214,6 +215,7 @@ function buildChildProfile(
   for (const name of MEMBER_PROCESS_ENV_NAMES) delete env[name]
   Object.assign(env, spec.memberEnv)
   env[SESSION_DIR_ENV] = resolveChildSessionDir(spec.state_dir, spec.task_id)
+  env[OMO_SENPI_TASK_RPC_CHILD] = "1"
   const extensions = spec.memberEnv === undefined
     ? spec.extensions?.filter((entry) => basename(entry) !== MEMBER_EXTENSION_BUNDLE_NAME)
     : spec.extensions

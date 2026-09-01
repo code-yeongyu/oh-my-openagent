@@ -27,6 +27,9 @@ export interface DagStatusNode {
   readonly dependsOn: readonly string[]
   // Display attempt; absent on legacy records, 1 for a node that ran exactly once.
   readonly attempt?: number
+  // Enqueue time, always written by the engine (dag/types.ts). Drives the waiting clock for a node
+  // that has not started yet; absent only on legacy records, which simply show no waiting token.
+  readonly createdAt?: string
   readonly startedAt?: string
   readonly completedAt?: string
 }
@@ -42,6 +45,9 @@ export interface DagStatusRunSnapshot {
   readonly status: string
   readonly nodes: readonly DagStatusNode[]
   readonly waves: readonly DagStatusWave[]
+  // Resume lease owner, written by the dag recovery claim and cleared on shutdown pause. A paused
+  // run still carrying a LIVE pid is mid-resume, not idle; absent on legacy records.
+  readonly leaseHolderPid?: number
 }
 
 export interface DagRunRowsOptions {
@@ -49,6 +55,8 @@ export interface DagRunRowsOptions {
   readonly maxWidth?: number
   // Rendering time for live elapsed labels; defaults to Date.now().
   readonly now?: number
+  // Liveness probe for the resume lease holder; defaults to a signal-0 existence check.
+  readonly isProcessAlive?: (pid: number) => boolean
 }
 
 const TERMINAL_NODE_STATES: ReadonlySet<string> = new Set(["completed", "failed", "cancelled", "skipped"])
@@ -69,6 +77,11 @@ const NODE_STATE_RANKS: Readonly<Record<string, number>> = {
 
 const NODE_ICONS: Readonly<Record<string, string>> = {
   running: "▶",
+  // The pre-running states are visually distinct on purpose: collapsing them into one fallback
+  // glyph is what made a booting graph read as a dead one.
+  pending: "◌",
+  scheduled: "◔",
+  blocked: "⊟",
   completed: "✓",
   failed: "✗",
   skipped: "⊘",
@@ -76,10 +89,14 @@ const NODE_ICONS: Readonly<Record<string, string>> = {
   paused: "⏸",
 }
 
+// The run-level pause family is deliberately neutral: a ⏸ beside a lane rendering ▶ reads as a
+// contradiction during the resume-reconcile window, so the header claims nothing about motion.
+const PAUSED_RUN_ICON = "·"
+
 export function runRows(run: DagStatusRunSnapshot, activity: ReadonlyMap<string, string> | undefined, options?: DagRunRowsOptions): string[] {
   const renderedAt = options?.now ?? Date.now()
   const maxWidth = boundedRowWidth(options?.maxWidth)
-  const rows = [runHeaderRow(run)]
+  const rows = [runHeaderRow(run, options?.isProcessAlive ?? isProcessAlive)]
   const shown = selectNodeRows(run.nodes)
   for (const node of shown) rows.push(nodeRow(node, activity, renderedAt, maxWidth))
   const overflow = run.nodes.length - shown.length
@@ -121,10 +138,32 @@ function selectNodeRows(nodes: readonly DagStatusNode[]): readonly DagStatusNode
   return ordered.slice(0, Math.max(MAX_NODE_ROWS, runningCount))
 }
 
-function runHeaderRow(run: DagStatusRunSnapshot): string {
-  const icon = NODE_ICONS[run.status] ?? "○"
+function runHeaderRow(run: DagStatusRunSnapshot, isAlive: (pid: number) => boolean): string {
+  const paused = run.status === "paused"
+  const icon = paused ? PAUSED_RUN_ICON : (NODE_ICONS[run.status] ?? "○")
   const name = excerptRendererText(normalizeRendererText(run.name), LABEL_MAX)
-  return `${icon} ${name} ${normalizeRendererText(run.status)} ${waveLabel(run)} ${countsLabel(run)}`
+  const status = paused ? pausedStatusText(run, isAlive) : normalizeRendererText(run.status)
+  return `${icon} ${name} ${status} ${waveLabel(run)} ${countsLabel(run)}`
+}
+
+// Priority is deliberate. A live lease means another process already claimed this run and is
+// reconciling it, so "paused" would be stale by the time it is painted. Without that lease, nodes
+// still recorded as running are stranded work the header must own rather than hide behind "paused".
+function pausedStatusText(run: DagStatusRunSnapshot, isAlive: (pid: number) => boolean): string {
+  if (run.leaseHolderPid !== undefined && isAlive(run.leaseHolderPid)) return "resuming"
+  const running = run.nodes.reduce((count, node) => count + (node.state === "running" ? 1 : 0), 0)
+  return running > 0 ? `suspended · ${running} active` : "paused"
+}
+
+// Signal 0 probes existence without delivering anything. ESRCH is the only "gone" answer: EPERM
+// means the pid exists under another uid, which still counts as a live lease holder.
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH"
+  }
 }
 
 // Current wave = the first wave still holding a nonterminal node; a fully settled run reads y/y.
@@ -155,16 +194,27 @@ function countsLabel(run: DagStatusRunSnapshot): string {
 }
 
 // Live nodes tick against the render clock; settled nodes freeze at their completedAt so a late
-// repaint never rewrites history. A node without a parseable startedAt shows no elapsed at all.
+// repaint never rewrites history. A node that has not started yet falls back to a WAITING clock
+// measured from its enqueue time, so a graph whose children are still booting still visibly moves —
+// a byte-identical row across repaints is what makes users conclude the run died.
 function elapsedLabel(node: DagStatusNode, now: number): string | undefined {
   const started = node.startedAt === undefined ? Number.NaN : Date.parse(node.startedAt)
-  if (!Number.isFinite(started)) return undefined
+  if (!Number.isFinite(started)) return waitingLabel(node, now)
   let end: number = now
   if (TERMINAL_NODE_STATES.has(node.state) && node.completedAt !== undefined) {
     const completed = Date.parse(node.completedAt)
     if (Number.isFinite(completed)) end = completed
   }
   return formatDurationHuman(Math.max(0, end - started))
+}
+
+// A node still waiting to run reports how long it has been waiting. Terminal states are excluded:
+// a skipped or cancelled node never started and must not appear to be accruing time.
+function waitingLabel(node: DagStatusNode, now: number): string | undefined {
+  if (TERMINAL_NODE_STATES.has(node.state)) return undefined
+  const created = node.createdAt === undefined ? Number.NaN : Date.parse(node.createdAt)
+  if (!Number.isFinite(created)) return undefined
+  return `waiting ${formatDurationHuman(Math.max(0, now - created))}`
 }
 
 // Assembles `  <icon> <label> · <route> · [xN] · [<activity>] · [<elapsed>]` within maxWidth,
@@ -179,8 +229,9 @@ function nodeRow(node: DagStatusNode, activity: ReadonlyMap<string, string> | un
   // A re-run node is the exception worth a badge; a first attempt stays unmarked.
   const attempt = (node.attempt ?? 1) > 1 ? `x${node.attempt}` : undefined
   const elapsed = elapsedLabel(node, now)
-  // Activity is live telemetry: it belongs to a running node only, never to a settled one.
-  const live = node.state === "running" ? activity?.get(node.id) : undefined
+  // Activity is live telemetry: any node that has not settled may carry it, including one still
+  // spawning its child. Settled nodes never do — their story is told by the terminal icon.
+  const live = TERMINAL_NODE_STATES.has(node.state) ? undefined : activity?.get(node.id)
   const activityText = live === undefined ? undefined : normalizeRendererText(live)
   const showActivity = activityText !== undefined && maxWidth >= NARROW_ROW_WIDTH
 

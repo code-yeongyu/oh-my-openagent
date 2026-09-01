@@ -63,7 +63,7 @@ export function createCategoryUnavailableWarningPlanner(deps: CategoryUnavailabl
 
     const providers = (error.missing_providers ?? []).join(", ")
     const text = `Category "${category}" has no usable model: none of its fallback-chain providers are connected (${providers}).`
-    deps.runtime.ui()?.notify(text, "warning")
+    deps.runtime.ui()?.notify(text, "info")
     deps.pi.sendMessage(
       {
         customType: CATEGORY_UNAVAILABLE_MESSAGE_TYPE,

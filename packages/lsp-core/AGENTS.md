@@ -17,8 +17,8 @@ Harness-neutral LSP engine (`@oh-my-opencode/lsp-core`). Manages language server
 | `src/lsp/json-rpc-connection.ts` | Raw JSON-RPC 2.0 framing over stdio |
 | `src/lsp/config-loader.ts` | Load `.codex/lsp-client.json` (project + user), merge with builtins |
 | `src/lsp/server-definitions.ts` | `BUILTIN_SERVERS` (51 languages), `LSP_INSTALL_HINTS`, `AUTO_INSTALLABLE_SERVERS` |
-| `src/lsp/server-resolution.ts` | `findServerForExtension()`: map extension to installed server |
-| `src/lsp/server-installation.ts` | `isServerInstalled()`: PATH lookup with Windows extension handling |
+| `src/lsp/server-resolution.ts` | `findServerForExtension()`: map extension to installed server; substitutes the resolved absolute binary path into `command[0]` |
+| `src/lsp/server-installation.ts` | `resolveServerBinary()`: marker-gated repo-local lookup then PATH, with Windows extension handling; `isServerInstalled()` retained for existing consumers |
 | `src/lsp/directory-diagnostics.ts` | `aggregateDiagnosticsForDirectory()`: walk directory, cap files + diagnostics; `AbortSignal` cancels acquisition and per-file scans |
 | `src/lsp/formatters.ts` | Format locations, symbols, diagnostics, rename results, workspace edits |
 | `src/lsp/workspace-edit.ts` + `workspace-edit-*.ts` | `applyWorkspaceEdit()` / `applyWorkspaceEditDetailed()`: parse → fingerprint/snapshot → simulate → commit pipeline |
@@ -37,6 +37,7 @@ Harness-neutral LSP engine (`@oh-my-opencode/lsp-core`). Manages language server
 - **Subpath exports:** `.`, `./tools`, `./request-context`, `./missing-dependency-result`, `./mcp`, `./post-edit`, and wildcard `./lsp/*` — all point at source `.ts`, no dist build.
 - **RequestContext seam:** `request-context.ts` uses `AsyncLocalStorage` so the MCP proxy can thread `cwd` and `env` through shared daemon sessions.
 - **Config priority:** project `.codex/lsp-client.json` beats user `~/.codex/lsp-client.json` beats `BUILTIN_SERVERS`.
+- **Binary resolution:** `resolveServerBinary()` probes a path-shaped command, then marker-gated repo-local bin directories walking up from the request cwd, then `PATH`. A local bin directory is only trusted when a sibling project marker (`package.json`, `pyproject.toml`, `Gemfile`, `go.mod`, ...) proves it belongs to that ecosystem, so an unmarked `node_modules/.bin` is never trusted; the walk stops at a `.git` boundary. Results are cached per process, keyed by working directory and command. Live QA driver: `scripts/qa/local-binary-resolution-e2e.mjs`.
 - **Reaper:** `LspManager` reaps clients idle longer than `IDLE_TIMEOUT_MS` (default 5 min) or stuck initializing past `INIT_TIMEOUT_MS` (default 30 s).
 - **Workspace-edit safety:** paths are canonicalized, prevalidated, simulated, and lease-guarded before commit; client wrappers reject paths outside the request context (`outside-context-workspace.ts`).
 - **Directory diagnostics cancellation:** `aggregateDiagnosticsForDirectory()` accepts an `AbortSignal`; it throws if aborted before acquisition, threads the signal into `manager.getClient()` so a cold acquisition is cancellable, and checks it between files. An aborted cold start rejects with `AbortError` and leaves `clientCount()` at 0.

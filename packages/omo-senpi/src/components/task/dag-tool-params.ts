@@ -16,7 +16,7 @@ export const DagToolParams = Type.Object({
     ],
     {
       description: [
-        "start creates or reuses a run from a definition; attach re-binds to a live run; snapshot reads current state; wait blocks until the run settles; cancel stops it.",
+        "start creates or reuses a run from a definition; attach re-binds to a live run; snapshot reads current state; wait detaches by default against a live run (the session is woken on node completions and on settle) and blocks only with detach=false; cancel stops it.",
         "retry gives failed, cancelled, or skipped nodes a FRESH attempt on the same run (completed nodes keep their results and are never re-run); it requires the run to have settled.",
         "send delivers a message to ONE node's child: a running child is steered in place, a finished resident child is revived with its context intact; a child that cannot be continued is refused with node_not_continuable, and retry is then the remedy.",
         "amend submits an edited definition for the SAME run: unchanged completed nodes are cache-reused, and only changed or added nodes plus their transitive dependents re-run.",
@@ -49,6 +49,7 @@ export const DagToolParams = Type.Object({
   ),
   run_id: Type.Optional(Type.String({ description: "Run id returned by start. Required for attach, snapshot, wait, cancel, retry, send, and amend." })),
   reason: Type.Optional(Type.String({ description: "Optional human-readable reason recorded when cancelling a run." })),
+  detach: Type.Optional(Type.Boolean({ description: "wait only. Defaults to true: against a live run, return immediately with the current snapshot instead of blocking - the session is woken as each node completes and when the run settles. Pass false to block until settle and return the final result; the eval SDK and dag library pass false." })),
   node_id: Type.Optional(Type.String({ description: "Single node id. Required for send; on retry it selects exactly one node and is mutually exclusive with node_ids." })),
   node_ids: Type.Optional(Type.Array(Type.String(), { description: "Node ids to retry. retry only, mutually exclusive with node_id; omit both to retry every failed or cancelled node plus the dependents they skipped." })),
   message: Type.Optional(Type.String({ description: "Message delivered to the node's child. Required for send, ignored otherwise." })),

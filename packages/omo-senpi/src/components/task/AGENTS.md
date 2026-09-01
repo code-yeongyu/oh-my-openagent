@@ -11,7 +11,7 @@ Senpi adapter for the `@oh-my-opencode/senpi-task` engine: task/team tools, the 
 | `planner.ts` | ChildPlanner over the live senpi model registry. Resolution order: known agent name, then explicit model verbatim, then category via omo.json + registry; missing registry fails closed as `model_unavailable`. |
 | `event-bridge.ts` | Session-start recovery chain in strict order (flush buffered completions, reconcile, liveness re-observe, reservation reclaim, redelivery, TTL cleanup, lead poll, status sync) plus reason-aware `session_shutdown` suspension and the once-per-session usage hint. |
 | `dag-runtime.ts` | DAG composition root: one shared manager/store graph feeding the tool, scheduler, RPC bridge, TUI, wake emitter, and lifecycle adapters. |
-| `dag-tool.ts` / `dag-commands.ts` | The `dag` tool (typebox params, `validateTaskTarget`) and read-only `/dag` slash commands over structural DagManager mirrors. Eight actions: `start`, `attach`, `snapshot`, `wait`, `cancel` (run-scoped) plus `retry`, `send`, `amend` (node-scoped recovery). Params live in `dag-tool-params.ts`, the result/error vocabulary in `dag-tool-contract.ts`, and the three node-scoped action handlers in `dag-tool-control.ts`. |
+| `dag-tool.ts` / `dag-commands.ts` | The `workflow` tool (typebox params, `validateTaskTarget`) and read-only `/dag` slash commands over structural DagManager mirrors. Eight actions: `start`, `attach`, `snapshot`, `wait`, `cancel` (run-scoped) plus `retry`, `send`, `amend` (node-scoped recovery). Params live in `dag-tool-params.ts`, the result/error vocabulary in `dag-tool-contract.ts`, and the three node-scoped action handlers in `dag-tool-control.ts`. |
 | engine node ops (`packages/senpi-task/src/dag/`) | `node-retry.ts` gives failed/cancelled/skipped nodes a fresh attempt and un-skips their cascaded dependents; `node-send.ts` steers a running node's child or revives a finished resident one; `node-control-context.ts` is the shared resolution/validation seam both use. Node-scoped errors: `node_not_found`, `node_not_retryable`, `node_not_continuable`, `amend_running_node`, `invalid_amendment`, `run_still_active`. |
 | `dag-rpc-bridge.ts` / `dag-rpc-handlers.ts` | Three wire channels: sequenced `omo.dag.event` ledger, unsequenced telemetry, snapshot push; four query handlers sharing one parser vocabulary and error envelope. Contract types in `dag-rpc-bridge-contract.ts`, payloads in `dag-snapshot-payload.ts`. |
 | `dag-wake.ts` / `dag-wake-source.ts` | Idle-injection wake messages (`omo-senpi.dag-run`) and read-only `wake_source_state` liveness under source `omo-dag`. |
@@ -33,11 +33,11 @@ Senpi adapter for the `@oh-my-opencode/senpi-task` engine: task/team tools, the 
 
 ## Key exports
 
-`createTaskComponent` (index.ts), `wireEventBridge` + `TASK_USAGE_HINT_FLAG`, `composeTaskEngine`, `createDagRuntime`, `createDagTool` + `DAG_TOOL_NAME`, message types `TASK_COMPLETION_MESSAGE_TYPE`, `TEAM_MEMBER_LIVENESS_MESSAGE_TYPE`, `CATEGORY_UNAVAILABLE_MESSAGE_TYPE`, `DAG_WAKE_MESSAGE_TYPE`.
+`createTaskComponent` (index.ts), `wireEventBridge` + `TASK_USAGE_HINT_FLAG`, `composeTaskEngine`, `createDagRuntime`, `createDagTool` + `WORKFLOW_TOOL_NAME`, message types `TASK_COMPLETION_MESSAGE_TYPE`, `TEAM_MEMBER_LIVENESS_MESSAGE_TYPE`, `CATEGORY_UNAVAILABLE_MESSAGE_TYPE`, `DAG_WAKE_MESSAGE_TYPE`.
 
 ## Lifecycle and wiring
 
-- Register: sweep first, then flag + capability gates, then config load (`loadSenpiOmoConfig` anchored to `pi.cwd`, never `process.cwd()` on cwd-capable hosts), then engine, renderers, tools (4 task + 6 lead team + `dag`), commands, status UI.
+- Register: sweep first, then flag + capability gates, then config load (`loadSenpiOmoConfig` anchored to `pi.cwd`, never `process.cwd()` on cwd-capable hosts), then engine, renderers, tools (4 task + 6 lead team + `workflow`), commands, status UI.
 - `engine.onStoreMutation` fans out to status sync, DAG sync, and resumption-channel emission.
 - `wireDagLifecycle` order matters: DAG shutdown pause registers before the task lifecycle handlers so runs suspend before children tear down; `session_start` attaches, `session_before_switch` detaches, `session_shutdown` disposes.
 - Team member processes see `isTeamMemberProcess()` true and register nothing; the scoped member extension lives in `senpi-task`.

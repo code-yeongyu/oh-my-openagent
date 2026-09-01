@@ -19,7 +19,9 @@ import type {
   DagNode,
   DagNodeCounts,
   DagNodeId,
+  DagNodeState,
   DagRunEvent,
+  DagRunEventPayload,
   DagRunId,
   DagRunSnapshot,
   DagRunStatus,
@@ -27,12 +29,24 @@ import type {
   DagWave,
 } from "./types"
 
+// #7412: a stale journal instance re-appending an already-recorded terminal transition is WAL
+// noise (dag_923ad20e seq38 journaled completed->completed). Every DagRunRecordV1 journal passes
+// this to createDagJournal so the locked recover inside append drops the duplicate instead of
+// journaling it.
+const DUPLICATE_TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["completed", "failed", "cancelled", "skipped"])
+export function skipDuplicateTerminalTransition(record: DagRunRecordV1, payload: DagRunEventPayload): boolean {
+  if (payload.type !== "dag.node.transitioned" || !DUPLICATE_TERMINAL_NODE_STATES.has(payload.to)) return false
+  return record.nodes.some((node) => node.id === payload.nodeId && node.state === payload.to)
+}
+
 const LIST_DEFAULT_LIMIT = 100
 const LIST_MAX_LIMIT = 256
 
 // Fixed scheduler identity of this engine: the fingerprint must change if these semantics change.
+// waveAdmission moved strict-barrier -> dependency-frontier on 2026-08-25 (dag_530ad299): old
+// runs keyed under the barrier fingerprint are deliberately not reused by the new semantics.
 const SCHEDULER_FINGERPRINT_INPUT = {
-  waveAdmission: "strict-barrier",
+  waveAdmission: "dependency-frontier",
   failurePolicy: "continue-independent",
   dependencyData: "filesystem-only",
 } as const
@@ -114,6 +128,10 @@ export type DagRunRecordV1 = DagJournalCheckpoint & {
   readonly bottlenecks: readonly DagBottleneck[]
   readonly diagnostics: readonly DagDiagnostic[]
   readonly amendHistory?: readonly AmendRecord[]
+  // Resume lease: recovery claims a paused run by writing the claiming host pid here and drops the
+  // field on shutdown pause (see recovery.ts). Absent on records written before the lease existed.
+  readonly leaseHolderPid?: number
+  readonly previousLeaseHolderPid?: number
 }
 
 export type DagRunSummary = {
@@ -382,6 +400,7 @@ function startRun(params: DagStartParams, context: StartContext): DagStartResult
       initialCheckpoint: record,
       applyEvent: applyRunEvent,
       now: context.now,
+      skipDuplicate: skipDuplicateTerminalTransition,
     })
     journal.append(dagRunCreatedEvent({
       runKey: definition.key,
@@ -498,6 +517,7 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     initialCheckpoint: oldRecord,
     applyEvent: applyDagRunMutation,
     now: context.now,
+    skipDuplicate: skipDuplicateTerminalTransition,
   })
   journal.append(mutation)
   context.store.writeKey({
@@ -616,8 +636,7 @@ function transitiveDependents(edges: readonly DagEdge[], seeds: readonly DagNode
 }
 
 function liveLeaseHolder(record: DagRunRecordV1): boolean {
-  const leaseRecord = record as DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
-  const pid = leaseRecord.leaseHolderPid ?? leaseRecord.previousLeaseHolderPid
+  const pid = record.leaseHolderPid ?? record.previousLeaseHolderPid
   if (pid === undefined) return false
   return defaultSignaller.isAlive(pid)
 }
@@ -690,6 +709,7 @@ function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
     diagnostics: record.diagnostics,
     counts: countNodes(record.nodes),
     ...(record.amendHistory === undefined ? {} : { amendHistory: record.amendHistory }),
+    ...(record.leaseHolderPid === undefined ? {} : { leaseHolderPid: record.leaseHolderPid }),
   }
 }
 

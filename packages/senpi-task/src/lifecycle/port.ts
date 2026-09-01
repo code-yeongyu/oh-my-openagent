@@ -40,6 +40,13 @@ export type ResidencyRegistry = {
   forget(taskId: string): void
   // A terminal resident with a queued send must NOT be evicted (codex is_unloadable parity).
   hasPendingSends(taskId: string): boolean
+  // Synchronous per-task arbitration held across async teardown. Eviction and sends are mutually
+  // exclusive; callers that lose the race must not touch the child handle.
+  tryClaimEviction?(taskId: string): boolean
+  releaseEviction?(taskId: string): void
+  isEvicting?(taskId: string): boolean
+  tryBeginSend?(taskId: string): boolean
+  endSend?(taskId: string): void
 }
 
 // Injectable OS-process signalling so unit tests never spawn real children. Defaults use
@@ -97,6 +104,15 @@ export function getLifecycleReattachPorts(store: TaskRecordStore): LifecycleReat
   return registeredReattachPorts.get(store)
 }
 
+export type IdleReclaimerTimer = {
+  unref?(): void
+}
+
+export type IdleReclaimerScheduler = {
+  setInterval(callback: () => void, delayMs: number): IdleReclaimerTimer
+  clearInterval(timer: IdleReclaimerTimer): void
+}
+
 export type LifecycleDeps = {
   readonly store: TaskRecordStore
   readonly registry: ResidencyRegistry
@@ -116,6 +132,8 @@ export type LifecycleDeps = {
   readonly dequeuePending?: (taskId: string) => void
   // Test seam for bounded admission-lease timing and deterministic contention.
   readonly reconcileAdmission?: BatchAdmissionOptions
+  // Injectable timer seam keeps lifecycle tests deterministic and prevents test-created timers.
+  readonly idleReclaimerScheduler?: IdleReclaimerScheduler
 }
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {
