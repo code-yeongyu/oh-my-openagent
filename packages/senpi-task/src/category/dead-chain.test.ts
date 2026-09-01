@@ -37,12 +37,11 @@ describe("dead-chain category disabling", () => {
       expect(result.missing_providers).toEqual([
         "kimi-coding",
         "kimi-for-coding",
-        "quotio-openai",
+        "openai-codex",
         "deepseek",
         "qwen-token-plan",
         "alibaba-token-plan",
         "bailian-coding-plan",
-        "vercel",
         "opencode-go",
         "xai",
         "anthropic-api",

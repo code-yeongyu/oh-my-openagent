@@ -42,7 +42,7 @@ async function createRepo(): Promise<string> {
   await run(["git", "init", "--quiet"], dir)
   await run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], dir)
   await run(["git", "config", "user.email", "agent@omo.local"], dir)
-  await run(["git", "config", "user.name", "Omo Agent"], dir)
+  await run(["git", "config", "user.name", "OmO Agent"], dir)
   await run(["git", "config", "commit.gpgsign", "false"], dir)
   installHooks(dir)
   return dir

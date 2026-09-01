@@ -7,8 +7,8 @@
  */
 
 import type { MessageRenderer } from "@code-yeongyu/senpi"
+import { buildNoticeBox } from "@oh-my-opencode/senpi-task/notice-box"
 import { normalizeRendererText } from "@oh-my-opencode/senpi-task/renderer-text"
-import { linesComponent } from "@oh-my-opencode/senpi-task/task-renderers"
 
 export const FALLBACK_ARCHITECT_TIP_TYPE = "omo-fallback-architect:tip"
 
@@ -20,10 +20,20 @@ export function buildFallbackTipText(input: { from: string; to: string }): strin
   ].join("\n")
 }
 
-export const renderFallbackTip: MessageRenderer = (message, _options, theme) => {
-  const text = typeof message.content === "string" ? message.content : ""
-  const lines = text
-    .split("\n")
-    .map((line, index) => theme.fg("dim", index === 0 ? `Tip: ${normalizeRendererText(line)}` : normalizeRendererText(line)))
-  return linesComponent(lines)
+export const renderFallbackTip: MessageRenderer = (message, options, theme) => {
+  const lines = (typeof message.content === "string" ? message.content : "").split("\n").map(normalizeRendererText)
+  const why = lines[0] ?? "Fallback architect keeps the refused question moving."
+  const extra = lines.slice(1, -1).filter((line) => line.length > 0).map((text) => ({ text }))
+  const expandedLine = lines.at(-1)
+  return buildNoticeBox(
+    {
+      title: "◆ Fallback architect tip",
+      tone: "accent",
+      why,
+      extra,
+      ...(expandedLine === undefined || expandedLine.length === 0 ? {} : { expandedLine }),
+    },
+    options,
+    theme,
+  )
 }

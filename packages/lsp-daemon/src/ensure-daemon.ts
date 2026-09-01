@@ -127,6 +127,7 @@ export function spawnDaemonProcess(paths: DaemonPaths): void {
 		const child = spawn(resolveDaemonNodeExecutable(), [paths.cliPath, "daemon"], {
 			detached: true,
 			stdio: ["ignore", logFd, logFd],
+			windowsHide: true,
 		});
 		child.once("spawn", () => closeSync(logFd));
 		child.once("error", (error) => {

@@ -2,6 +2,12 @@ import type { StartResult } from "../manager/types"
 import type { ResolvedModelRecord, TaskStatus } from "../state/types"
 import type { DagNodeId, DagRunId } from "./types"
 
+export type DagOwnerFingerprintInput = {
+  readonly definitionFingerprint: string
+  readonly nodeId: DagNodeId
+  readonly execAttempt?: number
+}
+
 export type DagTaskOwner = {
   readonly kind: "dag"
   readonly runId: DagRunId

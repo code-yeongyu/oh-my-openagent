@@ -90,6 +90,22 @@ function counts(nodes: readonly DagNode[]): DagNodeCounts {
   return tally
 }
 
+function within<T>(promise: Promise<T>, ms = 200): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
+    void promise.then(
+      (value) => {
+        clearTimeout(timeout)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timeout)
+        reject(error)
+      },
+    )
+  })
+}
+
 // Stands in for the scheduler's reducer (todos 9-11): the events under test only need to move the
 // run to a terminal status with terminal node states already folded into the checkpoint.
 function applyEvent(checkpoint: DagRunRecordV1, event: DagRunEvent): DagRunRecordV1 {
@@ -235,6 +251,35 @@ describe("createDagWaitSurface wait terminal projection", () => {
     expect(result.status).toBe("completed")
     expect(result.nodes.plan).toEqual({ state: "completed", taskId: "task-plan", output: "plan output" })
     expect(harness.store.readEvents(runId, 0, { limit: 100 }).headSeq).toBe(seqBefore)
+  })
+
+  test("#given a run terminalizes during live subscription setup #when wait registers #then the final checkpoint read resolves without an event callback", async () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const running = record([node("plan", { state: "running", taskId: "task-plan" })])
+    store.writeCheckpoint(runId, running)
+    store.writeResult(runId, "plan", "plan output")
+    const completed = {
+      ...running,
+      status: "completed",
+      completedAt: at,
+      nodes: [node("plan", { state: "completed", taskId: "task-plan", completedAt: at })],
+    } satisfies DagRunRecordV1
+    const surface = createDagWaitSurface({
+      store,
+      subscribe: () => {
+        store.writeCheckpoint(runId, completed)
+        return () => undefined
+      },
+    })
+
+    // when
+    const result = await within(surface.wait(runId, parentSessionId))
+
+    // then
+    expect(result.status).toBe("completed")
+    expect(result.nodes.plan).toEqual({ state: "completed", taskId: "task-plan", output: "plan output" })
+    expect(surface.waiterCount(runId)).toBe(0)
   })
 })
 

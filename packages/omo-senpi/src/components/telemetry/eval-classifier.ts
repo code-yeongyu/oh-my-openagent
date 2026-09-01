@@ -24,6 +24,8 @@ export type WaveBucketSummary = {
   readonly evalOnlyWaves: number
   readonly evalOnlyDurationMs: number
   readonly mixedWaves: number
+  readonly evalOuterJoinedCalls: number
+  readonly mixedNonEvalJoinedCalls: number
 }
 
 const EVAL_TOOL_NAMES = ["eval", "codemode", "code_mode"] as const
@@ -53,16 +55,23 @@ export function summarizeWaveBuckets(waves: readonly ClassifiableWave[]): WaveBu
   let evalOnlyWaves = 0
   let evalOnlyDurationMs = 0
   let mixedWaves = 0
+  let evalOuterJoinedCalls = 0
+  let mixedNonEvalJoinedCalls = 0
 
   for (const wave of waves) {
     const bucket = classifyWaveBucket(wave)
     if (bucket === "eval_only") {
       evalOnlyWaves += 1
       evalOnlyDurationMs += durationOf(wave)
+      evalOuterJoinedCalls += wave.toolNames.length
       continue
     }
     if (bucket === "mixed") {
       mixedWaves += 1
+      for (const toolName of wave.toolNames) {
+        if (isEvalToolName(toolName)) evalOuterJoinedCalls += 1
+        else mixedNonEvalJoinedCalls += 1
+      }
       continue
     }
     const size = wave.toolNames.length
@@ -82,6 +91,8 @@ export function summarizeWaveBuckets(waves: readonly ClassifiableWave[]): WaveBu
     evalOnlyWaves,
     evalOnlyDurationMs,
     mixedWaves,
+    evalOuterJoinedCalls,
+    mixedNonEvalJoinedCalls,
   }
 }
 

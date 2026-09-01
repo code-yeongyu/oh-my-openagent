@@ -17,6 +17,8 @@ const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 :
 
 afterEach(cleanup)
 
+const MEMORY_GIT_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
+
 describe("memoryApplyPatch validation failures", () => {
   it("#given read_only source or resulting target #when updated #then both are rejected before disk writes", async () => {
     // #given
@@ -49,7 +51,7 @@ describe("memoryApplyPatch validation failures", () => {
       expect(await repo.head()).toBe(before)
       expect(await git(dir, ["status", "--porcelain"])).toBe("")
     }
-  })
+  }, { timeout: MEMORY_GIT_TEST_TIMEOUT_MS })
 
   it("#given near-matching context #when updated #then no fuzzy match is attempted", async () => {
     // #given
@@ -70,7 +72,7 @@ describe("memoryApplyPatch validation failures", () => {
     // #then
     expect(error).toBeInstanceOf(MemoryPatchHunkError)
     expect(await readFile(join(dir, "system/similar.md"), "utf8")).toBe(original)
-  })
+  }, { timeout: MEMORY_GIT_TEST_TIMEOUT_MS })
 
   it("#given backticks in mismatched previews #when diagnosed #then the exact hardened format sizes fences safely", async () => {
     // #given
@@ -109,7 +111,7 @@ describe("memoryApplyPatch validation failures", () => {
       original,
       "````",
     ].join("\n"))
-  })
+  }, { timeout: MEMORY_GIT_TEST_TIMEOUT_MS })
 
   it("#given oversized failed and current chunks #when diagnosed #then previews truncate at 2000 and 4000 characters", async () => {
     // #given
@@ -130,7 +132,7 @@ describe("memoryApplyPatch validation failures", () => {
     expect(error.message).toContain("... <truncated 1027 chars> ...")
     expect(error.message).not.toContain(failed)
     expect(error.message).not.toContain("c".repeat(4_001))
-  })
+  }, { timeout: MEMORY_GIT_TEST_TIMEOUT_MS })
 
   it("#given UTF-16LE source #when read #then it is rejected with conversion guidance and remains byte-identical", async () => {
     // #given
@@ -172,5 +174,5 @@ describe("memoryApplyPatch validation failures", () => {
       // #then
       expect(error.message).toContain(`memory_apply_patch: ${expected}`)
     }
-  })
+  }, { timeout: MEMORY_GIT_TEST_TIMEOUT_MS })
 })

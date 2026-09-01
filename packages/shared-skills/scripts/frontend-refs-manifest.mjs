@@ -16,6 +16,7 @@ export const designOriginals = [
 	"interaction-skill.md",
 	"layout-skill.md",
 	"lazyweb.md",
+	"print-paged-media.md",
 	"react-dev-tooling-skill.md",
 	"stylegallery.md",
 ];

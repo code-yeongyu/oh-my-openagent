@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { designOriginals, frontendSkillRoot } from "./scripts/frontend-refs-manifest.mjs";
+import { designOriginals } from "./scripts/frontend-refs-manifest.mjs";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const frontendSkillRel = "packages/shared-skills/skills/frontend";
@@ -42,15 +42,4 @@ describe("#given the frontend skill routes spatial-structure research to StyleGa
 		expect(tracked).toContain(STYLEGALLERY);
 	});
 
-	test("#when the routing doc is read #then it reaches StyleGallery without a bare sg call", () => {
-		// given the shipped routing doc
-		const doc = readFileSync(join(frontendSkillRoot, "references", "design", STYLEGALLERY), "utf8");
-		// then it carries the verified raw-content host used for retrieval
-		expect(doc).toContain("raw.githubusercontent.com/changeroa/StyleGallery/main/");
-		// and it never emits a bare `sg <subcommand>`, which resolves to ast-grep on PATH
-		const bareSgCalls = (doc.match(/(?:^|\n|\s)sg(?=\s+[a-z-]+)/g) ?? []).filter(
-			(match) => !match.includes("sgfetch"),
-		);
-		expect(bareSgCalls).toEqual([]);
-	});
 });

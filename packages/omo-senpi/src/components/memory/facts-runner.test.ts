@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { FactsQueue, GitMemoryRepo, factsQueuePaths } from "@oh-my-opencode/memory-core"
+import { FactsFailureStore, FactsQueue, GitMemoryRepo, factsQueuePaths } from "@oh-my-opencode/memory-core"
+import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 import { FactsExtractorRunner } from "./facts-runner"
 import { enqueue, fixture, onlyRunDir, runnerOptions } from "./facts-runner.test-support"
 import type { ResolveAndPreflightMemoryLaunch } from "./worker/memory-launch-preflight"
@@ -40,6 +41,53 @@ describe("quick-pinned facts launch", () => {
     expect(warnings).toHaveLength(1)
     expect(await queue.listPending()).toHaveLength(1)
   }, 30_000)
+  test("#given a registry without quick but with another usable model #when pending facts are launched #then the beyond-category resolution is refused instead of launched", async () => {
+    // given: the quick chain is dead (no category config, no `omo-mock` model) while the registry
+    // still offers a usable model, so `resolveReflectionModel` answers `resolved` through its
+    // beyond-category ladder and tags it `source: "registry_fallback"`. A quick-PINNED surface
+    // must treat that as unavailable: an unattended extraction may never land on an arbitrary,
+    // possibly frontier-priced model.
+    const { root, identity, queue } = await fixture()
+    const beyondCategory: SenpiModelPort = { provider: "other-provider", id: "expensive-1" }
+    let spawnCount = 0
+    const warnings: string[] = []
+    const runner = new FactsExtractorRunner({
+      identity,
+      queue,
+      cwd: root,
+      loadConfig: () => ({ config: { categories: {} }, diagnostics: [], layers: [], sources: [] }),
+      resolveModelRegistry: () => ({
+        getAvailable: () => [beyondCategory],
+        find: (provider, modelId) =>
+          provider === beyondCategory.provider && modelId === beyondCategory.id ? beyondCategory : undefined,
+      }),
+      logger: {
+        info: () => undefined,
+        warn: (message) => warnings.push(message),
+        error: () => undefined,
+      },
+      sandbox: (args) => {
+        spawnCount += 1
+        return args
+      },
+    })
+
+    // when
+    const result = await runner.launchPending()
+
+    // then: identical skip semantics to the `category_unavailable` path - one warning, no child,
+    // no run dir, queue intact, and the preflight-scoped failure/backoff record still lands.
+    expect(result.status).toBe("skipped")
+    expect(spawnCount).toBe(0)
+    expect(warnings).toHaveLength(1)
+    expect(await queue.listPending()).toHaveLength(1)
+    expect(existsSync(join(identity.paths.facts, "runs"))).toBe(false)
+    const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
+    expect(state.entries).toHaveLength(1)
+    expect(state.entries[0]).toMatchObject({ streak: 1, lastReason: "quick_category_unavailable" })
+    expect(state.entries[0]?.lastFailureId).toMatch(/^preflight-[0-9a-f-]{36}$/)
+  }, 30_000)
+
   test("#given one injected launch-preflight seam #when reflection and facts launch #then both surfaces route through it", async () => {
     // given
     const surfaces: string[] = []
@@ -65,7 +113,7 @@ describe("quick-pinned facts launch", () => {
     expect(factsResult.status).toBe("failed")
     expect(surfaces).toEqual(["reflection", "facts"])
     await rm(reflection.root, { recursive: true, force: true })
-  }, 30_000)
+  }, 90_000)
 
   test("#given two pending queue entries #when one launch runs #then the supervised child consumes all entries in one trailer-bearing commit", async () => {
     // given
@@ -100,7 +148,7 @@ describe("quick-pinned facts launch", () => {
     expect(ledger.applyRecovery.paths.map((entry: { path: string }) => entry.path)).toEqual(
       [...ledger.applyRecovery.paths].map((entry: { path: string }) => entry.path).sort(),
     )
-  }, 30_000)
+  }, 90_000)
 
   test("#given an extension-only quick primary and a child-visible fallback #when facts extraction launches #then it retries and commits with the fallback", async () => {
     // given
@@ -111,6 +159,10 @@ describe("quick-pinned facts launch", () => {
     const base = runnerOptions(root, identity, queue, "model-fallback")
     const runner = new FactsExtractorRunner({
       ...base,
+      // The shared deadline must cover the preflight probe plus both attempts (~7 cold bun
+      // spawns); the 10s default fires mid-attempt on a loaded windows-latest runner, and a
+      // timeout is a non-retryable miss so the fallback never launches.
+      deadlineMs: 45_000,
       sandbox: (args) => {
         const modelIndex = args.args.indexOf("--model")
         attempted.push(args.args[modelIndex + 1] ?? "missing")
@@ -134,7 +186,7 @@ describe("quick-pinned facts launch", () => {
     expect(attemptNumbers).toEqual([1, 2])
     expect(new Set(deadlines).size).toBe(1)
     expect(await queue.listPending()).toHaveLength(0)
-  }, 30_000)
+  }, 60_000)
 
   test("#given facts attempt two has a stale attempt-one outcome #when reconciled before the shared deadline #then the retry remains active", async () => {
     // given

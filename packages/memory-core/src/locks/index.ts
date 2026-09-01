@@ -4,6 +4,7 @@ export {
   isHeld,
   releaseLock,
   withLock,
+  setLockCandidateFsForTests,
 } from "./acquire"
 export type { AcquireLockOptions } from "./acquire"
 export {
@@ -11,6 +12,7 @@ export {
   factsQueueLockPath,
   factsRunsLockPath,
   memoryWriterLockPath,
+  memoryUsageLockPath,
   noticeLockPath,
   reflectionSchedulerLockPath,
   runFinalizationLockPath,

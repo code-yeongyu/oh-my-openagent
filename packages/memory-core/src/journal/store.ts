@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, readFile, rename, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
@@ -7,6 +7,7 @@ import {
   deriveState,
   finalizeCursor,
   initialReflectionState,
+  reflectedThroughByteOffset,
   type ReflectionSnapshot, type ReflectionTranscriptState,
 } from "./cursor"
 import {
@@ -56,15 +57,21 @@ function nonNegativeInteger(value: unknown): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0
 }
 
+function optionalNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined
+}
+
 function parseState(raw: string | null): ReflectionTranscriptState {
   if (raw === null) return initialReflectionState()
   try {
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== "object") return initialReflectionState()
     const state = parsed as Record<string, unknown>
+    const reflectedThroughByteOffset = optionalNonNegativeInteger(state.reflected_through_byte_offset)
     return {
       schema_version: "v3_assistant_steps",
       reflected_through_message_id: optionalString(state.reflected_through_message_id),
+      ...(reflectedThroughByteOffset === undefined ? {} : { reflected_through_byte_offset: reflectedThroughByteOffset }),
       total_completed_steps: nonNegativeInteger(state.total_completed_steps),
       reflected_completed_steps: nonNegativeInteger(state.reflected_completed_steps),
       steps_since_last_successful_reflection: nonNegativeInteger(
@@ -145,22 +152,64 @@ export class TranscriptJournal {
   }
 
   /**
-   * Makes the journal durable under the cancellable lock (IC-11): the transcript file, the
-   * state file, and the journal directory are fsynced in turn, re-checking the signal before
-   * each one so an aborted flush STARTS no further I/O once the shutdown drain has returned.
+   * Makes the journal durable WITHOUT the state lock (IC-11). Locking is unnecessary here —
+   * transcript.jsonl is append-only and state.json is published by atomic rename, so fsync
+   * races no writer — and it is harmful: the shutdown drain that calls this owns a 1500ms
+   * budget, while the lock's acquisition wait alone is 5000ms, so a scanner holding state.lock
+   * used to exhaust the whole drain. The signal is re-checked before each fsync so an aborted
+   * flush STARTS no further I/O once the drain has returned.
    */
   async flush(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
     // Read through a call so the check is re-evaluated after every await: abort can fire
     // between two fsyncs, which a narrowed property read would miss.
     const aborted = (): boolean => signal?.aborted ?? false
-    await this.locked(async () => {
-      if (aborted()) return
-      await syncJournalFile(this.transcriptPath)
-      if (aborted()) return
-      await syncJournalFile(this.statePath)
-      if (aborted()) return
-      await syncJournalDirectory(this.options.journalDir)
-    }, signal)
+    await syncJournalFile(this.transcriptPath)
+    if (aborted()) return
+    await syncJournalFile(this.statePath)
+    if (aborted()) return
+    await syncJournalDirectory(this.options.journalDir)
+  }
+
+  /**
+   * Lock-free tolerant read for identity-wide scanners (dream selection): never touches
+   * state.lock, never creates files, and skips rows that do not parse — a torn trailing line
+   * from a concurrent append is expected under a snapshot read, not corruption. Correctness
+   * paths (reconcile, reflection cursors) keep using the locked readEntries().
+   */
+  async readEntriesSnapshot(): Promise<TranscriptEntry[]> {
+    let raw: string
+    try {
+      raw = await readFile(this.transcriptPath, "utf8")
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw error
+      return []
+    }
+    const entries: TranscriptEntry[] = []
+    for (const line of raw.split("\n")) {
+      if (line.trim().length === 0) continue
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(line)
+      } catch (error) {
+        if (error instanceof SyntaxError) continue
+        throw error
+      }
+      if (isTranscriptEntry(parsed)) entries.push(parsed)
+    }
+    return entries
+  }
+
+  async backfillReflectionByteOffset(entries: readonly TranscriptEntry[]): Promise<ReflectionTranscriptState> {
+    const state = await this.readStateUnlocked()
+    await this.writeStateUnlocked({
+      ...state,
+      reflected_through_byte_offset: state.reflected_through_byte_offset
+        ?? (state.reflected_through_message_id === undefined
+          ? 0
+          : reflectedThroughByteOffset(entries, state.reflected_through_message_id)),
+    }, entries)
+    return this.readStateUnlocked()
   }
 
   async finalizeReflection(snapshot: ReflectionSnapshot, success: boolean): Promise<void> {
@@ -237,7 +286,12 @@ export class TranscriptJournal {
     state: ReflectionTranscriptState,
     entries: readonly TranscriptEntry[],
   ): Promise<void> {
-    const derived = deriveState(state, entries)
+    const derived = deriveState({
+      ...state,
+      ...(state.reflected_through_message_id !== undefined && state.reflected_through_byte_offset === undefined
+        ? { reflected_through_byte_offset: reflectedThroughByteOffset(entries, state.reflected_through_message_id) }
+        : {}),
+    }, entries)
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
     await rename(temporaryPath, this.statePath)

@@ -1,6 +1,6 @@
 # lsp-daemon -- Shared Per-User LSP Daemon
 
-**Generated:** 2026-07-17 / 7d664b96b
+**Generated:** 2026-08-24 / f3642fcda
 
 ## OVERVIEW
 
@@ -48,5 +48,5 @@ session → omo-lsp-daemon (mcp proxy, stdio)
 - **OpenCode bootstrap:** dist/bootstrap resolves the package `./cli` export instead of deep-running generated files. Source mode runs the actual `src/cli.ts` with Bun and sets the paired `OMO_LSP_DAEMON_CLI`/`OMO_LSP_DAEMON_VERSION` override to that source CLI plus the package version. The OpenCode adapter supplies only the three `LSP_TOOLS_MCP_*` translator inputs for request context: `.opencode/lsp.json`, `.omo/lsp.json`, `.omo/lsp-client.json`, then the OpenCode user config and install-decision paths.
 - **Legacy cleanup input:** `test/fixtures/legacy-path-vectors.json` freezes the pre-migration natural Unix, hashed Unix, and Windows named-pipe paths for the installer cleanup work. Do not regenerate those paths from the new resolver.
 - **Clean builds:** `scripts/clean-dist.mjs` removes the complete old `dist` tree before TypeScript and Bun emit new artifacts, so deleted generated files cannot survive a build.
-- **Spawn is detached + log-redirected:** child runs `node cli.js daemon` with `stdio: ["ignore", logFd, logFd]` (→ `daemon.log`) and `unref()`, so the parent session never blocks on it. The launcher preserves `process.execPath` while it exists, falls back to an existing absolute `process.argv0`, then to PATH-resolved `node`; spawn errors are recorded in the log instead of escaping as an uncaught child-process event.
+- **Spawn is detached + log-redirected:** child runs `node cli.js daemon` with `stdio: ["ignore", logFd, logFd]` (→ `daemon.log`) and `unref()`, so the parent session never blocks on it. On Windows every detached/background spawn sets `windowsHide: true` (daemon spawn, version reaper) so periodic helpers never flash a conhost window. The launcher preserves `process.execPath` while it exists, falls back to an existing absolute `process.argv0`, then to PATH-resolved `node`; spawn errors are recorded in the log instead of escaping as an uncaught child-process event.
 - **Build before use:** `bun run build:lsp-daemon` (`npm ci` + `npm run build`) before anything needing `dist/`. Shipped via the root `package.json` `files` array (`packages/lsp-daemon/{package.json,dist}`).

@@ -8,7 +8,9 @@ import {
   createTaskSendTool,
   createTaskTool,
   defaultResolveCallerSessionId,
+  evaluateSpawnPolicy,
   isTeamMemberProcess,
+  loadPiTui,
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
   toTeamCoreConfig,
@@ -22,6 +24,7 @@ import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
 import { registerDagCommands } from "./dag-commands"
+import { createDagReloadSource } from "./dag-reload-source"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { createDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
@@ -55,7 +58,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
   return {
     name: "task",
-    register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+    async register(pi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
       if (isTeamMemberProcess()) return
 
       // Unconditional omo process hygiene (T16): fires on session_start before any
@@ -73,6 +76,11 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         ctx.logger.warn("omo-senpi task component skipped: missing ExtensionAPI capabilities", { missing })
         return
       }
+
+      // The task runtime ships as its own bundle (omo-task.js) with its own copy of the lazy
+      // pi-tui module state; compose's warm-up only reaches the omo.js copy. Warming here keeps
+      // this bundle's dynamic import alive through minification and covers a standalone load.
+      await loadPiTui()
 
       const cwd = options.resolveCwd?.() ?? sessionCwd(pi)
       const loaded = loadConfig({ cwd })
@@ -96,6 +104,18 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         pi,
         engine,
         logger: ctx.logger,
+        nodeSpawnPolicy: (node) =>
+          evaluateSpawnPolicy(
+            {
+              manager: engine.manager,
+              omoConfig: engine.omoConfig,
+              agents: engine.agents,
+              resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
+            },
+            node.subagentType,
+            node.prompt,
+            node.parentSessionId,
+          ),
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
       })
       registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations, dagRuntime)
@@ -112,6 +132,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         manager: engine.manager,
         runtime: engine.runtime,
         terminalWidth: () => process.stdout.columns,
+        logger: ctx.logger,
       })
       const resumptionChannels = createResumptionChannelEmitter({
         pi,
@@ -139,6 +160,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
           leadPollers: teamTools.leadPollers,
           resumptionChannels,
+          dagReloadSource: createDagReloadSource({
+            manager: dagRuntime.manager,
+            sessionId: () => engine.runtime.sessionId(),
+          }),
         })
       })
     },
@@ -217,6 +242,9 @@ function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: Dag
       rootSessionId: sessionId,
       wait: runtime.wait,
       cancel: runtime.cancel,
+      retry: runtime.retry,
+      send: runtime.send,
+      amend: runtime.amend,
     }),
   })
 }

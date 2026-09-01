@@ -11,6 +11,9 @@ import {
 
 const GPT_MODEL = "openai/gpt-5.5"
 const NON_GPT_MODEL = "opencode-go/qwen3.7-plus"
+const GEMINI_FALLBACK_MODEL = "google/gemini-3.1-pro"
+const DEEPSEEK_FALLBACK_MODEL = "deepseek/deepseek-v4-pro"
+const MINIMAX_FALLBACK_MODEL = "minimax-coding-plan/MiniMax-M3"
 
 // Mirror what maybeCreateSisyphusConfig captures at registration: the baked GPT
 // prompt plus a rebuild closure that re-runs the factory for a different model.
@@ -20,6 +23,19 @@ function registerGptSisyphus(): string {
     configuredModel: GPT_MODEL,
     bakedPrompt: baked,
     rebuildPromptForModel: (model) => createSisyphusAgent(model, [], [], [], []).prompt ?? "",
+  })
+  return baked
+}
+
+// Same registration mirror for a fallback-family model (issue #6966): the
+// fallback family is not prompt-uniform, so the baked body is model-dependent.
+function registerFallbackSisyphus(model: string): string {
+  const baked = createSisyphusAgent(model, [], [], [], []).prompt ?? ""
+  setSisyphusRuntimePromptContext({
+    configuredModel: model,
+    bakedPrompt: baked,
+    rebuildPromptForModel: (runtimeModel) =>
+      createSisyphusAgent(runtimeModel, [], [], [], []).prompt ?? "",
   })
   return baked
 }
@@ -93,5 +109,67 @@ describe("Sisyphus runtime prompt family reconciliation (#5297/#5316)", () => {
 
     expect(output.system[0]).not.toContain("based on GPT-5.5")
     expect(output.system[0]).not.toContain(GPT_APPLY_PATCH_GUIDANCE)
+  })
+})
+
+describe("Sisyphus runtime prompt same-family reconciliation (#6966)", () => {
+  test("#given a Gemini fallback body #when run on a MiniMax fallback model #then the Gemini override body is rebuilt", () => {
+    const baked = registerFallbackSisyphus(GEMINI_FALLBACK_MODEL)
+    // sanity: both models share the broad fallback family, yet the real prompt
+    // builder bakes Gemini-only overrides into the configured body
+    expect(baked).toContain("TOOL_CALL_MANDATE")
+    expect(createSisyphusAgent(MINIMAX_FALLBACK_MODEL, [], [], [], []).prompt).not.toBe(baked)
+
+    const system = [baked]
+    const swapped = reconcileSisyphusRuntimePrompt(system, MINIMAX_FALLBACK_MODEL)
+
+    expect(swapped).toBe(true)
+    expect(system[0]).not.toContain("TOOL_CALL_MANDATE")
+    expect(system[0]).toBe(createSisyphusAgent(MINIMAX_FALLBACK_MODEL, [], [], [], []).prompt)
+  })
+
+  test("#given a DeepSeek fallback body #when run on a MiniMax fallback model #then the identical rebuild is suppressed", () => {
+    const baked = registerFallbackSisyphus(DEEPSEEK_FALLBACK_MODEL)
+    // sanity: plain fallback bodies for DeepSeek and MiniMax bake byte-identical
+    expect(createSisyphusAgent(MINIMAX_FALLBACK_MODEL, [], [], [], []).prompt).toBe(baked)
+
+    const system = [baked]
+    const swapped = reconcileSisyphusRuntimePrompt(system, MINIMAX_FALLBACK_MODEL)
+
+    expect(swapped).toBe(false)
+    expect(system[0]).toBe(baked)
+  })
+
+  test("#given a Gemini fallback body #when run on the same exact model #then the body is left untouched", () => {
+    const baked = registerFallbackSisyphus(GEMINI_FALLBACK_MODEL)
+    const system = [baked]
+    expect(reconcileSisyphusRuntimePrompt(system, GEMINI_FALLBACK_MODEL)).toBe(false)
+    expect(system[0]).toBe(baked)
+  })
+
+  test("#given the full system-transform handler #when the runtime model is a bare-id MiniMax #then the Gemini body is reconciled end-to-end", async () => {
+    const baked = registerFallbackSisyphus(GEMINI_FALLBACK_MODEL)
+    const handler = createSystemTransformHandler()
+    const output = { system: [baked] }
+
+    await handler(
+      { sessionID: "s", model: { id: "MiniMax-M3", providerID: "minimax-coding-plan" } },
+      output,
+    )
+
+    expect(output.system[0]).not.toContain("TOOL_CALL_MANDATE")
+  })
+
+  test("#given the full system-transform handler #when the bare-id runtime model is the configured model #then the body is left untouched", async () => {
+    const baked = registerFallbackSisyphus(GEMINI_FALLBACK_MODEL)
+    const handler = createSystemTransformHandler()
+    const output = { system: [baked] }
+
+    await handler(
+      { sessionID: "s", model: { id: "gemini-3.1-pro", providerID: "google" } },
+      output,
+    )
+
+    expect(output.system[0]).toBe(baked)
   })
 })

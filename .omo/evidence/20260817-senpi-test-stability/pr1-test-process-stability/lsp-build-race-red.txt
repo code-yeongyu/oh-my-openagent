@@ -1,0 +1,67 @@
+WHAT WAS TESTED
+
+The current preload was exercised by two real Bun 1.3.12 test processes after
+removing the shared vendored LSP build outputs:
+
+  rm -rf packages/lsp-daemon/dist packages/lsp-daemon/node_modules
+
+Concurrent process A:
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun test script/test-environment-isolation.test.ts
+
+Concurrent process B:
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun test packages/omo-opencode/src/cli/run/on-complete-hook.test.ts
+
+RED OBSERVED
+
+Process A:
+
+  [test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+  1 pass
+  0 fail
+
+Process B:
+
+  [test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+  10 pass
+  0 fail
+
+  total_build_entries=2
+  expected_build_entries=1
+
+ROOT CAUSE
+
+`test-setup.ts` performs an unlocked check-then-build:
+
+1. both processes observe `dist/cli.js` missing;
+2. both call `npm ci` in the same `packages/lsp-daemon` directory;
+3. both call `npm run build`.
+
+The test processes happened to pass on this run, but two concurrent `npm ci`
+operations can delete or replace the same package-local `node_modules` while
+the other process is building. The duplicate build entry is the deterministic
+RED observable.
+
+WHY THIS IS FAITHFUL
+
+This drives the real test preload, real package directory, real Bun 1.3.12,
+and two independently scheduled processes. It does not rely on a synthetic
+timer, polling loop, or source inference.
+
+CLEANUP
+
+After both processes exited:
+
+  npm exec --yes --package=bun@1.3.12 -- bun run build:lsp-daemon
+  test -f packages/lsp-daemon/dist/cli.js
+  restored=1
+
+No preload test process remained alive.
+
+OMITTED
+
+Routine npm installation progress and passing assertion lines were summarized.
+No secret-bearing output was captured.

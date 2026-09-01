@@ -7,6 +7,7 @@ export const LOCK_DOMAINS = [
   "reflection-finalize",
   "transcript-state",
   "skills-usage",
+  "memory-usage",
   "facts-queue",
   "facts-runs",
   "notice",
@@ -43,6 +44,10 @@ export function transcriptStateLockPath(locksDirectory: string, transcriptId: st
 
 export function skillsUsageLockPath(locksDirectory: string): string {
   return path.join(locksDirectory, "skills-usage.lock")
+}
+
+export function memoryUsageLockPath(locksDirectory: string): string {
+  return path.join(locksDirectory, "memory-usage.lock")
 }
 
 export function factsQueueLockPath(locksDirectory: string): string {

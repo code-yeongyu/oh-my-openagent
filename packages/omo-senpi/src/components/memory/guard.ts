@@ -1,4 +1,4 @@
-import { lstatSync, readdirSync, realpathSync } from "node:fs"
+import { lstatSync, readdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 import type { ToolCallEventResult } from "@code-yeongyu/senpi"

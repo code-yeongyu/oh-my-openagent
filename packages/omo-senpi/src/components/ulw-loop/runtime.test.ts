@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { existsSync, readFileSync, realpathSync } from "node:fs"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { __testInternals, createUlwLoopComponent } from "./index"
@@ -12,6 +12,8 @@ import {
   readRealCwd,
   readRunnerArgv,
   readRunnerRuntime,
+  sessionEventCtx,
+  statusArgsFor,
   withEnv,
   withEnvAsync,
 } from "./ulw-loop.test-support"
@@ -120,8 +122,9 @@ describe("omo-senpi ulw-loop resolveOmoBin toolkit-first chain", () => {
 describe("omo-senpi ulw-loop default registration through the toolkit chain", () => {
   it("#given a PATH omo-agent-toolkit and no envs #when the component registers with defaults #then the toolkit binary receives the status argv", async () => {
     const fake = createTempOmoBin(activeStatus("DEFAULT-REGISTRATION"), "omo-agent-toolkit")
+    const path = process.env.PATH ? `${fake.dir}${delimiter}${process.env.PATH}` : fake.dir
     try {
-      await withEnvAsync({ OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: undefined, PATH: fake.dir }, async () => {
+      await withEnvAsync({ OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: undefined, PATH: path }, async () => {
         const pi = new FakeExtensionAPI()
         await createUlwLoopComponent().register(pi, {
           logger: createLogger(),
@@ -131,12 +134,12 @@ describe("omo-senpi ulw-loop default registration through the toolkit chain", ()
         const results = await pi.dispatch(
           "input",
           { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
-          { cwd: fake.dir },
+          sessionEventCtx(fake.dir),
         )
 
         expect(results).toHaveLength(1)
         expect(results[0]).toMatchObject({ action: "transform" })
-        expect(readRunnerArgv(fake.dir)).toEqual(["ulw-loop", "status", "--json"])
+        expect(readRunnerArgv(fake.dir)).toEqual(statusArgsFor())
       })
     } finally {
       fake.cleanup()
@@ -157,7 +160,7 @@ describe("omo-senpi ulw-loop default registration through the toolkit chain", ()
         const results = await pi.dispatch(
           "input",
           { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
-          { cwd: fake.dir },
+          sessionEventCtx(fake.dir),
         )
 
         expect(results).toEqual([{ action: "continue" }])

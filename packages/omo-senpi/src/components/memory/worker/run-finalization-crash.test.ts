@@ -160,6 +160,39 @@ describe("reflection finalization crash recovery", () => {
     ))).toMatchObject({ outcome: "merged" })
   }, 30_000)
 
+  test("#given a pressure dream merges above its token target #when finalization validates committed system memory #then the merge records a budget_not_met warning", async () => {
+    const item = await fixture(false)
+    await writeFile(join(item.worktree.dir, "system", "learned.md"), "L".repeat(400))
+    const childRepo = new GitMemoryRepo({ dir: item.worktree.dir, agentId: item.identity.id })
+    await childRepo.commitWrite(["system/learned.md"], "dream retained too much", {
+      agentId: item.identity.id,
+      authorName: "Dream Agent",
+    })
+    const dreamLedger: ReservationRunLedger = {
+      ...item.ledger,
+      kind: "dream",
+      trigger: "dream",
+      origin: "pressure",
+      systemTokenBudget: 100,
+      systemTokenTarget: 80,
+    }
+    await writeRunJsonAtomic(join(item.runDir, "ledger.json"), dreamLedger)
+
+    const result = await finalizeRecordedOutcome({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      withWriterLock: async (operation) => operation(),
+    }, item.runDir, dreamLedger)
+
+    expect(result).toMatchObject({
+      outcome: "merged",
+      reason: "budget_not_met",
+      detail: "Committed system/ estimate is 108 tokens; pressure dream target is below 80 tokens",
+    })
+    expect(result?.completion).toMatchObject({ outcome: "merged", reason: "budget_not_met" })
+  }, 30_000)
+
   test("#given parent_dirty was checkpointed before cleanup #when finalization retries #then the durable decision and user edit are preserved", async () => {
     // given
     const item = await fixture(false)

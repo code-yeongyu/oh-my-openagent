@@ -22,7 +22,7 @@ TOPOLOGY LOCK first: from the request plus exploration, enumerate the 1-6 top-le
 
 Then the TWO FILTERS (full definition in SKILL.md): (1) evidence-answerable -> explore; (2) intent plus a defensible default -> adopt and record, EXCEPT owner-decisions (irreversible / destructive / safety-critical, or cross-cutting product choices), which always survive as questions.
 
-ASK WITH WHY: name what you explored, why it did not resolve, and which part of the plan forks on the answer. 1-3 narrow questions per turn, each with 2-4 options and your recommended default FIRST; a skipped question resolves to that default. Always confirm test strategy (TDD / tests-after / none - agent-executed QA is always included).
+ASK WITH WHY: name what you explored, why it did not resolve, and which part of the plan forks on the answer. Deliver surviving forks through the active renderer (`references/stance-calibration.md` - read it first): batch puts every fork in one brief, one-by-one paces one fork per turn, examples-first replaces open questions with 2-3 contrasting concrete approaches to critique. In every renderer each fork carries 2-4 options with your recommended default FIRST, a skipped or opted-out fork resolves to that default, and every reply is classified per the same reference. Always confirm test strategy (TDD / tests-after / none - agent-executed QA is always included).
 
 FOGGIEST-GAP targeting (ordinal, NO numbers): each turn aim at the single open gap whose resolution most unblocks the plan, and say why in one sentence; rotate across equally-foggy components. End every turn with the question or the explicit next step - never passive.
 

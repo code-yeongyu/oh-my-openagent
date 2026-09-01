@@ -43,9 +43,10 @@ describe("root test Bun config", () => {
 
   test("#given bun 1.3.x test argv #when CI selects the dedicated config #then --config= is passed before test", () => {
     const workflow = readFileSync(workflowPath, "utf8")
-    expect(workflow).toContain("run: bun --config=bunfig.root.toml test")
+    expect(workflow).toContain("bun --config=bunfig.win2.parallel.toml test\n")
     expect(workflow).not.toContain("bun test -c")
-    expect(workflow).not.toContain("bun test --config")
+    expect(workflow).not.toContain("format('-c {0}'")
+    expect(workflow).not.toContain("--path-ignore-patterns=")
   })
 
   test("#given bunfig.root.toml #when bun loads it via --config= #then Senpi tests are ignored", () => {

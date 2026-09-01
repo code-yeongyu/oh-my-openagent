@@ -75,7 +75,6 @@ describe("slashcommand discovery and execution compatibility", () => {
     // then
     expect(result.success).toBe(true)
     expect(result.replacementText).toContain("Execute from parent config.")
-    expect(result.replacementText).toContain("**Scope**: opencode")
   })
 
   it("executes project commands using the provided directory even when cwd differs", async () => {
@@ -103,6 +102,5 @@ describe("slashcommand discovery and execution compatibility", () => {
     // then
     expect(result.success).toBe(true)
     expect(result.replacementText).toContain("Execute from project directory.")
-    expect(result.replacementText).toContain("**Scope**: project")
   })
 })

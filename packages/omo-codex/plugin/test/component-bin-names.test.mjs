@@ -10,9 +10,9 @@ const EXPECTED_COMPONENT_BINS = new Map([
 	["comment-checker", ["omo-comment-checker"]],
 	["lsp", ["omo-lsp"]],
 	["rules", ["omo-rules"]],
-	["start-work-continuation", ["omo-start-work-continuation"]],
 	["telemetry", ["omo-telemetry"]],
 	["ultrawork", ["omo-ultrawork"]],
+	["ulw-execute-continuation", ["omo-ulw-execute-continuation"]],
 	["ulw-loop", ["omo-ulw-loop", "ulw", "ulw-loop"]],
 ]);
 
@@ -20,9 +20,9 @@ const EXPECTED_USAGE_PREFIXES = new Map([
 	["comment-checker", "Usage: omo-comment-checker "],
 	["lsp", "Usage: omo-lsp "],
 	["rules", "Usage: omo-rules "],
-	["start-work-continuation", "Usage: omo-start-work-continuation "],
 	["telemetry", "Usage: omo-telemetry "],
 	["ultrawork", "Usage: omo-ultrawork "],
+	["ulw-execute-continuation", "Usage: omo-ulw-execute-continuation "],
 ]);
 
 async function readJson(relativePath) {

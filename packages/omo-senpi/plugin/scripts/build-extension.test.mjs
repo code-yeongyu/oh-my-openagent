@@ -3,7 +3,12 @@ import { appendFile, cp, mkdtemp, readFile, rm, utimes, writeFile } from "node:f
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { buildExtension, checkExtensionCurrent, toPortableBuildPath } from "./build-extension.mjs"
+import {
+  buildExtension,
+  checkExtensionCurrent,
+  resolveBunExecutable,
+  toPortableBuildPath,
+} from "./build-extension.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
@@ -11,7 +16,10 @@ const repoRoot = join(scriptDir, "..", "..", "..", "..")
 const perTestRoots = []
 let sharedBuildPromise = null
 
-setDefaultTimeout(30_000)
+// A focused run builds the six artifacts twice in ~14s, while the package suite shares CPU and disk
+// with other build/staging files. Keep the test bounded, but give the real two-build workload enough
+// headroom under suite contention instead of timing out before the freshness assertion runs.
+setDefaultTimeout(60_000)
 
 afterEach(async () => {
   await Promise.all(perTestRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
@@ -58,6 +66,12 @@ async function mutableOutputs() {
 }
 
 describe("checkExtensionCurrent", () => {
+  test("#given the host platform #when resolving the Bun executable #then Windows bypasses the command shell", () => {
+    expect(resolveBunExecutable("win32")).toBe("bun.exe")
+    expect(resolveBunExecutable("darwin")).toBe("bun")
+    expect(resolveBunExecutable("linux")).toBe("bun")
+  })
+
   test("#given freshly built outputs #when the executable bundles are inspected #then the shebang stays the first bytes and the marker still parses", async () => {
     // given
     const outputs = await sharedOutputs()
@@ -88,6 +102,9 @@ describe("checkExtensionCurrent", () => {
       ["reflection-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md")],
       ["dream-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "dream-persona.md")],
       ["facts-persona.md", join(repoRoot, "packages", "memory-core", "src", "facts", "assets", "facts-persona.md")],
+      // The memorian gate loads its persona from beside the BUNDLE, so an unstaged asset makes
+      // every live gate launch fail with ENOENT while every source-reading unit test still passes.
+      ["memorian-persona.md", join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "memorian-persona.md")],
     ]
 
     // then

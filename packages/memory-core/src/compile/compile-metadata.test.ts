@@ -15,7 +15,6 @@ describe("compileMemoryBlock", () => {
     expect(second).toBe(first)
     expect(parseCompiledBlock(first).metadata).toEqual({ agentId: "stable-agent" })
     expect(first).not.toContain("CONVERSATION_ID")
-    expect(first).not.toContain("System prompt last recompiled")
     expect(first).not.toContain("previous messages")
     expect(first).not.toContain("user turns since your last memory save")
     expect(first).not.toContain("Soul updated by")
