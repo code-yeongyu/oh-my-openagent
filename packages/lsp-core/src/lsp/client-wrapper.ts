@@ -21,7 +21,7 @@ import { LSP_LOCAL_INSTALL_HINTS } from "./server-definitions.js";
 import { loadInstallDecision } from "./server-install-state.js";
 import { findServerForExtension } from "./server-resolution.js";
 import type { ServerLookupResult } from "./types.js";
-import { WORKSPACE_MARKERS } from "./workspace-markers.js";
+import { GIT_WORKSPACE_MARKER, PROJECT_WORKSPACE_MARKERS } from "./workspace-markers.js";
 
 export function isDirectoryPath(filePath: string): boolean {
 	try {
@@ -31,6 +31,15 @@ export function isDirectoryPath(filePath: string): boolean {
 	}
 }
 
+/**
+ * Resolves the workspace root for a file inside the request cwd.
+ *
+ * A `.git`-containing ancestor always wins over nearer package markers, so all packages of a
+ * monorepo share one workspace root (one resident client per repository instead of one per
+ * package, which multiplies language-server processes by the package count). The nearest
+ * package-marked directory is remembered while walking and used only when no `.git` ancestor
+ * exists within the request cwd.
+ */
 export function findWorkspaceRoot(filePath: string): string {
 	const cwd = contextCwd();
 	const abs = resolveReadablePathInsideContext(filePath);
@@ -43,20 +52,26 @@ export function findWorkspaceRoot(filePath: string): string {
 	if (!isPathInside(cwd, abs)) return findWorkspaceRootOutsideContext(dir);
 
 	const fallbackRoot = nearestExistingDirectoryInsideContext(dir, cwd) ?? cwd;
+	let nearestPackageRoot: string | undefined;
 	while (isPathInside(cwd, dir)) {
 		const canonicalDir = existingDirectoryInsideContext(dir, cwd);
 		if (canonicalDir !== undefined) {
-			for (const marker of WORKSPACE_MARKERS) {
-				if (existsSync(join(dir, marker))) {
-					return canonicalDir;
-				}
+			if (existsSync(join(dir, GIT_WORKSPACE_MARKER))) {
+				return canonicalDir;
+			}
+			if (nearestPackageRoot === undefined && hasProjectWorkspaceMarker(dir)) {
+				nearestPackageRoot = canonicalDir;
 			}
 		}
 		if (dir === cwd) break;
 		dir = dirname(dir);
 	}
 
-	return fallbackRoot;
+	return nearestPackageRoot ?? fallbackRoot;
+}
+
+function hasProjectWorkspaceMarker(directory: string): boolean {
+	return PROJECT_WORKSPACE_MARKERS.some((marker) => existsSync(join(directory, marker)));
 }
 
 export function resolveReadablePathInsideContext(filePath: string): string {

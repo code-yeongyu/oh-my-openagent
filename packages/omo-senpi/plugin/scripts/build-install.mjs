@@ -9,7 +9,9 @@ const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = join(packageRoot, "..", "..")
 const entryPath = join(packageRoot, "src", "install", "cli-local.ts")
-const outputPath = join(pluginRoot, "scripts", "install.mjs")
+const outputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
+  ? join(pluginRoot, "scripts", "install.mjs")
+  : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "scripts", "install.mjs")
 
 export async function buildInstallCli(options = {}) {
   const output = options.outputPath ?? outputPath

@@ -13,6 +13,7 @@ const repoRoot = resolve(packageRoot, "..", "..")
 const pluginRoot = join(packageRoot, "plugin")
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
+const realOmoAgentDir = join(homedir(), ".omo", "agent")
 const commentCheckerHeader = "comment-checker found issues in"
 
 // Isolation is proven by these four files staying byte-identical: a live dev machine writes
@@ -21,6 +22,7 @@ const commentCheckerHeader = "comment-checker found issues in"
 // dropping its volatile interactive-session stamps (tipsHistory, lastChangelogVersion): a concurrent
 // host TUI rewrites those on its own lifecycle events, which cannot identify QA pollution.
 const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
+const PROTECTED_STATE_FILES = [...CREDENTIAL_FILES, "models-store.json", "hooks-state.json"]
 
 export function credentialDigest(agentDir) {
   const hash = createHash("sha256")
@@ -34,31 +36,80 @@ export function credentialDigest(agentDir) {
   return hash.digest("hex")
 }
 
-function credentialBytes(path, name) {
-  const content = readFileSync(path)
+function credentialBytes(path, name, readFile = readFileSync) {
+  const content = readFile(path)
   if (name !== "settings.json") return content
   try {
     const settings = JSON.parse(content.toString("utf8"))
     if (typeof settings !== "object" || settings === null || Array.isArray(settings)) return content
     delete settings.tipsHistory
     delete settings.lastChangelogVersion
+    delete settings.modelLastOnThinkingLevels
     return JSON.stringify(settings)
   } catch {
     return content
   }
 }
 
-export function digestDirectory(root) {
+export function snapshotProtectedState(root) {
+  return new Map(PROTECTED_STATE_FILES.map((name) => {
+    const path = join(root, name)
+    const bytes = existsSync(path) ? credentialBytes(path, name) : Buffer.from("absent")
+    return [name, createHash("sha256").update(bytes).digest("hex")]
+  }))
+}
+
+export function snapshotDirectory(root, { readdir = readdirSync, readFile = readFileSync } = {}) {
+  if (!existsSync(root)) return new Map()
+  const files = []
+  collectFiles(root, files, readdir)
+  const snapshot = new Map()
+  for (const file of files.sort()) {
+    const relative = file.slice(root.length + 1)
+    try {
+      const bytes = relative === "settings.json" ? credentialBytes(file, "settings.json", readFile) : readFile(file)
+      snapshot.set(relative, createHash("sha256").update(bytes).digest("hex"))
+    } catch (error) {
+      if (!isTransientSnapshotEntryError(error)) throw error
+    }
+  }
+  return snapshot
+}
+
+export function changedSnapshotPaths(before, after) {
+  return [...new Set([...before.keys(), ...after.keys()])]
+    .filter((path) => before.get(path) !== after.get(path))
+    .sort()
+}
+
+export function classifyObservedChanges(paths) {
+  const volatile = []
+  const protectedState = []
+  const other = []
+  for (const path of paths) {
+    if (path.startsWith("sessions/") || path.startsWith("cache/") || path.startsWith("logs/") || path.endsWith(".log")) volatile.push(path)
+    else if (PROTECTED_STATE_FILES.includes(path)) protectedState.push(path)
+    else other.push(path)
+  }
+  return { volatile, protectedState, other }
+}
+
+export function digestDirectory(root, { readdir = readdirSync, readFile = readFileSync } = {}) {
   if (!existsSync(root)) return "absent"
   const files = []
-  collectFiles(root, files)
+  collectFiles(root, files, readdir)
   const hash = createHash("sha256")
   for (const file of files.sort()) {
     const rel = file.slice(root.length + 1)
-    hash.update(rel)
-    hash.update("\0")
-    hash.update(createHash("sha256").update(readFileSync(file)).digest("hex"))
-    hash.update("\0")
+    try {
+      const fileDigest = createHash("sha256").update(readFile(file)).digest("hex")
+      hash.update(rel)
+      hash.update("\0")
+      hash.update(fileDigest)
+      hash.update("\0")
+    } catch (error) {
+      if (!isTransientSnapshotEntryError(error)) throw error
+    }
   }
   return hash.digest("hex")
 }
@@ -141,7 +192,11 @@ function runSenpi(senpiBin, sandbox, prompt, script, extraEnv = {}) {
 
 function main() {
   const providedSenpiCodingAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset"
-  const beforeDigest = digestDirectory(realSenpiAgentDir)
+  const beforeDigest = credentialDigest(realSenpiAgentDir)
+  const beforeSenpiSnapshot = snapshotDirectory(realSenpiAgentDir)
+  const beforeOmoSnapshot = snapshotDirectory(realOmoAgentDir)
+  const beforeSenpiProtectedState = snapshotProtectedState(realSenpiAgentDir)
+  const beforeOmoProtectedState = snapshotProtectedState(realOmoAgentDir)
   const sandbox = createSandbox()
   let commentChecker = "NOT-RUN"
   let ultraworkInjected = false
@@ -155,14 +210,14 @@ function main() {
     if (senpiBin.includes("/") && !existsSync(senpiBin)) {
       result = "SKIP"
       reason = "senpi-binary-unavailable"
-      return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, sandbox, providedSenpiCodingAgentDir })
+      return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, beforeSenpiSnapshot, beforeOmoSnapshot, beforeSenpiProtectedState, beforeOmoProtectedState, sandbox, providedSenpiCodingAgentDir })
     }
 
     const resolvedSenpi = senpiBin.includes("/") ? senpiBin : findOnPath(senpiBin)
     if (resolvedSenpi === null) {
       result = "SKIP"
       reason = "senpi-binary-unavailable"
-      return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, sandbox, providedSenpiCodingAgentDir })
+      return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, beforeSenpiSnapshot, beforeOmoSnapshot, beforeSenpiProtectedState, beforeOmoProtectedState, sandbox, providedSenpiCodingAgentDir })
     }
 
     const ultrawork = runSenpi(resolvedSenpi, sandbox, "ulw please respond", {
@@ -197,20 +252,42 @@ function main() {
     }
 
     result = ultraworkInjected && (commentChecker === "PASS" || commentChecker === "SKIPPED-no-binary") ? "PASS" : "FAIL"
-    return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, sandbox, providedSenpiCodingAgentDir })
+    return printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, beforeSenpiSnapshot, beforeOmoSnapshot, beforeSenpiProtectedState, beforeOmoProtectedState, sandbox, providedSenpiCodingAgentDir })
   } finally {
     rmSync(sandbox.root, { recursive: true, force: true })
   }
 }
 
-function printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, sandbox, providedSenpiCodingAgentDir }) {
-  const afterDigest = digestDirectory(realSenpiAgentDir)
+function printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, beforeSenpiSnapshot, beforeOmoSnapshot, beforeSenpiProtectedState, beforeOmoProtectedState, sandbox, providedSenpiCodingAgentDir }) {
+  const afterDigest = credentialDigest(realSenpiAgentDir)
+  const afterSenpiSnapshot = snapshotDirectory(realSenpiAgentDir)
+  const afterOmoSnapshot = snapshotDirectory(realOmoAgentDir)
+  const realSenpiObservedChangedPaths = changedSnapshotPaths(beforeSenpiSnapshot, afterSenpiSnapshot)
+  const realOmoObservedChangedPaths = changedSnapshotPaths(beforeOmoSnapshot, afterOmoSnapshot)
+  const senpiObserved = classifyObservedChanges(realSenpiObservedChangedPaths)
+  const omoObserved = classifyObservedChanges(realOmoObservedChangedPaths)
+  const realSenpiChangedPaths = [...senpiObserved.protectedState, ...senpiObserved.other].sort()
+  const realOmoChangedPaths = [...omoObserved.protectedState, ...omoObserved.other].sort()
+  const realSenpiProtectedChangedPaths = changedSnapshotPaths(beforeSenpiProtectedState, snapshotProtectedState(realSenpiAgentDir))
+  const realOmoProtectedChangedPaths = changedSnapshotPaths(beforeOmoProtectedState, snapshotProtectedState(realOmoAgentDir))
   const payload = {
     result,
     ...(reason ? { reason } : {}),
     ultraworkInjected,
     commentChecker,
-    realSenpiUntouched: beforeDigest === afterDigest,
+    realSenpiUntouched: realSenpiChangedPaths.length === 0,
+    realSenpiChangedPaths,
+    realSenpiObservedChangedPaths,
+    realSenpiVolatileChangedPaths: senpiObserved.volatile,
+    realSenpiProtectedChangedPaths,
+    realSenpiCredentialDigestUntouched: beforeDigest === afterDigest,
+    realOmoUntouched: realOmoChangedPaths.length === 0,
+    realOmoChangedPaths,
+    realOmoObservedChangedPaths,
+    realOmoVolatileChangedPaths: omoObserved.volatile,
+    realOmoProtectedChangedPaths,
+    protectedStateFiles: PROTECTED_STATE_FILES,
+    realHomesChecked: [realSenpiAgentDir, realOmoAgentDir],
     providedSenpiCodingAgentDir,
     sandboxAgentDir: sandbox.agentDir,
     sandboxCwd: sandbox.cwd,
@@ -218,12 +295,23 @@ function printResult({ result, reason, ultraworkInjected, commentChecker, before
   console.log(JSON.stringify(payload))
 }
 
-function collectFiles(root, files) {
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
+function collectFiles(root, files, readdir = readdirSync) {
+  let entries
+  try {
+    entries = readdir(root, { withFileTypes: true })
+  } catch (error) {
+    if (isTransientSnapshotEntryError(error)) return
+    throw error
+  }
+  for (const entry of entries) {
     const path = join(root, entry.name)
-    if (entry.isDirectory()) collectFiles(path, files)
+    if (entry.isDirectory()) collectFiles(path, files, readdir)
     else if (entry.isFile()) files.push(path)
   }
+}
+
+function isTransientSnapshotEntryError(error) {
+  return error?.code === "ENOENT" || error?.code === "ENOTDIR"
 }
 
 function readSandboxText(root) {

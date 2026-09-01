@@ -82,7 +82,7 @@ describe("DAG child in-process tool policy", () => {
         makeTool("task_create"),
         makeTool("task_send"),
         makeTool("team_create"),
-        makeTool("dag"),
+        makeTool("workflow"),
       ],
       createSession: async (options) => {
         captured = options
@@ -102,7 +102,7 @@ describe("DAG child in-process tool policy", () => {
     // given
     let captured: CreateAgentSessionOptions | undefined
     const runner = new InProcessRunner({
-      sharedParentTools: [makeTool("grep"), makeTool("task_update"), makeTool("team_send"), makeTool("dag")],
+      sharedParentTools: [makeTool("grep"), makeTool("task_update"), makeTool("team_send"), makeTool("workflow")],
       createSession: async (options) => {
         captured = options
         return makeSession()
@@ -116,9 +116,9 @@ describe("DAG child in-process tool policy", () => {
     expect(names(captured)).toEqual(["grep"])
   })
 
-  test("#given plain and team-member children #when their tool sets are built #then existing sanctioned sets stay exact and dag is absent", async () => {
+  test("#given plain and team-member children #when their tool sets are built #then existing sanctioned sets stay exact and the workflow orchestrator is absent", async () => {
     // given
-    const shared = [makeTool("grep"), makeTool("task"), makeTool("team_create"), makeTool("dag")]
+    const shared = [makeTool("grep"), makeTool("task"), makeTool("team_create"), makeTool("workflow")]
     const taskSend = makeTool("task_send")
     const captured: CreateAgentSessionOptions[] = []
     const runner = new InProcessRunner({

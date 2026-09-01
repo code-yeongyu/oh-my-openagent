@@ -11,10 +11,13 @@ import { join } from "node:path"
 
 import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
+import { dagNodeTransitionedEvent } from "./events"
 import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
+import { controlJournal } from "./node-control-context"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
-import { createDagScheduler } from "./scheduler"
+import { persistDagNodeResult } from "./results"
+import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
 
@@ -365,5 +368,51 @@ describe("DAG scheduler dependency-frontier admission", () => {
       event.type === "dag.wave.completed")
     expect(waveCompletions.map((event) => event.waveIndex)).toEqual([1, 2, 0])
     expect(waveCompletions.find((event) => event.waveIndex === 0)).toMatchObject({ nodeIds: ["slow", "fast"] })
+  })
+})
+
+describe("DAG scheduler foreign-commit wake (#7412)", () => {
+  test("#given a dependent behind a foreign-journaled completion #when no attached settlement fires #then admission wakes and the dependent runs (dag_923ad20e)", async () => {
+    // given - a's completion will land through a control-verb journal instance (the incident's
+    // revive watcher), NEVER through the scheduler's own attached waitFor.
+    const manager = new FrontierFakeManager()
+    const { scheduler, events, store } = frontierFixture(definition([node("a"), node("b", ["a"])]), manager)
+    const running = scheduler.run()
+    await manager.whenStarted("a")
+    // The incident node was attached and running when the foreign completion landed; arming any
+    // earlier races the scheduler's own started transition, which would clobber the completion.
+    await whenNodeState(scheduler, "a", "running")
+
+    // when - a settles outside the scheduler: result persisted, completion journaled foreign.
+    const durable = (): DagRunRecordV1 => {
+      const record = store.readCheckpoint<DagRunRecordV1>(runId)
+      if (record === null) throw new Error("missing durable checkpoint")
+      return record
+    }
+    const child = manager.recordOf("a")
+    if (child === undefined) throw new Error("missing fake child for a")
+    const terminal = { ...child, status: "completed" as const, final_response: "done a" }
+    const persisted = persistDagNodeResult({
+      store,
+      runId,
+      nodeId: "a" as DagNodeId,
+      record: terminal,
+      now: () => Date.parse("2026-08-25T00:00:03.000Z"),
+    })
+    expect(persisted.kind).not.toBe("failed")
+    const foreign = controlJournal({ store, taskManager: manager, initialRecord: durable() } as DagSchedulerOptions, durable())
+    foreign.append(dagNodeTransitionedEvent({ nodeId: "a" as DagNodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }))
+
+    // then - the live scheduler refreshes off the foreign commit and admits b at once.
+    await manager.whenStarted("b")
+    manager.complete("b")
+    const result = await running
+    expect(result.status).toBe("completed")
+    expect(manager.starts).toEqual(["a", "b"])
+
+    // and - exactly one completed transition for a: the foreign commit, never a stale re-append.
+    const aCompletions = events().filter((event) =>
+      event.type === "dag.node.transitioned" && String(event.nodeId) === "a" && event.to === "completed")
+    expect(aCompletions).toHaveLength(1)
   })
 })

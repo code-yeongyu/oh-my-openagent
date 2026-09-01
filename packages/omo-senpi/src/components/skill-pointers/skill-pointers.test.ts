@@ -175,7 +175,7 @@ describe("omo-senpi skill-pointers component", () => {
       expectPointerInjections(pi, result, [{ customType: MASS_ULW_CUSTOM_TYPE, skillName: "mass-ulw" }])
     })
 
-    it("#when the mass-ulw pointer is injected #then it still instructs dag orchestration", async () => {
+    it("#when the mass-ulw pointer is injected #then it still instructs workflow orchestration", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -186,7 +186,7 @@ describe("omo-senpi skill-pointers component", () => {
       // then
       const content = pi.messages[0]?.message["content"]
       if (typeof content !== "string") throw new Error("expected string content")
-      expect(content).toContain("dag tool")
+      expect(content).toContain("workflow tool")
     })
 
     it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop includes the resolved CLI shim", async () => {

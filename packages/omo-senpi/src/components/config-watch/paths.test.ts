@@ -301,6 +301,55 @@ describe("resolveOmoConfigWatchTargets", () => {
     const configTarget = targets.find((target) => target.path === omoDirectory)
     expect(configTarget?.filterGlobs).toEqual(["/omo.jsonc", "/omo.json"])
   })
+
+  it("#given a Plan 9 project filesystem #when resolving targets #then skips project and ancestor watches while retaining native user config", () => {
+    const fixture = createFixture()
+    const userConfigDirectory = join(fixture.homeDir, ".omo")
+    mkdirSync(userConfigDirectory, { recursive: true })
+    writeProjectConfig(fixture.projectDir)
+
+    const targets = resolveOmoConfigWatchTargets({
+      cwd: fixture.cwd,
+      env: fixtureEnv(fixture),
+      platform: "linux",
+      resolveFileSystemType: (path) => path === userConfigDirectory ? 0x01021994 : 0x01021997,
+    })
+
+    expect(targetFor(targets, userConfigDirectory, "/omo.jsonc")).toBe(true)
+    expect(targets.some((target) => target.path === fixture.projectDir && target.filterGlobs.includes("/.omo"))).toBe(false)
+    expect(targets.some((target) => target.filterGlobs.includes("/.omo"))).toBe(false)
+  })
+
+  it("#given a native project filesystem #when resolving targets #then preserves project and ancestor watches", () => {
+    const fixture = createFixture()
+    writeProjectConfig(fixture.projectDir)
+
+    const targets = resolveOmoConfigWatchTargets({
+      cwd: fixture.cwd,
+      env: fixtureEnv(fixture),
+      platform: "linux",
+      resolveFileSystemType: () => 0x01021994,
+    })
+
+    expect(targetFor(targets, join(fixture.projectDir, ".omo"), "/omo.jsonc")).toBe(true)
+    expect(targets.some((target) => target.filterGlobs.includes("/.omo"))).toBe(true)
+  })
+
+  it("#given a Plan 9 user config filesystem #when resolving targets #then skips the user config watch", () => {
+    const fixture = createFixture()
+    const userConfigDirectory = join(fixture.homeDir, ".omo")
+    mkdirSync(userConfigDirectory, { recursive: true })
+
+    const targets = resolveOmoConfigWatchTargets({
+      cwd: fixture.cwd,
+      env: fixtureEnv(fixture),
+      platform: "linux",
+      resolveFileSystemType: () => 0x01021997,
+    })
+
+    expect(targetFor(targets, userConfigDirectory, "/omo.jsonc")).toBe(false)
+    expect(targets.some((target) => target.filterGlobs.includes("/.omo"))).toBe(false)
+  })
 })
 
 process.on("beforeExit", () => {

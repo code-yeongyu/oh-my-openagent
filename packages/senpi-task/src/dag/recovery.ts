@@ -14,7 +14,7 @@ import {
   dagRunResumedEvent,
 } from "./events"
 import { createDagJournal, type DagJournal } from "./journal"
-import type { DagPersistedNode, DagRunRecordV1 } from "./manager"
+import { skipDuplicateTerminalTransition, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
 import { applyDagSchedulerEvent, createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
@@ -351,6 +351,7 @@ function recoveryJournal(
     ),
     ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
     now: context.now,
+    skipDuplicate: skipDuplicateTerminalTransition,
   })
 }
 

@@ -17,8 +17,8 @@ import {
   dagWaveCompletedEvent,
   dagWaveStartedEvent,
 } from "./events"
-import { createDagJournal, type DagJournal, type DagJournalListener } from "./journal"
-import { applyDagRunMutation, type DagMaterializeSkills, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
+import { createDagJournal, subscribeDagJournal, type DagJournal, type DagJournalListener } from "./journal"
+import { applyDagRunMutation, skipDuplicateTerminalTransition, type DagMaterializeSkills, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
 import { retryDagNodes, type DagRetryOptions, type DagRunReentry } from "./node-retry"
 import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { OwnedStartResult } from "./owner"
@@ -50,6 +50,7 @@ const TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set([
   "cancelled",
   "skipped",
 ])
+
 
 export type DagSchedulerOptions = {
   readonly store: DagFileStore
@@ -162,6 +163,9 @@ type SchedulerContext = {
   readonly cancellationCompleted: Promise<void>
   readonly resolveCancellationCompleted: () => void
   cancellationStarted: boolean
+  // #7412: set by the foreign-commit subscription so a wake that fired while no settle race was
+  // armed is not lost - settleOne consumes it level-triggered.
+  foreignSettlement: boolean
   cancellationOperation?: Promise<void>
   admissionInProgress: boolean
   readonly admissionIdleWaiters: Set<() => void>
@@ -172,6 +176,10 @@ type SchedulerContext = {
   // remembers which wave indexes this instance reported so each index completes at most once.
   readonly emittedWaveAdmissions: Set<number>
   readonly emittedWaveCompletions: Set<number>
+  // Per-node child subscriptions armed for queued spawns (start returned status "pending"):
+  // waitFor resolves only at terminal, so this watch is the only signal that folds the task
+  // engine's later queue promotion into a scheduled -> running node transition.
+  readonly promotionWatches: Map<DagNodeId, () => void>
 }
 
 export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
@@ -193,6 +201,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     ),
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     now,
+    skipDuplicate: skipDuplicateTerminalTransition,
   })
   const context: SchedulerContext = {
     taskManager: options.taskManager,
@@ -213,12 +222,31 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     cancellationCompleted: cancellationCompleted.promise,
     resolveCancellationCompleted: cancellationCompleted.resolve,
     cancellationStarted: false,
+    foreignSettlement: false,
     admissionInProgress: false,
     admissionIdleWaiters: new Set(),
     pendingAdmission: [],
     emittedWaveAdmissions: new Set<number>(),
     emittedWaveCompletions: new Set<number>(),
+    promotionWatches: new Map<DagNodeId, () => void>(),
   }
+  // #7412 defect 1: control verbs (send/revive watchers, retry) commit through their OWN journal
+  // instance, and a journal cache refreshes only on its own appends. Without this subscription a
+  // foreign-journaled completion neither refreshes the live scheduler's snapshot nor wakes its
+  // admission loop - a journaled-completion-but-starved-dependent stall. Foreign commits refresh
+  // the cache; terminal node transitions additionally wake the settle loop. The subscription
+  // retires once the run record is terminal.
+  const unsubscribeCommits = subscribeDagJournal(options.store, options.initialRecord.runId, (event) => {
+    if (event.seq > journal.snapshot().checkpointSeq) {
+      journal.refresh()
+      if (event.type === "dag.node.transitioned" && TERMINAL_NODE_STATES.has(event.to)) {
+        context.foreignSettlement = true
+        context.resolveSettlementChanged()
+      }
+    }
+    const status = journal.snapshot().status
+    if (status === "completed" || status === "failed" || status === "cancelled") unsubscribeCommits()
+  })
   for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
     context.attachedTaskIds.set(nodeId, taskId)
     attachTaskSettlement(context, nodeId, taskId)
@@ -236,7 +264,9 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
       runId,
       nodeId,
       message,
-      (revivedNodeId, taskId) => context.journal.snapshot().status === "running"
+      // Refresh, not snapshot: a control-journal commit may still be a microtask away from the
+      // subscription callback, and routing a revive off a stale status was half of dag_923ad20e.
+      (revivedNodeId, taskId) => context.journal.refresh().status === "running"
         ? watchRevivedInScheduler(context, revivedNodeId, taskId)
         : undefined,
     ),
@@ -412,6 +442,8 @@ async function cancelRun(context: SchedulerContext, runId: DagRunId, reason?: st
 async function performCancellation(context: SchedulerContext, reason?: string): Promise<void> {
   try {
     await whenAdmissionIdle(context)
+    // Watches go first so a promotion racing the cancel cannot flip nodes mid-cancellation.
+    for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
     const cancellationResults = await Promise.allSettled([...context.attachedTaskIds.values()].map((taskId) =>
       context.taskManager.cancelTask(taskId, reason, { abort: "skip" }),
     ))
@@ -647,11 +679,44 @@ function attachStarted(
         reason: { kind: "task_queued", queuePosition: result.queue_position },
       })
     }
+    watchQueuedPromotion(context, nodeId, result.task_id)
   } else if (result.status === "running") {
     transition(context, nodeId, "running", result.reused ? { kind: "resumed" } : { kind: "started" })
   }
   context.attachedTaskIds.set(nodeId, result.task_id)
   attachTaskSettlement(context, nodeId, result.task_id)
+}
+
+// A queued spawn reports status "pending": the concurrency queue will launch the child later, but
+// the scheduler's only other feedback channel (waitFor) resolves at terminal status. Without this
+// watch the node would sit in "scheduled" for its child's whole execution, rendering as "waiting"
+// in the widget while the header undercounts running children. Any child event re-checks the
+// record; the first one observed after the record flips to running folds into the transition.
+function watchQueuedPromotion(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
+  disposePromotionWatch(context, nodeId)
+  const foldPromotion = (): void => {
+    if (context.cancellationStarted) return
+    if (context.taskManager.get(taskId)?.status !== "running") return
+    disposePromotionWatch(context, nodeId)
+    // A task can terminalize straight from the queue (cancelled/errored before launch); by the
+    // time a stray event lands the node may already be folded, and a terminal node must never be
+    // dragged back to running (that path is reserved for explicit revives).
+    if (nodeById(context.journal.snapshot(), nodeId).state !== "scheduled") return
+    transition(context, nodeId, "running", { kind: "started" })
+  }
+  const unsubscribe = context.taskManager.subscribeChild(taskId, foldPromotion)
+  context.promotionWatches.set(nodeId, unsubscribe)
+  // Level-triggered arm check: the queue can grant, launch, and flip the record to running between
+  // startOwned's pending snapshot and this arm point, and a live-handle subscription never replays
+  // missed events - without this a node promoted in that window sits "scheduled" until terminal.
+  foldPromotion()
+}
+
+function disposePromotionWatch(context: SchedulerContext, nodeId: DagNodeId): void {
+  const dispose = context.promotionWatches.get(nodeId)
+  if (dispose === undefined) return
+  context.promotionWatches.delete(nodeId)
+  dispose()
 }
 
 function attachTaskSettlement(context: SchedulerContext, nodeId: DagNodeId, taskId: string): AttachedTask {
@@ -681,6 +746,12 @@ async function watchRevivedInScheduler(
 }
 
 async function settleOne(context: SchedulerContext): Promise<boolean> {
+  // #7412: a foreign commit can land while no settle race is armed (repeatableSignal wake-ups are
+  // edge-triggered); consuming the flag first keeps that wake level-triggered.
+  if (context.foreignSettlement) {
+    context.foreignSettlement = false
+    return true
+  }
   const settled = await Promise.race([
     ...[...context.attachedTasks.values()].map((entry) => entry.settled),
     context.settlementChanged().then(() => null),
@@ -691,6 +762,7 @@ async function settleOne(context: SchedulerContext): Promise<boolean> {
   const task = context.attachedTasks.get(settled.nodeId)
   context.attachedTasks.delete(settled.nodeId)
   context.attachedTaskIds.delete(settled.nodeId)
+  disposePromotionWatch(context, settled.nodeId)
   try {
     if (settled.kind === "error") {
       failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
