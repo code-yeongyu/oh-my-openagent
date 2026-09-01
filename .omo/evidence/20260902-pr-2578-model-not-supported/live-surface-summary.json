@@ -3,7 +3,5 @@
   "session_error_seen": true,
   "observed_error_name": "APIError",
   "observed_error_message": "model_not_supported",
-  "host_sessions_before": 1814,
-  "host_sessions_after": 1814,
-  "host_session_count_unchanged": true
+  "isolation": "dedicated HOME and XDG data/config/cache/state roots; sandbox database only"
 }
