@@ -17,6 +17,7 @@ import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveRunnableRunAgent } from "./runnable-agent-resolver"
+import { loadOutputSchema, resolveTerminalStructuredOutput } from "./structured-output"
 
 export { resolveRunAgent }
 
@@ -66,6 +67,7 @@ export async function run(options: RunOptions): Promise<number> {
   }
 
   try {
+    const outputSchema = options.outputSchema ? loadOutputSchema(options.outputSchema) : undefined
     const resolvedModel = resolveRunModel(options.model)
 
     const { client, cleanup: serverCleanup } = await createServerConnection({
@@ -131,6 +133,9 @@ export async function run(options: RunOptions): Promise<number> {
             tools: {
               question: false,
             },
+            ...(outputSchema ? {
+              format: { type: "json_schema" as const, schema: outputSchema },
+            } : {}),
             parts: [{ type: "text", text: message }],
           },
           query: { directory },
@@ -154,6 +159,9 @@ export async function run(options: RunOptions): Promise<number> {
       const exitCode = await pollForCompletion(ctx, eventState, abortController, {
         requireMeaningfulWork: true,
       })
+      const output = outputSchema && exitCode === 0
+        ? resolveTerminalStructuredOutput(eventState, sessionID)
+        : undefined
 
       abortController.abort()
 
@@ -179,6 +187,7 @@ export async function run(options: RunOptions): Promise<number> {
           durationMs,
           messageCount: eventState.messageCount,
           summary: eventState.lastPartText.slice(0, 200) || "Run completed",
+          ...(outputSchema ? { output } : {}),
         })
       }
 
