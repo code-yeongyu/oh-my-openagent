@@ -29,8 +29,8 @@ export function cleanupTempDirs(): void {
   }
 }
 
-export function git(root: string, args: readonly string[]): string {
-  return execFileSync("git", [...GIT_IDENTITY, ...args], { cwd: root, encoding: "utf8" })
+export function git(root: string, args: readonly string[], input?: string): string {
+  return execFileSync("git", [...GIT_IDENTITY, ...args], { cwd: root, encoding: "utf8", input })
 }
 
 export function initRepo(prefix = "omo-init-deep-fixture-"): string {
@@ -49,6 +49,39 @@ export function commitAll(root: string, message: string): string {
   git(root, ["add", "-A"])
   git(root, ["commit", "--allow-empty", "-m", message])
   return git(root, ["rev-parse", "HEAD"]).trim()
+}
+
+export function advanceCommits(
+  root: string,
+  baseSha: string,
+  count: number,
+  touchedFileIndexes: readonly number[],
+): void {
+  const stream: string[] = []
+  for (let step = 0; step < count; step++) {
+    const mark = step + 1
+    const message = `drift ${step}`
+    stream.push(
+      "commit refs/heads/main",
+      `mark :${mark}`,
+      `committer QA <qa@example.invalid> ${1_700_000_000 + step} +0000`,
+      `data ${Buffer.byteLength(message)}`,
+      message,
+      step === 0 ? `from ${baseSha}` : `from :${mark - 1}`,
+    )
+    for (const fileIndex of touchedFileIndexes) {
+      const content = sourceFile(100 + step + 1)
+      stream.push(
+        `M 100644 inline src/file${fileIndex}.ts`,
+        `data ${Buffer.byteLength(content)}`,
+        content,
+      )
+    }
+    stream.push("")
+  }
+  stream.push("done", "")
+  git(root, ["fast-import", "--quiet"], stream.join("\n"))
+  git(root, ["reset", "--hard", "HEAD"])
 }
 
 export function sourceFile(lines: number): string {

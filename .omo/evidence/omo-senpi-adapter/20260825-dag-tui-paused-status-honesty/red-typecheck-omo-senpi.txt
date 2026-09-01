@@ -1,0 +1,6 @@
+packages/omo-senpi/src/components/task/dag-status-row-format.test.ts(212,52): error TS2353: Object literal may only specify known properties, and 'leaseHolderPid' does not exist in type 'Partial<DagStatusRunSnapshot> & { runId: string; }'.
+packages/omo-senpi/src/components/task/dag-status-row-format.test.ts(214,34): error TS2353: Object literal may only specify known properties, and 'isProcessAlive' does not exist in type 'DagRunRowsOptions'.
+packages/omo-senpi/src/components/task/dag-status-row-format.test.ts(236,52): error TS2353: Object literal may only specify known properties, and 'leaseHolderPid' does not exist in type 'Partial<DagStatusRunSnapshot> & { runId: string; }'.
+packages/omo-senpi/src/components/task/dag-status-row-format.test.ts(238,34): error TS2353: Object literal may only specify known properties, and 'isProcessAlive' does not exist in type 'DagRunRowsOptions'.
+packages/omo-senpi/src/components/task/dag-status-row-format.test.ts(253,52): error TS2353: Object literal may only specify known properties, and 'leaseHolderPid' does not exist in type 'Partial<DagStatusRunSnapshot> & { runId: string; }'.
+packages/omo-senpi/src/components/task/dag-status-row-format.test.ts(255,34): error TS2353: Object literal may only specify known properties, and 'isProcessAlive' does not exist in type 'DagRunRowsOptions'.

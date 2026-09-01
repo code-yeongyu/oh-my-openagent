@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { isOmoTelemetryEnabled } from "@oh-my-opencode/omo-config-core"
@@ -10,29 +10,15 @@ import {
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
-import { getOmoNativePayloadFilePath } from "./omo-native-buffer"
 import { createOmoNativeProductConfig, getOmoNativeStateDir } from "./product-identity"
 
 const SOURCE = "omo-native-notice"
 const MARKER_FILE_NAME = "notice-shown"
 const DOCS_URL = "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/reference/senpi-telemetry.md"
 const NOTICE = `omo-senpi sends anonymous usage telemetry (no prompts, no paths). Docs: ${DOCS_URL} - opt out: DO_NOT_TRACK=1`
-const ENV_KEYS = [
-  "OMO_SENPI_DISABLE_POSTHOG",
-  "OMO_DISABLE_POSTHOG",
-  "OMO_SENPI_SEND_ANONYMOUS_TELEMETRY",
-  "OMO_SEND_ANONYMOUS_TELEMETRY",
-  "DO_NOT_TRACK",
-] as const
 
 type NotificationUi = {
   notify(message: string, type?: "info" | "warning" | "error"): void
-}
-
-type CommandContext = {
-  readonly cwd?: string
-  readonly ui?: NotificationUi
-  output?(text: string): void
 }
 
 export type OmoNativeNoticeOptions = {
@@ -75,13 +61,6 @@ export function createOmoNativeNoticeRegistration(
         } catch (error) {
           reportOnce(error)
         }
-      })
-
-      pi.registerCommand("omo-telemetry", {
-        description: "Preview OmO Native telemetry state and recently sent payloads.",
-        handler: async (_args: string, commandCtx: CommandContext): Promise<void> => {
-          report(commandCtx, preview(options, commandCtx.cwd, env, stateDir, reportOnce))
-        },
       })
     },
   }
@@ -132,47 +111,10 @@ function claimNotice(stateDir: string, diagnostics: (error: unknown) => void): b
   }
 }
 
-function preview(
-  options: OmoNativeNoticeOptions,
-  cwd: string | undefined,
-  env: TelemetryEnv,
-  stateDir: string,
-  diagnostics: (error: unknown) => void,
-): string {
-  const config = configEnabled(options, cwd, env, diagnostics)
-  const active = isTelemetryClientEnabled({ env, product: createOmoNativeProductConfig() }) && config
-  const matrix = ENV_KEYS.map((key) => `${key}: ${env[key] ?? "<unset>"}`)
-  return [
-    `Enabled: ${active}`,
-    "Opt-out matrix:",
-    ...matrix,
-    `omo.json telemetry.enabled: ${config}`,
-    "Last payloads:",
-    readPayloadPreview(getOmoNativePayloadFilePath(stateDir)),
-  ].join("\n")
-}
-
-function readPayloadPreview(path: string): string {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
-    if (!Array.isArray(parsed)) return "Telemetry payload preview is unreadable or malformed."
-    return JSON.stringify(parsed, null, 2)
-  } catch (error) {
-    return errorCode(error) === "ENOENT"
-      ? "No telemetry payloads have been recorded."
-      : "Telemetry payload preview is unreadable or malformed."
-  }
-}
-
 function notificationUi(value: unknown): NotificationUi | undefined {
   if (!isRecord(value)) return undefined
   const ui = value["ui"]
   return isRecord(ui) && typeof ui["notify"] === "function" ? ui as NotificationUi : undefined
-}
-
-function report(ctx: CommandContext, message: string): void {
-  if (ctx.output !== undefined) ctx.output(message)
-  else ctx.ui?.notify(message, "info")
 }
 
 function extractString(value: unknown, key: string): string | undefined {

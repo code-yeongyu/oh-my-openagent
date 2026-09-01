@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
+import { appendFile, mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 import {
   REFLECTION_STATE_SCHEMA_VERSION,
@@ -24,7 +25,7 @@ const NOW = new Date("2026-08-10T12:00:00.000Z")
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 function textEntry(
@@ -270,5 +271,60 @@ describe("dream journal selection", () => {
     expect(volume).toBe(alphaBytes + gammaBytes)
     expect(first).toEqual({ conversationIds: ["gamma", "alpha"], totalBytes: alphaBytes + gammaBytes })
     expect(JSON.stringify(second)).toBe(JSON.stringify(first))
+  })
+})
+
+describe("dream journal scan contention", () => {
+  test("#given a journal whose state.lock is held by a live process #when selection runs #then the scan completes without waiting for the lock", async () => {
+    // given
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "dream-selector-lock-")))
+    tempDirs.push(root)
+    const transcriptsDir = join(root, "transcripts")
+    await writeJournal(transcriptsDir, "held", [
+      textEntry("held", 0, "locked but readable", "2026-08-10T11:00:00.000Z"),
+    ])
+    const lockPath = join(transcriptsDir, "held", "state.lock")
+    await writeFile(lockPath, `${process.pid}\n`, "utf8")
+
+    // when
+    const result = await selectDreamConversations({
+      transcriptsDir,
+      autoSelectMax: 1,
+      autoSelectMaxBytes: 10_000,
+      now: () => NOW,
+    })
+
+    // then
+    expect(result.conversationIds).toEqual(["held"])
+    expect(await readFile(lockPath, "utf8")).toBe(`${process.pid}\n`)
+  }, 15_000)
+
+  test("#given a torn trailing transcript line #when volume and selection run #then the torn row is skipped and valid rows still count", async () => {
+    // given
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "dream-selector-torn-")))
+    tempDirs.push(root)
+    const transcriptsDir = join(root, "transcripts")
+    await writeJournal(transcriptsDir, "torn", [
+      textEntry("torn", 0, "intact row", "2026-08-10T11:00:00.000Z"),
+    ])
+    await appendFile(join(transcriptsDir, "torn", "transcript.jsonl"), '{"kind":"assistant","text":"torn', "utf8")
+
+    // when
+    const volume = await computeUnreflectedVolume({
+      transcriptsDir,
+      autoSelectMax: 1,
+      autoSelectMaxBytes: 10_000,
+      now: () => NOW,
+    })
+    const result = await selectDreamConversations({
+      transcriptsDir,
+      autoSelectMax: 1,
+      autoSelectMaxBytes: 10_000,
+      now: () => NOW,
+    })
+
+    // then
+    expect(volume).toBe(Buffer.byteLength("intact row", "utf8"))
+    expect(result.conversationIds).toEqual(["torn"])
   })
 })

@@ -1,9 +1,14 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import { acquireLock, createLockRecord, memoryWriterLockPath, releaseLock } from "@oh-my-opencode/memory-core"
 
 import { createMemoryTools } from "./tools"
 import { boundFixture, git, textOf } from "./tools.test-support"
+
+// Each case initializes a real Git repo and drives writer-lock contention through git children.
+// Match the 60s process test ceiling used by the supervisor suites: the 5s default is a fast-machine
+// assumption, and on a loaded Windows runner the previous file's cleanup is billed to this budget.
+setDefaultTimeout(60_000)
 
 describe("memory tool execution", () => {
   test("#given the writer lock is held #when a tool executes #then the contention surfaces as an error result", async () => {

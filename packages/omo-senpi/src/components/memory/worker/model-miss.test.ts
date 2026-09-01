@@ -29,6 +29,50 @@ describe("classifyRetryableModelMiss", () => {
     expect(miss).toEqual({ kind: "auth_missing", provider: "anthropic" })
   })
 
+  test("#given a provider cooldown 503 child failure #when classified #then it is retryable as a provider outage", () => {
+    // given: the exact stderr a reflection child died with while apitopia was cooling down
+    const child = result('503: {"message":"All providers are temporarily cooling down"}')
+
+    // when
+    const miss = classifyRetryableModelMiss(child)
+
+    // then
+    expect(miss).toEqual({
+      kind: "provider_unavailable",
+      detail: '503: {"message":"All providers are temporarily cooling down"}',
+    })
+  })
+
+  test("#given an exhausted senpi fallback chain #when classified #then the provider outage is still retryable on the next candidate", () => {
+    // given
+    const child = result("All configured providers are temporarily unavailable")
+
+    // when
+    const miss = classifyRetryableModelMiss(child)
+
+    // then
+    expect(miss).toEqual({
+      kind: "provider_unavailable",
+      detail: "All configured providers are temporarily unavailable",
+    })
+  })
+
+  test("#given a billing exhaustion child failure #when classified #then it is not retryable because another model cannot fix it", () => {
+    // given
+    const child = result("Error: quota exceeded for this organization")
+
+    // when / then
+    expect(classifyRetryableModelMiss(child)).toBeUndefined()
+  })
+
+  test("#given a prompt-shaped child failure #when classified #then it is not retryable", () => {
+    // given
+    const child = result("Error: context length exceeded for the submitted transcript")
+
+    // when / then
+    expect(classifyRetryableModelMiss(child)).toBeUndefined()
+  })
+
   test("#given a timeout or successful child #when classified #then it is not retryable", () => {
     // given
     const timeout = { ...result("No API key found for anthropic"), timedOut: true }

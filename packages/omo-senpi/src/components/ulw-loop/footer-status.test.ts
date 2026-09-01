@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentLogger } from "../../extension/types"
 import { createUlwLoopComponent } from "./index"
-import { activeStatus, completeStatus, createLogger } from "./ulw-loop.test-support"
+import { activeStatus, completeStatus, createLogger, sessionEventCtx } from "./ulw-loop.test-support"
 
 type StatusCall = {
   readonly key: string
@@ -58,6 +58,7 @@ async function registerFooterScenario(input: {
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent({
     resolveOmoBin: () => "/tmp/omo",
+    planDirExists: () => true,
     runCommand: async () => ({ code: 0, stdout: input.outputs.shift() ?? activeStatus() }),
     footerStatus: {
       isGoalActive: input.goalActive,
@@ -86,6 +87,7 @@ async function defaultFooterScenario(sessionId: string, outputs = [activeStatus(
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent({
     resolveOmoBin: () => "/tmp/omo",
+    planDirExists: () => true,
     runCommand: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     footerStatus: { timers },
   }).register(pi, {
@@ -166,7 +168,7 @@ describe("omo-senpi ulw-loop footer status", () => {
       timers,
     })
 
-    await pi.dispatch("session_start", { type: "session_start" }, { cwd: "/repo", ui })
+    await pi.dispatch("session_start", { type: "session_start" }, sessionEventCtx("/repo", { ui }))
     timers.fire()
     timers.fire()
     timers.fire()
@@ -192,18 +194,18 @@ describe("omo-senpi ulw-loop footer status", () => {
       timers,
     })
 
-    await pi.dispatch("session_start", { type: "session_start" }, { cwd: "/repo", ui })
+    await pi.dispatch("session_start", { type: "session_start" }, sessionEventCtx("/repo", { ui }))
     expect(ui.calls).toHaveLength(0)
 
     goalActive = true
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo", ui })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo", { ui }))
     expect(timers.activeCount()).toBe(1)
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo", ui })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo", { ui }))
     expect(ui.calls.at(-1)).toEqual({ key: "ulw-loop", text: undefined })
     expect(timers.activeCount()).toBe(0)
 
-    await pi.dispatch("session_shutdown", { type: "session_shutdown" }, { cwd: "/repo", ui })
+    await pi.dispatch("session_shutdown", { type: "session_shutdown" }, sessionEventCtx("/repo", { ui }))
     expect(ui.calls.at(-1)).toEqual({ key: "ulw-loop", text: undefined })
     expect(timers.activeCount()).toBe(0)
   })
@@ -217,7 +219,7 @@ describe("omo-senpi ulw-loop footer status", () => {
       timers,
     })
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo", ui })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo", { ui }))
     expect(pi.messages).toHaveLength(1)
     expect(pi.messages[0]?.message["customType"]).toBe("omo-senpi:ulw-continuation")
     expect(ui.calls.some((call) => call.key === "ulw-loop" && visibleFrame(call.text) === "⚡ ultraworking")).toBe(true)
@@ -228,7 +230,7 @@ describe("omo-senpi ulw-loop footer status", () => {
       outputs: [activeStatus()],
       timers: headlessTimers,
     })
-    await expect(headlessPi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })).resolves.toHaveLength(1)
+    await expect(headlessPi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))).resolves.toHaveLength(1)
     expect(headlessPi.messages).toHaveLength(1)
     expect(headlessTimers.activeCount()).toBe(0)
   })

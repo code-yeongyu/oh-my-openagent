@@ -123,7 +123,7 @@ export class ChaosRpcRespawnRunner {
     this.#observations = observations
   }
 
-  start(spec: RpcRunnerSpec): RpcChildHandle {
+  async start(spec: RpcRunnerSpec): Promise<RpcChildHandle> {
     observeLaunch("rpc-respawn", spec.task_id, this.#store, this.#processes, this.#observations)
     const pid = this.#processes.spawn()
     return {

@@ -16,12 +16,14 @@ export {
   deriveState,
   finalizeCursor,
   initialReflectionState,
+  reflectedThroughByteOffset,
   isCanonicalEntry,
   type ReflectionSnapshot,
   type ReflectionTranscriptState,
 } from "./cursor"
 export {
   TranscriptJournal,
+  JournalLockTimeoutError,
   withLocalJournalLock,
   type AppendResult,
   type JournalLock,

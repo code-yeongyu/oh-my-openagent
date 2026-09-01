@@ -4,6 +4,8 @@ import path from "node:path"
 import {
   LOCK_DOMAINS,
   factsQueueLockPath,
+  factsRunsLockPath,
+  memoryUsageLockPath,
   memoryWriterLockPath,
   noticeLockPath,
   reflectionSchedulerLockPath,
@@ -22,8 +24,10 @@ describe("lock domain paths", () => {
       memoryWriterLockPath(locksDirectory),
       reflectionSchedulerLockPath(locksDirectory),
       skillsUsageLockPath(locksDirectory),
+      memoryUsageLockPath(locksDirectory),
       transcriptStateLockPath(locksDirectory, "conversation/../one"),
       factsQueueLockPath(locksDirectory),
+      factsRunsLockPath(locksDirectory),
       noticeLockPath(locksDirectory),
       runFinalizationLockPath(locksDirectory, "run-123"),
     ]
@@ -35,17 +39,21 @@ describe("lock domain paths", () => {
       "reflection-finalize",
       "transcript-state",
       "skills-usage",
+      "memory-usage",
       "facts-queue",
+      "facts-runs",
       "notice",
     ])
     expect(paths[0]).toBe(path.join(locksDirectory, "memory-write.lock"))
     expect(paths[1]).toBe(path.join(locksDirectory, "reflection-scheduler.lock"))
     expect(paths[2]).toBe(path.join(locksDirectory, "skills-usage.lock"))
-    expect(path.dirname(paths[3] ?? "")).toBe(locksDirectory)
-    expect(path.basename(paths[3] ?? "")).toMatch(/^transcript-state-[a-f0-9]{16}\.lock$/)
-    expect(paths[4]).toBe(path.join(locksDirectory, "facts-queue.lock"))
-    expect(paths[5]).toBe(path.join(locksDirectory, "notice.lock"))
-    expect(paths[6]).toBe(path.join(locksDirectory, "finalize-run-123.lock"))
+    expect(paths[3]).toBe(path.join(locksDirectory, "memory-usage.lock"))
+    expect(path.dirname(paths[4] ?? "")).toBe(locksDirectory)
+    expect(path.basename(paths[4] ?? "")).toMatch(/^transcript-state-[a-f0-9]{16}\.lock$/)
+    expect(paths[5]).toBe(path.join(locksDirectory, "facts-queue.lock"))
+    expect(paths[6]).toBe(path.join(locksDirectory, "facts-runs.lock"))
+    expect(paths[7]).toBe(path.join(locksDirectory, "notice.lock"))
+    expect(paths[8]).toBe(path.join(locksDirectory, "finalize-run-123.lock"))
   })
 
   test("#given hostile and distinct run ids #when finalization paths are resolved #then names remain confined and distinct", () => {

@@ -20,6 +20,7 @@ const REQUIRED_ARTIFACTS = [
   "plugin/runtime/agent-toolkit/ulw-loop/cli.js",
   "plugin/runtime/agent-toolkit/omo-agent-toolkit",
   "plugin/runtime/agent-toolkit/omo-agent-toolkit.cmd",
+  "plugin/runtime/dag/sdk.js",
 ]
 
 const MIN_SKILL_COUNT = 18

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -44,7 +45,7 @@ describe("resolveSenpiLaunch", () => {
     }))
 
     // then
-    expect(launch).toEqual({ command: "C:\\node.exe", prefixArgs: [cli] })
+    expect(launch).toEqual({ command: "C:\\node.exe", prefixArgs: [realpathSync.native(cli)] })
   }, 30_000)
 
   test("#given no executable but an installed CLI #when resolved #then the current interpreter launches the CLI", async () => {
@@ -105,6 +106,8 @@ describe("resolveSenpiLaunch", () => {
 
     // then
     expect(child.exitCode).toBe(0)
-    expect(child.stdout.toString().trim()).toMatch(/^\d{4}\.\d+\.\d+/)
+    expect(child.stdout.toString().trim()).toMatch(
+      /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/,
+    )
   }, 30_000)
 })

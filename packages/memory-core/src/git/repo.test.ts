@@ -20,7 +20,9 @@ async function createRepo(agentId = "agent-one") {
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  for (const dir of tempDirs.splice(0)) {
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }).catch(() => undefined)
+  }
 })
 
 describe("GitMemoryRepo", () => {
@@ -169,7 +171,7 @@ describe("GitMemoryRepo", () => {
     const log = await exec.run(["log", "-1", "--format=%an <%ae>"], { cwd: dir, timeoutMs: 30_000 })
     expect(log.stdout.trim()).toBe("Correct Agent <agent-one@omo.local>")
     expect(await readFile(join(dir, "fact.md"), "utf8")).toBe("fact\n")
-  })
+  }, 30_000)
 
   it("#given commits with bodies and changed paths #when log reads history #then metadata trailers ranges filters and optional paths are parsed newest-first", async () => {
     // given
@@ -212,7 +214,7 @@ describe("GitMemoryRepo", () => {
     expect(history[1]?.paths).toEqual(["system/persona.md"])
     expect(filtered.map((commit) => commit.sha)).toEqual([first.sha])
     expect(filtered[0]?.paths).toBeUndefined()
-  })
+  }, 30_000)
 
   it("#given a reflection worktree commit #when it is merged no-ff #then the parent exposes the content and removes the worktree", async () => {
     // given
@@ -240,7 +242,7 @@ describe("GitMemoryRepo", () => {
     expect(await repo.head()).toBe(mergedHead)
     expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
     expect(existsSync(worktreeDir)).toBe(false)
-  })
+  }, 30_000)
 
   it("#given concurrent commits across worktrees #when index and ref locks contend #then every commit lands", async () => {
     // given - reflection commits from per-agent worktrees that share one object store
@@ -253,11 +255,25 @@ describe("GitMemoryRepo", () => {
     const parent = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-worktrees-")))
     tempDirs.push(parent)
 
-    // when - worktrees are added and committed into concurrently
+    // Worktree creation is SETUP, not the behavior under test, and `git worktree add` is not safe to
+    // run concurrently against one repository: while one process creates `.git/worktrees/<name>/`,
+    // another enumerating that directory reads a `commondir` that exists but is not yet written, and
+    // git aborts with `fatal: failed to read .git/worktrees/<name>/commondir` followed by the
+    // platform's spelling of errno 0 ("Success" on Linux, "Undefined error: 0" on macOS).
+    // Reproduced outside this suite with plain git at ~2 failures per 240 concurrent adds, and it
+    // has failed CI on both ubuntu and macos. Adding the worktrees sequentially removes that
+    // setup-only hazard by construction and keeps the assertion on what this test names: concurrent
+    // COMMITS contending on index and ref locks.
+    const checkouts: string[] = []
+    for (let index = 0; index < writers; index++) {
+      const checkout = join(parent, `checkout-${index}`)
+      await repo.worktreeAdd(checkout, `memory/concurrent-${index}`)
+      checkouts.push(checkout)
+    }
+
+    // when - every worktree is committed into concurrently
     const results = await Promise.allSettled(
-      Array.from({ length: writers }, async (_, index) => {
-        const checkout = join(parent, `checkout-${index}`)
-        await repo.worktreeAdd(checkout, `memory/concurrent-${index}`)
+      checkouts.map(async (checkout, index) => {
         await writeFile(join(checkout, "learned.md"), `learned ${index}\n`)
         const child = new GitMemoryRepo({ dir: checkout, agentId: "agent-one" })
         return child.commitWrite(["learned.md"], `concurrent write ${index}`, author)
@@ -273,8 +289,7 @@ describe("GitMemoryRepo", () => {
       result.status === "fulfilled" ? [result.value.sha] : [],
     )
     expect(new Set(shas).size).toBe(writers)
-  })
-
+  }, 30_000)
 
   it("#given a transient ref lock on the first attempt #when a repo is initialized #then the retry lets HEAD settle", async () => {
     // given - git loses the HEAD.lock race once, exactly as it does under Windows contention
@@ -305,7 +320,7 @@ describe("GitMemoryRepo", () => {
     // then - the transient lock must be retried away, not surfaced
     expect(head).toMatch(/^[0-9a-f]{7,}$/)
     expect(failedOnce.has("symbolic-ref")).toBe(true)
-  })
+  }, 30_000)
 
 })
 

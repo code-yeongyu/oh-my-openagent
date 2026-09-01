@@ -11,6 +11,7 @@ import {
   normalizeRendererText,
   rendererVisibleWidth,
 } from "../tools/task/renderers"
+import { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
 import type { CompletionDetails, ParentNotifierMessage } from "./types"
 
 export const FINAL_RESPONSE_TRANSPORT_LIMIT = 32_000
@@ -43,14 +44,19 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
     final_response: finalResponse.text,
     ...(finalResponse.file === undefined ? {} : { final_response_file: finalResponse.file }),
     continuation_hint: continuationHint(record),
+    ...(record.owner?.kind === "dag"
+      ? { dag: { run_id: record.owner.runId, node_id: record.owner.nodeId } }
+      : {}),
   }
   return tokens === undefined ? base : { ...base, tokens }
 }
 
 export function buildCompletionMessage(details: readonly CompletionDetails[]): ParentNotifierMessage {
+  const body = completionMessageLines(details).join("\n")
+  const carriesDag = details.some((detail) => detail.dag !== undefined)
   return {
     customType: "senpi-task.completion",
-    content: completionMessageLines(details).join("\n"),
+    content: carriesDag ? `${body}\n\n${DAG_VERIFICATION_DIRECTIVE}` : body,
     display: false,
     details,
   }

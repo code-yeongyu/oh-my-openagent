@@ -120,6 +120,42 @@ describe("resolveReflectionModel", () => {
     })
   })
 
+  test("#given the LAST canonical rung is selected #when earlier rungs are still findable #then they remain reflection fallbacks", () => {
+    // given: the availability snapshot only lists the last rung, so the category selects it, while
+    // find() (the direct lookup that beats a stale snapshot) still locates the earlier rung.
+    const earlier: SenpiModelPort = { provider: "extension-only", id: "primary" }
+    const selected: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
+    const snapshotRegistry = {
+      getAvailable: () => [selected],
+      find: (provider: string, modelId: string) =>
+        [earlier, selected].find((candidate) =>
+          candidate.provider === provider && candidate.id === modelId
+        ),
+    }
+    const config: OmoConfig = {
+      categories: {
+        quick: {
+          models: [
+            { model: "extension-only/primary", reasoning: "off" },
+            { model: "omo-mock/mock-1", reasoning: "minimal" },
+          ],
+        },
+      },
+    }
+
+    // when
+    const result = resolveReflectionModel("quick", config, snapshotRegistry)
+
+    // then
+    expect(result).toEqual({
+      kind: "resolved",
+      category: "quick",
+      model: "omo-mock/mock-1",
+      thinking: "minimal",
+      fallbacks: [{ model: "extension-only/primary", thinking: "off" }],
+    })
+  })
+
   test("#given legacy fallback_models and a stale availability snapshot #when find locates the chain #then reflection preserves every fallback", () => {
     // given
     const primary: SenpiModelPort = { provider: "extension-only", id: "primary" }
@@ -317,5 +353,34 @@ describe("resolveReflectionModel", () => {
     expect(shouldWarnCategoryUnavailable(globallySuppressed, "quick")).toBe(false)
     expect(shouldWarnCategoryUnavailable(categoryOptIn, "quick")).toBe(true)
     expect(shouldWarnCategoryUnavailable({ categories: { quick: { model: "missing/model" } } }, "quick")).toBe(false)
+  })
+
+  test("#given a pinned user model whose model id contains a slash #when the availability snapshot is stale #then the whole model id is looked up rather than its first segment", () => {
+    // given: apitopia publishes the model id "z-ai/glm-5.2-ultrafast-unlocked", which itself contains a
+    // slash, and the availability snapshot is still empty when reflection resolves the pin.
+    const slashed: SenpiModelPort = { provider: "apitopia", id: "z-ai/glm-5.2-ultrafast-unlocked" }
+    const lookups: { readonly provider: string; readonly modelId: string }[] = []
+    const staleRegistry = {
+      getAvailable: () => [],
+      find: (provider: string, modelId: string) => {
+        lookups.push({ provider, modelId })
+        return provider === slashed.provider && modelId === slashed.id ? slashed : undefined
+      },
+    }
+    const config: OmoConfig = {
+      categories: { quick: { model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked" } },
+    }
+
+    // when
+    const result = resolveReflectionModel("quick", config, staleRegistry)
+
+    // then: the pin resolves, and no lookup ever truncated the model id at its first slash
+    expect(result).toEqual({
+      kind: "resolved",
+      category: "quick",
+      model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+      fallbacks: [],
+    })
+    expect(lookups).not.toContainEqual({ provider: "apitopia", modelId: "z-ai" })
   })
 })

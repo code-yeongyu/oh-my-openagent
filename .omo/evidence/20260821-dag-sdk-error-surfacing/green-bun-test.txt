@@ -1,0 +1,41 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/extension/dag-sdk.test.ts:
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when a cell defines three nodes, starts the run, then waits > #then each call maps to the matching dag tool action in order and wait returns the run result [2.84ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when a shipped attach handle waits and cancels > #then it exposes done and cancel and dispatches the matching dag tool actions [0.47ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when start is called with a whole definition object > #then it forwards the definition verbatim under action=start [0.33ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when define receives only the documented required key > #then start emits a definition accepted by the shipped dag tool schema [1.03ms]
+(pass) dag eval sdk > #when retry is called with node ids and a prompt override > #then it emits action=retry with run_id, node_ids, and prompt [0.33ms]
+(pass) dag eval sdk > #when retry is called with a single node id > #then it emits action=retry with run_id and node_id [0.28ms]
+(pass) dag eval sdk > #when retry is called with no node ids > #then it emits action=retry with only run_id [0.25ms]
+(pass) dag eval sdk > #when send is called > #then it emits action=send with run_id, node_id, and message [0.26ms]
+(pass) dag eval sdk > #when amend is called > #then it emits action=amend with run_id and the new definition [0.23ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when start receives a definition_conflict > #then it throws the tool's own code and human message instead of hiding them behind run_id [0.33ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when wait receives the same error envelope > #then the non-start actions surface the code and message too [0.26ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when attach receives the same error envelope > #then it rejects rather than handing back a handle for a run that was never attached [0.27ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when the error envelope carries no code or message > #then it falls back to the first content text so the operator still sees the tool's words [0.25ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when the error envelope carries neither error fields nor content text > #then it still names the failing action rather than throwing something unreadable [0.23ms]
+(pass) dag eval sdk > #given a well-formed non-error response that still lacks a run_id > #when start reads it > #then the existing run_id diagnostic is preserved [0.23ms]
+(pass) dag eval sdk > #given a builder that already holds a node id > #when the same id is added again > #then it throws locally and the tool stub is never called [0.24ms]
+(pass) dag eval sdk > #given the shipped sdk artifact > #when it is loaded as a module > #then it imports nothing, so an eval worker without node_modules can run it [0.51ms]
+(pass) dag sdk root provisioning > #given the runtime dag directory exists > #when provisioning runs > #then OMO_DAG_SDK_ROOT holds that absolute directory [1.85ms]
+(pass) dag sdk root provisioning > #given the runtime dag directory is absent > #when provisioning runs > #then the env stays untouched rather than pointing at a missing path [1.20ms]
+(pass) dag sdk root provisioning > #given the real extension entry > #when the default provisioning runs > #then OMO_DAG_SDK_ROOT resolves to an existing directory containing sdk.js [2.36ms]
+
+packages/omo-senpi/src/extension/dag-library.test.ts:
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load rotates the key with an explicit suffix and fills {{key}} and {{date}} placeholders [6.95ms]
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load without a suffix stamps a fresh utc datetime suffix so every call is a new run [3.05ms]
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load with an empty suffix keeps the stored key so the run stays idempotent [4.35ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then OMO_DAG_LIBRARY shadows $PWD/.omo/dags which shadows $HOME/.omo/dags [2.59ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then on win32 the library env splits on semicolons so drive-letter paths survive [2.15ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then a missing name fails listing the searched dirs [2.40ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then a definition without a nodes array fails before any host round-trip [4.34ms]
+(pass) dag definition library > #given a stubbed tool.dag > #then start loads, rotates, and starts the run in one call and the handle wires done/cancel [4.42ms]
+(pass) dag definition library > #given the dag tool refuses the start with a details.kind=error envelope > #then start throws the tool's own code and human message [2.49ms]
+(pass) dag definition library > #given the dag tool refuses the start with a details.kind=error envelope > #then an error envelope without error fields still falls back to the tool's content text [4.13ms]
+(pass) dag definition library > #given a well-formed non-error start response that still lacks a run_id > #then the existing run_id diagnostic is preserved [2.30ms]
+
+ 31 pass
+ 0 fail
+ 63 expect() calls
+Ran 31 tests across 2 files. [845.00ms]

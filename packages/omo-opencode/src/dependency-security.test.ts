@@ -23,7 +23,7 @@ type BunLock = {
   packages?: Record<string, [string, ...unknown[]]>
 }
 
-const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.4"
+const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.7"
 const REPOSITORY_ROOT = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = __repoRootFrom(REPOSITORY_ROOT)
 const FIRST_PARTY_SOURCE_PATHS = ["packages", "script", "test-support"] as const
@@ -122,7 +122,7 @@ describe("dependency security", () => {
     expect(opencodePluginDependencies).toMatchObject({
       dependencies: expect.objectContaining({ effect: expect.any(String) }),
     })
-    expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.66")
+    expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.83")
   })
 
   // The scan spawns `git grep -P` over every first-party source and already bounds that spawn at

@@ -1,9 +1,12 @@
-import { afterAll, describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import { registerPalaceCommand, type PalaceCommandContext } from "./command"
 import { cleanupPalaceFixtures, createPalaceFixture, type PalaceFixture } from "./palace.test-support"
+
+// Palace fixtures perform Git-backed generation and recursive cleanup on every platform branch.
+setDefaultTimeout(60_000)
 
 afterAll(cleanupPalaceFixtures)
 

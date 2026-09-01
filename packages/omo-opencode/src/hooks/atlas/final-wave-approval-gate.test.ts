@@ -1,17 +1,14 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { randomUUID } from "node:crypto"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { createOpencodeClient } from "@opencode-ai/sdk"
-import type { AssistantMessage, Session } from "@opencode-ai/sdk"
-import type { BoulderState } from "../../features/boulder-state"
-import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
+import { describe, expect, test } from "bun:test"
+import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
 import { classifyFinalWaveVerdict } from "./final-wave-approval-gate"
+import {
+  createFinalWaveAfterHandlerHarness,
+  createFinalWaveMockPluginInput,
+  registerFinalWaveTestEnvironment,
+  writeFinalWavePlanState,
+} from "./final-wave-approval-gate.test-support"
 import { createAtlasHook } from "./index"
-
-type AtlasHookContext = Parameters<typeof createAtlasHook>[0]
-type PromptMock = ReturnType<typeof mock>
+import { createToolExecuteAfterHandler } from "./tool-execute-after"
 
 describe("classifyFinalWaveVerdict", () => {
   test("returns approve when the output carries an APPROVE verdict", () => {
@@ -108,84 +105,27 @@ bun test packages/omo-opencode/src/hooks/atlas/final-wave-approval-gate.test.ts
 })
 
 describe("Atlas final verification approval gate", () => {
-  let testDirectory = ""
+  const env = registerFinalWaveTestEnvironment({ resetAgentRegistration: true })
 
-  function createMockPluginInput(): AtlasHookContext & { _promptMock: PromptMock } {
-    const client = createOpencodeClient({ baseUrl: "http://localhost" })
-    const promptMock = mock((input: unknown) => input)
-
-    Reflect.set(client.session, "prompt", async (input: unknown) => {
-      promptMock(input)
-      return {
-        data: { info: {} as AssistantMessage, parts: [] },
-        request: new Request("http://localhost/session/prompt"),
-        response: new Response(),
-      }
-    })
-
-    Reflect.set(client.session, "promptAsync", async (input: unknown) => {
-      promptMock(input)
-      return {
-        data: undefined,
-        request: new Request("http://localhost/session/prompt_async"),
-        response: new Response(),
-      }
-    })
-
-    Reflect.set(client.session, "get", async ({ path }: { path: { id: string } }) => {
-      const parentID = path.id === "ses_final_wave_review"
-        ? "atlas-final-wave-session"
-        : path.id === "ses_feature_task"
-          ? "atlas-non-final-session"
-          : "main-session-123"
-      return {
-        data: {
-          id: path.id,
-          parentID,
-        } as Session,
-        request: new Request(`http://localhost/session/${path.id}`),
-        response: new Response(),
-      }
-    })
-
-    Reflect.set(client.tui, "showToast", async () => ({
-      data: undefined,
-      request: new Request("http://localhost/tui/show-toast"),
-      response: new Response(),
-    }))
-
-    return {
-      directory: testDirectory,
-      project: {} as AtlasHookContext["project"],
-      worktree: testDirectory,
-      serverUrl: new URL("http://localhost"),
-      $: {} as AtlasHookContext["$"],
-      client,
-      _promptMock: promptMock,
-    }
+  const resolveParentSessionID = (taskSessionID: string): string => {
+    if (taskSessionID === "ses_final_wave_review") return "atlas-final-wave-session"
+    if (taskSessionID === "ses_feature_task") return "atlas-non-final-session"
+    return "main-session-123"
   }
 
-  beforeEach(() => {
-    testDirectory = join(tmpdir(), `atlas-final-wave-test-${randomUUID()}`)
-    mkdirSync(join(testDirectory, ".omo"), { recursive: true })
-    clearBoulderState(testDirectory)
-  })
-
-  afterEach(() => {
-    clearBoulderState(testDirectory)
-    if (existsSync(testDirectory)) {
-      rmSync(testDirectory, { recursive: true, force: true })
-    }
-  })
+  function createMockPluginInput() {
+    return createFinalWaveMockPluginInput({ directory: env.directory, resolveParentSessionID })
+  }
 
   test("waits for explicit user approval after the last final-wave approval arrives", async () => {
     // given
     const sessionID = "atlas-final-wave-session"
 
-    const planPath = join(testDirectory, "final-wave-plan.md")
-    writeFileSync(
-      planPath,
-      `# Plan
+    writeFinalWavePlanState({
+      directory: env.directory,
+      sessionID,
+      planName: "final-wave-plan",
+      planContent: `# Plan
 
 ## TODOs
 - [x] 1. Ship the implementation
@@ -196,19 +136,13 @@ describe("Atlas final verification approval gate", () => {
 - [x] F3. **Real Manual QA** - \`unspecified-high\`
 - [ ] F4. **Scope Fidelity Check** - \`deep\`
 `,
-    )
-
-    const state: BoulderState = {
-      active_plan: planPath,
-      started_at: "2026-01-02T10:00:00Z",
-      session_ids: [sessionID],
-      plan_name: "final-wave-plan",
-      agent: "atlas",
-    }
-    writeBoulderState(testDirectory, state)
+    })
 
     const mockInput = createMockPluginInput()
-    const hook = createAtlasHook(mockInput, { directory: testDirectory, isCallerOrchestrator: async () => true })
+    const hook = createAtlasHook(mockInput, {
+      directory: env.directory,
+      isCallerOrchestrator: async () => true,
+    })
     const toolOutput = {
       title: "Sisyphus Task",
       output: `Tasks [4/4 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: APPROVE
@@ -219,26 +153,93 @@ session_id: ses_final_wave_review
       metadata: {},
     }
 
-    // when
+    // when - the final result enters the pause state, then the real idle path runs
     await hook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
+    expect(toolOutput.output).toContain("ses_final_wave_review")
+    mockInput._promptMock.mockClear()
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
 
-    // then
-    expect(toolOutput.output).toContain("FINAL WAVE APPROVAL GATE")
-    expect(toolOutput.output).toContain("explicit user approval")
-    expect(toolOutput.output).not.toContain("STEP 8: PROCEED TO NEXT TASK")
+    // then - idle observes the shared pause state and does not inject a continuation
     expect(mockInput._promptMock).not.toHaveBeenCalled()
+  })
 
+  test("does not dispatch completed-plan continuation when the plan reads complete while waiting for final-wave approval", async () => {
+    // given
+    const sessionID = "atlas-final-wave-session"
+
+    writeFinalWavePlanState({
+      directory: env.directory,
+      sessionID,
+      planName: "final-wave-complete-race-plan",
+      planContent: `# Plan
+
+## TODOs
+- [x] 1. Ship the implementation
+
+## Final Verification Wave (MANDATORY - after ALL implementation tasks)
+- [x] F1. **Plan Compliance Audit** - \`oracle\`
+- [x] F2. **Code Quality Review** - \`unspecified-high\`
+- [x] F3. **Real Manual QA** - \`unspecified-high\`
+- [ ] F4. **Scope Fidelity Check** - \`deep\`
+`,
+    })
+
+    const mockInput = createMockPluginInput()
+    const hook = createAtlasHook(mockInput, {
+      directory: env.directory,
+      isCallerOrchestrator: async () => true,
+    })
+    const toolOutput = {
+      title: "Sisyphus Task",
+      output: `Tasks [4/4 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: APPROVE
+
+<task_metadata>
+session_id: ses_final_wave_review
+</task_metadata>`,
+      metadata: {},
+    }
+
+    // when - the last final-wave reviewer approves and parks the session in the approval wait
+    const outputLengthBeforeApproval = toolOutput.output.length
+    await hook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
+    expect(toolOutput.output.length).toBeGreaterThan(outputLengthBeforeApproval)
+
+    // and the reviewer's F4 checkbox update lands after the pause, so the plan now reads complete
+    const planPath = writeFinalWavePlanState({
+      directory: env.directory,
+      sessionID,
+      planName: "final-wave-complete-race-plan",
+      planContent: `# Plan
+
+## TODOs
+- [x] 1. Ship the implementation
+
+## Final Verification Wave (MANDATORY - after ALL implementation tasks)
+- [x] F1. **Plan Compliance Audit** - \`oracle\`
+- [x] F2. **Code Quality Review** - \`unspecified-high\`
+- [x] F3. **Real Manual QA** - \`unspecified-high\`
+- [x] F4. **Scope Fidelity Check** - \`deep\`
+`,
+    })
+    expect(getPlanProgress(planPath).isComplete).toBe(true)
+
+    mockInput._promptMock.mockClear()
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+    // then - the approval gate wins over the completed-plan branch: no completion nudge and no boulder completion
+    expect(mockInput._promptMock).not.toHaveBeenCalled()
+    expect(readBoulderState(env.directory)?.status).not.toBe("completed")
   })
 
   test("pauses for escalation when a final-wave reviewer rejects", async () => {
     // given
     const sessionID = "atlas-final-wave-session"
 
-    const planPath = join(testDirectory, "final-wave-reject-plan.md")
-    writeFileSync(
-      planPath,
-      `# Plan
+    writeFinalWavePlanState({
+      directory: env.directory,
+      sessionID,
+      planName: "final-wave-reject-plan",
+      planContent: `# Plan
 
 ## TODOs
 - [x] 1. Ship the implementation
@@ -249,19 +250,13 @@ session_id: ses_final_wave_review
 - [ ] F3. **Real Manual QA** - \`unspecified-high\`
 - [ ] F4. **Scope Fidelity Check** - \`deep\`
 `,
-    )
+    })
 
-    const state: BoulderState = {
-      active_plan: planPath,
-      started_at: "2026-01-02T10:00:00Z",
-      session_ids: [sessionID],
-      plan_name: "final-wave-reject-plan",
-      agent: "atlas",
-    }
-    writeBoulderState(testDirectory, state)
-
-    const mockInput = createMockPluginInput()
-    const hook = createAtlasHook(mockInput, { directory: testDirectory, isCallerOrchestrator: async () => true })
+    const handler = createFinalWaveAfterHandlerHarness({
+      sessionID,
+      ctx: createMockPluginInput(),
+      createHandler: createToolExecuteAfterHandler,
+    })
     const toolOutput = {
       title: "Sisyphus Task",
       output: `Manual QA could not verify the shipped behavior.
@@ -275,26 +270,22 @@ session_id: ses_final_wave_review
     }
 
     // when
-    await hook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
-    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await handler.run(toolOutput)
 
-    // then
-    expect(toolOutput.output).toContain("FINAL REVIEW REJECTED")
-    expect(toolOutput.output).toContain("Boulder paused")
-    expect(toolOutput.output).toContain("VERDICT: REJECT")
-    expect(toolOutput.output).not.toContain("COMPLETION GATE")
-    expect(toolOutput.output).not.toContain("STEP 8")
-    expect(mockInput._promptMock).not.toHaveBeenCalled()
+    // then - output is wrapped and the boulder enters the pause state
+    expect(toolOutput.output).toContain("<system-reminder>")
+    expect(handler.sessionState.waitingForFinalWaveApproval).toBe(true)
   })
 
   test("keeps normal auto-continue instructions for non-final tasks", async () => {
     // given
     const sessionID = "atlas-non-final-session"
 
-    const planPath = join(testDirectory, "implementation-plan.md")
-    writeFileSync(
-      planPath,
-      `# Plan
+    writeFinalWavePlanState({
+      directory: env.directory,
+      sessionID,
+      planName: "implementation-plan",
+      planContent: `# Plan
 
 ## TODOs
 - [x] 1. Setup
@@ -306,19 +297,11 @@ session_id: ses_final_wave_review
 - [ ] F3. **Real Manual QA** - \`unspecified-high\`
 - [ ] F4. **Scope Fidelity Check** - \`deep\`
 `,
-    )
+    })
 
-    const state: BoulderState = {
-      active_plan: planPath,
-      started_at: "2026-01-02T10:00:00Z",
-      session_ids: [sessionID],
-      plan_name: "implementation-plan",
-      agent: "atlas",
-    }
-    writeBoulderState(testDirectory, state)
-
-    const hook = createAtlasHook(createMockPluginInput(), {
-      directory: testDirectory,
+    const mockInput = createMockPluginInput()
+    const hook = createAtlasHook(mockInput, {
+      directory: env.directory,
       isCallerOrchestrator: async () => true,
     })
     const toolOutput = {
@@ -333,11 +316,10 @@ session_id: ses_feature_task
 
     // when
     await hook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
 
-    // then
-    expect(toolOutput.output).toContain("COMPLETION GATE")
-    expect(toolOutput.output).toContain("STEP 8: PROCEED TO NEXT TASK")
-    expect(toolOutput.output).not.toContain("FINAL WAVE APPROVAL GATE")
-
+    // then - non-final task output is wrapped and the boulder auto-continues
+    expect(toolOutput.output).toContain("<system-reminder>")
+    expect(mockInput._promptMock).toHaveBeenCalled()
   })
 })
