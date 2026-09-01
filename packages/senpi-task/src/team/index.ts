@@ -78,6 +78,8 @@ export type {
 } from "./messaging"
 export {
   MEMBER_EXTENSION_BUNDLE_NAME,
+  MEMBER_IDENTITY_ENV,
+  isTeamMemberProcess,
   parseMemberExtensionEnv,
   resolveMemberExtensionEntryPath,
 } from "./member-extension"

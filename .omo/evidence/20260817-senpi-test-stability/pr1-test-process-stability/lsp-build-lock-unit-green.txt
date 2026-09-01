@@ -1,0 +1,57 @@
+WHAT CHANGED
+
+`test-setup.ts` now awaits a dedicated vendored LSP bootstrap helper.
+
+`script/ensure-vendored-lsp-daemon.ts`:
+
+- derives a per-worktree lock path from the canonical package path;
+- acquires the lock with atomic exclusive creation;
+- records and reaps only dead lock owners;
+- lets contenders subscribe with `fs.watch` before rechecking lock/output state;
+- runs exactly `npm ci` then `npm run build` once;
+- throws on install/build failure or missing output;
+- always releases the lock in `finally`;
+- uses a 300-second failure ceiling, with no sleep or polling delay.
+
+FOCUSED GREEN COMMAND
+
+  npm exec --yes --package=bun@1.3.12 -- bun test \
+    script/ensure-vendored-lsp-daemon.test.ts \
+    script/test-environment-isolation.test.ts \
+    packages/omo-opencode/src/cli/run/on-complete-hook.test.ts
+
+FOCUSED GREEN OBSERVED
+
+  12 pass
+  0 fail
+  25 expect() calls
+  Ran 12 tests across 3 files. [232.00ms]
+
+TYPECHECK COMMANDS
+
+  npm exec --yes --package=bun@1.3.12 -- bun run typecheck:script
+  npm exec --yes --package=bun@1.3.12 -- \
+    bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+TYPECHECK OBSERVED
+
+  typecheck:script exit=0
+  omo-opencode tsgo exit=0
+
+WHY THIS IS ENOUGH
+
+The formerly failing concurrency assertion now observes one install while two
+callers both complete. Existing preload isolation and on-complete hook tests
+remain green. Both changed TypeScript domains typecheck cleanly.
+
+REMAINING REAL-SURFACE PROOF
+
+A second two-process run against a deliberately removed real
+`packages/lsp-daemon/{dist,node_modules}` will confirm one build entry and two
+successful test processes after the concurrent Senpi child finishes using the
+shared worktree.
+
+OMITTED
+
+Routine passing assertion lines were summarized. No secret-bearing output was
+captured.

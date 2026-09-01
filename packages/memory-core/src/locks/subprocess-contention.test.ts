@@ -61,7 +61,7 @@ async function createFixture(): Promise<{ directory: string; lockPath: string; c
 afterEach(async () => {
   for (const child of children) child.kill("SIGKILL")
   await Promise.all(temporaryDirectories.splice(0).map(async (directory) => {
-    await rm(directory, { recursive: true, force: true })
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }))
 })
 

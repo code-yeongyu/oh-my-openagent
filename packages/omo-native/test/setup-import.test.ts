@@ -3,15 +3,18 @@ import { createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
 import {
   chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
-  rmSync, statSync, writeFileSync,
+  statSync, writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { teardownRoots, withDatabase } from "./teardown.test-support"
 
-// Bun 1.3.12 (the pinned CI runtime) ships no node:sqlite at all, so the module loads lazily and the
-// fixtures that need a real database skip there. Production degrades the same way: setup-import.js
-// reports the database credentials as not imported when the import throws.
+// Older Bun runtimes ship no node:sqlite at all, so the module loads lazily and the fixtures that
+// need a real database skip there. Production degrades the same way: setup-import.js reports the
+// database credentials as not imported when the import throws. The pinned CI runtime is now Bun
+// 1.4.0, which does provide node:sqlite on Windows too, so these fixtures really open database files
+// under the temp root - see teardown.test-support.ts for why teardown has to own those handles.
 const SQLITE_AVAILABLE = await (async () => {
   try {
     await import("node:sqlite")
@@ -45,20 +48,22 @@ function write(path: string, content: string): void {
 async function database(path: string, version: number, rows: Array<[string, string, string, string | null]>): Promise<void> {
   mkdirSync(dirname(path), { recursive: true })
   const DatabaseSync = await loadDatabaseSync()
-  const db = new DatabaseSync(path)
-  db.exec(`
-    CREATE TABLE auth_schema_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL);
-    INSERT INTO auth_schema_version VALUES (1, ${version});
-    CREATE TABLE auth_credentials (
-      id INTEGER PRIMARY KEY, provider TEXT NOT NULL, credential_type TEXT NOT NULL,
-      data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
-    );
-  `)
-  const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
-  for (const [provider, type, key, disabled] of rows) {
-    insert.run(provider, type, JSON.stringify({ key }), disabled)
-  }
-  db.close()
+  // withDatabase closes the handle on every exit path (including a throwing exec/run) and tracks it
+  // for teardown, so no Windows file handle inside the temp root can outlive the fixture.
+  withDatabase(new DatabaseSync(path), (db) => {
+    db.exec(`
+      CREATE TABLE auth_schema_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL);
+      INSERT INTO auth_schema_version VALUES (1, ${version});
+      CREATE TABLE auth_credentials (
+        id INTEGER PRIMARY KEY, provider TEXT NOT NULL, credential_type TEXT NOT NULL,
+        data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
+      );
+    `)
+    const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
+    for (const [provider, type, key, disabled] of rows) {
+      insert.run(provider, type, JSON.stringify({ key }), disabled)
+    }
+  })
 }
 
 function fixture(): Fixture {
@@ -76,13 +81,18 @@ function fixture(): Fixture {
 
 function run(item: Fixture, args: string[], ttyInput?: string) {
   const before = sourceSnapshot(item)
-  const env = {
-    ...process.env, HOME: item.home, SENPI_CODING_AGENT_DIR: item.agentDir,
+  const env: NodeJS.ProcessEnv = {
+    ...process.env, HOME: item.home, USERPROFILE: item.home, SENPI_CODING_AGENT_DIR: item.agentDir,
     XDG_DATA_HOME: item.xdg,
   }
+  delete env.OMO_CODING_AGENT_DIR
+  delete env.PI_CODING_AGENT_DIR
+  // spawnSync only returns after the child exited and was reaped, so teardown never races a live
+  // child; a surfaced spawn error must fail here instead of being read as empty output.
   const result = ttyInput === undefined
     ? spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env })
     : spawnSync("python3", [TTY_DRIVER, ttyInput, "[y/N]", process.execPath, item.launcher, ...args], { encoding: "utf8", env })
+  if (result.error) throw result.error
   transcripts.push(`${result.stdout}${result.stderr}`)
   expectSourcesUntouched(before)
   return result
@@ -114,11 +124,15 @@ function expectSourcesUntouched(before: ReturnType<typeof sourceSnapshot>): void
 }
 
 afterEach(() => {
-  for (const transcript of transcripts) {
-    for (const secret of secrets) expect(transcript).not.toContain(secret)
+  try {
+    for (const transcript of transcripts) {
+      for (const secret of secrets) expect(transcript).not.toContain(secret)
+    }
+  } finally {
+    // A leaking-secret assertion must not also leak the temp roots for the rest of the run.
+    transcripts.length = 0
+    teardownRoots(roots)
   }
-  transcripts.length = 0
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 describe("omo setup credential inheritance", () => {
@@ -157,8 +171,12 @@ describe("omo setup credential inheritance", () => {
     ])
 
     const result = run(item, ["setup", "--yes"])
+    const output = `${result.stdout}${result.stderr}`
 
     expect(result.status).toBe(0)
+    expect(output).not.toContain("could not inspect agent.db")
+    expect(output).toContain("imported: 2")
+    expect(existsSync(join(item.agentDir, "auth.json"))).toBe(true)
     expect(auth(item)).toEqual({
       google: { type: "api_key", key: secrets[0] },
       openai: { type: "api_key", key: secrets[1] },
@@ -197,7 +215,9 @@ describe("omo setup credential inheritance", () => {
     const files = readdirSync(item.agentDir)
     const backup = files.find((name) => /^auth\.json\.bak-\d{8}T\d{6}\.\d{3}Z$/.test(name))
     expect(first.status).toBe(0)
-    expect(statSync(join(item.agentDir, "auth.json")).mode & 0o777).toBe(0o600)
+    // Windows has no POSIX mode bits: chmod is a no-op and stat reports a default, so the 0600
+    // contract is only assertable where permission bits actually exist.
+    if (process.platform !== "win32") expect(statSync(join(item.agentDir, "auth.json")).mode & 0o777).toBe(0o600)
     expect(backup).toBeDefined()
     expect(readFileSync(join(item.agentDir, backup!), "utf8")).toBe(original)
     const afterFirst = readFileSync(join(item.agentDir, "auth.json"), "utf8")
@@ -210,15 +230,22 @@ describe("omo setup credential inheritance", () => {
     expect(readdirSync(item.agentDir)).toEqual(files)
   })
 
-  test("#given dry-run or declined consent #when setup runs #then auth remains absent", () => {
-    for (const [args, input] of [[["setup", "--dry-run"], undefined], [["setup"], "n\n"]] as const) {
-      const item = fixture()
-      write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({ openai: { type: "api", key: secrets[0] } }))
-      const result = run(item, [...args], input)
-      expect(result.status).toBe(0)
-      expect(existsSync(join(item.agentDir, "auth.json"))).toBe(false)
-      expect(`${result.stdout}${result.stderr}`).toContain(input === undefined ? "DRY RUN" : "Import cancelled")
-    }
+  test("#given dry-run #when setup runs #then auth remains absent", () => {
+    const item = fixture()
+    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({ openai: { type: "api", key: secrets[0] } }))
+    const result = run(item, ["setup", "--dry-run"])
+    expect(result.status).toBe(0)
+    expect(existsSync(join(item.agentDir, "auth.json"))).toBe(false)
+    expect(`${result.stdout}${result.stderr}`).toContain("DRY RUN")
+  })
+
+  test.skipIf(process.platform === "win32")("#given declined consent #when setup runs #then auth remains absent", () => {
+    const item = fixture()
+    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({ openai: { type: "api", key: secrets[0] } }))
+    const result = run(item, ["setup"], "n\n")
+    expect(result.status).toBe(0)
+    expect(existsSync(join(item.agentDir, "auth.json"))).toBe(false)
+    expect(`${result.stdout}${result.stderr}`).toContain("Import cancelled")
   })
 
   test("#given malformed senpi auth #when accepted #then it warns and skips all writes", () => {
@@ -244,5 +271,28 @@ describe("omo setup credential inheritance", () => {
     expect(result.stdout).toContain('"models": {')
     expect(result.stdout).toContain("<custom-baseUrl-provider>/<model-id>")
     expect(existsSync(join(item.agentDir, "models.json"))).toBe(false)
+  })
+})
+
+describe("omo setup import", () => {
+  describe("#given no agent directory is configured", () => {
+    describe("#when credentials are imported", () => {
+      test("#then they land in the canonical branded directory", () => {
+        const item = fixture()
+        write(
+          join(item.xdg, "opencode", "auth.json"),
+          JSON.stringify({ google: { type: "api", key: "IMPORT-SECRET" } }),
+        )
+        const env: NodeJS.ProcessEnv = { ...process.env, HOME: item.home, USERPROFILE: item.home, XDG_DATA_HOME: item.xdg }
+        delete env.OMO_CODING_AGENT_DIR
+        delete env.SENPI_CODING_AGENT_DIR
+        delete env.PI_CODING_AGENT_DIR
+
+        const result = spawnSync(process.execPath, [item.launcher, "setup", "--yes"], { encoding: "utf8", env })
+
+        expect(result.status).toBe(0)
+        expect(existsSync(join(item.home, ".omo", "agent", "auth.json"))).toBe(true)
+      })
+    })
   })
 })

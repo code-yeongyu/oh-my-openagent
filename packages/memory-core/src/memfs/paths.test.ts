@@ -26,7 +26,7 @@ function createFixture(): { base: string; root: string } {
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 

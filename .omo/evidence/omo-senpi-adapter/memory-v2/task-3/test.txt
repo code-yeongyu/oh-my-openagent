@@ -1,0 +1,359 @@
+=== RED: targeted todo 3 tests before implementation ===
+Command: bun test packages/memory-core/src/git/repo.test.ts packages/memory-core/src/compile/compile.test.ts packages/memory-core/src/compile/cache.test.ts packages/memory-core/src/tools/memory.test.ts packages/memory-core/src/tools/memory-apply-patch.test.ts packages/omo-senpi/src/components/memory/nudge-wiring.test.ts packages/omo-senpi/src/mcp/memory-server.test.ts
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/mcp/memory-server.test.ts:
+(pass) omo-memory MCP server > #given initialize #then server info and tool capabilities are returned [0.46ms]
+(pass) omo-memory MCP server > #given tools/list #then exactly the two memory tools are exposed [0.09ms]
+262 |   }
+263 |   return segments.join("/")
+264 | }
+265 |
+266 | function commandError(argv: readonly string[], result: GitExecResult): GitCommandError {
+267 |   return new GitCommandError(argv, result.code, result.stdout, result.stderr)
+               ^
+GitCommandError: git -c user.name=Omo Agent -c user.email=project-980a1e1a@omo.local commit -m chore: initialize local memory failed: Frontmatter validation failed:
+  system/human.md: unknown frontmatter key 'kind' (allowed: description read_only limit)
+  system/human.md: unknown frontmatter key 'aliases' (allowed: description read_only limit)
+   argv: [ "-c", "user.name=Omo Agent", "-c", "user.email=project-980a1e1a@omo.local", "commit", "-m",
+  "chore: initialize local memory"
+],
+   code: 1,
+ stdout: "",
+ stderr: "Frontmatter validation failed:\n  system/human.md: unknown frontmatter key 'kind' (allowed: description read_only limit)\n  system/human.md: unknown frontmatter key 'aliases' (allowed: description read_only limit)\n",
+
+      at commandError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:267:10)
+      at git (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:234:34)
+      at async commitStaged (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:218:18)
+      at async init (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:93:28)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/engine-session.ts:46:20)
+      at async withLock (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/locks/acquire.ts:156:18)
+(fail) omo-memory MCP server > #given a fresh project #when create then str_replace run through tools/call #then the memory repo records them [414.45ms]
+262 |   }
+263 |   return segments.join("/")
+264 | }
+265 |
+266 | function commandError(argv: readonly string[], result: GitExecResult): GitCommandError {
+267 |   return new GitCommandError(argv, result.code, result.stdout, result.stderr)
+               ^
+GitCommandError: git -c user.name=Omo Agent -c user.email=project-a1e879fe@omo.local commit -m chore: initialize local memory failed: Frontmatter validation failed:
+  system/human.md: unknown frontmatter key 'kind' (allowed: description read_only limit)
+  system/human.md: unknown frontmatter key 'aliases' (allowed: description read_only limit)
+   argv: [ "-c", "user.name=Omo Agent", "-c", "user.email=project-a1e879fe@omo.local", "commit", "-m",
+  "chore: initialize local memory"
+],
+   code: 1,
+ stdout: "",
+ stderr: "Frontmatter validation failed:\n  system/human.md: unknown frontmatter key 'kind' (allowed: description read_only limit)\n  system/human.md: unknown frontmatter key 'aliases' (allowed: description read_only limit)\n",
+
+      at commandError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:267:10)
+      at git (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:234:34)
+      at async commitStaged (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:218:18)
+      at async init (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:93:28)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/engine-session.ts:46:20)
+      at async withLock (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/locks/acquire.ts:156:18)
+(fail) omo-memory MCP server > #given injected provenance for a non-auto identity #when an MCP memory call runs #then it writes that bound repo with durable turn trailers [401.30ms]
+(pass) omo-memory MCP server > #given an unknown tool name #when called #then an error result is returned [0.41ms]
+
+packages/memory-core/src/tools/memory.test.ts:
+(pass) runMemoryTool > #given create params #when run #then it renders frontmatter, commits under the writer lock, and reports local [240.70ms]
+102 |         provenance: { sessionId: "session-provenance", userTurns: 7 },
+103 |       },
+104 |     })
+105 |
+106 |     // then
+107 |     expect((await setup.repo.log({ limit: 1 }))[0]?.trailers).toEqual({
+                                   ^
+TypeError: setup.repo.log is not a function. (In 'setup.repo.log({ limit: 1 })', 'setup.repo.log' is undefined)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/tools/memory.test.ts:107:30)
+(fail) runMemoryTool > #given accepted-turn provenance #when memory commits #then the in-band writer session and turn trailers are durable [226.47ms]
+(pass) runMemoryTool > #given create omits optional file_text #when run #then an empty body is valid [214.55ms]
+(pass) runMemoryTool > #given a configured remote #when create commits #then the result delegates synchronization to the harness [237.09ms]
+(pass) runMemoryTool > #given two matching body occurrences #when str_replace runs #then only the first occurrence changes [299.99ms]
+(pass) runMemoryTool > #given insert positions below and above the body #when insert runs #then positions clamp to first and lines+1 [383.01ms]
+(pass) runMemoryTool > #given a nested directory #when delete runs #then it recursively removes every tracked file [413.77ms]
+(pass) runMemoryTool > #given an editable file #when rename runs #then it creates parents and tracks old and new paths [303.18ms]
+(pass) runMemoryTool > #given read_only frontmatter #when update_description runs #then it rejects without changing HEAD [248.25ms]
+(pass) runMemoryTool > #given editable frontmatter with read_only false #when update_description runs #then body and flag are preserved [312.01ms]
+(pass) runMemoryTool > #given read_only descendants #when recursive delete runs #then tool-level enforcement rejects the directory [208.26ms]
+(pass) runMemoryTool > #given each editable mutation command targets read_only content #when run #then every command rejects [863.72ms]
+(pass) runMemoryTool > #given invalid and missing command inputs #when run #then caller-neutral typed tool errors retain the memory prefix [746.50ms]
+(pass) runMemoryTool > #given existing or missing targets #when commands require the opposite #then they fail without commits [265.42ms]
+(pass) runMemoryTool > #given byte-identical replacements or descriptions #when commit detects no diff #then it reports no effective changes [588.64ms]
+(pass) runMemoryTool > #given an untracked empty directory #when delete yields no affected tracked paths #then it reports made no changes [161.03ms]
+(pass) runMemoryTool > #given a UTF-16 BOM memory file #when a mutating command reads it #then a typed error asks for UTF-8 conversion [218.19ms]
+(pass) runMemoryTool > #given unrelated dirty files #when a command starts #then cleanCheck fails first with porcelain listing [160.56ms]
+
+packages/memory-core/src/tools/memory-apply-patch.test.ts:
+(pass) memoryApplyPatch > #given an add without frontmatter #when applied #then description is synthesized and reason and author commit [253.88ms]
+94 |       ...params(locksDirectory, "remember patch provenance", input),
+95 |       provenance: { sessionId: "session-patch", userTurns: 9 },
+96 |     })
+97 |
+98 |     // then
+99 |     expect((await repo.log({ limit: 1 }))[0]?.trailers).toEqual({
+                            ^
+TypeError: repo.log is not a function. (In 'repo.log({ limit: 1 })', 'repo.log' is undefined)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/tools/memory-apply-patch.test.ts:99:24)
+(fail) memoryApplyPatch > #given accepted-turn provenance #when a patch commits #then the in-band writer session and turn trailers are durable [217.10ms]
+(pass) memoryApplyPatch > #given add then update in one patch #when applied #then the update sees the pending add [279.52ms]
+(pass) memoryApplyPatch > #given a move followed by an edit #when applied #then target writes are visible and source is deleted [295.84ms]
+(pass) memoryApplyPatch > #given a delete and configured remote #when applied #then writer lock, deletion, and remote result shape are pinned [292.79ms]
+(pass) memoryApplyPatch > #given read_only source or resulting target #when updated #then both are rejected before disk writes [561.97ms]
+(pass) memoryApplyPatch > #given a final line without newline #when a newline-anchored hunk applies #then the sole fallback preserves no newline [285.02ms]
+(pass) memoryApplyPatch > #given near-matching context #when updated #then no fuzzy match is attempted [212.06ms]
+(pass) memoryApplyPatch > #given backticks in mismatched previews #when diagnosed #then the exact hardened format sizes fences safely [220.03ms]
+(pass) memoryApplyPatch > #given oversized failed and current chunks #when diagnosed #then previews truncate at 2000 and 4000 characters [213.96ms]
+(pass) memoryApplyPatch > #given UTF-16LE source #when read #then it is rejected with conversion guidance and remains byte-identical [271.31ms]
+(pass) memoryApplyPatch > #given duplicate add, existing add, and empty patch #when applied #then each fails with the tool prefix [374.05ms]
+
+packages/memory-core/src/compile/cache.test.ts:
+(pass) MemoryBlockCache > #given the same template and HEAD #when compiled twice #then the cached block and timestamp are reused [214.71ms]
+67 |     // then
+68 |     expect(templateChanged).not.toBe(first)
+69 |     expect(headChanged).not.toBe(templateChanged)
+70 |     expect(headChanged).toContain("second")
+71 |     expect(ticks).toBe(3)
+72 |     expect(cache.size).toBe(2)
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 3
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/compile/cache.test.ts:72:24)
+(fail) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each logical session key retains only its latest variant [332.32ms]
+(pass) MemoryBlockCache > #given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry [1267.51ms]
+(pass) MemoryBlockCache > #given template content #when hashed #then the structure version participates in sha256 [0.15ms]
+
+packages/memory-core/src/compile/compile.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'MEMORY_NUDGE_METADATA_TOKEN' not found in module '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/compile/compile.ts'.
+-------------------------------
+
+
+packages/memory-core/src/git/repo.test.ts:
+(pass) GitMemoryRepo > #given a new repository #when it is initialized and a write is committed #then HEAD advances to the committed content [283.91ms]
+(pass) GitMemoryRepo > #given no effective path changes #when commitWrite runs #then it throws a typed no-change error [229.50ms]
+(pass) GitMemoryRepo > #given unrelated uncommitted files #when cleanCheck runs #then it rejects with the porcelain listing [168.21ms]
+(pass) GitMemoryRepo > #given a UTF-16 markdown file is dirty #when cleanCheck runs #then its encoding problem is readable [164.28ms]
+(pass) GitMemoryRepo > #given local identity overrides #when init reconciles config #then email is preserved and agent identity is updated [182.66ms]
+(pass) GitMemoryRepo > #given commit signing is explicitly enabled locally #when init reconciles config #then the override is preserved [141.89ms]
+(pass) GitMemoryRepo > #given conflicting local identity #when a tool write commits #then explicit author flags control attribution [243.80ms]
+162 |       "remember note\n\nOmo-Writer: memory-tool\nOmo-Session: session-2\nOmo-Turn: 4",
+163 |       { agentId: "agent-one", authorName: "Memory Agent", authorEmail: "memory@example.test" },
+164 |     )
+165 |
+166 |     // when
+167 |     const history = await repo.log({ range: `${initial}..HEAD`, includePaths: true })
+                                     ^
+TypeError: repo.log is not a function. (In 'repo.log({ range: `${initial}..HEAD`, includePaths: !0 })', 'repo.log' is undefined)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.test.ts:167:32)
+(fail) GitMemoryRepo > #given commits with bodies and changed paths #when log reads history #then metadata trailers ranges filters and optional paths are parsed newest-first [299.61ms]
+(pass) GitMemoryRepo > #given a reflection worktree commit #when it is merged no-ff #then the parent exposes the content and removes the worktree [293.71ms]
+
+packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './nudge-wiring' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/nudge-wiring.test.ts'
+-------------------------------
+
+
+8 tests failed:
+(fail) omo-memory MCP server > #given a fresh project #when create then str_replace run through tools/call #then the memory repo records them [414.45ms]
+(fail) omo-memory MCP server > #given injected provenance for a non-auto identity #when an MCP memory call runs #then it writes that bound repo with durable turn trailers [401.30ms]
+(fail) runMemoryTool > #given accepted-turn provenance #when memory commits #then the in-band writer session and turn trailers are durable [226.47ms]
+(fail) memoryApplyPatch > #given accepted-turn provenance #when a patch commits #then the in-band writer session and turn trailers are durable [217.10ms]
+(fail) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each logical session key retains only its latest variant [332.32ms]
+(fail) GitMemoryRepo > #given commits with bodies and changed paths #when log reads history #then metadata trailers ranges filters and optional paths are parsed newest-first [299.61ms]
+
+ 42 pass
+ 8 fail
+ 2 errors
+ 105 expect() calls
+Ran 50 tests across 7 files. [14.31s]
+
+=== RED: fresh identity has no git history yet ===
+Command: bun test packages/omo-senpi/src/components/memory/nudge-wiring.test.ts --test-name-pattern "no repository yet"
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:
+326 |   }
+327 |   return segments.join("/")
+328 | }
+329 |
+330 | function commandError(argv: readonly string[], result: GitExecResult): GitCommandError {
+331 |   return new GitCommandError(argv, result.code, result.stdout, result.stderr)
+               ^
+GitCommandError: git log --format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI failed: fatal: cannot change to '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-nudge-CfbJJl/agents/named-agent/repo': No such file or directory
+   argv: [ "log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI" ],
+   code: 128,
+ stdout: "",
+ stderr: "fatal: cannot change to '/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-nudge-CfbJJl/agents/named-agent/repo': No such file or directory",
+
+      at commandError (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:331:10)
+      at git (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:267:34)
+      at async log (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/git/repo.ts:170:48)
+      at async nudgeTurns (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/nudge-wiring.ts:103:36)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:136:23)
+(fail) createMemoryNudgeWiring > #given a threshold on an identity with no repository yet #when nudge state resolves #then the fresh-session baseline is used without requiring git history [167.03ms]
+
+ 0 pass
+ 4 filtered out
+ 1 fail
+Ran 1 test across 1 file. [258.00ms]
+
+=== RED: senpi compiles before started disposition ===
+Command: bun test packages/omo-senpi/src/components/memory/nudge-wiring.test.ts --test-name-pattern "awaiting its started disposition"
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:
+131 |
+132 |     // when
+133 |     const turns = await wiring.nudgeTurns(repo, "session-order", context.identity)
+134 |
+135 |     // then
+136 |     expect(turns).toBe(2)
+                        ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: undefined
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:136:19)
+(fail) createMemoryNudgeWiring > #given one durable accepted turn and a second admitted input awaiting its started disposition #when the prompt compiles #then the projected accepted turn reaches the threshold [197.87ms]
+
+ 0 pass
+ 5 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [292.00ms]
+
+=== GREEN: todo 3 targeted acceptance suite ===
+Command: bun test packages/memory-core/src/git/repo.test.ts packages/memory-core/src/compile/compile.test.ts packages/memory-core/src/compile/cache.test.ts packages/memory-core/src/tools/memory.test.ts packages/memory-core/src/tools/memory-apply-patch.test.ts packages/omo-senpi/src/components/memory/nudge-wiring.test.ts packages/omo-senpi/src/components/memory/prompt.test.ts packages/omo-senpi/src/mcp/memory-server.test.ts
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/mcp/memory-server.test.ts:
+(pass) omo-memory MCP server > #given initialize #then server info and tool capabilities are returned [0.47ms]
+(pass) omo-memory MCP server > #given tools/list #then exactly the two memory tools are exposed [0.13ms]
+(pass) omo-memory MCP server > #given a fresh project #when create then str_replace run through tools/call #then the memory repo records them [1014.36ms]
+(pass) omo-memory MCP server > #given injected provenance for a non-auto identity #when an MCP memory call runs #then it writes that bound repo with durable turn trailers [267.52ms]
+(pass) omo-memory MCP server > #given an unknown tool name #when called #then an error result is returned [0.32ms]
+
+packages/memory-core/src/tools/memory.test.ts:
+(pass) runMemoryTool > #given create params #when run #then it renders frontmatter, commits under the writer lock, and reports local [261.12ms]
+(pass) runMemoryTool > #given accepted-turn provenance #when memory commits #then the in-band writer session and turn trailers are durable [257.89ms]
+(pass) runMemoryTool > #given create omits optional file_text #when run #then an empty body is valid [252.72ms]
+(pass) runMemoryTool > #given a configured remote #when create commits #then the result delegates synchronization to the harness [263.98ms]
+(pass) runMemoryTool > #given two matching body occurrences #when str_replace runs #then only the first occurrence changes [289.88ms]
+(pass) runMemoryTool > #given insert positions below and above the body #when insert runs #then positions clamp to first and lines+1 [385.08ms]
+(pass) runMemoryTool > #given a nested directory #when delete runs #then it recursively removes every tracked file [403.03ms]
+(pass) runMemoryTool > #given an editable file #when rename runs #then it creates parents and tracks old and new paths [340.17ms]
+(pass) runMemoryTool > #given read_only frontmatter #when update_description runs #then it rejects without changing HEAD [260.62ms]
+(pass) runMemoryTool > #given editable frontmatter with read_only false #when update_description runs #then body and flag are preserved [289.67ms]
+(pass) runMemoryTool > #given read_only descendants #when recursive delete runs #then tool-level enforcement rejects the directory [228.95ms]
+(pass) runMemoryTool > #given each editable mutation command targets read_only content #when run #then every command rejects [931.30ms]
+(pass) runMemoryTool > #given invalid and missing command inputs #when run #then caller-neutral typed tool errors retain the memory prefix [794.76ms]
+(pass) runMemoryTool > #given existing or missing targets #when commands require the opposite #then they fail without commits [275.76ms]
+(pass) runMemoryTool > #given byte-identical replacements or descriptions #when commit detects no diff #then it reports no effective changes [583.30ms]
+(pass) runMemoryTool > #given an untracked empty directory #when delete yields no affected tracked paths #then it reports made no changes [160.34ms]
+(pass) runMemoryTool > #given a UTF-16 BOM memory file #when a mutating command reads it #then a typed error asks for UTF-8 conversion [228.66ms]
+(pass) runMemoryTool > #given unrelated dirty files #when a command starts #then cleanCheck fails first with porcelain listing [168.72ms]
+
+packages/memory-core/src/tools/memory-apply-patch.test.ts:
+(pass) memoryApplyPatch > #given an add without frontmatter #when applied #then description is synthesized and reason and author commit [243.29ms]
+(pass) memoryApplyPatch > #given accepted-turn provenance #when a patch commits #then the in-band writer session and turn trailers are durable [236.99ms]
+(pass) memoryApplyPatch > #given add then update in one patch #when applied #then the update sees the pending add [240.34ms]
+(pass) memoryApplyPatch > #given a move followed by an edit #when applied #then target writes are visible and source is deleted [318.38ms]
+(pass) memoryApplyPatch > #given a delete and configured remote #when applied #then writer lock, deletion, and remote result shape are pinned [332.40ms]
+(pass) memoryApplyPatch > #given read_only source or resulting target #when updated #then both are rejected before disk writes [560.20ms]
+(pass) memoryApplyPatch > #given a final line without newline #when a newline-anchored hunk applies #then the sole fallback preserves no newline [331.88ms]
+(pass) memoryApplyPatch > #given near-matching context #when updated #then no fuzzy match is attempted [223.15ms]
+(pass) memoryApplyPatch > #given backticks in mismatched previews #when diagnosed #then the exact hardened format sizes fences safely [230.77ms]
+(pass) memoryApplyPatch > #given oversized failed and current chunks #when diagnosed #then previews truncate at 2000 and 4000 characters [232.70ms]
+(pass) memoryApplyPatch > #given UTF-16LE source #when read #then it is rejected with conversion guidance and remains byte-identical [317.42ms]
+(pass) memoryApplyPatch > #given duplicate add, existing add, and empty patch #when applied #then each fails with the tool prefix [398.73ms]
+
+packages/memory-core/src/compile/cache.test.ts:
+(pass) MemoryBlockCache > #given the same template and HEAD #when compiled twice #then the cached block and timestamp are reused [222.28ms]
+(pass) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each logical session key retains only its latest variant [353.47ms]
+(pass) MemoryBlockCache > #given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry [3549.89ms]
+(pass) MemoryBlockCache > #given template content #when hashed #then the structure version participates in sha256 [0.14ms]
+
+packages/memory-core/src/compile/compile.test.ts:
+(pass) compileMemoryBlock > #given nested committed memory #when compiled #then it matches the handcrafted Letta golden [245.04ms]
+(pass) compileMemoryBlock > #given a committed persona and identity #when compiled #then both render under <self> and identity stays out of the generic memory tier [244.59ms]
+(pass) compileMemoryBlock > #given only a committed identity #when compiled #then it renders under <self> without a persona [235.16ms]
+(pass) compileMemoryBlock > #given an empty committed repository #when compiled #then only metadata is emitted [197.73ms]
+(pass) compileMemoryBlock > #given only a committed persona #when compiled #then its description is omitted [235.59ms]
+(pass) compileMemoryBlock > #given nudge turns #when compiled #then metadata includes the behavioral nudge token and count only when requested [231.91ms]
+(pass) compileMemoryBlock > #given a dirty persona edit #when compiled #then only the committed HEAD body appears [225.65ms]
+(pass) compileMemoryBlock > #given a committed binary projection #when compiled #then its name appears without reading its blob [212.24ms]
+(pass) compileMemoryBlock > #given an unreadable committed system file #when compiled #then it is skipped best-effort [211.94ms]
+
+packages/memory-core/src/git/repo.test.ts:
+(pass) GitMemoryRepo > #given a new repository #when it is initialized and a write is committed #then HEAD advances to the committed content [260.07ms]
+(pass) GitMemoryRepo > #given no effective path changes #when commitWrite runs #then it throws a typed no-change error [197.00ms]
+(pass) GitMemoryRepo > #given unrelated uncommitted files #when cleanCheck runs #then it rejects with the porcelain listing [159.44ms]
+(pass) GitMemoryRepo > #given a UTF-16 markdown file is dirty #when cleanCheck runs #then its encoding problem is readable [178.28ms]
+(pass) GitMemoryRepo > #given local identity overrides #when init reconciles config #then email is preserved and agent identity is updated [225.24ms]
+(pass) GitMemoryRepo > #given commit signing is explicitly enabled locally #when init reconciles config #then the override is preserved [158.77ms]
+(pass) GitMemoryRepo > #given conflicting local identity #when a tool write commits #then explicit author flags control attribution [288.66ms]
+(pass) GitMemoryRepo > #given commits with bodies and changed paths #when log reads history #then metadata trailers ranges filters and optional paths are parsed newest-first [388.38ms]
+(pass) GitMemoryRepo > #given a reflection worktree commit #when it is merged no-ff #then the parent exposes the content and removes the worktree [314.25ms]
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+(pass) MEMORY_PROMPT_TEMPLATE > #given the compiled-block cache key #when the template id is read #then it is the v2 soul template [0.14ms]
+(pass) createMemoryPromptHandler > #given an unbound or disabled session #when before_agent_start dispatches #then the handler returns undefined and never touches the repo [168.61ms]
+(pass) createMemoryPromptHandler > #given an event context without a session manager #when before_agent_start dispatches #then the handler returns undefined [161.44ms]
+(pass) createMemoryPromptHandler > #given a bound identity #when before_agent_start dispatches #then the prompt gains a sentinel block with identity, session, and branch metadata [192.22ms]
+(pass) createMemoryPromptHandler > #given nudge state at the threshold #when before_agent_start compiles #then the memory metadata carries the behavioral nudge token [209.84ms]
+(pass) createMemoryPromptHandler > #given another extension already rewrote the system prompt #when the handler runs #then the foreign text survives and the block is appended [206.33ms]
+(pass) createMemoryPromptHandler > #given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once [225.26ms]
+(pass) createMemoryPromptHandler > #given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content [340.29ms]
+(pass) createMemoryPromptHandler > #given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated [273.88ms]
+
+packages/omo-senpi/src/components/memory/nudge-wiring.test.ts:
+(pass) createMemoryNudgeWiring > #given a fresh session #when two interactive inputs are accepted while extension and rejected inputs occur #then only the accepted interactive turns reach the threshold [236.91ms]
+(pass) createMemoryNudgeWiring > #given a durable accepted-turn record and contaminated branch users #when a session resumes #then hydration uses only the durable baseline [204.57ms]
+(pass) createMemoryNudgeWiring > #given one durable accepted turn and a second admitted input awaiting its started disposition #when the prompt compiles #then the projected accepted turn reaches the threshold [196.45ms]
+(pass) createMemoryNudgeWiring > #given a threshold on an identity with no repository yet #when nudge state resolves #then the fresh-session baseline is used without requiring git history [181.26ms]
+(pass) createMemoryNudgeWiring > #given a threshold nudge #when an in-band memory commit lands #then the next compile state self-clears and disabled settings remain quiet [293.30ms]
+(pass) createMemoryNudgeWiring > #given a bound non-auto identity #when a memory MCP tool call starts #then unforgeable identity and accepted-turn provenance are injected in place [149.87ms]
+
+ 72 pass
+ 0 fail
+ 186 expect() calls
+Ran 72 tests across 8 files. [22.83s]
+
+=== GREEN: MCP-surface identity propagation and nudge self-clear ===
+Command: bun test packages/omo-senpi/src/mcp/memory-server.test.ts --test-name-pattern 'injected provenance for a non-auto identity'
+Result: 1 pass, 0 fail, 6 expect() calls.
+
+=== PACKAGE GATES ===
+Command: bun test packages/memory-core
+Result: PASS, 375 pass, 0 fail, 2585 expect() calls across 39 files.
+
+Command: bun test packages/omo-senpi
+Result: 955 pass, 4 fail, 2738 expect() calls across 146 files.
+Pre-existing/concurrent failures outside todo 3:
+- 3 installer source-refresh tests: packed plugin missing the concurrently introduced generated memory-run-supervisor artifact. Generated bundles were explicitly forbidden for todo 3.
+- 1 documented OMO_BIN environment-resolution failure.
+No todo 3 test failed.
+
+Command: bun run --cwd packages/omo-senpi typecheck
+Result: PASS (clean).
+
+Command: bun run --cwd packages/memory-core typecheck
+Result: FAIL only in concurrently landed packages/memory-core/src/people/format.test.ts with 23 TS18048 possibly-undefined observation assertions. No diagnostic named a todo 3 file.
+
+LSP diagnostics note: the lsp_diagnostics tool rejected every specified-worktree path because its server is rooted at /Volumes/mengmotaStorage/local-workspaces/omo, which this task explicitly forbids touching. Package typechecks and targeted tests were used without changing the forbidden checkout.
+
+=== REAL SURFACE ===
+Artifact: .omo/evidence/omo-senpi-adapter/memory-v2/task-3/senpi-run.txt
+Result: PASS. Two senpi -p turns resumed one session; the second injected prompt logged the stable nudge token with N=2. Isolated memory and temp plugin roots were removed and verified absent.

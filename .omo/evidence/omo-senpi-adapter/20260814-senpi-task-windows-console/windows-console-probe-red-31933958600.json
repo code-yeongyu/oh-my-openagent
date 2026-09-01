@@ -1,0 +1,51 @@
+{
+  "workflow": 31933958600,
+  "job": 95132959708,
+  "job_url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31933958600/job/95132959708",
+  "head": "82d5b18d977cf2744689aaaec9fd5b9eaceae8f1",
+  "job_conclusion": "failure",
+  "sentinel": "WINDOWS_CONSOLE_PROBE",
+  "payload": {
+    "result": "FAIL",
+    "visible": {
+      "pid": 8836,
+      "stdioRoundTrip": true,
+      "mode": "visible-control",
+      "consoleAttached": true,
+      "consoleAttachError": 187,
+      "mainWindowHandle": 0,
+      "expectedVisible": true,
+      "childExited": true,
+      "parentExitCode": 0
+    },
+    "hidden": {
+      "pid": 7552,
+      "stdioRoundTrip": true,
+      "mode": "hidden-fixed",
+      "consoleAttached": true,
+      "consoleAttachError": 187,
+      "mainWindowHandle": 0,
+      "expectedVisible": false,
+      "childExited": true,
+      "parentExitCode": 0
+    },
+    "isolation": {
+      "sandboxAgentDir": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\omo-rpc-window-probe-xalInc\\agent",
+      "callerAgentDirIgnored": true,
+      "credentialsUntouched": true,
+      "credentialFiles": [
+        "auth.json",
+        "models.json",
+        "settings.json",
+        "trust.json"
+      ]
+    },
+    "cleanup": {
+      "visibleChildExited": true,
+      "hiddenChildExited": true,
+      "tempRootRemoved": true
+    }
+  },
+  "root_cause": "The Bun probe parent inherited the PowerShell host console, so both children inherited an attachable console and AttachConsole could not distinguish windowsHide.",
+  "fix": "Launch the Bun probe parent with ProcessStartInfo.CreateNoWindow, canonicalize the probe root, and measure the child console HWND visibility with GetConsoleWindow plus IsWindowVisible."
+}

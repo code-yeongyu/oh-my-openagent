@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { readFile, stat } from "node:fs/promises"
 import { dirname } from "node:path"
 
@@ -11,6 +11,10 @@ import {
 } from "./palace.test-support"
 
 afterAll(cleanupPalaceFixtures)
+
+// Every case commits into a real git fixture repository; the 5s default is not a budget those
+// subprocesses fit on a loaded Windows runner.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 function inlineJson(html: string): Record<string, unknown> {
   const match = html.match(
@@ -50,14 +54,28 @@ describe("palace generator machine gate", () => {
     expect(html).toContain(fixture.head)
   })
 
-  test("#given a generated palace #when its markup is parsed #then exactly four data-tab elements exist", async () => {
+  test("#given the default people gate #when the palace markup is parsed #then every tab has a matching panel", async () => {
     const fixture = await createPalaceFixture()
 
     const result = await generatePalaceHtml(fixture.context)
     const html = await readFile(result.path, "utf8")
 
     const tabs = [...html.matchAll(/data-tab="([a-z]+)"/g)].map((match) => match[1])
+    expect(tabs).toEqual(["core", "external", "history", "reflection", "people"])
+    for (const tab of tabs) expect(html).toContain(`id="panel-${tab}"`)
+  })
+
+  test("#given people collection disabled #when the palace markup is parsed #then only the four always-on tabs remain", async () => {
+    const fixture = await createPalaceFixture()
+
+    const result = await generatePalaceHtml(fixture.context, {
+      people: { enabled: false, limits: { maxEntries: 40, maxEntryChars: 200 } },
+    })
+    const html = await readFile(result.path, "utf8")
+
+    const tabs = [...html.matchAll(/data-tab="([a-z]+)"/g)].map((match) => match[1])
     expect(tabs).toEqual(["core", "external", "history", "reflection"])
+    for (const tab of tabs) expect(html).toContain(`id="panel-${tab}"`)
   })
 
   test("#given the viewers runtime directory #when the palace is written #then the file is 0600 inside a 0700 directory", async () => {

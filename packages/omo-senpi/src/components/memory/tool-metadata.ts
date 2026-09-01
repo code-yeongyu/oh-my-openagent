@@ -5,6 +5,13 @@
 export const MEMORY_TOOL_NAME = "memory"
 export const MEMORY_APPLY_PATCH_TOOL_NAME = "memory_apply_patch"
 
+// MCP surface identity. senpi names catalog tools `mcp_<server>_<tool>` with non-alphanumerics
+// (except dash/underscore) sanitized, so the omo-memory server exposes these exact tool names in
+// tool_call/tool_result events (senpi builtin mcp expose/naming.ts).
+export const MEMORY_MCP_SERVER_NAME = "omo-memory"
+export const MEMORY_MCP_TOOL_NAME = `mcp_${MEMORY_MCP_SERVER_NAME}_${MEMORY_TOOL_NAME}`
+export const MEMORY_MCP_APPLY_PATCH_TOOL_NAME = `mcp_${MEMORY_MCP_SERVER_NAME}_${MEMORY_APPLY_PATCH_TOOL_NAME}`
+
 export const MEMORY_TOOL_DESCRIPTION = [
   "A convenience tool for memories stored in the omo memory repo that automatically commits changes. The harness syncs clean committed memory changes after the turn.",
   "",

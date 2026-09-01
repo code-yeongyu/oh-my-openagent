@@ -45,5 +45,3 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
 export function markLiveRouteUnavailable(reason: string): void {
   routeResolver.markLiveRouteUnavailable?.(reason)
 }
-
-export type _PromptAsyncInputKeepAlive = PromptAsyncInput

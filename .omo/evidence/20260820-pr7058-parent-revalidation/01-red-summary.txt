@@ -1,0 +1,1 @@
+RED confirmed: second validation returned cached true instead of false after remote deletion.

@@ -64,15 +64,6 @@ export interface OrchestratorContext {
   userCategories?: Record<string, CategoryConfig>
 }
 
-export function getAtlasPrompt(model?: string): string {
-  const source = getAtlasPromptSource(model)
-  return loadPromptSync({
-    source: atlasPromptVariants[source],
-    name: "atlas",
-    variant: source,
-  }).body
-}
-
 function isAtlasPromptSource(variant: string): variant is AtlasPromptSource {
   return Object.prototype.hasOwnProperty.call(atlasPromptVariants, variant)
 }

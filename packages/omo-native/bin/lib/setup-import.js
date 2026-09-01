@@ -4,6 +4,7 @@ import {
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { createInterface } from "node:readline/promises"
+import { canonicalAgentDir } from "./agent-dir.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { printModelReport } from "./setup-models.js"
 import { printSetupReport } from "./setup-report.js"
@@ -201,7 +202,7 @@ async function consent(result, target, options) {
 export async function runSetup(args = process.argv.slice(2), options = {}) {
   const home = options.home ?? homedir()
   const env = options.env ?? process.env
-  const agentDir = env.SENPI_CODING_AGENT_DIR || join(home, ".senpi", "agent")
+  const agentDir = canonicalAgentDir(env, home)
   const target = join(agentDir, "auth.json")
   const runtime = { stdin: process.stdin, stdout: process.stdout, ...options, home, env }
   const inventory = await detectHarnesses(runtime)

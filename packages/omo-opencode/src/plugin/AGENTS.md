@@ -16,7 +16,7 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 | `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection, goal command dispatch + default goal auto-start |
 | `chat-params.ts` | `chat.params` | Anthropic effort, think mode, runtime fallback model override |
 | `chat-headers.ts` | `chat.headers` | Copilot `x-initiator` header injection |
-| `command-execute-before.ts` | `command.execute.before` | Pre-command guards (stop-continuation, /goal dispatch, start-work, auto-slash-command) |
+| `command-execute-before.ts` | `command.execute.before` | Pre-command guards (stop-continuation, /goal dispatch, ulw-execute, auto-slash-command) |
 | `event.ts` | `event` | Session lifecycle (created/deleted/idle/error/status), openclaw dispatch, runtime fallback, 4 team-session-event handlers (when team_mode.enabled) |
 | `tool-execute-before.ts` | `tool.execute.before` | Pre-tool guards (mcp_ strip, bash sleep block, task subagent resolution, skill /goal + /stop-continuation dispatch) |
 | `tool-execute-after.ts` | `tool.execute.after` | Post-tool hooks (truncation, comment-checker, hashline read tagging, json-error-recovery) |
@@ -32,9 +32,9 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 |------|------|-------|
 | `create-session-hooks.ts` | Session | 24 |
 | `create-tool-guard-hooks.ts` | Tool Guard | 18 (incl. `team-tool-gating`, null unless team_mode) |
-| `create-transform-hooks.ts` | Transform | 7 slots (2 team-gated, 1 monitor-gated; incl. `contextInjectorMessagesTransform` from `features/context-injector`) |
+| `create-transform-hooks.ts` | Transform | 8 slots (2 team-gated, 1 monitor-gated; incl. `btwSideContextInjector` and `contextInjectorMessagesTransform`) |
 | `create-skill-hooks.ts` | Skill | 2 |
-| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 49 slots |
+| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 50 slots |
 
 `createContinuationHooks()` (7) lives in `src/create-hooks.ts` next to `createCoreHooks()` and `createSkillHooks()`.
 

@@ -10,6 +10,10 @@ import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryPendingLedger } from "./context"
+import { resolveAgentReflectionSettings } from "./reflection-settings"
+
+/** Resolved trigger policy including the reflection feature switch. */
+export type ResolvedTriggerConfig = TriggerConfig & { readonly enabled: boolean }
 
 /** Narrow view of memory-core's ReflectionReservationStore used by the wiring. */
 export interface ReflectionTriggerEngine {
@@ -21,6 +25,8 @@ export interface ReflectionTriggerSession {
   readonly conversationId: string
   readonly ledger: MemoryPendingLedger
   readonly engine: ReflectionTriggerEngine
+  /** When false, the wiring short-circuits before reserving. Defaults to true when absent. */
+  readonly enabled?: boolean
 }
 
 export interface ManualReflectionOptions {
@@ -40,6 +46,12 @@ export interface ReflectionTriggerWiringOptions {
   readonly resolveSession: (eventCtx?: unknown) => ReflectionTriggerSession | undefined
   /** Launch action. Todo 23's detached worker plugs in here; the default is a no-op. */
   readonly onLaunch?: (request: ReflectionRequest) => void
+  /**
+   * Accepted-compaction observer. The memorian gate drops that session's pending nudges here: they
+   * judged a transcript the compaction has just replaced. Kept on THIS seam rather than a second
+   * session_compact handler so both consumers see exactly the same accepted events.
+   */
+  readonly onCompactionAccepted?: (conversationId: string) => void
   readonly logger?: ComponentLogger
 }
 
@@ -97,6 +109,10 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
         const outcome = outcomes.get(session.conversationId)
         outcomes.delete(session.conversationId)
         if (outcome === undefined || outcome.aborted || outcome.willRetry) return
+        if (session.enabled === false) {
+          session.ledger.pendingCompaction = false
+          return
+        }
 
         // Not tracked through whenIdle: the host already awaits this handler.
         try {
@@ -115,12 +131,19 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
         const session = options.resolveSession(eventCtx)
         if (!session) return
         session.ledger.pendingCompaction = true
+        try {
+          options.onCompactionAccepted?.(session.conversationId)
+        } catch (error: unknown) {
+          // An observer must never cost the reflection flag this handler exists to record.
+          options.logger?.warn("omo-senpi memory compaction observer failed", { error: describe(error) })
+        }
       })
     },
 
     requestManualReflection(focus?: string, manual: ManualReflectionOptions = {}): void {
       const session = options.resolveSession()
       if (!session) return
+      if (session.enabled === false) return
       track(() =>
         evaluateAndLaunch(session, {
           kind: "manual",
@@ -140,13 +163,16 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
 /**
  * Resolved reflection trigger policy for the bound agent: per-agent overrides win field by field
  * over the base settings. A step_count of 0 (the default) disables threshold launches entirely.
+ * `enabled` false short-circuits trigger evaluation before any reservation is made.
  */
-export function resolveReflectionTriggerConfig(settings: OmoMemorySettings, agentName?: string): TriggerConfig {
-  const base = settings.reflection.trigger
-  const override = agentName === undefined ? undefined : settings.agents[agentName]?.reflection?.trigger
+export function resolveReflectionTriggerConfig(settings: OmoMemorySettings, agentName?: string): ResolvedTriggerConfig {
+  const reflection = agentName === undefined
+    ? settings.reflection
+    : resolveAgentReflectionSettings(settings, agentName)
   return {
-    stepCount: override?.step_count ?? base.step_count,
-    onCompaction: override?.on_compaction ?? base.on_compaction,
+    enabled: reflection.enabled,
+    stepCount: reflection.trigger.step_count,
+    onCompaction: reflection.trigger.on_compaction,
   }
 }
 

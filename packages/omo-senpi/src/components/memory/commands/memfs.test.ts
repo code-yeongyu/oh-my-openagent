@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { existsSync, realpathSync } from "node:fs"
 import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -20,8 +20,16 @@ import { registerMemfsCommand } from "./memfs"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  // Windows releases git's handles slightly after the child exits, so a bare recursive remove
+  // throws EBUSY. Retry the unlink instead of failing an otherwise passing case.
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })),
+  )
 })
+
+// These cases drive real git subprocesses (init, commit, push); the 5s default is not a budget
+// they fit on a loaded Windows runner.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 const SEEDS = [
   { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" },
@@ -148,10 +156,12 @@ describe("/memfs sync", () => {
     const { root, identity } = await tempIdentity()
     tempDirs.push(root)
     const repo = await seededRepo(identity, SEEDS)
-    const bare = await mkdtemp(join(tmpdir(), "memory-mirror-"))
+    // Windows hands back an 8.3 short path (RUNNER~1) with backslashes; git only resolves the
+    // mirror as a remote when the configured URL is canonical and slash-separated.
+    const bare = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-mirror-")))
     tempDirs.push(bare)
     await createNodeGitExec().run(["init", "--bare", bare], { cwd: bare, timeoutMs: 30_000 })
-    await repo.configSet(CONFIG_KEY, bare)
+    await repo.configSet(CONFIG_KEY, `file://${bare.replaceAll("\\", "/")}`)
     const pi = new MemoryFakeExtensionAPI()
     registerMemfsCommand(pi, fakeDeps(identity))
     const ctx = fakeCommandContext()

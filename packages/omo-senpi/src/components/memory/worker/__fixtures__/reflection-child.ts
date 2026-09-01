@@ -33,6 +33,15 @@ if (mode === "commit") {
 } else if (mode === "timeout") {
   process.on("SIGTERM", () => undefined)
   setInterval(() => undefined, 1_000)
+} else if (mode === "model-not-found") {
+  console.error('Error: Model "extension-only/primary" not found. Use --list-models to see available models.')
+  process.exitCode = 1
+} else if (mode === "provider-cooldown") {
+  console.error('503: {"message":"All providers are temporarily cooling down"}')
+  process.exitCode = 1
+} else if (mode === "auth-missing") {
+  console.error("No API key found for kimi-coding")
+  process.exitCode = 1
 } else {
   throw new Error(`unknown reflection child mode: ${mode}`)
 }

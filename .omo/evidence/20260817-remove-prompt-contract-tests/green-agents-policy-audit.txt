@@ -1,0 +1,18 @@
+COMMAND: python3 .omo/evidence/20260817-remove-prompt-contract-tests/audit_agents_policy.py
+EXPECTED: exit 0 and pass true.
+OBSERVED:
+{
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "exists": true,
+      "missing": []
+    },
+    {
+      "path": "tests/AGENTS.md",
+      "exists": true,
+      "missing": []
+    }
+  ],
+  "pass": true
+}

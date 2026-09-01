@@ -42,9 +42,7 @@ describe("ultrawork skill pointer", () => {
 		expect(context).toBe(buildUltraworkSkillPointer(skillFilePath));
 		expect(context.startsWith("<ultrawork-mode>")).toBe(true);
 		expect(context).toContain(skillFilePath);
-		expect(context).toContain("First user-visible line this turn MUST be exactly:");
 		expect(context).toContain("create_goal");
-		expect(context).not.toContain("Tier triage");
 		expect(Buffer.byteLength(context, "utf8")).toBeLessThan(POINTER_MAX_BYTES);
 	});
 

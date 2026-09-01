@@ -49,6 +49,7 @@ function makeHook(handler: TransformHook): NonNullable<CreatedHooks["toolPairVal
 }
 
 function makeHooks(overrides: {
+  btw?: TransformHook
   contextInjector?: TransformHook
   teamModeStatus?: TransformHook
   teamMailbox?: TransformHook
@@ -57,6 +58,7 @@ function makeHooks(overrides: {
   categorySkill?: TransformHook
 }): CreatedHooks {
   return {
+    btwSideContextInjector: overrides.btw ? makeHook(overrides.btw) : undefined,
     contextInjectorMessagesTransform: overrides.contextInjector ? makeHook(overrides.contextInjector) : undefined,
     teamModeStatusInjector: overrides.teamModeStatus ? makeHook(overrides.teamModeStatus) : undefined,
     teamMailboxInjector: overrides.teamMailbox ? makeHook(overrides.teamMailbox) : undefined,
@@ -173,6 +175,23 @@ describe("createMessagesTransformHandler", () => {
 
     //#then
     expect(toolPairRan).toBe(true)
+  })
+
+  it("propagates BTW classification failures before the request can continue", async () => {
+    //#given
+    const hooks = makeHooks({
+      btw: async () => {
+        throw new Error("Unable to classify session for BTW isolation.")
+      },
+    })
+
+    //#when
+    const transform = runHandler(hooks, [])
+
+    //#then
+    await expect(transform).rejects.toThrow(
+      "Unable to classify session for BTW isolation.",
+    )
   })
 
   it("runs tool-pair-validator even when thinking-block-validator throws", async () => {
