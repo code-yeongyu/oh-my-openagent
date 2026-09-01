@@ -1,22 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
-import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { saveToken } from "../../features/mcp-oauth/storage"
 import { status } from "./status"
 
 describe("status command", () => {
-  const testConfigDirectory = join(tmpdir(), `mcp-oauth-status-test-${Date.now()}`)
+  let testConfigDirectory: string
   let originalConfigDirectory: string | undefined
   let consoleLogSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     originalConfigDirectory = process.env.OPENCODE_CONFIG_DIR
+    testConfigDirectory = mkdtempSync(join(tmpdir(), "mcp-oauth-status-test-"))
     process.env.OPENCODE_CONFIG_DIR = testConfigDirectory
     consoleLogSpy = spyOn(console, "log").mockImplementation(() => {})
-    if (!existsSync(testConfigDirectory)) {
-      mkdirSync(testConfigDirectory, { recursive: true })
-    }
   })
 
   afterEach(() => {
@@ -25,9 +23,7 @@ describe("status command", () => {
     } else {
       process.env.OPENCODE_CONFIG_DIR = originalConfigDirectory
     }
-    if (existsSync(testConfigDirectory)) {
-      rmSync(testConfigDirectory, { recursive: true, force: true })
-    }
+    rmSync(testConfigDirectory, { recursive: true, force: true })
     consoleLogSpy.mockRestore()
   })
 
@@ -71,14 +67,24 @@ describe("status command", () => {
     // given
     const serverName = "github"
     const serverUrl = "https://oauth.example.test/mcp"
-    saveToken(serverUrl, serverUrl, { accessToken: "test-token" })
+    const tokenKey = `oauth.example.test/${serverUrl}`
+    const accessToken = "fixture-access-token"
+    const refreshToken = "fixture-refresh-token"
+    const saved = saveToken(serverUrl, serverUrl, { accessToken, refreshToken })
 
     // when
     const exitCode = await status(serverName, { serverUrl })
+    const output = consoleLogSpy.mock.calls.flat().join("\n")
 
     // then
+    expect(saved).toBe(true)
     expect(exitCode).toBe(0)
     expect(consoleLogSpy).toHaveBeenCalledWith(`OAuth Status for ${serverName}:`)
-    expect(consoleLogSpy).not.toHaveBeenCalledWith(`No tokens found for ${serverName}`)
+    expect(consoleLogSpy).toHaveBeenCalledWith(`  ${tokenKey}:`)
+    expect(output).toContain("    Access Token: [REDACTED]")
+    expect(output).toContain("    Refresh Token: [REDACTED]")
+    expect(output).not.toContain(accessToken)
+    expect(output).not.toContain(refreshToken)
+    expect(output).not.toContain(`No tokens found for ${serverName}`)
   })
 })
