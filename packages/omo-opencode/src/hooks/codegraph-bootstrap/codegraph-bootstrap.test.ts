@@ -217,47 +217,53 @@ describe("createCodegraphBootstrapHook", () => {
     }
   })
 
-  test("#given CodeGraph is missing and auto provision is enabled on unsupported Node #when background work runs #then it does not provision or mutate the project", async () => {
+  test("#given a provisioned launcher and unsupported host Node #when background work runs #then it bootstraps through the managed launcher", async () => {
     // given
-    const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unsupported-provision-"))
-    const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unsupported-provision-home-"))
     const events: string[] = []
     const hook = createCodegraphBootstrapHook(
-      { directory: workspace },
+      { directory: "/repo" },
       { auto_provision: true, enabled: true },
-      {
-        ensureProvisioned: async () => {
-          throw new Error("codegraph provisioning should not run")
-        },
-        excludeProject: () => ({ excluded: false }),
-        log: (message) => {
-          events.push(`log:${message}`)
-        },
+      createDeps(events, {
         nodeSupport: () => ({ major: 26, override: false, reason: "too-new", supported: false }),
-        prepareWorkspace: (projectRoot) => prepareCodegraphWorkspace(projectRoot, { homeDir }),
-        resolveCommand: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
-        runCommand: async () => {
-          throw new Error("codegraph command should not run")
-        },
-        schedule: (task) => {
-          void task()
-        },
-      },
+        resolveCommand: () => ({ argsPrefix: [], command: "/managed/codegraph", exists: true, source: "provisioned" }),
+      }),
     )
 
-    try {
-      // when
-      hook.event({ event: { type: "session.created", properties: { worktree: workspace } } })
-      await waitForBackground()
+    // when
+    hook.event({ event: { type: "session.created", properties: {} } })
+    await waitForBackground()
 
-      // then
-      expect(events).toContain("log:[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap")
-      expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
-      expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false)
-    } finally {
-      rmSync(workspace, { recursive: true, force: true })
-      rmSync(homeDir, { recursive: true, force: true })
-    }
+    // then
+    expect(events).toContain("run:/managed/codegraph:status --json")
+    expect(events).toContain("run:/managed/codegraph:init")
+    expect(events).not.toContain("log:[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap")
+  })
+
+  test("#given CodeGraph is missing and auto provision is enabled on unsupported Node #when background work runs #then it provisions and bootstraps the managed launcher", async () => {
+    // given
+    const events: string[] = []
+    const hook = createCodegraphBootstrapHook(
+      { directory: "/repo" },
+      { auto_provision: true, enabled: true },
+      createDeps(events, {
+        ensureProvisioned: async () => {
+          events.push("provision")
+          return { binPath: "/managed/codegraph", provisioned: true }
+        },
+        nodeSupport: () => ({ major: 26, override: false, reason: "too-new", supported: false }),
+        resolveCommand: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
+      }),
+    )
+
+    // when
+    hook.event({ event: { type: "session.created", properties: {} } })
+    await waitForBackground()
+
+    // then
+    expect(events).toContain("provision")
+    expect(events).toContain("run:/managed/codegraph:status --json")
+    expect(events).toContain("run:/managed/codegraph:init")
+    expect(events).not.toContain("log:[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap")
   })
 
   test("#given CodeGraph is unavailable and auto provisioning is disabled #when background work runs #then it leaves the project untouched", async () => {
