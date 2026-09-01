@@ -1,7 +1,8 @@
-const { afterEach, beforeEach, describe, expect, test } = require("bun:test")
+const { afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import type { EventEmitter } from "node:events"
 
 const { executeHookCommand } = await import("./execute-hook-command")
 
@@ -128,6 +129,63 @@ describe("executeHookCommand", () => {
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain("rooted=/tmp/plugin-z/scripts/foo.sh")
   })
+
+  // Regression coverage for #7162 - on Windows, shell: true makes Node and Bun
+  // launch a bare-name cmd.exe, whose CreateProcess PATH search fails with
+  // EPERM (uv_spawn 'cmd.exe') under sanitized environments or security
+  // software. The hook executor must pass an absolute cmd.exe path instead.
+  test("#given win32 runtime with COMSPEC set #when executing hook command #then spawn receives the absolute COMSPEC path as shell", async () => {
+    // given
+    const fakeCmd = join(tempDirectory, "cmd.exe")
+    writeFileSync(fakeCmd, "")
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform")
+    const originalComspec = process.env.COMSPEC
+    process.env.COMSPEC = fakeCmd
+    Object.defineProperty(process, "platform", { value: "win32" })
+
+    let capturedShell: string | boolean | undefined
+    mock.module("node:child_process", () => ({
+      spawn: (_command: string, options?: { shell?: string | boolean }) => {
+        capturedShell = options?.shell
+        return makeFakeWin32Child()
+      },
+    }))
+
+    try {
+      // when
+      const result = await executeHookCommand("echo hooked", "", tempDirectory)
+
+      // then
+      expect(result.exitCode).toBe(0)
+      expect(capturedShell).toBe(fakeCmd)
+    } finally {
+      mock.restore()
+      if (originalComspec === undefined) delete process.env.COMSPEC
+      else process.env.COMSPEC = originalComspec
+      if (originalPlatform) Object.defineProperty(process, "platform", originalPlatform)
+    }
+  })
 })
+
+function makeFakeWin32Child(): EventEmitter & {
+  stdin: { on(): void; write(): void; end(): void }
+  stdout: EventEmitter
+  stderr: EventEmitter
+  pid: number
+} {
+  const { EventEmitter } = require("node:events")
+  const child = new EventEmitter() as EventEmitter & {
+    stdin: { on(): void; write(): void; end(): void }
+    stdout: EventEmitter
+    stderr: EventEmitter
+    pid: number
+  }
+  child.stdout = new EventEmitter()
+  child.stderr = new EventEmitter()
+  child.stdin = { on() {}, write() {}, end() {} }
+  child.pid = 4242
+  queueMicrotask(() => child.emit("close", 0, null))
+  return child
+}
 
 export {}

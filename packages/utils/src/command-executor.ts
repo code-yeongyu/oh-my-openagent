@@ -1,5 +1,7 @@
 export { executeHookCommand } from "./command-executor/execute-hook-command"
 export type { CommandResult, ExecuteHookOptions } from "./command-executor/execute-hook-command"
+export { resolveWindowsCmdPath } from "./command-executor/windows-shell"
+export type { ResolveWindowsCmdPathOptions } from "./command-executor/windows-shell"
 
 export { executeCommand } from "./command-executor/execute-command"
 export { resolveCommandsInText } from "./command-executor/resolve-commands-in-text"

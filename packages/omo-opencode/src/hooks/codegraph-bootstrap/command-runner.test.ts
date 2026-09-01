@@ -14,12 +14,51 @@ describe("CodeGraph command runner", () => {
     const command = "C:\\Users\\test\\.omo\\codegraph\\bin\\codegraph.cmd"
 
     // when
-    const invocation = resolveCodegraphCommandInvocation(command, ["status", "--json"], "win32")
+    const invocation = resolveCodegraphCommandInvocation(command, ["status", "--json"], "win32", {
+      env: {},
+      fileExists: () => false,
+    })
 
     // then
     expect(invocation).toEqual({
       args: ["/d", "/s", "/c", command, "status", "--json"],
       command: "cmd.exe",
+    })
+  })
+
+  test("#given Windows COMSPEC resolves #when command runner builds invocation for codegraph.cmd #then it wraps through the absolute cmd.exe path", () => {
+    // given
+    const command = "C:\\Users\\test\\.omo\\codegraph\\bin\\codegraph.cmd"
+    const absoluteCmd = "C:\\WINDOWS\\System32\\cmd.exe"
+
+    // when
+    const invocation = resolveCodegraphCommandInvocation(command, ["status", "--json"], "win32", {
+      env: { COMSPEC: absoluteCmd },
+      fileExists: (path) => path === absoluteCmd,
+    })
+
+    // then
+    expect(invocation).toEqual({
+      args: ["/d", "/s", "/c", command, "status", "--json"],
+      command: absoluteCmd,
+    })
+  })
+
+  test("#given no COMSPEC but SystemRoot set on Windows #when command runner builds invocation for codegraph.cmd #then it wraps through SystemRoot System32 cmd.exe", () => {
+    // given
+    const command = "C:\\Users\\test\\.omo\\codegraph\\bin\\codegraph.cmd"
+    const systemRootCmd = "C:\\WINDOWS\\System32\\cmd.exe"
+
+    // when
+    const invocation = resolveCodegraphCommandInvocation(command, ["sync"], "win32", {
+      env: { SystemRoot: "C:\\WINDOWS" },
+      fileExists: (path) => path === systemRootCmd,
+    })
+
+    // then
+    expect(invocation).toEqual({
+      args: ["/d", "/s", "/c", command, "sync"],
+      command: systemRootCmd,
     })
   })
 

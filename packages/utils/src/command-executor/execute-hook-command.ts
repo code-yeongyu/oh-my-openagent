@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { getHomeDirectory } from "./home-directory";
 import { findBashPath, findZshPath } from "./shell-path";
+import { resolveWindowsCmdPath } from "./windows-shell";
 
 export interface CommandResult {
   exitCode: number;
@@ -73,6 +74,9 @@ export async function executeHookCommand(
     let killTimer: ReturnType<typeof setTimeout> | null = null;
 
     const isWin32 = process.platform === "win32";
+    // #7162: shell: true launches a bare-name cmd.exe whose PATH search can
+    // fail with EPERM; hand Node an absolute cmd.exe path instead.
+    const shellOption = isWin32 ? (resolveWindowsCmdPath() ?? true) : true;
 
     // Keys that are always set from normalized sources and must not be
     // overwritten by ambient process.env values during the allowlist merge.
@@ -101,7 +105,7 @@ export async function executeHookCommand(
 
     const proc = spawn(finalCommand, {
       cwd,
-      shell: true,
+      shell: shellOption,
       detached: !isWin32,
       env,
     });
