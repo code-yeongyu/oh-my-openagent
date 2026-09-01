@@ -1,0 +1,11 @@
+host_sessions_before=732
+watching http://127.0.0.1:4096/event?directory=/tmp/qa-project for 'session.created' (<=300s)
+watching http://127.0.0.1:4096/event?directory=/tmp/qa-project for 'session.idle' (<=120s)
+opencode_version=1.18.14
+health={"healthy":true,"version":"1.18.14"}
+created_probe=PASS: observed 'session.created' on http://127.0.0.1:4096
+idle_probe=PASS: observed 'session.idle' on http://127.0.0.1:4096
+sender_return_ms=4
+notification={"hook":"idle","type":"idle","sessionID":"ses_025696588ffeKqI722jTvNDppO","projectDir":"/tmp/qa-project","title":"OpenCode QA","message":"Agent is ready for input"}
+host_sessions_after=732
+qa_container_remaining=none
