@@ -1,3 +1,4 @@
+import { extractMutatedFilePaths as extractSharedMutatedFilePaths, MUTATION_TOOL_NAMES } from "../post-mutation/post-mutation";
 import {
 	collectPostEditDiagnostics,
 	createPostEditNotConfiguredCache,
@@ -8,7 +9,6 @@ import {
 
 export type DiagnosticsRunner = (filePath: string) => Promise<PostEditDiagnosticsOutcome>;
 
-const MUTATION_TOOL_NAMES = new Set(["write", "edit", "apply_patch"]);
 const POST_EDIT_DIAGNOSTICS_CONCURRENCY = 4;
 export const POST_EDIT_DIAGNOSTICS_WIDGET_KEY = "omo-senpi-lsp";
 
@@ -118,56 +118,7 @@ export function syncPostEditDiagnosticsWidget(
 	setWidget(POST_EDIT_DIAGNOSTICS_WIDGET_KEY, result.widgetLines, { placement: "belowEditor" });
 }
 
-export function extractMutatedFilePaths(event: ToolResultLike): string[] {
-	const paths = new Set<string>();
-	addStringValue(paths, event.input["path"]);
-	addStringValue(paths, event.input["filePath"]);
-	addStringArray(paths, event.input["paths"]);
-	addStringArray(paths, event.input["filePaths"]);
-	addPatchInput(paths, event.input["input"]);
-	addPatchFiles(paths, event.input["files"]);
-	addPatchFiles(paths, event.input["changes"]);
-	return [...paths];
-}
-
-function addStringValue(paths: Set<string>, value: unknown): void {
-	if (typeof value === "string" && value.length > 0) {
-		paths.add(value);
-	}
-}
-
-function addStringArray(paths: Set<string>, value: unknown): void {
-	if (!Array.isArray(value)) return;
-	for (const item of value) {
-		addStringValue(paths, item);
-	}
-}
-
-function addPatchInput(paths: Set<string>, value: unknown): void {
-	if (typeof value !== "string") return;
-	for (const line of value.split("\n")) {
-		const path = extractPatchHeaderPath(line);
-		if (path !== undefined) paths.add(path);
-	}
-}
-
-function extractPatchHeaderPath(line: string): string | undefined {
-	const prefixes = ["*** Add File: ", "*** Update File: ", "*** Move to: "] as const;
-	for (const prefix of prefixes) {
-		if (line.startsWith(prefix)) return line.slice(prefix.length).trim();
-	}
-	return undefined;
-}
-
-function addPatchFiles(paths: Set<string>, value: unknown): void {
-	if (!Array.isArray(value)) return;
-	for (const item of value) {
-		if (!isRecord(item)) continue;
-		addStringValue(paths, item["path"]);
-		addStringValue(paths, item["filePath"]);
-		addStringValue(paths, item["movePath"]);
-	}
-}
+export const extractMutatedFilePaths = extractSharedMutatedFilePaths;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;

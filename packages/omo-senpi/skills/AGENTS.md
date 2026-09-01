@@ -1,6 +1,6 @@
 # skills
 
-Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (start-work, git-master, ...) get senpi overlays at sync time. Earned by score: 10 skill dirs with their own authoring contract.
+Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 10 skill dirs with their own authoring contract.
 
 ## WHERE TO LOOK
 

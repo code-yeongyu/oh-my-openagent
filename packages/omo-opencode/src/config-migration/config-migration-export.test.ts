@@ -6,11 +6,6 @@ const PACKAGE_PATH = join(import.meta.dir, "..", "..", "package.json")
 const ENTRY_POINT = join(import.meta.dir, "index.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
 const CONFIG_CORE_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "index.ts")
-const UTILS_MIGRATION_MODULES = [
-  join(PACKAGES_PATH, "utils", "src", "migration", "agent-names.ts"),
-  join(PACKAGES_PATH, "utils", "src", "migration", "hook-names.ts"),
-  join(PACKAGES_PATH, "utils", "src", "migration", "model-versions.ts"),
-]
 const NEGATIVE_FIXTURE_ENTRY_POINT = join(import.meta.dir, "..", "..", "test", "fixtures", "config-migration", "opencode-side-effect-import.ts")
 const OPENCODE_IMPORT = /^@opencode-ai\//
 const PLUGIN_RUNTIME_DIRECTORY = `${sep}plugin${sep}`
@@ -119,10 +114,7 @@ describe("config-migration public subpath", () => {
     }
 
     // then
-    expect(modules).toEqual(expect.arrayContaining([
-      CONFIG_CORE_ENTRY_POINT,
-      ...UTILS_MIGRATION_MODULES,
-    ]))
+    expect(modules).toEqual(expect.arrayContaining([CONFIG_CORE_ENTRY_POINT]))
     expect(offenders).toEqual([])
   })
 

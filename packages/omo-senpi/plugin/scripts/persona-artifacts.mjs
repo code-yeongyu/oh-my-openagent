@@ -6,6 +6,7 @@ export function runtimePersonaSources(repoRoot) {
     ["reflection-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md")],
     ["dream-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "dream-persona.md")],
     ["facts-persona.md", join(repoRoot, "packages", "memory-core", "src", "facts", "assets", "facts-persona.md")],
+    ["memorian-persona.md", join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "memorian-persona.md")],
   ]
 }
 

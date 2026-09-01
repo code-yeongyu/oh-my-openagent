@@ -162,7 +162,7 @@ export function createToolExecuteBeforeHandler(args: {
 
       // Clear stop state when user explicitly resumes work via work-starting commands.
       // This ensures /stop-continuation persists until the user intentionally restarts.
-      const workStartingCommands = ["start-work"]
+      const workStartingCommands = ["ulw-execute"]
       if (workStartingCommands.includes(command ?? "") && sessionID) {
         if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
           hooks.stopContinuationGuard.clear(sessionID)

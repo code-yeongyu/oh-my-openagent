@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { basename, join } from "node:path"
 
 import type { ReflectionCompletionRecord } from "./completion-contracts"

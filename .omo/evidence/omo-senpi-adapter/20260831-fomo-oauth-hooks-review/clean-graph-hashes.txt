@@ -1,0 +1,7 @@
+8f585233b6e9dafe9bc0b4e88c33298f57e0c66e33bc0c1f0b48c2dfae11b6bf  bun.lock
+f1d419858fc7f4120327a278156a2845d396df1a4ea75a9a00ecc512cdb7f753  packages/omo-senpi/plugin/extensions/omo.js
+eab063405878c8f594a640c895c894e6ef2cf445d3fe549370d7fafb0def4999  packages/omo-senpi/plugin/extensions/omo-task.js
+a7127b51eb176733e628171345b4433049ccb6e77c139aeb444d8ce39fcc6f3a  packages/omo-senpi/plugin/extensions/omo-member.js
+d9c5bd9b815039af9cc328a652ce5bb3f34344e30a587560312e77abb7104a88  packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+d3854aef83442005352f67dade49ebddb3598c8ca972f7352451f4271c6d7a60  packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+b013b8e5031614271ce6cc1bf17b3cef1e6fca129b3c8e2bbd4547d9c062cf22  packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js

@@ -18,7 +18,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `build-omo-native.ts` | Build the native omo runtime artifacts |
 | `ensure-vendored-lsp-daemon.ts` | Build/watch the vendored LSP daemon (daemon bin + lock-dir watch) |
 | `verify-omo-ai-payload.mjs` | omo-ai npm payload gate: required artifact list, 18-skill minimum, 30 MB unpacked cap, no nested `node_modules`/source paths |
-| `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml` |
+| `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml`. Groups run detached (own process groups) and are killed with the parent on SIGINT/SIGTERM; a spawned group inherits `OMO_TEST_FAST_ACTIVE=1` and re-entry refuses to recurse |
 | `ci-fast-path.mjs` | CI skip classifier (`classifyCiMode`): platform-sensitive paths and the `ci:full-matrix` label force the full OS matrix |
 | `telemetry-schema-block.mjs` | Generate the telemetry schema doc block (`generateTelemetrySchemaBlock`) |
 | `remove-stale-self-package-tests.ts` | Prune self-package tests that reference deleted sources |
@@ -55,6 +55,7 @@ Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycode
 | `codex-install-bundle-freshness.test.ts` | The COMMITTED Codex installer bundle matches its sources: reads the bundle from the git index (`git show :packages/omo-codex/scripts/install-dist/install-local.mjs`), checks the build marker is present and self-consistent, and asserts the current source digest matches it |
 | `agent-command-string-audit.test.ts` (+ `agent-command-string-scan.test.ts`) | Bare/unsafe agent command strings in tracked sources must be allowlisted (`agent-command-string-audit.allowlist.json`, categorized) |
 | `ci-root-test-partition.test.ts` / `root-test-config.test.ts` | `ci.yml` root test job and the `bunfig.*.toml` partition stay in sync |
+| `root-test-serial-quarantine.ts` | Single source of truth for the test files every parallel CI leg runs serially first, with the documented reason per entry; pinned into both parallel bunfigs and both leg commands by `ci-root-test-partition.test.ts` |
 | `test-environment-isolation.test.ts` | The test preload strips `OPENCODE_SERVER_PASSWORD` so credentials never reach tests |
 
 ## TSCONFIG
