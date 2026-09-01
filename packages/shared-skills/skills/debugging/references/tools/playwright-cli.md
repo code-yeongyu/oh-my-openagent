@@ -2,7 +2,7 @@
 
 **https://playwright.dev/ · https://github.com/microsoft/playwright**
 
-For any browser-served web UI bug, this is the correct tool. Not curl. Not imagination. Not a headless HTTP library. A real browser with a real rendering engine, real JS execution, real cookies, real service workers, real viewport.
+For any browser-served web UI bug, drive a real browser. In Codex, start with `browser:control-in-app-browser` and its `tab.playwright` capability. Use the standalone Playwright CLI described below only when the Browser tool is unavailable or insufficient. Not curl. Not imagination. Not a headless HTTP library. A real browser with a real rendering engine, real JS execution, real cookies, real service workers, real viewport.
 
 **In Phase 8 Manual QA for browser products, using Playwright is not optional.** Curl cannot catch: CSS that breaks at specific viewport widths, hydration mismatches, client-side router bugs, cookie/session interactions, service-worker caching, JS-triggered navigations. All of those are common bug classes. Drive a browser.
 
