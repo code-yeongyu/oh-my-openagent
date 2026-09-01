@@ -9,7 +9,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 
-const REQUIRED_POINTER_MARKERS = ["<omo-mass-ulw-pointer>", "mass-ulw/SKILL.md", "read tool", "dag tool"]
+const REQUIRED_POINTER_MARKERS = ["<omo-mass-ulw-pointer>", "mass-ulw/SKILL.md", "read tool", "workflow tool"]
 const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 
 function collectFiles(root, files) {

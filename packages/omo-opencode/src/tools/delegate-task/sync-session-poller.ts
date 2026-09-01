@@ -9,6 +9,7 @@ export { isSessionComplete } from "./sync-session-turns"
 
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const CHILD_WAKE_GRACE_MS = 5_000
+const MAX_NON_ACTIVE_STATUS_STALENESS_POLLS = 10
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -30,11 +31,23 @@ function isActiveSessionStatus(status: { type: string } | undefined): boolean {
   return status !== undefined && ACTIVE_SESSION_STATUSES.has(status.type)
 }
 
+function hasMessagesAfterAnchor(
+  messages: SessionMessage[],
+  anchorMessageID: string | undefined,
+  anchorMessageCount: number | undefined,
+): boolean {
+  if (anchorMessageID !== undefined) {
+    const anchorIndex = messages.findIndex((message) => message.info?.id === anchorMessageID)
+    return anchorIndex === -1 || anchorIndex < messages.length - 1
+  }
+  return anchorMessageCount === undefined || messages.length > anchorMessageCount
+}
+
 async function fetchSessionMessages(
   client: OpencodeClient,
   sessionID: string
 ): Promise<SessionMessage[]> {
-  const messagesResult = await client.session.messages({ path: { id: sessionID } })
+  const messagesResult = await client.session.messages({ path: { id: sessionID }, query: { limit: 100 } })
   const rawData = (messagesResult as { data?: unknown })?.data ?? messagesResult
   return Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
 }
@@ -50,6 +63,7 @@ export async function pollSyncSession(
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
     anchorMessageCount?: number
+    anchorMessageID?: string
     maxAssistantTurns?: number
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
     hasPendingParentWake?: (sessionID: string) => boolean
@@ -63,6 +77,9 @@ export async function pollSyncSession(
   const pollStart = Date.now()
   let inactiveStart = pollStart
   let pollCount = 0
+  let nonActivePollsSinceMessageFetch = 0
+  let lastStatusRevision: string | undefined
+  let hasFetchedNonActiveMessages = false
   let timedOut = false
   let assistantTurnCount = 0
   let lastSeenAssistantId: string | undefined
@@ -127,8 +144,11 @@ export async function pollSyncSession(
       }
 
       if (finalMessages) {
-        const hasNewMessages =
-          input.anchorMessageCount === undefined || finalMessages.length > input.anchorMessageCount
+        const hasNewMessages = hasMessagesAfterAnchor(
+          finalMessages,
+          input.anchorMessageID,
+          input.anchorMessageCount,
+        )
         if (hasNewMessages && isSessionComplete(finalMessages)) {
           log("[task] Abort detected after session already completed", { sessionID: input.sessionID })
           return null
@@ -144,11 +164,12 @@ export async function pollSyncSession(
     await wait(syncTiming.POLL_INTERVAL_MS)
     pollCount++
 
-    let sessionStatus: { type: string } | undefined
+    let sessionStatus: ({ type: string; updatedAt?: string | number; revision?: string | number; messageCount?: number } & Record<string, unknown>) | undefined
     try {
       const statusResult = await client.session.status()
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
-      sessionStatus = allStatuses[input.sessionID]
+      sessionStatus = allStatuses[input.sessionID] as typeof sessionStatus
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       log("[task] Poll status fetch failed, checking messages", { sessionID: input.sessionID, error: errorMessage })
@@ -169,6 +190,16 @@ export async function pollSyncSession(
       continue
     }
 
+    nonActivePollsSinceMessageFetch++
+    const statusRevision = sessionStatus && (sessionStatus.updatedAt ?? sessionStatus.revision ?? sessionStatus.messageCount)
+    const statusChanged = statusRevision !== undefined && String(statusRevision) !== lastStatusRevision
+    if (hasFetchedNonActiveMessages && !statusChanged && nonActivePollsSinceMessageFetch < MAX_NON_ACTIVE_STATUS_STALENESS_POLLS) {
+      continue
+    }
+    lastStatusRevision = statusRevision === undefined ? lastStatusRevision : String(statusRevision)
+    nonActivePollsSinceMessageFetch = 0
+    hasFetchedNonActiveMessages = true
+
     let messages: SessionMessage[]
     try {
       messages = await fetchSessionMessages(client, input.sessionID)
@@ -178,9 +209,7 @@ export async function pollSyncSession(
       continue
     }
 
-    if (input.anchorMessageCount !== undefined && messages.length <= input.anchorMessageCount) {
-      continue
-    }
+    if (!hasMessagesAfterAnchor(messages, input.anchorMessageID, input.anchorMessageCount)) continue
 
     const sessionError = getTerminalSessionError(messages)
     if (sessionError) {

@@ -283,7 +283,7 @@ describe("sweepWorktrees classification", () => {
 
     expect(report.defaultBranch).toBe("trunk")
     expect(decisionFor(report, feature).decision).toBe("SWEEP")
-  })
+  }, { timeout: 30_000 })
 
   test("falls back to master when origin/HEAD and main are absent", async () => {
     const { base, repo } = await createFixture("wt-sweep-master-")
@@ -307,21 +307,47 @@ describe("sweepWorktrees --older-than", () => {
     const old = path.join(base, "wt-old")
     const oldDirty = path.join(base, "wt-old-dirty")
 
-    await addUnmergedWorktree(repo, "young-branch", young)
-    await addUnmergedWorktree(repo, "old-branch", old)
-    await addUnmergedWorktree(repo, "old-dirty-branch", oldDirty)
-    // The untracked file first (writing it would touch the directory mtime), then age the directory.
+    // All three branches can share one unmerged commit. Creating that commit once
+    // avoids repeating checkout/commit cycles, which made this test exceed Bun's
+    // default timeout on slower Windows runners.
+    git(repo, ["worktree", "add", "-b", "young-branch", young, "main"])
+    await commit(young, "unmerged commit")
+    git(repo, ["worktree", "add", "-b", "old-branch", old, "young-branch"])
+    git(repo, ["worktree", "add", "-b", "old-dirty-branch", oldDirty, "young-branch"])
+
+    // Set both sides of the cutoff explicitly so filesystem timestamp granularity
+    // and fixture setup duration cannot change the age classification.
     await fs.writeFile(path.join(oldDirty, "scratch.txt"), "local change\n")
+    const youngTime = new Date(Date.now() + DAY_MS)
     const staleTime = new Date(Date.now() - 10 * DAY_MS)
-    await fs.utimes(old, staleTime, staleTime)
-    await fs.utimes(oldDirty, staleTime, staleTime)
+    await Promise.all([
+      fs.utimes(young, youngTime, youngTime),
+      fs.utimes(old, staleTime, staleTime),
+      fs.utimes(oldDirty, staleTime, staleTime),
+    ])
 
     const result = await sweepWorktrees({ repos: [repo], olderThanDays: 7 })
 
     const report = result.repos[0]!
-    expect(decisionFor(report, young).reason).toBe("unmerged")
-    expect(decisionFor(report, old).decision).toBe("SWEEP")
-    expect(decisionFor(report, oldDirty).reason).toBe("dirty")
+    expect(decisionFor(report, young)).toEqual({
+      path: young,
+      ref: "young-branch",
+      decision: "KEEP",
+      reason: "unmerged",
+    })
+    expect(decisionFor(report, old)).toEqual({
+      path: old,
+      ref: "old-branch",
+      decision: "SWEEP",
+    })
+    expect(decisionFor(report, oldDirty)).toEqual({
+      path: oldDirty,
+      ref: "old-dirty-branch",
+      decision: "KEEP",
+      reason: "dirty",
+    })
+    expect(result.sweepCount).toBe(1)
+    expect(result.keepCount).toBe(2)
   })
 
   test("olderThanDays 0 never sweeps unmerged worktrees regardless of age", async () => {

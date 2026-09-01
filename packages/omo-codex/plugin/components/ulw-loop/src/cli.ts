@@ -1,17 +1,15 @@
 #!/usr/bin/env node
 import { isUlwLoopSubcommand, ulwLoopCommand } from "./cli-commands.js";
+import { ULW_LOOP_HELP } from "./cli-output.js";
 import { runPreToolUseGoalBudgetGuardCli, runUlwLoopHookCli } from "./codex-hook.js";
 import { runSpawnGuardCli } from "./spawn-guard.js";
 import { runStopResumeHookCli } from "./stop-resume-hook.js";
-
-const TOP_LEVEL_HELP =
-	"Usage:\n  omo-agent-toolkit ulw-loop <subcommand> [args]\n  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)\n  omo-agent-toolkit help | --help | -h                          (this message)\n\nRun `omo-agent-toolkit ulw-loop help` for ulw-loop subcommands.\n";
 
 async function main(): Promise<number> {
 	const argv = process.argv.slice(2);
 	const command = argv[0];
 	if (command === undefined || command === "help" || command === "--help" || command === "-h") {
-		process.stdout.write(TOP_LEVEL_HELP);
+		process.stdout.write(`${ULW_LOOP_HELP}\n`);
 		return 0;
 	}
 	if (command === "ulw-loop") return ulwLoopCommand(argv.slice(1));
@@ -39,7 +37,7 @@ async function main(): Promise<number> {
 		return 1;
 	}
 	if (isUlwLoopSubcommand(command)) return ulwLoopCommand(argv);
-	process.stderr.write(`[omo] unknown command: ${command}\n${TOP_LEVEL_HELP}`);
+	process.stderr.write(`[omo] unknown command: ${command}\n${ULW_LOOP_HELP}\n`);
 	return 1;
 }
 

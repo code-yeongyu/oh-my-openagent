@@ -14,7 +14,10 @@ function createFixture(): { readonly homeDir: string; readonly root: string; rea
   const sourcePath = join(homeDir, ".config", "opencode", "oh-my-openagent.json")
   const targetPath = join(homeDir, ".omo", "omo.jsonc")
   mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true })
-  writeFileSync(sourcePath, JSON.stringify({ agents: { oracle: { model: "anthropic/legacy" } } }))
+  writeFileSync(sourcePath, JSON.stringify({
+    agents: { oracle: { model: "anthropic/legacy" } },
+    model_fallback: true,
+  }))
   return { homeDir, root, sourcePath, targetPath }
 }
 
@@ -92,7 +95,7 @@ describe("runConfigMigrate", () => {
 
     // then
     expect(firstExitCode).toBe(0)
-    expect(readFileSync(fixture.targetPath, "utf-8")).toContain("[opencode]")
+    expect(readFileSync(fixture.targetPath, "utf-8")).toContain("model_fallback")
     expect(secondExitCode).toBe(0)
     expect(secondLines.join("\n")).toContain("Nothing to migrate")
   })

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
-import { existsSync } from "node:fs"
-import { mkdir, readdir, rm } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { mkdir, readdir, rm } from "@oh-my-opencode/memory-core/fs"
 import { basename, join } from "node:path"
 
 import {
@@ -185,9 +185,6 @@ export function finalResult(record: FactsFinalRecord): FactsLaunchResult {
   return { status: "failed", runId: record.runId }
 }
 
-export function delay(_attempt: number, milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
-}
 
 export function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)

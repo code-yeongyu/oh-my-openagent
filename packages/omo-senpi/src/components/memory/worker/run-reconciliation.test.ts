@@ -8,7 +8,10 @@ import {
   ReflectionReservationStore,
   TranscriptJournal,
   buildIdentityPaths,
+  createLockRecord,
   createReflectionWorktree,
+  reflectionSchedulerLockPath,
+  withLock,
   type MemoryIdentity,
 } from "@oh-my-opencode/memory-core"
 
@@ -89,6 +92,22 @@ async function commitOrphanWorktree(item: Awaited<ReturnType<typeof fixture>>): 
 }
 
 describe("reflection and dream run reconciliation", () => {
+  test("#given the scheduler lock is held by a sibling bind #when reconciliation starts #then it defers without surfacing contention", async () => {
+    const item = await fixture()
+    const record = await createLockRecord("bind contention test")
+    const lockPath = reflectionSchedulerLockPath(item.identity.paths.locks)
+
+    const result = await withLock(lockPath, record, async () => {
+      return reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        deferOnSchedulerContention: true,
+      })
+    })
+
+    expect(result).toEqual([])
+  })
+
   test("#given an orphaned successful dream worktree #when session-start reconciliation runs #then it merges clears the reservation records completion and publishes final", async () => {
     // given
     const item = await fixture("dream")

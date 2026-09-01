@@ -1,0 +1,19 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/scheduler.test.ts:
+472 |     emitCompletedWaves(context)
+473 |     if (!await admitFrontier(context)) return cancelledSnapshot(context)
+474 |     const current = context.journal.snapshot()
+475 |     if (current.nodes.every((node) => TERMINAL_NODE_STATES.has(node.state))) break
+476 |     if (context.attachedTasks.size === 0) {
+477 |       throw new Error(`DAG run "${current.runId}" cannot terminalize while nodes are active`)
+                      ^
+error: DAG run "run-scheduler" cannot terminalize while nodes are active
+      at runFrontier (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-owner-completion-loss/packages/senpi-task/src/dag/scheduler.ts:477:17)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-owner-completion-loss/packages/senpi-task/src/dag/scheduler.test.ts:449:26)
+(fail) DAG scheduler owner conflict adoption > #given a live task owned by another DAG attempt #when its node is admitted #then the scheduler adopts its completion and admits the dependent [22.39ms]
+
+ 0 pass
+ 43 filtered out
+ 1 fail
+Ran 1 test across 1 file. [2.19s]

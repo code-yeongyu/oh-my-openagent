@@ -11,7 +11,7 @@ import { realpathSync } from "node:fs"
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
 
-async function fixture(stepCount = 2) {
+async function fixture(stepCount = 2, createRunId?: () => string | Promise<string>) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reservation-")))
   roots.push(root)
   const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
@@ -33,7 +33,7 @@ async function fixture(stepCount = 2) {
       if (!found) throw new Error(`missing journal: ${id}`)
       return found
     },
-    createRunId: () => `run-${++nextId}`,
+    createRunId: createRunId ?? (() => `run-${++nextId}`),
   })
   return { identity, journal, store }
 }
@@ -74,6 +74,41 @@ describe("persisted reflection reservation", () => {
     expect(result?.status).toBe("active")
     expect(result?.run.request.trigger).toBe("step-count")
     expect(result?.run.request.snapshots[0]?.snapshot.end_message_id).toBe("assistant-2")
+  })
+
+  it("#given an async run-id factory #when a reservation is made #then the awaited id names the reserved run", async () => {
+    // given
+    const { journal, store } = await fixture(2, async () => "run-async-1")
+
+    // when
+    const result = await store.tryReserve(await captured(journal, "step-count"))
+
+    // then
+    expect(result.status).toBe("active")
+    expect(result.run.runId).toBe("run-async-1")
+    expect((await store.readState()).active?.runId).toBe("run-async-1")
+  })
+
+  it("#given a factory deriving ids from shared state #when reservations race #then minting is serialized so no id is issued twice", async () => {
+    // given: a disk-scoped factory reads its high-water mark, yields, then writes it back. Minting
+    // outside the scheduler lock lets a second reservation read the same mark and re-mint the id.
+    let highWater = 0
+    const { journal, store } = await fixture(2, async () => {
+      const observed = highWater
+      await new Promise((resolve) => setImmediate(resolve))
+      highWater = observed + 1
+      return `run-${highWater}`
+    })
+    const base = await captured(journal, "step-count")
+
+    // when
+    const results = await Promise.all([
+      store.tryReserve(base),
+      store.tryReserve({ ...base, trigger: "manual", conversationIds: ["conversation-b"] }),
+    ])
+
+    // then
+    expect(new Set(results.map((result) => result.run.runId)).size).toBe(2)
   })
 
   it("#given a new active reservation #when it is published #then launch-owner identity and reservation time are durable in the same record", async () => {

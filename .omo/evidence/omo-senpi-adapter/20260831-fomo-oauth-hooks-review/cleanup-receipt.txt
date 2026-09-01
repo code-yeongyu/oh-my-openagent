@@ -1,0 +1,5 @@
+removedHeldLockQa=/tmp/omo-held-lock-qa.N81cMA
+removedCredentialQa=/tmp/omo-codex-credential-qa.6wKzMd
+removedCompiledOutput=/tmp/omo-linux-x64.Z5qw3h
+removedCleanWorktree=/tmp/omo-fomo-clean.trnTk9
+remainingProcesses=none (PTY children killed by bounded driver teardown)
