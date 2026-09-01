@@ -1,4 +1,4 @@
-import { appendFile } from "node:fs/promises"
+import { appendFile } from "../fs/resilient"
 
 import { GitMemoryRepo } from "../git"
 import {

@@ -2,7 +2,7 @@
 // check, and one journal factory, so retry and send can never disagree about who owns a run.
 import { defaultSignaller } from "../lifecycle/context"
 import { createDagJournal, type DagJournal } from "./journal"
-import type { DagRunRecordV1 } from "./manager"
+import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeId, DagRunId } from "./types"
@@ -102,6 +102,7 @@ export function controlJournal(
     }),
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     now,
+    skipDuplicate: skipDuplicateTerminalTransition,
   })
 }
 

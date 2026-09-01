@@ -1,4 +1,4 @@
-import { lstat, readFile } from "node:fs/promises"
+import { lstat, readFile } from "../fs/resilient"
 import { join } from "node:path"
 import type { GitExec, GitExecResult } from "./exec"
 import { commandError } from "./repo-arguments"

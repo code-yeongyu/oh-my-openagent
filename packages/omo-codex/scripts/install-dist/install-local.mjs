@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:475155d5e39ca774e5cf86194fee97439fd9c4f3624a85e946a994d5493e4629:a81031b3fe18e3977f1f0ad2b0683290efaaaa1a0a05202aecf0b69725c05678
+// omo-codex-install:819e258f7485f9ccdcbb64a54ac0097bf81cd8e2980d7f907017f224b1f99b98:2c6b840fadcd993447fd3e4c1b3e0965718c343ab68ad16a4972970dd0b828e7
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -47,9 +47,12 @@ import {
   fsyncSync,
   openSync,
   renameSync,
+  rmSync,
   unlinkSync,
   writeFileSync
 } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { dirname as dirname10 } from "node:path";
 function isToleratedFsyncError(error) {
   if (!(error instanceof Error))
     return false;
@@ -65,24 +68,36 @@ function tolerantFsyncSync(fileDescriptor, fsyncImpl) {
   }
 }
 function writeFileAtomically(filePath, content, options = {}) {
-  const tempPath = `${filePath}.tmp`;
-  writeFileSync(tempPath, content, "utf-8");
-  const tempFileDescriptor = openSync(tempPath, "r+");
+  const platform = options.platform ?? process.platform;
+  const fsyncImpl = options.fsyncSync ?? fsyncSync;
+  const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    tolerantFsyncSync(tempFileDescriptor, options.fsyncSync ?? fsyncSync);
-  } finally {
-    closeSync(tempFileDescriptor);
-  }
-  try {
-    renameSync(tempPath, filePath);
-  } catch (error) {
-    const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
-    if ((options.platform ?? process.platform) === "win32" && isPermissionError) {
+    writeFileSync(tempPath, content, "utf-8");
+    const tempFileDescriptor = openSync(tempPath, "r+");
+    try {
+      tolerantFsyncSync(tempFileDescriptor, fsyncImpl);
+    } finally {
+      closeSync(tempFileDescriptor);
+    }
+    try {
+      renameSync(tempPath, filePath);
+    } catch (error) {
+      const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
+      if (platform !== "win32" || !isPermissionError)
+        throw error;
       unlinkSync(filePath);
       renameSync(tempPath, filePath);
-      return;
     }
-    throw error;
+    if (platform === "win32")
+      return;
+    const directoryFileDescriptor = openSync(dirname10(filePath), "r");
+    try {
+      tolerantFsyncSync(directoryFileDescriptor, fsyncImpl);
+    } finally {
+      closeSync(directoryFileDescriptor);
+    }
+  } finally {
+    rmSync(tempPath, { force: true });
   }
 }
 var TOLERATED_FSYNC_CODES;
@@ -348,7 +363,7 @@ var init_env = __esm(() => {
 });
 
 // node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
-import { dirname as dirname10, posix as posix2, sep as sep7 } from "node:path";
+import { dirname as dirname11, posix as posix2, sep as sep7 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
   return async (frames) => {
@@ -357,7 +372,7 @@ function createModulerModifier() {
     return frames;
   };
 }
-function createGetModuleFromFilename(basePath = process.argv[1] ? dirname10(process.argv[1]) : process.cwd(), isWindows = sep7 === "\\") {
+function createGetModuleFromFilename(basePath = process.argv[1] ? dirname11(process.argv[1]) : process.cwd(), isWindows = sep7 === "\\") {
   const normalizedBase = isWindows ? normalizeWindowsPath(basePath) : basePath;
   return (filename) => {
     if (!filename)
@@ -7962,7 +7977,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0-beta.21",
+    version: "5.0.0-beta.31",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -8182,7 +8197,7 @@ var init_telemetry = __esm(() => {
 
 // packages/omo-codex/src/install/install-local-cli.ts
 import { readFile as readFile23 } from "node:fs/promises";
-import { dirname as dirname12, join as join40, resolve as resolve10 } from "node:path";
+import { dirname as dirname13, join as join40, resolve as resolve10 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // packages/utils/src/runtime/spawn.ts
@@ -11029,14 +11044,14 @@ import { join as join17 } from "node:path";
 var FALLBACK_CODEX_MODEL_CATALOG = {
   current: {
     model: "gpt-5.6-sol",
-    modelContextWindow: 372000,
+    modelContextWindow: 650000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh"
   },
   managedProfiles: [
     {
       model: "gpt-5.5",
-      modelContextWindow: 400000,
+      modelContextWindow: 650000,
       modelReasoningEffort: "high",
       planModeReasoningEffort: "xhigh"
     },
@@ -13540,7 +13555,7 @@ function shellQuote(value) {
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
 import { spawn as spawn3, spawnSync as spawnSync3 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
-import { dirname as dirname11, join as join38 } from "node:path";
+import { dirname as dirname12, join as join38 } from "node:path";
 import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
@@ -13649,7 +13664,7 @@ function resolveArgs(env2) {
 function resolveCurrentVersion(env2) {
   if (env2.LAZYCODEX_CURRENT_VERSION?.trim())
     return env2.LAZYCODEX_CURRENT_VERSION.trim();
-  const pluginRoot = dirname11(dirname11(fileURLToPath(import.meta.url)));
+  const pluginRoot = dirname12(dirname12(fileURLToPath(import.meta.url)));
   return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join38(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join38(pluginRoot, ".codex-plugin", "plugin.json"));
 }
 function resolveLatestVersion(env2) {
@@ -13829,7 +13844,7 @@ async function installMarketplaceLocally(options = {}) {
   return runCodexInstaller(options);
 }
 function resolveDefaultRepoRootForEntrypoint(entrypointPath) {
-  return resolve10(dirname12(entrypointPath), "..", "..", "..");
+  return resolve10(dirname13(entrypointPath), "..", "..", "..");
 }
 function resolveDefaultRepoRoot() {
   return resolveDefaultRepoRootForEntrypoint(fileURLToPath2(import.meta.url));

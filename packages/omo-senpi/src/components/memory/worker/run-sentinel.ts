@@ -1,4 +1,4 @@
-import { existsSync, watch, type FSWatcher } from "node:fs"
+import { existsSync, watch, type FSWatcher } from "@oh-my-opencode/memory-core/fs"
 import { dirname } from "node:path"
 
 export type SentinelWaitResult = "present" | "timeout"

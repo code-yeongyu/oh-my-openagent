@@ -3,7 +3,7 @@ import { isAbsolute, resolve } from "node:path"
 import { reportToolHookStatus } from "../../extension/tool-hook-status"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { COMMENT_CHECKER_FEEDBACK_HEADER } from "./constants"
-import { parseToolResultContext, parseToolResultEvent, toHookInput } from "./hook-input"
+import { parseToolResultContext, parseToolResultEvent, toApplyPatchHookInputs, toHookInput } from "./hook-input"
 import { resolveSenpiCommentCheckerBinary } from "./resolver"
 import { defaultRunCommentChecker } from "./runner"
 import type { BinaryResolutionState, CommentCheckerComponentOptions } from "./types"
@@ -31,16 +31,14 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           return undefined
         }
 
-        const rawPath = getString(event.input.path)
-        if (rawPath === undefined) {
-          return undefined
-        }
-
         const toolContext = parseToolResultContext(eventContext)
-        const absolutePath = isAbsolute(rawPath) ? rawPath : resolve(toolContext.cwd, rawPath)
-        if (reportedFilesThisTurn.has(absolutePath)) {
-          return undefined
-        }
+        const rawPath = getString(event.input.path)
+        const patchInputs = event.toolName === "apply_patch" ? toApplyPatchHookInputs(event, toolContext) : []
+        if (rawPath === undefined && patchInputs.length === 0) return undefined
+        const absolutePath = rawPath === undefined ? undefined : (isAbsolute(rawPath) ? rawPath : resolve(toolContext.cwd, rawPath))
+        const paths = patchInputs.length > 0 ? patchInputs.map((input) => input.tool_input.file_path).filter((path): path is string => typeof path === "string") : absolutePath ? [absolutePath] : []
+        const uniquePaths = paths.filter((path, index) => paths.indexOf(path) === index).filter((path) => !reportedFilesThisTurn.has(path))
+        if (uniquePaths.length === 0) return undefined
 
         const resolvedBinaryPath = ensureBinaryPath(resolveBinary, {
           logger: ctx.logger,
@@ -68,25 +66,20 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
         }
 
         reportToolHookStatus(eventContext, "(OmO) Checking Comments")
-        const result = await check({
-          binaryPath: resolvedBinaryPath,
-          hookInput: toHookInput(event, toolContext, absolutePath),
-        })
-        const message = normalizeFeedbackText(result.message)
-        if (!result.hasComments || message.length === 0) {
-          return undefined
+        const inputs = event.toolName === "apply_patch" ? patchInputs : [toHookInput(event, toolContext, uniquePaths[0])]
+        const feedback: string[] = []
+        for (const hookInput of inputs) {
+          const path = hookInput.tool_input.file_path
+          if (typeof path !== "string" || !uniquePaths.includes(path)) continue
+          const result = await check({ binaryPath: resolvedBinaryPath, hookInput })
+          const message = normalizeFeedbackText(result.message)
+          if (result.hasComments && message.length > 0) {
+            reportedFilesThisTurn.add(path)
+            feedback.push(`${COMMENT_CHECKER_FEEDBACK_HEADER} ${path}:\n${message}`)
+          }
         }
-
-        reportedFilesThisTurn.add(absolutePath)
-        return {
-          content: [
-            ...event.content,
-            {
-              type: "text",
-              text: `${COMMENT_CHECKER_FEEDBACK_HEADER} ${absolutePath}:\n${message}`,
-            },
-          ],
-        }
+        if (feedback.length === 0) return undefined
+        return { content: [...event.content, ...feedback.map((text) => ({ type: "text", text }))] }
       })
     },
   }
@@ -122,8 +115,8 @@ function ensureBinaryPath(resolveBinary: () => string | null, state: BinaryResol
   return nextBinaryPath
 }
 
-function isMutationToolName(toolName: string): toolName is "edit" | "write" {
-  return toolName === "edit" || toolName === "write"
+function isMutationToolName(toolName: string): toolName is "edit" | "write" | "apply_patch" {
+  return toolName === "edit" || toolName === "write" || toolName === "apply_patch"
 }
 
 function defaultResolveBinary(): string | null {

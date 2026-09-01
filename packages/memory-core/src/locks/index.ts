@@ -4,6 +4,7 @@ export {
   isHeld,
   releaseLock,
   withLock,
+  setLockCandidateFsForTests,
 } from "./acquire"
 export type { AcquireLockOptions } from "./acquire"
 export {

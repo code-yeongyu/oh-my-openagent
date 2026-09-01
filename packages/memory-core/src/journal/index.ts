@@ -16,6 +16,7 @@ export {
   deriveState,
   finalizeCursor,
   initialReflectionState,
+  reflectedThroughByteOffset,
   isCanonicalEntry,
   type ReflectionSnapshot,
   type ReflectionTranscriptState,

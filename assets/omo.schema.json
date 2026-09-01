@@ -5,6 +5,47 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "formatOnMutation": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "default": "best-effort",
+          "type": "string",
+          "enum": [
+            "off",
+            "best-effort",
+            "required"
+          ]
+        },
+        "languages": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "maxFileBytes": {
+          "default": 1048576,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timeoutMs": {
+          "default": 3000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "mode",
+        "maxFileBytes",
+        "timeoutMs"
+      ],
+      "additionalProperties": false
+    },
     "$schema": {
       "type": "string"
     },
@@ -1609,6 +1650,30 @@
           ],
           "additionalProperties": false
         },
+        "recall": {
+          "default": {
+            "enabled": true,
+            "max_items": 2
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_items": {
+              "default": 2,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "enabled",
+            "max_items"
+          ],
+          "additionalProperties": false
+        },
         "compile_warn_tokens": {
           "default": 30000,
           "type": "integer",
@@ -1797,6 +1862,20 @@
                 },
                 "additionalProperties": false
               },
+              "recall": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -1820,6 +1899,7 @@
         "write_notice",
         "sync",
         "search",
+        "recall",
         "compile_warn_tokens",
         "agents"
       ],
@@ -11073,6 +11153,11 @@
               "minimum": 1,
               "maximum": 9007199254740991
             },
+            "maxLiveDescendantsPerRoot": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "staleTimeoutMs": {
               "type": "number",
               "minimum": 60000
@@ -11789,6 +11874,39 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "formatOnMutation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "best-effort",
+                "required"
+              ]
+            },
+            "languages": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "maxFileBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -13177,6 +13295,20 @@
               },
               "additionalProperties": false
             },
+            "recall": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -13359,6 +13491,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -13390,6 +13536,39 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "formatOnMutation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "best-effort",
+                "required"
+              ]
+            },
+            "languages": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "maxFileBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -14778,6 +14957,20 @@
               },
               "additionalProperties": false
             },
+            "recall": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -14960,6 +15153,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -14997,6 +15204,39 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "formatOnMutation": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "best-effort",
+                  "required"
+                ]
+              },
+              "languages": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "maxFileBytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
           "categories": {
             "type": "object",
             "propertyNames": {
@@ -16385,6 +16625,20 @@
                 },
                 "additionalProperties": false
               },
+              "recall": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -16567,6 +16821,20 @@
                       "properties": {
                         "enabled": {
                           "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "recall": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "max_items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
                         }
                       },
                       "additionalProperties": false
@@ -25827,6 +26095,11 @@
                     "minimum": 1,
                     "maximum": 9007199254740991
                   },
+                  "maxLiveDescendantsPerRoot": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "staleTimeoutMs": {
                     "type": "number",
                     "minimum": 60000
@@ -26543,6 +26816,39 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "formatOnMutation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "best-effort",
+                      "required"
+                    ]
+                  },
+                  "languages": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "maxFileBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -27931,6 +28237,20 @@
                     },
                     "additionalProperties": false
                   },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -28113,6 +28433,20 @@
                           "properties": {
                             "enabled": {
                               "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "recall": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
                             }
                           },
                           "additionalProperties": false
@@ -28144,6 +28478,39 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "formatOnMutation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "best-effort",
+                      "required"
+                    ]
+                  },
+                  "languages": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "maxFileBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -29532,6 +29899,20 @@
                     },
                     "additionalProperties": false
                   },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -29714,6 +30095,20 @@
                           "properties": {
                             "enabled": {
                               "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "recall": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
                             }
                           },
                           "additionalProperties": false
