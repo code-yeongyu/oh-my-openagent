@@ -52,7 +52,10 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
           ...input.latestWake.promptContext,
           parts: [
             input.forceNoReply === true || !input.latestWake.shouldReply
-              ? withInternalNoReplyMarker(createInternalAgentTextPart(notificationContent))
+              ? {
+                  ...withInternalNoReplyMarker(createInternalAgentTextPart(notificationContent)),
+                  synthetic: true,
+                }
               : createInternalAgentTextPart(notificationContent),
           ],
         },
