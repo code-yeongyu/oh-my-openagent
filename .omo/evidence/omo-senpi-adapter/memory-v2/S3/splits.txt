@@ -1,0 +1,55 @@
+Memory v2 oversized-file splits
+Task: st_019feb50
+Date: 2026-08-10
+
+Measurement method
+- Pure LOC counts non-blank, non-comment source lines.
+- Multiline template-literal content remains source and is counted.
+- The task-provided audited before counts are recorded below; the after counts were measured from the resulting files.
+
+Before -> after
+- packages/omo-senpi/src/components/memory/worker/spawn.ts: 521 -> 3
+- packages/omo-senpi/src/components/memory/wiring.ts: 434 -> 174
+- packages/omo-senpi/src/components/memory/dream-trigger.ts: 282 -> 154
+- packages/memory-core/src/tools/memory-apply-patch.test.ts: 266 -> 73
+
+Spawn units
+- worker/spawn.ts: 3 pure LOC; re-export-only compatibility barrel.
+- worker/spawn-types.ts: 93 pure LOC; public spawn argument, result, sandbox, ledger, and preparation input contracts.
+- worker/spawn-payload.ts: 198 pure LOC; reflection/facts payload directories, files, environment, command arguments, and sandbox target confinement.
+- worker/spawn-metadata.ts: 29 pure LOC; reflection/dream launch metadata validation.
+- worker/spawn-supervisor.ts: 197 pure LOC; deadline validation, launch manifests, ledgers, and detached child supervision.
+- worker/spawn-supervisor-support.ts: 31 pure LOC; supervisor path resolution, environment normalization, signal validation, and bounded output reads.
+
+Wiring units
+- wiring.ts: 174 pure LOC; MemoryWiring composition in original registration/lifecycle order.
+- wiring-types.ts: 28 pure LOC; public MemoryWiring and MemoryWiringOptions contracts.
+- wiring-context.ts: 30 pure LOC; host event session, branch, and UI probes.
+- wiring-runtime.ts: 146 pure LOC; identity runtime, journal, facts, reflection-session, and dream-session registries.
+- wiring-static.ts: 156 pure LOC; static prompt/event/tool/guard/skills/palace/command/trigger registration surface.
+
+Dream-trigger units
+- dream-trigger.ts: 154 pure LOC; idle timer, event registration, shutdown evaluator, manual bypass entrypoint, and public compatibility exports.
+- dream-trigger-gates.ts: 84 pure LOC; settings resolution, automatic gates, and last-dream ledger read.
+- dream-trigger-fire.ts: 65 pure LOC; conversation selection, snapshot capture, reservation, abort checks, and launch.
+
+memory_apply_patch test units
+- memory-apply-patch.test.ts: 73 pure LOC; successful add/update/move/newline operations.
+- memory-apply-patch-validation.test.ts: 136 pure LOC; read-only, exact-hunk, diagnostic, encoding, and duplicate/existing validation failures.
+- memory-apply-patch-provenance.test.ts: 46 pure LOC; durable provenance trailers, writer lock, deletion, and remote result shape.
+- memory-apply-patch.test-support.ts: 50 pure LOC; per-file fixture harness, patch invocation, rejection, and git helpers.
+
+Consumer surfaces
+- Existing direct imports from worker/spawn.ts continue to resolve because spawn.ts re-exports every prior public type and function.
+- Existing imports through worker/index.ts continue unchanged because worker/index.ts still exports from ./spawn.
+- dream-trigger.ts re-exports the moved settings, gate, and ledger-read API; existing command and test imports are unchanged.
+- wiring.ts re-exports MemorySessionStateLike, MemoryWiring, and MemoryWiringOptions; createMemoryWiring remains at the same path.
+
+Verification
+- bun run --cwd packages/omo-senpi typecheck: PASS
+- bun run --cwd packages/memory-core typecheck: PASS
+- bun test packages/omo-senpi: 1078 pass, 1 known pre-existing failure, 3045 expect() calls, 1079 tests across 167 files, 79.72s.
+  Known allowed failure: omo-senpi ulw-loop runtime > #given OMO_BIN is set #when resolving the default omo binary #then Bun is not needed and PATH is ignored
+- bun test packages/memory-core: PASS; 418 pass, 0 fail, 3691 expect() calls, 418 tests across 53 files, 52.83s.
+- Focused changed-domain tests before the package run: omo-senpi 41 pass / 0 fail; memory-core 12 pass / 0 fail.
+- git diff --check: PASS

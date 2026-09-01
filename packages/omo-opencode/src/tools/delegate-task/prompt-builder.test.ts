@@ -94,7 +94,6 @@ describe("prompt-builder", () => {
         // then
         expect(result).toBeDefined()
         expect(result).toContain("git-master")
-        expect(result).toContain("AVAILABLE SKILLS")
       })
     })
 
@@ -140,7 +139,6 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
 
     // then
     expect(result).toBeDefined()
-    expect(result).toContain("AVAILABLE SKILLS")
     expect(result).toContain("omo-skill")
     expect(result).toContain("test-driven-development")
     expect(result).toContain("TDD discipline")

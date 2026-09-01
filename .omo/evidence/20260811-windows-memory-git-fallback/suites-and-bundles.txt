@@ -1,0 +1,55 @@
+===== memcore_suite (exit 0, 41.2s) =====
+(pass) reflection persona asset > #given the documented example commit message #when matched against the reflection-commit regex #then it matches [0.10ms]
+
+ 319 pass
+ 0 fail
+ 2266 expect() calls
+Ran 319 tests across 36 files. [41.14s]
+
+
+===== senpi_mem_suite (exit 0, 40.4s) =====
+(pass) resolveReflectionModel > #given the task warning suppression convention #when evaluated #then global opt-out and per-category opt-in retain their precedence [0.30ms]
+
+ 251 pass
+ 0 fail
+ 835 expect() calls
+Ran 251 tests across 40 files. [40.33s]
+
+
+===== typecheck_senpi (exit 0, 1.7s) =====
+$ tsgo --noEmit -p tsconfig.json
+
+
+===== bundle_build (exit 0, 1.6s) =====
+
+  omo-member.js  117.79 KB  (entry point)
+
+Bundled 61 modules in 4ms
+
+  omo-memory-mcp.js  50.54 KB  (entry point)
+
+Built omo-senpi extensions: /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/omo-senpi/plugin/extensions/omo.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/omo-senpi/plugin/extensions/omo-member.js
+
+
+===== bundle_check (exit 0, 1.3s) =====
+
+  omo-member.js  117.79 KB  (entry point)
+
+Bundled 61 modules in 4ms
+
+  omo-memory-mcp.js  50.54 KB  (entry point)
+
+omo-senpi extension build is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-omo-memory-windows-git-fallback/packages/omo-senpi/plugin/extensions/omo.js
+
+
+===== marker_grep (exit 0, 0.0s) =====
+packages/omo-senpi/plugin/extensions/omo-memory-mcp.js:1
+packages/omo-senpi/plugin/extensions/omo.js:1
+
+
+===== status (exit 0, 0.2s) =====
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+
+

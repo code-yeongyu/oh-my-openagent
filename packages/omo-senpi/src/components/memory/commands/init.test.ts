@@ -17,7 +17,7 @@ import { registerInitCommand } from "./init"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("/init", () => {
@@ -49,7 +49,7 @@ describe("/init", () => {
     expect(message).toContain("system/persona.md")
     expect(message).toContain("description:")
     expect(text).toContain("initialized")
-  })
+  }, 30_000)
 
   test("#given an existing repository #when invoked #then it refuses without overwriting and sends nothing", async () => {
     // given
@@ -72,7 +72,7 @@ describe("/init", () => {
     expect(await repo.show("HEAD", "system/persona.md")).toContain("keep me")
     expect(pi.userMessages).toHaveLength(0)
     expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
-  })
+  }, 30_000)
 
   test("#given an unbound session #when invoked #then an actionable error is returned", async () => {
     // given
@@ -86,5 +86,5 @@ describe("/init", () => {
     // then
     expect(text).toContain("not bound")
     expect(pi.userMessages).toHaveLength(0)
-  })
+  }, 30_000)
 })

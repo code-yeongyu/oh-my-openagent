@@ -1,18 +1,20 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { Buffer } from "node:buffer"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { TranscriptJournal } from "./store"
+import { realpathSync } from "node:fs"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createJournal(): Promise<TranscriptJournal> {
-  const dir = await mkdtemp(join(tmpdir(), "memory-cursor-"))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-cursor-")))
   tempDirs.push(dir)
   let tick = 0
   return new TranscriptJournal({
@@ -22,6 +24,23 @@ async function createJournal(): Promise<TranscriptJournal> {
 }
 
 describe("reflection cursor", () => {
+  it("#given an aborted signal #when snapshot capture starts #then reflection state is not mutated", async () => {
+    // given
+    const journal = await createJournal()
+    await journal.reconcile([
+      { kind: "assistant", messageId: "assistant-1", textBlocks: ["first"] },
+    ])
+    const controller = new AbortController()
+    controller.abort()
+
+    // when
+    const capture = journal.captureReflectionSnapshot(controller.signal)
+
+    // then
+    await expect(capture).rejects.toThrow()
+    expect((await journal.getState()).last_reflection_started_at).toBeUndefined()
+  })
+
   it("#given rows appended during reflection #when the captured snapshot succeeds #then only snapshot rows become reflected", async () => {
     // given
     const journal = await createJournal()
@@ -55,6 +74,8 @@ describe("reflection cursor", () => {
     expect(state.steps_since_last_successful_reflection).toBe(1)
     expect(state.last_reflection_started_at).toBe("2026-08-09T12:00:01.000Z")
     expect(state.last_reflection_succeeded_at).toBe("2026-08-09T12:00:03.000Z")
+    const transcript = await readFile(join(journal.options.journalDir, "transcript.jsonl"), "utf8")
+    expect(state.reflected_through_byte_offset).toBe(Buffer.byteLength(transcript.split("\n").slice(0, 3).join("\n") + "\n", "utf8"))
   })
 
   it("#given a captured snapshot #when reflection fails #then the cursor remains retryable", async () => {

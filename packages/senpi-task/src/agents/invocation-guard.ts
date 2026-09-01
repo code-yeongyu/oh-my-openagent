@@ -1,7 +1,7 @@
 // Plan-gated agents are plan-review specialists whose verdicts only make sense BEFORE execution
 // begins. The gate is deliberately strict: the USER must have explicitly requested the ulw-plan
 // workflow (a model-initiated SKILL.md read proves nothing), a plan artifact must have been
-// touched, and a session that already started executing (start-work) must not be pulled back into
+// touched, and a session that already started executing (ulw-execute) must not be pulled back into
 // plan review. This module owns the classification data and the pure verdict logic; the
 // session-scoped skill-invocation state is supplied by the host adapter (omo-senpi) via
 // TaskToolDeps.resolveSkillInvocations, keeping senpi-task harness-neutral.
@@ -13,8 +13,8 @@ export type AgentInvocationCondition = {
 }
 
 export const AGENT_INVOCATION_CONDITIONS = {
-  metis: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["start-work"] },
-  momus: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["start-work"] },
+  metis: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["ulw-execute"] },
+  momus: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["ulw-execute"] },
 } as const satisfies Readonly<Record<string, AgentInvocationCondition>>
 
 const CONDITIONS: Readonly<Record<string, AgentInvocationCondition>> = AGENT_INVOCATION_CONDITIONS
@@ -61,7 +61,7 @@ export function evaluateInvocationGuard(agentName: string, state: SkillInvocatio
   const condition = invocationConditionForAgent(agentName)
   if (condition === undefined) return { kind: "allow" }
 
-  // Forbidden skills win over missing requirements: once start-work ran, plan review is over for
+  // Forbidden skills win over missing requirements: once ulw-execute ran, plan review is over for
   // this session either way, so advice about arranging a plan review would be wrong.
   const violated = condition.forbidsSkills.find((skill) => state.hasInvoked(skill))
   if (violated !== undefined) {
@@ -73,16 +73,19 @@ export function evaluateInvocationGuard(agentName: string, state: SkillInvocatio
     }
   }
 
-  // The requirement is a USER request, never a model-initiated invocation: the denial deliberately
-  // avoids naming any mechanical unlock step.
+  // The requirement is a USER request, never a model-initiated invocation. The denial names the
+  // USER-driven unlock so the model stops re-spawning blindly, while still refusing to let the
+  // model arm the gate itself: every route named here is one only a human can take.
   const missing = condition.requiresSkills.filter((skill) => !state.hasUserRequested(skill))
   if (missing.length > 0) {
+    const names = missing.join(", ")
     return {
       kind: "deny",
       message:
-        `Agent "${agentName}" is plan-gated: it is available only after the user explicitly requests the ${missing.join(", ")} ` +
-        `workflow in this session, and no such request was made. Do not attempt to unlock this gate yourself - continue ` +
-        `without plan review (self-review instead), or ask the user whether they want a plan review.`,
+        `Agent "${agentName}" is plan-gated: it is available only after the user explicitly requests the ${names} ` +
+        `workflow in this session, and no such request was made. Do not attempt to unlock this gate yourself - retrying ` +
+        `this spawn will keep failing. Continue without plan review (self-review instead), or ask the user to start the ` +
+        `workflow themselves by running /skill:${names} or by asking for a plan in their own words.`,
     }
   }
 

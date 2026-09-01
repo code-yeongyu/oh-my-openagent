@@ -1,5 +1,6 @@
 export * from "./config-lock"
 export * from "./errors"
 export * from "./exec"
+export * from "./path-state"
 export * from "./porcelain"
 export * from "./repo"

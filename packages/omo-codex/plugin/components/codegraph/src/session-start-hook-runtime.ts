@@ -7,6 +7,7 @@ export function spawnDetachedSessionStartWorker(invocation: WorkerSpawnInvocatio
 		detached: true,
 		env: invocation.env,
 		stdio: "ignore",
+		windowsHide: true,
 	});
 	child.unref();
 }

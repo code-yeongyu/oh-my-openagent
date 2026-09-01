@@ -1,0 +1,18 @@
+Command:
+cd .agents/skills/codex-qa
+OMO_CODEX_SOURCE_ROOT=<task-worktree> bash scripts/app-server-drive.sh --plugin
+
+Exit code:
+0
+
+Observed first-party behavior:
+- real Codex app-server started against an isolated CODEX_HOME
+- local mock model completed the turn without an external model API call
+- notification stream contained hook/started events from the local plugin
+- notification stream contained hook/completed events for sessionStart
+- plugin source paths resolved inside the isolated plugin cache
+- real ~/.codex/config.toml SHA-256 was unchanged
+
+Binary result:
+PASS. The locally built plugin installed and its hook fired through the real
+Codex app-server surface.

@@ -3,7 +3,7 @@ import {
   log,
   normalizeSDKResponse,
 } from "../../shared"
-import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
+import { latestAssistantTurnBlocksInternalPrompt } from "@oh-my-opencode/utils/prompt-async-gate/pending-tool-turn"
 import type { DispatchedMonitorOutput, MonitorPromptClient, MonitorSessionMessage } from "./output-injector-types"
 
 export async function loadMonitorSessionMessages(

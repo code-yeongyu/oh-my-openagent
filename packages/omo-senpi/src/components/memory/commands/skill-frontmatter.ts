@@ -2,7 +2,7 @@
 // must carry a `name:` frontmatter key; missing or empty values are repaired from
 // the skill directory name. Used by `/doctor` and `/memfs repair`.
 
-import { readdir, readFile, stat, writeFile } from "node:fs/promises"
+import { readdir, readFile, stat, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { basename, dirname, join, relative } from "node:path"
 
 export interface SkillNameFrontmatterRepairSkippedFile {

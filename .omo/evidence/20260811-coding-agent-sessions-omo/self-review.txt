@@ -1,0 +1,28 @@
+SELF-REVIEW VERDICT: PASS
+
+Success criteria:
+1. PASS - `.omo` discovery is covered RED then GREEN and through the real CLI.
+2. PASS - legacy `.senpi` remains and same-ID overlap emits one higher-linkage row.
+3. PASS - exact isolated-HOME command returned `omo-only` as platform `senpi`.
+4. PASS - Python, BasedPyright, package/sync, build, Senpi, Codex, and harness QA are green.
+
+Seven-question architecture review:
+1. Single responsibility: yes. Production change only extends the existing
+   Senpi config-root tuple; no abstraction was added.
+2. Boundaries: yes. The scanner remains a pi-family implementation and no
+   platform key or cross-platform route changed.
+3. Types: yes. New test helper input is `str | None`; BasedPyright is clean.
+4. Errors: yes. No new error path, suppression, or swallowed failure exists.
+5. Performance: yes. One bounded root/profile glob is added under the existing
+   2000-file recent cap and dedupe pipeline.
+6. Security: yes. Existing `Path.home()` and scanner parsing boundaries are
+   reused; no new execution or external write is introduced.
+7. Scope: yes. Exactly five requested tracked files changed. The unrelated
+   documented environment-variable gap and an `omo` CLI alias remain out of
+   scope.
+
+Additional checks:
+- HEAVY tier remains justified by session-store and dedupe behavior.
+- SKILL.md description length: 984 characters (under 1024).
+- Pure LOC: production 32, test 150 (both under 250).
+- Diff size: 172 lines.

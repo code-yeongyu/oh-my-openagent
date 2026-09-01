@@ -34,9 +34,14 @@ function machine(steps = 0, stepCount: number | undefined = 5): MachineState {
   }
 }
 
-function request(trigger: ReflectionRequest["trigger"], conversations = ["conversation-a"]): ReflectionRequest {
+function request(
+  trigger: ReflectionRequest["trigger"],
+  conversations = ["conversation-a"],
+  origin?: "manual" | "idle" | "shutdown" | "pressure",
+): ReflectionRequest {
   return {
     trigger,
+    ...(trigger === "dream" ? { origin: origin ?? "manual" } : {}),
     conversationIds: conversations,
     snapshots: [{ conversationId: "conversation-a", snapshot: journal(6).snapshot }],
   }
@@ -83,6 +88,71 @@ describe("reflection trigger machine", () => {
       focus: "facts",
       recentN: 20,
     })
+  })
+
+  it("#given reflection and dream requests #when they compete for one pending slot #then the specified priority order and newest tie winner are preserved", () => {
+    const priorities = [
+      request("step-count"),
+      request("dream", undefined, "idle"),
+      request("compaction"),
+      request("dream", undefined, "shutdown"),
+      request("manual"),
+      request("dream", undefined, "manual"),
+    ]
+    let state = reserveTransition({}, request("step-count"), "active").state
+    priorities.forEach((candidate, index) => {
+      state = reserveTransition(state, candidate, `pending-${index}`).state
+    })
+    expect(state.active?.request.trigger).toBe("step-count")
+    expect(state.pending?.request).toMatchObject({ trigger: "dream", origin: "manual" })
+  })
+
+  it("#given two dream requests during an active reflection #when they merge #then one pending dream unions snapshots and the newest equal-priority request wins", () => {
+    const active = reserveTransition({}, request("manual"), "active")
+    const idle = reserveTransition(active.state, request("dream", ["conversation-a"], "idle"), "dream-idle")
+    const newerIdle = reserveTransition(
+      idle.state,
+      {
+        ...request("dream", ["conversation-b"], "idle"),
+        focus: "newest dream",
+        snapshots: [{ conversationId: "conversation-b", snapshot: journal(7).snapshot }],
+      },
+      "dream-newer",
+    )
+    expect(newerIdle.state.pending?.runId).toBe("dream-idle")
+    expect(newerIdle.state.pending?.request).toMatchObject({
+      trigger: "dream",
+      origin: "idle",
+      focus: "newest dream",
+      conversationIds: ["conversation-a", "conversation-b"],
+    })
+    expect(newerIdle.state.pending?.request.snapshots.map((item) => item.conversationId)).toEqual([
+      "conversation-a",
+      "conversation-b",
+    ])
+  })
+
+  it("#given interleaved reflection and dream requests #when every bounded event sequence is applied #then at most one active and one pending run exist", () => {
+    const candidates = [
+      request("step-count"),
+      request("compaction"),
+      request("manual"),
+      request("dream", undefined, "idle"),
+      request("dream", undefined, "shutdown"),
+      request("dream", undefined, "manual"),
+    ]
+    for (const first of candidates) {
+      for (const second of candidates) {
+        for (const third of candidates) {
+          let state = reserveTransition({}, first, "run-1").state
+          state = reserveTransition(state, second, "run-2").state
+          state = reserveTransition(state, third, "run-3").state
+          expect([state.active, state.pending].filter(Boolean).length).toBeLessThanOrEqual(2)
+          expect(state.active).toBeDefined()
+          expect(state.pending?.runId).not.toBe(state.active?.runId)
+        }
+      }
+    }
   })
 
   it("#given every completion outcome #when the active run completes #then only merged and no_changes advance its captured cursor", () => {

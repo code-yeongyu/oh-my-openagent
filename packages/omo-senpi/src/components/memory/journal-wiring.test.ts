@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import {
   buildIdentityPaths,
@@ -14,7 +15,7 @@ import { createMemoryJournalWiring } from "./journal-wiring"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { readonly paths: MemoryIdentityPaths } {
@@ -188,6 +189,42 @@ describe("memory journal wiring", () => {
     expect(state.total_completed_steps).toBe(2)
   })
 
+  test("#given role-custom entries in the branch #when settled #then only user and assistant rows journal, whatever the custom type", async () => {
+    // given: a memorian recall hint and a foreign extension's custom message, both in the
+    // role-custom `message` shape older writers can leave behind
+    const { paths } = fixture()
+    const pi = new FakeExtensionAPI()
+    const wiring = createMemoryJournalWiring({ identityPaths: paths })
+    wiring.register(pi)
+    const customEntry = (id: string, customType: string): Record<string, unknown> => ({
+      type: "message",
+      id,
+      parentId: null,
+      timestamp: "2026-08-09T00:00:01.500Z",
+      message: {
+        role: "custom",
+        customType,
+        content: [{ type: "text", text: "drain kubernetes nodes" }],
+        display: false,
+      },
+    })
+    const entries = [
+      userEntry("u1", "deploy question"),
+      customEntry("x1", "omo-memorian:recall"),
+      customEntry("x2", "vendor-banner:notice"),
+      assistantEntry("a1", { texts: ["answer one"] }),
+    ]
+
+    // when
+    const results = await pi.dispatch("agent_settled", {}, sessionCtx(entries))
+
+    // then: the foreign custom entry is admitted by the filter and still journals nothing,
+    // because projections only ever emit user and assistant rows (pre-feature behavior)
+    expect(results).toEqual([{ appended: 2, skipped: 0 }])
+    const rows = await wiring.journalFor("session-alpha").readEntries()
+    expect(rows.map((row) => row.source_line_id)).toEqual(["u1:user", "a1:assistant"])
+  })
+
   test("#given a tool-only assistant message #when settled #then no assistant row and no step increment", async () => {
     const { paths } = fixture()
     const pi = new FakeExtensionAPI()
@@ -330,4 +367,38 @@ describe("memory journal wiring", () => {
     expect(await pi.dispatch("agent_settled", {}, undefined)).toEqual([{ appended: 0, skipped: 0 }])
     expect(await pi.dispatch("agent_settled", {}, { sessionManager: {} })).toEqual([{ appended: 0, skipped: 0 }])
   })
+
+  test("#given the journal lock is contended by a live foreign owner #when agent_settled fires #then the handler degrades to a no-op and warns instead of rejecting", async () => {
+    // given: a transcript dir whose state.lock is held by a live foreign process
+    const { paths } = fixture()
+    const journalDir = join(paths.transcripts, "session-contended")
+    mkdirSync(journalDir, { recursive: true })
+    const foreign = Bun.spawn({
+      cmd: [process.execPath, "-e", "setTimeout(() => undefined, 60_000)"],
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+    const warnings: Array<{ message: string; details?: unknown }> = []
+    try {
+      writeFileSync(join(journalDir, "state.lock"), `${foreign.pid}\n`, { encoding: "utf8", mode: 0o600 })
+      const pi = new FakeExtensionAPI()
+      const wiring = createMemoryJournalWiring({
+        identityPaths: paths,
+        logger: { info: () => {}, warn: (message, details) => warnings.push({ message, details }), error: () => {} },
+      })
+      wiring.register(pi)
+      const entries = [userEntry("u1", "question"), assistantEntry("a1", { texts: ["answer"] })]
+
+      // when: the settled handler runs against the contended journal
+      const result = await pi.dispatch("agent_settled", {}, sessionCtx(entries, "session-contended"))
+
+      // then: the handler resolved to a no-op append (no EEXIST escaped), and the lock contention was warned
+      expect(result).toEqual([{ appended: 0, skipped: 0 }])
+      expect(warnings.length).toBe(1)
+      expect(warnings[0]?.message).toMatch(/lock contention|journal/)
+    } finally {
+      foreign.kill()
+      await foreign.exited
+    }
+  }, 30_000)
 })

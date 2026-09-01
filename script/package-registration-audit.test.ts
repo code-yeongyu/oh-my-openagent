@@ -228,8 +228,9 @@ describe("package registration audit", () => {
     const expectedDevDependencyNames = (
       await Promise.all(
         managedWorkspacePaths
-          // omo-opencode and omo-native publish under their own npm names, so neither is an internal workspace devDependency.
-          .filter((path) => path !== "packages/omo-opencode" && path !== "packages/omo-native")
+          // omo-opencode stays linked because the Senpi build imports its config-migration export.
+          // omo-native publishes under its own npm name and is not an internal workspace devDependency.
+          .filter((path) => path !== "packages/omo-native")
           .map((path) => readManifest(join(path, "package.json")).then((manifest) => manifest.name)),
       )
     ).toSorted()

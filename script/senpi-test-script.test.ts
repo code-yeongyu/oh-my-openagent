@@ -64,7 +64,7 @@ describe("Senpi compatibility test script", () => {
       "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
       "node packages/omo-senpi/plugin/scripts/build-install.mjs",
     ].join(" && ")
-    const senpiNode = /id: "senpi-plugin"[\s\S]*?args: \["run", "build:senpi-plugin:stage"\][\s\S]*?deps: \["ast-grep-mcp", "lsp-daemon"\]/.test(
+    const senpiNode = /id: "senpi-plugin"[\s\S]*?args: \["run", "build:senpi-plugin:stage"\][\s\S]*?deps: \["ast-grep-mcp", "lsp-daemon", "codex-plugin"\]/.test(
       buildOrchestrator,
     )
 
@@ -78,7 +78,7 @@ describe("Senpi compatibility test script", () => {
     expect(buildOrchestrator, "the build orchestrator must generate Senpi plugin artifacts before publishing").toContain(
       "build:senpi-plugin:stage",
     )
-    expect(senpiNode, "build graph senpi-plugin must depend on ast-grep-mcp and lsp-daemon and call only the stage script").toBe(true)
+    expect(senpiNode, "build graph senpi-plugin must wait for every shared runtime and plugin dependency").toBe(true)
     expect(prepublishOnlyScript, "prepublishOnly must route through build, which includes the Senpi plugin build").toContain(
       "bun run build",
     )
@@ -103,7 +103,7 @@ describe("Senpi compatibility test script", () => {
         "refactor",
         "remove-ai-slops",
         "review-work",
-        "start-work",
+        "ulw-execute",
         "ultimate-browsing",
         "ultrawork",
         "ulw-loop",
@@ -117,7 +117,15 @@ describe("Senpi compatibility test script", () => {
       }
       await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
       await writeFile(join(pluginRoot, "extensions", "omo.js"), "export default {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-member.js"), "export const runMember = () => undefined\n")
       await writeFile(join(pluginRoot, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
+      await writeFile(join(pluginRoot, "extensions", "dream-persona.md"), "# dream persona fixture\n")
+      await writeFile(join(pluginRoot, "extensions", "facts-persona.md"), "# facts persona fixture\n")
+      await writeFile(join(pluginRoot, "extensions", "memorian-persona.md"), "# memorian persona fixture\n")
+      // The memory run supervisor ships as its own executable artifact beside the bundle, so a
+      // packed root without it is genuinely incomplete and the installer is right to reject it.
+      await writeFile(join(pluginRoot, "extensions", "memory-run-supervisor.mjs"), "#!/usr/bin/env node\n")
       await mkdir(join(pluginRoot, "scripts"), { recursive: true })
       await writeFile(join(pluginRoot, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
       await mkdir(join(pluginRoot, "runtime", "lsp-daemon", "dist"), { recursive: true })
@@ -206,7 +214,7 @@ describe("Senpi compatibility test script", () => {
     // #then
     expect(senpiJob).toContain("os: [ubuntu-latest, macos-latest, windows-latest]")
     expect(senpiJob).toContain('node-version: "24"')
-    expect(senpiJob).toContain('bun-version: "1.3.12"')
+    expect(senpiJob).toContain('bun-version: "1.4.0"')
     expect(senpiJob).toContain("bun run build:senpi-plugin")
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")

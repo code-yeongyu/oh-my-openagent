@@ -9,6 +9,7 @@
 import { join } from "node:path"
 
 import {
+  JournalLockTimeoutError,
   TranscriptJournal,
   type AppendResult,
   type MemoryIdentityPaths,
@@ -17,11 +18,14 @@ import {
   type TranscriptProjection,
 } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
+import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
+import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 
 export interface MemoryJournalWiringOptions {
   readonly identityPaths: MemoryIdentityPaths
   readonly createJournal?: (journalDir: string) => TranscriptJournal
+  readonly logger?: ComponentLogger
 }
 
 export interface MemoryJournalWiring {
@@ -31,6 +35,16 @@ export interface MemoryJournalWiring {
 }
 
 const NOOP_APPEND: AppendResult = { appended: 0, skipped: 0 }
+
+// Memory-owned hidden custom-message channels (memorian recall hints, memory notices). Any other
+// custom message belongs to a foreign extension and is admitted like any other entry.
+const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, MEMORY_NOTICE_CUSTOM_TYPE])
+
+function isJournalLockFailure(error: unknown): boolean {
+  if (error instanceof JournalLockTimeoutError) return true
+  if (error instanceof Error && "code" in error && error.code === "EEXIST") return true
+  return false
+}
 
 export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): MemoryJournalWiring {
   const createJournal =
@@ -48,7 +62,21 @@ export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): 
   async function reconcileSession(eventCtx: unknown): Promise<AppendResult> {
     const surface = readBranchSurface(eventCtx)
     if (surface === undefined) return NOOP_APPEND
-    return journalFor(surface.sessionId).reconcile(projectSessionEntries(surface.entries))
+    try {
+      return await journalFor(surface.sessionId).reconcile(projectSessionEntries(surface.entries))
+    } catch (error: unknown) {
+      // A contended journal lock is best-effort bookkeeping: the next settle or session_start
+      // reconcile is idempotent (keyed by source_line_id), so degrade instead of surfacing an
+      // extension error. Covers both the typed timeout and a mixed-version raw EEXIST.
+      if (isJournalLockFailure(error)) {
+        options.logger?.warn("transcript journal reconcile skipped: lock contention", {
+          sessionId: surface.sessionId,
+          error: String(error),
+        })
+        return NOOP_APPEND
+      }
+      throw error
+    }
   }
 
   return {
@@ -126,6 +154,13 @@ function sessionMessageOf(entry: unknown): SessionMessage | undefined {
   if (!isRecord(body)) return undefined
   const role = stringOf(body.role)
   if (role === undefined) return undefined
+  // Memory-owned hidden channels, never conversation. The journal feeds BOTH the facts queue
+  // payload and the reflection/dream snapshot, so a role-custom memorian recall hint must never
+  // be extracted back into memory as if the session had said it. Senpi writes these as
+  // `custom_message` entries (already dropped by the type gate); this covers the role-custom
+  // `message` shape forks and older writers can leave behind. Foreign custom messages are not
+  // dropped here — projections only ever emit user and assistant rows, as before the feature.
+  if (role === "custom" && EXCLUDED_CUSTOM_TYPES.has(stringOf(body.customType) ?? "")) return undefined
   return { id, role, body }
 }
 

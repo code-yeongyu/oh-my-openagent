@@ -73,7 +73,7 @@ export interface RuntimeFallbackOptions {
 
 export interface RuntimeFallbackHook {
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
-  "chat.message"?: (input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } }, output: { message: { model?: { providerID: string; modelID: string } }; parts?: Array<{ type: string; text?: string }> }) => Promise<void>
+  "chat.message"?: (input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string }; variant?: string }, output: { message: { model?: { providerID: string; modelID: string }; variant?: string }; parts?: Array<{ type: string; text?: string }> }) => Promise<void>
   dispose?: () => void
 }
 
@@ -87,7 +87,7 @@ export interface HookDeps {
   sessionRetryInFlight: Set<string>
   sessionAwaitingFallbackResult: Set<string>
   sessionFallbackTimeouts: Map<string, RuntimeFallbackTimeout>
-  sessionStatusRetryKeys: Map<string, string>
+  sessionStatusRetryKeys: Map<string, Set<string>>
   /**
    * Sessions whose in-flight request was aborted by us (to swap in a fallback
    * model), as opposed to a user-initiated stop. Consumed by

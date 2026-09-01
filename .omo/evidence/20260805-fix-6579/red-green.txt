@@ -1,0 +1,11 @@
+RED
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-cleanup.test.ts
+exit_code=1
+result=4 pass, 2 fail
+failure_1=different model with same attempt/message produced no second dispatch
+failure_2=31-minute fallback session state was deleted
+
+GREEN
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-cleanup.test.ts
+exit_code=0
+result=6 pass, 0 fail, 17 expect calls

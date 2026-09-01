@@ -7,6 +7,13 @@ import type { CategoryConfig } from "../../config/schema"
 import type { ExecutorContext } from "./executor-types"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import {
+	DEEP_CATEGORY_PROMPT_APPEND,
+	DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5,
+} from "./openai-categories"
+
+const PROMPT_INPUT_SENTINEL = "PROMPT_INPUT_SENTINEL"
+const DESCRIPTION_INPUT_SENTINEL = "DESCRIPTION_INPUT_SENTINEL"
 
 describe("resolveCategoryExecution", () => {
 	let connectedProvidersSpy: ReturnType<typeof spyOn> | undefined
@@ -41,8 +48,8 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const args = {
 			category: "deep",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -69,8 +76,8 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const args = {
 			category: "definitely-not-a-real-category-xyz123",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -93,8 +100,8 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const args = {
 			category: "deep",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -123,8 +130,8 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const args = {
 			category: "canonical-chain",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -176,8 +183,8 @@ describe("resolveCategoryExecution", () => {
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
 			category: "quick",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -224,8 +231,8 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const args = {
 			category: "quick",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -266,8 +273,8 @@ describe("resolveCategoryExecution", () => {
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
 			category: "quick",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -312,8 +319,8 @@ describe("resolveCategoryExecution", () => {
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
 			category: "quick",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -366,8 +373,8 @@ describe("resolveCategoryExecution", () => {
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
 			category: "quick",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -417,8 +424,8 @@ describe("resolveCategoryExecution", () => {
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
 			category: "quick",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -463,8 +470,8 @@ describe("resolveCategoryExecution", () => {
 		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 		const args = {
 			category: "deep",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -508,8 +515,8 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const args = {
 			category: "quick",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -540,8 +547,8 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const args = {
 			category: "quick",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -564,12 +571,13 @@ describe("resolveCategoryExecution", () => {
 		expect(result.fallbackChain).toBeUndefined()
 	})
 
-	test("uses GPT-5.5 deep prompt append when category model resolves to gpt-5.5", async () => {
-		//#given
+	test("routes gpt-5.5 family models to the gpt-5.5 deep append", async () => {
+		//#given - the shipped family appends anchor the routing decision;
+		//#given the resolver under test must not be reused as its own oracle
 		const args = {
 			category: "deep",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -577,26 +585,48 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: { model: "openai/gpt-5.5", variant: "medium" },
+			deep: { model: "openai/gpt-5.5" },
 		}
 
 		//#when
 		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
 
-		//#then
+		//#then - the 5.5 family append is selected, not the legacy one
 		expect(result.error).toBeUndefined()
-		expect(result.actualModel).toBe("openai/gpt-5.5")
-		expect(result.categoryPromptAppend).toBeDefined()
-		expect(result.categoryPromptAppend).toContain("operating in DEEP mode")
-		expect(result.categoryPromptAppend).toContain("five to fifteen minutes")
+		expect(result.categoryPromptAppend).toBe(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5)
+		expect(result.categoryPromptAppend).not.toBe(DEEP_CATEGORY_PROMPT_APPEND)
 	})
 
-	test("uses legacy deep prompt append when category model resolves to gpt-5.4", async () => {
+	test("routes gpt-5.6 family models to the same gpt-5.5 deep append", async () => {
+		//#given - 5.6 belongs to the same routed family as 5.5
+		const args = {
+			category: "deep",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: { model: "openai/gpt-5.6-sol" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then - family routing collapses 5.6 onto the 5.5 append
+		expect(result.error).toBeUndefined()
+		expect(result.categoryPromptAppend).toBe(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5)
+	})
+
+	test("routes non-family models to the legacy deep append", async () => {
 		//#given
 		const args = {
 			category: "deep",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -610,20 +640,19 @@ describe("resolveCategoryExecution", () => {
 		//#when
 		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
 
-		//#then
+		//#then - the legacy append is selected, not the 5.5 family one
 		expect(result.error).toBeUndefined()
-		expect(result.actualModel).toBe("openai/gpt-5.4")
-		expect(result.categoryPromptAppend).toBeDefined()
-		expect(result.categoryPromptAppend).toContain("GOAL-ORIENTED AUTONOMOUS")
-		expect(result.categoryPromptAppend).not.toContain("operating in DEEP mode")
+		expect(result.categoryPromptAppend).toBe(DEEP_CATEGORY_PROMPT_APPEND)
+		expect(result.categoryPromptAppend).not.toBe(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5)
 	})
 
-	test("appends user prompt_append to GPT-5.5 deep base prompt", async () => {
+	test("appends user prompt_append after the gpt-5.5 family deep append", async () => {
 		//#given
+		const userPromptAppend = "USER_PROMPT_APPEND_SENTINEL"
 		const args = {
 			category: "deep",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -633,25 +662,27 @@ describe("resolveCategoryExecution", () => {
 		executorCtx.userCategories = {
 			deep: {
 				model: "openai/gpt-5.5",
-				prompt_append: "USER_CUSTOM_INSTRUCTION_XYZ",
+				prompt_append: userPromptAppend,
 			},
 		}
 
 		//#when
 		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
 
-		//#then
+		//#then - the shipped family append carries the dynamic user payload
 		expect(result.error).toBeUndefined()
-		expect(result.categoryPromptAppend).toContain("operating in DEEP mode")
-		expect(result.categoryPromptAppend).toContain("USER_CUSTOM_INSTRUCTION_XYZ")
+		expect(result.categoryPromptAppend).toBe(
+			`${DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5}\n\n${userPromptAppend}`,
+		)
 	})
 
-	test("appends user prompt_append to legacy deep base prompt for non-gpt-5.5 models", async () => {
+	test("appends user prompt_append after the legacy deep append", async () => {
 		//#given
+		const userPromptAppend = "USER_PROMPT_APPEND_SENTINEL"
 		const args = {
 			category: "deep",
-			prompt: "test prompt",
-			description: "Test task",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
 			run_in_background: false,
 			load_skills: [],
 			blockedBy: undefined,
@@ -661,17 +692,18 @@ describe("resolveCategoryExecution", () => {
 		executorCtx.userCategories = {
 			deep: {
 				model: "openai/gpt-5.4",
-				prompt_append: "USER_CUSTOM_INSTRUCTION_LEGACY",
+				prompt_append: userPromptAppend,
 			},
 		}
 
 		//#when
 		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
 
-		//#then
+		//#then - the legacy family append carries the dynamic user payload
 		expect(result.error).toBeUndefined()
-		expect(result.categoryPromptAppend).toContain("GOAL-ORIENTED AUTONOMOUS")
-		expect(result.categoryPromptAppend).toContain("USER_CUSTOM_INSTRUCTION_LEGACY")
+		expect(result.categoryPromptAppend).toBe(
+			`${DEEP_CATEGORY_PROMPT_APPEND}\n\n${userPromptAppend}`,
+		)
 	})
 
 	test("applyCategoryParams propagates category tools config (issue #5182)", () => {
