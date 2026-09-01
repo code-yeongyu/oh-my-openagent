@@ -99,7 +99,7 @@ describe("runStopResumeHook", () => {
 		expect(runStopResumeHook({ hook_event_name: "Stop" })).toBe("");
 	});
 
-	it("#given an active boulder work with remaining plan tasks #when the hook runs #then defers to start-work-continuation", () => {
+	it("#given an active boulder work with remaining plan tasks #when the hook runs #then defers to ulw-execute-continuation", () => {
 		writeGoals([pendingGoal()]);
 		const plan = writeBoulderPlan(true);
 		writeFileSync(

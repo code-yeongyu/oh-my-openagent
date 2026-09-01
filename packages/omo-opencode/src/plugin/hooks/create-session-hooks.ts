@@ -18,7 +18,7 @@ import {
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
   createTaskResumeInfoHook,
-  createStartWorkHook,
+  createUlwExecuteHook,
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createNoSisyphusGptHook,
@@ -55,7 +55,7 @@ export type SessionHooks = {
   goal: ReturnType<typeof createGoalHook> | null
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
-  startWork: ReturnType<typeof createStartWorkHook> | null
+  ulwExecute: ReturnType<typeof createUlwExecuteHook> | null
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
   noSisyphusGpt: ReturnType<typeof createNoSisyphusGptHook> | null
@@ -183,8 +183,8 @@ export function createSessionHooks(args: {
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
     : null
 
-  const startWork = isHookEnabled("start-work")
-    ? safeHook("start-work", () => createStartWorkHook(ctx))
+  const ulwExecute = isHookEnabled("ulw-execute")
+    ? safeHook("ulw-execute", () => createUlwExecuteHook(ctx))
     : null
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
@@ -250,7 +250,7 @@ export function createSessionHooks(args: {
     goal,
     editErrorRecovery,
     delegateTaskRetry,
-    startWork,
+    ulwExecute,
     prometheusMdOnly,
     sisyphusJuniorNotepad,
     noSisyphusGpt,

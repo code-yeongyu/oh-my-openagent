@@ -5,7 +5,7 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 // Session-scoped state feeding the senpi-task invocation gate for plan-gated agents (metis/momus).
 // Three observation channels, deliberately separated because they carry different trust levels:
 // - invoked: a `read` tool result on skills/<name>/SKILL.md or an expanded `<skill name="...">`
-//   block; feeds only the forbids check (start-work), never the requires check.
+//   block; feeds only the forbids check (ulw-execute), never the requires check.
 // - user-requested: raw USER input requesting the skill AFTER stripping injected
 //   <ultrawork-mode>/<system-reminder> blocks, so a directive that merely references ulw-plan
 //   cannot arm the gate. Two sub-channels, both user-input only: the explicit skill token

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const cleanScript = join(packageRoot, "scripts", "clean-dist.mjs");
+const buildScript = join(packageRoot, "scripts", "build.mjs");
 
 describe("clean daemon build output", () => {
 	const tempDirs: string[] = [];
@@ -31,10 +32,12 @@ describe("clean daemon build output", () => {
 		expect(existsSync(dist)).toBe(false);
 	});
 
-	it("#given the daemon package scripts #when inspecting build #then clean-dist is the first build action", () => {
+	it("#given the daemon package scripts #when inspecting build #then the build uses the atomic runner", () => {
 		const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as {
 			scripts?: Record<string, string>;
 		};
-		expect(manifest.scripts?.["build"]?.startsWith("node scripts/clean-dist.mjs && ")).toBe(true);
+		expect(manifest.scripts?.["build"]).toBe("node scripts/build.mjs");
+		expect(readFileSync(buildScript, "utf8")).toContain("mkdtemp");
+		expect(readFileSync(buildScript, "utf8")).toContain("rename(tempDist, distDir)");
 	});
 });
