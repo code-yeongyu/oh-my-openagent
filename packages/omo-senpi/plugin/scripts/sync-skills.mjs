@@ -8,7 +8,9 @@ import { applySenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
 
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const repoRoot = dirname(dirname(pluginRoot))
-const skillsRoot = join(pluginRoot, "skills")
+const skillsRoot = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
+  ? join(pluginRoot, "skills")
+  : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "skills")
 const sharedSkillsRoot = join(repoRoot, "shared-skills", "skills")
 
 const skillSources = [

@@ -102,6 +102,9 @@ describe("checkExtensionCurrent", () => {
       ["reflection-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md")],
       ["dream-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "dream-persona.md")],
       ["facts-persona.md", join(repoRoot, "packages", "memory-core", "src", "facts", "assets", "facts-persona.md")],
+      // The memorian gate loads its persona from beside the BUNDLE, so an unstaged asset makes
+      // every live gate launch fail with ENOENT while every source-reading unit test still passes.
+      ["memorian-persona.md", join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "memorian-persona.md")],
     ]
 
     // then

@@ -1,0 +1,20 @@
++ typescript@7.0.2
++ @clack/prompts@1.7.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.30.0
++ @opencode-ai/plugin@1.18.22
++ @opencode-ai/sdk@1.18.22
++ @opentui/core@0.5.8
++ @opentui/keymap@0.5.8
++ @opentui/solid@0.5.8
++ commander@15.0.0
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@5.3.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.7
++ posthog-node@5.51.1
++ zod@4.4.3
+
+595 packages installed [71.92s]

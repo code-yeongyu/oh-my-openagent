@@ -36,6 +36,9 @@ export type FakeHandleOptions = {
   // When set, abort() records the call THEN rejects, mirroring an rpc child that already exited
   // (protocol-client rejects send after isExited). Proves teardown survives an abort rejection.
   readonly abortRejects?: boolean
+  readonly followUpGate?: Promise<void>
+  readonly followUpGates?: readonly Promise<void>[]
+  readonly onFollowUpStart?: () => void
 }
 
 // Both runner adapters normalize onto ManagedChildHandle, so the two flavors differ only in the
@@ -45,6 +48,7 @@ export function makeFakeHandle(taskId: string, flavor: RunnerFlavor, options: Fa
   const followUpCalls: string[] = []
   const abortCalls: number[] = []
   let lastText: string | undefined
+  let followUpIndex = 0
   const handle: ManagedChildHandle = {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
@@ -54,6 +58,9 @@ export function makeFakeHandle(taskId: string, flavor: RunnerFlavor, options: Fa
     },
     followUp: async (text) => {
       followUpCalls.push(text)
+      options.onFollowUpStart?.()
+      const gate = options.followUpGates?.[followUpIndex++] ?? options.followUpGate
+      await gate
     },
     abort: async () => {
       abortCalls.push(abortCalls.length + 1)
@@ -97,6 +104,7 @@ export type SteeringHarness = {
   readonly dequeueCalls: string[]
   setLive(taskId: string, handle: ManagedChildHandle): void
   clearLive(taskId: string): void
+  setEvicting(taskId: string, evicting: boolean): void
   seedRecord(overrides?: Partial<TaskRecordInput>): TaskRecord
   now(): number
 }
@@ -107,9 +115,22 @@ export function makeHarness(): SteeringHarness {
   const destruction = makeFakeDestruction()
   const reviveCalls: string[] = []
   const dequeueCalls: string[] = []
+  const evicting = new Set<string>()
+  const sendCounts = new Map<string, number>()
   let clock = Date.parse("2026-07-06T00:00:00.000Z")
   const port: SteeringPort = {
     store,
+    tryBeginSend: (taskId) => {
+      if (evicting.has(taskId)) return false
+      sendCounts.set(taskId, (sendCounts.get(taskId) ?? 0) + 1)
+      return true
+    },
+    endSend: (taskId) => {
+      const count = sendCounts.get(taskId) ?? 0
+      if (count <= 1) sendCounts.delete(taskId)
+      else sendCounts.set(taskId, count - 1)
+    },
+    isEvicting: (taskId) => evicting.has(taskId),
     liveHandle: (taskId) => live.get(taskId),
     reserveForRevive: (taskId) => ({
       ok: true,
@@ -135,6 +156,10 @@ export function makeHarness(): SteeringHarness {
     },
     clearLive: (taskId) => {
       live.delete(taskId)
+    },
+    setEvicting: (taskId, value) => {
+      if (value) evicting.add(taskId)
+      else evicting.delete(taskId)
     },
     seedRecord: (overrides = {}) => {
       const record = createTaskRecord({

@@ -5,9 +5,9 @@
 // only destructive path: it requires confirmation (interactive) or --force
 // (noninteractive) and ALWAYS writes a backup before replacing the repository.
 
-import { readFile } from "node:fs/promises"
+import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
-import { rm } from "node:fs/promises"
+import { rm } from "@oh-my-opencode/memory-core/fs"
 
 import { MirrorSync, installHooks } from "@oh-my-opencode/memory-core"
 

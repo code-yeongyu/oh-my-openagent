@@ -4,7 +4,7 @@ import { getSessionAgent, handedBackSyncSessions } from "../../features/claude-c
 import { normalizeSDKResponse } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
-import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
+import { latestAssistantTurnBlocksInternalPrompt } from "@oh-my-opencode/utils/prompt-async-gate/pending-tool-turn"
 
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"

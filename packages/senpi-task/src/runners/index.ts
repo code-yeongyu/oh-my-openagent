@@ -35,6 +35,7 @@ export type {
 export {
   buildChildArgs,
   buildRpcSpawn,
+  OMO_SENPI_TASK_RPC_CHILD,
   detectBunBinary,
   resolveChildSessionDir,
   resolveSenpiExecutable,

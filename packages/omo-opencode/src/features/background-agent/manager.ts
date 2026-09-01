@@ -101,6 +101,8 @@ import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawn
 import { invokeTmuxSessionCreatedCallback } from "./spawner/tmux-callback-invoker"
 import {
   createSubagentDepthLimitError,
+  createSubagentDescendantLimitError,
+  getMaxLiveDescendantsPerRoot,
   getMaxSubagentDepth,
   resolveSubagentSpawnContext,
   type SubagentSpawnContext,
@@ -364,6 +366,16 @@ export class BackgroundManager {
     rollback: () => void
   }> {
     const spawnContext = await this.assertCanSpawn(parentSessionID)
+    const maxDescendants = getMaxLiveDescendantsPerRoot(this.config)
+    const currentCount = this.rootDescendantCounts.get(spawnContext.rootSessionID) ?? 0
+    if (maxDescendants !== 0 && currentCount >= maxDescendants) {
+      throw createSubagentDescendantLimitError({
+        descendantCount: currentCount,
+        maxDescendants,
+        parentSessionID,
+        rootSessionID: spawnContext.rootSessionID,
+      })
+    }
     const descendantCount = this.registerRootDescendant(spawnContext.rootSessionID)
     let settled = false
 
@@ -380,6 +392,14 @@ export class BackgroundManager {
         this.unregisterRootDescendant(spawnContext.rootSessionID)
       },
     }
+  }
+
+  async acquireSyncSubagentConcurrency(model: string, taskId?: string): Promise<void> {
+    await this.concurrencyManager.acquire(model, taskId)
+  }
+
+  releaseSyncSubagentConcurrency(model: string): void {
+    this.concurrencyManager.release(model)
   }
 
   private registerRootDescendant(rootSessionID: string): number {
@@ -1535,18 +1555,6 @@ The fallback retry session is now created and can be inspected directly.
     this.observedIncompleteTodosBySession.delete(sessionID)
   }
 
-  private messageUpdatedInfoHasParentWakeOutput(info: Record<string, unknown>, role: unknown): boolean {
-    if (role === "tool") {
-      return true
-    }
-    if (role !== "assistant") {
-      return false
-    }
-    if (info.error) {
-      return false
-    }
-    return !isEmptyNoProgressAssistantTurnInfo(info)
-  }
 
   private shouldHoldDispatchedParentWakeForTextDelta(
     eventType: string,
@@ -2328,7 +2336,7 @@ The task was re-queued on a fallback model after a retryable failure.
       this.completionTimers.delete(taskId)
     }
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       this.completionTimers.delete(taskId)
       const task = this.tasks.get(taskId)
       if (!task) return
@@ -2353,6 +2361,12 @@ The task was re-queued on a fallback model after a retryable failure.
         subagentSessions.delete(task.sessionId)
         clearDelegatedChildSessionBootstrap(task.sessionId)
         SessionCategoryRegistry.remove(task.sessionId)
+        const deleteSession = this.client.session.delete?.bind(this.client.session)
+        if (typeof deleteSession === "function") {
+          await deleteSession({ path: { id: task.sessionId } }).catch((error: unknown) => {
+            log("[background-agent] Failed to delete completed subagent session:", { sessionID: task.sessionId, error: String(error) })
+          })
+        }
       }
       log("[background-agent] Removed completed task from memory:", taskId)
     }, this.config?.taskCleanupDelayMs ?? TASK_CLEANUP_DELAY_MS)

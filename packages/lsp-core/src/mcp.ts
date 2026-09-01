@@ -71,6 +71,9 @@ export async function runMcpStdioServer(
 	await runJsonRpcStdioServer({
 		input,
 		output,
+		// Idle stays disabled: hosts of this CLI (legacy opencode configs and
+		// standalone lsp-tools-mcp users) have no evidenced respawn for an exited
+		// stdio server; opencode in particular marks it failed without retry.
 		idleTimeoutMs: 0,
 		parentWatchdog: options.parentWatchdog ?? {},
 		handler: (request) => runWithRequestContext(requestContext, () => handleLspMcpRequest(request)),

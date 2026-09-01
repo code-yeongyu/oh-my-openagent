@@ -55,6 +55,9 @@ export type SuspendSummary = {
 
 export type TaskLifecycle = {
   destroyResidentTask(taskId: string, cause: DestroyCause): Promise<void>
+  reclaimIdleResidents?(): Promise<readonly string[]>
+  // Stop the unref'd idle resident reclaimer when its owning session is disposed.
+  dispose?(): void
   admitResident(parentSessionId: string): Promise<AdmissionResult>
   reconcileOnSessionStart(parentSessionId?: string): Promise<ReconcileResult>
   cleanupExpiredRecords(): Promise<CleanupResult>

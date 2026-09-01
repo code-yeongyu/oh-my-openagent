@@ -1,0 +1,11 @@
+PASS bun test script/senpi-hooks-state.test.ts script/senpi-hooks-state-errors.test.ts: 9 pass, 0 fail
+PASS bun run typecheck:script
+PASS bun x tsgo --noEmit -p packages/omo-native/tsconfig.json
+PASS bun x tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+PASS bun x tsgo --noEmit -p packages/senpi-task/tsconfig.json
+PASS LSP diagnostics: changed script and omo-senpi files clean
+PASS node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+PASS npm pack --dry-run --json --ignore-scripts: 4220 files, 7767706 bytes
+PASS bun run test:senpi: 2423 pass, 7 platform skip, 0 fail; resolver 10 pass
+PASS Linux x64 compile and exact held-lock PTY
+PASS OpenAI Codex random OAuth credential derivation; secret discarded

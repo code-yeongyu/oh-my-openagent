@@ -2,7 +2,7 @@
 // `facts-queue` lock; the enqueue watermark is MONOTONIC so a late-finishing older batch
 // can never republish a range overlapping a retained newer entry.
 
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import type { MemoryIdentityPaths } from "../identity"

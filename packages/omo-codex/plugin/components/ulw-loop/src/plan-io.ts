@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, readdirSync } from "node:fs";
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 
@@ -11,6 +11,7 @@ import {
 	ulwLoopLedgerPath,
 	ulwLoopRelativeDir,
 } from "./paths.js";
+import { planMissingRecovery } from "./plan-missing-recovery.js";
 import type { UlwLoopLedgerEntry, UlwLoopPlan } from "./types.js";
 import { iso, ULW_LOOP_DIR, ULW_LOOP_GOALS, ULW_LOOP_LEDGER, UlwLoopError } from "./types.js";
 
@@ -73,10 +74,11 @@ export async function readUlwLoopPlan(repoRoot: string, scope?: UlwLoopScope): P
 		raw = await readFile(path, "utf8");
 	} catch (error) {
 		if (!hasCode(error, "ENOENT")) throw error;
+		const recovery = planMissingRecovery(readSessionDirs(repoRoot));
 		throw new UlwLoopError(
-			`No ulw-loop plan found at ${repoRelative(path, repoRoot)}. Run \`omo-agent-toolkit ulw-loop create-goals ...\` first.`,
+			`No ulw-loop plan found at ${repoRelative(path, repoRoot)}.\n${recovery.message}`,
 			"ULW_LOOP_PLAN_MISSING",
-			{ cause: error },
+			{ cause: error, ...(recovery.details === undefined ? {} : { details: recovery.details }) },
 		);
 	}
 	const parsed: UlwLoopPlan = JSON.parse(raw);
@@ -106,6 +108,19 @@ export async function readUlwLoopPlan(repoRoot: string, scope?: UlwLoopScope): P
 		);
 	}
 	return parsed;
+}
+
+// Session dirs are the only recovery hint that matters when a plan is missing: the
+// caller is almost always scoped to a session whose sibling actually holds the plan.
+function readSessionDirs(repoRoot: string): readonly string[] {
+	try {
+		return readdirSync(ulwLoopDir(repoRoot), { withFileTypes: true })
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name)
+			.sort();
+	} catch {
+		return [];
+	}
 }
 
 export async function writePlan(repoRoot: string, plan: UlwLoopPlan, scope?: UlwLoopScope): Promise<void> {

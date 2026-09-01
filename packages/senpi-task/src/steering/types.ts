@@ -18,6 +18,9 @@ export type ReviveReservation =
 
 export type SteeringPort = {
   readonly store: TaskRecordStore
+  tryBeginSend?(taskId: string): boolean
+  endSend?(taskId: string): void
+  isEvicting?(taskId: string): boolean
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
@@ -70,6 +73,7 @@ export type CancelOutcome =
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {
+  hasPendingSends(taskId: string): boolean
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>

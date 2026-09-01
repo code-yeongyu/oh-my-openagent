@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { copyFile, open, readFile, rename, rm } from "node:fs/promises"
+import { copyFile, open, readFile, rename, rm, writeHandleAll } from "../fs/resilient"
 import { isAbsolute, resolve } from "node:path"
 import type { GitExec, GitExecResult } from "./exec"
 import type { GitIndexIdentity } from "./path-state"
@@ -35,7 +35,7 @@ export async function writeIndexIfIdentity(options: {
       ? ["update-index", "--force-remove", "--", options.path]
       : ["update-index", "--add", "--cacheinfo", options.next.mode, options.next.oid, options.path]
     await git(options, argv, { GIT_INDEX_FILE: temporary })
-    await lock.writeFile(await readFile(temporary))
+    await writeHandleAll(lock, await readFile(temporary))
     await lock.sync()
     await lock.close()
     await rename(lockPath, indexPath)

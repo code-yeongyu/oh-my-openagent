@@ -1,18 +1,26 @@
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
 import {
   loadDreamPersona,
   loadFactsPersona,
+  loadMemorianPersona,
   loadReflectionPersona,
   serializeFactsPayload,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
+import {
+  MEMORIAN_NUDGE_EXTENSION_FILENAME,
+  MEMORIAN_NUDGE_EXTENSION_SOURCE,
+} from "./memorian-nudge-extension"
+
 import { estimateSystemTokens } from "../commands/tokens"
 import type {
   FactsSpawnArgs,
+  MemorianSpawnArgs,
   PrepareFactsSpawnInput,
+  PrepareMemorianSpawnInput,
   PrepareReflectionSpawnInput,
   ReflectionSpawnArgs,
   ReflectionSpawnPaths,
@@ -225,6 +233,95 @@ export async function prepareFactsSpawn(input: PrepareFactsSpawnInput): Promise<
     detached: true,
     paths: { runDir: input.runDir, payload, extraction },
   }
+}
+
+const MEMORIAN_DEFAULT_DEADLINE_MS = 5 * 60_000
+
+/**
+ * Materialize the memorian gate child's run directory and argv.
+ *
+ * The argv keeps BOTH `--no-extensions` and an explicit `-e`: `--no-extensions` suppresses
+ * extension DISCOVERY only, never an explicitly named extension (senpi args parsing; the same
+ * combination senpi-task's RPC child spawn relies on). Dropping it would boot the parent's whole
+ * extension set inside the judge. `--tools` is an allowlist that filters extension-registered
+ * tools too, so `nudge` must be named there alongside `read` (the persona reads its two input
+ * files). The system prompt is a FILE PATH materialized into the run dir, mirroring reflection.
+ */
+export async function prepareMemorianSpawn(input: PrepareMemorianSpawnInput): Promise<MemorianSpawnArgs> {
+  await mkdir(input.runDir, { recursive: true, mode: 0o700 })
+  const candidates = join(input.runDir, "candidates.json")
+  const transcript = join(input.runDir, "transcript-window.txt")
+  const persona = join(input.runDir, "memorian-persona.md")
+  const extension = join(input.runDir, MEMORIAN_NUDGE_EXTENSION_FILENAME)
+  const nudges = join(input.runDir, "nudges.ndjson")
+  // Payload files land at 0o400, so a reused run dir must relax the mode before rewriting.
+  const chmodFile = input.chmodFile ?? chmod
+  const readOnlyPaths = [candidates, transcript]
+  await Promise.all(readOnlyPaths.map(async (path) => {
+    try {
+      await chmodFile(path, 0o600)
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw error
+    }
+  }))
+  const payload = {
+    version: 1,
+    maxItems: input.maxItems,
+    candidates: input.candidates.map((candidate) => ({
+      path: candidate.path,
+      description: candidate.description,
+      excerpt: candidate.excerpt,
+      score: candidate.score,
+    })),
+    surfaced: [...input.surfaced],
+  }
+  await Promise.all([
+    writeFile(candidates, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }),
+    writeFile(transcript, renderTranscriptWindow(input.transcript), { encoding: "utf8", mode: 0o600 }),
+    writeFile(persona, loadMemorianPersona(), { encoding: "utf8", mode: 0o600 }),
+    writeFile(extension, MEMORIAN_NUDGE_EXTENSION_SOURCE, { encoding: "utf8", mode: 0o600 }),
+  ])
+  await Promise.all(readOnlyPaths.map((path) => chmod(path, 0o400)))
+
+  const env: NodeJS.ProcessEnv = {
+    ...input.env,
+    MEMORIAN_NUDGE_PATH: nudges,
+    MEMORIAN_CANDIDATES_PATH: candidates,
+    MEMORIAN_TRANSCRIPT_PATH: transcript,
+    SENPI_MEMORY_MEMORIAN: "1",
+    SENPI_PTY_FORCE_PIPE: "1",
+  }
+  const args = [
+    "-p",
+    "--system-prompt", persona,
+    "--tools", "nudge,read",
+    "-e", extension,
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-context-files",
+    "--session-dir", input.runDir,
+    "--model", input.model,
+    ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
+    `Read ${candidates} and ${transcript}, then follow the system prompt.`,
+  ]
+  const launch = resolveMemoryChildLaunch(input)
+  return {
+    hardDeadlineAt: input.hardDeadlineAt ?? Date.now() + MEMORIAN_DEFAULT_DEADLINE_MS,
+    model: input.model,
+    ...(input.thinking === undefined ? {} : { thinking: input.thinking }),
+    command: launch.command,
+    args: [...launch.prefixArgs, ...args],
+    cwd: input.runDir,
+    env,
+    detached: true,
+    paths: { runDir: input.runDir, candidates, transcript, persona, extension, nudges },
+  }
+}
+
+/** Both roles, oldest first: the judge compares what the user asked against what the agent said. */
+function renderTranscriptWindow(turns: readonly { readonly role: string; readonly text: string }[]): string {
+  return `${turns.map((turn) => `${turn.role}: ${turn.text}`).join("\n\n")}\n`
 }
 
 function resolveDreamTarget(worktree: string, targetDoc: string): string {

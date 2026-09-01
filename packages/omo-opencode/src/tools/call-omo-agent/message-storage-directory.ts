@@ -1,1 +1,0 @@
-export { getMessageDir } from "../../shared"

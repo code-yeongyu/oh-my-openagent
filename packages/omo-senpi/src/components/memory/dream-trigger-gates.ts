@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises"
+import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import type { DreamOrigin } from "@oh-my-opencode/memory-core"

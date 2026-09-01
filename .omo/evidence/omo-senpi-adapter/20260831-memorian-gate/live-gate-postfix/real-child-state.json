@@ -1,0 +1,57 @@
+{
+  "productionArgv": [
+    "/Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/node_modules/@code-yeongyu/senpi/dist/cli.js",
+    "-p",
+    "--system-prompt",
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run/memorian-persona.md",
+    "--tools",
+    "nudge,read",
+    "-e",
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run/nudge-extension.ts",
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-context-files",
+    "--session-dir",
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run",
+    "--model",
+    "omo-mock/mock-1",
+    "Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run/transcript-window.txt, then follow the system prompt."
+  ],
+  "argvActuallyRun": [
+    "/Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/node_modules/@code-yeongyu/senpi/dist/cli.js",
+    "-e",
+    "/Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/packages/omo-senpi/scripts/qa/task-e2e-mock-provider.ts",
+    "-p",
+    "--system-prompt",
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run/memorian-persona.md",
+    "--tools",
+    "nudge,read",
+    "-e",
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run/nudge-extension.ts",
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-context-files",
+    "--session-dir",
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run",
+    "--provider",
+    "omo-mock",
+    "--model",
+    "mock-1",
+    "Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ik07ev/memorian-run/transcript-window.txt, then follow the system prompt."
+  ],
+  "command": "/Users/yeongyu/.bun/bin/bun",
+  "toolsValue": "nudge,read",
+  "exitStatus": 0,
+  "stdoutTail": "done\n",
+  "stderrTail": "",
+  "ndjsonLines": [
+    "{\"path\":\"reference/project/test-note.md\",\"hint\":\"Rebase the oldest reviewed branch first so the dependent stack never inverts.\"}"
+  ],
+  "scriptedCall": {
+    "path": "reference/project/test-note.md",
+    "hint": "Rebase the oldest reviewed branch first so the dependent stack never inverts."
+  },
+  "exactMatch": true
+}

@@ -61,6 +61,7 @@ class ScriptedRunner implements ManagedRunner {
     readonly emit: (event: ManagedChildEvent) => void
     readonly listenerCount: () => number
     readonly settle: (output: string) => void
+    readonly disposed: Promise<void>
     readonly fail: (message: string) => void
   }> = []
   readonly #signals = new Map<number, ReturnType<typeof deferred<void>>>()
@@ -74,6 +75,7 @@ class ScriptedRunner implements ManagedRunner {
 
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const outcome = deferred<RunnerOutcome>()
+    const disposed = deferred<void>()
     const listeners = new Set<(event: ManagedChildEvent) => void>()
     const handle: ManagedChildHandle = {
       task_id: spec.taskId,
@@ -95,6 +97,7 @@ class ScriptedRunner implements ManagedRunner {
       lastAssistantText: () => undefined,
       dispose: () => {
         this.disposeCalls += 1
+        disposed.resolve()
         return Promise.resolve()
       },
     }
@@ -105,6 +108,7 @@ class ScriptedRunner implements ManagedRunner {
       },
       listenerCount: () => listeners.size,
       settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }),
+      disposed: disposed.promise,
       fail: (message) => outcome.resolve({ status: "error", failure: { kind: "child-turn-failed", message } }),
     })
     this.#signals.get(this.handles.length)?.resolve()
@@ -581,7 +585,6 @@ describe("assembled DAG runtime", () => {
       await within(runner.whenStarted(2))
       runner.handles[1]?.settle("runtime survived")
       const survived = await within(runtime.wait(survivor.snapshot.runId, sessionId))
-      await new Promise<void>((resolve) => setImmediate(resolve))
 
       // then
       expect(cancelled.status).toBe("cancelled")
@@ -591,7 +594,9 @@ describe("assembled DAG runtime", () => {
       expect(survived.nodes.survivor).toEqual(expect.objectContaining({ output: "runtime survived" }))
       expect(unhandled).toEqual([])
       runner.handles[0]?.settle("cancelled child reached its natural boundary")
-      await new Promise<void>((resolve) => setImmediate(resolve))
+      const disposed = runner.handles[0]?.disposed
+      if (disposed === undefined) throw new Error("cancelled child handle was not retained")
+      await within(disposed)
       expect(runner.disposeCalls).toBe(1)
     } finally {
       process.off("unhandledRejection", onUnhandled)

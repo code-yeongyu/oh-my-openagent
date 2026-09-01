@@ -139,6 +139,8 @@ class TaskManagerImpl implements TaskManager {
   readonly #released = new Map<string, number>()
   readonly #waiters = new Map<string, TaskWaiter[]>()
   readonly #background = new Set<string>()
+  readonly #evicting = new Set<string>()
+  readonly #sendCounts = new Map<string, number>()
   readonly #steering: SteeringEngine
   readonly #outcome: OutcomeTracker
 
@@ -168,6 +170,9 @@ class TaskManagerImpl implements TaskManager {
     })
     const port: SteeringPort = {
       store: options.store,
+      tryBeginSend: (taskId) => this.tryBeginSend(taskId),
+      endSend: (taskId) => this.endSend(taskId),
+      isEvicting: (taskId) => this.isEvicting(taskId),
       liveHandle: (taskId) => this.#live.get(taskId)?.handle,
       dequeuePending: (taskId) => {
         const rec = this.#tryLoad(taskId)
@@ -460,6 +465,36 @@ class TaskManagerImpl implements TaskManager {
 
   get(taskId: string): TaskRecord | undefined {
     return this.#tryLoad(taskId) ?? undefined
+  }
+
+  hasPendingSends(taskId: string): boolean {
+    return (this.#sendCounts.get(taskId) ?? 0) > 0 || (this.#steering.hasPendingSends(taskId) ?? false)
+  }
+
+  tryClaimEviction(taskId: string): boolean {
+    if ((this.#sendCounts.get(taskId) ?? 0) > 0 || this.#evicting.has(taskId)) return false
+    this.#evicting.add(taskId)
+    return true
+  }
+
+  releaseEviction(taskId: string): void {
+    this.#evicting.delete(taskId)
+  }
+
+  isEvicting(taskId: string): boolean {
+    return this.#evicting.has(taskId)
+  }
+
+  tryBeginSend(taskId: string): boolean {
+    if (this.#evicting.has(taskId)) return false
+    this.#sendCounts.set(taskId, (this.#sendCounts.get(taskId) ?? 0) + 1)
+    return true
+  }
+
+  endSend(taskId: string): void {
+    const count = this.#sendCounts.get(taskId) ?? 0
+    if (count <= 1) this.#sendCounts.delete(taskId)
+    else this.#sendCounts.set(taskId, count - 1)
   }
 
   list(scope: ListScope): readonly ListedTask[] {

@@ -87,7 +87,7 @@ describe("reflection health", () => {
     const imports = [...source.matchAll(/^import[\s\S]*?from "(.+?)"$/gm)].map((match) => match[1])
 
     // then
-    expect(imports).toEqual(["node:fs/promises", "node:path", "@oh-my-opencode/memory-core"])
+    expect(imports).toEqual(["@oh-my-opencode/memory-core/fs", "node:path", "@oh-my-opencode/memory-core"])
     expect(source).not.toContain("appendEntry")
     expect(source).not.toContain("safeNotify")
     expect(source).not.toContain("writeFile")

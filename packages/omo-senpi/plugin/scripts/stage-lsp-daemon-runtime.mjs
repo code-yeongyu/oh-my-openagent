@@ -10,7 +10,7 @@ const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = resolve(packageRoot, "..", "..")
 const defaultSourceDist = process.env.OMO_LSP_DAEMON_DIST ?? join(repoRoot, "packages", "lsp-daemon", "dist")
-const defaultTargetDist = join(pluginRoot, "runtime", "lsp-daemon", "dist")
+const defaultTargetDist = process.env.OMO_LSP_DAEMON_TARGET ?? join(pluginRoot, "runtime", "lsp-daemon", "dist")
 
 const REQUIRED_OUTPUTS = [
   "cli.js",

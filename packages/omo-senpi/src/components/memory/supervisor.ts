@@ -6,7 +6,6 @@ export interface MemoryModuleSupervisor {
 
 let references = 0
 
-// Placeholder shared lifecycle for todo 23's detached reflection completion supervisor.
 export const memoryModuleSupervisor: MemoryModuleSupervisor = {
   get refCount(): number {
     return references

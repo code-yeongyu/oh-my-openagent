@@ -1,0 +1,10 @@
+From https://github.com/code-yeongyu/oh-my-openagent
+ * branch                feat/memorian-gate -> FETCH_HEAD
+ * [new branch]          feat/memorian-gate -> origin/feat/memorian-gate
+Preparing worktree (detached HEAD 32188aa8c)
+Updating files:  65% (6060/9305)Updating files:  66% (6142/9305)Updating files:  67% (6235/9305)Updating files:  68% (6328/9305)Updating files:  69% (6421/9305)Updating files:  70% (6514/9305)Updating files:  71% (6607/9305)Updating files:  72% (6700/9305)Updating files:  73% (6793/9305)Updating files:  74% (6886/9305)Updating files:  75% (6979/9305)Updating files:  76% (7072/9305)Updating files:  77% (7165/9305)Updating files:  78% (7258/9305)Updating files:  79% (7351/9305)Updating files:  80% (7444/9305)Updating files:  81% (7538/9305)Updating files:  82% (7631/9305)Updating files:  83% (7724/9305)Updating files:  84% (7817/9305)Updating files:  85% (7910/9305)Updating files:  86% (8003/9305)Updating files:  87% (8096/9305)Updating files:  88% (8189/9305)Updating files:  89% (8282/9305)Updating files:  90% (8375/9305)Updating files:  91% (8468/9305)Updating files:  92% (8561/9305)Updating files:  93% (8654/9305)Updating files:  94% (8747/9305)Updating files:  95% (8840/9305)Updating files:  96% (8933/9305)Updating files:  97% (9026/9305)Updating files:  98% (9119/9305)Updating files:  99% (9212/9305)Updating files: 100% (9305/9305)Updating files: 100% (9305/9305), done.
+HEAD is now at 32188aa8c build(omo-senpi): refresh the committed plugin bundle
+32188aa8c4b2c46665e540a8c1c3069bde1767da
+32188aa8c build(omo-senpi): refresh the committed plugin bundle
+af3792d73 feat(omo-senpi): inject memorian nudges on the next turn
+e15ba558c feat(omo-senpi): launch the memorian gate child on settle

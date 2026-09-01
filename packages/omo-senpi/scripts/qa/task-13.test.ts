@@ -52,6 +52,11 @@ const { spawnSync } = await loadModule<ChildProcessModule>("node:child_process")
 
 const repoRoot = process.cwd()
 const driveScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "drive.mjs")
+const { snapshotDirectory, digestDirectory, changedSnapshotPaths } = await loadModule<{
+  snapshotDirectory(root: string, options?: { readdir?: (path: string, options: { withFileTypes: true }) => Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>; readFile?: (path: string) => Buffer }): Map<string, string>
+  digestDirectory(root: string, options?: { readdir?: (path: string, options: { withFileTypes: true }) => Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>; readFile?: (path: string) => Buffer }): string
+  changedSnapshotPaths(before: Map<string, string>, after: Map<string, string>): string[]
+}>(driveScript)
 const probeScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "probe-continuation.mjs")
 const mockProviderScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "mock-provider", "index.ts")
 
@@ -100,6 +105,60 @@ describe("task 13 senpi QA scripts", () => {
     expect(result.stderr).toBe("")
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("SELF-TEST OK")
+  })
+
+  test("#given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-senpi-settings-snapshot-"))
+    const settings = join(root, "settings.json")
+    try {
+      writeFileSync(settings, JSON.stringify({ theme: "dark", tipsHistory: { first: 1 }, lastChangelogVersion: "1.0.0", modelLastOnThinkingLevels: { model: "low" } }))
+      const before = snapshotDirectory(root)
+      writeFileSync(settings, JSON.stringify({ theme: "dark", tipsHistory: { second: 2 }, lastChangelogVersion: "2.0.0", modelLastOnThinkingLevels: { model: "high" } }))
+      const after = snapshotDirectory(root)
+
+      expect(changedSnapshotPaths(before, after)).toEqual([])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given entries vanish between enumeration and read #when the complete-tree snapshot runs #then transient entries are skipped", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-senpi-transient-snapshot-"))
+    const stable = join(root, "stable.txt")
+    const vanished = join(root, "vanished.tmp")
+    try {
+      writeFileSync(stable, "stable")
+      writeFileSync(vanished, "vanished")
+      const rootEntries = [
+        { name: "stable.txt", isDirectory: () => false, isFile: () => true },
+        { name: "vanished.tmp", isDirectory: () => false, isFile: () => true },
+        { name: "vanished-lock", isDirectory: () => true, isFile: () => false },
+      ]
+      const readdir = (path: string) => {
+        if (path === root) return rootEntries
+        const error = new Error("entry vanished") as Error & { code: string }
+        error.code = "ENOTDIR"
+        throw error
+      }
+      const readFile = (path: string) => {
+        if (path === vanished) {
+          const error = new Error("entry vanished") as Error & { code: string }
+          error.code = "ENOENT"
+          throw error
+        }
+        return Buffer.from("stable")
+      }
+
+      const snapshot = snapshotDirectory(root, { readdir, readFile })
+
+      expect(snapshot.has("stable.txt")).toBe(true)
+      expect(snapshot.has("vanished.tmp")).toBe(false)
+      expect(snapshot.has("vanished-lock/anything")).toBe(false)
+      expect(snapshot.size).toBe(1)
+      expect(digestDirectory(root, { readdir, readFile })).toBe(digestDirectory(root, { readdir: () => [{ name: "stable.txt", isDirectory: () => false, isFile: () => true }], readFile: () => Buffer.from("stable") }))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   test("#given probe-continuation self-test #when executed #then continuation helpers validate successfully", () => {
@@ -214,6 +273,14 @@ describe("task 13 senpi QA scripts", () => {
       expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
       expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
       expect(payload["realSenpiUntouched"]).toBe(true)
+      expect(payload["realSenpiChangedPaths"]).toEqual([])
+      expect(payload["realOmoUntouched"]).toBe(true)
+      expect(payload["realOmoChangedPaths"]).toEqual([])
+      expect(payload["protectedStateFiles"]).toContain("hooks-state.json")
+      expect(payload["realHomesChecked"]).toEqual([
+        join(process.env.HOME ?? "", ".senpi", "agent"),
+        join(process.env.HOME ?? "", ".omo", "agent"),
+      ])
       expect(String(payload["result"])).toMatch(/^(SKIP|FAIL)$/)
     } finally {
       rmSync(callerAgentDir, { recursive: true, force: true })

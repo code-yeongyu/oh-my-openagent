@@ -330,7 +330,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
 
     // upload shape: bare binaries + SHA256SUMS under .omo/release-binaries, npm-artifact parity on retention
     const uploadStep = binarySteps[2]!
-    expect(uploadStep).toContain("uses: actions/upload-artifact@v6")
+    expect(uploadStep).toContain("uses: actions/upload-artifact@v7")
     expect(uploadStep).toContain("name: release-binary-${{ matrix.platform }}")
     expect(uploadStep).toContain("path: .omo/release-binaries/")
     expect(uploadStep).toContain("retention-days: 1")

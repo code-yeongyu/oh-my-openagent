@@ -139,3 +139,26 @@ export function formatCodexGoalReconciliation(reconciliation: CodexGoalReconcili
 	const parts = [...reconciliation.errors, ...reconciliation.warnings];
 	return parts.join(" ");
 }
+
+export interface CodexGoalMismatchRecovery {
+	readonly message: string;
+	readonly details: { readonly expectedObjective: string; readonly receivedObjective: string };
+}
+
+/**
+ * The reconciliation errors normalize whitespace for comparison, which makes the
+ * quoted objective unusable as a copy source. Recovery therefore carries the
+ * plan's `codexObjective` verbatim so the agent can paste it into `update_goal`.
+ */
+export function codexGoalMismatchRecovery(
+	expectedObjective: string,
+	snapshot: CodexGoalSnapshot | null | undefined,
+): CodexGoalMismatchRecovery {
+	const receivedObjective = snapshot?.objective ?? "";
+	const message = [
+		"Recovery: the Codex goal objective must equal the plan's codexObjective exactly — copy the expected value below into update_goal and re-run get_goal.",
+		`expected codexObjective: ${expectedObjective}`,
+		`received objective: ${receivedObjective || "(none)"}`,
+	].join("\n");
+	return { message, details: { expectedObjective, receivedObjective } };
+}

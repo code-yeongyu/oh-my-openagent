@@ -134,7 +134,7 @@ describe("root test CI partition", () => {
 
   test("#given Windows cache restore costs more than install #when the root matrix runs #then only non-Windows jobs restore Bun cache", () => {
     const job = rootTestJob()
-    const cacheStart = job.indexOf("      - uses: actions/cache@v5")
+    const cacheStart = job.indexOf("      - uses: actions/cache@v6")
     const cacheEnd = job.indexOf("      - name: Install dependencies", cacheStart)
     const cacheStep = job.slice(cacheStart, cacheEnd)
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test"
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 
-import { toSpawnTarget } from "./omo-command"
+import { resolveOmoBin, toSpawnTarget } from "./omo-command"
 
 describe("omo-senpi ulw-loop omo-command spawn target", () => {
   it("#given a .cmd bin on win32 #when building the spawn target #then it wraps with cmd.exe /d /s /c", () => {
@@ -50,6 +54,28 @@ describe("omo-senpi ulw-loop omo-command spawn target", () => {
 
     expect(target.command).toBe("/home/u/omo.cmd")
     expect(target.args).toEqual(["status"])
+  })
+})
+
+describe("omo-senpi ulw-loop omo-command bundled CLI resolution", () => {
+  it("#given a staged CLI beside a packaged extension #when resolving with no env or PATH toolkit #then the bundled CLI wins", async () => {
+    const pluginDir = await mkdtemp(join(tmpdir(), "omo-senpi-bundled-toolkit-"))
+    try {
+      await mkdir(join(pluginDir, "extensions"), { recursive: true })
+      await mkdir(join(pluginDir, "runtime", "agent-toolkit"), { recursive: true })
+      await writeFile(join(pluginDir, "extensions", "omo.js"), "")
+      const stagedCli = join(pluginDir, "runtime", "agent-toolkit", "cli.js")
+      await writeFile(stagedCli, "")
+
+      const resolved = resolveOmoBin(
+        { OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: undefined, PATH: "" },
+        pathToFileURL(join(pluginDir, "extensions", "omo.js")).href,
+      )
+
+      expect(resolved).toBe(stagedCli)
+    } finally {
+      await rm(pluginDir, { recursive: true, force: true })
+    }
   })
 })
 

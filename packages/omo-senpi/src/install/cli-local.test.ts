@@ -27,6 +27,7 @@ async function makePackagedPlugin(): Promise<string> {
   await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "memorian-persona.md"), "# memorian persona fixture\n")
   const requiredSkillNames = [
     "ast-grep",
     "coding-agent-sessions",

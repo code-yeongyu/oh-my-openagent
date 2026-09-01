@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { stat } from "node:fs/promises"
+import { stat } from "@oh-my-opencode/memory-core/fs"
 
 import type { SenpiLauncher } from "@oh-my-opencode/senpi-task"
 

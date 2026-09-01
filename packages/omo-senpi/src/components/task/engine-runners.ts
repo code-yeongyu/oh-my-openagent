@@ -4,6 +4,7 @@ import {
   BUILTIN_AGENTS,
   CURATED_READONLY_AGENT_NAMES,
   InProcessRunner,
+  ULW_REVIEWER_AGENT_NAMES,
   RpcProcessRunner,
   createInProcessManagedRunner,
   createParentRegistrySessionContext,
@@ -43,6 +44,10 @@ export function resolveTaskAgents(config: OmoConfig): Readonly<Record<string, Ag
     merged[name] = { ...merged[name], ...definition }
   }
   for (const name of CURATED_READONLY_AGENT_NAMES) {
+    const definition = merged[name]
+    if (definition !== undefined) merged[name] = { ...definition, executionMode: "in-process" }
+  }
+  for (const name of ULW_REVIEWER_AGENT_NAMES) {
     const definition = merged[name]
     if (definition !== undefined) merged[name] = { ...definition, executionMode: "in-process" }
   }

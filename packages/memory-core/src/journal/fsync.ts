@@ -2,7 +2,7 @@
 // handle; the directory fsync is the POSIX affordance that makes the renames durable and is
 // simply unavailable on Windows, where a directory handle cannot be opened for sync.
 
-import { open } from "node:fs/promises"
+import { open } from "../fs/resilient"
 
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined

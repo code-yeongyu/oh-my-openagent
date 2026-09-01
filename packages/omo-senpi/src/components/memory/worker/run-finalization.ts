@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import { cleanupReflectionWorktree } from "@oh-my-opencode/memory-core"

@@ -15,8 +15,6 @@ import {
   spawnSgRunner,
 } from "../sg-runner";
 
-// ---- constants ----
-
 const MAX_PATTERN_BYTES = 16 * 1024;
 const MAX_REWRITE_BYTES = 64 * 1024;
 const MAX_PATHS = 64;
@@ -43,8 +41,6 @@ const LANGUAGES = [
 ] as const;
 
 const STRICTNESS = ["cst", "smart", "ast", "relaxed", "signature"] as const;
-
-// ---- input ----
 
 export interface RewriteInput {
   readonly pattern: string;
@@ -206,8 +202,6 @@ export const rewriteInputSchema = {
   },
 };
 
-// ---- CLI translation ----
-
 function scopeArgs(input: RewriteInput): string[] {
   const args: string[] = ["--strictness", input.strictness];
   if (input.selector) args.push("--selector", input.selector);
@@ -230,8 +224,6 @@ export function buildRewriteArgs(input: RewriteInput): string[] {
 export function buildRewriteApplyArgs(input: RewriteInput): string[] {
   return [...baseArgs(input), "--update-all", ...scopeArgs(input), ...input.paths];
 }
-
-// ---- output ----
 
 export type RewriteErrorCode =
   | "ABORTED"
@@ -352,8 +344,6 @@ function preflightCode(code: string | null): RewriteErrorCode {
       return "INVALID_ARGUMENT";
   }
 }
-
-// ---- main entry ----
 
 export async function executeRewrite(
   rawInput: RewriteInput,

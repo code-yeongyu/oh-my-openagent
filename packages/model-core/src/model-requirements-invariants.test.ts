@@ -13,6 +13,9 @@ const expectedAgents = [
   "momus",
   "atlas",
   "sisyphus-junior",
+  "omo-senpi-code-reviewer",
+  "omo-senpi-qa-executor",
+  "omo-senpi-gate-reviewer",
 ] as const
 
 const expectedCategories = [

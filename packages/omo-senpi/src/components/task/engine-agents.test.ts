@@ -64,8 +64,17 @@ describe("task engine builtin agent overlay", () => {
     const engine = composeIn(tempProject())
 
     // then
-    expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus"])
+    expect(Object.keys(engine.agents).sort()).toEqual([
+      "explore",
+      "librarian",
+      "metis",
+      "momus",
+      "omo-senpi-code-reviewer",
+      "omo-senpi-gate-reviewer",
+      "omo-senpi-qa-executor",
+    ])
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
+    expect(engine.agents["omo-senpi-code-reviewer"]?.executionMode).toBe("in-process")
   })
 
   test("#given an omo.json model override for a builtin agent #when the engine resolves agents #then the model wins and the builtin prompt and allowlist survive", () => {
@@ -92,7 +101,16 @@ describe("task engine builtin agent overlay", () => {
     const engine = composeIn(cwd)
 
     // then
-    expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus", "scout"])
+    expect(Object.keys(engine.agents).sort()).toEqual([
+      "explore",
+      "librarian",
+      "metis",
+      "momus",
+      "omo-senpi-code-reviewer",
+      "omo-senpi-gate-reviewer",
+      "omo-senpi-qa-executor",
+      "scout",
+    ])
     expect(engine.agents["scout"]?.prompt).toBe("Scout the repo.")
   })
 
@@ -106,6 +124,20 @@ describe("task engine builtin agent overlay", () => {
 
     // then
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
+  })
+
+  test("#given a process override for a reviewer agent #when the engine resolves agents #then in-process execution remains pinned", () => {
+    // given
+    const cwd = tempProject()
+    writeOmoJson(cwd, { agents: { "omo-senpi-code-reviewer": { execution_mode: "process" } } })
+
+    // when
+    const engine = composeIn(cwd)
+
+    // then
+    expect(engine.agents["omo-senpi-code-reviewer"]?.executionMode).toBe("in-process")
+    expect(engine.agents["omo-senpi-qa-executor"]?.executionMode).toBe("in-process")
+    expect(engine.agents["omo-senpi-gate-reviewer"]?.executionMode).toBe("in-process")
   })
 
   test("#given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable", () => {
@@ -127,7 +159,9 @@ describe("task engine builtin agent overlay", () => {
     const engine = composeIn(tempProject())
 
     // when / then
-    expect(advertisedAgentNames(engine)).toBe("explore, librarian")
+    expect(advertisedAgentNames(engine)).toBe(
+      "explore, librarian, omo-senpi-code-reviewer, omo-senpi-gate-reviewer, omo-senpi-qa-executor",
+    )
     expect(advertisedPlanGatedAgentNames(engine)).toBe("metis, momus")
   })
 
@@ -141,7 +175,9 @@ describe("task engine builtin agent overlay", () => {
 
     // then
     expect(engine.agents["momus"]?.disable).toBe(true)
-    expect(advertisedAgentNames(engine)).toBe("explore, librarian")
+    expect(advertisedAgentNames(engine)).toBe(
+      "explore, librarian, omo-senpi-code-reviewer, omo-senpi-gate-reviewer, omo-senpi-qa-executor",
+    )
     expect(advertisedPlanGatedAgentNames(engine)).toBe("metis")
   })
 })

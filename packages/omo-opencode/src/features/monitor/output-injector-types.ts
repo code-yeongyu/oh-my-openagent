@@ -1,4 +1,4 @@
-import type { InternalPromptDispatchArgs, InternalPromptDispatchResult, PromptAsyncInput, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import type { InternalPromptDispatchArgs, InternalPromptDispatchResult, PromptAsyncInput, PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import type { MonitorRecord, OutputBatch } from "./types"
 
 export type MonitorPromptClient = PromptDispatchClient & InternalPromptDispatchArgs<PromptAsyncInput>["client"]

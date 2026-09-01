@@ -28,7 +28,7 @@ jobs:
       run:
         working-directory: packages/web
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -38,7 +38,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Restore Next.js build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/web/.next/cache
           key: ${{ runner.os }}-web-next-${{ hashFiles('packages/web/bun.lock', 'packages/web/package.json', 'packages/web/next.config.ts', 'packages/web/open-next.config.ts', 'packages/web/postcss.config.mjs') }}-${{ hashFiles('packages/web/app/**', 'packages/web/components/**', 'packages/web/lib/**', 'packages/web/messages/**', 'packages/web/i18n/**', 'docs/**') }}

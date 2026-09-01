@@ -3,8 +3,8 @@
 // Backups are plain directory copies placed beside the repo as
 // <identity-root>/memory-backup-<YYYYMMDD-HHMMSS> (letta parity: sibling dirs).
 
-import { existsSync } from "node:fs"
-import { cp, readdir, rm } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { cp, readdir, rm } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import type { MemoryCommandDeps, MemoryCommandIdentity } from "./types"

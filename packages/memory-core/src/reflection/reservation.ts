@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, unlink, writeFile } from "../fs/resilient"
 import { hostname } from "node:os"
 import { dirname, join } from "node:path"
 import type { MemoryIdentity } from "../identity"
@@ -37,6 +37,10 @@ export interface ReflectionReservationStoreOptions {
 export interface ReservationResult {
   readonly status: "active" | "pending"
   readonly run: ReservedRun
+}
+
+export interface ReflectionReservationLockOptions {
+  readonly waitTimeoutMs?: number
 }
 
 export interface CompletionResult {
@@ -107,7 +111,11 @@ export class ReflectionReservationStore {
     }, signal)
   }
 
-  async complete(runId: string, outcome: ReflectionOutcome): Promise<CompletionResult> {
+  async complete(
+    runId: string,
+    outcome: ReflectionOutcome,
+    lockOptions?: ReflectionReservationLockOptions,
+  ): Promise<CompletionResult> {
     return this.locked(runId, async () => {
       const current = await this.readStateUnlocked()
       const conversationIds = new Set([
@@ -154,11 +162,11 @@ export class ReflectionReservationStore {
         outcome,
         ...(promoted === undefined ? {} : { launch: promoted }),
       }
-    })
+    }, undefined, lockOptions)
   }
 
-  async readState(): Promise<ReservationState> {
-    return this.locked(undefined, () => this.readStateUnlocked())
+  async readState(lockOptions?: ReflectionReservationLockOptions): Promise<ReservationState> {
+    return this.locked(undefined, () => this.readStateUnlocked(), undefined, lockOptions)
   }
 
   private async withLaunchOwner(run: ReservedRun | undefined): Promise<ReservedRun | undefined> {
@@ -173,11 +181,19 @@ export class ReflectionReservationStore {
     }
   }
 
-  private async locked<T>(runId: string | undefined, task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  private async locked<T>(
+    runId: string | undefined,
+    task: () => Promise<T>,
+    signal?: AbortSignal,
+    lockOptions?: ReflectionReservationLockOptions,
+  ): Promise<T> {
     signal?.throwIfAborted()
     const record = await createLockRecord("reflection-scheduler", runId ? { runId } : {})
     signal?.throwIfAborted()
-    return withLock(this.schedulerLockPath, record, task, { waitTimeoutMs: 5_000, signal })
+    return withLock(this.schedulerLockPath, record, task, {
+      waitTimeoutMs: lockOptions?.waitTimeoutMs ?? 5_000,
+      signal,
+    })
   }
 
   private async readStateUnlocked(): Promise<ReservationState> {

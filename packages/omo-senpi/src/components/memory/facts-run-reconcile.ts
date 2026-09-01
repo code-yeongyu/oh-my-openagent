@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { readdir } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { readdir } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import { describe, runLiveness } from "./facts-run-storage"

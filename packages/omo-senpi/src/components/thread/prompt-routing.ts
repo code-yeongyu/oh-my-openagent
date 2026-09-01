@@ -15,11 +15,6 @@ export type PromptRouteResponse =
   | { readonly ok: true }
   | { readonly ok: false; readonly code: PromptRouteError }
 
-export type PromptCancellationResponse = {
-  readonly type: "extension_ui_response"
-  readonly id: string
-  readonly cancelled: true
-}
 
 export type RoutedPrompt<TRequest, TResponse> = {
   readonly id: string

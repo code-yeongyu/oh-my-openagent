@@ -10,6 +10,9 @@ import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } 
 import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
 import { createMemoryNoticeWiring } from "./memory-notice-wiring"
+import { createMemorianGateWiring, type MemorianGateWiring } from "./memorian-wiring"
+import { resolveMemoryModelRegistry } from "./model-registry-resolver"
+import { createMemoryRecallWiring } from "./recall-wiring"
 import { branchEntryCount } from "./wiring-context"
 import {
   createMemoryReflectionLiveWiring,
@@ -38,7 +41,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       onLiveCompletion: reflectionLive.onLiveReflectionCompleted,
     },
   )
-  const { resolveContext, journalWiringFor, factsWiringFor, runtimeFor } = runtimeWiring
+  const { resolveContext, journalWiringFor, factsWiringFor, memorianRunnerFor, runtimeFor } = runtimeWiring
 
   const nudgeWiring = createMemoryNudgeWiring({
     resolveContext,
@@ -70,6 +73,32 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       }
     },
   })
+
+  // Late-bound because the two wirings are mutually dependent by design: recall's drain needs the
+  // gate's epoch to reject a superseded payload, and the gate needs recall's collection to launch.
+  // The gate wiring is constructed immediately below, so every call through this ref lands after it.
+  const gateWiringRef: { current?: MemorianGateWiring } = {}
+
+  const recallWiring = createMemoryRecallWiring({
+    resolveContext,
+    resolveSettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
+    env: options.env,
+    currentCompactionEpoch: (sessionId) => gateWiringRef.current?.currentCompactionEpoch(sessionId) ?? 0,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+  // The settle half of the recall channel: collection feeds the gate child, and the gate's pending
+  // nudges are what recallWiring's before_agent_start handler injects on the NEXT turn.
+  const memorianGateWiring = createMemorianGateWiring({
+    // The gate launch is fire-and-forget, so every ctx read must happen synchronously inside the
+    // settle handler: the host disposes the ctx the moment that handler returns.
+    snapshotSession: (eventCtx) => recallWiring.snapshotSession(eventCtx),
+    collectCandidatesFromSnapshot: (snapshot) => recallWiring.collectCandidatesFromSnapshot(snapshot),
+    resolveModelRegistry: (eventCtx) => resolveMemoryModelRegistry(eventCtx),
+    resolveContext,
+    runnerFor: memorianRunnerFor,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+  gateWiringRef.current = memorianGateWiring
 
   async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
     for (const tracker of skillsUsageTrackersRef.current.values()) {
@@ -133,6 +162,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         promptCache,
         nudgeWiring,
         noticeWiring,
+        recallWiring,
+        memorianGateWiring,
         dreamTriggerWiring,
         completionApi: createReflectionCompletionApi,
         resolveContext,
@@ -162,6 +193,12 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         await journalWiringFor(identity).reconcileSession(eventCtx)
       }
       factsWiringFor(identity).reconcileExtractor()
+      const dreamSession = runtimeWiring.dreamSessionById(sessionId)
+      if (dreamSession !== undefined) {
+        void dreamTriggerWiring.reconcileSessionStart(dreamSession).catch((error: unknown) => {
+          options.logger?.warn("omo-senpi memory dream session_start reconcile failed", { error: describe(error) })
+        })
+      }
       await reflectionLive.bind(
         pi,
         sessionId,

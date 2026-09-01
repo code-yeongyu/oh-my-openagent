@@ -1,4 +1,4 @@
-import { open, readFile, stat, unlink } from "node:fs/promises"
+import { open, readFile, stat, unlink, writeHandleAll } from "../fs/resilient"
 
 import { getPidLiveness, getProcessStartIdentity } from "../locks"
 
@@ -126,7 +126,7 @@ async function acquireAndRun<T>(
   // The lock is held: the finally below is exempt cleanup and always runs, abort or not.
   try {
     const startIdentity = (await getProcessStartIdentity(process.pid)) ?? ""
-    await handle.writeFile(`${process.pid}\n${startIdentity}\n`, "utf8")
+    await writeHandleAll(handle, `${process.pid}\n${startIdentity}\n`, "utf8")
     signal?.throwIfAborted()
     return await task()
   } finally {

@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process"
-import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { existsSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { mkdir, mkdtemp, readFile, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"

@@ -7,8 +7,29 @@ import { isCliEntry } from "./entry-guard.mjs";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const repoRoot = join(root, "..", "..", "..");
 const sharedSkillsRoot = sharedSkillsRootPath();
 const skillsRoot = join(root, "skills");
+// The ultrawork skill body is the canonical prompts-core directive, read DIRECTLY here rather than
+// from a component-local copy: sync-skills runs before build-components (see plugin/package.json
+// build chain), so consuming components/ultrawork/scripts/sync-directive.mjs output would break a
+// clean checkout.
+const canonicalUltraworkDirectivePath = join(
+	repoRoot,
+	"packages",
+	"prompts-core",
+	"prompts",
+	"ultrawork",
+	"codex.md",
+);
+const ultraworkSkillFrontmatter = `---
+name: ultrawork
+description: Binding ultrawork mode directive for omo on Codex. When a prompt contains ultrawork or ulw, the omo UserPromptSubmit hook injects a short bootstrap that points at this file. Read the whole file and follow every rule in it for the rest of the task.
+metadata:
+  short-description: Binding ultrawork mode directive
+---
+
+`;
 const sourceTestFilePattern = /\.test\.ts$/;
 const ignoredSkillSourceDirNames = new Set([".mypy_cache", ".omo", ".pytest_cache", ".ruff_cache", "__pycache__"]);
 const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json"]);
@@ -22,9 +43,8 @@ const skillSources = [
 	["teammode", "components/teammode/skills/teammode"],
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
-	["ultrawork", "components/ultrawork/skills/ultrawork"],
 ];
-const componentSkillNames = new Set(skillSources.map(([name]) => name));
+const componentSkillNames = new Set([...skillSources.map(([name]) => name), "ultrawork"]);
 const skillDisplayPrefix = "(OmO) ";
 
 function shouldCopySkillSource(source) {
@@ -253,6 +273,15 @@ async function syncSkills() {
 		await cp(join(root, source), join(skillsRoot, name), { recursive: true });
 		await adaptSkillForCodex(name);
 	}
+
+	await mkdir(join(skillsRoot, "ultrawork"), { recursive: true });
+	const canonicalUltraworkDirective = await readFile(canonicalUltraworkDirectivePath, "utf8");
+	await writeFile(
+		join(skillsRoot, "ultrawork", "SKILL.md"),
+		`${ultraworkSkillFrontmatter}${canonicalUltraworkDirective}`,
+		"utf8",
+	);
+	await adaptSkillForCodex("ultrawork");
 
 	const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true });
 	const sharedSkillNames = sharedSkillEntries

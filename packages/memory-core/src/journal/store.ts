@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, readFile, rename, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
@@ -7,6 +7,7 @@ import {
   deriveState,
   finalizeCursor,
   initialReflectionState,
+  reflectedThroughByteOffset,
   type ReflectionSnapshot, type ReflectionTranscriptState,
 } from "./cursor"
 import {
@@ -56,15 +57,21 @@ function nonNegativeInteger(value: unknown): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0
 }
 
+function optionalNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined
+}
+
 function parseState(raw: string | null): ReflectionTranscriptState {
   if (raw === null) return initialReflectionState()
   try {
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== "object") return initialReflectionState()
     const state = parsed as Record<string, unknown>
+    const reflectedThroughByteOffset = optionalNonNegativeInteger(state.reflected_through_byte_offset)
     return {
       schema_version: "v3_assistant_steps",
       reflected_through_message_id: optionalString(state.reflected_through_message_id),
+      ...(reflectedThroughByteOffset === undefined ? {} : { reflected_through_byte_offset: reflectedThroughByteOffset }),
       total_completed_steps: nonNegativeInteger(state.total_completed_steps),
       reflected_completed_steps: nonNegativeInteger(state.reflected_completed_steps),
       steps_since_last_successful_reflection: nonNegativeInteger(
@@ -193,6 +200,18 @@ export class TranscriptJournal {
     return entries
   }
 
+  async backfillReflectionByteOffset(entries: readonly TranscriptEntry[]): Promise<ReflectionTranscriptState> {
+    const state = await this.readStateUnlocked()
+    await this.writeStateUnlocked({
+      ...state,
+      reflected_through_byte_offset: state.reflected_through_byte_offset
+        ?? (state.reflected_through_message_id === undefined
+          ? 0
+          : reflectedThroughByteOffset(entries, state.reflected_through_message_id)),
+    }, entries)
+    return this.readStateUnlocked()
+  }
+
   async finalizeReflection(snapshot: ReflectionSnapshot, success: boolean): Promise<void> {
     await this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
@@ -267,7 +286,12 @@ export class TranscriptJournal {
     state: ReflectionTranscriptState,
     entries: readonly TranscriptEntry[],
   ): Promise<void> {
-    const derived = deriveState(state, entries)
+    const derived = deriveState({
+      ...state,
+      ...(state.reflected_through_message_id !== undefined && state.reflected_through_byte_offset === undefined
+        ? { reflected_through_byte_offset: reflectedThroughByteOffset(entries, state.reflected_through_message_id) }
+        : {}),
+    }, entries)
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
     await rename(temporaryPath, this.statePath)

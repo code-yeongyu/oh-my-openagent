@@ -51,6 +51,14 @@ export const ROOT_TEST_SERIAL_QUARANTINE: readonly SerialQuarantineEntry[] = [
     path: "packages/senpi-task/src/dag/scheduler.test.ts",
     reason: "wave-ordering assertions are timing sensitive under a saturated scheduler",
   },
+  {
+    path: "packages/omo-native/test/payload.test.ts",
+    reason: "runs a real omo-native plugin build that mutates shared plugin build inputs",
+  },
+  {
+    path: "script/build-omo-binary.test.ts",
+    reason: "runs a real omo-native plugin staging build against the same shared plugin tree",
+  },
 ] as const
 
 /** Quarantined paths in workflow/bunfig order. */

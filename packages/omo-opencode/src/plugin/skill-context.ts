@@ -21,7 +21,7 @@ import {
   normalizeSkillAliasName,
   readOpencodeConfigSkills,
 } from "../features/opencode-skill-loader"
-import { resolveActiveBuiltinSkills } from "../features/builtin-skills"
+import { resolveActiveBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills"
 import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
 import { adaptHostSkillConfig } from "../shared/host-skill-config"
 

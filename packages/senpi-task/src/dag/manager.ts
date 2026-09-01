@@ -19,13 +19,25 @@ import type {
   DagNode,
   DagNodeCounts,
   DagNodeId,
+  DagNodeState,
   DagRunEvent,
+  DagRunEventPayload,
   DagRunId,
   DagRunSnapshot,
   DagRunStatus,
   DagSettings,
   DagWave,
 } from "./types"
+
+// #7412: a stale journal instance re-appending an already-recorded terminal transition is WAL
+// noise (dag_923ad20e seq38 journaled completed->completed). Every DagRunRecordV1 journal passes
+// this to createDagJournal so the locked recover inside append drops the duplicate instead of
+// journaling it.
+const DUPLICATE_TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["completed", "failed", "cancelled", "skipped"])
+export function skipDuplicateTerminalTransition(record: DagRunRecordV1, payload: DagRunEventPayload): boolean {
+  if (payload.type !== "dag.node.transitioned" || !DUPLICATE_TERMINAL_NODE_STATES.has(payload.to)) return false
+  return record.nodes.some((node) => node.id === payload.nodeId && node.state === payload.to)
+}
 
 const LIST_DEFAULT_LIMIT = 100
 const LIST_MAX_LIMIT = 256
@@ -388,6 +400,7 @@ function startRun(params: DagStartParams, context: StartContext): DagStartResult
       initialCheckpoint: record,
       applyEvent: applyRunEvent,
       now: context.now,
+      skipDuplicate: skipDuplicateTerminalTransition,
     })
     journal.append(dagRunCreatedEvent({
       runKey: definition.key,
@@ -504,6 +517,7 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     initialCheckpoint: oldRecord,
     applyEvent: applyDagRunMutation,
     now: context.now,
+    skipDuplicate: skipDuplicateTerminalTransition,
   })
   journal.append(mutation)
   context.store.writeKey({

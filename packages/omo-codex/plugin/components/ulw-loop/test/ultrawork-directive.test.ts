@@ -56,11 +56,17 @@ describe("standalone ultrawork directive injection", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
 	});
 
-	it("#given ulw-loop bundles the ultrawork directive #when compared to ultrawork #then the copy stays byte-identical", async () => {
+	it("#given ulw-loop bundles the ultrawork directive #when compared to the canonical prompts-core source #then the copy stays byte-identical", async () => {
+		// ulw-loop is a standalone published package with no prompts-core dependency, so it bundles its
+		// own copy as the runtime fallback its `files` list ships. This pins that copy to the canonical
+		// source that scripts/sync-directive.mjs in the ultrawork component regenerates it from.
 		const ulwLoopDirective = await readFile(new URL("../directive.md", import.meta.url), "utf8");
-		const ultraworkDirective = await readFile(new URL("../../ultrawork/directive.md", import.meta.url), "utf8");
+		const canonicalDirective = await readFile(
+			new URL("../../../../../prompts-core/prompts/ultrawork/codex.md", import.meta.url),
+			"utf8",
+		);
 
-		expect(ulwLoopDirective).toBe(ultraworkDirective);
+		expect(ulwLoopDirective).toBe(canonicalDirective);
 	});
 
 	it("#given an existing ultrawork skill file #when standalone injection runs #then emits the compact skill pointer", async () => {

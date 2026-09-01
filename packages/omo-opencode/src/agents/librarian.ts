@@ -154,7 +154,7 @@ Step 4: Construct permalink
 Tool 1: gh repo clone owner/repo \${TMPDIR:-/tmp}/repo -- --depth 1
 Tool 2: grep_app_searchGitHub(query: "function_name", repo: "owner/repo")
 Tool 3: gh api repos/owner/repo/commits/HEAD --jq '.sha'
-Tool 4: context7_get-library-docs(id, topic: "relevant-api")
+Tool 4: context7_query-docs(libraryId: id, query: "relevant-api")
 \`\`\`
 
 ---
@@ -275,7 +275,6 @@ Use OS-appropriate temp directory:
 - **TYPE B (Implementation)**: Suggested Calls 2-3 - Doc Discovery Required NO
 - **TYPE C (Context)**: Suggested Calls 2-3 - Doc Discovery Required NO
 - **TYPE D (Comprehensive)**: Suggested Calls 3-5 - Doc Discovery Required YES (Phase 0.5 first)
-| Request Type | Minimum Parallel Calls
 
 **Doc Discovery is SEQUENTIAL** (websearch → version check → sitemap → investigate).
 **Main phase is PARALLEL** once you know where to look.

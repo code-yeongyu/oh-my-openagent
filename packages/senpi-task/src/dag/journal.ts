@@ -24,11 +24,18 @@ export type DagJournalOptions<TCheckpoint extends DagJournalCheckpoint> = {
   readonly applyEvent: (checkpoint: TCheckpoint, event: DagRunEvent) => TCheckpoint
   readonly subscriberRing?: number
   readonly now?: () => number
+  /** Evaluated against the freshly recovered checkpoint inside the run lock: returning true drops
+   * the append as an idempotent duplicate - nothing is journaled and no subscriber is notified
+   * (the dag_923ad20e completed->completed WAL class, #7412). */
+  readonly skipDuplicate?: (checkpoint: TCheckpoint, payload: DagRunEventPayload) => boolean
 }
 
 export type DagJournal<TCheckpoint extends DagJournalCheckpoint> = {
-  readonly append: (payload: DagRunEventPayload) => DagRunEvent
+  readonly append: (payload: DagRunEventPayload) => DagRunEvent | undefined
   readonly snapshot: () => TCheckpoint
+  /** Re-recovers the durable checkpoint under the run lock, replacing this instance's cache: the
+   * read path for state another journal instance committed (#7412). */
+  readonly refresh: () => TCheckpoint
   readonly subscribe: (listener: DagJournalListener) => () => void
   readonly whenIdle: () => Promise<void>
 }
@@ -45,7 +52,7 @@ type Subscriber = {
   running: boolean
   lastDeliveredSeq: number
   overflow?: OverflowState
-  readonly commitOverflow: (overflow: OverflowState) => DagRunEvent
+  readonly commitOverflow: (overflow: OverflowState) => DagRunEvent | undefined
   drainPromise: Promise<void>
 }
 
@@ -85,10 +92,15 @@ export function createDagJournal<TCheckpoint extends DagJournalCheckpoint>(
   const subscribers = new Set<Subscriber>()
   let checkpoint = options.store.withRunLock(options.runId, () => recoverCheckpoint(options))
 
-  const appendPayload = (payload: DagRunEventPayload, directSubscriber?: Subscriber): DagRunEvent => {
+  const appendPayload = (payload: DagRunEventPayload, directSubscriber?: Subscriber): DagRunEvent | undefined => {
     let durableEvent: DagRunEvent | undefined
+    let skipped = false
     checkpoint = options.store.withRunLock(options.runId, () => {
       const recovered = recoverCheckpoint(options)
+      if (options.skipDuplicate?.(recovered, payload) === true) {
+        skipped = true
+        return recovered
+      }
       const tailSeq = eventLogTailSeq(options.store, options.runId, recovered.checkpointSeq)
       const seq = Math.max(recovered.checkpointSeq, tailSeq) + 1
       const event: DagRunEvent = {
@@ -112,7 +124,10 @@ export function createDagJournal<TCheckpoint extends DagJournalCheckpoint>(
       return next
     })
     const event = durableEvent
-    if (event === undefined) throw new Error("DAG journal mutation completed without an event")
+    if (event === undefined) {
+      if (skipped) return undefined
+      throw new Error("DAG journal mutation completed without an event")
+    }
     for (const subscriber of subscribers) {
       if (subscriber !== directSubscriber) enqueue(subscriber, event, ringSize)
     }
@@ -123,6 +138,10 @@ export function createDagJournal<TCheckpoint extends DagJournalCheckpoint>(
   return {
     append: appendPayload,
     snapshot: () => checkpoint,
+    refresh: () => {
+      checkpoint = options.store.withRunLock(options.runId, () => recoverCheckpoint(options))
+      return checkpoint
+    },
     subscribe(listener) {
       const subscriber: Subscriber = {
         listener,
@@ -217,7 +236,8 @@ async function drain(subscriber: Subscriber): Promise<void> {
       const overflow = subscriber.overflow
       if (overflow !== undefined) {
         subscriber.overflow = undefined
-        await deliver(subscriber.listener, subscriber.commitOverflow(overflow))
+        const overflowEvent = subscriber.commitOverflow(overflow)
+        if (overflowEvent !== undefined) await deliver(subscriber.listener, overflowEvent)
         continue
       }
       const event = subscriber.queue.shift()

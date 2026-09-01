@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { FactsQueue, GitMemoryRepo, factsQueuePaths } from "@oh-my-opencode/memory-core"
+import { FactsFailureStore, FactsQueue, GitMemoryRepo, factsQueuePaths } from "@oh-my-opencode/memory-core"
+import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 import { FactsExtractorRunner } from "./facts-runner"
 import { enqueue, fixture, onlyRunDir, runnerOptions } from "./facts-runner.test-support"
 import type { ResolveAndPreflightMemoryLaunch } from "./worker/memory-launch-preflight"
@@ -40,6 +41,53 @@ describe("quick-pinned facts launch", () => {
     expect(warnings).toHaveLength(1)
     expect(await queue.listPending()).toHaveLength(1)
   }, 30_000)
+  test("#given a registry without quick but with another usable model #when pending facts are launched #then the beyond-category resolution is refused instead of launched", async () => {
+    // given: the quick chain is dead (no category config, no `omo-mock` model) while the registry
+    // still offers a usable model, so `resolveReflectionModel` answers `resolved` through its
+    // beyond-category ladder and tags it `source: "registry_fallback"`. A quick-PINNED surface
+    // must treat that as unavailable: an unattended extraction may never land on an arbitrary,
+    // possibly frontier-priced model.
+    const { root, identity, queue } = await fixture()
+    const beyondCategory: SenpiModelPort = { provider: "other-provider", id: "expensive-1" }
+    let spawnCount = 0
+    const warnings: string[] = []
+    const runner = new FactsExtractorRunner({
+      identity,
+      queue,
+      cwd: root,
+      loadConfig: () => ({ config: { categories: {} }, diagnostics: [], layers: [], sources: [] }),
+      resolveModelRegistry: () => ({
+        getAvailable: () => [beyondCategory],
+        find: (provider, modelId) =>
+          provider === beyondCategory.provider && modelId === beyondCategory.id ? beyondCategory : undefined,
+      }),
+      logger: {
+        info: () => undefined,
+        warn: (message) => warnings.push(message),
+        error: () => undefined,
+      },
+      sandbox: (args) => {
+        spawnCount += 1
+        return args
+      },
+    })
+
+    // when
+    const result = await runner.launchPending()
+
+    // then: identical skip semantics to the `category_unavailable` path - one warning, no child,
+    // no run dir, queue intact, and the preflight-scoped failure/backoff record still lands.
+    expect(result.status).toBe("skipped")
+    expect(spawnCount).toBe(0)
+    expect(warnings).toHaveLength(1)
+    expect(await queue.listPending()).toHaveLength(1)
+    expect(existsSync(join(identity.paths.facts, "runs"))).toBe(false)
+    const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
+    expect(state.entries).toHaveLength(1)
+    expect(state.entries[0]).toMatchObject({ streak: 1, lastReason: "quick_category_unavailable" })
+    expect(state.entries[0]?.lastFailureId).toMatch(/^preflight-[0-9a-f-]{36}$/)
+  }, 30_000)
+
   test("#given one injected launch-preflight seam #when reflection and facts launch #then both surfaces route through it", async () => {
     // given
     const surfaces: string[] = []

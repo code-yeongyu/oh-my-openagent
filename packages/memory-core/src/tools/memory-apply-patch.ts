@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises"
+import { access, mkdir, readFile, unlink, writeFile } from "../fs/resilient"
 import { dirname, join, relative } from "node:path"
 
 import { NoEffectiveChangesError, type GitCommitAuthor, type GitMemoryRepo } from "../git"

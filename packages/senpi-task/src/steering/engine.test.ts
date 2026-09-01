@@ -50,6 +50,65 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     expect(fake.steerCalls).toEqual(["keep going"])
   })
 
+  test("#given eviction claimed after the final idle observation #when a running send begins #then it is refused before touching the handle", async () => {
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    toRunning(harness, record)
+    const fake = makeFakeHandle(record.task_id, flavor)
+    harness.setLive(record.task_id, fake.handle)
+    harness.setEvicting(record.task_id, true)
+
+    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "too late", deliverAs: "steer" })
+
+    expect(outcome.kind).toBe("not_continuable")
+    expect(fake.steerCalls).toEqual([])
+  })
+
+  test("#given terminal teardown already claimed eviction #when a revive arrives #then it is typed-refused without touching the disposing session", async () => {
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    toCompleted(harness, record)
+    const fake = makeFakeHandle(record.task_id, flavor)
+    harness.setLive(record.task_id, fake.handle)
+    harness.setEvicting(record.task_id, true)
+
+    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "revive during teardown" })
+
+    expect(outcome.kind).toBe("not_continuable")
+    if (outcome.kind !== "not_continuable") throw new Error("expected typed refusal")
+    expect(outcome.reason).toContain("being evicted")
+    expect(fake.followUpCalls).toEqual([])
+    expect(harness.store.load(record.task_id)?.status).toBe("completed")
+  })
+
+  test("#given two overlapping sends #when the first settles #then pending state remains true until the second settles", async () => {
+    let releaseFirst!: () => void
+    let releaseSecond!: () => void
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const secondGate = new Promise<void>((resolve) => { releaseSecond = resolve })
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    toRunning(harness, record)
+    let started = 0
+    let bothStarted!: () => void
+    const startedSignal = new Promise<void>((resolve) => { bothStarted = resolve })
+    const fake = makeFakeHandle(record.task_id, flavor, { followUpGates: [firstGate, secondGate], onFollowUpStart: () => {
+      started += 1
+      if (started === 2) bothStarted()
+    } })
+    harness.setLive(record.task_id, fake.handle)
+    const first = harness.engine.sendToTask({ idOrName: record.task_id, message: "one" })
+    const second = harness.engine.sendToTask({ idOrName: record.task_id, message: "two" })
+    await startedSignal
+    expect(harness.engine.hasPendingSends(record.task_id)).toBe(true)
+    releaseFirst()
+    await first
+    expect(harness.engine.hasPendingSends(record.task_id)).toBe(true)
+    releaseSecond()
+    await second
+    expect(harness.engine.hasPendingSends(record.task_id)).toBe(false)
+  })
+
   test("#given a completed resident child #when sent a message #then it revives on the SAME instance with an incremented epoch", async () => {
     // given
     const harness = makeHarness()

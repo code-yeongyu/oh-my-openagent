@@ -326,6 +326,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     const dispose = createPluginDispose({
       backgroundManager: managers.backgroundManager,
       skillMcpManager: managers.skillMcpManager,
+      tuiStateMirror: managers.tuiStateMirror,
       disposeHooks: hooks.disposeHooks,
     })
 

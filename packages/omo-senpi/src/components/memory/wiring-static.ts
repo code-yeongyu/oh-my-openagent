@@ -18,6 +18,8 @@ import { registerMemorySkillsScope } from "./skills-scope"
 import { registerSkillsUsage, type SkillsUsageTracker } from "./skills-usage"
 import { registerMemoryUsage, type MemoryUsageTracker } from "./memory-usage"
 import type { createMemoryNoticeWiring } from "./memory-notice-wiring"
+import type { MemorianGateWiring } from "./memorian-wiring"
+import type { createMemoryRecallWiring } from "./recall-wiring"
 import { createReflectionTriggerWiring } from "./trigger-wiring"
 import { registerMemoryToolSurface } from "./tools"
 import {
@@ -38,6 +40,8 @@ export function registerMemoryStatic(input: {
   readonly promptCache: MemoryBlockCache
   readonly nudgeWiring: ReturnType<typeof createMemoryNudgeWiring>
   readonly noticeWiring: ReturnType<typeof createMemoryNoticeWiring>
+  readonly recallWiring: ReturnType<typeof createMemoryRecallWiring>
+  readonly memorianGateWiring: MemorianGateWiring
   readonly dreamTriggerWiring: DreamTriggerWiring
   readonly completionApi: (pi: SenpiExtensionAPI) => ReflectionCompletionApi | undefined
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
@@ -59,7 +63,7 @@ export function registerMemoryStatic(input: {
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
   const {
-    pi, ctx, options, promptCache, nudgeWiring, noticeWiring, dreamTriggerWiring,
+    pi, ctx, options, promptCache, nudgeWiring, noticeWiring, recallWiring, memorianGateWiring, dreamTriggerWiring,
     completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
     triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
     activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
@@ -93,6 +97,10 @@ export function registerMemoryStatic(input: {
     lastEventCtx.current = eventCtx
     return promptHandler(payload, eventCtx)
   })
+  // Recall owns a SEPARATE before_agent_start handler registered AFTER the projection handler:
+  // senpi merges one message per handler in registration order, so the hint lands last and the
+  // prompt handler stays the only writer of systemPrompt.
+  if (hasMemoryCapabilities(pi)) recallWiring.register(pi)
   pi.on("session_start", (_payload, eventCtx) => {
     if (eventCtx !== undefined) lastEventCtx.current = eventCtx
   })
@@ -109,6 +117,8 @@ export function registerMemoryStatic(input: {
     }
     const result = await journalWiringFor(identity).reconcileSession(eventCtx)
     await factsWiringFor(identity).onSettled(sessionId)
+    // Fire-and-forget by contract: the gate advises the NEXT turn, so this one never waits for it.
+    memorianGateWiring.onSettled(eventCtx)
     await onSettled?.(sessionId, eventCtx)
     return result
   })
@@ -198,6 +208,8 @@ export function registerMemoryStatic(input: {
   const triggerWiring = createReflectionTriggerWiring({
     resolveSession: triggerSessionFor,
     onLaunch: () => {},
+    // A compaction rewrites the transcript the pending nudges were judged against, so they die with it.
+    onCompactionAccepted: (conversationId) => memorianGateWiring.onCompactionAccepted(conversationId),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   triggerWiring.register(pi)

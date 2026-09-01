@@ -12,6 +12,7 @@ import {
 	steer,
 } from "./cli-subcommands.js";
 import { resolveUlwLoopSessionIdFromEnv, type UlwLoopScope } from "./paths.js";
+import { sessionIdRequiredMessage } from "./plan-missing-recovery.js";
 import { UlwLoopError } from "./types.js";
 
 export const ULW_LOOP_SUBCOMMANDS = [
@@ -108,7 +109,7 @@ function commandScope(argv: readonly string[]): UlwLoopScope | undefined {
 	if (sessionIdFlagPresent(argv)) {
 		const sessionId = readValue(argv, SESSION_ID_FLAG)?.trim();
 		if (!sessionId) {
-			throw new UlwLoopError(`${SESSION_ID_FLAG} requires a non-empty value.`, "ULW_LOOP_SESSION_ID_REQUIRED", {
+			throw new UlwLoopError(sessionIdRequiredMessage(SESSION_ID_FLAG), "ULW_LOOP_SESSION_ID_REQUIRED", {
 				details: { flag: SESSION_ID_FLAG },
 			});
 		}

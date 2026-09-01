@@ -81,10 +81,12 @@ function fixture(): Fixture {
 
 function run(item: Fixture, args: string[], ttyInput?: string) {
   const before = sourceSnapshot(item)
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env, HOME: item.home, USERPROFILE: item.home, SENPI_CODING_AGENT_DIR: item.agentDir,
     XDG_DATA_HOME: item.xdg,
   }
+  delete env.OMO_CODING_AGENT_DIR
+  delete env.PI_CODING_AGENT_DIR
   // spawnSync only returns after the child exited and was reaped, so teardown never races a live
   // child; a surfaced spawn error must fail here instead of being read as empty output.
   const result = ttyInput === undefined

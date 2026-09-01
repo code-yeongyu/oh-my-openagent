@@ -1,0 +1,13 @@
+Command:
+bun test packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts packages/omo-senpi/src/components/task/process-sweep.test.ts packages/senpi-task/src/runners/rpc/spawn-marker.test.ts packages/omo-senpi/src/components/task/index.test.ts
+
+Remote Bunshin machines:
+- gorky: exit 0
+- mengmotaHost: exit 0
+
+Additional command:
+bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+
+Remote Bunshin machines:
+- gorky: exit 0
+- mengmotaHost: exit 0

@@ -283,7 +283,14 @@ describe("createTaskChildPlanner", () => {
     // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis"])
+    expect(result.error.availableAgents).toEqual([
+      "explore",
+      "librarian",
+      "metis",
+      "omo-senpi-code-reviewer",
+      "omo-senpi-gate-reviewer",
+      "omo-senpi-qa-executor",
+    ])
   })
 
   test("#given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories", () => {
@@ -305,7 +312,15 @@ describe("createTaskChildPlanner", () => {
     // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
+    expect(result.error.availableAgents).toEqual([
+      "explore",
+      "librarian",
+      "metis",
+      "momus",
+      "omo-senpi-code-reviewer",
+      "omo-senpi-gate-reviewer",
+      "omo-senpi-qa-executor",
+    ])
     // writing survives on a gemini-only registry (its gemini-3.1-pro rung resolves); ultrabrain's
     // sol-only chain is dead, so the dead-chain gate excludes it.
     expect(result.error.availableCategories).toContain("writing")
@@ -332,7 +347,15 @@ describe("createTaskChildPlanner", () => {
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("model_unavailable")
     expect(result.error.message).toContain('No available model for agent "explore"')
-    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
+    expect(result.error.availableAgents).toEqual([
+      "explore",
+      "librarian",
+      "metis",
+      "momus",
+      "omo-senpi-code-reviewer",
+      "omo-senpi-gate-reviewer",
+      "omo-senpi-qa-executor",
+    ])
   })
 })
 

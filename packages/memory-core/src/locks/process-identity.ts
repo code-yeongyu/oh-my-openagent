@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { readFile } from "node:fs/promises"
+import { readFile } from "../fs/resilient"
 
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined

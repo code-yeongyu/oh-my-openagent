@@ -10,7 +10,7 @@ import {
   type FactsFailureRecord,
   type MemoryIdentityPaths,
 } from "@oh-my-opencode/memory-core"
-import { readdir } from "node:fs/promises"
+import { readdir } from "@oh-my-opencode/memory-core/fs"
 
 /** How many failing conversations the status view lists, newest failure first. */
 const MAX_LISTED_CONVERSATIONS = 5

@@ -1,4 +1,4 @@
-import { appendFile, readFile, writeFile } from "node:fs/promises"
+import { appendFile, readFile, writeFile } from "../fs/resilient"
 
 import { LockContentionError, acquireLock, createLockRecord, releaseLock } from "./index"
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process"
-import { closeSync, openSync, writeSync } from "node:fs"
+import { closeSync, openSync, writeSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 

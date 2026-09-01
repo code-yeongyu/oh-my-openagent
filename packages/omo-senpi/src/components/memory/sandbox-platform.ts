@@ -1,7 +1,13 @@
-import { existsSync, mkdirSync } from "node:fs"
+import { existsSync, mkdirSync } from "@oh-my-opencode/memory-core/fs"
 import { dirname, join } from "node:path"
 
-import type { FactsSpawnArgs, ReflectionSpawnArgs } from "./worker/spawn"
+import type { FactsSpawnArgs, MemorianSpawnArgs, ReflectionSpawnArgs } from "./worker/spawn"
+
+/** Every child spawn shape the path sandbox can wrap; it only rewrites command/args/env. */
+type SandboxableSpawnArgs = ReflectionSpawnArgs | FactsSpawnArgs | MemorianSpawnArgs
+
+/** Surfaces the sandbox names in its warnings; one per memory child kind. */
+type SandboxSurface = "reflection" | "facts" | "memorian"
 import { canonicalAbsentPath, canonicalPath, defaultWhich, resolveInnerCommand } from "./sandbox-paths"
 import { probeBwrapUsability, type SandboxUsability } from "./sandbox-bwrap-probe"
 import { SandboxUnavailableError, type SandboxPolicy } from "./sandbox-contracts"
@@ -9,7 +15,7 @@ import { SandboxUnavailableError, type SandboxPolicy } from "./sandbox-contracts
 export { classifyBwrapSmoke, probeBwrapUsability, type SandboxUsability } from "./sandbox-bwrap-probe"
 
 export interface PathSandboxInput {
-  readonly surface: "reflection" | "facts"
+  readonly surface: SandboxSurface
   readonly policy: SandboxPolicy
   readonly writableDirs: readonly string[]
   /**
@@ -40,7 +46,7 @@ export interface GenericSandboxTransform<T> {
   readonly warning?: string
 }
 
-export function buildPathSandboxTransform<T extends ReflectionSpawnArgs | FactsSpawnArgs>(
+export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
   input: PathSandboxInput,
 ): GenericSandboxTransform<T> {
   if (input.policy === "off") return identityTransform()
@@ -177,7 +183,7 @@ type LockPathsResolution =
  */
 function resolveLockPaths(input: {
   readonly lockPaths: readonly string[]
-  readonly surface: "reflection" | "facts"
+  readonly surface: SandboxSurface
   readonly policy: SandboxPolicy
   readonly platform: NodeJS.Platform
   readonly errorRethrow?: (error: SandboxUnavailableError) => never
@@ -212,8 +218,8 @@ function identityTransform<T>(warning?: string): GenericSandboxTransform<T> {
   })
 }
 
-function guardedSandboxedTransform<T extends ReflectionSpawnArgs | FactsSpawnArgs>(
-  surface: "reflection" | "facts",
+function guardedSandboxedTransform<T extends SandboxableSpawnArgs>(
+  surface: SandboxSurface,
   command: string,
   env: NodeJS.ProcessEnv,
   transform: (spawnArgs: T, innerCommand: string) => T,

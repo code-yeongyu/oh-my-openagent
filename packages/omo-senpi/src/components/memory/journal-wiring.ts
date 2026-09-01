@@ -19,6 +19,8 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
+import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
+import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 
 export interface MemoryJournalWiringOptions {
   readonly identityPaths: MemoryIdentityPaths
@@ -33,6 +35,10 @@ export interface MemoryJournalWiring {
 }
 
 const NOOP_APPEND: AppendResult = { appended: 0, skipped: 0 }
+
+// Memory-owned hidden custom-message channels (memorian recall hints, memory notices). Any other
+// custom message belongs to a foreign extension and is admitted like any other entry.
+const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, MEMORY_NOTICE_CUSTOM_TYPE])
 
 function isJournalLockFailure(error: unknown): boolean {
   if (error instanceof JournalLockTimeoutError) return true
@@ -148,6 +154,13 @@ function sessionMessageOf(entry: unknown): SessionMessage | undefined {
   if (!isRecord(body)) return undefined
   const role = stringOf(body.role)
   if (role === undefined) return undefined
+  // Memory-owned hidden channels, never conversation. The journal feeds BOTH the facts queue
+  // payload and the reflection/dream snapshot, so a role-custom memorian recall hint must never
+  // be extracted back into memory as if the session had said it. Senpi writes these as
+  // `custom_message` entries (already dropped by the type gate); this covers the role-custom
+  // `message` shape forks and older writers can leave behind. Foreign custom messages are not
+  // dropped here — projections only ever emit user and assistant rows, as before the feature.
+  if (role === "custom" && EXCLUDED_CUSTOM_TYPES.has(stringOf(body.customType) ?? "")) return undefined
   return { id, role, body }
 }
 

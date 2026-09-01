@@ -39,7 +39,7 @@ describe("pinned Senpi API surface", () => {
     )
 
     // then
-    expect(senpiTask.BUILTIN_AGENT_DEFAULTS).toHaveLength(4)
+    expect(senpiTask.BUILTIN_AGENT_DEFAULTS).toHaveLength(7)
     expect(result.kind).toBe("resolved")
   })
 

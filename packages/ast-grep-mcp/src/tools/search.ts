@@ -80,7 +80,6 @@ function parseSearchInput(input: unknown): ParseResult {
   }
   const obj = input as Record<string, unknown>;
 
-  // pattern (required, string, minLength 1, ≤16KiB)
   if (typeof obj.pattern !== "string") return { ok: false, error: "pattern must be a string" };
   if (obj.pattern.length === 0) return { ok: false, error: "pattern must be at least 1 character" };
   if (Buffer.byteLength(obj.pattern, "utf8") > MAX_PATTERN_BYTES) {
@@ -196,8 +195,6 @@ function parseSearchInput(input: unknown): ParseResult {
   };
 }
 
-// ---- CLI translation (ub §3) ----
-
 export function buildSearchArgs(input: SearchInput): string[] {
   const args: string[] = ["run", "-p", input.pattern, "--lang", input.language, "--json=stream"];
 
@@ -221,8 +218,6 @@ export function buildSearchArgs(input: SearchInput): string[] {
 
   return args;
 }
-
-// ---- error taxonomy (ub §6) ----
 
 export type SearchErrorCode =
   | "INVALID_ARGUMENT"
@@ -250,8 +245,6 @@ const RETRYABLE_CODES: ReadonlySet<SearchErrorCode> = new Set<SearchErrorCode>([
   "OUTPUT_PARSE_FAILED",
   "REWRITE_STALE_PREVIEW",
 ]);
-
-// ---- output types (ub §5/§6) ----
 
 export interface SearchSuccessPayload {
   readonly schemaVersion: 1;
@@ -329,8 +322,6 @@ function makeError(
     },
   };
 }
-
-// ---- main entry ----
 
 const LIMIT_WARNING = "Result limit reached; narrow paths or globs.";
 

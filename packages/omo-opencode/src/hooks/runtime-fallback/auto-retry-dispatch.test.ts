@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { DEFAULT_PROMPT_QUEUE_RETRY_MS, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
-import { setPromptReservation } from "../../shared/prompt-async-gate/reservations"
+import { setPromptReservation } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"

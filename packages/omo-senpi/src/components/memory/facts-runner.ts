@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { existsSync } from "node:fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { basename, join } from "node:path"
 
 import {
@@ -107,13 +107,20 @@ export class FactsExtractorRunner {
     const entries: readonly FactsQueueEntry[] = selection.selected
     const loaded = this.options.loadConfig()
     const resolution = resolveReflectionModel(QUICK_CATEGORY, loaded.config, this.options.resolveModelRegistry())
-    if (resolution.kind === "category_unavailable") {
-      this.options.logger?.warn("facts extractor quick category unavailable", { cause: resolution.cause })
+    // `category_unavailable` is not the only unavailable answer. resolveReflectionModel also has a
+    // beyond-category ladder (registry_fallback / session_inherit) that resolves ANY usable registry
+    // model when the quick chain is dead, and it marks those resolutions with a `source`.
+    // Category-sourced resolutions carry no `source`. This surface is quick-PINNED with no fallback:
+    // an unattended extraction must never land on an arbitrary, possibly frontier-priced model, so
+    // anything outside the category counts as unavailable and takes the same skip path.
+    if (resolution.kind === "category_unavailable" || resolution.source !== undefined) {
+      const cause = resolution.kind === "category_unavailable" ? resolution.cause : resolution.source
+      this.options.logger?.warn("facts extractor quick category unavailable", { cause })
       await this.terminal.preflightFail(
         queueEntryTargets(entries),
         preflightFailureId(this.options.createPreflightId),
         "quick_category_unavailable",
-        resolution.cause,
+        cause ?? "unknown",
       )
       return { status: "skipped" }
     }

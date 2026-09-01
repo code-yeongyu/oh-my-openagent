@@ -31,6 +31,13 @@ export const AST_GREP_SERVER_NAME = "ast_grep" as const;
 export const AST_GREP_SERVER_VERSION = "0.1.0" as const;
 const DEFAULT_PROTOCOL_VERSION = "2024-11-05";
 
+// 10 minutes: matches the mcp-stdio-core default already shipped for the
+// senpi-hosted memory MCP (omo-senpi/src/mcp/memory-server.ts), and the senpi
+// host auto-reconnects a degraded stdio server, so an idle exit costs one
+// backoff-delayed respawn rather than a broken session.
+export const DEFAULT_AST_GREP_IDLE_TIMEOUT_MS = 10 * 60_000;
+const IDLE_TIMEOUT_ENV_KEY = "OMO_AST_GREP_IDLE_TIMEOUT_MS";
+
 /**
  * The 19-code failure taxonomy: ub §6's 18 codes plus RULE_PARSE_FAILED from the
  * scan tool. Every isError payload this server emits carries one of these codes.
@@ -58,8 +65,6 @@ export const AST_GREP_ERROR_CODES = [
 ] as const;
 
 export type AstGrepErrorCode = (typeof AST_GREP_ERROR_CODES)[number];
-
-// ---- tool descriptors ----
 
 const LANGUAGES = [
   "bash", "c", "cpp", "csharp", "css", "elixir", "go", "haskell", "html",
@@ -199,8 +204,6 @@ export const AST_GREP_MCP_TOOLS: readonly McpToolDescriptor[] = [
   },
 ] as const;
 
-// ---- options ----
-
 export type ToolExecutor<Payload> = (
   input: never,
   sgPath: string,
@@ -220,11 +223,11 @@ export interface AstGrepMcpOptions {
   readonly executors?: AstGrepToolExecutors;
   readonly signal?: AbortSignal;
   readonly lifecycleLog?: McpLifecycleLog;
+  /** Test seam / explicit override: wins over OMO_AST_GREP_IDLE_TIMEOUT_MS. */
+  readonly idleTimeoutMs?: number;
   /** Test seam: production callers leave this unset so the watchdog uses its defaults. */
   readonly parentWatchdog?: ParentWatchdogConfig;
 }
-
-// ---- request handling ----
 
 export async function handleAstGrepMcpRequest(
   input: unknown,
@@ -272,13 +275,26 @@ export async function runMcpStdioServer(
       }
     },
     handlerOptions: undefined,
-    idleTimeoutMs: 0,
+    idleTimeoutMs: resolveIdleTimeoutMs(options.idleTimeoutMs),
     parentWatchdog: options.parentWatchdog ?? {},
     log: options.lifecycleLog,
     onParentExit: () => {
       active?.abort(new Error("parent process exited"));
     },
   });
+}
+
+// Precedence: explicit option > OMO_AST_GREP_IDLE_TIMEOUT_MS > 10-minute default.
+// Values <= 0 disable the timer (createIdleTimer semantics). A missing or
+// unparseable env value falls back to the default rather than disabling: the
+// timeout exists to reclaim abandoned servers, and a typo must not silently
+// reintroduce the leak.
+function resolveIdleTimeoutMs(explicit?: number): number {
+  if (explicit !== undefined) return explicit;
+  const raw = process.env[IDLE_TIMEOUT_ENV_KEY];
+  if (raw === undefined || raw === "") return DEFAULT_AST_GREP_IDLE_TIMEOUT_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : DEFAULT_AST_GREP_IDLE_TIMEOUT_MS;
 }
 
 async function handleToolCall(

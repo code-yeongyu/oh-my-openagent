@@ -46,6 +46,12 @@ export interface ReflectionTriggerWiringOptions {
   readonly resolveSession: (eventCtx?: unknown) => ReflectionTriggerSession | undefined
   /** Launch action. Todo 23's detached worker plugs in here; the default is a no-op. */
   readonly onLaunch?: (request: ReflectionRequest) => void
+  /**
+   * Accepted-compaction observer. The memorian gate drops that session's pending nudges here: they
+   * judged a transcript the compaction has just replaced. Kept on THIS seam rather than a second
+   * session_compact handler so both consumers see exactly the same accepted events.
+   */
+  readonly onCompactionAccepted?: (conversationId: string) => void
   readonly logger?: ComponentLogger
 }
 
@@ -125,6 +131,12 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
         const session = options.resolveSession(eventCtx)
         if (!session) return
         session.ledger.pendingCompaction = true
+        try {
+          options.onCompactionAccepted?.(session.conversationId)
+        } catch (error: unknown) {
+          // An observer must never cost the reflection flag this handler exists to record.
+          options.logger?.warn("omo-senpi memory compaction observer failed", { error: describe(error) })
+        }
       })
     },
 

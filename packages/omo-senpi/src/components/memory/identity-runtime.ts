@@ -134,7 +134,12 @@ export function createIdentityRuntime(
     runner,
     launch,
     async reconcile(): Promise<void> {
-      await reconcileReflectionRuns({ identity: asMemoryIdentity(identity), reservation: store, launch })
+      await reconcileReflectionRuns({
+        identity: asMemoryIdentity(identity),
+        reservation: store,
+        launch,
+        deferOnSchedulerContention: true,
+      })
     },
   }
   return runtime

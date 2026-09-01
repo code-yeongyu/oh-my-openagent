@@ -1,7 +1,7 @@
 import { resolveContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { DestroyCause, LifecycleDeps } from "./port"
-import { admitResident } from "./residency"
+import { admitResident, reclaimIdleResidents, startIdleResidentReclaimer } from "./residency"
 import { reconcileOnSessionStart } from "./reconcile"
 import { suspendOnSessionShutdown } from "./shutdown"
 import { cleanupExpiredRecords } from "./ttl"
@@ -14,11 +14,15 @@ import type { SuspendInput, TaskLifecycle } from "./types"
  */
 export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
   const context = resolveContext(deps)
+  const cleanup = () => cleanupExpiredRecords(context)
+  const stopIdleReclaimer = startIdleResidentReclaimer(context, cleanup)
   return {
     destroyResidentTask: (taskId: string, cause: DestroyCause) => destroyResidentTask(context, taskId, cause),
+    reclaimIdleResidents: () => reclaimIdleResidents(context),
+    dispose: stopIdleReclaimer,
     admitResident: (parentSessionId: string) => admitResident(context, parentSessionId),
     reconcileOnSessionStart: (parentSessionId?: string) => reconcileOnSessionStart(context, parentSessionId),
-    cleanupExpiredRecords: () => cleanupExpiredRecords(context),
+    cleanupExpiredRecords: cleanup,
     suspendOnSessionShutdown: (input: SuspendInput) => suspendOnSessionShutdown(context, input),
   }
 }

@@ -152,6 +152,19 @@ other_field: value
 })
 
 describe("isOracleVerified", () => {
+	test("#given valid gate-verifier verification #then should return true", () => {
+		// #given
+		const text = `Agent: gate-verifier
+
+<promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>`
+
+		// #when
+		const result = isOracleVerified(text)
+
+		// #then
+		expect(result).toBe(true)
+	})
+
 	test("#given valid oracle verification #then should return true", () => {
 		// #given
 		const text = `Agent: oracle
@@ -217,6 +230,23 @@ describe("isOracleVerified", () => {
 })
 
 describe("extractOracleSessionID", () => {
+	test("#given valid gate-verifier verification with session_id #then should return session_id", () => {
+		// #given
+		const text = `Agent: GATE-VERIFIER
+
+<promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>
+
+<task_metadata>
+session_id: ses_gate_verifier_123
+</task_metadata>`
+
+		// #when
+		const sessionID = extractOracleSessionID(text)
+
+		// #then
+		expect(sessionID).toBe("ses_gate_verifier_123")
+	})
+
 	test("#given valid oracle verification with session_id #then should return session_id", () => {
 		// #given
 		const text = `Agent: oracle

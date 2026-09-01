@@ -4,6 +4,7 @@ import type { MemoryIdentityContext } from "./context"
 import type { FactsExtractorRunnerOptions } from "./facts-runner"
 import type { FactsExtractorPort } from "./facts-wiring"
 import type { MemoryIdentityRuntime, MemoryIdentityRuntimeDeps } from "./identity-runtime"
+import type { MemorianGatePort } from "./memorian-wiring"
 import type { ShutdownDrainInput, ShutdownEvaluator } from "./shutdown-drain"
 import type { refreshMemoryStatus } from "./status"
 import type { MemoryFooterTimers } from "./status-live"
@@ -22,6 +23,8 @@ export interface MemoryWiringOptions {
   readonly logger?: ComponentLogger
   readonly createRuntime?: (identity: MemoryIdentityContext, deps: MemoryIdentityRuntimeDeps) => MemoryIdentityRuntime
   readonly createFactsExtractor?: (options: FactsExtractorRunnerOptions) => FactsExtractorPort
+  /** Memorian gate runner seam; the live QA driver substitutes a scripted child here. */
+  readonly createMemorianRunner?: (identity: MemoryIdentityContext) => MemorianGatePort
   /** Boot-snapshot tool exposure; registration must not re-read config (latch order is observable). */
   readonly toolExposure?: "direct" | "search"
   readonly now?: () => number

@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { mkdir, writeFile } from "node:fs/promises"
+import { existsSync } from "../fs/resilient"
+import { mkdir, writeFile } from "../fs/resilient"
 import { dirname, join } from "node:path"
 import { withGitLockRetry, withSerializedGitConfigMutation } from "./config-lock"
 import { DirtyRepoError, NoEffectiveChangesError } from "./errors"

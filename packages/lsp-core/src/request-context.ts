@@ -72,7 +72,7 @@ export function createStandaloneMcpRequestContext(
 	input: StandaloneMcpRequestContextInput = {},
 ): LspRequestContext {
 	const env = input.env ?? process.env;
-	const cwd = canonicalCwd(input.cwd ?? process.cwd());
+	const cwd = canonicalCwd(input.cwd ?? env["LSP_TOOLS_MCP_CWD"] ?? process.cwd());
 	const home = input.homeDir ?? homedir();
 	const projectConfigPaths = translateProjectConfigEnv(env["LSP_TOOLS_MCP_PROJECT_CONFIG"], cwd);
 	const userConfigPath = translateHomeConfigEnv(env["LSP_TOOLS_MCP_USER_CONFIG"], home, ".codex/lsp-client.json");

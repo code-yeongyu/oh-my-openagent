@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { root } from "./aggregate-plugin-fixture.mjs";
+import { repoRoot, root } from "./aggregate-plugin-fixture.mjs";
 
 const POINTER_MAX_BYTES = 4096;
 const skillPath = join(root, "skills", "ultrawork", "SKILL.md");
@@ -30,7 +30,10 @@ function runUserPromptSubmitCli(component, extraArgs = []) {
 test("#given synced skills #when the ultrawork skill is inspected #then it carries the full directive body", () => {
 	assert.equal(existsSync(skillPath), true);
 	const skill = readFileSync(skillPath, "utf8");
-	const directive = readFileSync(join(root, "components", "ultrawork", "directive.md"), "utf8");
+	const directive = readFileSync(
+		join(repoRoot, "packages", "prompts-core", "prompts", "ultrawork", "codex.md"),
+		"utf8",
+	);
 	assert.match(skill, /^---\nname: ultrawork\n/);
 	assert.equal(skill.endsWith(directive), true);
 });

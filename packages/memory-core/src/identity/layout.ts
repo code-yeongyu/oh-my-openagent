@@ -21,6 +21,7 @@ export const RUNTIME_SUBDIRNAMES = [
   "facts",
   "notices",
   "tool-receipts",
+  "recall",
 ] as const
 export type RuntimeSubdirname = (typeof RUNTIME_SUBDIRNAMES)[number]
 
@@ -39,6 +40,10 @@ export interface MemoryIdentityPaths {
   facts: string
   notices: string
   toolReceipts: string
+  /** Recall runtime tree: per-session surfaced-path ledgers and pending gate nudges. */
+  recall: string
+  recallLedger: string
+  recallPending: string
 }
 
 export function defaultMemoryRoot(): string {
@@ -71,5 +76,8 @@ export function buildIdentityPaths(memoryRoot: string, id: string): MemoryIdenti
     facts: join(runtime, "facts"),
     notices: join(runtime, "notices"),
     toolReceipts: join(runtime, "tool-receipts"),
+    recall: join(runtime, "recall"),
+    recallLedger: join(runtime, "recall", "ledger"),
+    recallPending: join(runtime, "recall", "pending"),
   }
 }

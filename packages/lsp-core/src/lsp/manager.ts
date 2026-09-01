@@ -1,6 +1,14 @@
 import { reportBestEffortCleanupError } from "./cleanup-errors.js";
 import { LspClient } from "./client.js";
-import { IDLE_TIMEOUT_MS, INIT_TIMEOUT_MS, MAX_RESIDENT_CLIENTS, REAPER_INTERVAL_MS } from "./constants.js";
+import {
+	CLIENT_RESPAWN_COOLDOWN_MS,
+	CLIENT_RESPAWN_RETRY_LIMIT,
+	IDLE_TIMEOUT_MS,
+	INIT_TIMEOUT_MS,
+	MAX_RESIDENT_CLIENTS,
+	REAPER_INTERVAL_MS,
+} from "./constants.js";
+import { LspClientRespawnBudgetExceededError } from "./errors.js";
 import { installProcessSignalCleanup } from "./process-signal-cleanup.js";
 import type { ResolvedServer } from "./types.js";
 
@@ -12,6 +20,11 @@ interface ManagedClient {
 	initPromise: Promise<void> | null;
 	isInitializing: boolean;
 	initializingSince: number | null;
+}
+
+interface RespawnBudget {
+	deadGenerations: number;
+	exhaustedAt: number | null;
 }
 
 export interface ClientSnapshot {
@@ -75,6 +88,9 @@ function awaitWithSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined
 
 export class LspManager {
 	private readonly clients = new Map<string, ManagedClient>();
+	/** In-flight stops per key; getClient awaits these instead of spawning a duplicate client. */
+	private readonly pendingStops = new Map<string, Promise<void>>();
+	private readonly respawnBudgets = new Map<string, RespawnBudget>();
 	private reaperHandle: NodeJS.Timeout | null = null;
 	private signalDisposer: (() => void) | null = null;
 	private disposed = false;
@@ -112,6 +128,50 @@ export class LspManager {
 		return `${root}::${serverId}`;
 	}
 
+	/**
+	 * Deletes-then-stops with a tombstone: the pending stop is recorded so a concurrent getClient
+	 * for the same key awaits it instead of spawning a duplicate client while the old one lingers
+	 * (production stops reach ~21s). The tombstone removes itself once the stop settles.
+	 */
+	private tombstoneStop(key: string, client: LspClient): Promise<void> {
+		const stop = stopClientBestEffort(client);
+		this.pendingStops.set(key, stop);
+		void stop.finally(() => {
+			if (this.pendingStops.get(key) === stop) {
+				this.pendingStops.delete(key);
+			}
+		});
+		return stop;
+	}
+
+	private recordDeadGeneration(key: string): void {
+		let budget = this.respawnBudgets.get(key);
+		if (budget === undefined) {
+			budget = { deadGenerations: 0, exhaustedAt: null };
+			this.respawnBudgets.set(key, budget);
+		}
+		budget.deadGenerations += 1;
+	}
+
+	private markHealthyGeneration(key: string): void {
+		this.respawnBudgets.delete(key);
+	}
+
+	/** Throws while the respawn budget is spent and the cooldown has not elapsed. */
+	private ensureRespawnAllowed(key: string, root: string, serverId: string): void {
+		const budget = this.respawnBudgets.get(key);
+		if (budget === undefined || budget.deadGenerations < CLIENT_RESPAWN_RETRY_LIMIT) return;
+		if (budget.exhaustedAt === null) {
+			budget.exhaustedAt = this.now();
+			throw new LspClientRespawnBudgetExceededError(serverId, root, CLIENT_RESPAWN_RETRY_LIMIT);
+		}
+		if (this.now() - budget.exhaustedAt < CLIENT_RESPAWN_COOLDOWN_MS) {
+			throw new LspClientRespawnBudgetExceededError(serverId, root, CLIENT_RESPAWN_RETRY_LIMIT);
+		}
+		budget.deadGenerations = 0;
+		budget.exhaustedAt = null;
+	}
+
 	private reapStale(): void {
 		const t = this.now();
 		for (const [key, managed] of this.clients) {
@@ -120,8 +180,8 @@ export class LspManager {
 				managed.initializingSince !== null &&
 				t - managed.initializingSince > this.initTimeoutMs
 			) {
-				void stopClientBestEffort(managed.client);
 				this.clients.delete(key);
+				void this.tombstoneStop(key, managed.client);
 				continue;
 			}
 
@@ -131,8 +191,8 @@ export class LspManager {
 				managed.pendingWaiters === 0 &&
 				t - managed.lastUsedAt > this.idleTimeoutMs
 			) {
-				void stopClientBestEffort(managed.client);
 				this.clients.delete(key);
+				void this.tombstoneStop(key, managed.client);
 			}
 		}
 	}
@@ -148,7 +208,7 @@ export class LspManager {
 			const victim = this.leastRecentlyUsedIdleClient();
 			if (!victim) return;
 			this.clients.delete(victim.key);
-			void stopClientBestEffort(victim.managed.client);
+			void this.tombstoneStop(victim.key, victim.managed.client);
 		}
 	}
 
@@ -171,7 +231,7 @@ export class LspManager {
 			this.clients.get(key) === managed
 		) {
 			this.clients.delete(key);
-			await stopClientBestEffort(managed.client);
+			await this.tombstoneStop(key, managed.client);
 		}
 	}
 
@@ -182,6 +242,16 @@ export class LspManager {
 		signal?.throwIfAborted();
 
 		const key = this.getKey(root, server.id);
+		for (;;) {
+			const pendingStop = this.pendingStops.get(key);
+			if (pendingStop === undefined) break;
+			await awaitWithSignal(pendingStop, signal);
+			signal?.throwIfAborted();
+		}
+		if (this.disposed) {
+			throw new Error("LspManager has been disposed");
+		}
+
 		let managed = this.clients.get(key);
 
 		if (managed) {
@@ -191,8 +261,8 @@ export class LspManager {
 				managed.initializingSince !== null &&
 				t - managed.initializingSince > this.initTimeoutMs
 			) {
-				await stopClientBestEffort(managed.client);
 				this.clients.delete(key);
+				await this.tombstoneStop(key, managed.client);
 				managed = undefined;
 			}
 		}
@@ -216,17 +286,22 @@ export class LspManager {
 			}
 
 			if (!managed.client.isAlive()) {
-				await stopClientBestEffort(managed.client);
-				this.clients.delete(key);
+				this.recordDeadGeneration(key);
+				if (this.clients.get(key) === managed) {
+					this.clients.delete(key);
+				}
+				await this.tombstoneStop(key, managed.client);
 				return this.getClient(root, server, signal);
 			}
 
+			this.markHealthyGeneration(key);
 			managed.refCount++;
 			managed.lastUsedAt = this.now();
 			return managed.client;
 		}
 
 		this.evictForAdmission();
+		this.ensureRespawnAllowed(key, root, server.id);
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();
@@ -253,7 +328,7 @@ export class LspManager {
 			if (this.clients.get(key) === newManaged) {
 				this.clients.delete(key);
 			}
-			await stopClientBestEffort(client);
+			await this.tombstoneStop(key, client);
 			throw err;
 		}
 
@@ -267,6 +342,16 @@ export class LspManager {
 			signal.throwIfAborted();
 		}
 
+		if (!client.isAlive()) {
+			this.recordDeadGeneration(key);
+			if (this.clients.get(key) === newManaged) {
+				this.clients.delete(key);
+			}
+			await this.tombstoneStop(key, client);
+			return this.getClient(root, server, signal);
+		}
+
+		this.markHealthyGeneration(key);
 		newManaged.refCount++;
 		newManaged.lastUsedAt = this.now();
 		return client;
@@ -287,15 +372,20 @@ export class LspManager {
 		if (!managed) return;
 		if (client && managed.client !== client) return;
 		this.clients.delete(key);
-		void stopClientBestEffort(managed.client);
+		void this.tombstoneStop(key, managed.client);
 	}
 
 	warmupClient(root: string, server: ResolvedServer): void {
 		if (this.disposed) return;
 		const key = this.getKey(root, server.id);
-		if (this.clients.has(key)) return;
+		if (this.clients.has(key) || this.pendingStops.has(key)) return;
 
 		this.evictForAdmission();
+		try {
+			this.ensureRespawnAllowed(key, root, server.id);
+		} catch {
+			return;
+		}
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();
@@ -326,7 +416,7 @@ export class LspManager {
 				if (this.clients.get(key) === managed) {
 					this.clients.delete(key);
 				}
-				void stopClientBestEffort(client);
+				void this.tombstoneStop(key, client);
 			},
 		);
 	}
@@ -379,8 +469,11 @@ export class LspManager {
 		for (const managed of this.clients.values()) {
 			stopPromises.push(stopClientBestEffort(managed.client));
 		}
+		const tombstonedStops = [...this.pendingStops.values()];
 		this.clients.clear();
-		await Promise.allSettled(stopPromises);
+		this.respawnBudgets.clear();
+		await Promise.allSettled([...stopPromises, ...tombstonedStops]);
+		this.pendingStops.clear();
 	}
 }
 

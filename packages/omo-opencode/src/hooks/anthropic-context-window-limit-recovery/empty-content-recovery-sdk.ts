@@ -48,7 +48,7 @@ function getSdkMessages(response: unknown): SDKMessage[] {
   const record = response as Record<string, unknown>
   const data = record["data"]
   if (Array.isArray(data)) return data as SDKMessage[]
-  return Array.isArray(record) ? (record as SDKMessage[]) : []
+  return []
 }
 
 async function findEmptyMessagesFromSDK(client: Client, sessionID: string): Promise<string[]> {

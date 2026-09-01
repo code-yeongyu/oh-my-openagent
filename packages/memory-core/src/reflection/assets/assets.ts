@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { readFileSync } from "../../fs/resilient"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 

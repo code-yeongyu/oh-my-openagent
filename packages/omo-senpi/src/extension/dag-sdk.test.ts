@@ -14,7 +14,7 @@ import { DAG_SDK_ROOT_ENV, createDagSdkRootProvisioning } from "./dag-sdk-root-p
 // The eval kernel installs `tool` as a global proxy whose properties are async tool callers
 // (senpi packages/senpi-codemode/src/kernels/js/worker-runtime.js). The SDK is loaded inside that
 // worker, so the tests drive it exactly the same way: install a stub global, import the artifact,
-// and assert on the recorded `tool.dag` arguments.
+// and assert on the recorded `tool.workflow` arguments.
 type DagCall = Record<string, unknown>
 
 type DagRunHandle = {
@@ -45,7 +45,7 @@ const sdkPath = join(import.meta.dir, "../../plugin/runtime/dag/sdk.js")
 function installToolStub(reply: (args: DagCall) => unknown): DagCall[] {
   const calls: DagCall[] = []
   Reflect.set(globalThis, "tool", {
-    dag: async (args: DagCall) => {
+    workflow: async (args: DagCall) => {
       calls.push(args)
       return reply(args)
     },

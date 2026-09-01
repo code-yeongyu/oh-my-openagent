@@ -1,0 +1,225 @@
+SHA=0173eb2be
+bun test v1.4.0 (34cbb9a40)
+
+packages/lsp-core/src/tool-surface.test.ts:
+(pass) LSP core tool surface > #given tool descriptors #when listed #then the public nine-tool schemas are pinned [0.53ms]
+(pass) LSP core tool surface > #given legacy tool aliases #when executed #then aliases are callable but not listed [1.17ms]
+(pass) LSP core tool surface > #given non-object tool arguments #when coerced #then they produce an empty argument record [0.07ms]
+
+packages/lsp-core/src/request-context.test.ts:
+(pass) LspRequestContext > #given exact typed context #when parsed #then canonicalizes cwd and preserves typed paths [0.40ms]
+(pass) LspRequestContext > #given no active context #when requested #then throws an actionable typed error [0.09ms]
+(pass) LspRequestContext > #given unknown field #when parsed #then rejects before lookup [0.22ms]
+(pass) LspRequestContext > #given project path outside cwd #when parsed #then rejects before config loading [0.42ms]
+(pass) LspRequestContext > #given equivalent macOS var spelling #when parsed #then canonicalizes to one identity [0.46ms]
+(pass) LspRequestContext > #given missing standard project config inside cwd #when parsed #then accepts and preserves the intended suffix [0.30ms]
+(pass) LspRequestContext > #given symlink project config escaping cwd #when parsed #then rejects the escape [0.58ms]
+(pass) LspRequestContext > #given standalone MCP env #when translated #then resolves exact defaults and relative paths [0.34ms]
+(pass) LspRequestContext > #given an injected LSP cwd #when standalone context is created #then it wins over process cwd without reading global env [0.38ms]
+(pass) LspRequestContext > #given explicit cwd and an injected LSP cwd #when standalone context is created #then explicit cwd wins [0.29ms]
+
+packages/lsp-core/src/missing-dependency-result.test.ts:
+(pass) missingDependencyResult > #given not configured lookup #when converted #then includes structured availability and typed config paths [0.31ms]
+(pass) missingDependencyResult > #given not installed lookup #when converted #then includes install decision availability [0.22ms]
+
+packages/lsp-core/src/mcp-protocol-pin.test.ts:
+(pass) lsp MCP protocol pins > #given initialize request #when handled #then exact server info and capabilities stay stable [0.20ms]
+(pass) lsp MCP protocol pins > #given malformed stdio line #when read #then parse error envelope includes parser data [2.21ms]
+
+packages/lsp-core/src/tools/format.test.ts:
+(pass) executeLspFormat > #given an extension with no configured server #when format runs #then the missing dependency result is returned and the file is untouched [0.69ms]
+(pass) executeLspFormat > #given a missing filePath argument #when format runs #then the parameter contract is enforced [0.09ms]
+
+packages/lsp-core/src/lsp/workspace-apply-edit.integration.test.ts:
+(pass) LspClient workspace/applyEdit > #given a server-applied edit returned again by rename #when rename completes #then one write is reused truthfully [38.83ms]
+(pass) LspClient workspace/applyEdit > #given a server-applied edit and a null rename result #when rename completes #then the recorded result is reused [36.69ms]
+(pass) LspClient workspace/applyEdit > #given two versioned server edits #when applied sequentially #then the synchronized version accepts the second edit [38.54ms]
+(pass) LspClient workspace/applyEdit > #given a mismatched document version #when the server requests applyEdit #then mutation is rejected truthfully [34.74ms]
+(pass) LspClient workspace/applyEdit > #given a server-applied edit and a different rename result #when rename completes #then conflict is reported without a second mutation [37.55ms]
+(pass) LspClient workspace/applyEdit > #given a real commit I/O failure #when the server requests applyEdit #then both protocol and rename result report failure [34.09ms]
+
+packages/lsp-core/src/lsp/manager-max-clients.test.ts:
+(pass) LspManager resident client cap > #given a cap of two idle clients #when a third client is admitted #then the least recently used one is stopped and evicted [0.72ms]
+(pass) LspManager resident client cap > #given the least recently used client is mid-request #when a new client is admitted #then the busy client survives and an idle one is evicted [0.15ms]
+(pass) LspManager resident client cap > #given every resident client is busy #when a new client is admitted #then nothing is evicted and the cap is exceeded rather than breaking a live request [0.10ms]
+(pass) LspManager resident client cap > #given warmup requests beyond the cap #when a warm client is admitted #then the idle least recently used client is evicted too [0.15ms]
+
+packages/lsp-core/src/lsp/directory-diagnostics.test.ts:
+(pass) directory diagnostics > #given multiple files and one per-file failure #when directory diagnostics run #then work stays bounded and file failures stay structured [0.73ms]
+(pass) directory diagnostics > #given directory diagnostics are aborted after one file #when the worker loops #then no later file is scheduled [0.29ms]
+(pass) directory diagnostics > #given cold client acquisition is pending #when directory diagnostics are aborted #then acquisition settles and cleans up before startup releases [0.62ms]
+
+packages/lsp-core/src/lsp/workspace-document-state.test.ts:
+(pass) WorkspaceDocumentState watched-file bounds > #given more closed-file mutations than one batch #when synchronized #then every notification stays bounded [0.35ms]
+(pass) WorkspaceDocumentState watched-file bounds > #given changed closed files #when synchronized #then sends bounded changed watched-file notifications [0.28ms]
+
+packages/lsp-core/src/lsp/utils.test.ts:
+(pass) formatKnownLspStartupFailure > #given rust-src component conflict #when formatting startup failure #then returns repair guidance [0.12ms]
+(pass) formatKnownLspStartupFailure > #given rust-analyzer sysroot error #when handling missing dependency #then returns repair guidance [0.07ms]
+(pass) formatKnownLspStartupFailure > #given unrelated process exits #when formatting startup failure #then returns null [0.06ms]
+(pass) handleMissingDependencyError > #given existing dependency messages #when handling error #then preserves current messages [0.06ms]
+
+packages/lsp-core/src/lsp/client-wrapper-outside-cwd.test.ts:
+(pass) LSP read-only access outside request cwd > #given an absolute file outside cwd #when resolving a read path #then returns the canonical path [0.78ms]
+(pass) LSP read-only access outside request cwd > #given an outside file inside its own marked project #when inferring workspace #then uses that project root [0.94ms]
+(pass) LSP read-only access outside request cwd > #given an outside file without any marker #when inferring workspace #then falls back to its own directory [0.69ms]
+(pass) LSP read-only access outside request cwd > #given an outside file #when resolving a mutating path #then still rejects to keep writes confined [0.71ms]
+
+packages/lsp-core/src/lsp/workspace-edit-adversarial.test.ts:
+(pass) workspace edit adversarial inputs > #given malformed and decorated URIs #when planned #then every variant is rejected before mutation [0.51ms]
+(pass) workspace edit adversarial inputs > #given invalid ranges and resource options #when planned #then each failure retains its operation index [0.61ms]
+(pass) workspace edit adversarial inputs > #given an outside target and a dirty unrelated file #when prevalidation fails #then neither is touched [0.53ms]
+(pass) workspace edit adversarial inputs > #given an in-workspace symlink to an outside file #when applying an edit #then rejects without modifying target [0.49ms]
+(pass) workspace edit adversarial inputs > #given annotations or mixed edit representations #when planned #then unsupported claims are rejected [0.24ms]
+
+packages/lsp-core/src/lsp/server-installation.test.ts:
+(pass) resolveServerBinary node marker resolution > #given a package.json marker and a local node bin #when resolving with an empty PATH #then it returns the local absolute path [0.76ms]
+(pass) resolveServerBinary node marker resolution > #given a nested working directory #when resolving #then it walks up to the marker root [1.02ms]
+(pass) resolveServerBinary node marker resolution > #given a local bin without any project marker #when resolving #then the unmarked directory is not trusted [0.74ms]
+(pass) resolveServerBinary node marker resolution > #given a bun.lock marker #when resolving #then the node bin directory is probed [0.60ms]
+(pass) resolveServerBinary non-node ecosystems > #given a pyproject marker and a venv binary #when resolving #then it returns the venv path [0.55ms]
+(pass) resolveServerBinary non-node ecosystems > #given a Gemfile marker and a bundled binary #when resolving #then it returns the vendored bundle path [0.64ms]
+(pass) resolveServerBinary non-node ecosystems > #given a go.mod marker and a project bin #when resolving #then it returns the project bin path [0.49ms]
+(pass) resolveServerBinary non-node ecosystems > #given a python marker without a matching venv binary #when resolving #then node bin dirs are not borrowed [0.81ms]
+(pass) resolveServerBinary probe ordering > #given a local binary and a PATH binary #when resolving #then the local binary wins [0.82ms]
+(pass) resolveServerBinary probe ordering > #given only a PATH binary #when resolving #then the PATH entry is returned [0.80ms]
+(pass) resolveServerBinary probe ordering > #given a path-shaped command #when resolving #then the command path itself is validated [0.42ms]
+(pass) resolveServerBinary probe ordering > #given no working directory #when resolving #then it falls back to PATH only [0.34ms]
+(pass) resolveServerBinary probe ordering > #given nothing anywhere #when resolving #then it returns null [0.81ms]
+(pass) resolveServerBinary containment > #given a marker only above the working directory root #when resolving with a stop boundary #then it does not escape the boundary [1.07ms]
+(pass) resolveServerBinary containment > #given a git repository boundary #when resolving #then the walk stops at the repository root [0.81ms]
+(pass) resolveServerBinary windows suffix probing > #given a windows platform and a .cmd shim #when resolving locally #then the suffixed binary is found [0.57ms]
+(pass) resolveServerBinary windows suffix probing > #given a windows platform and a PATH .exe #when resolving #then the suffixed PATH entry is found [0.28ms]
+(pass) resolveServerBinary caching > #given a repeated lookup #when resolving twice #then the filesystem is probed only once [0.56ms]
+(pass) resolveServerBinary caching > #given a cached negative lookup #when resolving twice #then the miss is also cached [0.52ms]
+(pass) resolveServerBinary caching > #given distinct working directories #when resolving the same command #then the cache keys stay separate [1.04ms]
+(pass) isServerInstalled compatibility > #given a repo-local binary #when checking installation #then it reports installed [0.73ms]
+(pass) isServerInstalled compatibility > #given a PATH binary and no working directory #when checking installation #then it reports installed [0.28ms]
+(pass) isServerInstalled compatibility > #given no binary at all #when checking installation #then it reports not installed [0.51ms]
+(pass) isServerInstalled compatibility > #given the node command #when checking installation #then the existing node allowance is preserved [0.37ms]
+(pass) resolveServerBinary node fallback > #given a node command missing from PATH #when resolving #then the name is kept so the server stays selectable [0.38ms]
+(pass) resolveServerBinary node fallback > #given a node command present on PATH #when resolving #then the PATH entry still wins [0.27ms]
+
+packages/lsp-core/src/lsp/workspace-edit-commit.test.ts:
+(pass) workspace edit commit barrier > #given cancellation before commit #when a valid plan is applied #then no mutation begins [0.52ms]
+(pass) workspace edit commit barrier > #given repeated pre-gate interruptions #when retried #then every attempt leaves the snapshot untouched [0.50ms]
+(pass) workspace edit commit barrier > #given cancellation after the first write #when commit has crossed the barrier #then all operations finish once [0.99ms]
+(pass) workspace edit commit barrier > #given an injected write failure #when commit begins #then the result reports real I/O failure [0.45ms]
+(pass) workspace edit commit barrier > #given a stale file snapshot #when a prepared plan commits #then the newer bytes are preserved [0.42ms]
+
+packages/lsp-core/src/lsp/client-wrapper.test.ts:
+(pass) LSP workspace root collapse in monorepos > #given a git repository containing four package.json packages #when resolving workspace roots for files in each package #then all collapse to the repository root [2.42ms]
+(pass) LSP workspace root collapse in monorepos > #given nested package.json markers without any .git #when resolving workspace #then keeps the nearest package root [0.90ms]
+(pass) LSP workspace root collapse in monorepos > #given four monorepo package files under one .git root #when acquiring clients #then one client serves the whole repository [3.92ms]
+(pass) LSP client path confinement > #given a relative file inside context cwd #when resolving workspace #then marker search stays inside cwd [0.69ms]
+(pass) LSP client path confinement > #given an absolute file outside context cwd #when resolving #then infers the file's own project root [0.86ms]
+(pass) LSP client path confinement > #given a symlink inside cwd that points outside #when resolving read path #then keeps lexical path and cwd root [0.94ms]
+(pass) LSP client path confinement > #given an absolute macOS alias path through an outside symlink #when resolving read path #then preserves the lexical suffix [0.71ms]
+(pass) LSP client path confinement > #given missing parent directories without markers #when resolving workspace #then uses an existing directory [0.28ms]
+(pass) LSP client path confinement > #given a symlink inside cwd that points outside #when starting rename #then rejects before client acquisition [0.63ms]
+
+packages/lsp-core/src/lsp/workspace-apply-edit-lease.integration.test.ts:
+(pass) LspClient workspace mutation lease > #given no mutating request #when the server calls applyEdit #then the request is rejected as unscoped [45.06ms]
+(pass) LspClient workspace mutation lease > #given one valid server apply #when the server applies twice #then the repeated request is rejected [35.88ms]
+(pass) LspClient workspace mutation lease > #given two concurrent server applies #when one enters commit #then the other is rejected without a second write [36.54ms]
+(pass) LspClient workspace mutation lease > #given a rename lease is held #when another rename starts #then it is rejected without a second request [186.71ms]
+(pass) LspClient workspace mutation lease > #given no server apply #when rename directly returns an edit #then it is applied exactly once [37.50ms]
+(pass) LspClient workspace mutation lease > #given cancellation before a delayed server apply #when the rename request is aborted #then no file is mutated [58.65ms]
+(pass) LspClient workspace mutation lease > #given cancellation after the commit gate #when applyEdit finishes #then rename reports one completed late-abort mutation [36.70ms]
+(pass) LspClient workspace mutation lease > #given lease-backed and bare clients #when initialized #then applyEdit and annotations are advertised honestly [66.41ms]
+
+packages/lsp-core/src/lsp/client-diagnostics-freshness.integration.test.ts:
+(pass) LspClient diagnostics freshness > #given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload [60.35ms]
+(pass) LspClient diagnostics freshness > #given only a pre-generation versionless publish #when a newer local version asks for diagnostics #then the stale versionless publish is ignored and the request does not resolve clean [342.57ms]
+(pass) LspClient diagnostics freshness > #given stale and future publish versions #when diagnostics target the current version #then neither stale nor future diagnostics satisfy the request [290.74ms]
+(pass) LspClient diagnostics freshness > #given a pull response overtaken by a later local change #when the stale full report returns first #then diagnostics restart within the same request and resolve from the current version [236.90ms]
+(pass) LspClient diagnostics freshness > #given a full pull report followed by an unchanged report for the same version and resultId #when diagnostics repeat without a local change #then the cached full items are reused [33.54ms]
+[lsp] ignored connection error notification failure during cleanup: Cannot call write after a stream was destroyed
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/lsp-apply-edit-DZGi9o exited with code 0
+(pass) LspClient diagnostics freshness > #given a server that claims pull support but closes instead of answering #when diagnostics run #then the transport failure is not labeled clean [533.18ms]
+(pass) LspClient diagnostics freshness > #given an advertised pull method that is explicitly unsupported and a matching push publish #when diagnostics run #then the client falls back to push diagnostics [533.48ms]
+(pass) LspClient diagnostics freshness > #given a diagnostic pull request times out #when the fake server keeps it pending #then the client sends cancel for the LSP request id [93.10ms]
+(pass) LspClient diagnostics freshness > #given a server without pull support that never publishes diagnostics #when diagnostics run on a clean file #then the request resolves clean after the freshness window instead of reporting a timeout [91.07ms]
+(pass) LspClient diagnostics freshness > #given a pull-supported server that cached diagnostics for an older document version #when the file changes and a later pull is rejected as unsupported without any publish #then the fallback resolves empty instead of returning the stale cached diagnostics [532.77ms]
+(pass) LspClient diagnostics freshness > #given a pull-supported server with a current cached pull report #when a later pull is rejected as unsupported without any publish and the document is unchanged #then the fallback resolves with the current cached diagnostics [535.37ms]
+
+packages/lsp-core/src/lsp/workspace-edit-options.test.ts:
+(pass) applyWorkspaceEdit resource options > #given create ignoreIfExists #when the target exists #then existing bytes are preserved [0.57ms]
+(pass) applyWorkspaceEdit resource options > #given rename ignoreIfExists #when the destination exists #then both files are preserved [0.55ms]
+(pass) applyWorkspaceEdit resource options > #given rename overwrite #when the destination exists #then source replaces destination [0.60ms]
+(pass) applyWorkspaceEdit resource options > #given delete ignoreIfNotExists #when the target is missing #then it is a successful no-op [0.22ms]
+(pass) applyWorkspaceEdit resource options > #given recursive delete #when the target is a non-empty directory #then the subtree is removed [0.41ms]
+
+packages/lsp-core/src/lsp/workspace-apply-edit-sync.integration.test.ts:
+(pass) LspClient workspace edit synchronization > #given an open edited document #when applyEdit commits #then didChange precedes didSave with the next version [29.70ms]
+(pass) LspClient workspace edit synchronization > #given an open file resource rename #when applyEdit commits #then didClose and didOpen move document state [30.59ms]
+(pass) LspClient workspace edit synchronization > #given an open file deletion #when applyEdit commits #then didClose removes document state [29.45ms]
+(pass) LspClient workspace edit synchronization > #given a closed edited file #when applyEdit commits #then one changed watched-file event is emitted [30.54ms]
+(pass) LspClient workspace edit synchronization > #given a new closed file #when applyEdit creates it #then one created watched-file event is emitted [29.61ms]
+(pass) LspClient workspace edit synchronization > #given an open file overwritten by create #when applyEdit commits #then didClose and didOpen reset its state [31.60ms]
+
+packages/lsp-core/src/lsp/server-resolution-local-binary.test.ts:
+(pass) findServerForExtension local binary substitution > #given a repo-local biome #when looking up a typescript file #then the command spawns the absolute local path [1.46ms]
+(pass) findServerForExtension local binary substitution > #given a PATH-only server #when looking up #then the resolved PATH entry is substituted [1.20ms]
+(pass) findServerForExtension local binary substitution > #given no server anywhere #when looking up #then the not_installed result is preserved [0.89ms]
+(pass) findServerForExtension local binary substitution > #given an unknown extension #when looking up #then the not_configured result is preserved [0.17ms]
+(pass) not-installed message repo-local guidance > #given a missing biome #when formatting the message #then the repo-local install is suggested before the global hint [0.47ms]
+(pass) not-installed message repo-local guidance > #given a server with no repo-local route #when formatting the message #then only the global hint is shown [0.37ms]
+(pass) not-installed message repo-local guidance > #given a pre-authorized install #when formatting the message #then both install routes stay visible [0.69ms]
+
+packages/lsp-core/src/lsp/json-rpc-connection-cancellation.test.ts:
+(pass) JsonRpcConnection cancellation > #given an active request #when its signal aborts #then cancel uses the same id and late responses are ignored [0.61ms]
+
+packages/lsp-core/src/lsp/format-document.test.ts:
+(pass) formatDocumentWithClient > #given a server returning text edits #when the document is formatted #then the file is rewritten and line deltas are reported [0.57ms]
+(pass) formatDocumentWithClient > #given a server returning an edit that adds lines #when the document is formatted #then the added and removed line counts differ [0.38ms]
+(pass) formatDocumentWithClient > #given a server that does not advertise document formatting #when the document is formatted #then the result is unavailable and the file bytes are untouched [0.25ms]
+(pass) formatDocumentWithClient > #given a server returning no edits #when the document is formatted #then the result is unchanged and the file bytes are untouched [0.31ms]
+(pass) formatDocumentWithClient > #given edits that reproduce the current bytes #when the document is formatted #then the result is unchanged [0.32ms]
+(pass) formatDocumentWithClient > #given the file shrinks after the server computed its edits #when the edits are applied #then the stale edit is rejected instead of corrupting the file [0.43ms]
+(pass) formatDocumentWithClient > #given a formatted document #when the write completes #then no temporary file is left behind [0.50ms]
+
+packages/lsp-core/src/lsp/client-diagnostics-concurrency.integration.test.ts:
+(pass) LspClient diagnostics concurrency > #given concurrent diagnostics on a cold file and an exact didOpen publish #when pull is not advertised #then one didOpen opens the file and both requests receive the current diagnostics [30.72ms]
+
+packages/lsp-core/src/lsp/cleanup-errors.test.ts:
+(pass) reportBestEffortCleanupError > #given an injected cleanup logger #when cleanup fails #then the normal diagnostic is emitted without an environment gate [0.08ms]
+
+packages/lsp-core/src/lsp/workspace-edit-prevalidation.test.ts:
+(pass) applyWorkspaceEdit prevalidation > #given a valid edit before an overlapping edit #when validated #then neither file is mutated [0.70ms]
+(pass) applyWorkspaceEdit prevalidation > #given byte-identical non-empty edits #when applied #then one edit is committed [0.47ms]
+(pass) applyWorkspaceEdit prevalidation > #given equal-position insertions #when applied #then all insertions retain declared order [0.45ms]
+(pass) applyWorkspaceEdit prevalidation > #given a range beyond the snapshot #when validated #then the edit fails without mutation [0.32ms]
+(pass) applyWorkspaceEdit prevalidation > #given a create followed by an invalid edit #when the sequence is validated #then no file is created [0.25ms]
+(pass) applyWorkspaceEdit prevalidation > #given rename then text edit of the destination #when applied #then declared order uses virtual state [0.63ms]
+
+packages/lsp-core/src/lsp/workspace-edit.characterization.test.ts:
+(pass) applyWorkspaceEdit preserved behavior > #given a valid text edit #when applied #then the file and ApplyResult remain compatible [0.53ms]
+(pass) applyWorkspaceEdit preserved behavior > #given a resource rename #when applied #then content moves and the destination is reported [0.50ms]
+(pass) applyWorkspaceEdit preserved behavior > #given an empty workspace edit #when applied #then it remains a successful no-op [0.15ms]
+(pass) applyWorkspaceEdit preserved behavior > #given no workspace edit #when applied #then the existing failure remains explicit [0.14ms]
+
+packages/lsp-core/src/lsp/workspace-edit-contract-evidence.test.ts:
+(pass) workspace edit contract evidence > #given both legitimate concurrent applyEdit lease outcomes #when failure evidence is hashed #then one canonical shape and hash is produced [0.12ms]
+(pass) workspace edit contract evidence > #given workspace-scoped evidence and a non-concurrent failure #when normalized #then paths are sanitized and the reason is preserved [0.05ms]
+
+packages/lsp-core/src/lsp/manager-lifecycle.test.ts:
+(pass) LspManager pending-stop tombstones > #given a slow-stopping client evicted at the resident cap #when the evicted root is re-acquired while the stop is pending #then the replacement spawns only after the old client stopped [102.53ms]
+(pass) LspManager pending-stop tombstones > #given an invalidated client whose stop is still pending #when the same root is re-acquired #then the replacement spawns only after the invalidated client stopped [102.42ms]
+(pass) LspManager pending-stop tombstones > #given a client whose initialization failed while its stop is pending #when another getClient races the stop #then the replacement spawns only after the failed client stopped [104.13ms]
+(pass) LspManager dead-client respawn budget > #given a crash-looping client that is dead on every acquisition #when getClient is called repeatedly #then respawn attempts stay within the retry budget [2.69ms]
+(pass) LspManager dead-client respawn budget > #given the respawn budget is exhausted #when getClient is called again #then it rejects with a budget error instead of respawning [2.45ms]
+(pass) LspManager dead-client respawn budget > #given the budget was exhausted but the cooldown elapsed and the server recovered #when getClient is called #then it spawns again and resets the budget on a healthy generation [3.65ms]
+
+packages/lsp-core/src/post-edit/orchestration.test.ts:
+(pass) collectPostEditDiagnostics > #given rendered not_configured text #when the same extension is checked again #then the text is not cached [0.37ms]
+(pass) collectPostEditDiagnostics > #given duplicate edited paths #when diagnostics run #then first seen paths are processed once and blocks stay ordered [0.10ms]
+(pass) collectPostEditDiagnostics > #given many edited paths #when diagnostics run #then concurrency is bounded to four and failures isolate [0.14ms]
+(pass) collectPostEditDiagnostics > #given structured not_configured diagnostics #when cache is reused and reset #then only not_configured is cached [0.13ms]
+(pass) collectPostEditDiagnostics > #given non-not_configured failures #when cache is reused #then every failure retries [0.11ms]
+
+ 157 pass
+ 0 fail
+ 400 expect() calls
+Ran 157 tests across 29 files. [5.06s]
+

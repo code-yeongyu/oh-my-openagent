@@ -1,3 +1,7 @@
+## 2026-09-01 — Defer bind-time reflection reconciliation on scheduler contention
+
+Session-start reflection reconciliation now uses a zero-wait scheduler lock and defers when a sibling session is already scheduling the same memory identity. Normal reflection reservation and completion paths retain their existing serialized wait budget.
+
 ## 2026-08-28 — Pin Senpi 2026.8.28-2 for the shared interactive host hotfix
 
 `packages/omo-native/package.json`, `packages/omo-senpi/package.json`, and the

@@ -7,7 +7,7 @@ import {
   readFileSync,
   unlinkSync,
   writeFileSync,
-} from "node:fs"
+} from "@oh-my-opencode/memory-core/fs"
 import { dirname, join } from "node:path"
 
 import {

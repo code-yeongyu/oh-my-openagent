@@ -51,7 +51,6 @@ export function toCanonicalPath(absolutePath: string): string {
     try {
       canonicalPath = realpathSync.native(absolutePath)
     } catch (canonicalPathError) {
-      canonicalPathError instanceof Error
       canonicalPath = absolutePath
     }
   } else {

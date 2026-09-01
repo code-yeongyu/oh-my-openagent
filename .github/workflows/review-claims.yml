@@ -1,0 +1,267 @@
+name: Review Claims
+
+# Review-claim label automation:
+# - will-review / in-review block merge via the "Review claim gate" required check
+# - labeling one of them auto-requests the labeler as reviewer and clears stale-review
+# - the claim label is removed ONLY when the claimer submits a real review (approve / request changes)
+# - claims idle for 3+ days are swept to stale-review
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted]
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  gate:
+    name: Review claim gate
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: review-claim-gate-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Fail while a review claim label is present
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map((l) => l.name);
+            const claims = labels.filter((l) => l === 'will-review' || l === 'in-review');
+            if (claims.length > 0) {
+              core.setFailed(`Merge blocked: active review claim label(s): ${claims.join(', ')}. The claimer must submit their review (approve or request changes) to release the claim.`);
+            } else {
+              core.info('No active review claim labels. Gate is green.');
+            }
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Review claim gate"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Job status | ${{ job.status }} |"
+            echo "| PR | #${{ github.event.pull_request.number }} |"
+            echo "| Event | ${{ github.event.action }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  claim:
+    name: Register claimer as reviewer
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action == 'labeled' &&
+      (github.event.label.name == 'will-review' || github.event.label.name == 'in-review')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request review from the claimer and clear stale-review
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const claimer = context.payload.sender.login;
+            const { owner, repo } = context.repo;
+            if (pr.labels.some((l) => l.name === 'stale-review')) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: 'stale-review' })
+                .then(() => core.info('Removed stale-review: superseded by a fresh claim.'))
+                .catch((e) => core.info(`stale-review removal skipped: ${e.message}`));
+            }
+            if (context.payload.sender.type === 'Bot') {
+              core.info(`Label applied by bot ${claimer}; skipping reviewer request.`);
+              return;
+            }
+            if (claimer === pr.user.login) {
+              core.info('Claimer is the PR author; skipping self review request.');
+              return;
+            }
+            const requested = (pr.requested_reviewers ?? []).map((r) => r.login);
+            if (requested.includes(claimer)) {
+              core.info(`${claimer} is already a requested reviewer.`);
+              return;
+            }
+            await github.rest.pulls.requestReviewers({ owner, repo, pull_number: pr.number, reviewers: [claimer] });
+            core.info(`Requested review from claimer ${claimer}.`);
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Review claim registered"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Job status | ${{ job.status }} |"
+            echo "| PR | #${{ github.event.pull_request.number }} |"
+            echo "| Label | ${{ github.event.label.name }} |"
+            echo "| Claimer | ${{ github.event.sender.login }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release-claim:
+    name: Release claim on claimer review
+    if: >-
+      github.event_name == 'pull_request_review' &&
+      (github.event.review.state == 'approved' || github.event.review.state == 'changes_requested')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Remove claim labels owned by this reviewer
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const CLAIMS = ['will-review', 'in-review'];
+            const pr = context.payload.pull_request;
+            const reviewer = context.payload.review.user.login;
+            const { owner, repo } = context.repo;
+            const present = pr.labels.map((l) => l.name).filter((n) => CLAIMS.includes(n));
+            if (present.length === 0) {
+              core.info('No claim labels on this PR.');
+              return;
+            }
+            const events = await github.paginate(github.rest.issues.listEventsForTimeline, {
+              owner, repo, issue_number: pr.number, per_page: 100,
+            });
+            const latestLabeler = {};
+            for (const ev of events) {
+              if (ev.event === 'labeled' && ev.label && CLAIMS.includes(ev.label.name)) {
+                latestLabeler[ev.label.name] = ev.actor ? ev.actor.login : undefined;
+              }
+            }
+            let removedAny = false;
+            for (const name of present) {
+              if (latestLabeler[name] === reviewer) {
+                try {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name });
+                  core.info(`Removed ${name}: claimer ${reviewer} submitted their review.`);
+                  removedAny = true;
+                } catch (e) {
+                  if (e.status === 403) {
+                    core.warning(`Token is read-only in this PR context; the hourly sweep will release ${name} instead.`);
+                  } else {
+                    throw e;
+                  }
+                }
+              } else {
+                core.info(`Kept ${name}: claimed by ${latestLabeler[name] ?? 'unknown'}, review came from ${reviewer}.`);
+              }
+            }
+            if (removedAny) {
+              const { data: rest } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: pr.number });
+              if (!rest.some((l) => CLAIMS.includes(l.name))) {
+                try {
+                  await github.rest.checks.create({
+                    owner, repo, name: 'Review claim gate', head_sha: pr.head.sha,
+                    status: 'completed', conclusion: 'success',
+                    output: { title: 'No active review claims', summary: 'Claim released by the claimer review; merge unblocked.' },
+                  });
+                  core.info('Refreshed the Review claim gate check to success.');
+                } catch (e) {
+                  core.warning(`Gate check refresh skipped: ${e.message}`);
+                }
+              }
+            }
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Review claim release"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Job status | ${{ job.status }} |"
+            echo "| PR | #${{ github.event.pull_request.number }} |"
+            echo "| Reviewer | ${{ github.event.review.user.login }} |"
+            echo "| Review state | ${{ github.event.review.state }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  stale-sweep:
+    name: Sweep stale review claims
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Move 3+ day old claims to stale-review
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const CLAIMS = ['will-review', 'in-review'];
+            const STALE = 'stale-review';
+            const MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+            const { owner, repo } = context.repo;
+            const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
+            for (const pr of prs) {
+              const names = pr.labels.map((l) => l.name);
+              const present = names.filter((n) => CLAIMS.includes(n));
+              if (present.length === 0) continue;
+              const events = await github.paginate(github.rest.issues.listEventsForTimeline, {
+                owner, repo, issue_number: pr.number, per_page: 100,
+              });
+              const latest = {};
+              for (const ev of events) {
+                if (ev.event === 'labeled' && ev.label && CLAIMS.includes(ev.label.name)) {
+                  latest[ev.label.name] = { actor: ev.actor ? ev.actor.login : undefined, at: Date.parse(ev.created_at) };
+                }
+              }
+              const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number: pr.number, per_page: 100 });
+              const now = Date.now();
+              let removedAny = false;
+              for (const name of present) {
+                const info = latest[name];
+                if (!info) continue;
+                const reviewedSince = reviews.some((r) =>
+                  r.user && r.user.login === info.actor &&
+                  Date.parse(r.submitted_at) > info.at &&
+                  (r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED'));
+                if (reviewedSince) {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name })
+                    .catch((e) => core.info(`PR #${pr.number}: ${name} release skipped: ${e.message}`));
+                  core.info(`PR #${pr.number}: released ${name} — claimer ${info.actor} already reviewed (backstop for restricted-token contexts).`);
+                  continue;
+                }
+                if (now - info.at < MAX_AGE_MS) continue;
+                await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name })
+                  .catch((e) => core.info(`PR #${pr.number}: ${name} removal skipped: ${e.message}`));
+                removedAny = true;
+                core.info(`PR #${pr.number}: removed stale ${name} (claimed by ${info.actor ?? 'unknown'}).`);
+              }
+              if (removedAny && !names.includes(STALE)) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [STALE] });
+                core.info(`PR #${pr.number}: applied ${STALE}.`);
+              }
+              const { data: rest } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: pr.number });
+              if (!rest.some((l) => CLAIMS.includes(l.name))) {
+                try {
+                  await github.rest.checks.create({
+                    owner, repo, name: 'Review claim gate', head_sha: pr.head.sha,
+                    status: 'completed', conclusion: 'success',
+                    output: { title: 'No active review claims', summary: 'Claims cleared by the sweep; merge unblocked.' },
+                  });
+                  core.info(`PR #${pr.number}: refreshed the Review claim gate check to success.`);
+                } catch (e) {
+                  core.warning(`PR #${pr.number}: gate check refresh skipped: ${e.message}`);
+                }
+              }
+            }
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Stale review claim sweep"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Job status | ${{ job.status }} |"
+            echo "| Trigger | ${{ github.event_name }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

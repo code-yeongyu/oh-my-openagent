@@ -10,6 +10,7 @@ export const ULW_LOOP_HELP = `Usage:
   omo-agent-toolkit ulw-loop complete-goals [--retry-failed] [--json]
   omo-agent-toolkit ulw-loop criteria --goal-id <id> [--json]
   omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass|fail|blocked --evidence "..." [--notes "..."] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --print-template [--goal-id <id>] [--json]
   omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete|failed|blocked --evidence "..." --codex-goal-json <...> [--quality-gate-json <...>] [--no-advance] [--json]
   omo-agent-toolkit ulw-loop steer --kind <kind> ... --evidence "..." --rationale "..." [--proposals-json <json-or-path>] [--json]
   omo-agent-toolkit ulw-loop add-goal --title "..." --objective "..." [--json]

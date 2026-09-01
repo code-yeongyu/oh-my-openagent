@@ -41,6 +41,20 @@ export async function sendToDagNode(
   if (node === undefined) {
     throw new DagNodeControlError({ code: "node_not_found", message: `unknown dag node "${nodeId}"`, runId, nodeIds: [nodeId] })
   }
+  // #7412 defect 2: a completed or cancelled run is settled evidence. Reviving a child here
+  // would journal running nodes under a terminal run - a checkpoint no recovery path can ever
+  // claim again (resume claims only "paused" runs). Failed runs stay sendable: revive is the
+  // documented remedy for a failed node whose child is still resident.
+  if (record.status === "completed" || record.status === "cancelled") {
+    throw new DagNodeControlError({
+      code: "node_not_continuable",
+      message: record.status === "completed"
+        ? `dag run "${runId}" already completed; node "${nodeId}" cannot be steered or revived. Amend the definition or start a new run.`
+        : `dag run "${runId}" was cancelled; node "${nodeId}" cannot be steered or revived. Retry the node to run it again.`,
+      runId,
+      nodeIds: [nodeId],
+    })
+  }
   const taskId = node.taskId
   if (taskId === undefined) {
     throw new DagNodeControlError({

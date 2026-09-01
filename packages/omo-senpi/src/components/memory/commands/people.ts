@@ -6,7 +6,7 @@
 // is delegated to the palace collector so the panel and this command share one parser.
 // Output is read-only and is pushed through the notify seam, never into model context.
 
-import { readFile } from "node:fs/promises"
+import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import type { ObservationGroup, PeopleLimits } from "@oh-my-opencode/memory-core"

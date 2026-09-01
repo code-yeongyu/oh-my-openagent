@@ -5,6 +5,7 @@ import type { PreToolUsePayload } from "./codex-hook.js";
 import { parsePreToolUsePayload } from "./codex-hook.js";
 import { isFinalRunCompletionCandidate } from "./goal-status.js";
 import { ulwLoopAttemptEvidenceDir, ulwLoopDir } from "./paths.js";
+import { GATE_REVIEWER_AGENT_NAMES, resolveToolkitSurface } from "./surface.js";
 import type { UlwLoopPlan } from "./types.js";
 
 // spawn_agent = v1; collaborationspawn_agent = the delimiter-free flattened v2
@@ -12,7 +13,7 @@ import type { UlwLoopPlan } from "./types.js";
 // dotted token observed live in the task-1 probe (hook-tool-tokens.txt).
 const SPAWN_TOOL_TOKENS = new Set(["spawn_agent", "collaborationspawn_agent", "collaboration.spawn_agent"]);
 const DEFAULT_FANOUT_LIMIT = 60;
-const GATE_MESSAGE_PATTERN = /lazycodex-gate-reviewer|final gate review/i;
+const GATE_MESSAGE_PATTERN = /lazycodex-gate-reviewer|omo-senpi-gate-reviewer|final gate review/i;
 
 export function applySpawnGuards(payload: PreToolUsePayload): string {
 	if (payload.hook_event_name !== "PreToolUse" || !SPAWN_TOOL_TOKENS.has(payload.tool_name)) return "";
@@ -57,19 +58,26 @@ function missingGateArtifact(payload: PreToolUsePayload, plan: UlwLoopPlan): str
 	if (goal === undefined || goal.status === "complete") return null;
 	if (!goal.successCriteria.every((criterion) => criterion.status === "pass")) return null;
 	const scope = { sessionId: payload.session_id } as const;
+	const surface = resolveToolkitSurface();
+	const requiredArtifacts =
+		surface === "omo-senpi" ? [`${goal.id}-manual-qa.md`] : [`${goal.id}-code-review.md`, `${goal.id}-manual-qa.md`];
 	if (plan.evidenceLayoutVersion === 2) {
 		const attemptDir = ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope);
-		for (const name of [`${goal.id}-code-review.md`, `${goal.id}-manual-qa.md`]) {
+		for (const name of requiredArtifacts) {
 			const relative = `${attemptDir}/${name}`;
 			if (!isNonEmptyFile(join(payload.cwd, relative))) return relative;
 		}
 		return null;
 	}
 	const flatReport = `.omo/evidence/${goal.id}-code-review.md`;
-	if (!isNonEmptyFile(join(payload.cwd, flatReport))) return flatReport;
+	if (surface !== "omo-senpi" && !isNonEmptyFile(join(payload.cwd, flatReport))) return flatReport;
+	if (surface === "omo-senpi") {
+		const manualQa = `.omo/evidence/${goal.id}-manual-qa.md`;
+		return isNonEmptyFile(join(payload.cwd, manualQa)) ? null : manualQa;
+	}
 	// v1 manual-QA approximation: any other non-empty evidence file counts.
 	if (!hasOtherEvidenceFile(join(payload.cwd, ".omo", "evidence"), `${goal.id}-code-review.md`))
-		return `.omo/evidence/<any manual-QA artifact besides ${goal.id}-code-review.md>`;
+		return `.omo/evidence/${goal.id}-manual-qa.md`;
 	return null;
 }
 
@@ -77,7 +85,7 @@ function isGateReviewerSpawn(toolInput: unknown): boolean {
 	if (typeof toolInput !== "object" || toolInput === null) return false;
 	const record = toolInput as Record<string, unknown>;
 	const agentType = record["agent_type"];
-	if (typeof agentType === "string") return agentType === "lazycodex-gate-reviewer";
+	if (typeof agentType === "string") return GATE_REVIEWER_AGENT_NAMES.has(agentType);
 	const message = record["message"];
 	return typeof message === "string" && GATE_MESSAGE_PATTERN.test(message);
 }

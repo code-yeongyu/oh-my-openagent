@@ -71,5 +71,5 @@ docs/
 ## ANTI-PATTERNS
 
 - Never add a doc to `guide/` or `reference/` without a `WHERE TO LOOK` entry above.
-- Never paste agent-facing system prompts here. Those live in [`packages/omo-opencode/src/agents/`](../packages/omo-opencode/src/agents/) or [`packages/omo-opencode/src/features/builtin-skills/`](../packages/omo-opencode/src/features/builtin-skills/).
+- Never paste agent-facing system prompts here. Those live in [`packages/omo-opencode/src/agents/`](../packages/omo-opencode/src/agents/) or [`packages/skills-loader-core/src/features/builtin-skills/`](../packages/skills-loader-core/src/features/builtin-skills/).
 - Never document changing config keys without also updating [`packages/omo-opencode/src/config/schema/`](../packages/omo-opencode/src/config/schema/) and re-running `bun run build:schema`.

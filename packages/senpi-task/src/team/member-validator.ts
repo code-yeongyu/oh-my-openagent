@@ -1,6 +1,6 @@
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
-import { CURATED_READONLY_AGENT_NAMES } from "../agents/builtin"
+import { CURATED_READONLY_AGENT_NAMES, ULW_REVIEWER_AGENT_NAMES } from "../agents/builtin"
 import { SenpiTeamSpecError } from "./errors"
 
 /**
@@ -41,6 +41,14 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
     if (CURATED_READONLY_AGENT_NAMES.has(member.subagent_type)) {
       throw new SenpiTeamSpecError(
         `curated read-only agent "${member.subagent_type}" cannot be a team member; delegate via the task tool instead`,
+        "UNKNOWN_SUBAGENT_TYPE",
+        spec.name,
+      )
+    }
+
+    if (ULW_REVIEWER_AGENT_NAMES.has(member.subagent_type)) {
+      throw new SenpiTeamSpecError(
+        `ulw reviewer agent "${member.subagent_type}" cannot be a team member; process-mode members drop reviewer instructions and tool allowlists, so delegate via the task tool instead`,
         "UNKNOWN_SUBAGENT_TYPE",
         spec.name,
       )

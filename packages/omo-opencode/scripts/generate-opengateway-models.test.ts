@@ -188,6 +188,26 @@ describe("buildOpenGatewayCatalog", () => {
     })
   })
 
+  test("registers kimi-k3-ultrafast with a 256k default context from the override table", () => {
+    // given moonshotai/kimi-k3-ultrafast, absent from models.dev and enriched only by the override table
+    const response: OpenGatewayCatalogResponse = {
+      data: [
+        {
+          id: "moonshotai/kimi-k3-ultrafast",
+          status: "active",
+          endpoints: ["chat_completions"],
+          modalities: { input: ["text", "image"], output: ["text"] },
+        },
+      ],
+    }
+
+    // when the catalog is built with no models.dev metadata for it
+    const catalog = buildOpenGatewayCatalog(response, {})
+
+    // then the override registers the 256k default context alongside the published output limit
+    expect(catalog["moonshotai/kimi-k3-ultrafast"]?.limit).toEqual({ context: 262144, output: 131072 })
+  })
+
   test("excludes a model whose models.dev entry is not tool-capable", () => {
     // given openai/gpt-3.5-turbo with tool_call false
     // when the catalog is built

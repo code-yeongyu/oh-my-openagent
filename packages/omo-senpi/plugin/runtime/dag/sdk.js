@@ -2,9 +2,9 @@
 // OMO_DAG_SDK_ROOT. It must stay import-free: the eval worker has no node_modules on its resolver
 // path, so anything this file imports would break the cell at load time.
 //
-// Every call funnels through globalThis.tool.dag({ action, ... }), the proxy the JS kernel installs
+// Every call funnels through globalThis.tool.workflow({ action, ... }), the proxy the JS kernel installs
 // (senpi packages/senpi-codemode/src/kernels/js/worker-runtime.js). Python cells cannot import ESM
-// and call tool.dag({...}) directly instead; there is no Python counterpart to this file.
+// and call tool.workflow({...}) directly instead; there is no Python counterpart to this file.
 
 // The dag tool reports a refusal in-band: it resolves with { details: { kind: "error", error: { code,
 // message, ... } } } and no run_id (see packages/omo-senpi/src/components/task/dag-tool-contract.ts).
@@ -33,10 +33,10 @@ function firstContentText(response) {
 
 async function callDag(args) {
   const proxy = globalThis.tool
-  if (proxy === undefined || proxy === null || typeof proxy.dag !== "function") {
+  if (proxy === undefined || proxy === null || typeof proxy.workflow !== "function") {
     throw new Error("The dag sdk requires the eval kernel's global `tool` proxy; it is unavailable here.")
   }
-  return throwIfToolError(args.action, await proxy.dag(args))
+  return throwIfToolError(args.action, await proxy.workflow(args))
 }
 
 class DagDefinitionBuilder {

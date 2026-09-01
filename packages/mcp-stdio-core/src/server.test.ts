@@ -362,6 +362,85 @@ describe("parent watchdog", () => {
   })
 })
 
+describe("idle timeout", () => {
+  test("#given a live parent that abandons stdin without closing it #when the idle timeout elapses #then the server settles instead of parking on the open pipe", async () => {
+    // The parent is alive and still holds the write end, so stdin never emits
+    // 'end' and the parent watchdog never fires. Only the idle timeout can end
+    // this server, and it must tear the read loop down rather than flag it.
+    const input = new PassThrough()
+    const output = new PassThrough()
+    let idleFired = false
+
+    const served = runJsonRpcStdioServer({
+      input,
+      output,
+      handlerOptions: undefined,
+      idleTimeoutMs: 20,
+      handler: async () => successResponse("idle", { acknowledged: true }),
+      onIdleTimeout: () => {
+        idleFired = true
+      },
+    })
+
+    const outcome = await Promise.race([
+      served.then(() => "settled" as const),
+      Bun.sleep(1_000).then(() => "hung" as const),
+    ])
+
+    expect(idleFired).toBe(true)
+    expect(outcome).toBe("settled")
+  })
+
+  test("#given a real child whose parent holds stdin open and never writes #when the idle timeout elapses #then the child process exits", async () => {
+    // The in-process test above only proves the promise settles. A settled loop
+    // still leaves a live process if anything keeps the event loop alive, so
+    // assert the exit itself — the symptom users actually observe.
+    const child = spawnIdleChild(300)
+    try {
+      const outcome = await Promise.race([
+        child.exited.then(() => "exited" as const),
+        Bun.sleep(5_000).then(() => "alive" as const),
+      ])
+      expect(outcome).toBe("exited")
+    } finally {
+      killQuietly(child.pid)
+    }
+  })
+
+  test("#given an explicitly zero idle timeout #when the server idles on a held-open pipe #then no idle timer is created", async () => {
+    // Callers on no-respawn hosts (codex: lsp proxy, git_bash, the codegraph
+    // unavailable stub) pin idleTimeoutMs: 0 and rely on zero meaning "no
+    // timer at all": the loop must park until stdin closes or the parent
+    // dies — never be torn down by a default timer that became live in #6548.
+    const input = new PassThrough()
+    const output = new PassThrough()
+    const events: string[] = []
+    const served = runJsonRpcStdioServer({
+      input,
+      output,
+      handlerOptions: undefined,
+      idleTimeoutMs: 0,
+      handler: async () => successResponse("idle", { acknowledged: true }),
+      log: (event) => {
+        events.push(event)
+      },
+    })
+
+    const outcome = await Promise.race([
+      served.then(() => "settled" as const),
+      Bun.sleep(500).then(() => "parked" as const),
+    ])
+    // Teardown of the held-open pipe is test cleanup; keep the rejection it
+    // provokes handled so the suite cannot fail on an unhandled error.
+    served.catch(() => {})
+    input.destroy()
+
+    expect(outcome).toBe("parked")
+    expect(events).toContain("stdio_started")
+    expect(events).not.toContain("idle_timeout")
+  })
+})
+
 describe("isProcessAlive", () => {
   test("#given a running process #when probed #then it reports alive", () => {
     expect(isProcessAlive(process.pid)).toBe(true)
@@ -404,10 +483,14 @@ describe("isProcessAlive", () => {
   })
 })
 
-function spawnWatchdogChild(parentPid: number, pollIntervalMs: number) {
+// Each teardown-path test needs a child running the real server over its own
+// stdio, and only the config driving that path differs. The boilerplate lives
+// here so the paths cannot drift; a caller supplies just the lines that make
+// its case, kept verbatim so the child's config still reads at the call site.
+function buildServerScript(config: string, trailer = ""): string {
   const serverUrl = new URL("./server.ts", import.meta.url).href
   const responsesUrl = new URL("./responses.ts", import.meta.url).href
-  const script = `
+  return `
     import { successResponse } from ${JSON.stringify(responsesUrl)};
     import { runJsonRpcStdioServer } from ${JSON.stringify(serverUrl)};
 
@@ -415,8 +498,27 @@ function spawnWatchdogChild(parentPid: number, pollIntervalMs: number) {
       input: process.stdin,
       output: process.stdout,
       handlerOptions: undefined,
-      idleTimeoutMs: 0,
       handler: async (input) => successResponse(input.id, { acknowledged: true }),
+${config}
+    });
+${trailer}
+  `
+}
+
+// Omitting env inherits the parent environment, so passing process.env through
+// unchanged is what the no-env case already did.
+function spawnServerChild(script: string, env?: Record<string, string>) {
+  return Bun.spawn([process.execPath, "-e", script], {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+    env: env ? { ...process.env, ...env } : process.env,
+  })
+}
+
+function spawnWatchdogChild(parentPid: number, pollIntervalMs: number) {
+  const script = buildServerScript(
+    `      idleTimeoutMs: 0,
       log: (event, fields) => {
         process.stderr.write(JSON.stringify({ event, ...(fields ?? {}) }) + "\\n");
       },
@@ -428,19 +530,12 @@ function spawnWatchdogChild(parentPid: number, pollIntervalMs: number) {
         onPoll: (alive) => {
           process.stderr.write(JSON.stringify({ event: "parent_poll", alive }) + "\\n");
         },
-      },
-    });
-    process.stderr.write(JSON.stringify({ event: "server_settled" }) + "\\n");
-  `
-  return Bun.spawn([process.execPath, "-e", script], {
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-    env: {
-      ...process.env,
-      WATCHDOG_PARENT_PID: String(parentPid),
-      WATCHDOG_POLL_MS: String(pollIntervalMs),
-    },
+      },`,
+    `    process.stderr.write(JSON.stringify({ event: "server_settled" }) + "\\n");`,
+  )
+  return spawnServerChild(script, {
+    WATCHDOG_PARENT_PID: String(parentPid),
+    WATCHDOG_POLL_MS: String(pollIntervalMs),
   })
 }
 
@@ -503,6 +598,13 @@ async function waitForStderrEvent(
   event: string,
 ): Promise<void> {
   await withTimeout(nextEventLine(lines, event), CHILD_EVENT_TIMEOUT_MS, `child event ${event}`)
+}
+
+function spawnIdleChild(idleTimeoutMs: number) {
+  // stdin stays piped and is never written to or closed: the test process is a
+  // live parent holding the write end, which is the case no other teardown
+  // path covers.
+  return spawnServerChild(buildServerScript(`      idleTimeoutMs: ${idleTimeoutMs},`))
 }
 
 function killQuietly(pid: number): void {

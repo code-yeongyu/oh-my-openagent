@@ -2,7 +2,7 @@
 // The graph is DERIVED on every read and never stored; card parsing is delegated to
 // memory-core's people/format module so the palace and /people share one parser.
 
-import { readFile, readdir, stat } from "node:fs/promises"
+import { readFile, readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {
