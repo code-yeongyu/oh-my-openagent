@@ -1,0 +1,87 @@
+RED
+Command: bun test packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts:
+(fail) memory run supervisor IC-8 containment > #given the injected posix branch #when the absolute deadline instants are advanced #then graceful and hard tree termination use those instants [5002.71ms]
+  ^ this test timed out after 5000ms.
+
+# Unhandled error between tests
+-------------------------------
+18 |   await new Promise<void>((resolve, reject) => {
+19 |     let settled = false
+20 |     const watcher = watch(dirname(path), (_event, changed) => {
+21 |       if (changed === basename(path) && existsSync(path)) finish()
+22 |     })
+23 |     const timeout = setTimeout(() => finish(new Error(`waited ${timeoutMs}ms for ${path}`)), timeoutMs)
+                                                     ^
+error: waited 5000ms for /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-run-supervisor-ic8-hZ6USU/child-started.json
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts:23:49)
+-------------------------------
+
+(fail) memory run supervisor IC-8 containment > #given the injected posix branch and a released child #when the supervisor dies abruptly #then the bootstrap alone enforces the persisted deadline [5001.11ms]
+  ^ this test timed out after 5000ms.
+
+# Unhandled error between tests
+-------------------------------
+18 |   await new Promise<void>((resolve, reject) => {
+19 |     let settled = false
+20 |     const watcher = watch(dirname(path), (_event, changed) => {
+21 |       if (changed === basename(path) && existsSync(path)) finish()
+22 |     })
+23 |     const timeout = setTimeout(() => finish(new Error(`waited ${timeoutMs}ms for ${path}`)), timeoutMs)
+                                                     ^
+error: waited 5000ms for /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-run-supervisor-ic8-MeUgVT/child-started.json
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts:23:49)
+-------------------------------
+
+(fail) memory run supervisor IC-8 containment > #given the injected win32 branch #when the absolute deadline instants are advanced #then graceful and hard tree termination use those instants [5001.43ms]
+  ^ this test timed out after 5000ms.
+
+# Unhandled error between tests
+-------------------------------
+18 |   await new Promise<void>((resolve, reject) => {
+19 |     let settled = false
+20 |     const watcher = watch(dirname(path), (_event, changed) => {
+21 |       if (changed === basename(path) && existsSync(path)) finish()
+22 |     })
+23 |     const timeout = setTimeout(() => finish(new Error(`waited ${timeoutMs}ms for ${path}`)), timeoutMs)
+                                                     ^
+error: waited 5000ms for /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-run-supervisor-ic8-4psNtZ/child-started.json
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts:23:49)
+-------------------------------
+
+(fail) memory run supervisor IC-8 containment > #given the injected win32 branch and a released child #when the supervisor dies abruptly #then the bootstrap alone enforces the persisted deadline [5001.30ms]
+  ^ this test timed out after 5000ms.
+
+ 0 pass
+ 4 fail
+ 3 errors
+Ran 4 tests across 1 file. [20.10s]
+
+GREEN
+Command: bun test packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.integration.test.ts packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.integration.test.ts:
+(pass) memory run supervisor > #given a fixture launch manifest #when supervised #then identity is durable before the command starts and the outcome is published once [128.28ms]
+(pass) memory run supervisor > #given a detached supervisor launched by a parent #when the parent is killed #then the supervisor still publishes the child outcome [178.60ms]
+(pass) memory run supervisor > #given a bootstrap waiting for release #when its parent pipe closes #then it exits without starting the manifest command [16.76ms]
+(pass) memory run supervisor > #given a released child #when the supervisor is killed abruptly #then the recorded live process group can be terminated [147.20ms]
+(pass) memory run supervisor > #given a child that exits during termination grace #when the absolute deadline arrives #then timeout is recorded without escalation [190.96ms]
+(pass) memory run supervisor > #given a child that ignores SIGTERM #when termination grace expires #then the process group is killed [247.87ms]
+
+packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts:
+(pass) memory run supervisor IC-8 containment > #given the injected posix branch #when the absolute deadline instants are advanced #then graceful and hard tree termination use those instants [282.37ms]
+(pass) memory run supervisor IC-8 containment > #given the injected posix branch and a released child #when the supervisor dies abruptly #then the bootstrap alone enforces the persisted deadline [184.10ms]
+(pass) memory run supervisor IC-8 containment > #given the injected win32 branch #when the absolute deadline instants are advanced #then graceful and hard tree termination use those instants [310.26ms]
+(pass) memory run supervisor IC-8 containment > #given the injected win32 branch and a released child #when the supervisor dies abruptly #then the bootstrap alone enforces the persisted deadline [201.55ms]
+
+ 10 pass
+ 0 fail
+ 33 expect() calls
+Ran 10 tests across 2 files. [2.02s]
+
+Touched-file typecheck:
+Command: bunx tsgo --ignoreConfig --noEmit ... <six touched TypeScript files>
+Touched-file typecheck: PASS (0 diagnostics)

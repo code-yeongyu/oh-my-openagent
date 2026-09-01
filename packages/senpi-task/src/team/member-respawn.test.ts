@@ -1,8 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
+
 import { normalizeSenpiTeamSpec } from "./normalize"
-import { createTeamMemberRespawnLaunchResolver } from "./member-respawn"
+import {
+  TeamMemberRespawnLaunchError,
+  createTeamMemberRespawnLaunchResolver,
+} from "./member-respawn"
 import { createTeam } from "./runtime"
+import { toTeamCoreConfig } from "./runtime-config"
+import { approveShutdown, requestShutdown, type ShutdownOutboundMessage } from "./shutdown"
+import { teamStorageBaseDir } from "./storage"
 import {
   FakeTeamManager,
   cleanupTeamRuntimeTmp,
@@ -104,5 +112,58 @@ describe("createTeamMemberRespawnLaunchResolver", () => {
 
     // when / then
     await expect(resolveLaunch({ ...record, task_id: "st_999999" })).rejects.toThrow("task_mapping_mismatch")
+  })
+
+  test("#given a shutdown-approved team member #when resolved #then reattach is rejected as member_missing and no launch is produced", async () => {
+    // given
+    const stateDir = stateDirConfig(tempProjectDir())
+    const settings = taskSettings()
+    const manager = new FakeTeamManager()
+    const created = await createTeam(
+      normalizeSenpiTeamSpec(
+        { members: [{ name: "alpha", kind: "category", category: "quick", prompt: "task alpha" }] },
+        "squad",
+      ),
+      "project",
+      {
+        manager,
+        stateDir,
+        taskSettings: settings,
+        leadSessionId: "lead-session",
+        spawnDepth: 1,
+        memberExtension: { entryPath: "/trusted/member-extension.js" },
+      },
+    )
+    const taskId = created.memberTaskIds.alpha
+    if (taskId === undefined) throw new Error("expected alpha task id")
+    const record = manager.get(taskId)
+    if (record === undefined) throw new Error("expected team member record")
+    const config = toTeamCoreConfig(settings, teamStorageBaseDir(stateDir))
+    const sent: ShutdownOutboundMessage[] = []
+    const sendMessage = (message: ShutdownOutboundMessage): Promise<void> => {
+      sent.push(message)
+      return Promise.resolve()
+    }
+    const cancelled: string[] = []
+    const cancelMemberTask = (memberName: string): Promise<void> => {
+      cancelled.push(memberName)
+      return Promise.resolve()
+    }
+    await requestShutdown(created.runtimeState.teamRunId, "alpha", { config, sendMessage })
+    await approveShutdown(created.runtimeState.teamRunId, "alpha", { config, sendMessage, cancelMemberTask })
+    const runtime = await loadRuntimeState(created.runtimeState.teamRunId, config)
+    expect(runtime.members.find((member) => member.name === "alpha")?.status).toBe("shutdown_approved")
+    const resolveLaunch = createTeamMemberRespawnLaunchResolver({
+      stateDir,
+      taskSettings: settings,
+      memberExtension: { entryPath: "/trusted/member-extension.js" },
+    })
+
+    // when
+    const attempt = resolveLaunch(record)
+
+    // then
+    await expect(attempt).rejects.toBeInstanceOf(TeamMemberRespawnLaunchError)
+    await expect(attempt).rejects.toThrow("member_missing")
   })
 })

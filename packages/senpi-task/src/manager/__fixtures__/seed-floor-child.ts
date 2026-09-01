@@ -21,6 +21,7 @@ function record(taskId: string): TaskRecord {
     execution_mode: "in-process",
     model: "test/model",
     name: taskId,
+    notify_on_terminal: false,
     created_at: "2026-07-20T00:00:00.000Z",
     updated_at: "2026-07-20T00:00:00.000Z",
     notification: { run_epoch: 0, notified_epoch: -1 },

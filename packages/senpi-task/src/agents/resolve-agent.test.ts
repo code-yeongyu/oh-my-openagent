@@ -45,6 +45,34 @@ function expectResolved(result: ReturnType<typeof resolveAgent>): Extract<typeof
 }
 
 describe("resolveAgent", () => {
+  test("#given an agent with disallowedTools #when resolved #then the denylist rides the persona as toolDenylist", () => {
+    // given
+    const agents = roster({
+      name: "explore",
+      prompt: "Inspect the codebase",
+      disallowedTools: ["bash", "write"],
+    })
+    const models = registry([model("openai", "gpt-5.6-luna-fast")])
+
+    // when
+    const result = expectResolved(resolveAgent("explore", agents, models))
+
+    // then
+    expect(result.toolDenylist).toEqual(["bash", "write"])
+  })
+
+  test("#given an agent without disallowedTools #when resolved #then no denylist is forced onto the persona", () => {
+    // given
+    const agents = roster({ name: "explore", prompt: "Inspect the codebase" })
+    const models = registry([model("openai", "gpt-5.6-luna-fast")])
+
+    // when
+    const result = expectResolved(resolveAgent("explore", agents, models))
+
+    // then
+    expect(result.toolDenylist).toBeUndefined()
+  })
+
   test("#given an agent fallback chain and matching live model #when resolved #then it returns agent metadata and persona", () => {
     // given
     const agents = roster({

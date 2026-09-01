@@ -1,0 +1,4 @@
+$ awk pure-LOC e2e-happy.test.ts
+     344
+
+$ git diff --check

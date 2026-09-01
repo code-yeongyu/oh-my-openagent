@@ -30,6 +30,7 @@ function completedTeamRecord(): TaskRecord {
       display: "vendor-b/fallback-model",
     },
     fallback_models: [],
+    notify_on_terminal: false,
     status: "completed",
     residency_state: "resident",
     created_at: "2026-07-28T08:00:00.000Z",
@@ -56,6 +57,13 @@ describe("team fallback notification", () => {
         list: () => ({ records: [...records.values()], diagnostics: [] }),
         replace: (next: TaskRecord) => {
           records.set(next.task_id, next)
+        },
+        mutate: (taskId: string, mutation: (record: TaskRecord) => TaskRecord) => {
+          const current = records.get(taskId)
+          if (current === undefined) return null
+          const next = mutation(current)
+          if (next !== current) records.set(taskId, next)
+          return next
         },
         appendEvent: (_taskId: string, _event: PersistedTaskEvent) => "events.jsonl",
       },

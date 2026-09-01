@@ -50,6 +50,11 @@ export function createCompletionObservingStore(backing: TaskRecordStore, deps: C
       }
       return result
     },
+    // TTL expunge is not a terminal transition - forward the two-phase store surface untouched so
+    // lifecycle.cleanupExpiredRecords works through the wrapper (no notify on tombstone/expunge).
+    tombstoneIfExpired: (taskId, shouldRetain) => backing.tombstoneIfExpired(taskId, shouldRetain),
+    completeExpunge: (taskId) => backing.completeExpunge(taskId),
+    listExpunging: () => backing.listExpunging(),
   }
 }
 

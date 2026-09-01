@@ -256,7 +256,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Grok", modelID: "grok-4.3", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
       { name: "Kimi (kimi)", modelID: "kimi-k2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "GLM", modelID: "glm-5.2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -361,6 +361,37 @@ describe("resolveCompatibleModelSettings", () => {
       }
     }
   })
+
+  test("GLM maps generic reasoningEffort levels to Z.AI high and max values", () => {
+    const cases = [
+      { requested: "low", expected: "high" },
+      { requested: "medium", expected: "high" },
+      { requested: "high", expected: "high" },
+      { requested: "xhigh", expected: "max" },
+      { requested: "max", expected: "max" },
+    ]
+
+    for (const { requested, expected } of cases) {
+      const result = resolveCompatibleModelSettings({
+        providerID: "zai-coding-plan",
+        modelID: "glm-5.2",
+        desired: { reasoningEffort: requested },
+      })
+
+      expect(result.reasoningEffort).toBe(expected)
+      expect(result.changes).toEqual(
+        requested === expected
+          ? []
+          : [{
+              field: "reasoningEffort",
+              from: requested,
+              to: expected,
+              reason: "unsupported-by-model-family",
+            }],
+      )
+    }
+  })
+
   test("DeepSeek keeps canonical high and max reasoningEffort values", () => {
     for (const reasoningEffort of ["high", "max"]) {
       const result = resolveCompatibleModelSettings({
@@ -550,6 +581,110 @@ describe("resolveCompatibleModelSettings", () => {
         reason: "unsupported-by-model-metadata",
       },
     ])
+  })
+
+  test.each([
+    ["anthropic", "claude-opus-4-8"],
+    ["openai", "o3"],
+  ])("keeps temperature for %s/%s when capability metadata explicitly enables it", (providerID, modelID) => {
+    const result = resolveCompatibleModelSettings({
+      providerID,
+      modelID,
+      desired: { temperature: 0.7 },
+      capabilities: { supportsTemperature: true },
+    })
+
+    expect(result.temperature).toBe(0.7)
+    expect(result.changes).toEqual([])
+  })
+
+  test("drops temperature for Claude Opus 4.8 without capability metadata", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "anthropic",
+      modelID: "anthropic/claude-opus-4-8",
+      desired: { temperature: 0.1 },
+    })
+
+    expect(result.temperature).toBeUndefined()
+    expect(result.changes).toEqual([
+      {
+        field: "temperature",
+        from: "0.1",
+        to: undefined,
+        reason: "unsupported-by-model-family",
+      },
+    ])
+  })
+
+  // A reasoning suffix makes the model id miss the capability snapshot, so `supportsTemperature`
+  // arrives undefined and only family detection can decide. This is the case that still leaks
+  // temperature into the outgoing request; the unsuffixed id is already snapshot-backed.
+  test("drops temperature for a reasoning-suffixed Claude Opus 4.8 id with no capability metadata", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "azure-anthropic",
+      modelID: "azure-anthropic/claude-opus-4-8-thinking",
+      desired: { temperature: 0.1 },
+    })
+
+    expect(result.temperature).toBeUndefined()
+    expect(result.changes).toEqual([
+      {
+        field: "temperature",
+        from: "0.1",
+        to: undefined,
+        reason: "unsupported-by-model-family",
+      },
+    ])
+  })
+
+  // Capability metadata always wins over family detection: an explicit `true` must be honored
+  // even for a family that would otherwise be assumed temperature-free.
+  test("keeps temperature when capability metadata explicitly supports it", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "azure-anthropic",
+      modelID: "azure-anthropic/claude-opus-4-8-thinking",
+      desired: { temperature: 0.1 },
+      capabilities: { supportsTemperature: true },
+    })
+
+    expect(result.temperature).toBe(0.1)
+    expect(result.changes).toEqual([])
+  })
+
+  test.each([
+    "openai/o3:high",
+    "openai/o3(high)",
+    "openai/o3 high",
+  ])("drops temperature for reasoning-suffixed o-series model %s", (modelID) => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID,
+      desired: { temperature: 0.1 },
+    })
+
+    expect(result.temperature).toBeUndefined()
+    expect(result.changes).toEqual([
+      {
+        field: "temperature",
+        from: "0.1",
+        to: undefined,
+        reason: "unsupported-by-model-family",
+      },
+    ])
+  })
+
+  test.each([
+    "openai/o3-deep-research",
+    "openai/o4-mini-deep-research",
+  ])("keeps temperature for the deep-research exception %s", (modelID) => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID,
+      desired: { temperature: 0.1 },
+    })
+
+    expect(result.temperature).toBe(0.1)
+    expect(result.changes).toEqual([])
   })
 
   test("drops thinking when model capabilities say it is unsupported", () => {

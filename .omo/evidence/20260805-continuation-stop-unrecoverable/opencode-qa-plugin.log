@@ -1,0 +1,45 @@
+[2026-08-05T09:32:20.836Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-qa-sandbox3\\project"}
+[2026-08-05T09:32:21.040Z] [config-migration] startup completed {"journalResumed":false,"migratedFrom":[],"skippedConflictCount":0}
+[2026-08-05T09:32:21.088Z] lsp-daemon stale-version sweep skipped: current lsp-daemon version is unknown 
+[2026-08-05T09:32:21.092Z] [live-server-route] registered {"directory":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-qa-sandbox3\\project","hasServerUrl":true,"registrationCount":1}
+[2026-08-05T09:32:21.125Z] [tmux-session-manager] initialized {"configEnabled":false,"tmuxConfig":{"enabled":false,"layout":"main-vertical","main_pane_size":60,"main_pane_min_width":120,"agent_pane_min_width":40,"isolation":"inline"},"projectDirectory":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-qa-sandbox3\\project","serverUrl":"http://localhost:4096/"}
+[2026-08-05T09:32:21.720Z] [tool-registry] Built tool registry {"totalTools":13,"teamModeEnabled":false,"teamToolCount":0}
+[2026-08-05T09:32:23.206Z] directory-agents-injector auto-disabled due to native OpenCode support {"currentVersion":"1.18.13","nativeVersion":"1.1.37"}
+[2026-08-05T09:32:23.296Z] Loaded 0 plugins with 0 commands, 0 skills, 0 agents, 0 MCP servers 
+[2026-08-05T09:32:23.781Z] [agent-source-loader] Agent sources loaded {"user":0,"project":0,"opencodeGlobal":0,"opencodeProject":0,"plugin":0,"agentDefinitions":0,"opencodeConfig":0,"config":0}
+[2026-08-05T09:32:23.783Z] [connected-providers-cache] Cache file not found {"cacheFile":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-qa-sandbox3\\cache\\oh-my-opencode\\connected-providers.json"}
+[2026-08-05T09:32:23.784Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-05T09:32:23.784Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution 
+[2026-08-05T09:32:23.804Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-05T09:32:23.804Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution 
+[2026-08-05T09:32:23.807Z] [config-handler] agents loaded {"agentKeys":["Sisyphus - ultraworker","Hephaestus - Deep Agent","Prometheus - Plan Builder","Atlas - Plan Executor","build","explore","librarian","Metis - Plan Consultant","Momus - Plan Critic","multimodal-looker","oracle","plan","Sisyphus-Junior"]}
+[2026-08-05T09:32:24.712Z] [config-handler] config handler applied {"agentCount":13,"commandCount":28}
+[2026-08-05T09:32:27.219Z] [connected-providers-cache] Provider-models cache file not found {"cacheFile":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-qa-sandbox3\\cache\\oh-my-opencode\\provider-models.json"}
+[2026-08-05T09:32:29.864Z] [auto-update-checker] Connected providers cache exists, updating in background 
+[2026-08-05T09:32:30.474Z] [connected-providers-cache] Fetched connected providers {"count":2,"providers":["openai","opencode"]}
+[2026-08-05T09:32:30.501Z] [connected-providers-cache] Cache written {"count":2,"updatedAt":"2026-08-05T09:32:30.474Z"}
+[2026-08-05T09:32:30.505Z] [connected-providers-cache] Extracted models from provider list {"providerCount":2,"totalModels":21}
+[2026-08-05T09:32:30.547Z] [connected-providers-cache] Provider-models cache written {"providerCount":2,"updatedAt":"2026-08-05T09:32:30.505Z"}
+[2026-08-05T09:32:30.650Z] [model-capabilities-cache] Cache written {"modelCount":2778,"generatedAt":"2026-08-05T09:32:30.613Z"}
+[2026-08-05T09:32:30.655Z] [auto-update-checker] Plugin not found in config 
+[2026-08-05T09:32:37.088Z] [auto-update-checker] Startup toast shown: v4.19.4 
+[2026-08-05T09:34:41.333Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-qa-sandbox3\\project"}
+[2026-08-05T09:34:41.392Z] [config-migration] startup completed {"journalResumed":false,"migratedFrom":[],"skippedConflictCount":0}
+[2026-08-05T09:34:41.410Z] lsp-daemon stale-version sweep skipped: current lsp-daemon version is unknown 
+[2026-08-05T09:34:41.415Z] [live-server-route] registered {"directory":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-qa-sandbox3\\project","hasServerUrl":true,"registrationCount":1}
+[2026-08-05T09:34:41.431Z] [tmux-session-manager] initialized {"configEnabled":false,"tmuxConfig":{"enabled":false,"layout":"main-vertical","main_pane_size":60,"main_pane_min_width":120,"agent_pane_min_width":40,"isolation":"inline"},"projectDirectory":"C:\\Users\\pss\\AppData\\Local\\Temp\\omo-qa-sandbox3\\project","serverUrl":"http://localhost:4096/"}
+[2026-08-05T09:34:41.907Z] [tool-registry] Built tool registry {"totalTools":13,"teamModeEnabled":false,"teamToolCount":0}
+[2026-08-05T09:34:42.931Z] directory-agents-injector auto-disabled due to native OpenCode support {"currentVersion":"1.18.13","nativeVersion":"1.1.37"}
+[2026-08-05T09:34:42.979Z] Loaded 0 plugins with 0 commands, 0 skills, 0 agents, 0 MCP servers 
+[2026-08-05T09:34:43.164Z] [agent-source-loader] Agent sources loaded {"user":0,"project":0,"opencodeGlobal":0,"opencodeProject":0,"plugin":0,"agentDefinitions":0,"opencodeConfig":0,"config":0}
+[2026-08-05T09:34:43.166Z] [connected-providers-cache] Read cache {"count":2,"updatedAt":"2026-08-05T09:32:30.474Z"}
+[2026-08-05T09:34:43.169Z] [connected-providers-cache] Read provider-models cache {"providerCount":2,"updatedAt":"2026-08-05T09:32:30.505Z"}
+[2026-08-05T09:34:43.170Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":false,"connectedProviders":["openai","opencode"]}
+[2026-08-05T09:34:43.170Z] [fetchAvailableModels] using provider-models cache (whitelist-filtered) 
+[2026-08-05T09:34:43.170Z] [fetchAvailableModels] parsed from provider-models cache {"count":21,"connectedProviders":["openai","opencode"]}
+[2026-08-05T09:34:43.176Z] [isAnyProviderConnected] found model from required provider {"provider":"openai","model":"openai/gpt-5.3-codex-spark"}
+[2026-08-05T09:34:43.179Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":false,"connectedProviders":["openai","opencode"]}
+[2026-08-05T09:34:43.180Z] [fetchAvailableModels] using provider-models cache (whitelist-filtered) 
+[2026-08-05T09:34:43.180Z] [fetchAvailableModels] parsed from provider-models cache {"count":21,"connectedProviders":["openai","opencode"]}
+[2026-08-05T09:34:43.181Z] [config-handler] agents loaded {"agentKeys":["Sisyphus - ultraworker","Hephaestus - Deep Agent","Prometheus - Plan Builder","Atlas - Plan Executor","build","explore","librarian","Metis - Plan Consultant","Momus - Plan Critic","multimodal-looker","oracle","plan","Sisyphus-Junior"]}
+[2026-08-05T09:34:43.947Z] [config-handler] config handler applied {"agentCount":13,"commandCount":28}

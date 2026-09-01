@@ -1,0 +1,3 @@
+legacy_exists=no
+journal_exists=no
+backup_path=.omo/migration-backup-2026-08-04T10-57-29-137Z-opencode-config/.config/opencode/oh-my-openagent.json

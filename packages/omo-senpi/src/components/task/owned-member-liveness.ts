@@ -16,6 +16,10 @@ export function createOwnedMemberLivenessNotifier(
   deps: OwnedMemberLivenessDeps,
 ): (record: TaskRecord) => Promise<void> {
   return async (record) => {
+    // A suspended member record (persisted_only/rpc_detached) is between shutdown and revival, not
+    // dead: skip it before the ownership read so reconcile-era re-observation cannot misfire a
+    // death notification for a member that is about to be revived.
+    if (record.residency_state === "persisted_only" || record.residency_state === "rpc_detached") return
     try {
       const sessionId = deps.runtime.sessionId()
       const owned = await isOwnedTeamMemberTask(record, sessionId, {

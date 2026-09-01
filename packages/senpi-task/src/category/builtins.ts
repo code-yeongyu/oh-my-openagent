@@ -24,6 +24,10 @@ export const CATEGORY_DESCRIPTIONS: Readonly<Record<string, string>> = Object.fr
   BUILTIN_CATEGORY_DEFAULTS.map((definition) => [definition.name, definition.description]),
 )
 
+export const CATEGORY_CALLER_GUIDANCE: Readonly<Record<string, string | undefined>> = Object.fromEntries(
+  BUILTIN_CATEGORY_DEFAULTS.map((definition) => [definition.name, definition.callerGuidance]),
+)
+
 export const CATEGORY_PROMPT_APPENDS: Readonly<Record<string, string>> = Object.fromEntries(
   BUILTIN_CATEGORY_DEFAULTS.map((definition) => [definition.name, definition.promptAppend]),
 )

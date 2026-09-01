@@ -1,0 +1,5 @@
+### TYPECHECK - issue #6141 - 2026-07-27T06:28:10Z
+### tool: tsgo (@typescript/native-preview) per repo convention
+
+=== tsgo --noEmit -p packages/omo-opencode ===
+EXIT=0

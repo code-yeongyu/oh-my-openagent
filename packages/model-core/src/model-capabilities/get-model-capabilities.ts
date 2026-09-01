@@ -1,5 +1,7 @@
 import { resolveModelIDAlias } from "../model-capability-aliases"
 import { detectHeuristicModelFamily } from "../model-capability-heuristics"
+import { parseVariantFromModelID } from "../model-string-parser"
+import type { ModelMetadata, ProviderCache } from "../provider-cache"
 
 import {
 	readRuntimeModel,
@@ -41,17 +43,116 @@ function getProviderOverride(providerID: string, modelID: string): ModelCapabili
 		: undefined
 }
 
+function stripSameProviderPrefix(providerID: string, modelID: string): string | undefined {
+	const prefix = `${providerID.trim()}/`
+	return prefix !== "/" && modelID.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase()
+		? modelID.slice(prefix.length)
+		: undefined
+}
+
+function buildLookupCandidates(providerID: string, modelID: string): string[] {
+	const bareModelID = parseVariantFromModelID(modelID, { allowMaxSuffix: true }).modelID
+	const candidates = [
+		modelID,
+		stripSameProviderPrefix(providerID, modelID),
+		bareModelID,
+		stripSameProviderPrefix(providerID, bareModelID),
+	]
+	const uniqueCandidates: string[] = []
+	const seen = new Set<string>()
+	for (const candidate of candidates) {
+		if (!candidate || seen.has(candidate)) continue
+		seen.add(candidate)
+		uniqueCandidates.push(candidate)
+	}
+	return uniqueCandidates
+}
+
+// The provider cache matches ids exactly (`entry.id === modelID`), so a request carrying a
+// reasoning suffix or same-provider prefix can miss the model the provider advertised.
+// More specific forms are tried first so exact suffixed metadata still wins.
+function findProviderMetadata(
+	providerCache: ProviderCache | undefined,
+	providerID: string,
+	modelID: string,
+): ModelMetadata | undefined {
+	if (!providerCache) return undefined
+	for (const candidate of buildLookupCandidates(providerID, modelID)) {
+		const match = providerCache.findProviderModelMetadata(providerID, candidate)
+		if (match) return match
+	}
+	return undefined
+}
+
+function findSnapshotEntry(
+	snapshot: GetModelCapabilitiesInput["runtimeSnapshot"],
+	providerID: string,
+	modelIDs: readonly string[],
+) {
+	if (!snapshot) return undefined
+	const normalizedProviderID = providerID.trim()
+	const providerSpecificCandidates: string[] = []
+	const generalCandidates: string[] = []
+	for (const modelID of modelIDs) {
+		const strippedModelID = stripSameProviderPrefix(providerID, modelID)
+		const unqualifiedModelID = strippedModelID ?? (modelID.includes("/") ? undefined : modelID)
+		if (!unqualifiedModelID) {
+			generalCandidates.push(...buildLookupCandidates(providerID, modelID))
+			continue
+		}
+		const bareModelID = parseVariantFromModelID(unqualifiedModelID, { allowMaxSuffix: true }).modelID
+		if (normalizedProviderID) {
+			providerSpecificCandidates.push(
+				`${normalizedProviderID}/${unqualifiedModelID}`,
+				`${normalizedProviderID}/${bareModelID}`,
+			)
+		}
+		generalCandidates.push(unqualifiedModelID, bareModelID)
+	}
+	const seen = new Set<string>()
+	for (const candidate of [...providerSpecificCandidates, ...generalCandidates]) {
+		if (seen.has(candidate)) continue
+		seen.add(candidate)
+		const entry = snapshot.models[candidate]
+		if (entry) return entry
+	}
+	return undefined
+}
+
+function resolveCapabilityModelAlias(modelID: string, providerID: string) {
+	const direct = resolveModelIDAlias(modelID, providerID)
+	if (direct.source !== "canonical") return direct
+	const bareModelID = parseVariantFromModelID(modelID, { allowMaxSuffix: true }).modelID
+	if (bareModelID === modelID) return direct
+	const bareAlias = resolveModelIDAlias(bareModelID, providerID)
+	return bareAlias.source === "canonical"
+		? direct
+		: { ...bareAlias, requestedModelID: modelID }
+}
+
 export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCapabilities {
-	const canonicalization = resolveModelIDAlias(input.modelID, input.providerID)
+	const canonicalization = resolveCapabilityModelAlias(input.modelID, input.providerID)
 	const override = getOverride(input.modelID)
 	const providerOverride = getProviderOverride(input.providerID, canonicalization.canonicalModelID)
 	const runtimeModel = readRuntimeModel(
-		input.runtimeModel ?? input.providerCache?.findProviderModelMetadata(input.providerID, input.modelID),
+		input.runtimeModel ?? findProviderMetadata(input.providerCache, input.providerID, input.modelID),
 	)
 	const runtimeSnapshot = input.runtimeSnapshot
 	const bundledSnapshot = input.bundledSnapshot
-	const snapshotEntry = runtimeSnapshot?.models?.[canonicalization.canonicalModelID]
-		?? bundledSnapshot?.models?.[canonicalization.canonicalModelID]
+	const snapshotModelIDs = canonicalization.source === "canonical"
+		? [input.modelID, canonicalization.canonicalModelID]
+		: [canonicalization.canonicalModelID, input.modelID]
+	const runtimeSnapshotEntry = findSnapshotEntry(
+		runtimeSnapshot,
+		input.providerID,
+		snapshotModelIDs,
+	)
+	const bundledSnapshotEntry = findSnapshotEntry(
+		bundledSnapshot,
+		input.providerID,
+		snapshotModelIDs,
+	)
+	const snapshotEntry = runtimeSnapshotEntry ?? bundledSnapshotEntry
 	const heuristicFamily = detectHeuristicModelFamily(canonicalization.canonicalModelID)
 
 	const runtimeVariants = readRuntimeModelVariants(runtimeModel)
@@ -64,9 +165,9 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const runtimeModalities = readRuntimeModelModalities(runtimeModel)
 
 	const snapshotSource: ModelCapabilitiesDiagnostics["snapshot"]["source"] =
-		runtimeSnapshot?.models?.[canonicalization.canonicalModelID]
+		runtimeSnapshotEntry
 			? "runtime-snapshot"
-			: bundledSnapshot?.models?.[canonicalization.canonicalModelID]
+			: bundledSnapshotEntry
 			? "bundled-snapshot"
 			: "none"
 	const familySource: ModelCapabilitiesDiagnostics["family"]["source"] =

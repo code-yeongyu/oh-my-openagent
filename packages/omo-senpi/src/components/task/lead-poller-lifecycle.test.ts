@@ -166,6 +166,27 @@ describe("lead poller lifecycle", () => {
     expect(h.created[0]?.poller.polls).toBe(1)
   })
 
+  test("#given an owned team whose members are suspended #when the lead session shuts down and resumes #then the same poller keeps the team", async () => {
+    // given a live poller for the owned team, then the lead session enters shutdown (members suspend)
+    const h = harness()
+    await h.lifecycle.tick()
+    h.setState({ kind: "session_shutdown" })
+    h.setSessionFile(undefined)
+
+    // when the shutdown window passes with the team still active, then the session resumes
+    await h.lifecycle.tick()
+    expect(h.lifecycle.resolveLeadPoller("run-owned")).toBeUndefined()
+    h.setState({ kind: "idle" })
+    h.setSessionFile("/tmp/lead.jsonl")
+    await h.lifecycle.tick()
+
+    // then the original poller instance kept the team across the suspension window
+    expect(h.created).toHaveLength(1)
+    expect(h.created[0]?.poller.shutdowns).toBe(0)
+    expect(h.created[0]?.poller.polls).toBe(2)
+    expect(h.lifecycle.resolveLeadPoller("run-owned")).toBe(h.created[0]?.poller)
+  })
+
   test("#given ownership disappears #when the lifecycle reconciles #then the old poller shuts down and cannot resolve", async () => {
     // given
     const h = harness()

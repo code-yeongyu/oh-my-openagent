@@ -1,0 +1,19 @@
+GitHub failure:
+  run=31778788360
+  job=senpi-compatibility (windows-latest)
+  test=dream shutdown evaluator success path
+  elapsed_ms=1516
+  previous_budget_ms=1500
+
+Focused:
+  tests=8 passed, 0 failed
+  expect_calls=17
+  exit_code=0
+
+Package:
+  command=bun run --cwd packages/omo-senpi test
+  exit_code=0
+
+Static:
+  package_typecheck_exit=0
+  strict_audit=No violations in 1 file(s).

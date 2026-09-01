@@ -334,6 +334,27 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("exposes GLM max reasoning effort through heuristic capabilities", () => {
+    const result = getModelCapabilities({
+      providerID: "zai-coding-plan",
+      modelID: "glm-5.2",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "glm-5.2",
+      family: "glm",
+      variants: ["low", "medium", "high", "max"],
+      reasoningEfforts: ["high", "max"],
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "heuristic-backed",
+      family: { source: "heuristic" },
+      variants: { source: "heuristic" },
+      reasoningEfforts: { source: "heuristic" },
+    })
+  })
+
   test("prefers snapshot reasoning over heuristic supportsThinking for MiniMax M2.7", () => {
     // given
     const modelID = "minimax-m2.7"

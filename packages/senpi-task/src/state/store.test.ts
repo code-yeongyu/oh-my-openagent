@@ -63,6 +63,7 @@ describe("TaskRecordStore", () => {
       agent_type: "sisyphus",
       execution_mode: "background",
       model: "gpt-5.2",
+      notify_on_terminal: false,
       tool_allow: ["read", "bash"],
       tool_deny: ["write"],
     })
@@ -98,6 +99,7 @@ describe("TaskRecordStore", () => {
       category: "quick",
       execution_mode: "in-process",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     })
 
     // when
@@ -118,6 +120,7 @@ describe("TaskRecordStore", () => {
       depth: 0,
       execution_mode: "direct",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     })
     store.save(record)
 
@@ -144,6 +147,7 @@ describe("TaskRecordStore", () => {
       depth: 0,
       execution_mode: "direct",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     })
     store.save(good)
     const tasksDir = join(resolveStateDir({ project_dir: project }), "tasks")
@@ -174,6 +178,7 @@ describe("TaskRecordStore", () => {
       depth: 0,
       execution_mode: "direct",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     })
     const duplicate = {
       ...createTaskRecord({
@@ -182,6 +187,7 @@ describe("TaskRecordStore", () => {
         depth: 0,
         execution_mode: "direct",
         model: "gpt-5.2",
+        notify_on_terminal: false,
       }),
       task_id: original.task_id,
     }
@@ -213,6 +219,7 @@ describe("TaskRecordStore", () => {
         depth: 0,
         execution_mode: "direct",
         model: "gpt-5.2",
+        notify_on_terminal: false,
       }),
       {
         type: "start",

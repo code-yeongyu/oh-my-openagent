@@ -1,0 +1,86 @@
+S2 omo-senpi file-size splits
+Date: 2026-08-10
+Rule: source files must remain below 250 pure LOC (blank and comment-only lines excluded; multiline template content counted).
+
+Per assigned file
+
+1. packages/omo-senpi/src/components/memory/dream-trigger.test.ts
+   Before: 491 pure LOC
+   After: 75 pure LOC
+   New cohesive units:
+   - dream-trigger.test-support.ts: 173 pure LOC; deterministic scheduler, filesystem fixture, gate probes, and shared dream-trigger test lifecycle
+   - dream-trigger-idle.test.ts: 148 pure LOC; idle timer and automatic gate behavior
+   - dream-trigger-shutdown.test.ts: 92 pure LOC; shutdown evaluator behavior
+   - dream-trigger-manual.test.ts: 57 pure LOC; manual origin and reservation integration behavior
+
+2. packages/omo-senpi/src/components/memory/palace/template.ts
+   Before: 473 pure LOC
+   After: 47 pure LOC
+   New cohesive units:
+   - palace/styles.ts: 249 pure LOC; palace design tokens and presentation rules
+   - palace/client-script.ts: 183 pure LOC; in-browser data parsing, rendering, theme, and tab behavior
+   Exact-render proof: pre/post PALACE_TEMPLATE SHA-256 both efbd3362326ff02fbb7be71a94f4eee55b2678d3736593dcea66bcff03e59da6 (byte-for-byte cmp passed).
+
+3. packages/omo-senpi/src/components/memory/facts-runner.ts
+   Before: 402 pure LOC
+   After: 244 pure LOC
+   New cohesive units:
+   - facts-runner-types.ts: 54 pure LOC; public runner contracts and persisted facts run records
+   - facts-run-storage.ts: 115 pure LOC; run-directory reservation, final records, liveness, and queue-key serialization
+   - facts-batch-apply.ts: 70 pure LOC; people routing and writer-lock retry/application policy
+
+4. packages/omo-senpi/src/components/memory/trigger-wiring.test.ts
+   Before: 362 pure LOC
+   After: 213 pure LOC
+   New cohesive units:
+   - trigger-wiring.test-support.ts: 105 pure LOC; reflection trigger fixture and event drivers
+   - trigger-wiring-config.test.ts: 51 pure LOC; base and per-agent trigger configuration resolution
+
+5. packages/omo-senpi/src/components/memory/worker/runner.ts
+   Before: 284 pure LOC
+   After: 235 pure LOC
+   New cohesive units:
+   - worker/runner-types.ts: 44 pure LOC; runner interfaces, options, and execution result contracts
+   - worker/runner-results.ts: 15 pure LOC; finalization failure classification and cleanup/error helpers
+
+6. packages/omo-senpi/src/components/memory/dream-selector.ts
+   Before: 277 pure LOC
+   After: 208 pure LOC
+   New cohesive unit:
+   - dream-scoring.ts: 86 pure LOC; candidate scoring, deterministic ranking, packing, and score contracts
+
+7. packages/omo-senpi/src/components/memory/skills-usage.test.ts
+   Before: 265 pure LOC
+   After: 70 pure LOC
+   New cohesive units:
+   - skills-usage.test-support.ts: 54 pure LOC; filesystem/context fixture and tool event builders
+   - skills-usage-tracker.test.ts: 61 pure LOC; tracker buffering and flush behavior
+   - skills-usage-wiring.test.ts: 75 pure LOC; tool-call registration behavior
+   - skills-usage-ledger.test.ts: 29 pure LOC; ledger parsing and corruption fallback behavior
+
+8. packages/omo-senpi/src/components/memory/facts-runner.test.ts
+   Before: 262 pure LOC
+   After: 95 pure LOC
+   New cohesive units:
+   - facts-runner.test-support.ts: 95 pure LOC; queue/model/supervisor fixture and runner construction
+   - facts-runner-locking.test.ts: 57 pure LOC; deterministic writer-lock retry behavior
+   - facts-runner-people.test.ts: 39 pure LOC; people routing gate behavior
+
+9. packages/omo-senpi/plugin/scripts/install.mjs
+   Before/current: 436 pure LOC (generated self-contained Bun bundle)
+   Carry justification: no honest source-module seam exists in this generated deployment artifact. Splitting the emitted bundle would change its self-contained executable surface and the build-install step would immediately regenerate the monolith. The cohesive source seam was split in install-senpi.ts/plugin-artifacts.ts instead; install.mjs was not edited by this task.
+
+10. packages/omo-senpi/src/install/install-senpi.ts
+    Before: 262 pure LOC
+    After: 134 pure LOC
+    New cohesive unit:
+    - install/plugin-artifacts.ts: 132 pure LOC; required artifact inventory, source refresh pipeline, and ast-grep runtime integrity verification
+
+Verification
+- Typecheck: `bunx tsc --noEmit --pretty false -p packages/omo-senpi/tsconfig.json` -> pass, no diagnostics.
+- Focused memory/palace/worker suites: 158 pass, 0 fail, 470 expect() calls across 26 files.
+- Installer suites: 21 pass, 0 fail, 58 expect() calls across 4 files.
+- Full `bun test packages/omo-senpi`: 1078 pass, 1 known pre-existing failure, 3044 expect() calls across 167 files. The sole failure is exactly the excluded ulw-loop OMO_BIN test: `omo-senpi ulw-loop runtime > #given OMO_BIN is set #when resolving the default omo binary #then Bun is not needed and PATH is ignored`.
+- Package run excluding the known failing `components/ulw-loop/runtime.test.ts` file: 1026 pass, 0 fail, 2966 expect() calls across 159 files in one run. The full run above verifies the remaining tests in that file pass.
+- Palace rendered HTML: byte-for-byte cmp passed; matching SHA-256 recorded above.
+- `git diff --check`: pass.

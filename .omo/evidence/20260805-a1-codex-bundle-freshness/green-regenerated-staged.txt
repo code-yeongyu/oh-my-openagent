@@ -1,0 +1,11 @@
+$ git show :packages/omo-codex/scripts/install-dist/install-local.mjs | sed -n 2p   # staged blob build marker
+// omo-codex-install:837f31a80cb49a0be547308babfd7266571dd1c53846dc2a2225006cc2da8bfa:4d76fe0ff01e90dd4738f72edf1ef3d8e3fcffd9fbb16dc119e9299ef723edcb
+
+$ bun test script/codex-install-bundle-freshness.test.ts
+bun test v1.3.14 (0d9b296a)
+
+ 2 pass
+ 0 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [917.00ms]
+exit=0

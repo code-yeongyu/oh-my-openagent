@@ -122,6 +122,11 @@ function buildDeps(fixture: Fixture, overrides: Partial<CodexComponentsDoctorDep
     env: {},
     platform: TEST_PLATFORM,
     arch: TEST_ARCH,
+    // The sg fixtures are byte-filled placeholders, not runnable binaries, and the resolver now
+    // requires every candidate to answer `--version` with `ast-grep`. These cases assert doctor
+    // reporting, not probe behaviour (that is pinned in packages/utils/src/ast-grep), so stand in
+    // for the probe here instead of shipping a platform-specific executable stub.
+    sgRunVersionProbeSync: () => "ast-grep 0.43.0",
     sgWhich: () => null,
     ...overrides,
   }
@@ -300,7 +305,7 @@ describe("codex components doctor check", () => {
         lastStatus: "degraded",
         degraded: [
           { component: "ast_grep", reason: "download failed: checksum mismatch", hint: "npx lazycodex-ai doctor" },
-          { component: "omo-cli", reason: "payload has no dist/cli" },
+          { component: "omo-agent-toolkit", reason: "payload has no dist/cli" },
         ],
       },
     })
@@ -313,7 +318,7 @@ describe("codex components doctor check", () => {
     expect(result.details).toContain(
       "degraded component=ast_grep reason=download failed: checksum mismatch hint=npx lazycodex-ai doctor",
     )
-    expect(result.details).toContain("degraded component=omo-cli reason=payload has no dist/cli")
+    expect(result.details).toContain("degraded component=omo-agent-toolkit reason=payload has no dist/cli")
   })
 
   test("#given malformed bootstrap state json #when checking components #then treats bootstrap as pending without crashing", async () => {

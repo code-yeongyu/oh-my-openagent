@@ -1,0 +1,39 @@
+WHAT WAS TESTED
+Codex generated copy:
+  node packages/omo-codex/plugin/scripts/sync-skills.mjs
+  node --test packages/omo-codex/plugin/test/sync-skills.test.mjs
+
+Senpi generated copy:
+  node packages/omo-senpi/plugin/scripts/sync-skills.mjs
+  bun test packages/omo-senpi/src/skills-sync.test.ts
+
+Shared package shape:
+  bun test packages/omo-opencode/src/shared-skills-package.test.ts
+  npm pack --dry-run --ignore-scripts --json
+
+WHAT WAS OBSERVED
+Codex sync tests:
+  All generated-copy drift and aggregate skill tests passed.
+  Generated coding-agent-sessions `pi_family.py` contains:
+    SENPI_CONFIG_DIRS = (".omo", ".senpi", ".pi")
+
+Senpi sync tests:
+  11 pass, 0 fail
+  Generated coding-agent-sessions `pi_family.py` contains the same root tuple.
+
+Shared package test:
+  14 pass, 0 fail
+
+Dry-run package inspection:
+  24 coding-agent-sessions files ship.
+  `scripts/agent_sessions/pi_family.py` is present.
+  `scripts/tests/` and `__pycache__` are absent.
+
+WHY IT IS ENOUGH
+These checks prove the hand-authored shared source reaches both generated
+harness skill trees and the published package while source-only tests and
+caches remain excluded.
+
+WHAT WAS OMITTED
+The full npm file manifest and generated source bodies were summarized. No
+credentials or private session data were captured.

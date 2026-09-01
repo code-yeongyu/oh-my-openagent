@@ -108,8 +108,8 @@ export function maybeCreateSisyphusConfig(input: {
   })
 
   // The body above is baked from the *configured* model. If the user switches to
-  // a different model family in the TUI, the system-transform hook rebuilds the
-  // prompt for the runtime model using this captured pipeline (issue #5297/#5316).
+  // a different model in the TUI, the system-transform hook rebuilds the
+  // prompt for the runtime model using this captured pipeline (issue #5297/#5316/#6966).
   setSisyphusRuntimePromptContext({
     configuredModel: sisyphusModel,
     bakedPrompt: sisyphusConfig.prompt ?? "",

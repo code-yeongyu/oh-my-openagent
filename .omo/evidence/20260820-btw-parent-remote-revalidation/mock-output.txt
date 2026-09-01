@@ -1,0 +1,15 @@
+MOCK_LISTENING 46731
+PARENT_HELD
+PARENT_HELD
+SIDE_CONTEXT_OK
+PARENT_RELEASED
+PARENT_RELEASED
+PARENT_HELD
+PARENT_HELD
+SIDE_CONTEXT_OK
+PARENT_RELEASED
+PARENT_RELEASED
+
+The two SIDE_CONTEXT_OK lines correspond to the passing side-screen and
+switch-close real-TUI scenarios. The local mock emits this sentinel only when
+the model request contains both ALPHA-CONTEXT-42 and <omo-btw-boundary>.
