@@ -1,31 +1,7 @@
-import type { TmuxConfig } from "../../../config/schema"
-import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
+import { replaceTmuxPane as replaceTmuxPaneCore } from "@oh-my-opencode/tmux-core"
+import type { ReplaceTmuxPaneDeps, TmuxConfig } from "@oh-my-opencode/tmux-core"
 import type { SpawnPaneResult } from "../types"
-import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { isInsideTmux } from "./environment"
-import { buildTmuxPlaceholderCommand } from "./pane-command"
-
-type ReplaceTmuxPaneDeps = {
-	log: (message: string, data?: unknown) => void
-	runTmuxCommand: typeof RunTmuxCommand
-	isInsideTmux: typeof isInsideTmux
-	getTmuxPath: typeof getTmuxPath
-}
-
-async function resolveReplaceTmuxPaneDeps(deps?: Partial<ReplaceTmuxPaneDeps>): Promise<ReplaceTmuxPaneDeps> {
-	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
-		import("../runner"),
-	])
-
-	return {
-		log,
-		runTmuxCommand,
-		isInsideTmux,
-		getTmuxPath,
-		...deps,
-	}
-}
+import { withPaneReplaceDeps } from "./adapter-deps"
 
 export async function replaceTmuxPane(
 	paneId: string,
@@ -36,46 +12,13 @@ export async function replaceTmuxPane(
 	_directory: string,
 	depsInput?: Partial<ReplaceTmuxPaneDeps>,
 ): Promise<SpawnPaneResult> {
-	const deps = await resolveReplaceTmuxPaneDeps(depsInput)
-	const { log, runTmuxCommand } = deps
-
-	log("[replaceTmuxPane] called", { paneId, sessionId, description })
-
-	if (!config.enabled) {
-		return { success: false }
-	}
-	if (!deps.isInsideTmux()) {
-		return { success: false }
-	}
-
-	const tmux = await deps.getTmuxPath()
-	if (!tmux) {
-		return { success: false }
-	}
-
-	log("[replaceTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
-	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
-
-	const placeholderCmd = buildTmuxPlaceholderCommand(description)
-
-	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, placeholderCmd])
-
-	if (result.exitCode !== 0) {
-		log("[replaceTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: result.stderr.trim() })
-		return { success: false }
-	}
-
-	const title = `omo-subagent-${description.slice(0, 20)}`
-	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
-	if (titleResult.exitCode !== 0) {
-		log("[replaceTmuxPane] WARNING: failed to set pane title", {
-			paneId,
-			title,
-			exitCode: titleResult.exitCode,
-			stderr: titleResult.stderr.trim(),
-		})
-	}
-
-	log("[replaceTmuxPane] SUCCESS", { paneId, sessionId })
-	return { success: true, paneId }
+	return replaceTmuxPaneCore(
+		paneId,
+		sessionId,
+		description,
+		config,
+		_serverUrl,
+		_directory,
+		withPaneReplaceDeps(depsInput),
+	)
 }

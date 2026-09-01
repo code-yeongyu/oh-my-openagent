@@ -1,0 +1,16 @@
+2026-08-17T10:10:45.0488345Z (fail) DAG failure, crash, and policy end to end > #given a wave wider than residency_max_children #when admission frees slots in batches #then every node completes without a residency failure [8484.00ms]
+2026-08-17T10:10:45.0489265Z   ^ this test timed out after 5000ms.
+2026-08-17T10:11:02.1454307Z (fail) DAG happy-path end to end > #given eight mixed-route nodes across four waves #when the real engine runs #then routes, membership, events, and outputs stay intact [8156.00ms]
+2026-08-17T10:11:02.1455150Z   ^ this test timed out after 5000ms.
+2026-08-17T10:11:22.9408844Z (fail) createDagManager concurrent starts > #given two OS processes racing the same key with different prompts #when both are released together #then one run is created and the conflicting submission mutates nothing [1313.00ms]
+2026-08-17T10:11:46.8513376Z (fail) DAG scheduler failure semantics > #given every terminal task status #when folded #then each maps to its exact node outcome and error code [5985.00ms]
+2026-08-17T10:11:46.8514136Z   ^ this test timed out after 5000ms.
+2026-08-17T10:26:58.0472045Z 4 tests failed:
+2026-08-17T10:26:58.0473585Z (fail) DAG failure, crash, and policy end to end > #given a wave wider than residency_max_children #when admission frees slots in batches #then every node completes without a residency failure [8484.00ms]
+2026-08-17T10:26:58.0474736Z   ^ this test timed out after 5000ms.
+2026-08-17T10:26:58.0475879Z (fail) DAG happy-path end to end > #given eight mixed-route nodes across four waves #when the real engine runs #then routes, membership, events, and outputs stay intact [8156.00ms]
+2026-08-17T10:26:58.0476895Z   ^ this test timed out after 5000ms.
+2026-08-17T10:26:58.0478348Z (fail) createDagManager concurrent starts > #given two OS processes racing the same key with different prompts #when both are released together #then one run is created and the conflicting submission mutates nothing [1313.00ms]
+2026-08-17T10:26:58.0480141Z (fail) DAG scheduler failure semantics > #given every terminal task status #when folded #then each maps to its exact node outcome and error code [5985.00ms]
+2026-08-17T10:26:58.0481191Z   ^ this test timed out after 5000ms.
+2026-08-17T10:26:58.0483171Z Ran 15744 tests across 2041 files. [1762.75s]

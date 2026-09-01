@@ -1,10 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import { getSessionAgent, handedBackSyncSessions } from "../../features/claude-code-session-state"
 import { normalizeSDKResponse } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
-import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
+import { latestAssistantTurnBlocksInternalPrompt } from "@oh-my-opencode/utils/prompt-async-gate/pending-tool-turn"
 
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
@@ -54,8 +54,18 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  if (handedBackSyncSessions.has(sessionID)) {
+    log(`[${HOOK_NAME}] Skipped: sync subagent already handed back to parent`, { sessionID })
+    return
+  }
+
   if (state.tokenLimitDetected) {
     log(`[${HOOK_NAME}] Skipped: token limit error detected, retry would worsen context overflow`, { sessionID })
+    return
+  }
+
+  if (state.unrecoverableErrorDetected) {
+    log(`[${HOOK_NAME}] Skipped: non-retryable request error detected, re-injecting would rebuild the same request`, { sessionID })
     return
   }
 
@@ -71,6 +81,7 @@ export async function handleSessionIdle(args: {
 
   const hasRunningBgTasks = backgroundManager
     ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
+      || backgroundManager.hasPendingParentWake?.(sessionID) === true
     : false
 
   if (hasRunningBgTasks) {
@@ -98,7 +109,8 @@ export async function handleSessionIdle(args: {
       return
     }
   } catch (error) {
-    log(`[${HOOK_NAME}] Messages fetch failed, skipping continuation`, { sessionID, error: String(error) })
+    const loggedError = error instanceof Error ? { name: error.name, message: error.message } : String(error)
+    log(`[${HOOK_NAME}] Messages fetch failed, skipping continuation`, { sessionID, error: loggedError })
     return
   }
 
@@ -107,7 +119,8 @@ export async function handleSessionIdle(args: {
     const response = await ctx.client.session.todo({ path: { id: sessionID } })
     todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
-    log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(error) })
+    const loggedError = error instanceof Error ? { name: error.name, message: error.message } : String(error)
+    log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: loggedError })
     return
   }
 
@@ -160,7 +173,8 @@ export async function handleSessionIdle(args: {
     encounteredCompaction = messageInfoResult.encounteredCompaction
     latestMessageWasCompaction = messageInfoResult.latestMessageWasCompaction
   } catch (error) {
-    log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
+    const loggedError = error instanceof Error ? { name: error.name, message: error.message } : String(error)
+    log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: loggedError })
   }
 
   if (latestMessageWasCompaction) {
@@ -210,6 +224,14 @@ export async function handleSessionIdle(args: {
     incompleteCount,
     todos,
   )
+  if (state.continuationBlockReason) {
+    log(`[${HOOK_NAME}] Skipped: continuation paused at turn boundary`, {
+      sessionID,
+      reason: state.continuationBlockReason,
+      hasProgressed: progressUpdate.hasProgressed,
+    })
+    return
+  }
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return
   }

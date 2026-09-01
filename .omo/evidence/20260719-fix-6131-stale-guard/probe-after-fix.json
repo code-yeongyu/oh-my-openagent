@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "outcomes": {
+    "exactCurrent": {
+      "outcome": "exact-current",
+      "items": [
+        "exact-current"
+      ],
+      "concurrentItems": [
+        "exact-current"
+      ],
+      "didOpenCount": 1,
+      "ok": true
+    },
+    "postGenerationVersionless": {
+      "outcome": "post-generation-versionless",
+      "items": [
+        "post-generation-versionless"
+      ],
+      "elapsedMs": 23,
+      "ok": true
+    },
+    "stale": {
+      "outcome": "stale",
+      "items": [],
+      "transientError": {
+        "kind": "freshness_timeout",
+        "message": "Timed out waiting for fresh diagnostics for /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/lsp-apply-edit-zn77xk/source.ts within 30ms."
+      },
+      "ok": true
+    },
+    "future": {
+      "outcome": "future",
+      "items": [],
+      "transientError": {
+        "kind": "freshness_timeout",
+        "message": "Timed out waiting for fresh diagnostics for /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/lsp-apply-edit-tFUUI6/source.ts within 30ms."
+      },
+      "ok": true
+    },
+    "pullOvertaken": {
+      "outcome": "pull-overtaken",
+      "items": [
+        "pull-fresh"
+      ],
+      "requestCount": 2,
+      "ok": true
+    },
+    "silent": {
+      "outcome": "silent",
+      "items": [],
+      "transientError": null,
+      "ok": true
+    },
+    "closedServer": {
+      "outcome": "closed-server",
+      "error": "LSP server workspace-edit-fixture at /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/lsp-apply-edit-goLMUM exited with code 0",
+      "ok": true
+    },
+    "unsupportedPull": {
+      "outcome": "unsupported-pull",
+      "items": [
+        "push-fallback"
+      ],
+      "ok": true
+    },
+    "sameVersionUnchanged": {
+      "outcome": "same-version-unchanged",
+      "firstItems": [
+        "cached-full"
+      ],
+      "secondItems": [
+        "cached-full"
+      ],
+      "ok": true
+    }
+  }
+}

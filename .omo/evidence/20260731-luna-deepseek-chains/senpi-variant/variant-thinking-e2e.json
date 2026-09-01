@@ -1,0 +1,77 @@
+{
+  "result": "FAIL",
+  "checks": {
+    "momus_senpi_exit": "PASS",
+    "momus_one_child_stream": "FAIL",
+    "momus_applied_matches_variant": "FAIL",
+    "momus_record_variant": "FAIL",
+    "metis_senpi_exit": "PASS",
+    "metis_one_child_stream": "FAIL",
+    "metis_applied_matches_variant": "FAIL",
+    "metis_record_variant": "FAIL",
+    "real_senpi_untouched": "PASS"
+  },
+  "cases": [
+    {
+      "agent": "momus",
+      "sandboxCwd": "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-PXayGN/project",
+      "checks": {
+        "senpi_exit": "PASS",
+        "one_child_stream": "FAIL",
+        "applied_matches_variant": "FAIL",
+        "record_variant": "FAIL"
+      },
+      "expected": "xhigh",
+      "applied": null,
+      "recordVariant": null,
+      "recordStatuses": [],
+      "childCaptures": [],
+      "parentTail": [
+        "",
+        "omo-senpi codegraph skipped: running inside a senpi-task RPC child { component: 'codegraph' }",
+        "omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }",
+        "omo-senpi process sweep skipped: running inside a senpi-task RPC child undefined",
+        "omo-senpi start-work-continuation skipped { reason: 'not-continuable' }",
+        "omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }",
+        "omo-senpi ulw-loop continuation skipped { reason: 'inactive' }",
+        ""
+      ]
+    },
+    {
+      "agent": "metis",
+      "sandboxCwd": "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-Ps1td5/project",
+      "checks": {
+        "senpi_exit": "PASS",
+        "one_child_stream": "FAIL",
+        "applied_matches_variant": "FAIL",
+        "record_variant": "FAIL"
+      },
+      "expected": "medium",
+      "applied": null,
+      "recordVariant": null,
+      "recordStatuses": [],
+      "childCaptures": [],
+      "parentTail": [
+        "",
+        "omo-senpi codegraph skipped: running inside a senpi-task RPC child { component: 'codegraph' }",
+        "omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }",
+        "omo-senpi process sweep skipped: running inside a senpi-task RPC child undefined",
+        "omo-senpi start-work-continuation skipped { reason: 'not-continuable' }",
+        "omo-senpi ulw-loop status ignored { reason: 'non-zero-exit', code: 1 }",
+        "omo-senpi ulw-loop continuation skipped { reason: 'inactive' }",
+        ""
+      ]
+    }
+  ],
+  "realSenpiChangedPaths": [],
+  "concurrentRealSenpiChangedPaths": [
+    "sessions/--Users-yeongyu-local-workspaces-macos-cua--/2026-07-26T13-57-31-287Z_019f9eb7-7617-7dc9-962d-47564ed7143c.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-omo--/2026-07-31T11-01-38-722Z_019fb7d6-3d21-74ed-a772-034ba90b2317.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-31T10-59-15-714Z_019fb7d4-0e82-703d-80a4-406713f3bf3f.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-31T11-00-52-922Z_019fb7d5-8a3a-752d-8a5e-58ee3d55bccf.jsonl",
+    "sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-31T11-02-44-618Z_019fb7d7-3e8a-766b-a305-f61dc6842915.jsonl"
+  ],
+  "realSenpiDigestUnchanged": false,
+  "credentialIsolationClean": true,
+  "providedAgentDir": "unset"
+}

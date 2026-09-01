@@ -1,13 +1,16 @@
-import { execFileSync } from "node:child_process"
 import { promises as fs } from "node:fs"
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as loader from "./loader"
 import { getCommandLoaderCacheKey } from "./loader-cache"
 
-const TEST_DIR = join(tmpdir(), `claude-code-command-loader-${Date.now()}`)
+// mkdtempSync, never a Date.now()-derived name: consecutive Date.now() calls in one
+// process return the same millisecond, so sibling suites collided on one directory and
+// each teardown removed the other's live fixture. On Windows, removing an in-use tree
+// blocks until the hook budget expires ("a beforeEach/afterEach hook timed out").
+let TEST_DIR = ""
 
 function writeCommand(directory: string, name: string, description: string): void {
   mkdirSync(directory, { recursive: true })
@@ -22,7 +25,7 @@ describe("claude-code command loader", () => {
   let originalOpencodeConfigDir: string | undefined
 
   beforeEach(() => {
-    mkdirSync(TEST_DIR, { recursive: true })
+    TEST_DIR = mkdtempSync(join(tmpdir(), "claude-code-command-loader-"))
     originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
     originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
 
@@ -129,10 +132,7 @@ describe("claude-code command loader", () => {
     const repositoryDir = join(TEST_DIR, "repo")
     const nestedDirectory = join(repositoryDir, "packages", "app", "src")
     mkdirSync(nestedDirectory, { recursive: true })
-    execFileSync("git", ["init"], {
-      cwd: repositoryDir,
-      stdio: ["ignore", "ignore", "ignore"],
-    })
+    mkdirSync(join(repositoryDir, ".git"), { recursive: true })
     writeCommand(join(repositoryDir, ".opencode", "commands", "deploy"), "staging", "Deploy staging")
     writeCommand(join(repositoryDir, ".opencode", "command"), "release", "Release command")
     writeCommand(join(TEST_DIR, ".opencode", "commands"), "outside", "Outside command")

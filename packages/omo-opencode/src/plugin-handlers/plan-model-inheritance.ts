@@ -1,5 +1,6 @@
 const MODEL_SETTINGS_KEYS = [
   "model",
+  "reasoning",
   "variant",
   "temperature",
   "top_p",
@@ -8,6 +9,7 @@ const MODEL_SETTINGS_KEYS = [
   "reasoningEffort",
   "textVerbosity",
   "providerOptions",
+  "fallback_models",
 ] as const
 
 export function buildPlanDemoteConfig(

@@ -10,6 +10,8 @@ export type BackgroundOutputMessage = {
     content?: string | Array<{ type: string; text?: string }>
     output?: string
     name?: string
+    tool?: string
+    input?: unknown
   }>
 }
 

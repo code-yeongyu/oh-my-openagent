@@ -15,9 +15,11 @@ const TEAM_TOOL_DENIALS = {
   team_list: false,
 }
 
+type AddTaskArg = Parameters<import("../../features/task-toast-manager/manager").TaskToastManager["addTask"]>[0]
+
 describe("executeSyncContinuation - toast cleanup error paths", () => {
   let removeTaskCalls: string[] = []
-  let addTaskCalls: any[] = []
+  let addTaskCalls: AddTaskArg[] = []
   let resetToastManager: (() => void) | null = null
 
   beforeEach(() => {
@@ -43,7 +45,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       tui: { showToast: mock(() => Promise.resolve()) },
     })
 
-    spyOn(toastManager, "addTask").mockImplementation((task: any) => {
+    spyOn(toastManager, "addTask").mockImplementation((task: AddTaskArg) => {
       addTaskCalls.push(task)
     })
     spyOn(toastManager, "removeTask").mockImplementation((id: string) => {
@@ -110,7 +112,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with fetchSyncResult throwing
-    let error: any = null
+    let error: unknown = null
     let result: string | null = null
     try {
       result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
@@ -120,7 +122,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     //#then - error should be thrown but toast should still be removed
     expect(error).not.toBeNull()
-    expect(error.message).toBe("Network error")
+    expect((error as Error).message).toBe("Network error")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
@@ -173,7 +175,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with pollSyncSession throwing
-    let error: any = null
+    let error: unknown = null
     let result: string | null = null
     try {
       result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
@@ -183,7 +185,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     //#then - error should be thrown but toast should still be removed
     expect(error).not.toBeNull()
-    expect(error.message).toBe("Poll error")
+    expect((error as Error).message).toBe("Poll error")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
@@ -478,6 +480,139 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(result).toContain("Result")
   })
 
+  test("marks and aborts resumed sync session after successful handback", async () => {
+    //#given - a resumed sync continuation completes successfully
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const abortCalls: Array<{ path: { id: string } }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+            { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            {
+              info: { id: "msg_004", role: "assistant", time: { created: 4000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "New response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation hands the completed result back to the parent
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - todo-continuation wake paths can identify and stop the handed-back child
+    expect(result).toContain("Task continued and completed")
+    expect(handedBackSyncSessions.has("ses_test_12345678")).toBe(true)
+    expect(abortCalls).toEqual([{ path: { id: "ses_test_12345678" } }])
+
+    handedBackSyncSessions.clear()
+  })
+
+  test("does not mark or abort resumed sync session when handback fails", async () => {
+    //#given - a resumed sync continuation returns a poll error instead of a handback result
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const abortCalls: Array<{ path: { id: string } }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => "Task failed before handback",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_87654321",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation cannot hand a result back to the parent
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - todo-continuation wake paths are not told to ignore a still-unreturned child
+    expect(result).toBe("Task failed before handback")
+    expect(handedBackSyncSessions.has("ses_test_87654321")).toBe(false)
+    expect(abortCalls).toEqual([])
+
+    handedBackSyncSessions.clear()
+  })
+
   test("removes toast when abort happens", async () => {
     //#given - create a context with abort signal
     const controller = new AbortController()
@@ -505,7 +640,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async (_ctx: any, _client: any, input: any) => {
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { toastManager?: { removeTask: (id: string) => void } | null; taskId?: string }) => {
         if (input.toastManager && input.taskId) {
           input.toastManager.removeTask(input.taskId)
         }
@@ -592,7 +727,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with null toastManager
-    let error: any = null
+    let error: unknown = null
     let result: string | null = null
     try {
       result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)

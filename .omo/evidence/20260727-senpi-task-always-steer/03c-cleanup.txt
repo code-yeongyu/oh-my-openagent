@@ -1,0 +1,19 @@
+Cleanup receipt:
+
+- All live RPC child processes were gone (`leakedPids: 0`).
+- The manual resident-revival driver called `cleanupProjects()`.
+- Removed and verified absent 12 Senpi QA sandbox roots created by this session:
+  - `omo-senpi-qa-clDJdI`
+  - `omo-senpi-qa-WEZWSd`
+  - `omo-senpi-qa-HD652P`
+  - `omo-senpi-qa-xXrHho`
+  - `omo-senpi-qa-1fFR8D`
+  - `omo-senpi-qa-bNquFs`
+  - `omo-senpi-qa-H95XXN`
+  - `omo-senpi-qa-iTIZFP`
+  - `omo-senpi-qa-RdERdZ`
+  - `omo-senpi-qa-WfrUSG`
+  - `omo-senpi-qa-ANRX7H`
+  - `omo-senpi-qa-cw3t7m`
+
+The committed `task-e2e-debug/verdict.json` remains intentionally as reviewer evidence, not live runtime state.

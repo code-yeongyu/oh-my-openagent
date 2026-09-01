@@ -22,7 +22,7 @@ const TASK_ALLOWED_AGENT_NAMES = [
   "sisyphus",
   "atlas",
   "hephaestus",
-  "sisyphus-junior",
+  "prometheus",
 ] as const
 
 function createParams(agentNames: readonly string[]): {
@@ -95,6 +95,64 @@ describe("applyToolConfig task permission hard denials", () => {
           expect(permission.task).toBe("allow")
         })
       }
+    })
+  })
+
+  describe("#given user-configured permission.task on main agents (#6990)", () => {
+    describe("#when applying tool config", () => {
+      for (const agentName of TASK_ALLOWED_AGENT_NAMES) {
+        it(`#then should preserve user permission.task for ${agentName}`, () => {
+          // given the user explicitly configured permission.task
+          const params = createParams([agentName])
+          params.agentResult[agentName].permission = { task: "ask" }
+
+          // when
+          applyToolConfig(params)
+
+          // then the user value survives instead of being clobbered to "allow"
+          const permission = requirePermission(params.agentResult, agentName)
+          expect(permission.task).toBe("ask")
+          // sanity: the other plugin-injected rules still apply
+          expect(permission.call_omo_agent).toBe("deny")
+        })
+      }
+    })
+  })
+
+  describe("#given sisyphus-junior (factory sets task:deny)", () => {
+    describe("#when applying tool config with empty initial permission", () => {
+      it("#then should NOT add task:allow to sisyphus-junior (regression of #5193)", () => {
+        // given sisyphus-junior with empty permission (test isolation, not factory state)
+        const params = createParams(["sisyphus-junior"])
+
+        // when
+        applyToolConfig(params)
+
+        // then permission.task must NOT be "allow" — only the other keys get added
+        const permission = requirePermission(params.agentResult, "sisyphus-junior")
+        expect(permission.task).toBeUndefined()
+        // sanity: the other keys ARE still added
+        expect(permission["task_*"]).toBe("allow")
+        expect(permission.teammate).toBe("allow")
+      })
+    })
+
+    describe("#when applying tool config with permission.task=deny from factory", () => {
+      it("#then should NOT clobber task:deny to allow (sub-bug of #5193)", () => {
+        // given sisyphus-junior with task:deny set by the factory
+        const params = createParams(["sisyphus-junior"])
+        const junior = params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }
+        junior.permission = { task: "deny" }
+
+        // when
+        applyToolConfig(params)
+
+        // then task remains "deny" (not overwritten to "allow")
+        expect(junior.permission.task).toBe("deny")
+        // other keys are still added
+        expect(junior.permission["task_*"]).toBe("allow")
+        expect(junior.permission.teammate).toBe("allow")
+      })
     })
   })
 })

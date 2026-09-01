@@ -21,6 +21,10 @@ function isResolvedStatus(status: UlwLoopStatus): boolean {
 	return status === "complete";
 }
 
+export function isMemberResolved(goal: UlwLoopItem, plan: UlwLoopPlan): boolean {
+	return isResolvedStatus(goal.status) || isSupersededResolved(goal, plan);
+}
+
 function isSupersededResolved(goal: UlwLoopItem, plan: UlwLoopPlan): boolean {
 	if (goal.steeringStatus !== "superseded") return false;
 	const replacements = goal.supersededBy ?? [];
@@ -81,6 +85,22 @@ export function compatibleCodexObjectives(plan: UlwLoopPlan): readonly string[] 
 
 export function hasAllCriteriaPass(goal: UlwLoopItem): boolean {
 	return goal.successCriteria.length > 0 && goal.successCriteria.every((criterion) => criterion.status === "pass");
+}
+
+export function isEssentialCriterion(criterion: UlwLoopSuccessCriterion): boolean {
+	return criterion.essential ?? true;
+}
+
+export function essentialCriteriaOf(goal: UlwLoopItem): readonly UlwLoopSuccessCriterion[] {
+	const explicit = goal.successCriteria.filter(isEssentialCriterion);
+	if (explicit.length > 0) return explicit;
+	const happy = goal.successCriteria.find((criterion) => criterion.userModel === "happy");
+	return happy === undefined ? [] : [happy];
+}
+
+export function hasEssentialCriteriaPass(goal: UlwLoopItem): boolean {
+	const criteria = essentialCriteriaOf(goal);
+	return criteria.length > 0 && criteria.every((criterion) => criterion.status === "pass");
 }
 
 export function firstUnresolvedCriterion(goal: UlwLoopItem): UlwLoopSuccessCriterion | undefined {

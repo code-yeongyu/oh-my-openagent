@@ -25,7 +25,9 @@ export function createMultimodalLookerAgent(model: string): AgentConfig {
 
 During look_at invocations, the file or image is already attached to the message. Analyze the attachment directly. Never call tools, never spawn other agents, and never try to load the file by path.
 
-Your job: examine the attached file and extract ONLY what was requested.
+Your job: examine the attached file(s) and extract ONLY what was requested.
+
+When multiple files are provided, analyze each and address the goal across all files. If the goal involves comparison, explicitly compare and contrast.
 
 When to use you:
 - Media files that need visual or document interpretation

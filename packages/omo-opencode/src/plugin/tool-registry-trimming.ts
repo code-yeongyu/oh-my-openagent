@@ -17,8 +17,6 @@ const LOW_PRIORITY_TOOL_ORDER = [
   "background_output",
   "background_cancel",
   "edit",
-  "ast_grep_replace",
-  "ast_grep_search",
   "glob",
   "grep",
   "skill_mcp",

@@ -1,12 +1,12 @@
 # src/features/boulder-state/ — Active Work Plan Tracker
 
-**Generated:** 2026-05-15
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
 10 files (~1k LOC excl. tests). Tracks Sisyphus's "boulder" — the active work plan being rolled across sessions, worktrees, and subagent task delegations. Named after the Sisyphus myth: the boulder must keep rolling until the plan is complete.
 
-Inspected interactively via `bunx oh-my-opencode boulder` (see [`src/cli/boulder/`](file:///Users/yeongyu/local-workspaces/omo/src/cli/boulder/)).
+Inspected interactively via `bunx oh-my-opencode boulder` (see [`src/cli/boulder/`](../../cli/boulder)).
 
 ## SCHEMA (v2)
 
@@ -43,10 +43,9 @@ interface BoulderState {
 ## LIFECYCLE
 
 ```
-session.startWork(plan)
+session.ulwExecute(plan)
   → BoulderState created with active_plan, started_at, plan_name
-  → atlas-hook reads BoulderState on session.idle for boulder continuation
-  → ralph-loop reads task_sessions to resume subagent work
+  → atlas-hook reads BoulderState + `task_sessions` on session.idle (boulder continuation + subagent resume)
 session.idle (incomplete plan)
   → todoContinuationEnforcer + atlasHook inspect state
   → Inject CONTINUATION_PROMPT or BOULDER_COMPLETE_PROMPT
@@ -58,11 +57,10 @@ session.completed
 
 | Where | What |
 |-------|------|
-| [`src/cli/boulder/`](file:///Users/yeongyu/local-workspaces/omo/src/cli/boulder/) | CLI inspector formats this state |
-| [`src/hooks/atlas/`](file:///Users/yeongyu/local-workspaces/omo/src/hooks/atlas/) | Reads work state, drives boulder-complete and parallel-delegation prompts |
-| [`src/hooks/ralph-loop/`](file:///Users/yeongyu/local-workspaces/omo/src/hooks/ralph-loop/) | Resumes subagent task sessions via `task_sessions` |
-| [`src/hooks/start-work/`](file:///Users/yeongyu/local-workspaces/omo/src/hooks/start-work/) | Creates the BoulderState on `/start-work` invocation |
-| [`src/hooks/todo-continuation-enforcer/`](file:///Users/yeongyu/local-workspaces/omo/src/hooks/todo-continuation-enforcer/) | Session-idle continuation when boulder incomplete |
+| [`src/cli/boulder/`](../../cli/boulder) | CLI inspector formats this state |
+| [`src/hooks/atlas/`](../../hooks/atlas) | Reads work state + `task_sessions` (subagent resume); drives boulder-complete and parallel-delegation prompts |
+| [`src/hooks/ulw-execute/`](../../hooks/ulw-execute) | Creates the BoulderState on `/ulw-execute` invocation |
+| [`src/hooks/todo-continuation-enforcer/`](../../hooks/todo-continuation-enforcer) | Session-idle continuation when boulder incomplete |
 
 ## STORAGE
 

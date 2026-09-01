@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { tool } from "@opencode-ai/plugin"
 import type { ToolDefinition } from "@opencode-ai/plugin"
 
@@ -43,9 +44,7 @@ export function normalizeToolArgSchemas<TDefinition extends Pick<ToolDefinition,
 
 const UNSUPPORTED_SCHEMA_KEYWORDS = new Set(["contentEncoding", "contentMediaType"])
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
+
 
 function normalizeJsonSchemaRef(value: string): string {
   if (value.startsWith("#") || value.includes(":") || value.startsWith("/")) {
@@ -60,7 +59,7 @@ export function sanitizeJsonSchema(value: unknown, depth = 0, isPropertyName = f
     return value.map((item) => sanitizeJsonSchema(item, depth + 1, false))
   }
 
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     return value
   }
 

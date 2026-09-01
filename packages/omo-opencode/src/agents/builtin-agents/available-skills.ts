@@ -1,7 +1,8 @@
 import type { AvailableSkill } from "../dynamic-agent-prompt-builder"
 import type { BrowserAutomationProvider } from "../../config/schema"
 import type { LoadedSkill, SkillScope } from "../../features/opencode-skill-loader/types"
-import { createBuiltinSkills } from "../../features/builtin-skills"
+import { isDisabledSkillAlias } from "../../features/opencode-skill-loader"
+import { createBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills"
 
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"
@@ -27,7 +28,7 @@ export function buildAvailableSkills(
 
   const discoveredAvailable: AvailableSkill[] = discoveredSkills
     .filter(s => {
-      if (disabledSkills?.has(s.name)) return false
+      if (disabledSkills && isDisabledSkillAlias(s, disabledSkills)) return false
       // If the skill declares an agent restriction and we know the current agent,
       // exclude skills that don't belong to this agent.
       if (agentName && s.definition.agent && s.definition.agent !== agentName) return false

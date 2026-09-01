@@ -1,89 +1,81 @@
-import { describe, test, expect } from "bun:test"
-import { MOMUS_SYSTEM_PROMPT, createMomusAgent } from "./momus"
+import { describe, expect, test } from "bun:test";
+import { createMomusAgent } from "./momus";
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
+describe("createMomusAgent", () => {
+  describe("#given a GPT-5.6 family model", () => {
+    test("#when creating the agent #then it runs high reasoning with a GPT-5.6 tuned prompt", () => {
+      // given
+      const model = "openai/gpt-5.6-sol";
 
-describe("MOMUS_SYSTEM_PROMPT policy requirements", () => {
-  test("should treat SYSTEM DIRECTIVE as ignorable/stripped", () => {
-    // given
-    const prompt = MOMUS_SYSTEM_PROMPT
+      // when
+      const config = createMomusAgent(model);
+      const gpt55Config = createMomusAgent("openai/gpt-5.5");
 
-    // when / #then
-    // Should mention that system directives are ignored
-    expect(prompt.toLowerCase()).toMatch(/system directive.*ignore|ignore.*system directive/)
-    // Should give examples of system directive patterns
-    expect(prompt).toMatch(/<system-reminder>|system-reminder/)
-  })
+      // then
+      expect(config.reasoningEffort).toBe("high");
+      expect(config.prompt).not.toBe(gpt55Config.prompt);
+    });
 
-  test("should extract paths containing .omo/plans/ and ending in .md", () => {
-    // given
-    const prompt = MOMUS_SYSTEM_PROMPT
+    test("#when creating the agent #then review contract and restrictions are preserved", () => {
+      // given
+      const model = "openai/gpt-5.6-sol";
 
-    // when / #then
-    expect(prompt).toContain(".omo/plans/")
-    expect(prompt).toContain(".md")
-    // New extraction policy should be mentioned
-    expect(prompt.toLowerCase()).toMatch(/extract|search|find path/)
-  })
+      // when
+      const config = createMomusAgent(model);
+      const permission = config.permission as Record<string, string>;
 
-  test("should NOT teach that 'Please review' is INVALID (conversational wrapper allowed)", () => {
-    // given
-    const prompt = MOMUS_SYSTEM_PROMPT
+      // then
+      expect(config.mode).toBe("subagent");
+      expect(config.temperature).toBe(0.1);
+      expect(permission.write).toBe("deny");
+      expect(permission.edit).toBe("deny");
+      expect(permission.apply_patch).toBe("deny");
+    });
 
-    // when / #then
-    // In RED phase, this will FAIL because current prompt explicitly lists this as INVALID
-    const invalidExample = "Please review .omo/plans/plan.md"
-    const rejectionTeaching = new RegExp(
-      `reject.*${escapeRegExp(invalidExample)}`,
-      "i",
-    )
+    test("#when the model is a dotted or dashed 5.6 alias #then the 5.6 path is selected", () => {
+      // given
+      const solConfig = createMomusAgent("openai/gpt-5.6-sol");
 
-    // We want the prompt to NOT reject this anymore.
-    // If it's still in the "INVALID" list, this test should fail.
-    expect(prompt).not.toMatch(rejectionTeaching)
-  })
+      // when
+      const aliasConfig = createMomusAgent("openai/gpt-5.6");
+      const dashedConfig = createMomusAgent("vercel/openai/gpt-5-6-sol");
 
-  test("should handle ambiguity (2+ paths) and 'no path found' rejection", () => {
-    // given
-    const prompt = MOMUS_SYSTEM_PROMPT
+      // then
+      expect(aliasConfig.prompt).toBe(solConfig.prompt);
+      expect(aliasConfig.reasoningEffort).toBe("high");
+      expect(dashedConfig.prompt).toBe(solConfig.prompt);
+      expect(dashedConfig.reasoningEffort).toBe("high");
+    });
+  });
 
-    // when / #then
-    // Should mention what happens when multiple paths are found
-    expect(prompt.toLowerCase()).toMatch(/multiple|ambiguous|2\+|two/)
-    // Should mention rejection if no path found
-    expect(prompt.toLowerCase()).toMatch(/no.*path.*found|reject.*no.*path/)
-  })
-})
+  describe("#given a GPT-5.5 or older GPT model", () => {
+    test("#when creating the agent #then the existing GPT path stays unchanged", () => {
+      // given
+      const model = "openai/gpt-5.5";
 
-describe("Momus fresh reread contract", () => {
-  test("default variant (MOMUS_SYSTEM_PROMPT) requires fresh reread of plan file", () => {
-    // given
-    const prompt = MOMUS_SYSTEM_PROMPT
+      // when
+      const config = createMomusAgent(model);
+      const gpt56Config = createMomusAgent("openai/gpt-5.6-sol");
 
-    // when / #then
-    // Must instruct fresh reread from disk, not trusting cached content
-    expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
-    // Must warn that previous verdict cannot be trusted without re-reading
-    expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
-  })
+      // then
+      expect(config.reasoningEffort).toBe("medium");
+      expect(config.prompt).not.toBe(gpt56Config.prompt);
+    });
+  });
 
-  test("GPT-5.5 variant (createMomusAgent(\"gpt-5.5\")) requires fresh reread", () => {
-    // given
-    const prompt = createMomusAgent("gpt-5.5").prompt
+  describe("#given a Claude model", () => {
+    test("#when creating the agent #then the default prompt and thinking config apply", () => {
+      // given
+      const model = "anthropic/claude-sonnet-4-6";
 
-    // when / #then
-    expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
-    expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
-  })
+      // when
+      const config = createMomusAgent(model) as Record<string, unknown>;
+      const gptConfig = createMomusAgent("openai/gpt-5.5");
 
-  test("provider-prefixed GPT-5.5 variant requires fresh reread", () => {
-    // given
-    const prompt = createMomusAgent("openai/gpt-5.5").prompt
-
-    // when / #then
-    expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
-    expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
-  })
-})
+      // then
+      expect(config.reasoningEffort).toBeUndefined();
+      expect(config.prompt).not.toBe(gptConfig.prompt);
+      expect(config.thinking).toEqual({ type: "enabled", budgetTokens: 32000 });
+    });
+  });
+});

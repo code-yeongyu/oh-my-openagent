@@ -12,6 +12,7 @@ import {
   killTmuxSessionIfExists,
   getIsolatedSessionName,
   sweepStaleOmoAgentSessions,
+  sweepStaleOmoAttachPanes,
   activateTmuxPane,
 } from "../../shared/tmux"
 import { queryWindowState as defaultQueryWindowState } from "./pane-state-querier"
@@ -19,9 +20,13 @@ import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./de
 import { executeActions, executeAction } from "./action-executor"
 import { TmuxPollingManager } from "./polling-manager"
 import { createTrackedSession, markTrackedSessionClosePending } from "./tracked-session-state"
+import { isCmuxCompatEnvironment } from "../../shared/tmux/cmux-detect"
 import { waitForSessionReady } from "./session-ready-waiter"
 import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusResponse } from "./session-status-parser"
+import { FailedReadinessCache, type FailedReadinessSessionSeed } from "./failed-readiness-cache"
+import { resolveServerUrl } from "./resolve-server-url"
+import { sweepStaleTmuxResources } from "./stale-tmux-resource-sweeper"
 type OpencodeClient = PluginInput["client"]
 
 type SpawnStage =
@@ -40,15 +45,6 @@ interface DeferredSession {
   title: string
   queuedAt: Date
   retryIsolatedContainer: boolean
-}
-
-interface FailedReadinessSessionSeed {
-  sessionId: string
-  title: string
-}
-
-interface FailedReadinessSession extends FailedReadinessSessionSeed {
-  rememberedAt: number
 }
 
 export interface TmuxUtilDeps {
@@ -120,9 +116,8 @@ export class TmuxSessionManager {
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
   private pendingSessions = new Set<string>()
-  private failedReadinessSessions = new Map<string, FailedReadinessSession>()
   private closedByPolling = new Set<string>()
-  private failedReadinessSweepInterval?: ReturnType<typeof setInterval>
+  private readonly failedReadinessCache: FailedReadinessCache
   private spawnQueue: Promise<void> = Promise.resolve()
   private deferredSessions = new Map<string, DeferredSession>()
   private deferredQueue: string[] = []
@@ -149,39 +144,14 @@ export class TmuxSessionManager {
     this.projectDirectory = ctx.directory || process.cwd()
     this.deps = { ...defaultTmuxDeps, ...deps }
     this.shouldSkipSession = options.shouldSkipSession ?? (() => false)
-    const configuredPort = process.env.OPENCODE_PORT
-    const parsedPort = configuredPort ? Number(configuredPort) : 4096
-    const defaultPort = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535
-      ? String(parsedPort)
-      : "4096"
-    const fallbackUrl = `http://localhost:${defaultPort}`
+    this.failedReadinessCache = new FailedReadinessCache({
+      ttlMs: FAILED_READINESS_SESSION_TTL_MS,
+      sweepIntervalMs: FAILED_READINESS_SWEEP_INTERVAL_MS,
+      log: this.deps.log,
+    })
     const rawServerUrl = ctx.serverUrl?.toString()
     this.ctxServerUrl = rawServerUrl
-    try {
-      if (rawServerUrl) {
-        const parsed = new URL(rawServerUrl)
-        const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80')
-        if (port === '0') {
-          this.deps.log(
-            "[tmux-session-manager] ctx.serverUrl has port 0; falling back. " +
-              "team_mode tmux visualization will silently skip if nothing is listening on the fallback URL. " +
-              "Launch opencode with --port N and OPENCODE_PORT=N to bind a real port (see issue #3963).",
-            { kind: "warning", ctxServerUrl: rawServerUrl, fallbackUrl },
-          )
-          this.serverUrl = fallbackUrl
-        } else {
-          this.serverUrl = rawServerUrl
-        }
-      } else {
-        this.serverUrl = fallbackUrl
-      }
-    } catch (error) {
-      this.deps.log("[tmux-session-manager] failed to parse server URL, using fallback", {
-        serverUrl: rawServerUrl,
-        error: String(error),
-      })
-      this.serverUrl = fallbackUrl
-    }
+    this.serverUrl = resolveServerUrl(rawServerUrl, process.env, this.deps.log)
     this.sourcePaneId = this.deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,
@@ -617,7 +587,7 @@ export class TmuxSessionManager {
     retryIsolatedContainer = false,
   ): void {
     if (this.shouldSkipRespawnAfterPollingClose(sessionId, "deferred enqueue")) {
-      this.clearFailedReadinessSession(sessionId)
+      this.failedReadinessCache.clear(sessionId)
       return
     }
 
@@ -755,92 +725,6 @@ export class TmuxSessionManager {
     }
   }
 
-  private rememberFailedReadinessSession(
-    session: FailedReadinessSessionSeed,
-  ): void {
-    this.failedReadinessSessions.set(session.sessionId, {
-      ...session,
-      rememberedAt: Date.now(),
-    })
-    this.startFailedReadinessSweep()
-  }
-
-  private clearFailedReadinessSession(sessionId: string): void {
-    this.failedReadinessSessions.delete(sessionId)
-    if (this.failedReadinessSessions.size === 0) {
-      this.stopFailedReadinessSweep()
-    }
-  }
-
-  private startFailedReadinessSweep(): void {
-    if (this.failedReadinessSweepInterval) {
-      return
-    }
-
-    this.failedReadinessSweepInterval = setInterval(() => {
-      this.sweepExpiredFailedReadinessSessions()
-    }, FAILED_READINESS_SWEEP_INTERVAL_MS)
-  }
-
-  private stopFailedReadinessSweep(): void {
-    if (!this.failedReadinessSweepInterval) {
-      return
-    }
-
-    clearInterval(this.failedReadinessSweepInterval)
-    this.failedReadinessSweepInterval = undefined
-  }
-
-  private isFailedReadinessSessionExpired(
-    session: FailedReadinessSession,
-    now: number,
-  ): boolean {
-    return now - session.rememberedAt >= FAILED_READINESS_SESSION_TTL_MS
-  }
-
-  private sweepExpiredFailedReadinessSessions(): void {
-    const now = Date.now()
-
-    for (const [sessionId, failedReadinessSession] of this.failedReadinessSessions.entries()) {
-      if (!this.isFailedReadinessSessionExpired(failedReadinessSession, now)) {
-        continue
-      }
-
-      this.failedReadinessSessions.delete(sessionId)
-      this.deps.log("[tmux-session-manager] expired failed readiness session", {
-        sessionId,
-        ttlMs: FAILED_READINESS_SESSION_TTL_MS,
-      })
-    }
-
-    if (this.failedReadinessSessions.size === 0) {
-      this.stopFailedReadinessSweep()
-    }
-  }
-
-  private getFailedReadinessSession(sessionId: string): FailedReadinessSession | undefined {
-    const failedReadinessSession = this.failedReadinessSessions.get(sessionId)
-    if (!failedReadinessSession) {
-      return undefined
-    }
-
-    if (!this.isFailedReadinessSessionExpired(failedReadinessSession, Date.now())) {
-      return failedReadinessSession
-    }
-
-    this.failedReadinessSessions.delete(sessionId)
-    this.deps.log("[tmux-session-manager] expired failed readiness session on access", {
-      sessionId,
-      ttlMs: FAILED_READINESS_SESSION_TTL_MS,
-    })
-
-    if (this.failedReadinessSessions.size === 0) {
-      this.stopFailedReadinessSweep()
-    }
-
-    return undefined
-  }
-
   private async spawnPendingSession(args: {
     session: FailedReadinessSessionSeed
     stage: SpawnStage
@@ -852,7 +736,7 @@ export class TmuxSessionManager {
     const readyForSpawn = await this.ensureSessionReadyBeforeSpawn(sessionId, stage)
     if (!readyForSpawn) {
       if (rememberReadinessFailure) {
-        this.rememberFailedReadinessSession(session)
+        this.failedReadinessCache.remember(session)
       }
       return
     }
@@ -865,17 +749,19 @@ export class TmuxSessionManager {
         status: sessionStatus,
       })
       if (rememberReadinessFailure) {
-        this.rememberFailedReadinessSession(session)
+        this.failedReadinessCache.remember(session)
       }
       return
     }
 
-    this.clearFailedReadinessSession(sessionId)
+    this.failedReadinessCache.clear(sessionId)
 
     const isolatedPaneId = await this.spawnInIsolatedContainer(sessionId, title)
     if (isolatedPaneId) {
       this.sessions.set(
         sessionId,
+        // TODO(#5809): isolated-window/session paths do not support eager cmux attach yet.
+        // cmux attach for isolated paths requires native cmux window management — out of scope.
         createTrackedSession({ sessionId, paneId: isolatedPaneId, description: title }),
       )
       this.pollingManager.startPolling()
@@ -976,9 +862,10 @@ export class TmuxSessionManager {
           sessionId,
           paneId: result.spawnedPaneId,
           description: title,
+          attachActivated: isCmuxCompatEnvironment(),
         }),
       )
-      this.clearFailedReadinessSession(sessionId)
+      this.failedReadinessCache.clear(sessionId)
       this.deps.log("[tmux-session-manager] pane spawned and tracked", {
         sessionId,
         paneId: result.spawnedPaneId,
@@ -1027,7 +914,7 @@ export class TmuxSessionManager {
       return
     }
 
-    const failedReadinessSession = this.getFailedReadinessSession(sessionId)
+    const failedReadinessSession = this.failedReadinessCache.get(sessionId)
     if (!failedReadinessSession) {
       return
     }
@@ -1048,7 +935,7 @@ export class TmuxSessionManager {
             return
           }
 
-          this.clearFailedReadinessSession(sessionId)
+          this.failedReadinessCache.clear(sessionId)
           await this.spawnPendingSession({
             session: failedReadinessSession,
             stage: "session.idle.retry",
@@ -1115,6 +1002,8 @@ export class TmuxSessionManager {
         if (isolatedPaneId) {
           this.sessions.set(
             sessionId,
+            // TODO(#5809): isolated-window/session paths do not support eager cmux attach yet.
+            // cmux attach for isolated paths requires native cmux window management — out of scope.
             createTrackedSession({
               sessionId,
               paneId: isolatedPaneId,
@@ -1201,6 +1090,7 @@ export class TmuxSessionManager {
           sessionId,
           paneId: result.spawnedPaneId,
           description: deferred.title,
+          attachActivated: isCmuxCompatEnvironment(),
         }),
       )
       this.removeDeferredSession(sessionId)
@@ -1232,6 +1122,8 @@ export class TmuxSessionManager {
     const sessionId = resolveSessionEventID(event.properties)
     if (!sessionId || !info?.parentID) return
 
+    await this.sweepStaleIsolatedSessionsOnce()
+
     // Team-mode members live in `team-layout-tmux` (which owns the pane
     // lifecycle via runtimeState.tmuxLayout). Tracking them here as well
     // produces two managers fighting over the same pane: polling can close a
@@ -1257,7 +1149,6 @@ export class TmuxSessionManager {
     }
 
     try {
-      await this.sweepStaleIsolatedSessionsOnce()
       await this.retryPendingCloses()
 
       const session = { sessionId, title }
@@ -1298,7 +1189,7 @@ export class TmuxSessionManager {
     if (!this.isEnabled()) return
 
     this.closedByPolling.delete(event.sessionID)
-    this.clearFailedReadinessSession(event.sessionID)
+    this.failedReadinessCache.clear(event.sessionID)
     this.removeDeferredSession(event.sessionID)
 
     if (!this.getEffectiveSourcePaneId()) return
@@ -1421,9 +1312,8 @@ export class TmuxSessionManager {
     this.stopDeferredAttachLoop()
     this.deferredQueue = []
     this.deferredSessions.clear()
-    this.failedReadinessSessions.clear()
     this.closedByPolling.clear()
-    this.stopFailedReadinessSweep()
+    this.failedReadinessCache.clearAll()
     this.pollingManager.stopPolling()
 
     if (this.sessions.size > 0) {
@@ -1472,16 +1362,20 @@ export class TmuxSessionManager {
   private async sweepStaleIsolatedSessionsOnce(): Promise<void> {
     if (this.staleSweepCompleted) return
     if (this.staleSweepInProgress) return
-    if (this.tmuxConfig.isolation !== "session") {
-      this.staleSweepCompleted = true
-      return
-    }
 
     this.staleSweepInProgress = true
     try {
-      const killed = await sweepStaleOmoAgentSessions()
-      if (killed > 0) {
-        this.deps.log("[tmux-session-manager] stale isolated sessions swept", { killed })
+      const report = await sweepStaleTmuxResources({
+        isolation: this.tmuxConfig.isolation,
+        sweepStaleOmoAgentSessions,
+        sweepStaleOmoAttachPanes,
+      })
+      if (report.killed > 0) {
+        this.deps.log("[tmux-session-manager] stale tmux resources swept", {
+          killed: report.killed,
+          killedAttachPanes: report.killedAttachPanes,
+          killedIsolatedSessions: report.killedIsolatedSessions,
+        })
       }
       this.staleSweepCompleted = true
     } catch (error) {

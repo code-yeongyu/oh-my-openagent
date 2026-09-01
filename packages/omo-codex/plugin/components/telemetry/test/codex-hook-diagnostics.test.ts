@@ -4,8 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
-import { getTelemetryDiagnosticsFilePath } from "../src/diagnostics.js";
 import type { PostHogClient } from "../src/posthog.js";
+import { getComponentTelemetryDiagnosticsFilePath } from "../src/product-identity.js";
 
 const tempDirectories: string[] = [];
 const originalXdgDataHome = process.env["XDG_DATA_HOME"];
@@ -63,7 +63,7 @@ describe("runSessionStartHook diagnostics", () => {
 
 			expect(output).toBe("");
 			expect(shutdownCalls).toBe(1);
-			const diagnostics = readFileSync(getTelemetryDiagnosticsFilePath(), "utf-8");
+			const diagnostics = readFileSync(getComponentTelemetryDiagnosticsFilePath(), "utf-8");
 			expect(diagnostics).toContain('"event":"telemetry_capture_failed"');
 			expect(diagnostics).toContain('"error_message":"trackActive failed"');
 		});
@@ -88,7 +88,7 @@ describe("runSessionStartHook diagnostics", () => {
 
 			expect(output).toBe("");
 			expect(shutdownCalls).toBe(1);
-			const diagnostics = readFileSync(getTelemetryDiagnosticsFilePath(), "utf-8");
+			const diagnostics = readFileSync(getComponentTelemetryDiagnosticsFilePath(), "utf-8");
 			expect(diagnostics).toContain('"event":"telemetry_capture_failed"');
 			expect(diagnostics).toContain('"error_name":"symbol"');
 			expect(diagnostics).toContain('"error_message":"Symbol(trackActive failed)"');

@@ -1,4 +1,4 @@
-import { deleteToken } from "../../features/mcp-oauth/storage"
+import { deleteToken } from "@oh-my-opencode/mcp-client-core/mcp-oauth/storage"
 
 export interface LogoutOptions {
   serverUrl?: string

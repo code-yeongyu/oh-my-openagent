@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import type { ParsedTokenLimitError } from "./types"
 
 interface AnthropicErrorData {
@@ -28,8 +29,8 @@ const TOKEN_LIMIT_KEYWORDS = [
   "non-empty content",
 ]
 
-// Patterns that indicate thinking block structure errors (NOT token limit errors)
-// These should be handled by session-recovery hook, not compaction
+// Patterns that indicate thinking block structure errors (NOT token limit errors);
+// compaction must not react to them
 const THINKING_BLOCK_ERROR_PATTERNS = [
   /thinking.*first block/i,
   /first block.*thinking/i,
@@ -45,9 +46,7 @@ function isThinkingBlockError(text: string): boolean {
 
 const MESSAGE_INDEX_PATTERN = /messages\.(\d+)/
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object"
-}
+
 
 function readProperty(source: Record<string, unknown>, key: string): unknown | undefined {
   try {

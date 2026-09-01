@@ -1,0 +1,16 @@
+test file: packages/omo-codex/src/install/codex-config-permissions.test.ts
+running as uid=0 (root) -- root bypasses chmod, which is the suspected cause
+
+== WITH my change (current HEAD 07a5e5d4b) ==
+(fail) #given unreadable existing config #when updating config #then rejects and preserves content [12.45ms]
+ 0 pass
+ 1 fail
+
+== PRISTINE upstream/dev baseline ==
+  dev=55ea9490b
+(fail) #given unreadable existing config #when updating config #then rejects and preserves content [6.94ms]
+ 0 pass
+ 1 fail
+
+  restored HEAD=07a5e5d4b
+

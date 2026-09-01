@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { log } from "./logger"
@@ -5,10 +6,15 @@ import { getOpenCodeCacheDir } from "./data-path"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { normalizeSDKResponse } from "./normalize-sdk-response"
 
+type OpencodeClient = PluginInput["client"]
+type ModelListClient = OpencodeClient & { model?: { list?: () => Promise<unknown> } }
+
 function normalizeModelName(name: string): string {
 	return name
 		.toLowerCase()
 		.replace(/claude-(opus|sonnet|haiku)-(\d+)[.-](\d+)/g, "claude-$1-$2.$3")
+		.replace(/kimi-k2[.-](\d+)/g, "kimi-k2.$1")
+		.replace(/\b(glm|gpt)-(\d+)[.-](\d+)/g, "$1-$2.$3")
 }
 
 /**
@@ -103,7 +109,7 @@ export function isModelAvailable(
 	return fuzzyMatchModel(targetModel, availableModels) !== null
 }
 
-export async function getConnectedProviders(client: any): Promise<string[]> {
+export async function getConnectedProviders(client: OpencodeClient): Promise<string[]> {
 	if (!client?.provider?.list) {
 		log("[getConnectedProviders] client.provider.list not available")
 		return []
@@ -121,7 +127,7 @@ export async function getConnectedProviders(client: any): Promise<string[]> {
 }
 
 export async function fetchAvailableModels(
-	client?: any,
+	client?: ModelListClient,
 	options?: { connectedProviders?: string[] | null }
 ): Promise<Set<string>> {
 	let connectedProviders = options?.connectedProviders ?? null

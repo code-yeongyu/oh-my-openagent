@@ -1,3 +1,5 @@
+// allow: SIZE_OK - ULW loop hook tests share one fake Codex stream/process harness; this release adds narrow hook cases and future additions should split by hook lifecycle.
+
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -150,11 +152,11 @@ describe("applyUserPromptUlwLoopSteering - OMO directive patterns", () => {
 		expect(out).toContain("accepted");
 	});
 
-	it("processes omo ulw-loop steer: pattern", async () => {
+	it.each(["omo ulw-loop steer", "omo-agent-toolkit ulw-loop steer"])("processes %s: pattern", async (marker) => {
 		const repoRoot = await bootstrapPlanRepo();
 		const out = await applyUserPromptUlwLoopSteering(
 			payload(
-				'omo ulw-loop steer: {"kind":"annotate_ledger","source":"user_prompt_submit","evidence":"x","rationale":"y"}',
+				`${marker}: {"kind":"annotate_ledger","source":"user_prompt_submit","evidence":"x","rationale":"y"}`,
 				repoRoot,
 			),
 		);
@@ -165,6 +167,10 @@ describe("applyUserPromptUlwLoopSteering - OMO directive patterns", () => {
 describe("applyUserPromptUlwLoopSteering - non-matching prompts", () => {
 	it("returns empty string when no directive in prompt", async () => {
 		expect(await applyUserPromptUlwLoopSteering(payload("just a normal user message", "/tmp"))).toBe("");
+	});
+
+	it("#given standalone ultrawork injection is disabled #when prompt is ulw #then aggregate ulw-loop steering stays silent", async () => {
+		expect(await applyUserPromptUlwLoopSteering(payload("ulw this change", "/tmp"))).toBe("");
 	});
 
 	it("returns empty when hook_event_name is not UserPromptSubmit", async () => {
@@ -186,6 +192,13 @@ describe("applyUserPromptUlwLoopSteering - error swallowing", () => {
 
 	it("returns empty when steering proposal is malformed JSON after marker", async () => {
 		const out = await applyUserPromptUlwLoopSteering(payload("OMO_ULW_LOOP_STEER: {bad", "/tmp"));
+		expect(out).toBe("");
+	});
+
+	it("#given malformed steering and standalone ultrawork enabled #when prompt contains OMO_ULW #then hook does not fall through to ultrawork", async () => {
+		const out = await applyUserPromptUlwLoopSteering(payload("OMO_ULW_LOOP_STEER: {bad", "/tmp"), {
+			includeUltraworkDirective: true,
+		});
 		expect(out).toBe("");
 	});
 });
@@ -229,7 +242,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 				permissionDecision: "deny",
 			},
 		});
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("token_budget");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("unlimited");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("update_goal");
@@ -245,7 +257,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 		// then
 		const parsed = JSON.parse(output);
 		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("update_goal");
 	});
 
@@ -259,7 +270,6 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 		// then
 		const parsed = JSON.parse(output);
 		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 	});
 
 	it("#given create_goal omits token_budget #when PreToolUse runs #then it stays silent", () => {

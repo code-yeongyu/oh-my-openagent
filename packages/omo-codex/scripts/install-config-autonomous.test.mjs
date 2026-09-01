@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { updateCodexConfig } from "./install/config.mjs";
+import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
 test("#given autonomous permissions requested #when script installer updates config #then enables full Codex autonomy", async () => {
 	// given

@@ -1,0 +1,22 @@
+{
+  "reloadIdentical": true,
+  "redactedApiKey": true,
+  "sentinelAbsent": true,
+  "corruptSkipped": true,
+  "malformedOptionalSkipped": true,
+  "illegalTransitionApplied": false,
+  "completedResidentMessageability": "revive",
+  "evictedCompletedApplied": true,
+  "evictedCompletedStatus": "completed",
+  "evictedCompletedMessageability": "not-continuable",
+  "normalLostApplied": false,
+  "normalLostStatus": "running",
+  "traversalRejected": true,
+  "outsideWriteCreated": false,
+  "finalStatus": "completed",
+  "cleanup": {
+    "existedBeforeCleanup": true,
+    "outsidePathExistsBeforeCleanup": false,
+    "existsAfterCleanup": false
+  }
+}

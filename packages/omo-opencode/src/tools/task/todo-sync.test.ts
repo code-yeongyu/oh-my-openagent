@@ -1,11 +1,16 @@
 /// <reference types="bun-types/test-globals" />
 import type { Task } from "../../features/claude-tasks/types";
+import type { PluginInput } from "@opencode-ai/plugin";
 import {
   syncTaskToTodo,
   syncAllTasksToTodos,
   syncTaskTodoUpdate,
   type TodoInfo,
 } from "./todo-sync";
+
+type MockTodoCtx = PluginInput & {
+  client: { session: { todo: { mockResolvedValue: (value: unknown) => void; mockRejectedValue: (value: unknown) => void } } };
+};
 
 describe("syncTaskToTodo", () => {
   it("converts pending task to pending todo", () => {
@@ -200,7 +205,7 @@ describe("syncTaskToTodo", () => {
 });
 
 describe("syncTaskTodoUpdate", () => {
-  let mockCtx: any;
+  let mockCtx: MockTodoCtx;
 
   beforeEach(() => {
     mockCtx = {
@@ -209,7 +214,7 @@ describe("syncTaskTodoUpdate", () => {
           todo: vi.fn(),
         },
       },
-    };
+    } as unknown as MockTodoCtx;
   });
 
   it("writes updated todo and preserves existing items", async () => {
@@ -283,7 +288,7 @@ describe("syncTaskTodoUpdate", () => {
 });
 
 describe("syncAllTasksToTodos", () => {
-  let mockCtx: any;
+  let mockCtx: MockTodoCtx;
 
   beforeEach(() => {
     mockCtx = {
@@ -292,7 +297,7 @@ describe("syncAllTasksToTodos", () => {
           todo: vi.fn(),
         },
       },
-    };
+    } as unknown as MockTodoCtx;
   });
 
   it("fetches current todos from OpenCode", async () => {

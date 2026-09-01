@@ -1,10 +1,13 @@
 import { join } from "node:path";
+import type { RuleCandidate } from "@oh-my-opencode/rules-engine/engine";
+import {
+	createEngine,
+	defaultConfig,
+	matchRule as defaultMatchRule,
+	type EngineDeps,
+} from "@oh-my-opencode/rules-engine/engine";
 import { describe, expect, it } from "vitest";
-
 import { configFromEnvironment } from "../src/config.js";
-import { createEngine, defaultConfig, type EngineDeps } from "../src/rules/engine.js";
-import { matchRule as defaultMatchRule } from "../src/rules/matcher.js";
-import type { RuleCandidate } from "../src/rules/types.js";
 
 const projectRoot = "/tmp/codex-rules-engine";
 

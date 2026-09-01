@@ -1,0 +1,24 @@
+                                                                                                                        
+  ┃                                                                                                                     
+  ┃  Exact artifact main context.                                    ┃                                               ┃  
+  ┃                                                                  ┃   OhMyOpenCode 5.0.0-beta.13 (dev)            ┃  
+                                                                     ┃                                               ┃  
+     fake response 3                                                 ┃  Sisyphus running in local development mode.  ┃  
+                                                                     ┃                                               ┃  
+        Hephaestus - Deep Agent  gpt-fake  700ms                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+  ┃                                                                                                                     
+  ┃                                                                                                                     
+  ┃                                                                                                                     
+  ┃  Hephaestus - Deep Agent   gpt-fake OpenAI                                          BTW retained  ctrl+/ picker     
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀  
+   [REDACTED]/.omo/        15 (0%)ctrl+p         
+   evidence/20260821-btw-pr-review-findings/project                                                      commands       
+                                                                                                                        

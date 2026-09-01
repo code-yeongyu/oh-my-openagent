@@ -1,7 +1,7 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { lookupTeamSession } from "../team-session-registry"
-import { loadRuntimeState } from "../team-state-store/store"
-import type { Message, RuntimeState } from "../types"
+import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
+import type { Message, RuntimeState } from "@oh-my-opencode/team-core/types"
 
 export type TeamRuntimeDetails = {
   teamRunId: string
@@ -12,6 +12,7 @@ export type TeamRuntimeDetails = {
 
 export type TeamSendMessageToolDeps = {
   loadRuntimeState: typeof loadRuntimeState
+  liveDeliverySettleMs?: number
 }
 
 export const defaultTeamSendMessageToolDeps: TeamSendMessageToolDeps = {

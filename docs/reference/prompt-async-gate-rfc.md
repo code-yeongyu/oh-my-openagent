@@ -56,11 +56,11 @@ isolation and still collide with another route in the same process.
 The root `AGENTS.md` now records the governing invariant in the section
 "Internal message injection is dangerous": production code may call
 `session.prompt` or `session.promptAsync` only inside
-`src/shared/prompt-async-gate.ts`. Every other route must use the shared gate.
+`packages/omo-opencode/src/shared/prompt-async-gate.ts`. Every other route must use the shared gate.
 
 ## Decision
 
-Create `src/shared/prompt-async-gate.ts` as the single production owner of raw
+Create `packages/omo-opencode/src/shared/prompt-async-gate.ts` as the single production owner of raw
 OpenCode prompt dispatch.
 
 The gate exposes one public dispatcher that production callers must use:
@@ -162,7 +162,7 @@ releasePromptAsyncReservation(sessionID, {
 for callers that know the full reservation source.
 
 Raw prompt calls outside the gate are blocked by
-`src/shared/prompt-async-route-audit.test.ts`. The audit uses the TypeScript
+`packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts`. The audit uses the TypeScript
 Compiler API rather than regex so it catches destructuring, bracket access,
 optional chaining, and aliased or cast access patterns.
 
@@ -185,7 +185,7 @@ optional chaining, and aliased or cast access patterns.
 
 - Caller-side retry logic that releases and retries must call
   `releasePromptAsyncReservation` explicitly when the original prompt did not
-  durably reach the server. `src/shared/model-suggestion-retry.ts` is the
+  durably reach the server. `packages/omo-opencode/src/shared/model-suggestion-retry.ts` is the
   reference case.
 - 13+ wiring sites each need to be conscious of the gate result. Treating
   `reserved` as a failure can create noisy retries.
@@ -231,5 +231,5 @@ for their trigger. Static policy alone is not enough.
 - Root `AGENTS.md`: section "Internal message injection is dangerous".
 - `.omo/rules/test-discipline.md`: forbids `setTimeout(resolve, N)` and
   `await sleep(N)` in tests unless time itself is the system under test.
-- Implementation: `src/shared/prompt-async-gate.ts`.
-- Audit: `src/shared/prompt-async-route-audit.test.ts`.
+- Implementation: `packages/omo-opencode/src/shared/prompt-async-gate.ts`.
+- Audit: `packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts`.

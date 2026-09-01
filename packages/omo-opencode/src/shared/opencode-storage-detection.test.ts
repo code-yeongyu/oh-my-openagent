@@ -47,7 +47,7 @@ describe("isSqliteBackend", () => {
     resetSqliteBackendCache()
     versionCheckCalls = []
     versionReturnValue = true
-    try { rmSync(TEST_DATA_DIR, { recursive: true, force: true }) } catch {}
+    try { rmSync(TEST_DATA_DIR, { recursive: true, force: true }) } catch {} // no-excuse-ok: catch — best-effort temp-dir cleanup
   })
 
   it("returns false when version is below threshold", () => {

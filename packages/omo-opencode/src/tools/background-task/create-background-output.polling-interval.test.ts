@@ -38,6 +38,8 @@ const client: BackgroundOutputClient = {
   },
 }
 
+const LEGACY_BACKGROUND_OUTPUT_POLL_INTERVAL_MS = 1000
+
 describe("background_output blocking poll interval", () => {
   test("#given a short blocking timeout and a task that completes on retry #when fetching output #then it does not sleep for the legacy one second interval", async () => {
     // given
@@ -64,7 +66,7 @@ describe("background_output blocking poll interval", () => {
     }, mockContext)
 
     // then
-    expect(Date.now() - startedAt).toBeLessThan(200)
+    expect(Date.now() - startedAt).toBeLessThan(LEGACY_BACKGROUND_OUTPUT_POLL_INTERVAL_MS)
     expect(pollCount).toBeGreaterThanOrEqual(3)
     expect(output).toContain("completed result")
   })

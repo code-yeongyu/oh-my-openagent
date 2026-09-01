@@ -1,0 +1,70 @@
+# Review blocker: LSP dead-owner recovery and deadline
+
+## RED
+
+Command:
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun test script/ensure-vendored-lsp-daemon.test.ts
+
+Before the blocker fix:
+
+  owner-death regression:
+    error: timed out waiting for cli.js
+    fail after 1024.93ms
+
+  aggregate-deadline regression:
+    expected budgets [1000, 600]
+    received budgets [1000, 1000]
+
+  2 pass
+  2 fail
+
+The owner test subscribed the waiter, killed a real lock-owning Bun process,
+and observed that the current waiter never returned to acquisition.
+
+## GREEN
+
+The helper now:
+
+- computes one absolute operation deadline;
+- rechecks the lock owner PID while waiting;
+- returns to acquisition when the owner dies;
+- keeps filesystem watch events as the fast path;
+- keeps bounded state rechecks authoritative if watch creation or the watcher
+  itself fails;
+- passes only remaining time to install and build;
+- preserves spawn errors and terminating signals.
+
+Command:
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun test script/ensure-vendored-lsp-daemon.test.ts
+
+Observed:
+
+  7 pass
+  0 fail
+  Ran 7 tests across 1 file. [185.00ms]
+
+Covered scenarios:
+
+- two successful callers, one build;
+- owner killed after waiter subscription, waiter recovers;
+- watcher creation unavailable, state recheck still completes;
+- remaining deadline passed to build;
+- aggregate deadline exhaustion;
+- nonzero npm status;
+- spawn error detail;
+- signal termination detail.
+
+Typecheck:
+
+  bun run typecheck:script
+  exit=0
+
+Cleanup:
+
+- killed owner process observed exiting;
+- per-test lock roots and package roots removed;
+- no stale lock file or owner process remains.
