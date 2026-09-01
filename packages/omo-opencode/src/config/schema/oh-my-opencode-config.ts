@@ -1,6 +1,5 @@
 import { z } from "zod"
 import { AnyMcpNameSchema } from "../../mcp/types"
-import { BuiltinSkillNameSchema } from "./agent-names"
 import { AgentDefinitionsConfigSchema } from "./agent-definitions"
 import { AgentOverridesSchema } from "./agent-overrides"
 import { BabysittingConfigSchema } from "./babysitting"
@@ -8,6 +7,7 @@ import { BackgroundTaskConfigSchema } from "./background-task"
 import { BrowserAutomationConfigSchema } from "./browser-automation"
 import { CategoriesConfigSchema } from "./categories"
 import { ClaudeCodeConfigSchema } from "./claude-code"
+import { CodegraphConfigSchema } from "./codegraph"
 import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
 import { DefaultModeConfigSchema } from "./default-mode"
@@ -18,14 +18,16 @@ import { KeywordDetectorConfigSchema } from "./keyword-detector"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
 import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
-import { RalphLoopConfigSchema } from "./ralph-loop"
+import { GoalConfigSchema } from "./goal"
+import { MonitorConfigSchema } from "./monitor"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
 import { TeamModeConfigSchema } from "./team-mode"
 import { SkillsConfigSchema } from "./skills"
 import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
-import { StartWorkConfigSchema } from "./start-work"
+import { TuiConfigSchema } from "./tui"
+import { UlwExecuteConfigSchema } from "./ulw-execute"
 import { WebsearchConfigSchema } from "./websearch"
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -40,7 +42,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   agent_definitions: AgentDefinitionsConfigSchema,
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(z.string()).optional(),
-  disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
+  disabled_skills: z.array(z.string()).optional(),
   disabled_hooks: z.array(z.string()).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
@@ -56,6 +58,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   mcp_env_allowlist: z.array(z.string()).optional(),
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
+  /** Enable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry. */
+  telemetry: z.boolean().optional().describe("Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry."),
   /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */
   model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
@@ -66,7 +70,9 @@ export const OhMyOpenCodeConfigSchema = z.object({
   experimental: ExperimentalConfigSchema.optional(),
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
-  ralph_loop: RalphLoopConfigSchema.optional(),
+  goal: GoalConfigSchema.optional(),
+  /** Deprecated compatibility shim. Old \`ralph_loop\` key is parsed and migrated to \`goal\` in validate.ts. */
+  ralph_loop: z.record(z.string(), z.unknown()).optional(),
   /**
    * Enable runtime fallback (default: false)
    * Set to false to disable, or use object for advanced config:
@@ -79,6 +85,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   openclaw: OpenClawConfigSchema.optional(),
   /** Plugin i18n settings */
   i18n: I18nConfigSchema.optional(),
+  monitor: MonitorConfigSchema.optional(),
+  codegraph: CodegraphConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
@@ -90,9 +98,12 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
+  tui: TuiConfigSchema.default({ sidebar: { enabled: true } }).optional(),
   sisyphus: SisyphusConfigSchema.optional(),
-  start_work: StartWorkConfigSchema.optional(),
-  /** Default mode auto-activation settings (ultrawork, ralph loop) */
+  ulw_execute: UlwExecuteConfigSchema.optional(),
+  /** Deprecated compatibility shim. Old \`start_work\` key is parsed and migrated to \`ulw_execute\` in validate.ts. */
+  start_work: UlwExecuteConfigSchema.optional(),
+  /** Default mode auto-activation settings (ultrawork, goal) */
   default_mode: DefaultModeConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),

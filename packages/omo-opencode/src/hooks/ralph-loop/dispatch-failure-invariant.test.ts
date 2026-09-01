@@ -68,7 +68,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -115,7 +115,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -161,7 +161,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -205,11 +205,8 @@ describe("ralph-loop dispatch failure invariants", () => {
 						}
 						return { data: [] }
 					},
-					promptAsync: async (options: { body: { parts: Array<{ type: string; text: string }> } }) => {
-						if (options.body.parts[0]?.text.includes("Verification failed")) {
-							throw new Error("simulated dispatch failure")
-						}
-						return {}
+					promptAsync: async () => {
+						throw new Error("simulated dispatch failure")
 					},
 					prompt: async () => ({}),
 					abort: async () => ({}),
@@ -223,6 +220,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 				},
 			},
 		} as never, {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID): string => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 
@@ -274,15 +272,10 @@ describe("ralph-loop dispatch failure invariants", () => {
 						}
 						return { data: [] }
 					},
-					promptAsync: async (options: { body: { parts: Array<{ type: string; text: string }> } }) => {
-						if (options.body.parts[0]?.text.includes("Verification failed")) {
-							return {
-								error: { message: "verification continuation rejected by OpenCode" },
-								response: { status: 400 },
-							}
-						}
-						return {}
-					},
+					promptAsync: async () => ({
+						error: { message: "verification continuation rejected by OpenCode" },
+						response: { status: 400 },
+					}),
 					prompt: async () => ({}),
 					abort: async () => ({}),
 					create: async () => ({ data: { id: "new-session-id" } }),
@@ -295,6 +288,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 				},
 			},
 		} as never, {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID): string => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 
@@ -361,7 +355,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -721,7 +715,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,

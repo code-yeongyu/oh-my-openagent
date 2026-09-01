@@ -10,14 +10,15 @@ import {
   createModelFallbackHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
+  createCodegraphBootstrapHook,
+  createAstGrepSgProvisionHook,
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
-  createRalphLoopHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
   createTaskResumeInfoHook,
-  createStartWorkHook,
+  createUlwExecuteHook,
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createNoSisyphusGptHook,
@@ -28,6 +29,7 @@ import {
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
 } from "../../hooks"
+import { createGoalHook } from "../../hooks/goal"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -45,13 +47,15 @@ export type SessionHooks = {
   modelFallback: ReturnType<typeof createModelFallbackHook> | null
   anthropicContextWindowLimitRecovery: ReturnType<typeof createAnthropicContextWindowLimitRecoveryHook> | null
   autoUpdateChecker: ReturnType<typeof createAutoUpdateCheckerHook> | null
+  codegraphBootstrap: ReturnType<typeof createCodegraphBootstrapHook> | null
+  astGrepSgProvision: ReturnType<typeof createAstGrepSgProvisionHook> | null
   agentUsageReminder: ReturnType<typeof createAgentUsageReminderHook> | null
   nonInteractiveEnv: ReturnType<typeof createNonInteractiveEnvHook> | null
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
-  ralphLoop: ReturnType<typeof createRalphLoopHook> | null
+  goal: ReturnType<typeof createGoalHook> | null
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
-  startWork: ReturnType<typeof createStartWorkHook> | null
+  ulwExecute: ReturnType<typeof createUlwExecuteHook> | null
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
   noSisyphusGpt: ReturnType<typeof createNoSisyphusGptHook> | null
@@ -139,6 +143,14 @@ export function createSessionHooks(args: {
         }))
     : null
 
+  const codegraphBootstrap = isHookEnabled("codegraph-bootstrap")
+    ? safeHook("codegraph-bootstrap", () => createCodegraphBootstrapHook(ctx, pluginConfig.codegraph))
+    : null
+
+  const astGrepSgProvision = isHookEnabled("ast-grep-sg-provision")
+    ? safeHook("ast-grep-sg-provision", () => createAstGrepSgProvisionHook())
+    : null
+
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? safeHook("agent-usage-reminder", () => createAgentUsageReminderHook(ctx))
     : null
@@ -153,12 +165,13 @@ export function createSessionHooks(args: {
     ? safeHook("interactive-bash-session", () => createInteractiveBashSessionHook(ctx))
     : null
 
-  const ralphLoop = isHookEnabled("ralph-loop")
-    ? safeHook("ralph-loop", () =>
-        createRalphLoopHook(ctx, {
-          config: pluginConfig.ralph_loop,
-          checkSessionExists: async (sessionId) => await sessionExists(sessionId),
-          backgroundManager,
+  const goal = isHookEnabled("goal") && pluginConfig.goal?.enabled
+    ? safeHook("goal", () =>
+        createGoalHook(ctx, {
+          projectDir: ctx.directory,
+          autoStart: pluginConfig.goal?.auto_start ?? false,
+          ultrawork: pluginConfig.default_mode?.ultrawork ?? false,
+          getSessionExists: async (sessionId) => await sessionExists(sessionId),
         }))
     : null
 
@@ -170,8 +183,8 @@ export function createSessionHooks(args: {
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
     : null
 
-  const startWork = isHookEnabled("start-work")
-    ? safeHook("start-work", () => createStartWorkHook(ctx))
+  const ulwExecute = isHookEnabled("ulw-execute")
+    ? safeHook("ulw-execute", () => createUlwExecuteHook(ctx))
     : null
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
@@ -229,13 +242,15 @@ export function createSessionHooks(args: {
     modelFallback,
     anthropicContextWindowLimitRecovery,
     autoUpdateChecker,
+    codegraphBootstrap,
+    astGrepSgProvision,
     agentUsageReminder,
     nonInteractiveEnv,
     interactiveBashSession,
-    ralphLoop,
+    goal,
     editErrorRecovery,
     delegateTaskRetry,
-    startWork,
+    ulwExecute,
     prometheusMdOnly,
     sisyphusJuniorNotepad,
     noSisyphusGpt,

@@ -1,0 +1,12 @@
+Command: bun test packages/omo-opencode/src/hooks/runtime-fallback packages/model-core
+
+Result:
+- 580 pass
+- 0 fail
+- 1660 expect() calls
+- Ran 580 tests across 60 files in 2.14s
+
+Relevant passing regressions:
+- extractRuntimeFallbackAutoRetrySignal returns the free usage provider message.
+- createSessionStatusHandler dispatches fallback immediately for the free usage retry status.
+- adapter session.status fallback patterns share the canonical model-core pattern set.

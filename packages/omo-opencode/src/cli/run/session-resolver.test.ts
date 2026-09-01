@@ -81,13 +81,13 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = await resolveSession({ client: mockClient, directory })
+    const result = await resolveSession({ client: mockClient, directory, retryDelayMs: 1 })
 
     // then
     expect(result).toBe("new-session-id")
     expect(mockClient.session.create).toHaveBeenCalledWith({
       body: {
-        title: "oh-my-opencode run",
+        title: "oh-my-openagent run",
         permission: [
           { permission: "question", action: "deny", pattern: "*" },
         ],
@@ -107,14 +107,14 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = await resolveSession({ client: mockClient, directory })
+    const result = await resolveSession({ client: mockClient, directory, retryDelayMs: 1 })
 
     // then
     expect(result).toBe("retried-session-id")
     expect(mockClient.session.create).toHaveBeenCalledTimes(2)
     expect(mockClient.session.create).toHaveBeenCalledWith({
       body: {
-        title: "oh-my-opencode run",
+        title: "oh-my-openagent run",
         permission: [
           { permission: "question", action: "deny", pattern: "*" },
         ],
@@ -134,7 +134,7 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = resolveSession({ client: mockClient, directory })
+    const result = resolveSession({ client: mockClient, directory, retryDelayMs: 1 })
 
     // then
     await Promise.resolve(
@@ -154,7 +154,7 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = resolveSession({ client: mockClient, directory })
+    const result = resolveSession({ client: mockClient, directory, retryDelayMs: 1 })
 
     // then
     await Promise.resolve(

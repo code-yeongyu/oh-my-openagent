@@ -1,8 +1,9 @@
+# allow: SIZE_OK - Windows bootstrap hook keeps PowerShell 5.1-compatible resolver/provisioning flow in one audited entrypoint.
 # LazyCodex bootstrap SessionStart hook for native Windows (Windows PowerShell 5.1).
-# Codex runs hooks through %COMSPEC%, so node may be absent from PATH entirely;
-# this script provisions it silently: node on PATH -> common install dirs ->
-# winget OpenJS.NodeJS.LTS -> portable ZIP pinned by manifests/node.json
-# (sha256-verified, extracted under <codexHome>\runtime\node, USER PATH append).
+# Codex runs hooks through %COMSPEC%, so node may be absent from PATH entirely.
+# Resolve Codex-managed Node first, then the portable ZIP pinned by
+# manifests/node.json, then common install dirs and PATH. Never install system
+# dependencies or mutate the user PATH from a hook.
 # Git Bash is prepared best-effort on the provisioning path, then the script
 # delegates to the bundled node hook. It always exits 0: provisioning failures
 # are logged to $env:PLUGIN_DATA\bootstrap\ps-bootstrap.log, never block a session.
@@ -70,62 +71,50 @@ function Get-PortableNodeDirectory {
 	return (Join-Path $runtimeRoot ("node-v" + $Manifest.version + "-win-x64"))
 }
 
+function Resolve-NodeReplNodePath {
+	param([string]$CodexHome)
+	if (-not [string]::IsNullOrWhiteSpace($env:NODE_REPL_NODE_PATH)) {
+		$candidate = $env:NODE_REPL_NODE_PATH.Trim()
+		if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+	}
+	$configPath = Join-Path $CodexHome "config.toml"
+	if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { return $null }
+	try {
+		foreach ($line in Get-Content -LiteralPath $configPath) {
+			if ($line -match '^\s*NODE_REPL_NODE_PATH\s*=\s*[''"]([^''"]+)[''"]') {
+				$candidate = $Matches[1]
+				if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+			}
+		}
+	} catch {
+		Write-BootstrapLog ("degraded component=node reason=config-read-failed path=" + $configPath + " error=" + $_.Exception.Message + " hint=" + $script:DoctorHint)
+	}
+	return $null
+}
+
 function Resolve-NodeCommand {
 	param([string]$CodexHome, $Manifest)
-	$onPath = Get-Command node -CommandType Application -ErrorAction SilentlyContinue
-	if ($null -ne $onPath) {
-		return (@($onPath)[0]).Source
-	}
+	$codexNode = Resolve-NodeReplNodePath -CodexHome $CodexHome
+	if ($null -ne $codexNode) { return $codexNode }
 	$candidateDirectories = @()
+	if ($null -ne $Manifest) {
+		$candidateDirectories += (Get-PortableNodeDirectory -CodexHome $CodexHome -Manifest $Manifest)
+	}
 	if (-not [string]::IsNullOrWhiteSpace($env:ProgramFiles)) {
 		$candidateDirectories += (Join-Path $env:ProgramFiles "nodejs")
 	}
 	if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
 		$candidateDirectories += (Join-Path $env:LOCALAPPDATA "Programs\nodejs")
 	}
-	if ($null -ne $Manifest) {
-		$candidateDirectories += (Get-PortableNodeDirectory -CodexHome $CodexHome -Manifest $Manifest)
-	}
 	foreach ($directory in $candidateDirectories) {
 		$candidate = Join-Path $directory "node.exe"
 		if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
 	}
+	$onPath = Get-Command node -CommandType Application -ErrorAction SilentlyContinue
+	if ($null -ne $onPath) {
+		return (@($onPath)[0]).Source
+	}
 	return $null
-}
-
-function Install-NodeWithWinget {
-	$winget = Get-Command winget -ErrorAction SilentlyContinue
-	if ($null -eq $winget) {
-		Write-BootstrapLog "winget unavailable; skipping winget node install"
-		return
-	}
-	Write-BootstrapLog "installing node via: winget install OpenJS.NodeJS.LTS --silent"
-	try {
-		& winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements | Out-Null
-		Write-BootstrapLog ("winget node install finished with exit code " + $LASTEXITCODE)
-	} catch {
-		Write-BootstrapLog ("winget node install failed: " + $_.Exception.Message)
-	}
-}
-
-function Add-UserPathEntry {
-	param([string]$Directory)
-	$normalizedTarget = $Directory.TrimEnd("\")
-	$currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-	if ($null -eq $currentPath) { $currentPath = "" }
-	foreach ($entry in $currentPath.Split(";")) {
-		if ($entry.Trim().TrimEnd("\") -eq $normalizedTarget) {
-			Write-BootstrapLog ("user PATH already contains " + $Directory + "; leaving it unchanged")
-			return
-		}
-	}
-	if ($currentPath.Trim().Length -eq 0) {
-		$updatedPath = $Directory
-	} else {
-		$updatedPath = $currentPath.TrimEnd(";") + ";" + $Directory
-	}
-	[Environment]::SetEnvironmentVariable("Path", $updatedPath, "User")
-	Write-BootstrapLog ("appended " + $Directory + " to the USER PATH; restart Codex so new sessions can see node")
 }
 
 function Install-PortableNode {
@@ -170,7 +159,6 @@ function Install-PortableNode {
 		return $null
 	}
 	Write-BootstrapLog ("portable node provisioned at " + $nodeExe)
-	Add-UserPathEntry -Directory $nodeDirectory
 	return $nodeExe
 }
 
@@ -220,23 +208,8 @@ function Resolve-GitBash {
 
 function Initialize-GitBash {
 	$resolution = Resolve-GitBash
-	if (($null -eq $resolution) -and ($env:OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL -ne "1")) {
-		$winget = Get-Command winget -ErrorAction SilentlyContinue
-		if ($null -ne $winget) {
-			Write-BootstrapLog "installing git bash via: winget install --id Git.Git -e --source winget"
-			try {
-				& winget install --id Git.Git -e --source winget | Out-Null
-				Write-BootstrapLog ("winget git install finished with exit code " + $LASTEXITCODE)
-			} catch {
-				Write-BootstrapLog ("winget git install failed: " + $_.Exception.Message)
-			}
-			$resolution = Resolve-GitBash
-		} else {
-			Write-BootstrapLog "winget unavailable; skipping git bash install"
-		}
-	}
 	if ($null -eq $resolution) {
-		Write-BootstrapLog ("degraded component=git_bash reason=not-found install=winget install --id Git.Git -e --source winget hint=" + $script:DoctorHint)
+		Write-BootstrapLog ("degraded component=git_bash reason=not-found install=Install Git for Windows or set OMO_CODEX_GIT_BASH_PATH hint=" + $script:DoctorHint)
 		return
 	}
 	Write-BootstrapLog ("git bash resolved at " + $resolution.Path + " source=" + $resolution.Source)
@@ -262,7 +235,7 @@ function Invoke-NodeHookDelegate {
 }
 
 function Write-ProvisioningIncompleteNotice {
-	$notice = "LazyCodex bootstrap: Node.js is not available yet. Install Node LTS (winget install OpenJS.NodeJS.LTS), then restart Codex. Diagnose with: " + $script:DoctorHint
+	$notice = "LazyCodex bootstrap: Node.js is not available yet. Rerun LazyCodex install from Codex Desktop or install Node LTS manually, then restart Codex. Diagnose with: " + $script:DoctorHint
 	$payload = @{
 		hookSpecificOutput = @{
 			hookEventName = "SessionStart"
@@ -288,11 +261,7 @@ function Invoke-Bootstrap {
 		Invoke-NodeHookDelegate -NodeExe $nodeExe
 		return
 	}
-	Install-NodeWithWinget
-	$nodeExe = Resolve-NodeCommand -CodexHome $codexHome -Manifest $manifest
-	if ($null -eq $nodeExe) {
 		$nodeExe = Install-PortableNode -CodexHome $codexHome -Manifest $manifest
-	}
 	Initialize-GitBash
 	if ($null -eq $nodeExe) {
 		Write-BootstrapLog ("degraded component=node reason=unresolved hint=" + $script:DoctorHint)

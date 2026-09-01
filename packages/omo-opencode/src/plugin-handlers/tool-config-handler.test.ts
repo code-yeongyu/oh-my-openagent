@@ -306,6 +306,45 @@ describe("applyToolConfig", () => {
     })
   })
 
+  describe("#given sisyphus-junior with permission.task=deny from factory", () => {
+    describe("#when applyToolConfig runs", () => {
+      it("#then should NOT clobber task:deny to allow (sub-bug of #5193)", () => {
+        // given a sisyphus-junior agent with permission.task === "deny" (factory output)
+        const params = createParams({ agents: ["sisyphus-junior"] });
+        (params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }).permission = {
+          task: "deny",
+        };
+
+        // when applyToolConfig runs
+        applyToolConfig(params);
+
+        // then task remains "deny" (NOT overwritten to "allow")
+        const junior = params.agentResult["sisyphus-junior"] as {
+          permission: Record<string, unknown>;
+        };
+        expect(junior.permission.task).toBe("deny");
+      });
+
+      it("#then should still add task_*:allow and teammate:allow to sisyphus-junior", () => {
+        // given
+        const params = createParams({ agents: ["sisyphus-junior"] });
+        (params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }).permission = {
+          task: "deny",
+        };
+
+        // when
+        applyToolConfig(params);
+
+        // then
+        const junior = params.agentResult["sisyphus-junior"] as {
+          permission: Record<string, unknown>;
+        };
+        expect(junior.permission["task_*"]).toBe("allow");
+        expect(junior.permission.teammate).toBe("allow");
+      });
+    });
+  });
+
   describe("#given disabled_tools includes 'question'", () => {
     let originalConfigContent: string | undefined
     let originalCliRunMode: string | undefined

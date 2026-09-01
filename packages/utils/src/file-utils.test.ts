@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test"
-import { mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync } from "fs"
+import { chmodSync, mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
-import { resolveSymlink, resolveSymlinkAsync, isSymbolicLink } from "./file-utils"
+import { fileExists, fileExistsStrict, resolveSymlink, resolveSymlinkAsync, isSymbolicLink } from "./file-utils"
 
 const testDir = join(tmpdir(), "file-utils-test-" + Date.now())
+const supportsPosixChmodPermissions = process.platform !== "win32"
 
 // Create a directory structure that mimics the real-world scenario:
 //
@@ -104,5 +105,95 @@ describe("isSymbolicLink", () => {
 
 	it("returns false for a non-existent path", () => {
 		expect(isSymbolicLink(join(testDir, "does-not-exist"))).toBe(false)
+	})
+})
+
+describe("fileExists", () => {
+	it("#given a regular file #when checking existence #then it returns true", async () => {
+		// given
+		const filePath = join(realSkillDir, "SKILL.md")
+
+		// when
+		const result = await fileExists(filePath)
+
+		// then
+		expect(result).toBe(true)
+	})
+
+	it("#given a missing file #when checking existence #then it returns false", async () => {
+		// given
+		const filePath = join(testDir, "missing-file")
+
+		// when
+		const result = await fileExists(filePath)
+
+		// then
+		expect(result).toBe(false)
+	})
+
+	it("#given an inaccessible child path #when checking existence #then it returns false", async () => {
+		if (!supportsPosixChmodPermissions) return
+
+		// given
+		const lockedDir = join(testDir, "locked-quiet")
+		const filePath = join(lockedDir, "secret.txt")
+		mkdirSync(lockedDir, { recursive: true })
+		writeFileSync(filePath, "secret")
+		chmodSync(lockedDir, 0)
+
+		try {
+			// when
+			const result = await fileExists(filePath)
+
+			// then
+			expect(result).toBe(false)
+		} finally {
+			chmodSync(lockedDir, 0o755)
+		}
+	})
+})
+
+describe("fileExistsStrict", () => {
+	it("#given a regular file #when checking existence strictly #then it returns true", async () => {
+		// given
+		const filePath = join(realSkillDir, "SKILL.md")
+
+		// when
+		const result = await fileExistsStrict(filePath)
+
+		// then
+		expect(result).toBe(true)
+	})
+
+	it("#given a missing file #when checking existence strictly #then it returns false", async () => {
+		// given
+		const filePath = join(testDir, "missing-strict-file")
+
+		// when
+		const result = await fileExistsStrict(filePath)
+
+		// then
+		expect(result).toBe(false)
+	})
+
+	it("#given an inaccessible child path #when checking existence strictly #then it rethrows the permission error", async () => {
+		if (!supportsPosixChmodPermissions) return
+
+		// given
+		const lockedDir = join(testDir, "locked-strict")
+		const filePath = join(lockedDir, "secret.txt")
+		mkdirSync(lockedDir, { recursive: true })
+		writeFileSync(filePath, "secret")
+		chmodSync(lockedDir, 0)
+
+		try {
+			// when
+			const result = fileExistsStrict(filePath)
+
+			// then
+			await expect(result).rejects.toThrow()
+		} finally {
+			chmodSync(lockedDir, 0o755)
+		}
 	})
 })

@@ -1,0 +1,413 @@
+TASK 5 - Release surfaces: publish.yml codex smoke assertions + postinstall notice + docs + CHANGELOG
+Worktree: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename
+Branch: feat/omo-agent-toolkit-rename  HEAD: 3715b8e16
+Captured: 2026-08-09T08:49:55Z
+
+==================================================================
+0. PLAN REFERENCE DRIFT (plan cited commit 76b9aa8d3; branch is 8b33ac959)
+==================================================================
+Every plan line reference was re-verified against this branch. Drift found and resolved:
+
+publish.yml
+  plan :815-850 smoke function        -> ACTUAL 801-843 (fn), calls at 845-847.  RESOLVED: edited by content, not line number.
+  plan :773-778 transformation        -> ACTUAL 773-781 jq block, `.bin` rewrite at :776. NOT TOUCHED (verified by diff below).
+  plan :988 marketplace path          -> ACTUAL :988 `diff -qr .../plugins/omo`. NOT TOUCHED (plugin path, not a bin).
+docs/reference/cli.md
+  plan :12-18 bin list                -> ACTUAL 13-19 (+1).
+  plan :17,:83,:104 examples          -> ACTUAL :89 (telemetry `omo install`), :110 (`omo uninstall`), :82 lazycodex equivalence,
+                                         :115 options-table "shared `omo` CLI". All migrated.
+docs/guide/installation.md
+  plan :16,:43,:104,:126              -> ACTUAL :16,:43,:104,:126 exact match.
+  plan :373 verify-grep pattern       -> ACTUAL :388 (+15).
+  plan :871 OMO_INVOCATION_NAME       -> ACTUAL :878 (+7).
+  plan :971-973 uninstall block       -> ACTUAL :990-992 (+19).
+  NOT in plan, found by regex sweep and migrated: :749 ("top-level `omo` command"), :780 (command-not-found row),
+                                         :889 (OPENCODE_DEFAULT_AGENT `omo run`).
+docs/reference/features.md
+  plan :406                           -> ACTUAL :390 (`omo ulw-loop` passthrough) (-16).
+  NOT in plan, found and migrated: :127 (`cmux omo` -> `cmux omo-agent-toolkit`; cmux launches the root bin).
+docs/reference/codex-telemetry.md
+  plan :25                            -> ACTUAL :25 exact match.
+README.md
+  plan :126                           -> Light-edition table row; contains only the PLUGIN cache path
+                                         `~/.codex/plugins/cache/sisyphuslabs/omo/`, which the plan forbids renaming.
+                                         NO EDIT NEEDED - recorded as a plan over-reference, not a miss.
+  plan :129,:166,:414-419             -> ACTUAL :129,:166,:414/:416 exact match. All migrated.
+CHANGELOG.md
+  plan :6 SemVer statement            -> ACTUAL :6 exact match. Version fields untouched (publish workflow owns them).
+
+STATE NOTE: `git merge-base HEAD dev` == HEAD, so todos 1-4 have NOT landed in this worktree. Todo 5 is Wave 1
+(parallel with 1-4), so the smoke assertions here describe the POST-merge end state and cannot execute green against
+this tree's installer (which still writes `omo`). Per the plan this is expected: the CI smoke is exercised for real by
+the release run, with todo 6's local isolated install smokes as the pre-merge stand-in.
+
+==================================================================
+1. SCOPE-EXTENSION FINDING (reported to lead, premise retracted)
+==================================================================
+The lead's initial scope extension asked to migrate `--package oh-my-openagent omo <verb>` invocations in publish.yml
+and to update script/lazycodex-published-smoke-workflow.test.ts. Verified against this branch head and REFUTED:
+  a) `rg -- '--package oh-my-openagent' .github/workflows/publish.yml` -> 0 hits. The smoke uses `npx -y "$package_spec"`.
+     That shape was already removed in commit 9c6d1373f ("fix(codex): use windows-safe lazycodex install delegation").
+  b) script/lazycodex-published-smoke-workflow.test.ts:6 reads ../.github/workflows/ci.yml, NOT publish.yml.
+  c) Its `--package oh-my-openagent omo` literals are NEGATIVE guards (removedStrictInstallGate /
+     rejectsLegacyInstallShape / removedStrictDoctorGate are all `!workflow.includes(...)`). Migrating them would have
+     retired the Windows-regression protection. That file was left UNMODIFIED and still passes (see section 6).
+The lead verified all three points and retracted the extension, approving option (a) instead: extend scope by exactly
+one file, script/publish-lazycodex-workflow.test.ts (the positive pin that my publish.yml rewrite breaks).
+
+SEPARATE GENUINE GAP found and routed to the todo-3 owner (NOT fixed here, outside scope):
+  packages/omo-codex/src/install/lazycodex-delegated-command.ts:54 builds ["--yes","--package","oh-my-openagent","omo",cmd]
+  -> every emitted delegation command 127s once the `omo` bin is dropped. Pinned by
+  packages/omo-codex/scripts/install-local-entrypoint.test.mjs:156,171,186,343 and install-delegated-command.test.mjs:242.
+
+==================================================================
+2. postinstall.mjs - FAILING TEST FIRST (RED)
+==================================================================
+$ bun test postinstall.test.ts   # before implementing the notice
+48 |     // #then
+49 |     expect(countNoticeLines(run.stdout)).toBe(1)
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (postinstall.test.ts:49:42)
+(fail) postinstall rename notice > announces the omo-agent-toolkit rename exactly once [459.01ms]
+(pass) postinstall rename notice > never fails the install regardless of platform binary resolution [263.52ms]
+71 |     expect(countNoticeLines(firstRun.stdout)).toBe(1)
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (postinstall.test.ts:71:47)
+(fail) postinstall rename notice > stays idempotent across repeated runs [552.94ms]
+
+ 1 pass
+ 2 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [2.94s]
+
+==================================================================
+3. postinstall.mjs - AFTER IMPLEMENTATION (GREEN)
+==================================================================
+$ bun test postinstall.test.ts
+postinstall.test.ts:
+(pass) postinstall rename notice > announces the omo-agent-toolkit rename exactly once [247.21ms]
+(pass) postinstall rename notice > never fails the install regardless of platform binary resolution [245.72ms]
+(pass) postinstall rename notice > stays idempotent across repeated runs [492.56ms]
+
+ 3 pass
+ 0 fail
+ 4 expect() calls
+Ran 3 tests across 1 file. [1066.00ms]
+
+--- mutation probe: delete the notice line -> RED ---
+(fail) postinstall rename notice > announces the omo-agent-toolkit rename exactly once
+(fail) postinstall rename notice > stays idempotent across repeated runs
+ 1 pass
+ 2 fail
+--- restore -> GREEN ---
+ 3 pass
+ 0 fail
+
+--- real spawn transcript (isolated HOME/XDG_CACHE_HOME) ---
+$ HOME=$(mktemp -d) XDG_CACHE_HOME=$(mktemp -d) node postinstall.mjs
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+exit=0
+
+(the notice prints on stdout even when the platform binary is absent; exit stays 0)
+VISIBILITY IS BEST-EFFORT BY DESIGN: npm >=7 hides lifecycle output unless --foreground-scripts.
+
+==================================================================
+4. actionlint
+==================================================================
+$ bunx actionlint .github/workflows/publish.yml
+(exit 0, no output = clean)
+
+==================================================================
+5. publish.yml acceptance greps
+==================================================================
+$ rg -n 'omo-agent-toolkit' .github/workflows/publish.yml    # need >=3
+824:              [ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ] || return 1
+861:                 [ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ] &&
+863:                 omo_agent_toolkit_version_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" --version 2>&1) &&
+865:                 ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ulw-loop --help 2>&1) &&
+871:                echo "omo-agent-toolkit --version: $omo_agent_toolkit_version_output"
+872:                echo "omo-agent-toolkit ulw-loop: $ulw_loop_output"
+hit count: 6
+
+$ rg -n '! -e "$CODEX_LOCAL_BIN_DIR/omo"' .github/workflows/publish.yml    # need >=1
+862:                 [ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ] &&
+
+$ # zero forwarder/legacy-omo invocation asserts remain in the smoke:
+(none - correct)
+
+==================================================================
+6. script/publish-lazycodex-workflow.test.ts - RED then GREEN (lockstep)
+==================================================================
+--- BASELINE, untouched tree (before any publish.yml edit) ---
+ 6 pass
+ 0 fail
+ 51 expect() calls
+
+--- RED: after the publish.yml smoke rewrite, before updating the pin ---
+348 |     expect(
+349 |       installsRealPackageAndVerifiesOmoBin,
+350 |       "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes ulw-loop",
+351 |     ).toBe(true)
+            ^
+error: post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes ulw-loop
+
+Expected: true
+Received: false
+
+      at <anonymous> (script/publish-lazycodex-workflow.test.ts:351:7)
+(fail) LazyCodex publish workflow > smoke tests the published LazyCodex alias after npm publish [0.29ms]
+
+ 5 pass
+ 1 fail
+ 51 expect() calls
+
+--- GREEN: after the lockstep pin update ---
+$ bun test script/publish-lazycodex-workflow.test.ts
+(pass) LazyCodex publish workflow > publishes a LazyCodex GitHub release only when the marketplace payload changed [2.26ms]
+(pass) LazyCodex publish workflow > skips the LazyCodex GitHub release when the previous payload is unchanged [0.15ms]
+(pass) LazyCodex publish workflow > can skip LazyCodex npm alias publishing when npm holds the package name [0.12ms]
+(pass) LazyCodex publish workflow > publishes lazycodex as a Node installer without Bun-backed runtime dependencies [0.23ms]
+(pass) LazyCodex publish workflow > smoke tests the published LazyCodex alias after npm publish [0.18ms]
+(pass) LazyCodex publish workflow > builds the Codex plugin components in publish-main before any package that ships the plugin tree [0.12ms]
+
+ 6 pass
+ 0 fail
+ 53 expect() calls
+Ran 6 tests across 1 file. [86.00ms]
+
+expect() calls went 51 -> 53: two ADDED assertions
+  assertsLegacyOmoBinIsRemoved  - pins '[ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ]' AND that the smoke never invokes the legacy bin
+  simulatesLegacyOmoUpgrade     - pins both upgrade-simulation calls, the marker literal, and both post-conditions
+
+--- the new guards BITE (mutation probes against publish.yml, reverted after each) ---
+probe A: delete `[ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ]` from publish.yml  -> 5 pass / 1 fail
+probe B: delete the marked upgrade-simulation call from publish.yml     -> 5 pass / 1 fail
+         error: post-publish smoke must simulate upgrades: a marker-bearing legacy omo is reclaimed and an
+                unmarked user-owned omo survives byte-identical
+restore both                                                            -> 6 pass / 0 fail, actionlint clean
+
+--- PRE-EXISTING NEGATIVE GUARDS PRESERVED VERBATIM (lead requirement) ---
+330:      !smokeStep.includes("npx --yes --package oh-my-openagent omo install") &&
+331:      !smokeStep.includes("--platform=claude-code") &&
+332:      !smokeStep.includes("--platform=gemini")
+
+--- script/lazycodex-published-smoke-workflow.test.ts NOT MODIFIED (guards ci.yml, premise refuted) ---
+unmodified
+ 1 pass
+ 0 fail
+ 14 expect() calls
+Ran 1 test across 1 file. [77.00ms]
+
+==================================================================
+7. markdown-link-audit
+==================================================================
+$ bun test packages/omo-opencode/src/shared/markdown-link-audit.test.ts
+
+ 16 pass
+ 0 fail
+ 21 expect() calls
+Ran 16 tests across 1 file. [230.00ms]
+
+==================================================================
+8. TODO-4 AUDIT REGEX SWEEP over every doc I touched (must all be 0)
+==================================================================
+  docs/reference/cli.md                    agent-cmd=0  human-cmd=0
+  docs/guide/installation.md               agent-cmd=0  human-cmd=0
+  docs/reference/features.md               agent-cmd=0  human-cmd=0
+  docs/reference/codex-telemetry.md        agent-cmd=0  human-cmd=0
+  README.md                                agent-cmd=0  human-cmd=0
+
+NEVER-RECOMMEND-AN-ALIAS check (plan hard rule - would collide with the future omo-ai bin):
+  (no shell alias recommended anywhere - correct)
+
+PUBLISH TRANSFORMATION/PAYLOAD UNTOUCHED (publish.yml .bin rewrite + bin/ exclusion):
+  (no diff lines touch the transformation or payload - correct)
+
+==================================================================
+9. REVIEWER-READ NOTES (each doc read end-to-end after editing)
+==================================================================
+docs/reference/cli.md
+  Read the whole file. The bin list is the document's contract, so the `omo` row is DELETED outright rather than
+  reworded, and `omo-agent-toolkit` is promoted to the top of the list as "short name, recommended in docs and
+  prompts" - inheriting the exact role the `omo` row used to claim. The lazycodex/lazycodex-ai equivalence rows are
+  untouched, as are the sentences at :82 explaining that those aliases default to --platform=codex.
+  ONE context line was added at :20, immediately under the list where a reader who just lost a bin will look:
+  the `omo` bin was removed in this major release and the name is reserved for the future native edition (npm
+  `omo-ai`), which is NOT shipped here. It does not describe omo-ai as installable - it names the reservation only.
+  Command examples migrated: :89 telemetry trigger, :110 uninstall usage, :115 options-table "shared ... CLI".
+  Deliberately NOT changed: `omo@sisyphuslabs` / plugin `omo` (:82, :124) - the plan forbids renaming the
+  marketplace plugin identity, and those strings are Codex config keys, not commands. Flow reads correctly: a
+  reader now meets the new name first, learns the old one is gone, and never sees a dead example.
+
+docs/guide/installation.md
+  Read every section containing a bin mention. Nine edits, each verified in context:
+  :16  "shared `omo` CLI" -> `omo-agent-toolkit` (the --platform default sentence stays true).
+  :43  Windows guidance - the `npx --package` warning now names `omo-agent-toolkit install`; the advice itself
+       (keep the direct `npx lazycodex-ai install ...` form) is unchanged and still correct.
+  :104 "links the top-level `omo` runtime wrapper" -> `omo-agent-toolkit`; this is the sentence describing exactly
+       what todo 3 now writes into the bin dir, so it had to move in lockstep.
+  :126 degraded row - key `omo-cli` -> `omo-agent-toolkit` and the prose "The top-level `omo` command was not
+       linked" -> `omo-agent-toolkit`. Wording deliberately matched to todo 3(d), which renames the bootstrap
+       ledger component label `omo-cli` -> `omo-agent-toolkit`. The row is a lookup key for that emitted label, so
+       a mismatch here would make the table unusable.
+  :388 the verify-grep bin-name pattern: bare `omo` DROPPED from the alternation and `omo-agent-toolkit` added.
+       This is the one line where a stale entry would actively mislead - a user grepping for `^omo$` after upgrading
+       would see nothing and conclude the install broke. Component bins (omo-rules, omo-lsp, ...) are untouched.
+  :749 "The top-level `omo` command belongs to the shared oh-my-openagent launcher" -> `omo-agent-toolkit`.
+  :780 troubleshooting "command not found: omo" -> `omo-agent-toolkit` (this is the error a user actually sees now).
+  :878 OMO_INVOCATION_NAME example list: `omo` -> `omo-agent-toolkit`.
+  :889 OPENCODE_DEFAULT_AGENT "Default agent for `omo run`" -> `omo-agent-toolkit run`.
+  :990-992 the Codex uninstall block, both the command and its backward-compatible `cleanup` alias.
+  Untouched by design: plugin-cache paths, `omo@sisyphuslabs` config keys, `codex plugin add omo`, and prose using
+  "omo" as the product nickname ("every omo hook", "not recommended for omo agents") - none are commands.
+
+docs/reference/features.md
+  Two edits. :390 `omo ulw-loop` -> `omo-agent-toolkit ulw-loop` (plan cited :406; drifted to :390). :127 `cmux omo`
+  -> `cmux omo-agent-toolkit`, which the plan did not list: cmux launches the root bin by name, so leaving it would
+  have shipped a dead command example. `$omo:remove-ai-slops` (:468) is a skill token and is untouched.
+
+docs/reference/codex-telemetry.md
+  One edit at :25, the Sources table row for `install_completed`: both `omo install --platform=codex` and
+  `omo install --platform=both` migrated. The neighbouring `bunx lazycodex-ai install` trigger is unchanged, and the
+  event names `omo_daily_active` / `omo_codex_daily_active` are untouched - they are telemetry identifiers, not
+  commands. The marketplace identity sentence at :3 (`sisyphuslabs` / `omo`) stays per the plan's no-rename rule.
+
+README.md
+  Three edits. :129 "shared `omo` CLI" -> `omo-agent-toolkit`. :414/:416 the Codex uninstall block and its
+  cleanup alias. :166 REWRITTEN as the plan requires: it previously advertised `omo` as a shipped bin alias while
+  warning against `bunx omo`, which is now self-contradictory. It now states the short command is
+  `omo-agent-toolkit`, that the `omo` bin was REMOVED in this major release, and that `bunx omo` / `npx omo`
+  resolve to an unrelated third-party npm package by a different author - so the warning is now about a package
+  that was never ours, which is the accurate post-removal story. No shell alias is suggested (plan hard rule).
+  :126 was cited by the plan but needs no edit: it contains only the plugin cache path, not a bin. The uninstall
+  prose at :419 keeps `omo@sisyphuslabs` (config key).
+
+CHANGELOG.md
+  Added ONE `**Breaking**:` bullet at the top of the existing `[Unreleased] > ### Changed` list, matching the two
+  breaking entries already there (same `- **Breaking**: ` prefix, same voice). It carries all four required parts:
+  the removal (npm `omo` bin + the Codex `~/.local/bin/omo` wrapper, replaced by `omo-agent-toolkit`), the
+  migration one-liner (replace `omo ` with `omo-agent-toolkit ` in scripts/prompts/CI), the automatic-migration
+  notes (npm upgrade prunes the old bin link; Codex installs delete the generated wrapper at next session start or
+  installer run; an unmarked user-owned `omo` is left untouched), and the one-time in-flight-agent caveat (a single
+  failed `omo ulw-loop` call at the relink moment must be re-issued). It states the release is major because a
+  published bin entry is removed, and closes on the `omo-ai` reservation without implying it is installable.
+  NO version field was edited anywhere - the publish workflow owns versions (repo law). The entry sits under
+  [Unreleased]; the recommended 5.0.0 bump is the release runner's call.
+
+==================================================================
+10. FINAL SCOPE DIFF
+==================================================================
+ M .github/workflows/publish.yml
+ M CHANGELOG.md
+ M README.md
+ M docs/guide/installation.md
+ M docs/reference/cli.md
+ M docs/reference/codex-telemetry.md
+ M docs/reference/features.md
+ M packages/omo-codex/plugin/components/bootstrap/src/setup.ts
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/plugin/components/codegraph/dist/serve.js
+ M packages/omo-codex/plugin/test/bootstrap-binlinks.test.mjs
+ M packages/omo-codex/scripts/install-bin-links.test.mjs
+ M packages/omo-codex/scripts/install-delegated-command.test.mjs
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-codex/scripts/install-local-entrypoint.test.mjs
+ M packages/omo-codex/scripts/install-local.test.mjs
+ M packages/omo-codex/src/install/codex-cache-bins.test.ts
+ M packages/omo-codex/src/install/codex-cache-bins.ts
+ M packages/omo-codex/src/install/codex-cache-runtime-wrapper.ts
+ M packages/omo-codex/src/install/install-codex-test-fixtures.ts
+ M packages/omo-codex/src/install/install-codex.test.ts
+ M packages/omo-codex/src/install/install-codex.ts
+ M packages/omo-codex/src/install/lazycodex-delegated-command.ts
+ M packages/omo-codex/src/install/lazycodex-install-surface.test.ts
+ M packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts
+ M packages/omo-opencode/src/cli/doctor/checks/codex-runtime-wrapper.ts
+ M packages/omo-opencode/src/cli/doctor/checks/codex.test.ts
+ M packages/omo-opencode/src/cli/doctor/checks/codex.ts
+ M packages/omo-senpi/plugin/extensions/omo.js
+ M postinstall.mjs
+ M script/publish-lazycodex-workflow.test.ts
+?? postinstall.test.ts
+
+ .github/workflows/publish.yml                      |  56 +++++-
+ CHANGELOG.md                                       |   1 +
+ README.md                                          |   8 +-
+ docs/guide/installation.md                         |  22 +--
+ docs/reference/cli.md                              |  12 +-
+ docs/reference/codex-telemetry.md                  |   2 +-
+ docs/reference/features.md                         |   4 +-
+ .../plugin/components/bootstrap/src/setup.ts       |  14 +-
+ .../plugin/components/codegraph/dist/cli.js        | 208 +++++++++++++--------
+ .../plugin/components/codegraph/dist/serve.js      | 164 +++++++++-------
+ .../plugin/test/bootstrap-binlinks.test.mjs        |  24 +--
+ .../omo-codex/scripts/install-bin-links.test.mjs   |  58 +++++-
+ .../scripts/install-delegated-command.test.mjs     |  12 +-
+ .../scripts/install-dist/install-local.mjs         | 175 ++++++++++-------
+ .../scripts/install-local-entrypoint.test.mjs      |   8 +-
+ packages/omo-codex/scripts/install-local.test.mjs  |   7 +-
+ .../omo-codex/src/install/codex-cache-bins.test.ts |  74 +++++++-
+ packages/omo-codex/src/install/codex-cache-bins.ts |  44 ++++-
+ .../src/install/codex-cache-runtime-wrapper.ts     |  28 ++-
+ .../src/install/install-codex-test-fixtures.ts     |   2 +-
+ .../omo-codex/src/install/install-codex.test.ts    |   4 +-
+ packages/omo-codex/src/install/install-codex.ts    |   2 +-
+ .../src/install/lazycodex-delegated-command.ts     |   4 +-
+ .../src/install/lazycodex-install-surface.test.ts  |   4 +-
+ .../src/cli/doctor/checks/codex-components.test.ts |   4 +-
+ .../src/cli/doctor/checks/codex-runtime-wrapper.ts |  19 +-
+ .../src/cli/doctor/checks/codex.test.ts            |  48 ++++-
+ .../omo-opencode/src/cli/doctor/checks/codex.ts    |   8 +-
+ packages/omo-senpi/plugin/extensions/omo.js        | 108 +++++------
+ postinstall.mjs                                    |   6 +
+ script/publish-lazycodex-workflow.test.ts          |  33 +++-
+ 31 files changed, 780 insertions(+), 383 deletions(-)
+
+==================================================================
+11. SCOPE ATTRIBUTION + RE-VERIFY AGAINST MERGED WORKTREE
+==================================================================
+The todo-3 owner's changes landed in this SHARED worktree during my run (22 files under packages/). Those are NOT
+mine. My change set is exactly these 9 modified files + 1 new file:
+ .github/workflows/publish.yml             | 56 +++++++++++++++++++++++++++----
+ CHANGELOG.md                              |  1 +
+ README.md                                 |  8 ++---
+ docs/guide/installation.md                | 22 ++++++------
+ docs/reference/cli.md                     | 12 ++++---
+ docs/reference/codex-telemetry.md         |  2 +-
+ docs/reference/features.md                |  4 +--
+ postinstall.mjs                           |  6 ++++
+ script/publish-lazycodex-workflow.test.ts | 33 ++++++++++++++----
+ 9 files changed, 107 insertions(+), 37 deletions(-)
+  postinstall.test.ts (new, untracked)
+
+The gap I escalated (lazycodex-delegated-command.ts:54) has since been FIXED by the todo-3 owner:
+-    ? { ...process.env, OMO_INVOCATION_NAME: "omo", ...invocation.env }
++    ? { ...process.env, OMO_INVOCATION_NAME: "omo-agent-toolkit", ...invocation.env }
+-  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command]
++  const args = ["--yes", "--package", "oh-my-openagent", "omo-agent-toolkit", parsed.command]
+
+Full verify set re-run against the merged worktree state - all green:
+  actionlint publish.yml ............... CLEAN
+  postinstall.test.ts ..................  3 pass
+  markdown-link-audit.test.ts ..........  16 pass
+  publish-lazycodex-workflow.test.ts ...  6 pass
+  lazycodex-published-smoke (untouched)   1 pass
+  rg omo-agent-toolkit publish.yml ..... 6 hits (need >=3)
+  rg absence assertion ................. 1 hit (need >=1)
+
+NOT DONE / CANNOT DO:
+  - The publish.yml smoke cannot be EXECUTED here: it asserts post-merge installer behaviour and runs against a
+    published npm tarball inside GitHub Actions. Per the plan this is a known post-merge verification, with todo 6's
+    local isolated install smokes as the pre-merge stand-in. Static proof only (actionlint + the pinning test).
+  - No commit was made (the lead commits).
+  - `bun install` was not run (instructed); no test failed on missing modules.

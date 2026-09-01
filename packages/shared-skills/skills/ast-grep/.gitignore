@@ -1,0 +1,26 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test / scratch artifacts
+scratch/
+.ast-grep-helper-cache/
+/tmp/ast-grep-skill-*
+
+# Local config
+.ast-grep-skill.json
+.ast-grep-skill/
+
+# Cached binary (from install.sh fallback download)
+bin/sg
+bin/ast-grep
+bin/sg.exe
+bin/ast-grep.exe

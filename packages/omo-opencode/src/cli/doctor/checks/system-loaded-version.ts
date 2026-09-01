@@ -7,7 +7,7 @@ import { resolveSymlink } from "../../../shared/file-utils"
 import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
 import { findPackageJsonUp } from "../../../hooks/auto-update-checker/checker/package-json-locator"
-import { PACKAGE_NAME } from "../constants"
+import { PACKAGE_NAME } from "../framework/constants"
 import { ACCEPTED_PACKAGE_NAMES, getOpenCodeCacheDir, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
 
 interface PackageJsonShape {

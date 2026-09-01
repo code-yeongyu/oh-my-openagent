@@ -1,0 +1,32 @@
+[TRIMMED] node --test over 50 files in packages/omo-codex/plugin/test/. Kept the summary and the single failure.
+
+✔ #given Codex round R2 replaced R1 #when a delayed R1 launch or receipt arrives #then identity-bound CAS leaves R2 unchanged (0.5144ms)
+✔ #given Codex independent reviewers #when exact-path retrieval drifts #then intake fails closed without alternate artifact recovery (0.7437ms)
+✔ #given an unclear auth-improvement request #when ulw-plan derives its full-scope components #then it preserves evidenced intent without inventing reduction or MFA expansion (49.9122ms)
+✔ #given ulw-plan skill copies #when component source and packaged copy are compared #then they are byte-identical and expose the loader-parsed name (14.1557ms)
+✔ #given ulw-research skill copies #when frontmatter is inspected #then the loader-parsed name is ulw-research (6.597ms)
+✔ #given ulw-research skill copies #when scanned for non-English content #then they contain no Hangul (5.0917ms)
+ℹ tests 358
+ℹ suites 0
+ℹ pass 357
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42973.2461
+
+✖ failing tests:
+
+test at packages\omo-codex\plugin\test\component-bundled-cli.test.mjs:139:1
+✖ #given bundled LSP hook CLI in installed layout #when diagnostics run #then it spawns sibling daemon target (1960.1522ms)
+  Error: EPERM, Permission denied: \\?\C:\Users\pss\AppData\Local\Temp\omo-codex-lsp-installed-qCOmW1 '\\?\C:\Users\pss\AppData\Local\Temp\omo-codex-lsp-installed-qCOmW1'
+      at rmSync (node:fs:1222:18)
+      at TestContext.<anonymous> (file:///C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-144/packages/omo-codex/plugin/test/component-bundled-cli.test.mjs:238:3)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\pss\\AppData\\Local\\Temp\\omo-codex-lsp-installed-qCOmW1',
+    syscall: 'rm'
+  }

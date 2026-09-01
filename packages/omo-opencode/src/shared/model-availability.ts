@@ -13,6 +13,8 @@ function normalizeModelName(name: string): string {
 	return name
 		.toLowerCase()
 		.replace(/claude-(opus|sonnet|haiku)-(\d+)[.-](\d+)/g, "claude-$1-$2.$3")
+		.replace(/kimi-k2[.-](\d+)/g, "kimi-k2.$1")
+		.replace(/\b(glm|gpt)-(\d+)[.-](\d+)/g, "$1-$2.$3")
 }
 
 /**

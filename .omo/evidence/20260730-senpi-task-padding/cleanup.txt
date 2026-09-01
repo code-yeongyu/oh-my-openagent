@@ -1,0 +1,36 @@
+Cleanup receipt: 2026-07-30T05:57:00Z
+
+Attempt 1:
+  Core single and batch behavior passed, but the global verdict detected four
+  concurrently modified real Senpi extension files. The four attempt-1
+  sandbox roots were removed and verified absent. Raw attempt-1 logs were
+  removed after the successful isolated-home rerun because they contained
+  unrelated host session-path churn; the reviewer-facing failure reason is
+  retained here.
+
+Attempt 2:
+  Ran with a throwaway HOME so the isolation snapshot could not be affected
+  by concurrent host extension updates.
+  result: PASS
+  leaked pids: 0
+  isolated real-senpi changed paths: []
+
+Removed and verified absent:
+  /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-task-home.XXXXXX.eANwPADwLT
+  /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-2ASxjQ
+  /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-QEDFiY
+  /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-xmcbaL
+  /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-DbB3A4
+
+QA-only source mutations:
+  packages/omo-senpi/scripts/qa/task-e2e.mjs
+  packages/omo-senpi/scripts/qa/task-e2e-scenarios.mjs
+
+Revert proof:
+  git diff --quiet -- <both QA scripts>
+  exit: 0
+
+Post-rebase baseline worktrees removed and verified absent:
+  /private/tmp/omo-dev-root-baseline-20260730
+  /private/tmp/omo-dev-root-baseline-clean-20260730
+  /private/tmp/omo-dev-root-baseline-ignore-scripts-20260730

@@ -49,6 +49,11 @@ export function getPlatformPackage({ platform, arch, libcFamily, packageBaseName
 /** @param {{ platform: string, arch: string, libcFamily?: string | null, preferBaseline?: boolean, packageBaseName?: string }} options */
 export function getPlatformPackageCandidates({ platform, arch, libcFamily, preferBaseline = false, packageBaseName = "oh-my-opencode" }) {
   const primaryPackage = getPlatformPackage({ platform, arch, libcFamily, packageBaseName });
+
+  if (platform === "win32" && arch === "arm64") {
+    return [primaryPackage, `${packageBaseName}-windows-x64-baseline`];
+  }
+
   const baselinePackage = getBaselinePlatformPackage({ platform, arch, libcFamily, packageBaseName });
 
   if (!baselinePackage) {

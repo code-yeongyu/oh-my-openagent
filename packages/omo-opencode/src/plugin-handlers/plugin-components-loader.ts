@@ -1,5 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
-import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
+import { loadAllPluginComponents } from "@oh-my-opencode/claude-code-compat-core/claude-code-plugin-loader";
 import type { PluginHooksConfig } from "../hooks/claude-code-hooks/types";
 import { addConfigLoadError, log } from "../shared";
 
@@ -11,6 +11,7 @@ export type PluginComponents = {
   hooksConfigs: PluginHooksConfig[];
   plugins: Array<{ name: string; version: string }>;
   errors: Array<{ pluginKey: string; installPath: string; error: string }>;
+  retryableLoadFailure?: true;
 };
 
 const EMPTY_PLUGIN_COMPONENTS: PluginComponents = {
@@ -67,6 +68,6 @@ export async function loadPluginComponents(params: {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log("[config-handler] Plugin loading failed", { error: errorMessage });
     addConfigLoadError({ path: "plugin-loading", error: errorMessage });
-    return EMPTY_PLUGIN_COMPONENTS;
+    return { ...EMPTY_PLUGIN_COMPONENTS, retryableLoadFailure: true };
   }
 }

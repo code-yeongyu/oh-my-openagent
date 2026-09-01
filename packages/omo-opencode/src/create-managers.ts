@@ -4,12 +4,18 @@ import type { PluginContext, TmuxConfig } from "./plugin/types"
 
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
+import type { MonitorManager } from "./features/monitor"
+import { createMonitorManager } from "./features/monitor"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { cleanupSessionTeamRuns } from "./features/team-mode/team-runtime/session-cleanup"
 import { lookupTeamSession } from "./features/team-mode/team-session-registry"
+import { TuiStateMirror } from "./features/tui-sidebar/mirror-manager"
 import { createModelFallbackControllerAccessor } from "./hooks/model-fallback"
 import { initTaskToastManager } from "./features/task-toast-manager"
-import { TmuxSessionManager } from "./features/tmux-subagent"
+import {
+  selectTmuxManagerEnvironmentPredicate,
+  TmuxSessionManager,
+} from "./features/tmux-subagent"
 import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
@@ -21,6 +27,8 @@ type CreateManagersDeps = {
   BackgroundManagerClass: typeof BackgroundManager
   SkillMcpManagerClass: typeof SkillMcpManager
   TmuxSessionManagerClass: typeof TmuxSessionManager
+  TuiStateMirrorClass: typeof TuiStateMirror
+  createMonitorManagerFn: typeof createMonitorManager
   initTaskToastManagerFn: typeof initTaskToastManager
   registerManagerForCleanupFn: typeof registerManagerForCleanup
   cleanupSessionTeamRunsFn: typeof cleanupSessionTeamRuns
@@ -32,6 +40,8 @@ const defaultCreateManagersDeps: CreateManagersDeps = {
   BackgroundManagerClass: BackgroundManager,
   SkillMcpManagerClass: SkillMcpManager,
   TmuxSessionManagerClass: TmuxSessionManager,
+  TuiStateMirrorClass: TuiStateMirror,
+  createMonitorManagerFn: createMonitorManager,
   initTaskToastManagerFn: initTaskToastManager,
   registerManagerForCleanupFn: registerManagerForCleanup,
   cleanupSessionTeamRunsFn: cleanupSessionTeamRuns,
@@ -45,6 +55,8 @@ export type Managers = {
   skillMcpManager: SkillMcpManager
   configHandler: ReturnType<typeof createConfigHandler>
   modelFallbackControllerAccessor: ModelFallbackControllerAccessor
+  tuiStateMirror?: TuiStateMirror
+  monitorManager?: MonitorManager
 }
 
 export function createManagers(args: {
@@ -70,7 +82,9 @@ export function createManagers(args: {
   if (tmuxConfig.enabled && ctx.serverUrl) {
     deps.markServerRunningInProcessFn()
   }
-  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, undefined, {
+  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, {
+    isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation),
+  }, {
     // Team-mode members get their tmux panes from team-layout-tmux, which
     // owns the lifecycle via runtimeState.tmuxLayout. Telling the subagent
     // manager to ignore those sessions prevents the polling loop from racing
@@ -80,6 +94,14 @@ export function createManagers(args: {
   })
   const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
   let backgroundManager: BackgroundManager | undefined
+  let tuiStateMirror: TuiStateMirror | undefined
+
+  const monitorManager = pluginConfig.monitor?.enabled
+    ? deps.createMonitorManagerFn({
+      pluginContext: { client: ctx.client, directory: ctx.directory },
+      config: pluginConfig.monitor,
+    })
+    : undefined
 
   const cleanupTeamModeRuns = async (): Promise<void> => {
     if (!pluginConfig.team_mode?.enabled) return
@@ -95,11 +117,15 @@ export function createManagers(args: {
 
   deps.registerManagerForCleanupFn({
     shutdown: async () => {
+      tuiStateMirror?.stop()
       await cleanupTeamModeRuns().catch((error) => {
         log("[create-managers] team-mode cleanup error during process shutdown:", error)
       })
       await tmuxSessionManager.cleanup().catch((error) => {
         log("[create-managers] tmux cleanup error during process shutdown:", error)
+      })
+      await monitorManager?.shutdown().catch((error) => {
+        log("[create-managers] monitor cleanup error during process shutdown:", error)
       })
     },
   })
@@ -155,16 +181,29 @@ export function createManagers(args: {
       log("[create-managers] onSubagentSessionDeleted callback completed")
     },
     onShutdown: async () => {
+      tuiStateMirror?.stop()
       await cleanupTeamModeRuns().catch((error) => {
         log("[create-managers] team-mode cleanup error during shutdown:", error)
       })
       await tmuxSessionManager.cleanup().catch((error) => {
         log("[create-managers] tmux cleanup error during shutdown:", error)
       })
+      await monitorManager?.shutdown().catch((error) => {
+        log("[create-managers] monitor cleanup error during shutdown:", error)
+      })
     },
     enableParentSessionNotifications: backgroundNotificationHookEnabled,
     modelFallbackControllerAccessor,
   })
+
+  if (pluginConfig.tui?.sidebar?.enabled !== false) {
+    tuiStateMirror = new deps.TuiStateMirrorClass({
+      client: ctx.client,
+      projectDir: ctx.directory,
+      backgroundManager,
+    })
+    tuiStateMirror.start()
+  }
 
   deps.initTaskToastManagerFn(ctx.client)
 
@@ -182,5 +221,7 @@ export function createManagers(args: {
     skillMcpManager,
     configHandler,
     modelFallbackControllerAccessor,
+    tuiStateMirror,
+    monitorManager,
   }
 }

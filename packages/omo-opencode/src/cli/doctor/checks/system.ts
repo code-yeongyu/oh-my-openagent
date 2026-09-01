@@ -1,12 +1,13 @@
 import { existsSync, readFileSync } from "node:fs"
 
-import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
+import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../framework/constants"
+import type { CheckResult, DoctorIssue, SystemInfo } from "../framework/types"
 import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./system-binary"
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared/jsonc-parser"
-import { PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { ACCEPTED_PACKAGE_NAMES, PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { getPluginEntryName } from "../../../shared/plugin-entry-shape"
 
 const runtime = globalThis as typeof globalThis & { Bun?: { version?: string } }
 
@@ -36,6 +37,8 @@ const defaultDeps: SystemCheckDeps = {
   parseConfigContent: (content) => parseJsonc<Record<string, unknown>>(content),
 }
 
+const BUN_POSTINSTALL_HELPER_PACKAGE_NAME = "@code-yeongyu/comment-checker"
+
 function isConfigValid(configPath: string | null, deps: SystemCheckDeps): boolean {
   if (!configPath) return true
   if (!deps.configExists(configPath)) return false
@@ -62,6 +65,15 @@ function buildMessage(status: CheckResult["status"], issues: DoctorIssue[]): str
   if (status === "pass") return "System checks passed"
   if (status === "fail") return `${issues.length} system issue(s) detected`
   return `${issues.length} system warning(s) detected`
+}
+
+function getLoadedPackageName(installedPackagePath: string): string {
+  const parts = installedPackagePath.split(/[\\/]/)
+  const nodeModulesIndex = parts.lastIndexOf("node_modules")
+  const packageName = nodeModulesIndex >= 0 ? parts[nodeModulesIndex + 1] : undefined
+  return packageName !== undefined && ACCEPTED_PACKAGE_NAMES.some((acceptedName) => acceptedName === packageName)
+    ? packageName
+    : PUBLISHED_PACKAGE_NAME
 }
 
 export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Promise<SystemInfo> {
@@ -130,15 +142,16 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
   }
 
   if (pluginInfo.entry && !pluginInfo.isLocalDev) {
-    const isLegacyName = pluginInfo.entry === LEGACY_PLUGIN_NAME
-      || pluginInfo.entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+    const entryName = getPluginEntryName(pluginInfo.entry)
+    const isLegacyName = entryName === LEGACY_PLUGIN_NAME
+      || entryName.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 
     if (isLegacyName) {
-      const suggestedEntry = pluginInfo.entry.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME)
+      const suggestedEntry = entryName.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME)
       issues.push({
         title: "Using legacy package name",
         description: `Your opencode.json references "${LEGACY_PLUGIN_NAME}" which has been renamed to "${PLUGIN_NAME}". The old name may stop working in a future release.`,
-        fix: `Update your opencode.json plugin entry: "${pluginInfo.entry}" → "${suggestedEntry}"`,
+        fix: `Update your opencode.json plugin entry: "${entryName}" → "${suggestedEntry}"`,
         severity: "warning",
         affects: ["plugin loading"],
       })
@@ -160,10 +173,13 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
     latestVersion &&
     !deps.compareVersions(systemInfo.loadedVersion, latestVersion)
   ) {
+    const loadedPackageName = getLoadedPackageName(loadedInfo.installedPackagePath)
     issues.push({
       title: "Loaded plugin is outdated",
       description: `Loaded ${systemInfo.loadedVersion}, latest ${latestVersion}.`,
-        fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${PUBLISHED_PACKAGE_NAME}@${installTag}`,
+      fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${loadedPackageName}@${installTag}\n` +
+        `If Bun reports blocked postinstalls, inspect them: cd "${loadedInfo.cacheDir}" && bun pm untrusted\n` +
+        `Then trust only OMO-related packages from that list: cd "${loadedInfo.cacheDir}" && bun pm trust ${loadedPackageName} ${BUN_POSTINSTALL_HELPER_PACKAGE_NAME}`,
       severity: "warning",
       affects: ["plugin features"],
     })

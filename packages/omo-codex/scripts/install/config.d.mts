@@ -29,6 +29,7 @@ export interface UpdateCodexConfigOptions {
 	trustedHookStates?: readonly CodexTrustedHookState[];
 	agentConfigs?: readonly CodexAgentConfig[];
 	autonomousPermissions?: boolean;
+	codegraphMcpEnabled?: boolean;
 	gitBashEnabled?: boolean;
 }
 

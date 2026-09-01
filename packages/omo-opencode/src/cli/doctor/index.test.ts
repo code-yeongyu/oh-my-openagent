@@ -29,4 +29,16 @@ describe("formatDoctorFailure", () => {
     expect(lines.join("\n")).toContain("Doctor failed unexpectedly: boom")
     expect(lines.join("\n")).not.toContain("memory pressure")
   })
+
+  it("suggests the canonical doctor command", () => {
+    // given
+    const error = new Error("boom")
+
+    // when
+    const lines = formatDoctorFailure(error)
+
+    // then
+    expect(lines.join("\n")).toContain("bunx oh-my-openagent doctor --verbose")
+    expect(lines.join("\n")).not.toContain("bunx oh-my-opencode doctor")
+  })
 })

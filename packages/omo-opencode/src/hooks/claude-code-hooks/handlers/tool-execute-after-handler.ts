@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { loadClaudeHooksConfig } from "../config"
 import { loadPluginExtendedConfig } from "../config-loader"
@@ -12,9 +13,7 @@ import type { PluginConfig } from "../types"
 import { isHookDisabled, log } from "../../../shared"
 import { normalizeHookText, normalizeHookTextList } from "../hook-text"
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value)
-}
+
 
 function getStringValue(record: Record<string, unknown>, key: string): string | undefined {
 	const value = record[key]
@@ -28,7 +27,7 @@ function getNumberValue(record: Record<string, unknown>, key: string): number | 
 
 function buildTranscriptToolOutput(outputText: string, metadata: unknown): Record<string, unknown> {
 	const compactOutput: Record<string, unknown> = { output: outputText }
-	if (!isRecord(metadata)) {
+	if (!isPlainRecord(metadata)) {
 		return compactOutput
 	}
 
@@ -57,7 +56,7 @@ function buildTranscriptToolOutput(outputText: string, metadata: unknown): Recor
 	}
 
 	const filediff = metadata.filediff
-	if (isRecord(filediff)) {
+	if (isPlainRecord(filediff)) {
 		const additions = getNumberValue(filediff, "additions")
 		const deletions = getNumberValue(filediff, "deletions")
 		if (additions !== undefined || deletions !== undefined) {

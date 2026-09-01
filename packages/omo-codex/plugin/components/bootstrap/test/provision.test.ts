@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deflateRawSync } from "node:zlib";
 
-import type { FetchLike } from "../src/download.ts";
+import { SG_PINNED_VERSION, type SgFetch, type SgManifestAsset, type SgRuntimeSlug } from "../../../../../utils/src/ast-grep/index.ts";
 import {
 	runSgProvision,
 	SG_FORCE_PROVISION_ENV_KEY,
@@ -113,26 +113,22 @@ const FIXTURE_ZIP = makeZip([
 	{ data: SHIM_BYTES, name: "sg" },
 	{ data: STANDALONE_BYTES, name: "ast-grep" },
 ]);
-const FIXTURE_VERSION = "9.9.9";
+const FIXTURE_VERSION = SG_PINNED_VERSION;
 
-async function writeAstGrepManifest(
-	manifestsDir: string,
-	options: { sha256?: string; platforms?: Record<string, { url: string; sha256: string }> } = {},
-): Promise<void> {
-	await mkdir(manifestsDir, { recursive: true });
-	const platforms = options.platforms ?? {
+function fixtureReleaseAssets(
+	options: { readonly sha256?: string; readonly platforms?: Partial<Record<SgRuntimeSlug, SgManifestAsset>> } = {},
+): Partial<Record<SgRuntimeSlug, SgManifestAsset>> {
+	return options.platforms ?? {
 		"linux-x64": {
 			sha256: options.sha256 ?? sha256Hex(FIXTURE_ZIP),
-			url: "https://example.invalid/releases/9.9.9/app-x86_64-unknown-linux-gnu.zip",
+			url: `https://example.invalid/releases/${FIXTURE_VERSION}/app-x86_64-unknown-linux-gnu.zip`,
 		},
 	};
-	const manifest = { name: "ast-grep", platforms, version: FIXTURE_VERSION };
-	await writeFile(join(manifestsDir, "ast-grep.json"), JSON.stringify(manifest, null, "\t"), "utf8");
 }
 
-function fetchReturning(bytes: Uint8Array): { fetchImpl: FetchLike; calls: string[] } {
+function fetchReturning(bytes: Uint8Array): { fetchImpl: SgFetch; calls: string[] } {
 	const calls: string[] = [];
-	const fetchImpl: FetchLike = async (url) => {
+	const fetchImpl: SgFetch = async (url) => {
 		calls.push(url);
 		return new Response(bytes, { status: 200 });
 	};
@@ -180,7 +176,6 @@ describe("runSgProvision", () => {
 		const root = createTemporaryDirectory("omo-bootstrap-provision-");
 		const codexHome = join(root, "codex-home");
 		const manifestDir = join(root, "manifests");
-		await writeAstGrepManifest(manifestDir);
 		const { calls, fetchImpl } = fetchReturning(FIXTURE_ZIP);
 		const probed: string[] = [];
 		const context = makeContext({ codexHome, manifestDir, pluginData: join(root, "data") });
@@ -189,6 +184,7 @@ describe("runSgProvision", () => {
 		const outcome = await runSgProvision(context, {
 			arch: "x64",
 			fetchImpl,
+			releaseAssets: fixtureReleaseAssets(),
 			resolvePreexistingSg: () => null,
 			runVersionProbe: async (binaryPath: string) => {
 				probed.push(binaryPath);
@@ -200,7 +196,7 @@ describe("runSgProvision", () => {
 		const destination = join(codexHome, "runtime", "ast-grep", "linux-x64", "sg");
 		expect(sgProvisionDestination(context, "x64")).toBe(destination);
 		expect(outcome.degraded).toEqual([]);
-		expect(calls).toEqual(["https://example.invalid/releases/9.9.9/app-x86_64-unknown-linux-gnu.zip"]);
+		expect(calls).toEqual([`https://example.invalid/releases/${FIXTURE_VERSION}/app-x86_64-unknown-linux-gnu.zip`]);
 		expect(probed).toEqual([destination]);
 		expect(new Uint8Array(await readFile(destination))).toEqual(STANDALONE_BYTES);
 		expect((await stat(destination)).mode & 0o777).toBe(0o755);
@@ -213,7 +209,6 @@ describe("runSgProvision", () => {
 		const root = createTemporaryDirectory("omo-bootstrap-provision-");
 		const codexHome = join(root, "codex-home");
 		const manifestDir = join(root, "manifests");
-		await writeAstGrepManifest(manifestDir);
 		const { calls, fetchImpl } = fetchReturning(FIXTURE_ZIP);
 		const context = makeContext({ codexHome, manifestDir, pluginData: join(root, "data") });
 
@@ -221,6 +216,7 @@ describe("runSgProvision", () => {
 		const outcome = await runSgProvision(context, {
 			arch: "x64",
 			fetchImpl,
+			releaseAssets: fixtureReleaseAssets(),
 			resolvePreexistingSg: () => "/opt/homebrew/bin/sg",
 			runVersionProbe: async () => {
 				throw new Error("must not probe on short-circuit");
@@ -239,7 +235,6 @@ describe("runSgProvision", () => {
 		const root = createTemporaryDirectory("omo-bootstrap-provision-");
 		const codexHome = join(root, "codex-home");
 		const manifestDir = join(root, "manifests");
-		await writeAstGrepManifest(manifestDir);
 		const { calls, fetchImpl } = fetchReturning(FIXTURE_ZIP);
 		const resolverCalls: string[] = [];
 		const context = makeContext({
@@ -253,6 +248,7 @@ describe("runSgProvision", () => {
 		const outcome = await runSgProvision(context, {
 			arch: "x64",
 			fetchImpl,
+			releaseAssets: fixtureReleaseAssets(),
 			resolvePreexistingSg: () => {
 				resolverCalls.push("resolved");
 				return "/opt/homebrew/bin/sg";
@@ -274,13 +270,13 @@ describe("runSgProvision", () => {
 		const root = createTemporaryDirectory("omo-bootstrap-provision-");
 		const codexHome = join(root, "codex-home");
 		const manifestDir = join(root, "manifests");
-		await writeAstGrepManifest(manifestDir, { sha256: sha256Hex(new TextEncoder().encode("tampered")) });
 		const context = makeContext({ codexHome, manifestDir, pluginData: join(root, "data") });
 
 		// when
 		const outcome = await runSgProvision(context, {
 			arch: "x64",
 			fetchImpl: fetchReturning(FIXTURE_ZIP).fetchImpl,
+			releaseAssets: fixtureReleaseAssets({ sha256: sha256Hex(new TextEncoder().encode("tampered")) }),
 			resolvePreexistingSg: () => null,
 			runVersionProbe: async () => `ast-grep ${FIXTURE_VERSION}`,
 		});
@@ -299,13 +295,13 @@ describe("runSgProvision", () => {
 		const root = createTemporaryDirectory("omo-bootstrap-provision-");
 		const codexHome = join(root, "codex-home");
 		const manifestDir = join(root, "manifests");
-		await writeAstGrepManifest(manifestDir);
 		const context = makeContext({ codexHome, manifestDir, pluginData: join(root, "data") });
 
 		// when
 		const outcome = await runSgProvision(context, {
 			arch: "x64",
 			fetchImpl: fetchReturning(FIXTURE_ZIP).fetchImpl,
+			releaseAssets: fixtureReleaseAssets(),
 			resolvePreexistingSg: () => null,
 			runVersionProbe: async () => "ast-grep 0.0.1",
 		});
@@ -320,19 +316,23 @@ describe("runSgProvision", () => {
 		expect(await listFilesRecursively(join(codexHome, "runtime"))).toEqual([]);
 	});
 
-	it("#given a platform absent from the manifest #when provisioning #then a degraded entry names the unsupported platform without fetching", async () => {
+	it("#given the shared provisioner download fails #when provisioning #then a degraded entry names the download failure and leaves runtime empty", async () => {
 		// given
 		const root = createTemporaryDirectory("omo-bootstrap-provision-");
 		const codexHome = join(root, "codex-home");
 		const manifestDir = join(root, "manifests");
-		await writeAstGrepManifest(manifestDir);
-		const { calls, fetchImpl } = fetchReturning(FIXTURE_ZIP);
+		const calls: string[] = [];
+		const fetchImpl: SgFetch = async (url) => {
+			calls.push(url);
+			return new Response("unavailable", { status: 503 });
+		};
 		const context = makeContext({ codexHome, manifestDir, pluginData: join(root, "data") });
 
 		// when
 		const outcome = await runSgProvision(context, {
-			arch: "riscv64",
+			arch: "x64",
 			fetchImpl,
+			releaseAssets: fixtureReleaseAssets(),
 			resolvePreexistingSg: () => null,
 			runVersionProbe: async () => `ast-grep ${FIXTURE_VERSION}`,
 		});
@@ -341,9 +341,9 @@ describe("runSgProvision", () => {
 		expect(outcome.degraded).toHaveLength(1);
 		const entry = outcome.degraded[0];
 		expect(entry?.component).toBe(SG_PROVISION_COMPONENT);
-		expect(entry?.reason).toMatch(/unsupported platform/i);
-		expect(entry?.reason).toContain("linux-riscv64");
-		expect(calls).toEqual([]);
+		expect(entry?.reason).toMatch(/failed to download/i);
+		expect(entry?.reason).toContain("HTTP 503");
+		expect(calls).toEqual([`https://example.invalid/releases/${FIXTURE_VERSION}/app-x86_64-unknown-linux-gnu.zip`]);
 		expect(await listFilesRecursively(join(codexHome, "runtime"))).toEqual([]);
 	});
 
@@ -356,14 +356,6 @@ describe("runSgProvision", () => {
 			{ data: SHIM_BYTES, name: "sg.exe" },
 			{ data: STANDALONE_BYTES, name: "ast-grep.exe" },
 		]);
-		await writeAstGrepManifest(manifestDir, {
-			platforms: {
-				"win32-x64": {
-					sha256: sha256Hex(windowsZip),
-					url: "https://example.invalid/releases/9.9.9/app-x86_64-pc-windows-msvc.zip",
-				},
-			},
-		});
 		const context: BootstrapWorkerContext = {
 			...makeContext({ codexHome, manifestDir, pluginData: join(root, "data") }),
 			platform: "win32",
@@ -373,6 +365,14 @@ describe("runSgProvision", () => {
 		const outcome = await runSgProvision(context, {
 			arch: "x64",
 			fetchImpl: fetchReturning(windowsZip).fetchImpl,
+			releaseAssets: fixtureReleaseAssets({
+				platforms: {
+					"win32-x64": {
+						sha256: sha256Hex(windowsZip),
+						url: `https://example.invalid/releases/${FIXTURE_VERSION}/app-x86_64-pc-windows-msvc.zip`,
+					},
+				},
+			}),
 			resolvePreexistingSg: () => null,
 			runVersionProbe: async () => `ast-grep ${FIXTURE_VERSION}`,
 		});
@@ -392,7 +392,6 @@ describe("worker sg step wiring", () => {
 		const manifestDir = join(root, "manifests");
 		const pluginData = join(root, "data");
 		const pluginRoot = join(root, "plugin-root");
-		await writeAstGrepManifest(manifestDir);
 		await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
 		await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ version: "1.2.3" }), "utf8");
 		const { calls, fetchImpl } = fetchReturning(FIXTURE_ZIP);
@@ -406,6 +405,7 @@ describe("worker sg step wiring", () => {
 				sg: {
 					arch: "x64",
 					fetchImpl,
+					releaseAssets: fixtureReleaseAssets(),
 					resolvePreexistingSg: () => null,
 					runVersionProbe: async () => `ast-grep ${FIXTURE_VERSION}`,
 				},
@@ -432,7 +432,6 @@ describe("worker sg step wiring", () => {
 		const manifestDir = join(root, "manifests");
 		const pluginData = join(root, "data");
 		const pluginRoot = join(root, "plugin-root");
-		await writeAstGrepManifest(manifestDir, { sha256: sha256Hex(new TextEncoder().encode("tampered")) });
 		await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
 		await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ version: "1.2.3" }), "utf8");
 
@@ -445,6 +444,7 @@ describe("worker sg step wiring", () => {
 				sg: {
 					arch: "x64",
 					fetchImpl: fetchReturning(FIXTURE_ZIP).fetchImpl,
+					releaseAssets: fixtureReleaseAssets({ sha256: sha256Hex(new TextEncoder().encode("tampered")) }),
 					resolvePreexistingSg: () => null,
 					runVersionProbe: async () => `ast-grep ${FIXTURE_VERSION}`,
 				},

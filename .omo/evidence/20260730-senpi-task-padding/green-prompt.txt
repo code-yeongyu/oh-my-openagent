@@ -1,0 +1,33 @@
+Scenario: task prompt responsibility separation
+Captured: 2026-07-30T05:39:00Z
+
+Commands:
+  bun test packages/senpi-task/src/tools/task/description.test.ts
+  bun test packages/omo-senpi/src/components/task/usage-guidance.test.ts
+
+Binary observables:
+  - Tool description remains the single owner of input-form and target rules.
+  - Prompt guidelines retain continuation/control behavior without duplicating
+    category/subagent selection.
+  - Hidden guidance retains delivery timing, task_output, task_send, task_cancel,
+    and team-mail semantics without repeating invocation syntax.
+
+Output:
+  description.test.ts: 6 pass, 0 fail
+  usage-guidance.test.ts: 3 pass, 0 fail
+
+Machine-consumed prompt size after:
+  descriptionChars: 2036
+  snippetChars: 80
+  guidelineCount: 3
+  guidelineChars: 287
+  usageChars: 583
+  totalChars: 2986
+
+Comparison:
+  before totalChars: 4120
+  after totalChars: 2986
+  reduction: 1134 characters (27.5%)
+
+The size comparison is tuning evidence, not the test oracle. The test oracle is
+the responsibility separation and retained runtime/tool behavior above.

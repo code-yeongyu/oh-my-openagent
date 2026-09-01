@@ -1,4 +1,4 @@
-import { spawnWithTimeout } from "../spawn-with-timeout"
+import { spawnWithTimeout } from "../framework/spawn-with-timeout"
 import { bunWhich } from "../../../shared/bun-which-shim"
 
 export interface GhCliInfo {

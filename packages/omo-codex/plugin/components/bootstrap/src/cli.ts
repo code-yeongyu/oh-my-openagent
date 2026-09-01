@@ -38,7 +38,7 @@ export {
 } from "./provision.ts";
 export type { ResolvePreexistingSgOptions, SgProvisionSeams } from "./provision.ts";
 export { GIT_BASH_INSTALL_HINT, runWorkerSetup, SETUP_MARKETPLACE_NAME, SETUP_PLUGIN_NAME } from "./setup.ts";
-export type { SetupRunCommand, WorkerSetupOptions } from "./setup.ts";
+export type { WorkerSetupOptions } from "./setup.ts";
 export type {
 	SessionStartAction,
 	SessionStartHookOptions,

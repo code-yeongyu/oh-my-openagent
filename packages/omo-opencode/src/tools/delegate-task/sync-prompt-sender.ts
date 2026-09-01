@@ -5,6 +5,7 @@ import { createInternalAgentTextPart } from "../../shared/internal-initiator-mar
 import {
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
+import { migrateToolsToPermission } from "../../shared/permission-compat"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { routePromptRetry } from "../../shared/session-route"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -49,11 +50,21 @@ function isUnexpectedEofError(error: unknown): boolean {
   return lowered.includes("unexpected eof") || lowered.includes("json parse error")
 }
 
-export function buildSyncPromptTools(agentToUse: string): Record<string, boolean> {
+export function buildSyncPromptTools(
+  agentToUse: string,
+  permission?: Record<string, "ask" | "allow" | "deny">,
+): Record<string, boolean> {
+  const userDenied: Record<string, boolean> = {}
+  if (permission) {
+    for (const [tool, value] of Object.entries(permission)) {
+      if (value === "deny") userDenied[tool] = false
+    }
+  }
   return {
     task: isPlanFamily(agentToUse),
     call_omo_agent: true,
     question: false,
+    ...userDenied,
     ...getAgentToolRestrictions(agentToUse),
   }
 }
@@ -75,10 +86,19 @@ export async function sendSyncPrompt(
 ): Promise<string | null> {
   const tddEnabled = input.sisyphusAgentConfig?.tdd
   const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
-  const tools = buildSyncPromptTools(input.agentToUse)
+  const userPermission = input.categoryModel?.tools
+    ? migrateToolsToPermission(input.categoryModel.tools)
+    : undefined
+  const tools = buildSyncPromptTools(input.agentToUse, userPermission)
   setSessionTools(input.sessionID, tools)
 
-  applySessionPromptParams(input.sessionID, input.categoryModel)
+  const loweredReasoning = applySessionPromptParams(input.sessionID, input.categoryModel)
+  const promptModel = input.categoryModel?.reasoning !== undefined
+    ? { ...input.categoryModel, reasoningEffort: loweredReasoning.reasoningEffort }
+    : input.categoryModel
+  const promptVariant = input.categoryModel?.reasoning !== undefined
+    ? loweredReasoning.variant
+    : input.categoryModel?.variant
 
   const promptArgs = {
     path: { id: input.sessionID },
@@ -95,8 +115,8 @@ export async function sendSyncPrompt(
             },
           }
         : {}),
-      ...(input.categoryModel?.variant ? { variant: input.categoryModel.variant } : {}),
-      ...buildPromptGenerationParams(input.categoryModel),
+      ...(promptVariant ? { variant: promptVariant } : {}),
+      ...buildPromptGenerationParams(promptModel),
     },
   }
 

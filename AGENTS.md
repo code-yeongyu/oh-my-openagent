@@ -2,15 +2,15 @@
 
 > **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
 
-**Generated:** 2026-06-11 | **Commit:** 6bb284503 | **Branch:** dev | **Release:** v4.8.1
+**Generated:** 2026-08-24 | **Source snapshot:** f3642fcda | **Branch:** initdeep-refresh-20260824 | **Release:** v5.0.0-beta.18
 
-## STOP. QA IS MANDATORY. NON-NEGOTIABLE. EVERY SINGLE TIME YOU TOUCH AN OPENCODE- OR CODEX-CONNECTED COMPONENT.
+## STOP. QA IS MANDATORY. NON-NEGOTIABLE. EVERY SINGLE TIME YOU TOUCH AN OPENCODE-, CODEX-, OR SENPI-CONNECTED COMPONENT.
 
-> **IF YOUR CHANGE TOUCHES ANYTHING WIRED INTO OPENCODE OR INTO THE CODEX LIGHT EDITION, YOU MUST QA IT. ALWAYS. EVERY SINGLE TIME. NO EXCEPTIONS. THERE IS NO "TOO SMALL TO SKIP". THERE IS NO "IT OBVIOUSLY WORKS".**
+> **IF YOUR CHANGE TOUCHES ANYTHING WIRED INTO OPENCODE, INTO THE CODEX LIGHT EDITION, OR INTO THE SENPI ADAPTER, YOU MUST QA IT. ALWAYS. EVERY SINGLE TIME. NO EXCEPTIONS. THERE IS NO "TOO SMALL TO SKIP". THERE IS NO "IT OBVIOUSLY WORKS".**
 
 **"It typechecks" is NOT QA. "`bun test` is green" is NOT QA.** YOU MUST DRIVE THE REAL HARNESS, and then **YOU MUST WRITE THE EVIDENCE TO DISK.** If there is no evidence file, **the QA DID NOT HAPPEN**, and **YOU ARE NOT ALLOWED TO COMMIT OR PUSH.**
 
-This is repeated on purpose, because it is the single most ignored rule in this repo. **CHANGE A HOOK, A TOOL, AN AGENT, A FEATURE, A CONFIG SCHEMA, AN MCP, A CLI COMMAND, AN INSTALLER, A PROMPT, OR ANYTHING ELSE THAT REACHES OPENCODE OR CODEX, THEN: RUN QA, THEN RECORD EVIDENCE.** Always. Every time. No exceptions.
+This is repeated on purpose, because it is the single most ignored rule in this repo. **CHANGE A HOOK, A TOOL, AN AGENT, A FEATURE, A CONFIG SCHEMA, AN MCP, A CLI COMMAND, AN INSTALLER, A PROMPT, OR ANYTHING ELSE THAT REACHES OPENCODE, CODEX, OR SENPI, THEN: RUN QA, THEN RECORD EVIDENCE.** Always. Every time. No exceptions.
 
 ### OPENCODE side (`packages/omo-opencode/`): ALWAYS run the `opencode-qa` skill
 
@@ -19,67 +19,98 @@ This is repeated on purpose, because it is the single most ignored rule in this 
 3. **USE tmux** for the TUI smoke (`scripts/tui-smoke.sh`) and for any interactive driving. tmux is for SMOKE (did it boot, render, accept a key); assert REAL behavior via `opencode run --format json` or the server API + SSE.
 4. **PROVE THE HOOK FIRED.** If you changed a lifecycle hook, prove the matching event hit the wire (`scripts/sse-hook-probe.sh --event <name>`). Seeing the event proves the hook would fire.
 
-### CODEX side (`packages/omo-codex/`): ALWAYS install the LOCAL build into an ISOLATED `CODEX_HOME`
+### CODEX side (`packages/omo-codex/`): ALWAYS run the `codex-qa` skill
 
-1. **NEVER QA AGAINST YOUR REAL `~/.codex`.** Point `CODEX_HOME` at a throwaway dir and install THIS repo's LOCAL build into it. LOCAL build. ISOLATED home. NEVER the published package. NEVER the real home.
-   ```bash
-   export CODEX_HOME="$(mktemp -d)/codex"
-   node packages/omo-codex/scripts/install-local.mjs install   # installs the LOCAL repo build into the isolated CODEX_HOME
-   ```
-2. **RUN THE CODEX GATE:** `bun run test:codex` (installer + config migration + plugin component suite; the canonical Codex compatibility gate).
-3. **DRIVE CODEX UNDER tmux** in that isolated `CODEX_HOME`: confirm the plugin loads, the hooks actually fire (`SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse` / `PostCompact` / `Stop` / `SubagentStop`), and `omo@sisyphuslabs` is enabled. **CONFIRM THE REAL `~/.codex/config.toml` WAS NOT TOUCHED.**
+1. **ALWAYS RUN THE `codex-qa` SKILL** (`.agents/skills/codex-qa/`) to map the EXPECTED IMPACT and the FULL CHANGE SCOPE of your edit BEFORE and AFTER. It exercises ONLY our plugin in strict isolation — an isolated `CODEX_HOME` + a LOCAL mock model (no real API call) — so the real `~/.codex` is NEVER read or written. NEVER QA against your real `~/.codex`; NEVER the published package.
+2. **PROVE THE HOOK FIRED, FIRST-PARTY.** The skill drives the real `codex app-server` and asserts `hook/started` / `hook/completed` notifications for our components (`scripts/app-server-drive.sh --plugin`). Deterministic per-component checks: `scripts/hook-unit-probe.sh`. Installer + `config.toml` landing: `scripts/install-verify.sh`. tmux TUI smoke: `scripts/tui-smoke.sh`. Each script ships a `--self-test`.
+3. **RUN THE CODEX GATE:** `bun run test:codex` (installer + config migration + plugin component suite). This is the hermetic UNIT gate; it does NOT prove a live session — the `codex-qa` skill does.
+4. **CONFIRM THE REAL `~/.codex/config.toml` WAS NOT TOUCHED** — every `codex-qa` script asserts this automatically (shasum before/after).
+
+### SENPI side (`packages/omo-senpi/`, `packages/senpi-task/`): ALWAYS run the `senpi-qa` skill
+
+1. **ALWAYS RUN THE `senpi-qa` SKILL** (`.agents/skills/senpi-qa/`) to map the EXPECTED IMPACT and the FULL CHANGE SCOPE of your edit BEFORE and AFTER. It drives the REAL `senpi` binary through the drivers in `packages/omo-senpi/scripts/qa/`, which build their own isolated `SENPI_CODING_AGENT_DIR` and IGNORE a caller-provided one, so the real `~/.senpi/agent` is NEVER written.
+2. **RESOLVE THE EVIDENCE DIRECTORY WITH THE SKILL'S SCRIPT.** `node .agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs --repo-root "$(git rev-parse --show-toplevel)" --slug <YYYYMMDD>-<short-slug>` is the ONLY sanctioned way to pick the path. It returns an absolute path under `.omo/evidence/omo-senpi-adapter/<slug>/`, creates nothing, and rejects traversal, separators, absolute paths, and stray roots such as `local-ignore/qa-evidence`.
+3. **RUN THE SENPI GATE:** `tsgo --noEmit -p packages/omo-senpi/tsconfig.json` then `bun run test:senpi`. This is the hermetic UNIT gate; it does NOT prove a live session — the `senpi-qa` skill does.
+4. **CONFIRM THE REAL `~/.senpi/agent` WAS NOT TOUCHED** — record the live driver's `realSenpiUntouched` / changed-path fields and isolated agent-dir path. A whole-directory digest is supporting evidence only because live debug/cache files may change. A driver reporting `SKIP` because the `senpi` binary is absent is NOT a pass; say so in the evidence.
 
 ### EVIDENCE: record it under `.omo/evidence/` or it DID NOT HAPPEN
 
-**WRITE EVERY QA ARTIFACT TO `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (the existing evidence dir; one subfolder per change, keep it ORGANIZED). For EVERY change you MUST record, in plain files:
-- **WHY THERE IS NO REGRESSION:** before/after, the isolation proof (session-count unchanged), and the EXACT commands you ran with their output.
-- **PROOF THAT EVERY INTENDED CHANGE LANDED:** the new behavior OBSERVED on the real harness, not merely asserted.
-- The QA case(s) run, the tmux capture(s), and the isolation receipts.
+**WRITE EVERY QA ARTIFACT TO `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (the existing evidence dir; one subfolder per change, keep it ORGANIZED). Live Senpi QA is the one scoped exception: it goes under `.omo/evidence/omo-senpi-adapter/<slug>/`, resolved by the `senpi-qa` skill's script. For EVERY change you MUST record reviewer-readable plain files:
+- **WHAT WAS TESTED:** the command or manual action, the surface driven, and the behavior it was meant to prove.
+- **WHAT WAS OBSERVED:** the before/after or new behavior, isolation proof such as unchanged session counts, and the artifact path for the exact captured output.
+- **WHY IT IS ENOUGH:** how the evidence covers the intended behavior and remaining regression risk.
+- **WHAT WAS OMITTED:** redact or summarize raw secret-bearing logs, env dumps, tokens, auth headers, and private credentials instead of copying them.
 
 **NO EVIDENCE FILE == NO QA == NO COMMIT == NO PUSH.** ALWAYS. EVERY TIME. NO EXCEPTIONS.
 
+## MANDATORY CHANGE-EXECUTION PROTOCOL. EVERY USER-ORDERED PATCH FOLLOWS THIS. NO EXCEPTIONS.
+
+> **THE MOMENT A TASK REQUIRES PRODUCING A PATCH THAT MODIFIES THIS REPOSITORY, AND THE USER HAS EXPLICITLY INSTRUCTED THAT MODIFICATION, THIS PROTOCOL IS LAW. IT IS NOT A SUGGESTION. IT IS NOT OPTIONAL. THERE IS NO "TOO SMALL TO BOTHER", NO "JUST THIS ONCE", NO "I ALREADY KNOW THE CODEBASE". YOU RUN EVERY STEP, IN ORDER, EVERY SINGLE TIME.**
+
+1. **EXPLORE.** MAP the code you are about to touch BEFORE editing a single line: read the real files, trace the call paths, measure the blast radius. NEVER patch from memory.
+2. **MAKE A PLAN.** Write the full plan down BEFORE the first edit: every file, every change, the verification for each. NO PLAN ON DISK MEANS YOU DO NOT START.
+3. **ADD TODOS IN ULTRA-DETAIL.** Mirror EVERY atomic step of the plan into the todo list: one todo per edit-plus-verification unit. Vague todos like "implement feature" are FORBIDDEN.
+4. **MAKE A NEW WORKTREE.** ALL implementation happens in a fresh, task-owned git worktree. NEVER edit the main checkout in place, NEVER hand-commit to `dev`.
+5. **MAKE A PR AND WORK UNTIL IT GETS MERGED.** Open a reviewer-readable PR and STAY ON IT until it is MERGED: fix CI, answer review, re-run QA, resolve conflicts via `smart-rebase`. AN UNMERGED PR IS UNFINISHED WORK.
+6. **SET A GOAL AND RUN THE ULW LOOP.** Register the goal with binding success criteria and drive the work through the `ulw-loop`: evidence-bound, failing-first, real-surface QA. "IT SHOULD WORK" IS NOT EVIDENCE.
+7. **MANAGE THE TODO LIST OBSESSIVELY.** Mark a step in progress the instant it begins, done the instant it finishes, append new steps the moment they surface. THE TODO LIST NEVER LAGS REALITY. EVER.
+
+## DEFAULT WORKFLOW — how to take on any task
+
+Unless the user EXPLICITLY says otherwise, or the task is an urgent must-fix-now hotfix, deliver every change through the **`work-with-pr`** skill: it works in an isolated git worktree, implements with evidence-bound manual QA, opens a reviewer-readable English PR (what changed, why, observed behavior, QA/evidence, residual risk), runs the verification loop, and merges. Do NOT hand-commit normal work straight to `dev`.
+
+- **QA is the evidence gate, scoped to what you touched.** A change under `packages/omo-opencode/` MUST run the **`opencode-qa`** skill; a change under `packages/omo-codex/` (lazycodex) MUST run the **`codex-qa`** skill; a change under `packages/omo-senpi/` or `packages/senpi-task/` MUST run the **`senpi-qa`** skill (see the QA section above for each). Run the matching skill, and treat its captured output (written under `.omo/evidence/`) as the QA evidence `work-with-pr` requires. A change touching more than one runs each.
+- **Conflicts → `smart-rebase`.** If the worktree branch conflicts with its base, resolve it with the **`smart-rebase`** skill, then re-run the scoped QA. Never hand-resolve by force-pushing shared history.
+- **Merge → merge commit, ALWAYS.** Land the PR with a merge commit per **PR MERGE POLICY** below. NEVER squash-merge or rebase-merge, even if a generic workflow, skill, or GitHub default suggests it.
+
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 55-62 lifecycle hooks (base / +team-mode) across 61 dirs, 20-39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, ~54-62 lifecycle hooks (54 base / 61 team / 62 monitor) across 62 dirs, 12-38 registry tools (gated by config flags including team-mode and goal; 8 `lsp_*` aliases served via the built-in lsp MCP), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility.
 
-**The package layering refactor moved the entire plugin out of root `src/` into [`packages/omo-opencode/src/`](packages/omo-opencode/src/AGENTS.md)** (a 100% git rename — there is NO root `src/` anymore). That adapter tree holds ~2443 `.ts` files (~870 co-located tests), 125 barrel `index.ts` files; the rest of the logic lives in 9 Core packages + 4 MCP packages + the Codex adapter. Build entry: `packages/omo-opencode/src/index.ts`, a thin wrapper that delegates to `packages/omo-opencode/src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin = `packages/omo-opencode/`) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
+**The package layering refactor moved the entire plugin out of root `src/` into [`packages/omo-opencode/src/`](packages/omo-opencode/src/AGENTS.md)** (a 100% git rename — there is NO root `src/` anymore). That adapter tree is now the OpenCode-facing shim over 20 Core packages + 4 MCP packages + sibling adapters (Codex, Senpi, native). Build entry: `packages/omo-opencode/src/index.ts`, a thin wrapper that delegates to `packages/omo-opencode/src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin = `packages/omo-opencode/`) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](packages/omo-codex/AGENTS.md), with `lazycodex` as the repository/bin identity and `lazycodex-ai` as the live npm alias; see CODEX LIGHT EDITION below).
 
 ## STRUCTURE
 
 ```
 oh-my-opencode/                      # workspace root (no root src/ — it moved into packages/omo-opencode)
-├── packages/                        # 28 sibling pkgs, layered: Core → MCP → Skills → Adapters → Platform/Web. See packages/AGENTS.md
+├── packages/                        # 45 sibling packages across Core/MCP/Skills/Adapters/Platform/Web. See packages/AGENTS.md
 │   ├── omo-opencode/                # ★ THE OpenCode plugin adapter (formerly root src/). Build entry: src/index.ts
-│   │   └── src/                     # plugin source: ~2443 .ts, ~870 tests, 125 barrels. Full breakdown → packages/omo-opencode/src/AGENTS.md
+│   │   ├── src/                     # plugin source and OpenCode-facing adapter shims. Full breakdown → packages/omo-opencode/src/AGENTS.md
 │   │       ├── index.ts             # Plugin entry; thin wrapper re-exporting createPluginModule() from src/testing/
 │   │       ├── plugin-interface.ts  # 12 OpenCode hook handlers (+2 wired in testing/create-plugin-module.ts)
 │   │       ├── create-{managers,tools,hooks}.ts  # 4 managers / ToolRegistry / 5-tier hook composition
-│   │       ├── agents/              # 11 agent factories (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   │       ├── hooks/               # ~55 lifecycle hooks across 61 dirs (incl. zauc-mocks sort-order hack + team-session-events/)
-│   │       ├── tools/               # 13 native tool dirs; LSP + AST-grep served via built-in MCPs
-│   │       ├── features/            # 22 feature modules (team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, mcp-oauth, claude-code-plugin-loader, boulder-state, …)
+│   │       ├── agents/              # 11 agents, 10 createXXXAgent factories (Prometheus special-cased via plugin-handlers/prometheus-agent-config-builder.ts)
+│   │       ├── hooks/               # ~54-62 lifecycle hooks (54 base / 61 team / 62 monitor) across 62 dirs (incl. 5 zauc-* mock dirs + shared/ + team-session-events/)
+│   │       ├── tools/               # 15 native tool dirs (14 tools + shared/); LSP served via a built-in MCP, ast-grep via the bundled skill
+│   │       ├── features/            # 24 feature modules (team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, mcp-oauth, boulder-state, btw-side, tui-sidebar, opengateway-provider, …)
 │   │       ├── shared/              # cross-cutting utilities; logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
-│   │       ├── config/             # Zod v4 schema system (32 schema files)
-│   │       ├── cli/                 # Commander.js CLI: install, run, doctor, mcp-oauth, boulder, sparkshell, ulw-loop
-│   │       ├── mcp/                 # 5 built-in MCPs (3 remote + local stdio lsp + ast_grep)
+│   │       ├── config/             # Zod v4 schema system (36 schema files)
+│   │       ├── cli/                 # Commander.js CLI, 12 commands: install(setup), run, doctor, cleanup(uninstall), version, get-local-version, refresh-model-capabilities, boulder, ulw-loop, config (migrate), worktree-sweep, mcp (oauth login/logout/status)
+│   │       ├── mcp/                 # 5 built-in MCPs (3 remote + local stdio lsp + codegraph)
 │   │       ├── plugin/ plugin-handlers/  # OpenCode hook handlers + 6-phase config loading pipeline
 │   │       ├── openclaw/            # Bidirectional Discord/Telegram/HTTP/shell integration + reply listener daemon
 │   │       └── generated/ help/ locales/ testing/ __tests__/  # model-capabilities, CLI help schemas, i18n, test factory, perf benchmarks
-│   ├── omo-codex/                   # Codex CLI Light edition (lazycodex); vendored Codex plugin `omo` + TS installer + telemetry
-│   ├── utils/ model-core/ prompts-core/ rules-engine/ agents-md-core/ ast-grep-core/ comment-checker-core/ hashline-core/ boulder-state/   # 9 Core (pure-TS) pkgs
-│   ├── lsp-tools-mcp/ ast-grep-mcp/ git-bash-mcp/ lsp-daemon/   # 4 MCP-layer pkgs (stdio); lsp-daemon = shared per-user LSP daemon (Codex)
+│   │   └── scripts/             # standalone codegen (OpenGateway + models.dev → tracked src/features/opengateway-provider/opengateway-models.json). See scripts/AGENTS.md
+│   ├── omo-codex/                   # Codex CLI Light edition; vendored Codex plugin `omo` + TS installer + telemetry (`lazycodex` repo/bin identity, `lazycodex-ai` live npm alias)
+│   ├── omo-senpi/                   # Senpi native TS extension adapter (local-path Pi package); 18 components incl. task + memory + init-deep-advisor (drives senpi-task + omo-config-core)
+│   ├── omo-native/                  # npm `omo-ai` distribution (BETA channel): launcher spawning the pinned senpi engine + `canonicalAgentDir()` (~/.omo/agent)
+│   ├── senpi-task/                  # Senpi-coupled task engine: state machine, store, in-process/RPC runners, lifecycle, completion, teams, dependency-frontier DAG engine (src/dag/, largest subsystem); 4 task + 6 lead-team tools (the `dag` tool is registered by omo-senpi)
+│   ├── pi-goal/ pi-webfetch/        # Standalone Pi adapters: Codex-style goal tracking + bounded URL retrieval
+│   ├── utils/ model-core/ prompts-core/ rules-engine/ agents-md-core/ comment-checker-core/ hashline-core/ boulder-state/ memory-core/ telemetry-core/ lsp-core/ mcp-stdio-core/ tmux-core/ claude-code-compat-core/ skills-loader-core/ mcp-client-core/ openclaw-core/ team-core/ delegate-core/ omo-config-core/   # 20 Core (pure-TS) pkgs
+│   ├── lsp-tools-mcp/ git-bash-mcp/ lsp-daemon/ ast-grep-mcp/   # 4 MCP-layer pkgs (stdio); LSP packages consume lsp-core + mcp-stdio-core
 │   ├── shared-skills/               # Cross-harness SKILL.md bundle shared by OpenCode + Codex
 │   ├── web/                         # Marketing site (Next.js 15 + Cloudflare Workers); own bun.lock; only @/* alias zone in the repo
-│   └── oh-my-opencode-<os>-<arch>[-variant]/   # 11 platform binaries (bin/ + package.json only; generated, never hand-edited)
-├── bin/                             # Platform-detection JS shim (5 bin aliases: oh-my-opencode, oh-my-openagent, omo, lazycodex, lazycodex-ai)
-├── script/                          # Build/publish automation (singular, not scripts/)
+│   └── oh-my-opencode-<os>-<arch>[-variant]/   # 12 platform launcher packages (bin/ + package.json only; generated, never hand-edited)
+├── bin/                             # Platform-detection JS shim; 5 public aliases. See bin/AGENTS.md
+├── script/                          # Bun/TS build/publish automation (singular). See script/AGENTS.md
+├── scripts/                         # Node ESM third-party-notice helpers. See scripts/AGENTS.md
 ├── docs/                            # User-facing docs (guide/, reference/, examples/, legal/, manifesto.md, troubleshooting/)
-├── assets/                          # oh-my-opencode.schema.json (auto-generated from Zod)
-├── test-support/ tests/             # Shared test fixtures + cross-package integration tests
+├── assets/                          # Generated config/help schemas. See assets/AGENTS.md
+├── test-support/ tests/             # Shared helpers + repo-level integration tests (incl. tests/hashline/ standalone Vercel AI SDK edit-integration suite). See tests/AGENTS.md
 ├── signatures/                      # CLA signature registry (cla.json)
 ├── postinstall.mjs                  # Verifies platform binary + OpenCode version
 ├── test-setup.ts                    # Bun test preload (resets state between tests)
-├── .opencode/  .agents/             # Project-scope skills + commands (.agents/ is the recent migration target)
+├── .opencode/  .agents/             # Project-scope skills + commands; .agents/ is the authoritative superset (both load, consumers prefer .agents/; new skills go to .agents/ only)
 ├── .omo/                            # AI agent workspace (rules/, plans/, tasks/, teams/, ulw-loop/, notepads/)
 └── .local-ignore/                   # Dev-only test fixtures + PR worktrees (NOT part of the real AGENTS.md hierarchy)
 ```
@@ -96,6 +127,9 @@ pluginModule.server(input, options)   # serverPlugin() in packages/omo-opencode/
   ├─→ detectExternalSkillPlugin()     # warn on conflicts
   ├─→ injectServerAuthIntoClient()    # auth headers into shared SDK client
   ├─→ loadPluginConfig()              # JSONC parse → user/project merge → Zod validate → migrate
+  ├─→ recordPluginTelemetry()         # plugin-load telemetry
+  ├─→ ensureTuiPluginEntry()          # always; BTW remains available when sidebar is disabled
+  ├─→ initLiveServerRoute() + setLiveParentWakeRoutingDisabled() + warmLiveServerProbe()  # live-listener wake routing
   ├─→ selectRuntimeSecuritySkills() + createRuntimeSkillSourceServer()  # runtime security-skill source
   ├─→ initI18n()                      # load locale strings (packages/omo-opencode/src/locales/)
   ├─→ setAgentSortOrder()             # apply configured agent_order
@@ -116,7 +150,7 @@ pluginModule.server(input, options)   # serverPlugin() in packages/omo-opencode/
 | Handler | OpenCode Hook | Purpose |
 |---------|---------------|---------|
 | `config` | `config` | 6-phase pipeline: provider → plugin-components → agents → tools → MCPs → commands |
-| `tool` | `tool` | 20–39 registered tools (config-gated: team-mode +12, task system +4, hashline +1, interactive_bash +1, look_at +1) |
+| `tool` | `tool` | 12-38 registered tools (config-gated: team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1, goal +3) |
 | `tool.definition` | `tool.definition` | Per-tool definition transform (applies `todo-description-override`) |
 | `chat.message` | `chat.message` | First-message variant, session setup, keyword detection (ultrawork/search/analyze/team) |
 | `chat.params` | `chat.params` | Anthropic effort, think mode, runtime fallback override |
@@ -132,11 +166,11 @@ pluginModule.server(input, options)   # serverPlugin() in packages/omo-opencode/
 
 ## TOOL CATALOG (config-gated)
 
-**Always on (20):** `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_diagnostics`, `lsp_prepare_rename`, `lsp_rename`, `grep`, `glob`, `ast_grep_search`, `ast_grep_replace`, `session_list`, `session_read`, `session_search`, `session_info`, `background_output`, `background_cancel`, `call_omo_agent`, `task` (delegate), `skill`, `skill_mcp`.
+**Always on (12 registry tools):** `grep`, `glob`, `session_list`, `session_read`, `session_search`, `session_info`, `background_output`, `background_cancel`, `call_omo_agent`, `task` (delegate), `skill`, `skill_mcp`.
 
-> Note: `lsp_*` and `ast_grep_*` tool names are now served by built-in MCP servers (`lsp` via `packages/lsp-tools-mcp`, `ast_grep` via `packages/ast-grep-mcp`), preserving existing names through OpenCode MCP namespacing.
+> Note: the 8 LSP aliases (`lsp_status`, `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_install_decision`) are NOT registry registrations — they are served by the built-in `lsp` MCP via `packages/lsp-tools-mcp`. Structural search and rewrite is provided by the `ast-grep` skill using `sg`.
 
-**Conditional:** `look_at` (+1, multimodal-looker not disabled), `interactive_bash` (+1, `tmux` binary available on PATH via `isInteractiveBashEnabled()`), `task_create`/`task_get`/`task_list`/`task_update` (+4, `experimental.task_system`), `edit` (+1, `hashline_edit`), `team_create`/`team_delete`/`team_shutdown_request`/`team_approve_shutdown`/`team_reject_shutdown`/`team_send_message`/`team_task_create`/`team_task_list`/`team_task_update`/`team_task_get`/`team_status`/`team_list` (+12, `team_mode.enabled`).
+**Conditional (up to 38 total):** `look_at` (+1, multimodal-looker not disabled), `interactive_bash` (+1, `tmux` binary available on PATH via `isInteractiveBashEnabled()`), `monitor_start`/`monitor_stop`/`monitor_list`/`monitor_output` (+4, `monitor.enabled`), `task_create`/`task_get`/`task_list`/`task_update` (+4, `experimental.task_system`), `edit` (+1, `hashline_edit`), `team_create`/`team_delete`/`team_shutdown_request`/`team_approve_shutdown`/`team_reject_shutdown`/`team_send_message`/`team_task_create`/`team_task_list`/`team_task_update`/`team_task_get`/`team_status`/`team_list` (+12, `team_mode.enabled`), `create_goal`/`update_goal`/`get_goal` (+3, `goal.enabled`).
 
 ## TEAM MODE
 
@@ -175,43 +209,49 @@ Teams live as directories under `~/.omo/teams/{name}/config.json` (user) or `<pr
 
 ## CODEX LIGHT EDITION (omo-codex / lazycodex)
 
-oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCode plugin (omo for OpenCode = `packages/omo-opencode/`). **Light** = omo for the OpenAI Codex CLI, vendored under [`packages/omo-codex/`](packages/omo-codex/AGENTS.md). "omo in Codex" / "omo for Codex" = **lazycodex**, and the public GitHub repo [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) IS this: a thin distribution layer over `omo-codex` (site lazycodex.ai; "Codex for no-brainers, just prompt with `ultrawork`"; Codex edition "coming June 2026", currently OpenCode-only).
+oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCode plugin (omo for OpenCode = `packages/omo-opencode/`). **Light** = omo for the OpenAI Codex CLI, vendored under [`packages/omo-codex/`](packages/omo-codex/AGENTS.md). "omo in Codex" / "omo for Codex" = **lazycodex**, and the public GitHub repo [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) is the thin marketplace/distribution layer over `omo-codex`; `lazycodex-ai` is the live npm alias and `lazycodex` is the repository/bin identity.
 
-- **Package:** `@oh-my-opencode/omo-codex` (private, v0.1.0): "Codex harness adapter. Vendored Codex plugin namespace `omo` + TypeScript installer + telemetry." Plugin bundle pkg = `@sisyphuslabs/omo-codex-plugin`. Reuses `@oh-my-opencode/utils` + `@oh-my-opencode/shared-skills`.
-- **Marketplace identity (precision):** Codex sees marketplace `sisyphuslabs`, plugin `omo`, enabled as `omo@sisyphuslabs`. `lazycodex` is ONLY the repo/npm/bin alias, never the marketplace name.
-- **Alias mechanics:** root `package.json` maps `lazycodex-ai` to `bin/oh-my-opencode.js` (1 of 5 bin aliases: `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex`, `lazycodex-ai`, all the same compiled CLI). `bunx lazycodex-ai install` is exactly `bunx oh-my-openagent install --platform=codex`. Routing: `packages/omo-opencode/src/cli/cli-program.ts` (`lazycodex`/`lazycodex-ai` default platform to codex), `bin/platform.js` (both resolve the `oh-my-openagent` platform family). `packages/omo-opencode/src/cli/star-request.ts` stars both repos. The bare `lazycodex` npm name was unpublished 2026-05-30; the live npm package is `lazycodex-ai`.
-- **Disambiguation:** `publish.yml` republishes this repo's CLI under the npm name `lazycodex-ai` (name/version rewrite). The bare `lazycodex` npm name was unpublished 2026-05-30 and is no longer installable. `lazycodex` (without `-ai`) now refers only to the `code-yeongyu/lazycodex` GitHub repository that hosts the marketplace bundle, not an npm package. Both this repo's publish target and the `code-yeongyu/lazycodex` repo's package resolve to `lazycodex-ai` on npm, so their release versions must stay coordinated.
-- **Components (8):** `comment-checker`, `git-bash`, `lsp`, `rules`, `start-work-continuation`, `telemetry`, `ultrawork`, `ulw-loop`, wired to Codex events `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PostToolUse`/`PostCompact`/`Stop`/`SubagentStop`. No agent orchestration, no `team_*`, no built-in MCPs beyond LSP, no hashline.
-- **Install:** `bunx oh-my-openagent install --platform=codex` (or `bunx lazycodex-ai install`, or `--platform=both`) copies the plugin to `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes a local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, links component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`). Installer: [`packages/omo-opencode/src/cli/install-codex/`](packages/omo-opencode/src/cli/install-codex/AGENTS.md) + `packages/omo-codex/scripts/install*.mjs`.
+- **Package:** `@oh-my-opencode/omo-codex` (private, versioned with the repo): "Codex harness adapter. Vendored Codex plugin namespace `omo` + TypeScript installer + telemetry." Plugin bundle pkg = `@sisyphuslabs/omo-codex-plugin`. Reuses `@oh-my-opencode/utils`, shared Core packages, and generated SKILL.md outputs from `@oh-my-opencode/shared-skills` plus component-local skills.
+- **Marketplace identity (precision):** Codex sees marketplace `sisyphuslabs`, plugin `omo`, enabled as `omo@sisyphuslabs`. `lazycodex-ai` is the live npm alias; `lazycodex` is the repository/bin identity, never the marketplace name.
+- **Alias mechanics:** root `package.json` maps `lazycodex-ai` to `bin/oh-my-opencode.js` (1 of 5 bin aliases: `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex`, `lazycodex-ai`, all the same CLI launcher). `bunx lazycodex-ai install` is exactly `bunx oh-my-openagent install --platform=codex`. Routing: `packages/omo-opencode/src/cli/cli-program.ts` (`lazycodex`/`lazycodex-ai` default platform to codex), `bin/platform.js` (both resolve the `oh-my-openagent` platform family). `packages/omo-opencode/src/cli/star-request.ts` stars both repos.
+- **Disambiguation:** `publish.yml` republishes this repo's CLI under the live npm alias `lazycodex-ai` (name/version rewrite). Bare `lazycodex` is only the `code-yeongyu/lazycodex` repository/bin identity, not an npm package.
+- **Components (11 live workspaces):** `codegraph`, `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `lsp`, `rules`, `ulw-execute-continuation`, `teammode`, `telemetry`, `ultrawork`, `ulw-loop` (per `plugin/package.json` `workspaces[]`), wired to Codex events `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PostToolUse`/`PostCompact`/`Stop`/`SubagentStop`. Plus `bootstrap` (runtime provisioner with its own package.json, deliberately outside the workspaces array), `test-support` (test helper dir, not a component), and `lcx` (skills-only carrier, no package.json, not a workspace). `workflow-selector` was removed 2026-06-29. No `team_*` tools (teammode is script+skill driven), no hashline; `.mcp.json` declares 5 servers: lsp + codegraph + git-bash (local stdio) + grep_app + context7 (remote).
+- **Ultrawork skill pointer (truncation-safe):** Codex App truncates large `UserPromptSubmit` hook output, so the ultrawork hook injects a compact `<ultrawork-mode>` skill pointer (<4096 bytes, pinned by `plugin/test/ultrawork-skill-pointer.test.mjs`) that instructs the model to `create_goal` then READ the full directive from the bundled `ultrawork` skill (`ultrawork/src/skill-pointer.ts`); falls back to the full inline directive when the plugin skills tree is absent. `ulw-loop/src/ultrawork-skill-pointer.ts` is a byte-identical mirror for the standalone `--with-ultrawork` path.
+- **Install:** `bunx oh-my-openagent install --platform=codex` (or `bunx lazycodex-ai install`, or `--platform=both`) copies the plugin to `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes a local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, links the root `omo` runtime wrapper plus component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`). Installer source lives in [`packages/omo-codex/src/install/`](packages/omo-codex/src/install/); `packages/omo-codex/scripts/install*.mjs` are generated/bundled Node entrypoints that keep the published CLI paths stable.
 - **Deploy / publish** ([`.github/workflows/publish.yml`](.github/workflows/publish.yml), manual dispatch):
   - `publish_lazycodex` (default **true**) publishes the npm alias `lazycodex-ai`: rewrites root `package.json` name to `lazycodex-ai` + version to the release + optionalDeps `oh-my-opencode-*` to `oh-my-openagent-*`, skips when `registry.npmjs.org/lazycodex-ai/${VERSION}` exists, publishes `--access public --provenance --tag latest`, then restores `package.json`. (The bare `lazycodex` npm name was unpublished 2026-05-30; `lazycodex-ai` is the live package.)
-  - Codex marketplace sync is **automatic for every stable release** (no manual toggle; the old `sync_lazycodex_marketplace` input was removed). The release-job steps are gated on `needs.release-metadata.outputs.dist_tag == ''` (stable only; prereleases skip) and require secret `LAZYCODEX_SYNC_TOKEN` (enforced up-front by the `preflight-trust` token check, also gated on stable). They check out `code-yeongyu/lazycodex`, build the plugin + ast-grep-mcp + lsp-tools-mcp, run [`script/sync-lazycodex-marketplace.ts`](script/sync-lazycodex-marketplace.ts) `<source-root> <lazycodex-root>`, then `git push origin HEAD:main`.
-  - **Sync mechanism is file copy + commit push, NOT a git subtree:** `marketplace.json` to `.agents/plugins/marketplace.json`; `plugin/` to `plugins/omo/`; bundles `ast-grep-mcp` + `lsp-tools-mcp` `dist/cli.js` to `plugins/omo/components/*/dist/`; rewrites `.mcp.json` paths; validates via `script/lazycodex-marketplace-validation.ts`. Root `package.json` `files` ships `packages/omo-codex/{marketplace.json,plugin,plugin/.codex-plugin,scripts}`. First-publish playbook: [`docs/reference/lazycodex-npm-reservation.md`](docs/reference/lazycodex-npm-reservation.md). CI gate: `bun run test:codex` (ci.yml `codex-compatibility`, ubuntu/macos/windows).
+- Codex marketplace sync is **automatic for every stable release** (no manual toggle; the old `sync_lazycodex_marketplace` input was removed). The release-job steps are gated on `needs.release-metadata.outputs.dist_tag == ''` (stable only; prereleases skip) and require secret `LAZYCODEX_SYNC_TOKEN` (enforced up-front by the `preflight-trust` token check, also gated on stable). They check out `code-yeongyu/lazycodex`, build the plugin + lsp-tools-mcp + lsp-daemon + git-bash-mcp, run [`script/sync-lazycodex-marketplace.ts`](script/sync-lazycodex-marketplace.ts) `<source-root> <lazycodex-root>`, then `git push origin HEAD:main`.
+- **Sync mechanism is file copy + commit push, NOT a git subtree:** `marketplace.json` to `.agents/plugins/marketplace.json`; `plugin/` to `plugins/omo/`; bundles LSP/Git Bash MCP runtime dists to `plugins/omo/components/*/dist/`; bundles root CLI runtimes to `plugins/omo/dist/cli` and `plugins/omo/dist/cli-node`; rewrites `.mcp.json` paths; validates via `script/lazycodex-marketplace-validation.ts`. Root `package.json` `files` ships `dist/cli`, `dist/cli-node`, and `packages/omo-codex/{marketplace.json,plugin,plugin/.codex-plugin,scripts}`. First-publish playbook: [`docs/reference/lazycodex-npm-reservation.md`](docs/reference/lazycodex-npm-reservation.md). CI gate: `bun run test:codex` (ci.yml `codex-compatibility`; full suite ubuntu, platform smoke macos/windows).
 - **Telemetry:** event `omo_codex_daily_active` (once per UTC day per machine, id `sha256("omo-codex:"+hostname)`); opt-out `OMO_CODEX_DISABLE_POSTHOG=1` / `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` (global flags also disable). Full internals: [`packages/omo-codex/AGENTS.md`](packages/omo-codex/AGENTS.md).
 
 ## MULTI-LEVEL CONFIG
 
+One unified file configures every omo harness (OpenCode plugin, Senpi, Codex codegraph loader). Legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine.
+
 ```
-Walked configs (closer wins): <pwd up to $HOME>/.opencode/oh-my-openagent.json[c]   (legacy: oh-my-opencode.json[c])
+Project layers (nearest wins): <pwd up to $HOME>/.omo/omo.json[c]   ($HOME itself skipped)
                             ↓ merged onto
-User config:               ~/.config/opencode/oh-my-openagent.json[c]   (Windows: %APPDATA%\opencode\)
-                            ↓ falls back to
-Defaults                   (Zod safeParse fills omitted fields)
+User layer:                  ~/.omo/omo.json[c]   (same on every platform)
+                            ↓ resolved per harness, later wins
+Shared base → [harness] block → profiles.<P> → profiles.<P>.[harness]
+                            ↓ applied once at the end
+Defaults                   (Zod schema defaults)
 ```
 
-- `agents`, `categories`, `claude_code`: deep merged recursively (prototype-pollution safe)
-- `disabled_*` arrays: Set union (concatenated + deduplicated)
-- All other fields: override replaces base value
-- `mcp_env_allowlist`: **user-only** for security; walked configs cannot extend it
-- `migrateConfigFile()` rewrites legacy keys (idempotent via `_migrations` tracking + timestamped backups)
+- Harness blocks: `[opencode]` (freeform plugin config), `[senpi]` / `[codex]` (typed shared keys)
+- Profile activation: `OMO_PROFILE` > `OCX_PROFILE` (`ocx oc -p <name>`) > `OPENCODE_CONFIG_DIR` tail `profiles/<name>` > none; no default profiles ship
+- `models` catalog: a `model` string matching a catalog key resolves to the entry's model id and fills unset tuning; site tuning wins; `[harness]` blocks can override entries
+- Merge: plain objects deep-merge recursively (prototype-pollution safe); scalars and arrays replace
+- `mcp_env_allowlist` + `browser_automation_engine.playwright_mcp_args`: **user-layer only** (incl. the user's own profile block); project layers cannot extend them
+- Runtime migration (lock+journal, no-clobber, markers in `_migrations`): ids `2026-07-opencode-config-unification` (oh-my-* files) and `2026-07-codex-config-jsonc` (`~/.omo/config.jsonc`); backups at `~/.omo/migration-backup-<UTC-ts>-opencode-config/`; triggers at plugin startup (opencode + senpi), codex startup (config.jsonc group only), install, and `oh-my-openagent config migrate` (`--dry-run`/`--json`)
 
-Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"`
+Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"`
 
 ## THREE-TIER MCP SYSTEM
 
 | Tier | Source | Loader | Mechanism |
 |------|--------|--------|-----------|
-| 1. Built-in | `packages/omo-opencode/src/mcp/` | `createBuiltinMcps()` | 3 remote HTTP + 2 local stdio MCPs (`lsp`, `ast_grep`) |
+| 1. Built-in | `packages/omo-opencode/src/mcp/` | `createBuiltinMcps()` | 3 remote HTTP + 2 local stdio MCPs (`lsp`, `codegraph`) |
 | 2. Claude Code | `.mcp.json` (project + user) | `claude-code-mcp-loader` | `${VAR}` env expansion (allowlist via `mcp_env_allowlist`) |
 | 3. Skill-embedded | SKILL.md YAML frontmatter | `SkillMcpManager` (per-session) | stdio + HTTP, OAuth 2.0 + PKCE + DCR step-up |
 
@@ -226,7 +266,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 | Add new tool | `packages/omo-opencode/src/tools/{name}/` + register in `src/plugin/tool-registry.ts` | Factory `createXXXTool` (most) or direct `ToolDefinition` (interactive_bash) |
 | Add new feature module | `packages/omo-opencode/src/features/{name}/` | Standalone module wired into `plugin/` layer |
 | Add new MCP (tier 1) | `packages/omo-opencode/src/mcp/` + register in `createBuiltinMcps()` | Remote HTTP or local stdio |
-| Add new built-in skill | `packages/omo-opencode/src/features/builtin-skills/skills/{name}.ts` + register in `skills.ts` | Implement `BuiltinSkill` interface |
+| Add new built-in skill | `packages/skills-loader-core/src/features/builtin-skills/skills/{name}.ts` + register in `skills.ts` | Implement `BuiltinSkill` interface |
 | Add new command | `packages/omo-opencode/src/features/builtin-commands/` | Templates in `templates/` |
 | Modify ultrawork prompts | `packages/prompts-core/prompts/ultrawork/*.md` | `packages/omo-opencode/src/hooks/keyword-detector/ultrawork/*.ts` are loader shims; keep `index.ts` and `source-detector.ts` routing stable |
 | Add new CLI subcommand | `packages/omo-opencode/src/cli/cli-program.ts` | Commander.js subcommand |
@@ -237,13 +277,30 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 | Reactive provider error recovery | `packages/omo-opencode/src/hooks/runtime-fallback/` | Distinct from `model-fallback` (proactive, chat.params) |
 | External notifications | `packages/omo-opencode/src/openclaw/` | Bidirectional: outbound (event → HTTP/shell), inbound (Discord/Telegram daemon → tmux send-keys) |
 | Skill-embedded MCP | `packages/omo-opencode/src/features/skill-mcp-manager/` | Tier-3 MCPs (per-session, stdio + HTTP) |
-| Shared per-user LSP daemon (Codex) | `packages/lsp-daemon/` | Unix-socket / named-pipe daemon + stdio MCP proxy reusing `lsp-tools-mcp` |
+| Shared per-user LSP daemon (Codex) | `packages/lsp-daemon/` | Unix-socket / named-pipe daemon + stdio MCP proxy consuming `packages/lsp-core/` + `packages/mcp-stdio-core/` |
+| Dependency-frontier DAG engine | `packages/senpi-task/src/dag/` | 35 files / ~14k LOC; WAL + fingerprint recovery; node admission keyed on dependsOn completion + free slot (waves informational only); the `dag` tool is registered by omo-senpi |
+| Regenerate OpenGateway model catalog | `packages/omo-opencode/scripts/` | Writes tracked `src/features/opengateway-provider/opengateway-models.json`; distinct from `build:model-capabilities` |
+| Senpi live QA drivers | `packages/omo-senpi/scripts/qa/` | Lanes: task/team/rpc/resume/memory/components/runtimes; sandbox + digest isolation, `--self-test` |
+
+## CODE MAP
+
+Digest-verified centrality (refs unmeasured unless noted):
+
+| Symbol | Type | Location | Refs | Role |
+|--------|------|----------|------|------|
+| `createPluginModule()` | fn | `packages/omo-opencode/src/testing/create-plugin-module.ts` | - | Staged plugin init; build entry delegates here |
+| `dispatchInternalPrompt()` | fn | `packages/utils/src/prompt-async-gate/` | - | ONLY sanctioned internal `session.prompt*` route |
+| `canonicalAgentDir()` | fn | `packages/omo-native/bin/lib/agent-dir.js` | - | Single canonical `~/.omo/agent` resolution |
+| `resolveAgentHome()` | fn | `packages/omo-senpi/src/components/agent-home/` | - | Adapter-side twin of `canonicalAgentDir()` |
+| `buildTaskExecute` | fn | `packages/senpi-task/src/tools/task/` | ~103 | `task` tool factory; batch cap 16 on schema AND execution |
+| `SCOPE_PRIORITY` | const | `packages/skills-loader-core/src/features/opencode-skill-loader/` | - | Numeric skill precedence across 7 discover* sources |
+| `consumeSoulNoticeDelta()` | fn | `packages/memory-core/src/soul/` | - | Soul-notice watermark consumption |
 
 ## ARCHITECTURE INVARIANTS
 
 - **Canonical agent order:** Sisyphus → Hephaestus → Prometheus → Atlas. Enforced by `installAgentSortShim()` (patches `Array.prototype.toSorted`/`.sort` narrowly when the array contains ≥2 canonical core agents). See [`packages/omo-opencode/src/plugin-handlers/AGENTS.md`](packages/omo-opencode/src/plugin-handlers/AGENTS.md) for the full history of why this exists.
 - **Hashline edit + read pairing:** Every `Read` tool output is tagged with `LINE#ID` content hashes; `hashline_edit` validates the hash before applying. Stale hash → reject.
-- **5-tier hook composition:** Session (24) + ToolGuard (17) + Transform (5) + Continuation (7) + Skill (2) = 55 base. With `team_mode.enabled`: +1 ToolGuard (`team-tool-gating`), +2 Transform (`team-mode-status-injector`, `team-mailbox-injector`), +4 direct event handlers in `packages/omo-opencode/src/plugin/event.ts` (`team-session-events/*`) = 62 total. Composed by `createCoreHooks()` + `createContinuationHooks()` + `createSkillHooks()`.
+- **5-tier hook composition:** Session (24) + ToolGuard (18) + Transform (8) + Continuation (7) + Skill (2) = 59 composed hook slots; config-gated nulls by default: `team-tool-gating` (ToolGuard) + `team-mode-status-injector`/`team-mailbox-injector` (Transform) via `team_mode.enabled`, `monitor-status-injector` (Transform) via `monitor.enabled`, `goal` (Session) via `goal.enabled`, Session-tier `model-fallback` (`model_fallback`, default off) and `preemptive-compaction` (`experimental.preemptive_compaction`), and `interactive-bash-session` when tmux integration is off → **54 active on default config / 61 with team mode / 62 with monitor** (team mode also adds +4 direct event handlers in `packages/omo-opencode/src/plugin/event.ts`, `team-session-events/*`). Composed by `createCoreHooks()` + `createContinuationHooks()` + `createSkillHooks()`; the Transform tier also pulls `btwSideContextInjector` from `features/btw-side` and `contextInjectorMessagesTransform` from `features/context-injector` (neither is a `hooks/` dir).
 - **Per-session MCP isolation:** Tier-3 MCP clients keyed by `${sessionID}:${skillName}:${serverName}` so the same skill in two sessions does not share state.
 - **Two fallback systems:** `model-fallback` (proactive, chat.params) vs `runtime-fallback` (reactive, session.error). They operate independently — no direct integration.
 - **OpenClaw bidirectional:** Outbound dispatchers fire on session events; inbound daemon polls Discord/Telegram and `send-keys` replies into the tracked tmux pane.
@@ -256,10 +313,10 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 ## CONVENTIONS
 
-- **Runtime:** Bun only (1.3.12 in CI). Never npm/yarn/pnpm. (Exceptions: `packages/lsp-tools-mcp` + `packages/lsp-daemon` are Node-targeted, vendored, and built with `npm` + vitest/biome.)
+- **Runtime:** Bun only (1.4.0, pinned identically in CI and `.devcontainer/Dockerfile`). Never npm/yarn/pnpm. (Exceptions: `packages/lsp-tools-mcp` + `packages/lsp-daemon` are Node-targeted, vendored, and built with `npm` + vitest/biome.)
 - **TypeScript:** strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`).
 - **Tests:** Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style — nested `describe` with `#given`/`#when`/`#then` prefixes, or inline `// given` / `// when` / `// then` comments. Never Arrange-Act-Assert comments.
-- **CI tests:** plain `bun test` runs the root Bun suite in one process; no sharding or split isolation runner.
+- **CI tests:** every root-test leg runs the shared serial quarantine (`script/root-test-serial-quarantine.ts`) in one process, then parallelizes the remainder — Linux/macOS via `bunfig.root.parallel.toml`, Windows shard 2 via `bunfig.win2.parallel.toml`. `script/ci-fast-path.mjs` (`classifyCiMode`) runs the full OS matrix only when platform-sensitive paths change or the `ci:full-matrix` label is set. `bun run test:fast` partitions locally (opencode-memory → senpi → root-rest via `bunfig.win2.toml`).
 - **Test setup:** `test-setup.ts` preloaded via `bunfig.toml` resets session/cache state between tests.
 - **Factory pattern:** `createXXX()` for all tools, hooks, agents.
 - **File naming:** kebab-case for files and directories.
@@ -268,6 +325,13 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 - **Config format:** JSONC with comments + trailing commas, Zod v4 validation, snake_case keys.
 - **Dual package:** `oh-my-opencode` + `oh-my-openagent` published simultaneously during the rename transition.
 - **Comments:** AI slop comment patterns blocked by `comment-checker` hook (binary: `@code-yeongyu/comment-checker`). Use `// @allow` to bypass single line, `// comment-checker-disable-file` at file top to bypass file. Sparingly.
+- **Project skills/commands:** `.agents/` is authoritative during the `.opencode/` → `.agents/` migration - both load, consumers prefer `.agents/`; new skills land in `.agents/` only; drift between shared copies is a bug.
+
+## UNIQUE STYLES
+
+- Singular `script/` (Bun/TS build/publish/QA automation) vs plural `scripts/` (repo-root Node ESM notice helpers) - both exist at root; never merge or confuse them.
+- Rule blocks in AGENTS.md / SKILL.md use emphatic all-caps imperatives deliberately (QA mandate, merge policy, prompt gate); they are binding contracts, not style noise.
+- Skill precedence is numeric, not directory order: `opencode-project(6) > project(5) > opencode(4) > user(3) > config(2) > builtin=shared(1)` across 7 discover* sources.
 
 ## ANTI-PATTERNS (BLOCKING)
 
@@ -280,10 +344,12 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 - Never write to existing files without reading them first (`write-existing-file-guard`).
 - Never use `background_cancel(all=true)` — cancel by `taskId` individually.
 - Never delete a failing test to make a build green. Fix the code.
+- Never bypass a red required check with `--admin`, a skipped or weakened test, retry masking, platform or shell exclusion, or an environment-specific workaround.
 - Never em dashes / en dashes / AI filler ("simply", "obviously", "clearly", "moreover", "furthermore") in generated content.
 - Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`).
 - Never empty catch blocks `catch(e) {}`.
 - Never test with Arrange-Act-Assert comments — use given/when/then.
+- **Prompt/prose contract tests are forbidden.** Never assert authored agent prompt, `SKILL.md`, rule, `AGENTS.md`, or markdown-instruction wording, headings, section order, fragments, snapshots, negative past wording, or authored text length. Test only machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, or observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation. Pure prose has no automated-test seam; review and QA-by-read are the correct verification.
 - Never dump business logic into `index.ts` — barrel exports only.
 - Prometheus may ONLY edit `.md` files (enforced by `prometheus-md-only` hook); FORBIDDEN paths: `packages/*/src/`, `package.json`, config files.
 
@@ -291,36 +357,60 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 ```bash
 bun test                          # Root Bun test suite in one process
-bun run test:codex                # Codex Light compatibility suite (ast-grep + lsp + omo-codex plugin)
+bun run test:codex                # Codex Light gate: git-bash-mcp + lsp-tools-mcp + lsp-daemon + codegraph + omo-codex plugin + third-party notices (ast-grep-mcp is senpi-side, not in this gate)
 bun run build                     # Build plugin (ESM bundle ← packages/omo-opencode/src/index.ts + .d.ts + cli bundle + schema)
-bun run build:all                 # Build + 11 platform binaries
-bun run build:binaries            # 11 platform binaries only (script/build-binaries.ts)
+bun run build:all                 # Build + 12 generated platform launchers
+bun run build:binaries            # 12 generated platform launchers only (script/build-binaries.ts)
 bun run build:lsp-tools-mcp       # npm ci + build the vendored LSP MCP package
 bun run build:lsp-daemon          # npm ci + build the vendored per-user LSP daemon package
+bun run build:senpi-plugin       # Bundle the Senpi Pi plugin (chains build:ast-grep-mcp)
+bun run build:codex-install      # Generate packages/omo-codex/scripts/install-dist (published Node entrypoints)
 bun run build:schema              # Regenerate assets/oh-my-opencode.schema.json
 bun run build:model-capabilities  # Refresh shared/model-capabilities cache from models.dev
 bun run typecheck                 # tsgo --noEmit + typecheck:script + typecheck:packages (NOT tsc; @typescript/native-preview)
-bun run typecheck:packages        # tsgo per workspace package (13 tsconfigs)
+bun run typecheck:packages        # tsgo per workspace package
+bun run test:senpi               # Senpi adapter unit gate (bun test packages/omo-senpi; live QA via senpi-qa skill)
+bun run test:fast                # Partitioned local suite: opencode-memory → senpi → root-rest (bunfig.win2.toml)
 bun run clean                     # rm -rf dist
 bunx oh-my-opencode install       # Interactive setup wizard
 bunx oh-my-opencode doctor        # Health diagnostics (4 categories: System / Config / Tools / Models)
 bunx oh-my-opencode run <message> # Non-interactive session (auto-completes when todos done + no bg tasks)
-bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR)
+bunx oh-my-opencode mcp oauth login <server-name> # Tier-3 MCP OAuth (PKCE + DCR); top-level command is `mcp` with nested `oauth login|logout|status`
 ```
+
+## DEVELOPMENT ENVIRONMENT
+
+Cross-harness, one-command dev setup. The **single source of truth** is [`script/agent/setup.sh`](script/agent/setup.sh): it verifies the toolchain (bun/node/git, warns if tmux is missing), runs `bun install`, and runs `bun run build` only when `dist/index.js` is missing or `OMO_AGENT_FORCE_BUILD=1` (cheap to re-run). [`script/agent/cleanup.sh`](script/agent/cleanup.sh) removes regenerable transients by default and takes `--deep` to also drop `dist/`, vendored `packages/*/dist/`, and `node_modules/`. [`script/agent/cleanup-hook.sh`](script/agent/cleanup-hook.sh) is the non-blocking Claude Code SessionEnd launcher for that cleanup worker. Every harness below delegates to those scripts, so there is exactly one place to maintain. Claude Code reads [`CLAUDE.md`](CLAUDE.md) (a symlink to this AGENTS.md) and OpenCode reads this file, so every harness shares one infra.
+
+| Harness | Committed wiring | Runs |
+|---------|------------------|------|
+| GitHub Codespaces / VS Code Dev Containers | [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) + [`.devcontainer/Dockerfile`](.devcontainer/Dockerfile) (Node 24 + Bun 1.4.0 + tmux, matching CI) | `postCreateCommand` runs `setup.sh` on container create |
+| Plain Docker | [`script/agent/docker-dev.sh`](script/agent/docker-dev.sh) | builds the same Dockerfile, opens a shell |
+| Cursor cloud agents | [`.cursor/environment.json`](.cursor/environment.json) | `install` runs `setup.sh` on environment creation |
+| Claude Code | [`.claude/settings.json`](.claude/settings.json) | `SessionStart` runs `setup.sh`, `SessionEnd` launches `cleanup-hook.sh` |
+| Codex App (local environments) | [`.codex/setup.sh`](.codex/setup.sh) | committable setup script Codex runs at project root on worktree creation |
+| Codex Cloud / Codex CLI | no committable hook | Cloud: paste the `setup.sh` commands into the web-UI Setup script field. CLI: AGENTS.md only. |
+| OpenCode (this plugin's own harness) | root [`AGENTS.md`](AGENTS.md) + [`CLAUDE.md`](CLAUDE.md) symlink | no worktree hook; run `script/agent/setup.sh` (Claude Code auto-runs it via `.claude/settings.json`) |
+
+**Credentials and isolation.** [`.env.example`](.env.example) is the committed injection point: copy it to `.env` (gitignored) ONCE and fill in keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, optionally `OPENCODE_SERVER_PASSWORD`). `setup.sh` and `qa-sandbox.sh` auto-source `.env`, so credentials are set once per machine and never prompted again. For QA, `source` [`script/agent/qa-sandbox.sh`](script/agent/qa-sandbox.sh): it exports an isolated, throwaway environment (its own `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME`/`XDG_STATE_HOME` and a fresh `CODEX_HOME` under a `mktemp` dir, plus `OPENCODE_DISABLE_AUTOUPDATE`/`OPENCODE_DISABLE_MODELS_FETCH`) so QA NEVER reads or writes the host's real `~/.config/opencode` or `~/.codex`. Mirrors the `opencode-qa` and `codex-qa` skill conventions. For containerized environments, [`.devcontainer/README.md`](.devcontainer/README.md) documents how to inject provider credentials and your `~/.codex`, `~/.claude`, and `~/.config/opencode` config into the container.
+
+**MAINTENANCE - KEEP THIS IN SYNC.** `script/agent/setup.sh`, `script/agent/cleanup.sh`, and harness launchers such as `script/agent/cleanup-hook.sh` are the contract. Whenever a setup dependency or configuration is added, breaks, or changes (a new build step, a pinned tool version in the Dockerfile, a new env var or credential, a new harness wiring file), you MUST, in the SAME change, update: this section; the matching "Development Environment" / "Credentials & Isolation" sections in [`CONTRIBUTING.md`](CONTRIBUTING.md); [`.devcontainer/README.md`](.devcontainer/README.md) if container config injection changed; and the matching skill (`opencode-qa` for the OpenCode side, `codex-qa` for the Codex side) whose isolation conventions `qa-sandbox.sh` mirrors. Keep `script/agent-env.test.ts`, `script/agent-harness-wiring.test.ts`, and `script/agents-md-dev-env.test.ts` green. `CLAUDE.md` is a symlink to this file, so the Claude side stays in sync automatically. The scripts, the docs, and the skills must never drift out of sync.
 
 ## CI/CD
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push/PR to master/dev | Tests, typecheck, build, codex-compatibility (`bun run test:codex`, ubuntu/macos/windows), auto-commit schema on master push, draft "next" release on dev push (blocks master-targeting PRs) |
-| `publish.yml` | manual dispatch | Test, typecheck, preflight-trust (OIDC verify 24 packages), dual npm publish (`oh-my-opencode` + `oh-my-openagent`) + `lazycodex` npm alias (`publish_lazycodex`, default on) + automatic Codex marketplace sync to `code-yeongyu/lazycodex` on every **stable** release (no toggle; gated on empty `dist_tag`, needs `LAZYCODEX_SYNC_TOKEN`), platform binaries, GitHub release, merge to master |
-| `publish-platform.yml` | called by publish.yml | 11 platform binaries via `bun compile` (darwin/linux/windows) |
+| `ci.yml` | push/PR to master/dev | `block-master-pr` guard, root `bun test` (fast-path matrix via `script/ci-fast-path.mjs`; full OS matrix only on platform-sensitive paths or `ci:full-matrix` label), typecheck, codex-compatibility (full `bun run test:codex` plus per-component `npm run check` on ubuntu; platform smoke on macos/windows), senpi-compatibility (bundle `--check` + `bun test packages/omo-senpi`), lazycodex-published-smoke, build, omo-ai-payload-check (npm dry-run payload), auto-commit schema on master push, draft "next" release on dev push |
+| `publish.yml` | manual dispatch | Test, typecheck, preflight-trust (OIDC verify workspace packages), dual npm publish (`oh-my-opencode` + `oh-my-openagent`) + `lazycodex-ai` npm alias (`publish_lazycodex`, default on) + automatic Codex marketplace sync to `code-yeongyu/lazycodex` on every **stable** release (no toggle; gated on empty `dist_tag`, needs `LAZYCODEX_SYNC_TOKEN`), 12 platform launcher packages, GitHub release, merge to master |
+| `publish-platform.yml` | called by publish.yml | 12 generated Node launcher packages for darwin/linux/windows |
 | `sisyphus-agent.yml` | @mention or manual dispatch | AI agent handles issues/PRs |
 | `refresh-model-capabilities.yml` | weekly cron / dispatch | Refresh model capabilities from models.dev API |
 | `cla.yml` | issue_comment / PR | CLA assistant for contributors |
 | `lint-workflows.yml` | push/PR touching `.github/workflows/**` | actionlint only (`shellcheck=""` disables shellcheck) |
 | `web-ci.yml` | push/PR to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself | format-check, lint, type-check, next build, opennextjs-cloudflare build |
 | `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v3` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets) |
+| `package-labels.yml` | issues opened/edited + pull_request_target | Auto-applies package labels (`opencode` / `lazycodex` / `lazycodex-generated`) |
+| `stats.yml` | weekly cron (Sun) / dispatch | Runs `script/stats.ts` (npm + GitHub-release download counts) |
 
 ## PR MERGE POLICY
 
@@ -328,6 +418,9 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - Use `gh pr merge <number> --merge --delete-branch` after CI, review-work, and Cubic pass.
 - **NEVER squash merge or rebase merge** PRs in this repository, even if a generic workflow, skill, or GitHub default suggests it.
 - If another instruction says `--squash` or `--rebase`, this repo-level rule overrides it.
+- **NEVER use `gh pr merge --admin` or any required-check override.** Do not request or act on authorization to bypass a gate.
+- A required check that is already red on `dev` is a base-branch defect and remains a merge blocker. Inspect the latest `dev` run, reproduce the failure on the matching platform and toolchain, root-fix it in the current PR or a separate atomic PR, rebase onto the repaired `dev`, rerun every required check, and record the evidence.
+- Reducing the failure count is not a green result. Never make a gate disappear through `test.skip`, weakened assertions, retry loops, `continue-on-error`, platform or shell exclusion, or an environment-specific workaround.
 
 ## NOTES
 
@@ -337,20 +430,38 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Model fallback:** per-agent chains in `packages/omo-opencode/src/shared/model-requirements.ts`. **There is no single global priority.**
 - **Two fallback systems:** `model-fallback` (proactive, chat.params, hardcoded chains) vs `runtime-fallback` (reactive, session.error, configurable per-category/agent).
 - **Config migration:** idempotent via `_migrations` tracking, atomic writes with timestamped backups.
-- **Build:** `bun build` (ESM, entry `packages/omo-opencode/src/index.ts`) + `tsc --emitDeclarationOnly`, externals: `@ast-grep/napi`, `zod`.
+- **Goal feature (replaces ralph-loop):** `packages/omo-opencode/src/hooks/goal/` session-tier hook + `create_goal`/`update_goal`/`get_goal` tools, gated on `goal.enabled` (default off). Legacy `ralph_loop` config migrates to `goal` in `packages/omo-opencode/src/config/validate.ts` (deprecated schema shim); `ralph-loop` hook dir retained but no longer wired.
+- **Build:** `bun build` (ESM, entry `packages/omo-opencode/src/index.ts`) + `tsc --emitDeclarationOnly`, external: `zod`.
 - **CI tests:** root tests run through plain `bun test`; `packages/web/**` has its own package-level CI workflow.
-- **125 barrel `index.ts` files** establish module boundaries within `packages/omo-opencode/src/`.
+- **Barrel `index.ts` files** establish module boundaries within `packages/omo-opencode/src/`.
 - **Architecture rules** enforced via the `rules-injector` hook reading `.omo/rules/*.md` (e.g. `test-discipline.md`, `file-size-architectural-smell.md`, `typescript-programmer.md`).
 - **Windows builds:** run on `windows-latest` (not cross-compiled) to avoid Bun segfaults.
-- **Platform binaries:** detect AVX2 + libc family at runtime, fallback to baseline if needed.
+- **Platform launchers:** detect AVX2 + libc family at runtime, fallback to baseline if needed.
 - **IntentGate (`keyword-detector`):** classifies user intent (`ultrawork`/`ulw`, `search`, `analyze`, `team`) and injects mode-specific prompts.
 - **Hashline edit:** every `Read` output tagged with `LINE#ID` content hashes (chars from `ZPMQVRWSNKTXJBYH`); edits reject on hash mismatch.
 - **zauc-mocks pattern:** directories named `zauc-mocks-*` (under `packages/omo-opencode/src/hooks/`, `tools/`, `mcp/`, `shared/`) hold `mock.module()` setup that must load alphabetically before the tests that consume those mocked modules. The `zauc-` prefix is purely a sort-order hack for `bun:test` discovery; these are NOT hooks/tools.
-- **Test discipline meta-audits:** two files (`packages/omo-opencode/src/shared/mock-module-lifecycle-audit.test.ts` and `prompt-async-route-audit.test.ts`) parse the entire codebase via the TS compiler API and FAIL the suite when an architectural invariant is violated (`mock.module()` without restore, raw `session.promptAsync` outside the gate).
+- **Test discipline meta-audits:** repo-wide tests that parse source and FAIL the suite on invariant violations: `packages/omo-opencode/src/shared/mock-module-lifecycle-audit.test.ts` (`mock.module()` without restore) and `prompt-async-route-audit.test.ts` (raw `session.promptAsync` outside the gate) via the TS compiler API; `script/package-registration-audit.test.ts` (workspace/devDep registration + ROADMAP reverse-dependency edges stay zero); `script/shared-core-extraction-guard.test.ts` (`packages/*-core` stay harness-neutral); `packages/omo-opencode/src/shared/markdown-link-audit.test.ts` (no machine-local absolute paths in committed `.md`); `opencode-coupling-audit.test.ts` (×2 pkgs — non-adapter packages must not import `@opencode-ai/*`). Root-level cross-package invariants live in `tests/` (category drift, schema freshness, reasoning-vocabulary parity, ulw-loop/ulw-plan contracts).
 - **Docs:** see [`docs/guide/`](docs/guide) for user-facing guides (overview, installation, orchestration, agent-model-matching, team-mode), [`docs/reference/`](docs/reference) for CLI/configuration/features reference. See also [`CHANGELOG.md`](CHANGELOG.md), [`docs/reference/prompt-async-gate-rfc.md`](docs/reference/prompt-async-gate-rfc.md), and [`docs/reference/release-process.md`](docs/reference/release-process.md).
 - **Rules files** (auto-injected by `rules-injector` hook): scans `.omo/rules/`, `.claude/rules/`, `.cursor/rules/`, `.github/instructions/`, plus `.github/copilot-instructions.md` and `.mdc` files.
 - **Process cleanup:** Background-agent error handlers are now log-only — no force-exit on transient errors. Opt out entirely via `OMO_DISABLE_PROCESS_CLEANUP=1` env var.
+- **models.dev has two distinct consumers:** `bun run build:model-capabilities` (shared model-capabilities cache) and `packages/omo-opencode/scripts/` (OpenGateway catalog generator → tracked `opengateway-models.json`, shape-pinned by test). Do not conflate.
+- **shared-skills sub-projects:** 17 skills; `ultimate-browsing/engine` and `coding-agent-sessions` are Python sub-projects with own tests; `visual-qa` ships a zero-dep bundled CLI (`scripts/visual-qa.mjs`) - regenerate the bundle after TS fixes.
 - **First-prompt watchdog:** `packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts` detects subagent sessions producing no progress within 90s and triggers fallback / abort.
 - **ParentWakeNotifier:** Background-agent parent-wake state in `packages/omo-opencode/src/features/background-agent/parent-wake-notifier.ts` with dependency-injected client and enqueue callback.
+- **Agent state directory:** ONE canonical location, `~/.omo/agent`, resolved through `canonicalAgentDir()` in [`packages/omo-native/bin/lib/agent-dir.js`](packages/omo-native/bin/lib/agent-dir.js) (and its adapter-side twin `resolveAgentHome()` in `packages/omo-senpi/src/components/agent-home/`). EVERY omo entry point - the spawned engine, `omo doctor`, `omo setup`, the local launcher, the local installer - MUST resolve the directory through that helper instead of composing its own default; an explicit `OMO_CODING_AGENT_DIR` (or the legacy `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) still wins. Composing a private default is what made settings look erased on update.
 - **Workspace migration:** Runtime state migrated from `.sisyphus/` → `.omo/`. Legacy `.sisyphus/` still exists during transition; `packages/omo-opencode/src/shared/legacy-workspace-migration.ts` copies it forward on first load.
 - **CI nuance:** PRs targeting `master` are hard-blocked — they MUST target `dev`. CI auto-commits schema changes on master push and creates a draft "next" release on dev push.
+
+## Review claim labels (merge-gating)
+
+Three PR labels drive the review workflow; automation lives in `.github/workflows/review-claims.yml`:
+
+- `will-review` — a reviewer claims the PR ("I will review this"). Applying it auto-requests the labeler as reviewer and BLOCKS merge via the required `Review claim gate` check.
+- `in-review` — the claimer is actively reviewing. Same merge-blocking + auto-reviewer-request effects.
+- `stale-review` — a claim sat 3+ days without the claimer's review; the sweep removes the claim labels and applies this one. A fresh claim clears it.
+
+Rules:
+- Apply `will-review` when you plan to review a PR; switch to `in-review` when you start.
+- NEVER merge a PR carrying `will-review` or `in-review`; the gate check enforces this.
+- Claim labels are removed automatically ONLY when the claimer (the person who applied the label) submits an approve or request-changes review. Do not remove someone else's claim label by hand.
+- If a PR shows `stale-review`, it needs a (new) reviewer: claim it.

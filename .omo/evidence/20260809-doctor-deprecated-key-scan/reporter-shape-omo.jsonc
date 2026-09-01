@@ -1,0 +1,44 @@
+{
+  "[opencode]": {
+    "agents": {
+      "sisyphus": {
+        "model": "anthropic/claude-opus-5",
+        "fallback_models": [
+          "openai/gpt-5.6-sol",
+          {
+            "model": "google/gemini-3.1-pro",
+            "variant": "high",
+            "temperature": 0.2
+          },
+          {
+            "model": "anthropic/claude-sonnet-5",
+            "thinking": {
+              "type": "enabled",
+              "budgetTokens": 64000
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "fallback_models": [
+          "openai/gpt-5.6-sol"
+        ]
+      },
+      "librarian": {
+        "fallback_models": [
+          "openai/gpt-5.6-sol"
+        ]
+      },
+      "explore": {
+        "fallback_models": [
+          "openai/gpt-5.6-sol"
+        ]
+      },
+      "multimodal-looker": {
+        "fallback_models": [
+          "openai/gpt-5.6-sol"
+        ]
+      }
+    }
+  }
+}

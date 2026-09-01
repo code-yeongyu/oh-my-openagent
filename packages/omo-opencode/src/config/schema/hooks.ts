@@ -16,6 +16,8 @@ export const HookNameSchema = z.enum([
   "rules-injector",
   "background-notification",
   "auto-update-checker",
+  "codegraph-bootstrap",
+  "ast-grep-sg-provision",
   "startup-toast",
   "keyword-detector",
   "agent-usage-reminder",
@@ -23,7 +25,8 @@ export const HookNameSchema = z.enum([
   "interactive-bash-session",
 
   "tool-pair-validator",
-  "ralph-loop",
+  "monitor-status-injector",
+  "goal",
   "category-skill-reminder",
 
   "compaction-context-injector",
@@ -39,7 +42,7 @@ export const HookNameSchema = z.enum([
   "no-sisyphus-gpt",
   "no-hephaestus-non-gpt",
   "hephaestus-agents-md-injector",
-  "start-work",
+  "ulw-execute",
   "atlas",
   "unstable-agent-babysitter",
   "task-resume-info",

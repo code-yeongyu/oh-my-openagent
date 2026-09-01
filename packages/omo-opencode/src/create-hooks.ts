@@ -2,6 +2,7 @@ import type { AvailableSkill } from "./agents/dynamic-agent-prompt-builder"
 import type { HookName, OhMyOpenCodeConfig } from "./config"
 import type { LoadedSkill } from "./features/opencode-skill-loader/types"
 import type { BackgroundManager } from "./features/background-agent"
+import type { MonitorManager } from "./features/monitor"
 import type { ModelFallbackControllerAccessor } from "./hooks/model-fallback"
 import type { PluginContext } from "./plugin/types"
 import type { ModelCacheState } from "./plugin-state"
@@ -18,6 +19,7 @@ export type DisposableCreatedHooks = {
   claudeCodeHooks?: DisposableHook
   commentChecker?: DisposableHook
   runtimeFallback?: DisposableHook
+  atlasHook?: DisposableHook
   todoContinuationEnforcer?: DisposableHook
   autoSlashCommand?: DisposableHook
   anthropicContextWindowLimitRecovery?: DisposableHook
@@ -27,6 +29,7 @@ export function disposeCreatedHooks(hooks: DisposableCreatedHooks): void {
   hooks.claudeCodeHooks?.dispose?.()
   hooks.commentChecker?.dispose?.()
   hooks.runtimeFallback?.dispose?.()
+  hooks.atlasHook?.dispose?.()
   hooks.todoContinuationEnforcer?.dispose?.()
   hooks.autoSlashCommand?.dispose?.()
   hooks.anthropicContextWindowLimitRecovery?.dispose?.()
@@ -38,6 +41,7 @@ export function createHooks(args: {
   modelCacheState: ModelCacheState
   backgroundManager: BackgroundManager
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+  monitorManager?: MonitorManager
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
   mergedSkills: LoadedSkill[]
@@ -49,6 +53,7 @@ export function createHooks(args: {
     modelCacheState,
     backgroundManager,
     modelFallbackControllerAccessor,
+    monitorManager,
     isHookEnabled,
     safeHookEnabled,
     mergedSkills,
@@ -61,6 +66,7 @@ export function createHooks(args: {
     modelCacheState,
     backgroundManager,
     modelFallbackControllerAccessor,
+    monitorManager,
     isHookEnabled,
     safeHookEnabled,
   })

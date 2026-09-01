@@ -1,0 +1,7 @@
+=== 2026-08-19T14:22:37Z GREEN entry-surface QA ===
+--- installed senpi version (resolved on disk) ---
+2026.8.19
+--- senpi CLI --version ---
+2026.8.19
+--- omo entry bin ---
+omo-native 5.0.0-0.beta.12 senpi-pin 2026.8.19

@@ -1,0 +1,17 @@
+=== TYPECHECK: errors attributable to task-8 files ===
+$ bun run typecheck (packages/memory-core), filtered to facts/ locks/domains identity/layout
+(none - clean)
+
+$ bun run typecheck (packages/omo-senpi), filtered to facts-wiring / memory/context
+(none - clean)
+
+=== PRE-EXISTING failures on pristine origin/dev (NOT from this task) ===
+verified in a throwaway detached worktree of origin/dev: packages/omo-senpi -> 808 pass / 8 fail
+  omo-senpi lsp architecture boundary (vendored LSP audit)
+  omo-senpi package shape x3 (workspace metadata / manifest / license+notice)
+  omo-senpi ultrawork component x3 (generated directive drift, synced skill artifact)
+  omo-senpi ulw-loop runtime: OMO_BIN env-resolution  <- the one the task brief called out
+
+Additional failures on the shared branch come from OTHER agents' in-flight todos
+(people frontmatter kind/aliases = todo 16/18, nudge-wiring = todo 3, run supervisor = todo 25).
+None involve the facts queue: no failing test name contains 'facts'.

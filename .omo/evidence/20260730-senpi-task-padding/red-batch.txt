@@ -1,0 +1,28 @@
+Scenario: padded batch task argument preparation
+Captured: 2026-07-30T05:34:00Z
+Command:
+  bun test packages/senpi-task/src/tools/task/argument-normalization.test.ts
+
+Binary observable:
+  FAIL because a serializer-padded top-level `prompt: ""` is retained and
+  `resolveSpawnItems` still classifies the meaningful batch as an error.
+
+Output:
+  bun test v1.4.0-canary.1 (ae4b17de6)
+
+  (pass) padded single spawn
+  Expected: "ok"
+  Received: "error"
+  at packages/senpi-task/src/tools/task/argument-normalization.test.ts:128:27
+  (fail) GPT-padded batch normalizes blank top-level prompt and item overrides
+  (pass) genuinely meaningful prompt and tasks remains a hard error
+
+  2 pass
+  1 fail
+  5 expect() calls
+  Ran 3 tests across 1 file.
+
+Why this is the right RED:
+  Single normalization remains green and true ambiguity remains rejected.
+  Only the blank-prompt batch edge is failing, isolating the next production
+  change to semantic blank removal for batch calls.

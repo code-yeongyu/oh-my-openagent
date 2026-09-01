@@ -1,2 +1,1 @@
-export { GitUnavailableError, createWorktree, isGitAvailable, validateWorktreeSpec } from "./manager"
-export { findOrphanWorktrees, removeWorktree } from "./cleanup"
+export * from "@oh-my-opencode/team-core/team-worktree"

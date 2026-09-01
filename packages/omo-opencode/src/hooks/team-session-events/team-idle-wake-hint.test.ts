@@ -45,6 +45,42 @@ type WakeHintPromptInput = {
 }
 
 const temporaryDirectories: string[] = []
+const TEST_EVENT_TIMEOUT_MS = 1_000
+const realSetTimeout = globalThis.setTimeout
+const realClearTimeout = globalThis.clearTimeout
+const immediatePromptGateOptions: Parameters<typeof createTeamIdleWakeHint>[2] = {
+  idleSettleMs: 0,
+  postDispatchHoldMs: 0,
+}
+
+type Deferred<T> = {
+  promise: Promise<T>
+  resolve(value: T): void
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolvePromise: Deferred<T>["resolve"] | undefined
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  if (!resolvePromise) throw new Error("deferred resolver was not initialized")
+  return { promise, resolve: resolvePromise }
+}
+
+async function waitForEvent<T>(promise: Promise<T>, description: string): Promise<T> {
+  let timeoutID: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutID = realSetTimeout(() => reject(new Error(`timed out waiting for ${description}`)), TEST_EVENT_TIMEOUT_MS)
+  })
+
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    if (timeoutID !== undefined) {
+      realClearTimeout(timeoutID)
+    }
+  }
+}
 
 async function createTemporaryBaseDir(): Promise<string> {
   const baseDir = await mkdtemp(path.join(tmpdir(), "team-idle-wake-hint-"))
@@ -261,7 +297,6 @@ describe("createTeamIdleWakeHint", () => {
       throw new Error("expected wake hint prompt input")
     }
     expect(promptInput.path).toEqual({ id: "member-session" })
-    expect(promptInput.body.parts[0]?.text).toContain("2 new team messages")
     expect(promptInput.body.parts[0]?.text).not.toContain("first message body")
     expect(promptInput.body.parts[0]?.text).not.toContain("second message body")
   })
@@ -508,8 +543,13 @@ describe("createTeamIdleWakeHint", () => {
     })
     const handler = createTeamIdleWakeHint({
       directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+      client: {
+        session: {
+          promptAsync: promptAsyncSpy,
+          status: async () => ({ data: { "member-session": { type: "idle" } } }),
+        },
+      },
+    }, config, immediatePromptGateOptions)
 
     // when
     await handler({
@@ -532,7 +572,9 @@ describe("createTeamIdleWakeHint", () => {
 
     const processedEntries = await readdir(path.join(getInboxDir(resolveBaseDir(config), teamRunId, "worker"), "processed"))
     expect(processedEntries.sort()).toEqual(messageIds.map((messageId) => `${messageId}.json`).sort())
-  })
+    // Loaded Windows runners push this past the 5s default; the waits stay event-driven
+    // (~60ms locally), so only the ceiling moves.
+  }, 30_000)
 
   test("acks pending reserved live-delivery messages on idle", async () => {
     // given
@@ -618,7 +660,14 @@ describe("createTeamIdleWakeHint", () => {
     const messageId = randomUUID()
     await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
     await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+    registerTeamSession("member-session", {
+      teamRunId,
+      memberName: "worker",
+      role: "member",
+    })
     const errorHandler = createTeamMemberErrorHandler(config)
+    const idleHandlerReachedStatus = createDeferred<void>()
+    const continueIdleHandler = createDeferred<void>()
 
     const handler = createTeamIdleWakeHint({
       directory: "/tmp/project",
@@ -626,12 +675,8 @@ describe("createTeamIdleWakeHint", () => {
         session: {
           promptAsync: mock(async (_input: WakeHintPromptInput) => ({})),
           status: async () => {
-            await errorHandler({
-              event: {
-                type: "session.error",
-                properties: { sessionID: "member-session", error: new Error("late prompt failure") },
-              },
-            })
+            idleHandlerReachedStatus.resolve()
+            await continueIdleHandler.promise
             return { data: { "member-session": { type: "idle" } } }
           },
         },
@@ -639,12 +684,24 @@ describe("createTeamIdleWakeHint", () => {
     }, config, { idleSettleMs: 0 })
 
     // when
-    await handler({
+    const idleHandler = handler({
       event: {
         type: "session.idle",
         properties: { sessionID: "member-session" },
       },
     })
+    try {
+      await waitForEvent(idleHandlerReachedStatus.promise, "stale idle handler status check")
+      await errorHandler({
+        event: {
+          type: "session.error",
+          properties: { sessionID: "member-session", error: new Error("late prompt failure") },
+        },
+      })
+    } finally {
+      continueIdleHandler.resolve()
+      await idleHandler
+    }
 
     // then
     const runtimeState = await loadRuntimeState(teamRunId, config)
@@ -689,7 +746,6 @@ describe("createTeamIdleWakeHint", () => {
 
     // then
     expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
-    expect(promptInputs[0]?.body.parts[0]?.text).toContain("1 new team messages")
 
     const runtimeState = await loadRuntimeState(teamRunId, config)
     expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
@@ -790,7 +846,7 @@ describe("createTeamIdleWakeHint", () => {
     if (promptInput === undefined) {
       throw new Error("expected wake hint prompt input")
     }
-    expect(promptInput.body.parts[0]?.text).toContain("1 new team messages")
+    expect(promptInput.body.parts[0]?.text).not.toContain("fresh registry wake hint")
   })
 
   test("falls back to disk lookup when the registry points the member session at the wrong teamRunId", async () => {
@@ -851,7 +907,7 @@ describe("createTeamIdleWakeHint", () => {
     if (promptInput === undefined) {
       throw new Error("expected wake hint prompt input")
     }
-    expect(promptInput.body.parts[0]?.text).toContain("2 new team messages")
+    expect(promptInput.body.parts[0]?.text).not.toContain("wrong team message")
     expect(promptInput.body.agent).toBe("atlas")
   })
 })

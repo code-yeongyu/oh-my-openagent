@@ -182,6 +182,7 @@ export async function runPostToolUseHook(
 		completedPostCompactKind !== undefined
 			? withPostCompactBudget(dynamicConfig, { model: input.model, transcriptPath: input.transcript_path })
 			: dynamicConfig,
+		input.model,
 	);
 	hydrateEngineState(engine, cachePath);
 	debugTimer.lap("hydrate", {
@@ -189,7 +190,7 @@ export async function runPostToolUseHook(
 		dynamicTargetFingerprints: engine.state.dynamicTargetFingerprints.size,
 		staticDedup: engine.state.staticDedup.size,
 	});
-	const dynamicTargetFingerprints = fingerprintDynamicTargets(input.cwd, targetPaths, config);
+	const dynamicTargetFingerprints = fingerprintDynamicTargets(input.cwd, targetPaths, config, input.model);
 	debugTimer.lap("fingerprint", { fingerprints: dynamicTargetFingerprints.length });
 	const pendingTargetFingerprints = dynamicTargetFingerprints.filter(
 		(target) => engine.state.dynamicTargetFingerprints.get(target.cacheKey) !== target.fingerprint,

@@ -668,11 +668,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: "gpt-5.6-luna-fast",
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 
@@ -683,7 +683,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(createdSessions).toEqual(["ses_first", "ses_second"])
     expect(polledSessions).toEqual(["ses_first", "ses_second"])
     expect(attemptedModels).toEqual([
-      { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini", variant: undefined },
+      { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast", variant: undefined },
       { providerID: "genai-proxy-aws", modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0", variant: undefined },
     ])
     expect(result).toContain("Result from ses_second")
@@ -697,6 +697,89 @@ describe("executeSyncTask - cleanup on error paths", () => {
       modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
       variant: undefined,
     })
+  })
+
+  test("#given sync poll hits subscription quota exhaustion #when a fallback chain exists #then retries on the next fallback model without changing generic stop semantics", async () => {
+    //#given
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    const { shouldRetryError } = require("../../shared/model-error-classifier")
+    const createdSessions: string[] = []
+    const attemptedModels: Array<{ providerID: string; modelID: string; variant?: string } | undefined> = []
+
+    const pollError = "Subscription quota exceeded. You can continue using free models."
+    const deps = {
+      createSyncSession: async () => {
+        const sessionID = createdSessions.length === 0 ? "ses_quota_primary" : "ses_quota_fallback"
+        createdSessions.push(sessionID)
+        return { ok: true as const, sessionID }
+      },
+      sendSyncPrompt: async (_client: unknown, input: { categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
+        attemptedModels.push(input.categoryModel)
+        return null
+      },
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
+        return input.sessionID === "ses_quota_primary"
+          ? pollError
+          : null
+      },
+      fetchSyncResult: async (_client: unknown, sessionID: string) => ({
+        ok: true as const,
+        textContent: `Result from ${sessionID}`,
+      }),
+      isProviderExhaustionFallbackEligible: (error: { message?: string }) => error.message === pollError,
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+      modelFallbackControllerAccessor: {
+        setSessionFallbackChain: () => {},
+        clearSessionFallbackChain: () => {},
+      },
+    }
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "quick",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+    const initialModel = {
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-6",
+      variant: undefined,
+    }
+    const fallbackChain = [
+      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
+      { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
+    ]
+
+    //#when
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
+
+    //#then
+    expect(shouldRetryError({ message: pollError })).toBe(false)
+    expect(createdSessions).toEqual(["ses_quota_primary", "ses_quota_fallback"])
+    expect(attemptedModels).toEqual([
+      { providerID: "anthropic", modelID: "claude-sonnet-4-6", variant: undefined },
+      { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
+    ])
+    expect(result).toContain("Result from ses_quota_fallback")
   })
 
   test("#given no fallback chain #when poll returns retryable runtime error #then returns poll error without creating retry session", async () => {
@@ -875,11 +958,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: "gpt-5.6-luna-fast",
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 
@@ -949,11 +1032,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: "gpt-5.6-luna-fast",
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 
@@ -1089,8 +1172,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     //#then - the spawnDepth recorded in metadata MUST match what reserveSubagentSpawn returned
     expect(reservedDepth).toBe(3)
-    const taskMeta = metadataCalls.find((c) => c.metadata?.spawnDepth !== undefined)!
+    const taskMeta = metadataCalls.find((c) => c.metadata?.spawnDepth !== undefined)
     expect(taskMeta).toBeDefined()
+    if (!taskMeta) {
+      throw new Error("Expected metadata call with spawnDepth")
+    }
     expect(taskMeta.metadata.spawnDepth).toBe(3) // NOT 1 (the fallback value)
   })
 })

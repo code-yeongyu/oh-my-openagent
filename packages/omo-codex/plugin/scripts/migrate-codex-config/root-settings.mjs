@@ -62,7 +62,7 @@ function replaceOrInsertRootSetting(config, key, value) {
 }
 
 function isSectionHeader(line) {
-	const trimmed = line.trim();
+	const trimmed = stripUnquotedInlineComment(line).trim();
 	return trimmed.startsWith("[") && trimmed.endsWith("]");
 }
 
@@ -71,4 +71,34 @@ function isRootSetting(line, key) {
 	if (trimmed.startsWith("#") || trimmed.startsWith("[")) return false;
 	const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=/);
 	return match?.[1] === key;
+}
+
+function stripUnquotedInlineComment(line) {
+	let quote = null;
+	let index = 0;
+	while (index < line.length) {
+		const char = line[index];
+		if (quote === "\"") {
+			if (char === "\\") {
+				index += 2;
+				continue;
+			}
+			if (char === "\"") quote = null;
+			index += 1;
+			continue;
+		}
+		if (quote === "'") {
+			if (char === "'") quote = null;
+			index += 1;
+			continue;
+		}
+		if (char === "\"" || char === "'") {
+			quote = char;
+			index += 1;
+			continue;
+		}
+		if (char === "#") return line.slice(0, index);
+		index += 1;
+	}
+	return line;
 }

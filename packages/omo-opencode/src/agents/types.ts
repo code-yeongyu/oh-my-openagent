@@ -2,42 +2,55 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 
 import {
   isClaudeFable5Model,
+  isClaudeFableOrMythosModel,
   isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
+  isClaudeOpus5Model,
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isGrok45Model,
+  isGrok46Model,
   isKimiK2Model,
+  isKimiK27Model,
+  isKimiK3Model,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core";
 
 export {
   isClaudeFable5Model,
+  isClaudeFableOrMythosModel,
   isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
+  isClaudeOpus5Model,
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isGrok45Model,
+  isGrok46Model,
   isKimiK2Model,
+  isKimiK27Model,
+  isKimiK3Model,
   isMiniMaxModel,
 };
 
 const CLAUDE_THINKING_BUDGET_TOKENS = 32000;
 
 /**
- * Anthropic Opus 4.7+ rejects thinking.type "enabled"; it requires adaptive
- * thinking plus an effort, which OpenCode core derives from the model variant.
- * For those models emit no thinking config and let core drive it (issue #4614).
- * All other Claude models keep the explicit enabled-thinking budget.
+ * Anthropic Opus 4.7+, Fable, and Mythos models reject thinking.type "enabled";
+ * they require adaptive thinking plus an effort, which OpenCode core derives from
+ * the model variant. For those models emit no thinking config and let core drive
+ * it (issue #4614; opencode core #31546). All other Claude models keep the
+ * explicit enabled-thinking budget.
  */
 export function buildClaudeThinkingConfig(
   model: string,
 ): { thinking: { type: "enabled"; budgetTokens: number } } | Record<string, never> {
-  if (isClaudeOpus47OrLaterModel(model)) {
+  if (isClaudeOpus47OrLaterModel(model) || isClaudeFableOrMythosModel(model)) {
     return {};
   }
   return { thinking: { type: "enabled", budgetTokens: CLAUDE_THINKING_BUDGET_TOKENS } };
@@ -117,7 +130,7 @@ function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model;
 }
 
-const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:[4-9]|\d{2,})/i;
+const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:(?:3[.-])?codex|[4-9]|\d{2,})/i;
 
 export function isGptNativeSisyphusModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
@@ -127,6 +140,12 @@ export function isGptNativeSisyphusModel(model: string): boolean {
 export function isGpt5_5Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
   return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
+}
+
+/** Matches the GPT-5.6 family: gpt-5.6, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna. */
+export function isGpt5_6Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("gpt-5.6") || modelName.includes("gpt-5-6");
 }
 
 export type BuiltinAgentName =

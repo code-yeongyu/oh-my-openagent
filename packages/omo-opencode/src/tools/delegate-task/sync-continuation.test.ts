@@ -480,6 +480,139 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(result).toContain("Result")
   })
 
+  test("marks and aborts resumed sync session after successful handback", async () => {
+    //#given - a resumed sync continuation completes successfully
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const abortCalls: Array<{ path: { id: string } }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+            { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            {
+              info: { id: "msg_004", role: "assistant", time: { created: 4000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "New response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation hands the completed result back to the parent
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - todo-continuation wake paths can identify and stop the handed-back child
+    expect(result).toContain("Task continued and completed")
+    expect(handedBackSyncSessions.has("ses_test_12345678")).toBe(true)
+    expect(abortCalls).toEqual([{ path: { id: "ses_test_12345678" } }])
+
+    handedBackSyncSessions.clear()
+  })
+
+  test("does not mark or abort resumed sync session when handback fails", async () => {
+    //#given - a resumed sync continuation returns a poll error instead of a handback result
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const abortCalls: Array<{ path: { id: string } }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input)
+          return {}
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => "Task failed before handback",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_87654321",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation cannot hand a result back to the parent
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - todo-continuation wake paths are not told to ignore a still-unreturned child
+    expect(result).toBe("Task failed before handback")
+    expect(handedBackSyncSessions.has("ses_test_87654321")).toBe(false)
+    expect(abortCalls).toEqual([])
+
+    handedBackSyncSessions.clear()
+  })
+
   test("removes toast when abort happens", async () => {
     //#given - create a context with abort signal
     const controller = new AbortController()

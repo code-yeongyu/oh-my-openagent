@@ -14,10 +14,14 @@ import {
   discoverOpencodeProjectSkills,
   discoverProjectAgentsSkills,
   discoverGlobalAgentsSkills,
+  discoverSharedSkills,
+  collectDisabledSkillAliases,
+  isDisabledSkillAlias,
   mergeSkills,
+  normalizeSkillAliasName,
   readOpencodeConfigSkills,
 } from "../features/opencode-skill-loader"
-import { resolveActiveBuiltinSkills } from "../features/builtin-skills"
+import { resolveActiveBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills"
 import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
 import { adaptHostSkillConfig } from "../shared/host-skill-config"
 
@@ -27,6 +31,8 @@ export type SkillContext = {
   browserProvider: BrowserAutomationProvider
   disabledSkills: Set<string>
 }
+
+export { collectDisabledSkillAliases }
 
 const PROVIDER_GATED_SKILL_NAMES = new Set(["agent-browser", "dev-browser", "playwright"])
 
@@ -49,26 +55,50 @@ function filterProviderGatedSkills(
   })
 }
 
+function filterDisabledSkills(
+  skills: LoadedSkill[],
+  disabledSkills: ReadonlySet<string>,
+): LoadedSkill[] {
+  if (disabledSkills.size === 0) return skills
+
+  return skills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills))
+}
+
+function isDisabledConfigSkillEntryName(
+  name: string,
+  disabledSkills: ReadonlySet<string>,
+): boolean {
+  return disabledSkills.has(normalizeSkillAliasName(name))
+}
+
 export async function createSkillContext(args: {
   directory: string
   pluginConfig: OhMyOpenCodeConfig
+  /**
+   * Host skill config from opencode's merged runtime config (e.g. fetched via
+   * the plugin client). Includes runtime-injected `skills.paths` from other
+   * plugins. When omitted, falls back to reading the on-disk opencode config.
+   */
+  hostSkills?: { paths?: string[]; urls?: string[] }
 }): Promise<SkillContext> {
-  const { directory, pluginConfig } = args
+  const { directory, pluginConfig, hostSkills } = args
 
   const browserProvider: BrowserAutomationProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright"
+  const playwrightMcpArgs = pluginConfig.browser_automation_engine?.playwright_mcp_args
 
-  const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? [])
+  const disabledSkills = collectDisabledSkillAliases(pluginConfig)
 
   const builtinSkills = resolveActiveBuiltinSkills({
     browserProvider,
     disabledSkills,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
+    playwrightMcpArgs,
     systemMcpNames: getSystemMcpServerNames(),
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const hostSkillConfig = adaptHostSkillConfig(readOpencodeConfigSkills(directory))
+  const hostSkillConfig = adaptHostSkillConfig(hostSkills ?? readOpencodeConfigSkills(directory))
   const [
     configSourceSkills,
     hostConfigSkills,
@@ -78,6 +108,7 @@ export async function createSkillContext(args: {
     opencodeProjectSkills,
     agentsProjectSkills,
     agentsGlobalSkills,
+    sharedSkills,
   ] = await Promise.all([
     discoverConfigSourceSkills({
       config: pluginConfig.skills,
@@ -93,6 +124,7 @@ export async function createSkillContext(args: {
     discoverOpencodeProjectSkills(directory),
     discoverProjectAgentsSkills(directory),
     discoverGlobalAgentsSkills(),
+    discoverSharedSkills(),
   ])
 
   // Host-config skills (read from opencode.jsonc skills.paths) take precedence
@@ -124,16 +156,38 @@ export async function createSkillContext(args: {
     agentsGlobalSkills,
     browserProvider,
   )
-
+  const activeConfigSourceSkills = filterDisabledSkills(filteredConfigSourceSkills, disabledSkills)
+  const activeUserSkills = filterDisabledSkills(filteredUserSkills, disabledSkills)
+  const activeGlobalSkills = filterDisabledSkills(filteredGlobalSkills, disabledSkills)
+  const activeProjectSkills = filterDisabledSkills(filteredProjectSkills, disabledSkills)
+  const activeOpencodeProjectSkills = filterDisabledSkills(
+    filteredOpencodeProjectSkills,
+    disabledSkills,
+  )
+  const activeAgentsProjectSkills = filterDisabledSkills(
+    filteredAgentsProjectSkills,
+    disabledSkills,
+  )
+  const activeAgentsGlobalSkills = filterDisabledSkills(
+    filteredAgentsGlobalSkills,
+    disabledSkills,
+  )
+  const filteredSharedSkills = filterDisabledSkills(
+    filterProviderGatedSkills(sharedSkills, browserProvider),
+    disabledSkills,
+  )
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
-    filteredConfigSourceSkills,
-    [...filteredUserSkills, ...filteredAgentsGlobalSkills],
-    filteredGlobalSkills,
-    [...filteredProjectSkills, ...filteredAgentsProjectSkills],
-    filteredOpencodeProjectSkills,
-    { configDir: directory },
+    activeConfigSourceSkills,
+    [...activeUserSkills, ...activeAgentsGlobalSkills, ...filteredSharedSkills],
+    activeGlobalSkills,
+    [...activeProjectSkills, ...activeAgentsProjectSkills],
+    activeOpencodeProjectSkills,
+    {
+      configDir: directory,
+      isConfigEntryAllowed: (name) => !isDisabledConfigSkillEntryName(name, disabledSkills),
+    },
   )
 
   const availableSkills: AvailableSkill[] = mergedSkills.map((skill) => ({

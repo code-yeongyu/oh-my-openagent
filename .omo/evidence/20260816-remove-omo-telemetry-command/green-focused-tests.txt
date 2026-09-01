@@ -1,0 +1,23 @@
+Command:
+cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command
+npm exec --yes --package=bun@1.3.12 -- bun test packages/omo-senpi/src/components/telemetry/omo-native-notice.test.ts packages/omo-senpi/src/components/telemetry/omo-native-component.test.ts
+
+Observed:
+bun test v1.3.12 (700fc117)
+
+12 pass
+0 fail
+30 expect() calls
+Exit code 0
+
+Covered behavior:
+- The notice registration exposes no `omo-telemetry` command.
+- The composed telemetry component still emits its expected allowlisted event stream.
+- The same full event sequence leaves no `last-payloads.json` file.
+- The first-run notice, unconfigured-key guard, DO_NOT_TRACK guard, marker race,
+  diagnostic behavior, and shutdown/restart behavior remain green.
+
+LSP note:
+The session LSP tool rejected absolute task-worktree paths because its workspace root is
+the main checkout. A worktree bridge under the existing ignored `.local-ignore/lsp-worktrees`
+surface will be used before criterion 1 is closed.

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test"
-import type { CheckDefinition, CheckResult, DoctorResult, SystemInfo, ToolsSummary } from "./types"
+import type { CheckDefinition, CheckResult, DoctorResult, SystemInfo, ToolsSummary } from "./framework/types"
 
 function createSystemInfo(): SystemInfo {
   return {
@@ -18,7 +18,6 @@ function createTools(): ToolsSummary {
   return {
     lspServers: [{ id: "typescript", extensions: [".ts", ".tsx", ".js", ".jsx"] }],
     astGrepCli: true,
-    astGrepNapi: false,
     commentChecker: true,
     ghCli: { installed: true, authenticated: true, username: "yeongyu" },
     mcpBuiltin: ["context7"],
@@ -199,7 +198,7 @@ describe("runner", () => {
         gatherSystemInfo: async () => expectedResult.systemInfo,
         gatherToolsSummary: async () => expectedResult.tools,
       }))
-      mock.module("./formatter", () => ({
+      mock.module("./framework/formatter", () => ({
         formatDoctorOutput: formatDoctorOutputMock,
         formatJsonOutput: formatJsonOutputMock,
       }))

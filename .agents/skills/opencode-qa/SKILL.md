@@ -10,7 +10,7 @@ helper script and a deep reference. Every script ships a `--self-test` that
 asserts its scenario against the live machine, so the scripts are both the QA
 tools and their own regression checks.
 
-Verified against opencode v1.15.13 (bun 1.3.12, macOS). Confirm the installed
+Verified against opencode v1.17.7 (bun 1.3.12, macOS). Confirm the installed
 version with `opencode --version`; the surface is stable but always sanity
 check a flag with `opencode <cmd> --help`.
 
@@ -38,6 +38,12 @@ directory (or with their absolute path):
 cd <this-skill-dir>                        # .agents/skills/opencode-qa
 bash scripts/lib/common.sh --self-check    # confirm the harness + deps
 ```
+
+**Docker is the default QA surface.** Run QA inside a disposable container that
+has the latest opencode and a copy of your config, with the host untouched:
+`script/agent/qa-docker.sh` (see [references/docker-qa.md](references/docker-qa.md)).
+The local scripts below are the fallback for when Docker is unavailable or on
+Windows.
 
 `common.sh` provides the shared harness (DB path, SQL escaping, isolated XDG
 sandbox, free port, server start/stop, and an EXIT-trap cleanup). It requires
@@ -118,6 +124,23 @@ This launches the TUI under tmux in an isolated sandbox, confirms it renders
 (`capture-pane`), confirms `send-keys` reaches the composer, tears the tmux
 session down, and verifies the real DB session count is unchanged.
 
+When TUI visual QA evidence is needed for a PR, follow
+`docs/reference/web-terminal-visual-qa.md`: render the TUI through the real
+xterm.js web terminal and screenshot it - NEVER the `tmux capture-pane` frame,
+which degrades color and CJK width. From the repository root:
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "OpenCode TUI QA" \
+  --command "opencode" --input "{Enter}" \
+  --evidence-dir .omo/evidence/<slug>/opencode-web-terminal
+```
+
+This runs a real pty, renders it in xterm.js under Chrome, and writes
+`terminal.txt`, `terminal-ansi.txt`, `terminal.png` (the true-color artifact),
+and `metadata.json` with a cleanup receipt (`--from-file <capture.ansi>` replays
+a saved raw stream). The isolated `scripts/tui-smoke.sh` remains the canonical
+OpenCode TUI boot smoke (tmux), separate from this visual evidence.
+
 Honest verdict: tmux is fine for SMOKE (did it boot, render, accept a key) but
 fragile for asserting conversation output (the TUI is a 60fps full-screen app).
 For real behavior assertions use Case A (`opencode run`), Case B (server API +
@@ -193,3 +216,4 @@ isolated sandbox and clean up on exit.
 - `references/tui-tmux.md` - tmux recipe, isolation, TUI control API
 - `references/testing-harness.md` - how opencode tests itself (bun test)
 - `references/sdk.md` - the @opencode-ai/sdk client (reference only)
+- `references/docker-qa.md` - run QA in a disposable Docker container (default; local is the fallback)

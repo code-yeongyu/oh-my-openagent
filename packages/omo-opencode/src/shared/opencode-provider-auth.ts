@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { readFileSync, statSync } from "node:fs"
 import * as path from "node:path"
 
@@ -29,9 +30,7 @@ function getAuthFilePath(): string {
   return path.join(getDataDir(), "opencode", "auth.json")
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function loadAuthMap(): Map<string, string> {
   const filePath = getAuthFilePath()

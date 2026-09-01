@@ -57,11 +57,34 @@ function getTemporaryConversionPath(error: unknown): string | null {
   return null
 }
 
-function createJsonTextPart(filePath: string): LookAtTextPart {
-  const fileContent = readFileSync(filePath, "utf-8")
+type ReadJsonTextPartResult =
+  | { ok: true; value: LookAtTextPart }
+  | { ok: false; error: string }
+
+function readJsonTextPart(filePath: string): ReadJsonTextPartResult {
+  let fileContent: string
+  try {
+    fileContent = readFileSync(filePath, "utf-8")
+  } catch (error) {
+    const code = error instanceof Error ? Reflect.get(error, "code") : undefined
+    if (code === "ENOENT") {
+      return { ok: false, error: `Error: File not found: ${filePath}` }
+    }
+    const message = error instanceof Error ? error.message : String(error)
+    return { ok: false, error: `Error: Failed to read JSON file ${filePath}: ${message}` }
+  }
   return {
-    type: "text",
-    text: `Attached JSON file (${basename(filePath)}):\n\n${fileContent}`,
+    ok: true,
+    value: {
+      type: "text",
+      text: `Attached JSON file (${basename(filePath)}):\n\n${fileContent}`,
+    },
+  }
+}
+
+function cleanupTempFiles(tempFiles: readonly string[]): void {
+  for (const temporaryFile of tempFiles) {
+    cleanupConvertedImage(temporaryFile)
   }
 }
 
@@ -86,7 +109,12 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
     let tempConversionPath: string | null = null
 
     if (mimeType === "application/json") {
-      inputParts.push(createJsonTextPart(filePath))
+      const jsonPart = readJsonTextPart(filePath)
+      if (!jsonPart.ok) {
+        cleanupTempFiles(tempFilesToCleanup)
+        return { ok: false, error: jsonPart.error }
+      }
+      inputParts.push(jsonPart.value)
       continue
     }
 
@@ -104,6 +132,7 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
           tempConversionPath = failedConversionPath
         }
         log(`[look_at] Conversion failed: ${conversionError}`)
+        cleanupTempFiles(tempFilesToCleanup)
         return {
           ok: false,
           error: `Error: Failed to convert image format. ${conversionError}`,
@@ -139,6 +168,7 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
         log("[look_at] Base64 conversion successful")
       } catch (conversionError) {
         log(`[look_at] Base64 conversion failed: ${conversionError}`)
+        cleanupTempFiles(tempFilesToCleanup)
         return {
           ok: false,
           error: `Error: Failed to convert Base64 image format. ${conversionError}`,
@@ -166,9 +196,7 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
       inputParts,
       sourceDescription,
       cleanup() {
-        for (const temporaryFile of tempFilesToCleanup) {
-          cleanupConvertedImage(temporaryFile)
-        }
+        cleanupTempFiles(tempFilesToCleanup)
       },
     },
   }

@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test"
 import { OhMyOpenCodeConfigSchema } from "./oh-my-opencode-config"
 
 describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
-  test("accepts review-work, shared skills, and runtime security skills", () => {
+  test("accepts review-work, runtime security skills", () => {
     // given
     const config = {
       disabled_skills: [

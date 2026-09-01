@@ -1,0 +1,9 @@
+committed blob at HEAD (what a clean checkout executes today):
+  .installed-bin-dir.json occurrences: 0
+staged blob after this fix:
+  .installed-bin-dir.json occurrences: 1
+
+readInstalledCodexBinDir occurrences in the staged bundle: 0
+  Expected 0. The read side runs on the uninstall path in the root CLI
+  (packages/omo-codex/src/install/codex-cleanup.ts), which is not bundled into
+  the installer entrypoint. Only the WRITE belongs in this bundle.

@@ -28,6 +28,7 @@ export const PLATFORMS: PlatformTarget[] = [
   { platform: "linux-arm64-musl", packageName: "oh-my-opencode-linux-arm64-musl", packageDir: "oh-my-opencode-linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "oh-my-opencode.js", description: "Linux ARM64 (musl)" },
   { platform: "windows-x64", packageName: "oh-my-opencode-windows-x64", packageDir: "oh-my-opencode-windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.js", description: "Windows x64" },
   { platform: "windows-x64-baseline", packageName: "oh-my-opencode-windows-x64-baseline", packageDir: "oh-my-opencode-windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "oh-my-opencode.js", description: "Windows x64 (no AVX2)" },
+  { platform: "windows-arm64", packageName: "oh-my-opencode-windows-arm64", packageDir: "oh-my-opencode-windows-arm64", target: "bun-windows-x64", binary: "oh-my-opencode.js", description: "Windows ARM64 (x64 emulation / node fallback)" },
 ];
 
 const CLI_DIST_ENTRY = "dist/cli/index.js";

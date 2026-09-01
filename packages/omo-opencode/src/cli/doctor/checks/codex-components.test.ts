@@ -15,7 +15,7 @@ const HOOK_TARGETS = [
   "scripts/auto-update.mjs",
 ] as const
 const WINDOWS_HOOK_TARGET = "components/bootstrap/scripts/bootstrap.ps1"
-const MCP_TARGETS = ["components/ast-grep-mcp/dist/cli.js", "components/lsp-daemon/dist/cli.js"] as const
+const MCP_TARGETS = ["components/codegraph/dist/serve.js", "components/context7/dist/cli.js", "components/lsp-daemon/dist/cli.js"] as const
 
 interface BootstrapStateFixture {
   readonly completedForVersion?: string
@@ -81,7 +81,8 @@ async function createInstalledFixture(options: FixtureOptions = {}): Promise<Fix
     ".mcp.json",
     JSON.stringify({
       mcpServers: {
-        ast_grep: { command: "node", args: ["./components/ast-grep-mcp/dist/cli.js", "mcp"] },
+        codegraph: { command: "node", args: [join(pluginRoot, "components", "codegraph", "dist", "serve.js")] },
+        context7: { command: "node", args: ["./components/context7/dist/cli.js", "mcp"] },
         lsp: { command: "node", args: ["./components/lsp-daemon/dist/cli.js", "mcp"] },
         grep_app: { url: "https://mcp.grep.app" },
       },
@@ -121,9 +122,12 @@ function buildDeps(fixture: Fixture, overrides: Partial<CodexComponentsDoctorDep
     env: {},
     platform: TEST_PLATFORM,
     arch: TEST_ARCH,
-    resolveModulePath: () => {
-      throw new Error("Cannot find module '@ast-grep/cli/package.json'")
-    },
+    // The sg fixtures are byte-filled placeholders, not runnable binaries, and the resolver now
+    // requires every candidate to answer `--version` with `ast-grep`. These cases assert doctor
+    // reporting, not probe behaviour (that is pinned in packages/utils/src/ast-grep), so stand in
+    // for the probe here instead of shipping a platform-specific executable stub.
+    sgRunVersionProbeSync: () => "ast-grep 0.43.0",
+    sgWhich: () => null,
     ...overrides,
   }
 }
@@ -164,18 +168,33 @@ describe("codex components doctor check", () => {
 
   test("#given a zero-byte mcp dist target #when checking components #then fails and reports the zero-byte state", async () => {
     // given
-    const fixture = await createInstalledFixture({ zeroByteTargets: ["components/ast-grep-mcp/dist/cli.js"] })
+    const fixture = await createInstalledFixture({ zeroByteTargets: ["components/context7/dist/cli.js"] })
 
     // when
     const result = await checkCodexComponents(buildDeps(fixture))
 
     // then
     expect(result.status).toBe("fail")
-    const issue = result.issues.find((entry) => entry.title.includes("components/ast-grep-mcp/dist/cli.js"))
+    const issue = result.issues.find((entry) => entry.title.includes("components/context7/dist/cli.js"))
     expect(issue).toBeDefined()
     expect(issue?.severity).toBe("error")
     expect(issue?.description).toContain(".mcp.json")
     expect(issue?.description).toContain("zero bytes")
+  })
+
+  test("#given an absolute installed mcp dist target is missing #when checking components #then fails instead of treating the rewrite as drift", async () => {
+    // given
+    const fixture = await createInstalledFixture({ omitTargets: ["components/codegraph/dist/serve.js"] })
+
+    // when
+    const result = await checkCodexComponents(buildDeps(fixture))
+
+    // then
+    expect(result.status).toBe("fail")
+    const issue = result.issues.find((entry) => entry.title.includes("components/codegraph/dist/serve.js"))
+    expect(issue).toBeDefined()
+    expect(issue?.severity).toBe("error")
+    expect(issue?.description).toContain(".mcp.json")
   })
 
   test("#given a missing commandWindows target #when checking components #then the windows hook path is validated too", async () => {
@@ -203,8 +222,11 @@ describe("codex components doctor check", () => {
     const issue = result.issues.find((entry) => entry.title.includes("ast_grep"))
     expect(issue).toBeDefined()
     expect(issue?.severity).toBe("warning")
-    expect(issue?.fix).toContain("bootstrap")
+    expect(issue?.description).toContain("ast-grep skill")
+    expect(issue?.fix).toContain("ast-grep skill")
     expect(issue?.fix).toContain("npx lazycodex-ai doctor")
+    expect(issue?.fix).toContain("omo doctor")
+    expect(issue?.affects).toEqual(["ast-grep skill"])
   })
 
   test("#given an OMO_AST_GREP_SG_PATH override #when checking components #then reports the env override source", async () => {
@@ -223,27 +245,23 @@ describe("codex components doctor check", () => {
     expect(result.details).toContain(`ast_grep: ok (env override OMO_AST_GREP_SG_PATH: ${overridePath})`)
   })
 
-  test("#given sg only resolvable through the @ast-grep/cli package #when checking components #then reports the package source", async () => {
+  test("#given sg only resolvable through PATH #when checking components #then reports the PATH source", async () => {
     // given
     const fixture = await createInstalledFixture({ provisionSg: false })
-    const packageDir = join(fixture.root, "node_modules", "@ast-grep", "cli")
-    await mkdir(packageDir, { recursive: true })
-    await writeFile(join(packageDir, "package.json"), JSON.stringify({ name: "@ast-grep/cli" }))
-    await writeFile(join(packageDir, "sg"), Buffer.alloc(VALID_BINARY_BYTES, 122))
+    const pathSg = join(fixture.root, "bin", "sg")
+    await writeFile(pathSg, Buffer.alloc(VALID_BINARY_BYTES, 122))
 
     // when
     const result = await checkCodexComponents(
       buildDeps(fixture, {
-        resolveModulePath: (specifier) => {
-          if (specifier === "@ast-grep/cli/package.json") return join(packageDir, "package.json")
-          throw new Error(`Cannot find module '${specifier}'`)
-        },
+        sgRunVersionProbeSync: () => "ast-grep 0.43.0",
+        sgWhich: (commandName) => (commandName === "sg" ? pathSg : null),
       }),
     )
 
     // then
     expect(result.status).toBe("pass")
-    expect(result.details).toContain(`ast_grep: ok (@ast-grep/cli package: ${join(packageDir, "sg")})`)
+    expect(result.details).toContain(`ast_grep: ok (PATH: ${pathSg})`)
   })
 
   test("#given no bootstrap state file #when checking components #then surfaces bootstrap pending as info detail without issues", async () => {
@@ -287,7 +305,7 @@ describe("codex components doctor check", () => {
         lastStatus: "degraded",
         degraded: [
           { component: "ast_grep", reason: "download failed: checksum mismatch", hint: "npx lazycodex-ai doctor" },
-          { component: "omo-cli", reason: "payload has no dist/cli" },
+          { component: "omo-agent-toolkit", reason: "payload has no dist/cli" },
         ],
       },
     })
@@ -300,7 +318,7 @@ describe("codex components doctor check", () => {
     expect(result.details).toContain(
       "degraded component=ast_grep reason=download failed: checksum mismatch hint=npx lazycodex-ai doctor",
     )
-    expect(result.details).toContain("degraded component=omo-cli reason=payload has no dist/cli")
+    expect(result.details).toContain("degraded component=omo-agent-toolkit reason=payload has no dist/cli")
   })
 
   test("#given malformed bootstrap state json #when checking components #then treats bootstrap as pending without crashing", async () => {
@@ -325,8 +343,8 @@ describe("codex components doctor check", () => {
     const fixture = await createInstalledFixture()
     await writeBundleFile(
       fixture.pluginRoot,
-      "components/ast-grep-mcp/.mcp.json",
-      JSON.stringify({ mcpServers: { ast_grep: { command: "node", args: ["../../../../dev-packages/ast-grep-mcp/dist/cli.js", "mcp"] } } }),
+      "components/local-dev/.mcp.json",
+      JSON.stringify({ mcpServers: { local_dev: { command: "node", args: ["../../../../dev-packages/custom-mcp/dist/cli.js", "mcp"] } } }),
     )
 
     // when

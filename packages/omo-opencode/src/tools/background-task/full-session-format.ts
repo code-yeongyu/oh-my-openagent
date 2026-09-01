@@ -6,7 +6,7 @@ import { truncateText } from "./truncate-text"
 import { formatTaskStatus } from "./task-status-format"
 import { getBackgroundOutputFetchTimeoutMs, withSdkCallTimeout } from "./with-sdk-call-timeout"
 
-const MAX_MESSAGE_LIMIT = 100
+const MAX_MESSAGE_LIMIT = 200
 const THINKING_MAX_CHARS = 2000
 
 function extractToolResultText(part: NonNullable<BackgroundOutputMessage["parts"]>[number]): string[] {

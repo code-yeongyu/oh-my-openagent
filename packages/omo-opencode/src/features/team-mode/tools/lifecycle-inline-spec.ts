@@ -2,9 +2,9 @@ import { z } from "zod"
 
 import type { AgentOverrides, CategoriesConfig } from "../../../config/schema"
 import { mergeCategories } from "../../../shared/merge-categories"
-import { normalizeTeamSpecInput } from "../team-registry/loader"
-import { validateSpec } from "../team-registry/validator"
-import { TeamSpecSchema, type TeamSpec } from "../types"
+import { normalizeTeamSpecInput } from "@oh-my-opencode/team-core/team-registry/loader"
+import { validateSpec } from "@oh-my-opencode/team-core/team-registry/validator"
+import { TeamSpecSchema, type TeamSpec } from "@oh-my-opencode/team-core/types"
 
 export const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inline_spec. Use team_create({ teamName: \"existing-team\" }) or team_create({ inline_spec: { name: \"team-name\", members: [{ name: \"worker\", category: \"quick\", prompt: \"Do the assigned work.\" }] } })."
 

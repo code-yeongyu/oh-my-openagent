@@ -1,0 +1,14 @@
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:6 char:8
++ $log = bun test packages/omo-codex/src/install/codex-cleanup.test.ts  ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ 17 pass
+ 2 skip
+ 0 fail
+ 89 expect() calls
+Ran 19 tests across 2 files. [1.87s]
+

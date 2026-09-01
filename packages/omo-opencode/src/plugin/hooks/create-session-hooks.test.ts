@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../../config"
+import type { BackgroundManager } from "../../features/background-agent"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 import { createSessionHooks } from "./create-session-hooks"
@@ -19,6 +20,7 @@ const mockContext = unsafeTestValue<PluginContext>({
 })
 
 const mockModelCacheState = {} as ModelCacheState
+const mockBackgroundManager = unsafeTestValue<BackgroundManager>({})
 
 describe("createSessionHooks", () => {
   it("keeps model fallback disabled when config is unset", () => {
@@ -30,6 +32,7 @@ describe("createSessionHooks", () => {
       ctx: mockContext,
       pluginConfig,
       modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
       isHookEnabled: (hookName) => hookName === "model-fallback",
       safeHookEnabled: true,
     })
@@ -47,6 +50,7 @@ describe("createSessionHooks", () => {
       ctx: mockContext,
       pluginConfig,
       modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
       isHookEnabled: (hookName) => hookName === "model-fallback",
       safeHookEnabled: true,
     })
@@ -64,7 +68,8 @@ describe("createSessionHooks", () => {
       ctx: mockContext,
       pluginConfig,
       modelCacheState: mockModelCacheState,
-      isHookEnabled: (hookName) => hookName === "context-window-monitor",
+      backgroundManager: mockBackgroundManager,
+      isHookEnabled: (hookName: string) => hookName === "context-window-monitor",
       safeHookEnabled: true,
     })
 
@@ -90,11 +95,52 @@ describe("createSessionHooks", () => {
       ctx: mockContext,
       pluginConfig,
       modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
       isHookEnabled: (hookName) => hookName === "interactive-bash-session",
       safeHookEnabled: true,
     })
 
     // then
     expect(result.interactiveBashSession).toBeNull()
+  })
+
+  it("skips codegraph bootstrap when disabled hooks exclude it", () => {
+    // given
+    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({})
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
+      isHookEnabled: (hookName) => hookName !== "codegraph-bootstrap",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.codegraphBootstrap).toBeNull()
+  })
+
+  it("keeps codegraph bootstrap registered when the hook is enabled", () => {
+    // given
+    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
+      codegraph: {
+        enabled: false,
+      },
+    })
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
+      isHookEnabled: (hookName) => hookName === "codegraph-bootstrap",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.codegraphBootstrap).not.toBeNull()
   })
 })

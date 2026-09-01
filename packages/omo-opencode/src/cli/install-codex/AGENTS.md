@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. Entry: `runCodexInstaller()` in `install-codex.ts`. Triggered by `bunx oh-my-openagent install --platform=codex` (alias `npx lazycodex-ai install`).
+Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. This directory is now an OpenCode CLI adapter shim over the canonical installer source in [`packages/omo-codex/src/install/`](../../../../../packages/omo-codex/src/install). Entry: `runCodexInstaller()` in `install-codex.ts`. Triggered by `bunx oh-my-openagent install --platform=codex` (alias `npx lazycodex-ai install`).
 
 ## KEY FILES
 
@@ -25,7 +25,7 @@ Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. Entr
 ```
 runCodexInstaller()
   1. resolve repoRoot / codexHome / binDir / projectDirectory
-  2. git-bash.ts: Windows Git Bash preflight (auto-install via winget if missing)
+  2. git-bash.ts: Windows Git Bash preflight (discovery-first; no automatic winget/system install)
   3. codex-marketplace.ts: read marketplace.json + plugin manifests
   4. lazycodex-version-stamp.ts: resolve plugin version from distribution manifest
   5. For each marketplace plugin:
@@ -53,7 +53,8 @@ runCodexInstaller()
 - All TOML mutation is string-based via `toml-section-editor.ts` (no TOML parser dependency)
 - Atomic directory promotion: copy to temp sibling, then `rename()`; backup restored on failure
 - Windows uses `.cmd` shims; POSIX uses symlinks
-- `MANAGED_CODEX_AGENT_NAMES` hardcodes 6 agent names: `codex-ultrawork-reviewer`, `explorer`, `librarian`, `metis`, `momus`, `plan`
+- Current managed Codex agent roster: `explorer`, `librarian`, `metis`, `momus`, `plan`
+- Legacy purge/back-compat code still tracks the retired reviewer agent so installs can remove stale config and agent files from older releases
 - Legacy marketplace cleanup: `lazycodex` and `code-yeongyu-codex-plugins` are pruned on `sisyphuslabs` install
 
 ## ANTI-PATTERNS

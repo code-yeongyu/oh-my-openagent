@@ -25,8 +25,11 @@ import {
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { runCodexInstaller } from "./install-codex"
+import { runSenpiInstaller } from "./install-senpi"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
+import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
+import * as astGrepInstall from "./install-ast-grep-sg"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -108,6 +111,12 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     printSuccess(
       `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
     )
+    try {
+      ensureTuiPluginEntry()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      printWarning(`Could not update OpenCode TUI config: ${message}`)
+    }
 
     printStep(step++, totalSteps, `Writing ${PLUGIN_NAME} configuration...`)
     const omoResult = writeOmoConfig(config)
@@ -116,13 +125,14 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
       return 1
     }
     printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
+    await astGrepInstall.installAstGrepForOpenCode({ log: printWarning })
   }
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
   if (config.hasOpenCode && !config.hasClaude) {
     printInfo(
-      "Note: Sisyphus agent performs best with Claude Opus 4.5+. " +
+      "Note: Sisyphus agent performs best with Claude Opus 5. " +
         "Other models work but may have reduced orchestration quality.",
     )
   }
@@ -149,6 +159,19 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         return 1
       }
       printWarning(`Codex install failed (OpenCode install is still complete): ${message}`)
+    }
+    console.log()
+  }
+
+  if (config.hasSenpi) {
+    printInfo("Installing Senpi harness adapter...")
+    try {
+      const senpiResult = await runSenpiInstaller()
+      printSuccess(`Senpi adapter installed ${SYMBOLS.arrow} ${color.dim(senpiResult.settingsPath)}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      printError(`Senpi install failed: ${message}`)
+      return 1
     }
     console.log()
   }
