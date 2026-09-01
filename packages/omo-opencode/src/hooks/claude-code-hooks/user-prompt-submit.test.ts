@@ -200,3 +200,164 @@ describe("executeUserPromptSubmitHooks", () => {
     expect(dispatchSpy).toHaveBeenCalledTimes(0)
   })
 })
+
+describe("executeUserPromptSubmitHooks control output", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
+  const ctx: UserPromptSubmitContext = {
+    sessionId: "test-session-control",
+    prompt: "hello",
+    parts: [{ type: "text", text: "hello" }],
+    cwd: "/tmp",
+  }
+
+  const config = {
+    UserPromptSubmit: [
+      { matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] },
+    ],
+  }
+
+  function mockHook(stdout?: string, options?: { exitCode?: number; stderr?: string }) {
+    spyOn(dispatchHookModule, "dispatchHook").mockResolvedValue({
+      exitCode: options?.exitCode ?? 0,
+      stdout,
+      stderr: options?.stderr ?? "",
+    })
+  }
+
+  it("#given a hook that writes nothing #when prompt submit runs #then nothing is injected", async () => {
+    // given
+    mockHook()
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(false)
+    expect(result.messages).toEqual([])
+  })
+
+  it("#given control output without additionalContext #when prompt submit runs #then nothing is injected", async () => {
+    // given
+    mockHook('{"continue":true}')
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(false)
+    expect(result.messages).toEqual([])
+  })
+
+  it("#given control output with additionalContext #when prompt submit runs #then only that context is injected", async () => {
+    // given
+    mockHook(
+      JSON.stringify({
+        continue: true,
+        systemMessage: "shown to the user, not to the model",
+        hookSpecificOutput: {
+          hookEventName: "UserPromptSubmit",
+          additionalContext: "branch is main",
+        },
+      })
+    )
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.messages).toEqual([
+      "<user-prompt-submit-hook>\nbranch is main\n</user-prompt-submit-hook>",
+    ])
+  })
+
+  it("#given text containing a brace #when prompt submit runs #then it is injected verbatim", async () => {
+    // given - only stdout that starts with `{` is control output
+    mockHook("warning: {count} placeholders left")
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.messages).toEqual([
+      "<user-prompt-submit-hook>\nwarning: {count} placeholders left\n</user-prompt-submit-hook>",
+    ])
+  })
+
+  it("#given malformed JSON #when prompt submit runs #then it is injected verbatim", async () => {
+    // given
+    mockHook('{"continue": tru')
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.messages).toEqual([
+      '<user-prompt-submit-hook>\n{"continue": tru\n</user-prompt-submit-hook>',
+    ])
+  })
+
+  it("#given decision block on exit 0 #when prompt submit runs #then the prompt is blocked", async () => {
+    // given
+    mockHook('{"decision":"block","reason":"secrets in prompt"}')
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(true)
+    expect(result.reason).toBe("secrets in prompt")
+    expect(result.messages).toEqual([])
+  })
+
+  it("#given continue false #when prompt submit runs #then the prompt is blocked with stopReason", async () => {
+    // given
+    mockHook('{"continue":false,"stopReason":"quota exhausted"}')
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(true)
+    expect(result.reason).toBe("quota exhausted")
+  })
+
+  it("#given valid JSON that is not an object #when prompt submit runs #then it is injected verbatim", async () => {
+    // given - the leading `{` is what marks control output, not JSON validity
+    mockHook('[{"note":"first"}]')
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.messages).toEqual([
+      '<user-prompt-submit-hook>\n[{"note":"first"}]\n</user-prompt-submit-hook>',
+    ])
+  })
+
+  it("#given both decision block and continue false #when prompt submit runs #then reason wins over stopReason", async () => {
+    // given
+    mockHook('{"decision":"block","reason":"blocked","continue":false,"stopReason":"stopped"}')
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(true)
+    expect(result.reason).toBe("blocked")
+  })
+
+  it("#given continue false without stopReason #when prompt submit runs #then stderr becomes the reason", async () => {
+    // given
+    mockHook('{"continue":false}', { exitCode: 1, stderr: "hook failed" })
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(true)
+    expect(result.reason).toBe("hook failed")
+  })
+})
