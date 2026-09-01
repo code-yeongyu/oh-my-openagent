@@ -1,0 +1,17 @@
+command:
+  MSYS_NO_PATHCONV=1 wsl -u codexqa bash /mnt/c/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/.omo/evidence/20260813-pr6611-manual-reset/opencode-hook-qa.sh
+
+observed:
+  opencode_version=1.18.13
+  health={"healthy":true,"version":"1.18.13"}
+  config_plugins=["file:///mnt/c/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/dist/index.js"]
+  prompt_http_status=204
+  sse_event={"type":"session.status"}
+  real_db_sessions_before=0
+  real_db_sessions_after=0
+
+exit_code=0
+
+The transient curl message reported that the SSE transfer closed after the
+matching event was captured. The driver assertions passed and the process
+exited zero.

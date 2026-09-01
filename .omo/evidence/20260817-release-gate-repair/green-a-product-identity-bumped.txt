@@ -1,0 +1,17 @@
+bun test v1.3.12 (700fc117)
+
+packages/omo-senpi/src/components/telemetry/product-identity.test.ts:
+(pass) OmO Native product identity > #given the native product #when config is created #then identity derivation and effective geoip settings are fixed [1.45ms]
+(pass) OmO Native product identity > #given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi [0.34ms]
+(pass) OmO Native product identity > #given a machine state directory #when session ids are hashed #then the persisted salt is stable and raw ids stay distinct [3.69ms]
+(pass) OmO Native product identity > #given a deleted salt #when another session id is hashed #then the salt is recreated without throwing [0.88ms]
+(pass) OmO Native product identity > #given an unwritable state path #when a session id is hashed #then fallback identity stays stable without throwing [0.17ms]
+(pass) OmO Native product identity > #given a known provider with an unknown custom model #when masked #then only model_id becomes custom [0.13ms]
+(pass) OmO Native product identity > #given senpi-task builtins #when telemetry allowlists are loaded #then names exactly match imported sources [0.11ms]
+(pass) OmO Native product identity > #given the tracked-call cap #when the widest wave histogram is encoded #then it stays inside the 64 character privacy limit [0.10ms]
+(pass) OmO Native product identity > #given static telemetry inventories #when inspected #then they and every property allowlist are frozen [0.15ms]
+
+ 9 pass
+ 0 fail
+ 161 expect() calls
+Ran 9 tests across 1 file. [750.00ms]

@@ -1,16 +1,9 @@
-const KNOWN_VARIANTS = new Set([
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-  "minimal",
-  "none",
-  "auto",
-  "thinking",
-])
+import { splitReasoningSuffix } from "./reasoning-level"
 
-export function parseVariantFromModelID(rawModelID: string): { modelID: string; variant?: string } {
+export function parseVariantFromModelID(
+  rawModelID: string,
+  options?: { readonly allowMaxSuffix?: boolean },
+): { modelID: string; variant?: string } {
   if (typeof rawModelID !== "string") {
     return { modelID: "" }
   }
@@ -26,11 +19,16 @@ export function parseVariantFromModelID(rawModelID: string): { modelID: string; 
     return variant ? { modelID, variant } : { modelID }
   }
 
+  const suffixedModel = splitReasoningSuffix(trimmedModelID, options)
+  if (suffixedModel.level) {
+    return { modelID: suffixedModel.base, variant: suffixedModel.level }
+  }
+
   const spaceVariant = trimmedModelID.match(/^(.*\S)\s+([a-z][a-z0-9_-]*)$/i)
   if (spaceVariant) {
     const modelID = spaceVariant[1]?.trim() ?? ""
     const variant = spaceVariant[2]?.trim().toLowerCase()
-    if (variant && KNOWN_VARIANTS.has(variant)) {
+    if (variant) {
       return { modelID, variant }
     }
   }
@@ -56,7 +54,7 @@ export function parseModelString(
     return undefined
   }
 
-  const parsedModel = parseVariantFromModelID(rawModelID)
+  const parsedModel = parseVariantFromModelID(rawModelID, { allowMaxSuffix: true })
   if (!parsedModel.modelID) {
     return undefined
   }

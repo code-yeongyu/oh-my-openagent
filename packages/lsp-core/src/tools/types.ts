@@ -93,6 +93,16 @@ export interface LspPrepareRenameDetails {
 	errorKind?: "missing_dependency";
 }
 
+export interface LspFormatDetails {
+	filePath: string;
+	status: "formatted" | "unchanged" | "unavailable";
+	reason?: "capability_not_advertised" | "server_unavailable";
+	linesAdded: number;
+	linesRemoved: number;
+	error?: string;
+	errorKind?: "missing_dependency";
+}
+
 export interface LspRenameDetails {
 	filePath: string;
 	line: number;

@@ -1,0 +1,28 @@
+Rebase target:
+
+```text
+origin/dev
+```
+
+Conflicts:
+
+1. `packages/omo-senpi/src/components/task/usage-guidance.ts`
+   - Preserved current upstream concise task-output/team-mail/automatic-delivery wording.
+   - Preserved this change's always-steer task_send guidance.
+
+2. `packages/omo-senpi/src/components/ultrawork/generated-directive.ts`
+   - Regenerated with `node packages/omo-senpi/plugin/scripts/embed-directive.mjs`.
+   - `--check` passed.
+
+3. `packages/omo-senpi/plugin/extensions/omo.js`
+   - Regenerated with `bun run build:senpi-plugin`.
+   - Build exited 0.
+
+Conflict verification:
+
+- `git diff --check`: exit 0.
+- Anchored conflict-marker scan across all three files: no matches.
+- `bun run --cwd packages/senpi-task test`: `554 pass`, `0 fail`, `1786 expect() calls`, 77 files.
+- `bun run test:senpi`: `403 pass`, `0 fail`, `1174 expect() calls`, 70 files.
+
+One pre-existing timing-sensitive test (`senpi-api-tripwire.test.ts`) exceeded its 5-second timeout while the conflict team was active, then passed in isolation and the full suite passed after team teardown. No timing test or timeout was weakened.

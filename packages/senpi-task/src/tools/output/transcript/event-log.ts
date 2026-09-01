@@ -1,34 +1,29 @@
-import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT } from "../../../manager/transcript-log"
-import type { TranscriptEntry } from "../types"
+import { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_ERROR_EVENT, TRANSCRIPT_TOOL_EVENT } from "../../../manager/transcript-log"
+import type { TranscriptEntry, TranscriptReadResult } from "../types"
+import { readBoundedFileText } from "./read-bounded"
 
 // Re-exported from the writer (manager/transcript-log.ts) so reader and writer share ONE contract for
 // the event-type names and can never drift.
-export { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT }
+export { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_ERROR_EVENT, TRANSCRIPT_TOOL_EVENT }
 
 // Reconstruct a child's transcript from OUR event log (logs/<taskId>.jsonl). Only the two transcript
 // event types are lifted; lifecycle/audit events on the same log are ignored. A missing log is an
 // empty transcript, never a throw (task_output is read-only and must tolerate absent state).
 export function readEventLogTranscript(stateDir: string, taskId: string): readonly TranscriptEntry[] {
-  const raw = readLog(join(stateDir, "logs", `${taskId}.jsonl`))
-  if (raw === undefined) return []
+  return readEventLogTranscriptResult(stateDir, taskId).entries
+}
+
+export function readEventLogTranscriptResult(stateDir: string, taskId: string): TranscriptReadResult {
+  const raw = readBoundedFileText(join(stateDir, "logs", `${taskId}.jsonl`))
+  if (raw === undefined) return { entries: [], source: "event-log", truncated: false }
   const entries: TranscriptEntry[] = []
-  for (const line of raw.split("\n")) {
+  for (const line of raw.text.split("\n")) {
     const entry = transcriptEntryOf(parseLine(line))
     if (entry !== undefined) entries.push(entry)
   }
-  return entries
-}
-
-function readLog(path: string): string | undefined {
-  try {
-    return readFileSync(path, "utf8")
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
-    throw error
-  }
+  return { entries, source: "event-log", truncated: raw.truncated }
 }
 
 function parseLine(line: string): unknown {
@@ -51,6 +46,9 @@ function transcriptEntryOf(entry: unknown): TranscriptEntry | undefined {
   }
   if (entry.type === TRANSCRIPT_TOOL_EVENT && typeof payload.tool === "string") {
     return { kind: "tool", tool: payload.tool, is_error: payload.is_error === true }
+  }
+  if (entry.type === TRANSCRIPT_ERROR_EVENT && typeof payload.message === "string") {
+    return { kind: "error", message: payload.message }
   }
   if (entry.type === "team_message_waited" && typeof payload.from === "string" && typeof payload.body === "string") {
     return { kind: "assistant", text: `[team message from ${payload.from}] ${payload.body}` }

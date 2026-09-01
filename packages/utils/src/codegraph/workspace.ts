@@ -1,5 +1,6 @@
+import { execFileSync } from "node:child_process"
 import { appendFileSync, existsSync, lstatSync, mkdirSync, realpathSync, readFileSync, statSync, symlinkSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import { canonicalizeCodegraphPath, resolveCodegraphWorkspacePaths, type CodegraphWorkspacePaths } from "./paths"
 import { writeCodegraphSourceMetadata } from "./store"
@@ -107,18 +108,90 @@ export function prepareCodegraphWorkspace(
 }
 
 export function ensureCodegraphGitignored(workspace: string): boolean {
-  const gitDir = join(workspace, ".git")
-  if (!existsSync(gitDir)) return false
+  const gitMarkerPath = join(workspace, ".git")
+  if (!existsSync(gitMarkerPath)) return false
 
-  const excludePath = join(gitDir, "info", "exclude")
   try {
-    mkdirSync(join(gitDir, "info"), { recursive: true })
+    const isWorktree = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }).trim()
+    if (isWorktree !== "true") return false
+    const gitTopLevel = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }).trim()
+    if (gitTopLevel.length === 0 || realpathSync.native(gitTopLevel) !== realpathSync.native(workspace)) return false
+
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }).trim()
+    if (gitDir.length === 0 || !gitMarkerOwnsGitDir(gitMarkerPath, workspace, gitDir)) return false
+
+    const gitExcludePath = execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }).trim()
+    if (gitExcludePath.length === 0) return false
+
+    const excludePath = resolve(workspace, gitExcludePath)
+    mkdirSync(dirname(excludePath), { recursive: true })
     const existing = existsSync(excludePath) ? readFileSync(excludePath, "utf8") : ""
     if (existing.split(/\r?\n/).includes(".codegraph")) return true
     appendFileSync(excludePath, `${existing.endsWith("\n") || existing.length === 0 ? "" : "\n"}.codegraph\n`)
     return true
-  } catch (error) {
-    if (error instanceof Error) return false
-    throw error
+  } catch {
+    return false
   }
+}
+
+function gitMarkerOwnsGitDir(gitMarkerPath: string, workspace: string, gitDir: string): boolean {
+  const markerStat = lstatSync(gitMarkerPath)
+  if (markerStat.isSymbolicLink()) return false
+
+  const resolvedGitDir = realpathSync.native(gitDir)
+  if (markerStat.isDirectory()) return realpathSync.native(gitMarkerPath) === resolvedGitDir
+  if (!markerStat.isFile()) return false
+
+  const markerMatch = /^gitdir:\s*(.+)\s*$/i.exec(readFileSync(gitMarkerPath, "utf8").trim())
+  if (markerMatch?.[1] === undefined) return false
+  if (realpathSync.native(resolve(workspace, markerMatch[1])) !== resolvedGitDir) return false
+
+  const backlinkPath = join(resolvedGitDir, "gitdir")
+  if (existsSync(backlinkPath)) {
+    const backlink = readFileSync(backlinkPath, "utf8").trim()
+    return backlink.length > 0
+      && realpathSync.native(resolve(resolvedGitDir, backlink)) === realpathSync.native(gitMarkerPath)
+  }
+
+  const coreWorktree = execFileSync(
+    "git",
+    ["config", "--file", join(resolvedGitDir, "config"), "--get", "core.worktree"],
+    {
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    },
+  ).trim()
+  return coreWorktree.length > 0
+    && realpathSync.native(resolve(resolvedGitDir, coreWorktree)) === realpathSync.native(workspace)
 }

@@ -16,10 +16,11 @@ import {
   SenpiTeamRuntimeError,
   type CreateTeamDeps,
   type CreateTeamResult,
+  type CreatedMemberInfo,
   type DeleteTeamDeps,
   type DeleteTeamResult,
 } from "./runtime-types"
-import { spawnTeamMembers, type SpawnMembersResult, type SpawnedMember } from "./spawn-members"
+import { memberTaskName, spawnTeamMembers, type SpawnMembersResult, type SpawnedMember } from "./spawn-members"
 import { ensureTeamRuntimeDirs, resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
 
 const MS_PER_MINUTE = 60_000
@@ -28,6 +29,8 @@ export { SenpiTeamRuntimeError } from "./runtime-types"
 export type {
   CreateTeamDeps,
   CreateTeamResult,
+  CreatedMemberInfo,
+  CreatedMemberRole,
   DeleteTeamDeps,
   DeleteTeamResult,
   TeamRuntimeManagerPort,
@@ -76,7 +79,6 @@ export async function createTeam(
           ...config,
           stateDir: resolveStateDir(deps.stateDir),
           members: spec.members.map((member) => member.name),
-          wait: deps.taskSettings.wait,
         }),
       },
     } : {}),
@@ -104,7 +106,40 @@ export async function createTeam(
   }
 
   const activated = await activateTeam(teamRunId, result.spawned, config)
-  return { runtimeState: activated, memberTaskIds }
+  return { runtimeState: activated, memberTaskIds, members: toCreatedMemberInfos(spec, result.spawned, activated) }
+}
+
+const PROMPT_EXCERPT_MAX = 120
+
+function excerptPrompt(prompt: string): string {
+  const collapsed = prompt.replace(/\s+/g, " ").trim()
+  return collapsed.length <= PROMPT_EXCERPT_MAX ? collapsed : `${collapsed.slice(0, PROMPT_EXCERPT_MAX)}...`
+}
+
+// Builds the caller-facing per-member views from the spec (role, prompt), the spawn outcomes (task
+// id, resolved model), and the activated runtime state (live status). Spawn success guarantees every
+// spec member has an outcome; a member missing from the map is skipped defensively.
+function toCreatedMemberInfos(
+  spec: TeamSpec,
+  spawned: ReadonlyMap<string, SpawnedMember>,
+  state: RuntimeState,
+): CreatedMemberInfo[] {
+  return spec.members.flatMap((member) => {
+    const outcome = spawned.get(member.name)
+    if (outcome === undefined) return []
+    const stateMember = state.members.find((candidate) => candidate.name === member.name)
+    return [{
+      name: member.name,
+      taskId: outcome.taskId,
+      status: stateMember?.status ?? outcome.status,
+      role: member.kind === "category"
+        ? { kind: "category", category: member.category }
+        : { kind: "subagent_type", subagentType: member.subagent_type },
+      ...(outcome.resolvedModel !== undefined ? { model: outcome.resolvedModel } : {}),
+      ...(member.prompt !== undefined ? { promptExcerpt: excerptPrompt(member.prompt) } : {}),
+      ...(member.task_summary !== undefined ? { taskSummary: member.task_summary } : {}),
+    }]
+  })
 }
 
 async function activateTeam(
@@ -152,8 +187,23 @@ function toMemberTaskMap(spawned: ReadonlyMap<string, SpawnedMember>): MemberTas
  * Deletes a team run: transition `active`/`shutdown_requested` -> `deleting`, cancel every mapped
  * member task, transition -> `deleted`, then remove the team-core runtime directory. A missing
  * runtime state is treated as an already-deleted no-op (idempotent double delete).
+ *
+ * Same-process calls for one team coalesce onto a single in-flight operation: an uncoordinated
+ * second delete can crash on the removed runtime directory or tear down the same resident twice,
+ * so concurrent callers share one promise keyed by the resolved runtime directory.
  */
-export async function deleteTeam(teamRunId: string, deps: DeleteTeamDeps): Promise<DeleteTeamResult> {
+const deleteOperations = new Map<string, Promise<DeleteTeamResult>>()
+
+export function deleteTeam(teamRunId: string, deps: DeleteTeamDeps): Promise<DeleteTeamResult> {
+  const key = resolveTeamRuntimeDirs(deps.stateDir, teamRunId).runtimeDir
+  const current = deleteOperations.get(key)
+  if (current !== undefined) return current
+  const operation = performDeleteTeam(teamRunId, deps).finally(() => deleteOperations.delete(key))
+  deleteOperations.set(key, operation)
+  return operation
+}
+
+async function performDeleteTeam(teamRunId: string, deps: DeleteTeamDeps): Promise<DeleteTeamResult> {
   const config = toTeamCoreConfig(deps.taskSettings, teamStorageBaseDir(deps.stateDir))
   const runtimeDir = resolveTeamRuntimeDirs(deps.stateDir, teamRunId).runtimeDir
 
@@ -182,9 +232,31 @@ export async function deleteTeam(teamRunId: string, deps: DeleteTeamDeps): Promi
 async function cancelMemberTasks(teamRunId: string, runtimeDir: string, deps: DeleteTeamDeps): Promise<string[]> {
   const map = await readMemberTaskMap(runtimeDir)
   const cancelled: string[] = []
-  for (const taskId of Object.values(map)) {
+  for (const [memberName, taskId] of Object.entries(map)) {
+    if (deps.manager.get(taskId)?.name !== memberTaskName(teamRunId, memberName)) continue
     const outcome = await deps.manager.cancelTask(taskId, `delete team ${teamRunId}`)
-    if (outcome.kind === "cancelled") cancelled.push(taskId)
+    if (outcome.kind === "cancelled") {
+      cancelled.push(taskId)
+      continue
+    }
+    // Terminal cancellation is an intentional noop (completed residents stay revivable), but team
+    // deletion owns member teardown: route the resident through the lifecycle single-writer port.
+    // A `cancelled` noop means an in-flight cancellation already owns destruction, and a
+    // non-resident record has nothing left to tear down, so neither path may destroy again. Re-read
+    // immediately before destruction so a revive between the noop and residency checks wins; a
+    // narrower revive window remains after this final read and is serialized by lifecycle teardown.
+    const observed = deps.manager.get(taskId)
+    if (outcome.kind === "noop" && outcome.status !== "cancelled" && observed?.residency_state === "resident") {
+      const current = deps.manager.get(taskId)
+      if (
+        current !== undefined
+        && current.status !== "pending"
+        && current.status !== "running"
+        && current.residency_state === "resident"
+      ) {
+        await deps.destruction.destroyResidentTask(taskId, "cancel")
+      }
+    }
   }
   return cancelled
 }

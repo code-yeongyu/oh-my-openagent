@@ -1,0 +1,35 @@
+RED
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+exit_code=1
+result=5 pass, 1 fail, 15 expect calls
+failure=the repeated model-less retry aborted twice after currentModel mutated
+
+GREEN
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+exit_code=0
+result=6 pass, 0 fail, 18 expect calls
+observed=the repeated model-less retry aborted and dispatched exactly once
+
+VARIANT RED
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+exit_code=1
+result=6 pass, 1 fail, 19 expect calls
+failure=low and high variants produced the same key, so the high variant did not advance
+
+VARIANT GREEN
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+exit_code=0
+result=7 pass, 0 fail, 19 expect calls
+observed=the repeated low variant deduped and the high variant advanced once
+
+INTERLEAVED RED
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+exit_code=1
+result=7 pass, 1 fail, 20 expect calls
+failure=the stale first model aborted a third time after the second model overwrote its key
+
+INTERLEAVED GREEN
+command=bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+exit_code=0
+result=8 pass, 0 fail, 21 expect calls
+observed=both active model keys remained stored and the stale first model deduped

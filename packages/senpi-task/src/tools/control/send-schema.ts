@@ -14,24 +14,28 @@ const StructuredMessage = Type.Union([
   }),
 ])
 
+const Recipient = Type.String({ description: "Child task id/name or team member name." })
+const PlainMessage = Type.String({ description: "The instruction or context to deliver." })
+const Summary = Type.Optional(Type.String({ description: "Optional one-line summary for team messages." }))
+
 export const TaskSendParams = Type.Object({
-  to: Type.String({ description: "Child task id/name or team member name." }),
-  message: Type.Optional(
-    Type.Union([Type.String({ description: "The instruction or context to deliver." }), StructuredMessage]),
-  ),
-  deliver_as: Type.Optional(
-    Type.Union([Type.Literal("steer"), Type.Literal("followUp"), Type.Literal("interrupt")], {
-      description: "steer interrupts the running turn immediately; followUp (default) queues a message; interrupt parks a running child and takes no message.",
-    }),
-  ),
+  to: Recipient,
+  message: Type.Optional(Type.Union([PlainMessage, StructuredMessage])),
   team_run_id: Type.Optional(Type.String({ description: "Team run id for lead-to-member messages or shutdown messages." })),
-  summary: Type.Optional(Type.String({ description: "Optional one-line summary for team messages." })),
+  summary: Summary,
   all_scope: Type.Optional(
     Type.Boolean({ description: "Allow messaging a child owned by another session. Off by default." }),
   ),
 })
 
+export const MemberScopedTaskSendParams = Type.Object({
+  to: Recipient,
+  message: PlainMessage,
+  summary: Summary,
+})
+
 export type TaskSendInput = Static<typeof TaskSendParams>
+export type MemberScopedTaskSendInput = Static<typeof MemberScopedTaskSendParams>
 export type StructuredMessageInput = Exclude<Exclude<TaskSendInput["message"], undefined>, string>
 
 export function isStructuredMessage(message: TaskSendInput["message"]): message is StructuredMessageInput {

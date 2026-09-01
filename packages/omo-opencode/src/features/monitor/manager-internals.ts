@@ -3,7 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { MonitorConfig } from "../../config/schema/monitor"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "../background-agent/process-cleanup"
 import { log } from "../../shared"
-import type { InternalPromptDispatchArgs, PromptAsyncInput, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import type { InternalPromptDispatchArgs, PromptAsyncInput, PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { MonitorBatcher, type SchedulerDeps, type TimerHandle } from "./batcher"
 import { createMonitorPipeline } from "./pipeline"
 import { spawnMonitoredProcess, type MonitoredProcess } from "./process"
@@ -60,6 +60,7 @@ export const MONITOR_OUTPUT_PENDING_RETRY_MS = 1_000
 export const MONITOR_OUTPUT_ACCEPTED_MESSAGE_SKEW_MS = 5_000
 export const MONITOR_OUTPUT_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
 export const MONITOR_OUTPUT_POST_DISPATCH_HOLD_MS = 250
+export const MONITOR_OUTPUT_MAX_ACTIVE_DEFER_MS = 60_000
 
 export function createEmptyCounters() {
   return {

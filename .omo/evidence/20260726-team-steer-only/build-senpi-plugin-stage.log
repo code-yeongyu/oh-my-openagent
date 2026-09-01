@@ -1,0 +1,20 @@
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] wrote 148 frontend reference files from submodules
+Staged Senpi LSP runtime: /Users/yeongyu/local-workspaces/omo-wt/feat-team-steer-only/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Bundled 584 modules in 38ms
+
+  omo.js  0.59 MB  (entry point)
+
+Bundled 233 modules in 11ms
+
+  omo-member.js  113.68 KB  (entry point)
+
+Built omo-senpi extensions: /Users/yeongyu/local-workspaces/omo-wt/feat-team-steer-only/packages/omo-senpi/plugin/extensions/omo.js, /Users/yeongyu/local-workspaces/omo-wt/feat-team-steer-only/packages/omo-senpi/plugin/extensions/omo-member.js
+synced omo-senpi skills to /Users/yeongyu/local-workspaces/omo-wt/feat-team-steer-only/packages/omo-senpi/plugin/skills
+generated directive is current: /Users/yeongyu/local-workspaces/omo-wt/feat-team-steer-only/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 2 modules in 3ms
+
+  install.mjs  9.72 KB  (entry point)
+
+Built omo-senpi installer: /Users/yeongyu/local-workspaces/omo-wt/feat-team-steer-only/packages/omo-senpi/plugin/scripts/install.mjs

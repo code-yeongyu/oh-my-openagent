@@ -1,0 +1,15 @@
+OpenCode real-harness QA for issue #6972
+command: opencode run <task-tool probe> --model opencode/deepseek-v4-flash-free --format json
+plugin: /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-6972-category-chain/dist/index.js
+configured chain: opencode/issue-6972-model-does-not-exist -> opencode/deepseek-v4-flash-free
+run exit: 0
+task tool events: 1
+CHILD_OK observations: 1
+PARENT_OK observations: 1
+selected available model log observations: 6
+missing-model errors: 0
+real DB sessions before: 5861
+real DB sessions after: 5861
+real DB unchanged: true
+stderr tail:
+result: PASS

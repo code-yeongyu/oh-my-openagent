@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 
 import { aggregateDiagnosticsForDirectory } from "./directory-diagnostics.js";
-import type { LspClient } from "./client.js";
+import { LspClient } from "./client.js";
+import { LspManager } from "./manager.js";
 import type { Diagnostic, ResolvedServer } from "./types.js";
 
 describe("directory diagnostics", () => {
@@ -94,7 +95,123 @@ describe("directory diagnostics", () => {
 			rmSync(workspace, { recursive: true, force: true });
 		}
 	});
+
+	it("#given cold client acquisition is pending #when directory diagnostics are aborted #then acquisition settles and cleans up before startup releases", async () => {
+		const workspace = mkdtempSync(join(tmpdir(), "lsp-directory-diag-cold-cancel-"));
+		const controller = new AbortController();
+		const startupStarted = deferred();
+		const startupRelease = deferred();
+		const server: ResolvedServer = {
+			id: "typescript",
+			command: ["typescript-language-server"],
+			extensions: [".ts"],
+			priority: 1,
+		};
+		const client = new PendingStartLspClient({
+			root: workspace,
+			server,
+			startupStarted,
+			startupRelease,
+		});
+		const manager = new LspManager({
+			clientFactory: () => client,
+			reaperIntervalMs: 60_000,
+		});
+		const aggregation = aggregateDiagnosticsForDirectory(workspace, ".ts", "all", 1, {
+			manager,
+			listFiles: () => [join(workspace, "a.ts")],
+			workspaceRoot: workspace,
+			server,
+			signal: controller.signal,
+		});
+
+		try {
+			await startupStarted.promise;
+			controller.abort();
+
+			const settledBeforeStartupRelease = await settlesWithin(aggregation, 100);
+
+			expect(settledBeforeStartupRelease).toBe(true);
+			await expect(aggregation).rejects.toHaveProperty("name", "AbortError");
+			expect(manager.clientCount()).toBe(0);
+			expect(client.stopCallCount).toBe(1);
+		} finally {
+			startupRelease.resolve();
+			await aggregation.catch(() => undefined);
+			await manager.stopAll();
+			rmSync(workspace, { recursive: true, force: true });
+		}
+	});
 });
+
+class PendingStartLspClient extends LspClient {
+	stopCallCount = 0;
+	private readonly startupStarted: Deferred;
+	private readonly startupRelease: Deferred;
+
+	constructor(options: PendingStartLspClientOptions) {
+		super(options.root, options.server);
+		this.startupStarted = options.startupStarted;
+		this.startupRelease = options.startupRelease;
+	}
+
+	override async start(): Promise<void> {
+		this.startupStarted.resolve();
+		await this.startupRelease.promise;
+	}
+
+	override async initialize(): Promise<void> {}
+
+	override async stop(): Promise<void> {
+		this.stopCallCount += 1;
+	}
+
+	override isAlive(): boolean {
+		return true;
+	}
+
+	override async diagnostics(): Promise<{ readonly items: Diagnostic[] }> {
+		return { items: [] };
+	}
+}
+
+interface PendingStartLspClientOptions {
+	readonly root: string;
+	readonly server: ResolvedServer;
+	readonly startupStarted: Deferred;
+	readonly startupRelease: Deferred;
+}
+
+interface Deferred {
+	readonly promise: Promise<void>;
+	resolve(): void;
+}
+
+function deferred(): Deferred {
+	let resolvePromise: (() => void) | undefined;
+	const promise = new Promise<void>((resolve) => {
+		resolvePromise = resolve;
+	});
+	return { promise, resolve: () => resolvePromise?.() };
+}
+
+async function settlesWithin(promise: Promise<unknown>, timeoutMs: number): Promise<boolean> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			promise.then(
+				() => true,
+				() => true,
+			),
+			new Promise<boolean>((resolve) => {
+				timer = setTimeout(() => resolve(false), timeoutMs);
+				timer.unref();
+			}),
+		]);
+	} finally {
+		if (timer !== undefined) clearTimeout(timer);
+	}
+}
 
 function diagnostic(message: string): Diagnostic {
 	return {

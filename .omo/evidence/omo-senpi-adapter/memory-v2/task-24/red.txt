@@ -1,0 +1,15 @@
+RED: bun test packages/omo-senpi/src/components/memory/dream-selector.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/dream-selector.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './dream-selector' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/dream-selector.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [96.00ms]

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { dirname, join } from "node:path"
-import { parseJsoncSafe } from "@oh-my-opencode/utils"
+import { dirname, join, posix } from "node:path"
+import { parseJsoncSafe } from "../internal/jsonc-parse"
 import { applyEdits, modify } from "jsonc-parser/lib/esm/main.js"
 import { resolveUserOmoConfigPath } from "../loader"
 import {
@@ -50,9 +50,10 @@ function writeBackup(path: string, content: string, fileSystem: typeof DEFAULT_W
 }
 
 function resolveWritePath(options: UpdateOmoConfigOptions): string {
+  if (options.targetPath !== undefined) return options.targetPath
   const fileSystem = options.fileSystem ?? DEFAULT_WRITE_FILE_SYSTEM
   if (options.scope === "user") {
-    const jsoncPath = resolveUserOmoConfigPath(options.env, options.platform ?? process.platform)
+    const jsoncPath = resolveUserOmoConfigPath(options.env)
     if (fileSystem.existsSync(jsoncPath)) return jsoncPath
     const jsonPath = join(dirname(jsoncPath), "omo.json")
     return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath
@@ -61,6 +62,10 @@ function resolveWritePath(options: UpdateOmoConfigOptions): string {
   if (fileSystem.existsSync(jsoncPath)) return jsoncPath
   const jsonPath = join(dirname(jsoncPath), "omo.json")
   return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath
+}
+
+function directoryPath(path: string): string {
+  return path.startsWith("/") ? posix.dirname(path) : dirname(path)
 }
 
 function writeAtomically(path: string, content: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): void {
@@ -117,7 +122,7 @@ function assertJsoncCanBeModified(path: string, content: string): void {
 export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfigResult {
   const fileSystem = options.fileSystem ?? DEFAULT_WRITE_FILE_SYSTEM
   const path = resolveWritePath(options)
-  const directory = dirname(path)
+  const directory = directoryPath(path)
   const existed = fileSystem.existsSync(path)
   let content = EMPTY_OMO_CONFIG
 

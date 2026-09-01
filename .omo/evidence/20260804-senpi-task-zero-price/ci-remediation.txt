@@ -1,0 +1,20 @@
+Failed gate:
+  CI / senpi-compatibility (ubuntu-latest)
+
+Failed step:
+  Verify committed Senpi plugin bundle is current
+
+Root cause:
+  The task worktree initially had no local node_modules. Bun walked upward to the shared main checkout while building, so the local generated-output check resolved the main checkout's workspace package rather than this branch's `senpi-task` source. GitHub CI used clean branch-local dependencies and correctly detected the committed bundle was stale.
+
+Remediation:
+  - installed worktree-local dependencies with `bun install --frozen-lockfile`
+  - regenerated `packages/omo-senpi/plugin/extensions/omo.js`
+  - ran `node packages/omo-senpi/plugin/scripts/build-extension.mjs --check`
+  - reran the focused renderer suite: 7 pass, 0 fail, 20 assertions
+
+Additional live QA:
+  A post-regeneration task-e2e run passed all functional lifecycle checks and reported 0 leaked PIDs. Its global-state sentinel alone failed because the active host harness concurrently updated `logs/compaction.log`; no sandbox path or spawned process leaked. The earlier isolated run remains the clean real-harness proof, and the refreshed PR Senpi matrix is the authoritative cross-platform gate.
+
+Unrelated generated files:
+  `bun install` ran the repository postinstall build and changed Codex generated outputs. They were not staged or committed because they are outside this fix.

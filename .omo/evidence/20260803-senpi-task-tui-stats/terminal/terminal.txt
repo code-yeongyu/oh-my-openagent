@@ -1,0 +1,2 @@
+⠋ Background... · category:quick(apitopia/z-ai/glm-5.2-ultrafast-unlocked) · turn 3 (3 tools) · $0.1303 · 42 tok/s · read src/foo.ts · 1m 5s
+task_output Background completion statistics (st_background) completed · category:quick · ran 1m 5s · 3 tools · $0.1303 (CH: 44%) · 42 tok/s

@@ -1,0 +1,50 @@
+oh-my-openagent #6701 Windows VM RED evidence
+Date: 2026-08-11
+Control path: Bunshin machine SDK -> mengmotaMac -> SSH -> Windows 11
+VM: Windows 11 {dcde557f-dcad-4131-81b5-11f3b5948310}
+Original state: stopped
+
+$ /usr/local/bin/prlctl list -a
+UUID                                    STATUS       IP_ADDR         NAME
+{dcde557f-dcad-4131-81b5-11f3b5948310}  stopped      -               Windows 11
+
+$ /usr/local/bin/prlctl start "Windows 11"
+Starting the VM...
+The VM has been successfully started.
+
+SSH readiness at 10.211.55.4 initially succeeded on bounded attempt 3, then the Mac's accepted Tailscale subnet route took precedence over the Parallels shared-network route. Subsequent QA SSH used the same guest's Tailscale address 100.107.53.122; hostname and user verification returned mengmotaWindows / mengmotawindows\yeongyu.
+
+=== TOOLING PROBE ===
+> where.exe git
+C:\Program Files\Git\cmd\git.exe
+where_git_exit=0
+> Test-Path "C:\Program Files\Git\cmd\git.exe"
+True
+> "C:\Program Files\Git\cmd\git.exe" --version
+git version 2.54.0.windows.1
+absolute_git_exit=0
+> bun.cmd --version
+1.3.14
+bun_cmd_exit=0
+=== RED REVISION ee81ab7c5150fbe027b0b79b411093a30e1d7353 ===
+> New-Item -ItemType Directory -Force -Path C:\Users\yeongyu\AppData\Local\Temp\omo6701-qa\ee81ab7c5150fbe027b0b79b411093a30e1d7353
+> Invoke-WebRequest https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/ee81ab7c5150fbe027b0b79b411093a30e1d7353/packages/memory-core/src/git/exec.ts -OutFile C:\Users\yeongyu\AppData\Local\Temp\omo6701-qa\ee81ab7c5150fbe027b0b79b411093a30e1d7353\exec.ts
+exec.ts bytes=2640 sha256=507CC0CB177D73BCD3DB0D326689F90B6740CE364133C7D41C04B3041FE753D2
+> Invoke-WebRequest https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/ee81ab7c5150fbe027b0b79b411093a30e1d7353/packages/memory-core/src/git/errors.ts -OutFile C:\Users\yeongyu\AppData\Local\Temp\omo6701-qa\ee81ab7c5150fbe027b0b79b411093a30e1d7353\errors.ts
+errors.ts bytes=1559 sha256=A8C808FC0DB58D88960AB005DC1E17D6804FFF70DFB56AEBC2359C495B0DDE23
+> bun -e "import { createNodeGitExec } from './exec.ts'; const env = { SystemRoot: process.env.SystemRoot, ProgramFiles: process.env.ProgramFiles, 'ProgramFiles(x86)': process.env['ProgramFiles(x86)'], LOCALAPPDATA: process.env.LOCALAPPDATA, Path: 'C:\only-path' }; try { console.log(JSON.stringify(await createNodeGitExec().run(['--version'], { cwd: process.env.USERPROFILE, timeoutMs: 10000, env }))); } catch (error) { console.error(error.name + ': ' + error.message); process.exitCode = 1; }"
+--- STDOUT ---
+--- STDERR ---
+bun.cmd : GitNotFoundError: Git is required for memory storage but was not found on PATH.
+At line:43 char:1
++ & bun.cmd -e $js 1> $stdoutFile 2> $stderrFile
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (GitNotFoundErro... found on PATH.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+EXIT_CODE=1
+
+REMOTE_COMMAND_EXIT=1
+
+RED RESULT: PASS - absolute Git for Windows returned "git version 2.54.0.windows.1"; isolated Path produced "GitNotFoundError: Git is required for memory storage but was not found on PATH." with exit code 1.

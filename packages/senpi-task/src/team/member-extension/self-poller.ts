@@ -17,7 +17,9 @@ import { MessageSchema, type Message } from "@oh-my-opencode/team-core/types"
 
 import type { PersistedTaskEvent } from "../../store"
 import { buildPeerMessageEnvelope } from "../messaging/message"
-import type { WaitClaim, WaitRegistry } from "../messaging/wait-registry"
+import { isMissingPath, sessionJsonlContainsMessage } from "./session-scan"
+
+export { sessionJsonlContainsMessage } from "./session-scan"
 
 const DEAD_PID_LEASE_STALE_MS = 0
 const RESERVED_PREFIX = ".delivering-"
@@ -28,8 +30,7 @@ export type MemberSelfPollerDeps = {
   readonly memberName: string
   readonly config: TeamModeConfig
   readonly sessionDir: string
-  readonly waitRegistry: WaitRegistry<Message>
-  readonly sendUserMessage: (content: string) => void
+  readonly inject: (content: string) => void
   readonly appendEvent?: (event: PersistedTaskEvent) => void
   readonly afterInject?: (message: Message) => Promise<void>
 }
@@ -137,52 +138,9 @@ async function processMessage(
     return
   }
 
-  const waitClaim = deps.waitRegistry.takeMatch(message)
-  if (waitClaim !== undefined) {
-    await resolveWait(deps, { message, reservation }, waitClaim)
-    return
-  }
-
   state.pending.set(message.messageId, { message, reservation })
-  deps.sendUserMessage(buildPeerMessageEnvelope(message))
+  deps.inject(buildPeerMessageEnvelope(message))
   await deps.afterInject?.(message)
-}
-
-async function resolveWait(
-  deps: MemberSelfPollerDeps,
-  delivery: PendingDelivery,
-  claim: WaitClaim<Message>,
-): Promise<void> {
-  if (!claim.isActive()) {
-    await releaseDeliveryReservation(delivery.reservation)
-    claim.abandon()
-    return
-  }
-
-  let committed = false
-  try {
-    await commitDeliveryReservation(delivery.reservation)
-    committed = true
-    try {
-      appendDeliveredEvent(deps, delivery.message)
-      deps.appendEvent?.({
-        type: "team_message_waited",
-        payload: {
-          message_id: delivery.message.messageId,
-          from: delivery.message.from,
-          body: delivery.message.body,
-        },
-      })
-    } finally {
-      claim.resolve()
-    }
-  } catch (error) {
-    if (!committed) {
-      await releaseDeliveryReservation(delivery.reservation)
-      claim.abandon()
-    }
-    throw error
-  }
 }
 
 async function recoverReservations(deps: MemberSelfPollerDeps): Promise<void> {
@@ -238,48 +196,4 @@ function appendDeliveredEvent(deps: MemberSelfPollerDeps, message: Message): voi
   })
 }
 
-export async function sessionJsonlContainsMessage(sessionDir: string, messageId: string): Promise<boolean> {
-  let entries: string[]
-  try {
-    entries = (await readdir(sessionDir)).filter((name) => name.endsWith(".jsonl")).toSorted()
-  } catch (error) {
-    if (isMissingPath(error)) return false
-    throw error
-  }
 
-  for (const entry of entries) {
-    const text = await readFile(join(sessionDir, entry), "utf8")
-    for (const line of text.split("\n")) {
-      const value = parseJsonLine(line)
-      if (containsEnvelopeMarker(value, messageId)) return true
-    }
-  }
-  return false
-}
-
-function parseJsonLine(line: string): unknown {
-  if (line.trim().length === 0) return undefined
-  try {
-    return JSON.parse(line)
-  } catch (error) {
-    if (error instanceof SyntaxError) return undefined
-    throw error
-  }
-}
-
-function containsEnvelopeMarker(value: unknown, messageId: string): boolean {
-  if (typeof value === "string") {
-    return value.includes("<peer_message ") && value.includes(`messageId="${messageId}"`)
-  }
-  if (Array.isArray(value)) return value.some((entry) => containsEnvelopeMarker(entry, messageId))
-  if (!isRecord(value)) return false
-  return Object.values(value).some((entry) => containsEnvelopeMarker(entry, messageId))
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function isMissingPath(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT"
-}

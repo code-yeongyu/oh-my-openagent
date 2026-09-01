@@ -175,26 +175,18 @@ After`
   })
 
   describe("isExcludedCommand", () => {
-    it("should exclude ralph-loop", () => {
-      // given ralph-loop command
+    it("should not exclude goal", () => {
+      // given goal command
       // when checking exclusion
-      // then should be excluded
-      expect(isExcludedCommand("ralph-loop")).toBe(true)
+      // then should not be excluded
+      expect(isExcludedCommand("goal")).toBe(false)
     })
 
-    it("should exclude cancel-ralph", () => {
-      // given cancel-ralph command
-      // when checking exclusion
-      // then should be excluded
-      expect(isExcludedCommand("cancel-ralph")).toBe(true)
-    })
-
-    it("should be case-insensitive for exclusion", () => {
+    it("should be case-insensitive for non-exclusion", () => {
       // given uppercase variants
       // when checking exclusion
-      // then should still be excluded
-      expect(isExcludedCommand("RALPH-LOOP")).toBe(true)
-      expect(isExcludedCommand("Cancel-Ralph")).toBe(true)
+      // then should not be excluded
+      expect(isExcludedCommand("GOAL")).toBe(false)
     })
 
     it("should not exclude regular commands", () => {
@@ -244,15 +236,17 @@ After`
       expect(result?.command).toBe("commit")
     })
 
-    it("should NOT detect excluded commands", () => {
-      // given excluded command
-      const text = "/ralph-loop do something"
+    it("should detect goal command", () => {
+      // given goal command
+      const text = "/goal implement the feature"
 
       // when detecting
       const result = detectSlashCommand(text)
 
-      // then should not detect
-      expect(result).toBeNull()
+      // then should detect
+      expect(result).not.toBeNull()
+      expect(result?.command).toBe("goal")
+      expect(result?.args).toBe("implement the feature")
     })
 
     it("should return null for non-command text", () => {

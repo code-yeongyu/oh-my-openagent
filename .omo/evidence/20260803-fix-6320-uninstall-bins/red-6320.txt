@@ -1,0 +1,46 @@
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:4 char:8
++ $log = bun test packages/omo-codex/src/install/codex-cleanup.test.ts  ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-codex\src\install\codex-cleanup.test.ts:
+436 |       projectDirectory: codexHome,
+437 |       now: () => new Date("2026-06-01T00:00:00Z"),
+438 |     })
+439 | 
+440 |     // then: managed bins gone (the "omo still remains" symptom), unmanaged files preserved
+441 |     expect(await pathExists(rootBin)).toBe(false)
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-codex\src\install\codex-cleanup.test.ts:441:39)
+(fail) codex cleanup > #given installer-created bin links in the bin dir #when cleanup runs #then removes the managed 
+omo bins and keeps unmanaged files [14.26ms]
+499 |       projectDirectory: codexHome,
+500 |       now: () => new Date("2026-06-01T00:00:00Z"),
+501 |     })
+502 | 
+503 |     // then
+504 |     expect(result.removedBinLinks).toEqual([])
+                                         ^
+error: expect(received).toEqual(expected)
+
+Expected: []
+Received: undefined
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-codex\src\install\codex-cleanup.test.ts:504:36)
+(fail) codex cleanup > #given no bin directory on disk #when cleanup runs #then reports no removed bin links and does 
+not throw [8.34ms]
+
+ 11 pass
+ 1 skip
+ 2 fail
+ 73 expect() calls
+Ran 14 tests across 1 file. [546.00ms]
+

@@ -1,0 +1,81 @@
+{
+  "result": "FAIL",
+  "checks": [
+    {
+      "check": "real_credentials_untouched_and_caller_env_ignored",
+      "verdict": "PASS",
+      "facts": {
+        "realCredentialsUntouched": true,
+        "providedAgentDir": "IGNORED",
+        "sandboxAgentDir": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-4qab4h/agent",
+        "credentialFiles": ["auth.json", "models.json", "settings.json", "trust.json"]
+      }
+    },
+    {
+      "check": "process_mode_routes_to_rpc_runner",
+      "verdict": "PASS",
+      "facts": {
+        "task_id": "st_01a008a4",
+        "pid": 29366,
+        "status": "completed",
+        "error_excerpt": ""
+      }
+    },
+    {
+      "check": "spawn_process_pid_and_session_jsonl",
+      "verdict": "PASS",
+      "facts": {
+        "task_id": "st_01a008a4",
+        "execution_mode": "process",
+        "pid": 29366,
+        "sessionJsonl": true,
+        "residency_state": "rpc_detached"
+      }
+    },
+    {
+      "check": "steer_ack_mid_run",
+      "verdict": "PASS"
+    },
+    {
+      "check": "completion_push_arrives",
+      "verdict": "PASS",
+      "facts": {
+        "statusSnapshotCount": 10
+      }
+    },
+    {
+      "check": "kill_marks_error_killed_true",
+      "verdict": "PASS",
+      "facts": {
+        "pid": 30331,
+        "killed": true,
+        "error_excerpt": "RPC child killed by signal SIGKILL (pid=30331)"
+      }
+    },
+    {
+      "check": "reconcile_lost_terminates_orphan",
+      "verdict": "FAIL",
+      "reason": "relaunchOk=true lostWithPid=false orphanDead=true",
+      "facts": {
+        "orphanPid": 31070,
+        "orphanDead": true,
+        "breadcrumb": ""
+      }
+    },
+    {
+      "check": "no_leaked_rpc_child_pids",
+      "verdict": "PASS",
+      "facts": {
+        "leakedPids": []
+      }
+    }
+  ],
+  "realCredentialsUntouched": true,
+  "wholeDirDigestStable": true,
+  "leakedPids": 0,
+  "providedAgentDir": "IGNORED",
+  "sandboxAgentDir": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-4qab4h/agent",
+  "sandboxCwd": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-4qab4h/project",
+  "wiringFixed": true,
+  "interpretation": "The production process route and RPC child PID proof are GREEN. The aggregate result is FAIL only because the unrelated reconcile check did not record lostWithPid even though the orphan was dead."
+}

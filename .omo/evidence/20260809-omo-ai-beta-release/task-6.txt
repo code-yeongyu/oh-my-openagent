@@ -1,0 +1,371 @@
+task-6: build:omo-native staging build + payload completeness gate
+plan: .omo/plans/omo-ai-beta-release.md row 6
+date: 2026-08-09 (UTC timestamps inline)
+scope: script/build-omo-native.ts, root package.json build:omo-native line, packages/omo-native/.gitignore, packages/omo-native/test/payload.test.ts, this evidence
+
+== TDD RED 1/2: failing-first payload.test.ts (implementation parked outside the repo) ==
+$ bun test packages/omo-native/test/payload.test.ts   (implementation parked at /tmp -> failing-first RED)
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-native/test/payload.test.ts:
+54 |     describe("#when the completeness check runs", () => {
+55 |       test("#then it exits 1 naming the first missing artifact", () => {
+56 |         const outputDir = join(makeTempDir(), "plugin")
+57 |         const result = runBuild(["--output", outputDir, "--check-only"])
+58 |         expect(result.exitCode).toBe(1)
+59 |         expect(result.output).toContain(`missing required artifact: ${join("extensions", "omo.js")}`)
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "missing required artifact: extensions/omo.js"
+Received: "error: Module not found \"/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/script/build-omo-native.ts\"\n"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/payload.test.ts:59:31)
+(fail) build:omo-native staged payload > #given an empty staging directory > #when the completeness check runs > #then it exits 1 naming the first missing artifact [5.78ms]
+66 |       test(
+67 |         "#then every required artifact is present with preserved modes and no dev clutter",
+68 |         () => {
+69 |           const outputDir = join(makeTempDir(), "plugin")
+70 |           const result = runBuild(["--output", outputDir])
+71 |           expect(result.exitCode).toBe(0)
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/test/payload.test.ts:71:35)
+(fail) build:omo-native staged payload > #given a full plugin build > #when the payload is staged to a temp output dir > #then every required artifact is present with preserved modes and no dev clutter [4.69ms]
+
+ 0 pass
+ 2 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [98.00ms]
+exit=1
+
+== TDD RED 2/2: completeness gate fails closed on empty staging ==
+$ bun run script/build-omo-native.ts --output "$EMPTY/plugin" --check-only   (empty staging -> gate fails closed)
+omo-native payload completeness check failed: missing required artifact: extensions/omo.js
+exit=1
+
+== Build A: bun run build:omo-native (tail) ==
+Bundled 3 modules in 3ms
+
+  install.mjs  14.80 KB  (entry point)
+
+Built omo-senpi installer: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/scripts/install.mjs
+omo-native payload complete at /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/plugin (32 required artifacts present)
+exit=0
+2026-08-09T15:27:10Z
+
+== Post-build probes ==
+$ node packages/omo-native/plugin/runtime/agent-toolkit/cli.js ulw-loop --help
+Usage:
+  omo-agent-toolkit ulw-loop <subcommand> [args]
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+
+Run `omo-agent-toolkit ulw-loop help` for ulw-loop subcommands.
+exit=0
+
+$ node script/verify-omo-ai-payload.mjs   (todo 4 deferred GREEN)
+omo-ai payload verification OK (484 packed paths, 0 offenders, 6669952 bytes)
+exit=0
+
+note: node script/verify-omo-ai-payload.mjs above is todo 4's deferred GREEN (task-4.txt: 'The GREEN run is deferred to todo 6 (integration)').
+
+== Determinism ==
+procedure: two consecutive full builds; snapshot scoped files (plugin manifest, extensions, skills, runtime/agent-toolkit [stage-script-owned], runtime/lsp-daemon/dist, runtime/ast-grep-mcp) as <sha256> <mode> <relpath>; runtime manifest JSON normalized before hashing (keys ending in AtUtc and ISO-8601 string values replaced with <normalized>); extension bundles compared by their omo-senpi-build marker sourceDigest per the repo's own freshness semantics (build-extension.mjs artifactsMatch: sourceDigest equality = current, bodyDigest = self-integrity only).
+
+-- raw A-vs-B diff (naive byte comparison) --
+$ diff snap-a snap-b
+309d308
+< a62e95400895f276cfafd4964a6656c4219f90e8dc3fa1f3f96c659f8fa83971 644 extensions/omo.js
+378a378
+> ca55e21662a208b0949405de752e85d0ee20f7aa5665be5e1a14eb19f2ac4762 644 extensions/omo.js
+diff-exit=1
+
+-- drift root cause --
+observed drift: extensions/omo.js ONLY (of 471 scoped files). marker anatomy: // omo-senpi-build:<sourceDigest>:<bodyDigest>.
+  build A/x1: sourceDigest=c7f73a8ab871d259889e266220455982ffbd3dcafe3a99e63731780cbbe996a4 bodyDigest=b8dc652205f6b6d311f76f6ba9b7ba67384500915e49a0ef91e6c91f339bf4d4
+  build B:    sourceDigest=c7f73a8ab871d259889e266220455982ffbd3dcafe3a99e63731780cbbe996a4 bodyDigest=78e69d873ba2bd403d77ba8f7e0cd17e6b4c9fc8dd7978cc23594bfec2018669
+identical sourceDigest proves byte-identical build INPUTS (all 662 modules + settings + build script); the body drift is intermittent bun --minify symbol-renaming churn (minified identifiers renamed, e.g. jC->GC; 7671 differing bytes, identical 707266-byte size). two immediate back-to-back extension rebuilds (x1, x2) were byte-identical, confirming intermittency. the repo's own freshness check (build-extension.mjs --check via artifactsMatch) already treats sourceDigest as the identity signal and tolerates body churn; the determinism comparison adopts the same semantics for extensions/omo.js and extensions/omo-member.js.
+ulw-loop aggregate bundle: source sha256 385522388f46798d589c500edf98c4ecaae74d73178127659a5954477c24909a constant across builds A, B, C, D and the staged copy matches it (mode 755); the anticipated ulw-loop non-determinism did NOT materialize, so no content-hash pin/re-stamp was needed.
+ast-grep-mcp runtime manifest.json stagedAtUtc is the volatile timestamp field covered by normalization; lsp-daemon .omo-runtime-manifest.json carries no timestamp fields.
+
+-- final consecutive-build comparison (C vs D, normalized) --
+source ulw-loop bundle sha256: 385522388f46798d589c500edf98c4ecaae74d73178127659a5954477c24909a
+files hashed: 471
+extension extensions/omo-member.js bodyDigest=59123e0b89f171f2fb5b8e08c6b7562efd98bf95e0426020ab4bf8f6c57460c1
+extension extensions/omo.js bodyDigest=78e69d873ba2bd403d77ba8f7e0cd17e6b4c9fc8dd7978cc23594bfec2018669
+source ulw-loop bundle sha256: 385522388f46798d589c500edf98c4ecaae74d73178127659a5954477c24909a
+files hashed: 471
+extension extensions/omo-member.js bodyDigest=59123e0b89f171f2fb5b8e08c6b7562efd98bf95e0426020ab4bf8f6c57460c1
+extension extensions/omo.js bodyDigest=b8dc652205f6b6d311f76f6ba9b7ba67384500915e49a0ef91e6c91f339bf4d4
+$ diff snap-c snap-d (extension markers compared by sourceDigest, runtime manifests timestamp-normalized)
+DETERMINISTIC: identical file sets, modes, and normalized hashes across consecutive builds C and D
+(extensions/omo.js bodyDigest flipped again between C and D while sourceDigest held; omo-member.js stable. all other 470 scoped entries raw-identical.)
+
+== Copy fidelity (staged tree vs source tree, allowlist scope) ==
+$ copy fidelity: allowlist-scoped source tree vs staged tree (relative sha256 + mode)
+FIDELITY-OK: staged tree byte- and mode-identical to source across the allowlist (472 files; scripts/ carries only install.mjs by design)
+
+== Failure probe ==
+$ rm packages/omo-native/plugin/runtime/agent-toolkit/ulw-loop/cli.js   (failure probe)
+removed
+
+$ bun run script/build-omo-native.ts --check-only
+omo-native payload completeness check failed: missing required artifact: runtime/agent-toolkit/ulw-loop/cli.js
+exit=1
+
+$ bun run build:omo-native   (rebuild E restores the payload)
+omo-native payload complete at /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/plugin (32 required artifacts present)
+exit=0
+
+$ node script/verify-omo-ai-payload.mjs   (post-rebuild)
+omo-ai payload verification OK (486 packed paths, 0 offenders, 6672083 bytes)
+exit=0
+
+== Local dev install regression (isolated SENPI_CODING_AGENT_DIR) ==
+sandbox=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.mzW5oS1RxT
+e9826efb0c0fe5ff1eaf841bab244f1e89ab3d11d10a4f345261767439523367  /Users/yeongyu/.senpi/agent/settings.json
+$ SENPI_CODING_AGENT_DIR=$SANDBOX bun packages/omo-senpi/src/install/cli-local.ts install
+Bundled 662 modules in 24ms
+
+  omo.js  0.71 MB  (entry point)
+
+Bundled 277 modules in 9ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Built omo-senpi extensions: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/extensions/omo.js, /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/extensions/omo-member.js
+[materialize] wrote 148 frontend reference files from submodules
+synced omo-senpi skills to /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/skills
+Bundled 3 modules in 3ms
+
+  install.mjs  14.80 KB  (entry point)
+
+Built omo-senpi installer: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/scripts/install.mjs
+Staged Senpi LSP runtime: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+npm warn allow-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+added 74 packages, and audited 94 packages in 1s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 7ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 9ms
+
+  cli.js  19.23 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 6ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 7ms
+
+  cli.js  19.40 KB  (entry point)
+
+Building components/start-work-continuation
+
+> @code-yeongyu/codex-start-work-continuation@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 6ms
+
+  cli.js  14.55 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 78 modules in 12ms
+
+  cli.js  204.84 KB  (entry point)
+
+Bundled 76 modules in 13ms
+
+  posthog.js  202.42 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 13ms
+
+  cli.js  155.41 KB  (entry point)
+
+Bundling components/start-work-continuation/dist/cli.js
+Bundled 5 modules in 3ms
+
+  cli.js  14.79 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@4.19.4 build
+> node scripts/build.mjs
+
+
+  dist/cli.js  148.7kb
+
+⚡ Done in 8ms
+Bundling components/telemetry/dist/cli.js
+Bundled 78 modules in 11ms
+
+  cli.js  204.57 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 11ms
+
+  cli.js  155.62 KB  (entry point)
+
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 9ms
+
+  cli.js  153.14 KB  (entry point)
+
+Building components/codegraph
+
+> @sisyphuslabs/codex-codegraph@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 159 modules in 17ms
+
+  serve.js  0.33 MB  (entry point)
+
+Bundled 182 modules in 14ms
+
+  cli.js  0.42 MB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@4.19.4 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 4 modules in 3ms
+
+  cli.js  7.30 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 4 modules in 3ms
+
+  cli.js  7.44 KB  (entry point)
+
+Bundling components/codegraph/dist/cli.js
+Bundled 182 modules in 10ms
+
+  cli.js  0.42 MB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@4.19.4 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@4.19.4 build
+> node scripts/build-runtime.mjs
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 2ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 3ms
+
+  cli.js  8.33 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 38 modules in 4ms
+
+  cli.js  153.70 KB  (entry point)
+
+Usage:
+  omo-agent-toolkit ulw-loop <subcommand> [args]
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+
+Run `omo-agent-toolkit ulw-loop help` for ulw-loop subcommands.
+Staged Senpi agent-toolkit runtime: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/runtime/agent-toolkit
+{"ok":true,"action":"install","agentDir":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.mzW5oS1RxT","settingsPath":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.mzW5oS1RxT/settings.json","pluginPath":"/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin","changed":true,"backupPath":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.mzW5oS1RxT/settings.json.20260809T152913833Z.backup"}
+exit=0
+
+sandbox tree after install:
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.mzW5oS1RxT/settings.json
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.mzW5oS1RxT/settings.json.20260809T152913833Z.backup
+
+sandbox settings.json:
+{
+  "packages": [
+    "/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin"
+  ]
+}
+
+real settings.json after (byte-compare):
+e9826efb0c0fe5ff1eaf841bab244f1e89ab3d11d10a4f345261767439523367  /Users/yeongyu/.senpi/agent/settings.json
+
+note: verify-omo-ai-payload packed-path count moved 484 -> 486 between the post-build and post-rebuild runs (upstream skill-set churn from parallel lanes sharing this worktree); 0 offenders and GREEN on both runs.
+
+== Test + typecheck gates ==
+$ bun test packages/omo-native (committed baseline + task-6 files; lane-13 untracked setup-import.test.ts excluded)
+(pass) omo native footer badge absence for omo-ai installs > #given the published omo-ai payload > #when the shipped file set is inspected > #then no shipped directory carries a senpi badge gate manifest [5.88ms]
+
+ 56 pass
+ 0 fail
+ 192 expect() calls
+Ran 56 tests across 7 files. [7.49s]
+exit=0
+
+$ bun run typecheck:script
+$ tsgo --noEmit -p script/tsconfig.json
+exit=0
+
+$ bunx tsgo --noEmit -p packages/omo-native/tsconfig.json
+exit=0
+
+== Cross-lane note (pre-existing, not caused by task 6) ==
+packages/omo-native/test/setup-import.test.ts + bin/lib/{setup-import,setup-models}.js + bin/lib/provider-map.json are UNTRACKED in-flight work of the todo-13 lane, and bin/omo.js carries their uncommitted modification. bun test packages/omo-native (whole directory) currently fails 2 tests inside that lane's file ('mode backup and idempotency are exact', 'dry-run or declined consent'); the same failures reproduce with task-6 files excluded from the run, and earlier fluctuated (7 fails) while the lane was mid-edit. task-6 scope (committed baseline + payload.test.ts) is 56/56 green.

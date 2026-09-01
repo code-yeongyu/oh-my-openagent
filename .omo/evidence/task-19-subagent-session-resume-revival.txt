@@ -1,0 +1,57 @@
+=== task 19 QA evidence: team members suspend and revive across session resume ===
+date: 2026-08-04T10:05:51Z
+
+--- RED (initial failures, before fix) ---
+5 fail: member-liveness suspended-guard, owned-member-liveness suspended-guard (misfiring death
+notifications for suspended members), plus 3 fixture-setup failures in the new revival suite
+(invalid st_ id shape in fixture, fixed by re-pointing the member sidecar map).
+
+--- QA happy: suspend+revive a fake member keeps team mailbox identity ---
+ 2 filtered out
+ 0 fail
+ 8 expect() calls
+Ran 1 test across 1 file. [129.00ms]
+observed: outcome resumed 'respawned and reattached'; rpc spec extensions == trusted resolver
+[/trusted/member-extension.js, /trusted/provider-extension.js] (NOT the persisted malicious spec);
+memberEnv.SENPI_TASK_MEMBER == <teamRunId>::alpha (mailbox identity preserved);
+SENPI_TASK_TEAM_CONFIG carries no untrusted data; record resident+running after reattach.
+
+--- QA failure: team deleted while suspended -> member not revived, record left suspended ---
+ 2 filtered out
+ 0 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [104.00ms]
+ 2 filtered out
+ 0 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [106.00ms]
+observed: outcome deferred/team_inactive (real createTeamMemberRespawnLaunchResolver threw
+runtime_unavailable / runtime_inactive); zero respawn attempts; record stays running+rpc_detached
+with host_pid cleared (CAS rollback to suspension); no reconcile_lost event.
+
+--- suspended member -> no liveness death event ---
+ 6 filtered out
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [801.00ms]
+ 2 pass
+ 0 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [675.00ms]
+
+--- poller keeps the team across the suspension window ---
+ 13 filtered out
+ 0 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [709.00ms]
+
+--- full gates ---
+bun test packages/senpi-task: 1303 pass 0 fail
+bun test packages/omo-senpi: 545 pass 0 fail
+tsgo --noEmit -p tsconfig.json: clean for packages/senpi-task and packages/omo-senpi
+
+--- adversarial probes ---
+stale_state: APPLIED - inactive/deleted team runtime -> member stays suspended (deferred/team_inactive), never lost.
+misleading_success_output: APPLIED - revival proven to use trusted resolver extensions/memberEnv via the real
+createTeamMemberRespawnLaunchResolver against an on-disk team runtime, not a stub; persisted malicious spec rejected.
+remaining probes: N/A (no network/timing/concurrency surface beyond what the suites cover).
