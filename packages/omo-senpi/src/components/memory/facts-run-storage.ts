@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
-import { existsSync } from "node:fs"
-import { mkdir, readdir, rm } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { mkdir, readdir, rm } from "@oh-my-opencode/memory-core/fs"
 import { basename, join } from "node:path"
 
 import {

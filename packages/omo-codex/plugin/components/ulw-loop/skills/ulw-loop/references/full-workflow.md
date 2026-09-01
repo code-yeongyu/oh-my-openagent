@@ -179,6 +179,23 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 4. If blocked or failed, checkpoint with `--status blocked` or `--status failed` and include diagnosis evidence.
 5. If this is the final goal, run the final quality gate first and pass `--quality-gate-json`.
 
+## Exact final-story sequence
+For the final story, follow this exact checkpoint sequence:
+
+```sh
+omo-agent-toolkit ulw-loop status --json
+# Read nextActions and currentAttemptDir.
+omo-agent-toolkit ulw-loop record-evidence --goal-id <g> --criterion-id <c> --status pass --evidence "..."
+# Repeat record-evidence once per criterion.
+# Then use the harness update_goal tool with status complete.
+omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --print-template --json
+# Fill the printed template: replace every placeholder and use real artifact paths under currentAttemptDir.
+omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --status complete --evidence "..." --codex-goal-json <path> --quality-gate-json <path>
+omo-agent-toolkit ulw-loop complete-goals
+```
+
+The lazycodex gate uses all five sections shown in the sample below, including `codeReview`.
+
 ## Final Quality Gate
 Trigger only for the final aggregate goal after every criterion in every goal is `pass`.
 1. Run targeted verification for changed behavior.

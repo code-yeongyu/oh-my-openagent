@@ -25,6 +25,7 @@ export async function deliverLiveToRecipient(input: {
   reservation: DeliveryReservation
   config: TeamModeConfig
   directory: string
+  settleMs?: number
 }): Promise<void> {
   const {
     client,
@@ -36,6 +37,7 @@ export async function deliverLiveToRecipient(input: {
     reservation,
     config,
     directory,
+    settleMs,
   } = input
 
   const recipientSessionId = recipientMember.sessionId
@@ -100,6 +102,7 @@ export async function deliverLiveToRecipient(input: {
       sessionID: recipientSessionId,
       source: "team-live-delivery",
       queueBehavior: "defer",
+      settleMs,
       input: {
         path: { id: recipientSessionId },
         body: buildMemberPromptBody(recipientMember, envelope),
