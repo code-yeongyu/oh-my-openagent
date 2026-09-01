@@ -59,6 +59,7 @@ describe("runTuiInstaller Senpi platform", () => {
       hasSenpi: true,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasZhipuaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
       hasBailianCodingPlan: false,

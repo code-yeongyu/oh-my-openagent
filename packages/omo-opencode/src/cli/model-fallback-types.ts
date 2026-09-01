@@ -9,6 +9,7 @@ export interface ProviderAvailability {
 	opencodeZen: boolean
 	copilot: boolean
 	zai: boolean
+	zhipuaiCodingPlan: boolean
 	kimiForCoding: boolean
 	opencodeGo: boolean
 	bailianCodingPlan: boolean

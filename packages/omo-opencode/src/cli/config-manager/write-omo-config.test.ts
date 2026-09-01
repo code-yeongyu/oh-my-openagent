@@ -26,6 +26,7 @@ const installConfig: InstallConfig = {
   hasSenpi: false,
   hasVercelAiGateway: false,
   hasZaiCodingPlan: false,
+  hasZhipuaiCodingPlan: false,
   isMax20: true,
   platform: "opencode",
 }

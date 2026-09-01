@@ -115,7 +115,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "claude-opus-5",
       variant: "xhigh",
     },
-    { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
+    { providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
     {
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: "kimi-k3",

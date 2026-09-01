@@ -18,6 +18,7 @@ function createDetectedConfig(): DetectedConfig {
     hasCodex: false,
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,
+    hasZhipuaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
     hasBailianCodingPlan: false,
@@ -179,7 +180,7 @@ describe("promptInstallConfig platform branching", () => {
 
       // then
       expect(config).toMatchObject({ platform, hasOpenCode: true, hasCodex } satisfies Partial<InstallConfig>)
-      expect(selectSpy).toHaveBeenCalledTimes(12)
+      expect(selectSpy).toHaveBeenCalledTimes(13)
     },
   )
 
