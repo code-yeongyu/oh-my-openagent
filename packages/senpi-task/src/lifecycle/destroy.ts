@@ -21,14 +21,20 @@ export async function destroyResidentTask(
   cause: DestroyCause,
   orphanPid?: number,
 ): Promise<void> {
-  const handle = context.registry.get(taskId)
-  if (handle !== undefined) {
-    await teardownHandle(handle, cause === "cancel_without_abort")
-    if (cause !== "fallback_handoff") context.registry.forget(taskId)
-  } else if (cause === "reconcile_lost" || cause === "ttl") {
-    await terminateOrphan(context, taskId, orphanPid)
+  const claimedEviction = cause === "evict" ? (context.registry.tryClaimEviction?.(taskId) ?? true) : false
+  if (cause === "evict" && !claimedEviction) return
+  try {
+    const handle = context.registry.get(taskId)
+    if (handle !== undefined) {
+      await teardownHandle(handle, cause === "cancel_without_abort")
+      if (cause !== "fallback_handoff") context.registry.forget(taskId)
+    } else if (cause === "reconcile_lost" || cause === "ttl") {
+      await terminateOrphan(context, taskId, orphanPid)
+    }
+    if (cause !== "fallback_handoff") recordResidency(context, taskId, cause)
+  } finally {
+    if (claimedEviction) context.registry.releaseEviction?.(taskId)
   }
-  if (cause !== "fallback_handoff") recordResidency(context, taskId, cause)
 }
 
 async function teardownHandle(handle: ResidentHandle, skipInProcessAbort: boolean): Promise<void> {

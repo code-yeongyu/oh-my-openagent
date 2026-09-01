@@ -4,25 +4,50 @@ import { createHash } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import {
+  answerCompiledFastPath,
   buildSenpiArgs,
+  remapSenpiEnvironment,
+  runCompiledLauncher,
+  shouldPrintCompiledBanner,
+  updateLine,
+  versionLine,
+} from "../compile-entry"
+import { loadOpenAICodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js"
+import { openaiCodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js"
+import { openaiCodexProvider } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/providers/openai-codex.js"
+import {
   isProvisionedExecutable,
   materializeProvisionedExecutable,
   provisionEmbeddedRuntime,
-  remapSenpiEnvironment,
   runningExecutablePath,
-  runCompiledLauncher,
   selectRuntimeManifest,
   shouldReexecAfterProvisioning,
-  versionLine,
-  updateLine,
   type EmbeddedManifest,
-} from "../compile-entry"
+} from "../compile-runtime"
 
 const roots: string[] = []
 const temp = () => { const root = mkdtempSync(join(homedir(), "omo-compile-entry-test-")); roots.push(root); return root }
 const sha = (value: string) => createHash("sha256").update(value).digest("hex")
 
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+
+describe("compiled OMO OAuth module identity", () => {
+  test("registers the loader in the same nested pi-ai graph used by the provider", async () => {
+    const loadedFlow = await loadOpenAICodexOAuth()
+
+    expect(loadedFlow).toBe(openaiCodexOAuth)
+    expect(openaiCodexProvider().id).toBe("openai-codex")
+  })
+
+  test("derives OpenAI Codex request auth from a stored OAuth credential", async () => {
+    const secret = "review-secret-must-not-be-printed"
+    const credential = { type: "oauth" as const, access: secret, refresh: "discarded", expires: Date.now() + 60_000 }
+
+    const auth = await openaiCodexProvider().auth.oauth?.toAuth(credential)
+
+    expect(auth).toEqual({ apiKey: secret })
+  })
+})
 
 describe("compiled omo entry launcher parity", () => {
   test("uses the launched Windows executable path for self-provisioning identity", () => {
@@ -33,6 +58,14 @@ describe("compiled omo entry launcher parity", () => {
     expect(runningExecutablePath("/runtime/omo", "/usr/local/bin/bun", "darwin")).toBe("/usr/local/bin/bun")
     expect(shouldReexecAfterProvisioning("win32")).toBe(false)
     expect(shouldReexecAfterProvisioning("darwin")).toBe(true)
+  })
+
+  test("pins the engine package dir to the provisioned root", () => {
+    // Defence in depth alongside the re-exec: PACKAGE_DIR is consulted by
+    // getPackageDir() ahead of dirname(process.execPath), so the engine stays
+    // correct on any path that reaches it without having been re-executed.
+    const env = remapSenpiEnvironment({}, "/provisioned/root")
+    expect(env.OMO_PACKAGE_DIR ?? env.SENPI_PACKAGE_DIR).toBe("/provisioned/root")
   })
 
   test("early commands pass through without an extension", () => {
@@ -70,6 +103,75 @@ describe("compiled omo entry launcher parity", () => {
   })
 })
 
+describe("pre-provisioning fast paths", () => {
+  const manifest: EmbeddedManifest = { omoAiVersion: "9.9.9", enginePin: "2026.1.1", manifestSha: "m", entries: [] }
+
+  const captureLog = (run: () => boolean): { handled: boolean; output: string[] } => {
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (value?: unknown) => { output.push(String(value)) }
+    try {
+      return { handled: run(), output }
+    } finally {
+      console.log = originalLog
+    }
+  }
+
+  test("answers --version from the embedded manifest before provisioning", () => {
+    const { handled, output } = captureLog(() => answerCompiledFastPath(["--version"], manifest))
+    expect(handled).toBe(true)
+    expect(output).toEqual(["omo 9.9.9 (engine: senpi 2026.1.1)"])
+  })
+
+  test("-v answers while --version with extra arguments falls through", () => {
+    expect(captureLog(() => answerCompiledFastPath(["-v"], manifest)).handled).toBe(true)
+    const extra = captureLog(() => answerCompiledFastPath(["--version", "--json"], manifest))
+    expect(extra.handled).toBe(false)
+    expect(extra.output).toEqual([])
+  })
+
+  test("self-update spellings answer with the curl line while engine updates fall through", () => {
+    const selfUpdate = captureLog(() => answerCompiledFastPath(["update"], manifest))
+    expect(selfUpdate.handled).toBe(true)
+    expect(selfUpdate.output[0]).toContain("curl")
+    expect(captureLog(() => answerCompiledFastPath(["update", "self"], manifest)).handled).toBe(true)
+    expect(captureLog(() => answerCompiledFastPath(["update", "--extensions"], manifest)).handled).toBe(false)
+  })
+
+  test("ordinary commands never fast-path", () => {
+    const result = captureLog(() => answerCompiledFastPath(["chat"], manifest))
+    expect(result.handled).toBe(false)
+    expect(result.output).toEqual([])
+  })
+
+  test("fast-path version line matches the provisioned launcher's line for the same stamp", async () => {
+    const root = temp()
+    writeFileSync(join(root, "package.json"), JSON.stringify({ version: manifest.omoAiVersion }))
+    const fast = captureLog(() => answerCompiledFastPath(["--version"], manifest))
+    const provisionedOutput: string[] = []
+    const originalLog = console.log
+    console.log = (value?: unknown) => { provisionedOutput.push(String(value)) }
+    try {
+      await runCompiledLauncher(["--version"], root, manifest.enginePin)
+    } finally {
+      console.log = originalLog
+    }
+    expect(fast.output).toEqual(provisionedOutput)
+  })
+
+  test("banner gate requires a tty and an interactive-default launch", () => {
+    expect(shouldPrintCompiledBanner(["chat"], true)).toBe(true)
+    expect(shouldPrintCompiledBanner([], true)).toBe(true)
+    expect(shouldPrintCompiledBanner(["chat"], false)).toBe(false)
+    expect(shouldPrintCompiledBanner(["-p", "hi"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["--print", "hi"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["--mode", "rpc"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["install", "x"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["--version"], true)).toBe(false)
+    expect(shouldPrintCompiledBanner(["update"], true)).toBe(false)
+  })
+})
+
 describe("embedded runtime provisioning", () => {
   test("materializes the executable directly on Windows", () => {
     const root = temp()
@@ -94,6 +196,37 @@ describe("embedded runtime provisioning", () => {
     materializeProvisionedExecutable(source, destination, "win32")
 
     expect(readFileSync(destination, "utf8")).toBe("existing binary")
+  })
+
+  test("skips re-copying an identical provisioned executable on POSIX", () => {
+    const root = temp()
+    const source = join(root, "source.exe")
+    const destination = join(root, "runtime", "omo.exe")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(source, "compiled binary")
+
+    materializeProvisionedExecutable(source, destination, "darwin")
+    const first = statSync(destination).mtimeMs
+
+    materializeProvisionedExecutable(source, destination, "darwin")
+
+    // Copying ~114MB on every launch was the dominant cold-start cost; an
+    // unchanged destination must not be rewritten.
+    expect(statSync(destination).mtimeMs).toBe(first)
+    expect(readFileSync(destination, "utf8")).toBe("compiled binary")
+  })
+
+  test("still replaces a provisioned executable whose contents differ on POSIX", () => {
+    const root = temp()
+    const source = join(root, "source.exe")
+    const destination = join(root, "runtime", "omo.exe")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(source, "new binary")
+    writeFileSync(destination, "stale binary of different length")
+
+    materializeProvisionedExecutable(source, destination, "darwin")
+
+    expect(readFileSync(destination, "utf8")).toBe("new binary")
   })
 
   test("materializes the executable through a temporary non-executable path on POSIX", () => {

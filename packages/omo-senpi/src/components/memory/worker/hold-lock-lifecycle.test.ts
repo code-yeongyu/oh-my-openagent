@@ -149,16 +149,19 @@ child.stdout.on("data", (chunk) => {
       // when
       await wrapperExit
 
-      // then: the exit marker is the original holder's own terminal signal. The marker write
-      // precedes the process's actual exit by a beat, so termination is awaited event-first
-      // (the /proc watcher on linux, a bounded liveness probe elsewhere) instead of being
-      // asserted from a single point-in-time probe.
-      expect(await waitForFileToExist(marker, EXIT_TIMEOUT_MS)).toBe(true)
+      // then: the ORIGINAL holder is terminal. Termination is awaited event-first (a zombie-aware
+      // liveness probe against the captured identity) instead of being asserted from a single
+      // point-in-time probe, because the holder's death trails the wrapper's by a beat.
       if (holderIdentityForCleanup !== null) {
         expect(await pidTerminalWithin(holderIdentityForCleanup, EXIT_TIMEOUT_MS)).toBe(true)
       } else {
         expect(pidAlive(holderPid)).toBe(false)
       }
+      // and then (POSIX only): the holder observed its own ownership loss and shut down through
+      // its stdin-EOF path, which is what writes the marker. Windows tears the whole tree down
+      // with the wrapper, so the holder never gets to run that handler - the marker is a
+      // graceful-shutdown observable there, not a termination one.
+      if (process.platform !== "win32") expect(await waitForFileToExist(marker, EXIT_TIMEOUT_MS)).toBe(true)
     } finally {
       wrapper.kill("SIGKILL")
       if (holderIdentityForCleanup !== null) killIfAlive(holderIdentityForCleanup)

@@ -24,13 +24,22 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
-function recordingLogger(): { logger: ComponentLogger; warnings: string[] } {
+type LogCall = { message: string; details: unknown }
+
+function recordingLogger(): { logger: ComponentLogger; warnings: string[]; infos: LogCall[]; warningCalls: LogCall[] } {
   const warnings: string[] = []
+  const infos: LogCall[] = []
+  const warningCalls: LogCall[] = []
   return {
     warnings,
+    infos,
+    warningCalls,
     logger: {
-      info: () => {},
-      warn: (message) => { warnings.push(message) },
+      info: (message, details) => { infos.push({ message, details }) },
+      warn: (message, details) => {
+        warnings.push(message)
+        warningCalls.push({ message, details })
+      },
       error: () => {},
     },
   }
@@ -104,6 +113,71 @@ describe("session shutdown drain budget", () => {
 
     // then
     expect(order).toEqual(["a", "b", "a", "b", "a", "b", "a", "b"])
+  })
+
+  test("#given a durable step exhausts the budget #when quit drains #then it warns with timing and completed steps", async () => {
+    // given
+    const order: string[] = []
+    const { logger, warningCalls } = recordingLogger()
+    let clock = 0
+    const stalled = new Promise<void>(() => {})
+    const drain = createShutdownDrain({
+      logger,
+      steps: recordingSteps(order, {
+        flushJournal: async () => {
+          clock = SESSION_SHUTDOWN_DRAIN_BUDGET_MS
+          await stalled
+        },
+      }),
+    })
+
+    // when
+    await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: SESSION_SHUTDOWN_DRAIN_BUDGET_MS, now: () => clock })
+
+    // then
+    expect(warningCalls).toHaveLength(1)
+    expect(warningCalls[0]).toEqual({
+      message: "memory shutdown drain hit its budget",
+      details: {
+        step: "journal-flush",
+        reason: "quit",
+        sessionId: SESSION,
+        remainingMs: 0,
+        completedSteps: [],
+      },
+    })
+  })
+
+  test("#given the budget is consumed before shutdown evaluation #when quit drains #then optional work is deferred at info severity", async () => {
+    // given
+    const order: string[] = []
+    const { logger, infos, warningCalls } = recordingLogger()
+    let clock = 0
+    const drain = createShutdownDrain({
+      logger,
+      steps: recordingSteps(order, {
+        launchFacts: async () => { order.push("c"); clock = SESSION_SHUTDOWN_DRAIN_BUDGET_MS },
+      }),
+    })
+    let evaluated = false
+    drain.registerEvaluator(() => { evaluated = true })
+
+    // when
+    await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: SESSION_SHUTDOWN_DRAIN_BUDGET_MS, now: () => clock })
+
+    // then
+    expect(evaluated).toBe(false)
+    expect(infos).toEqual([{
+      message: "memory shutdown drain deferred optional work",
+      details: {
+        step: "shutdown-evaluator",
+        reason: "quit",
+        sessionId: SESSION,
+        remainingMs: 0,
+        completedSteps: ["journal-flush", "facts-enqueue", "skills-usage-flush", "facts-launch"],
+      },
+    }])
+    expect(warningCalls).toHaveLength(0)
   })
 
   test("#given a step that stalls two seconds on the injected clock #when quit drains #then it returns inside the budget and no later step starts", async () => {

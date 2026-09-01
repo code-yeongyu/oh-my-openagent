@@ -7,7 +7,7 @@ import type { Server, Socket } from "node:net"
 
 import { preflightMemoryModels, resetModelPreflightCacheForTests } from "./model-preflight"
 import type { MemoryModelChain } from "./memory-model-attempts"
-import { identityMatches, killIfAlive, pidAlive, pidTerminalWithin, readPidFileWhenWritten, readPidWhenWritten, waitForFileToExist } from "./process-liveness.test-support"
+import { identityMatches, killIfAlive, pidAlive, pidTerminalWithin, readPidFileWhenWritten, readPidOnce, readPidWhenWritten, waitForFileToExist } from "./process-liveness.test-support"
 
 const roots: string[] = []
 
@@ -260,31 +260,40 @@ control.once("error", () => process.exit(0))
       expect(result).toEqual({ kind: "unavailable", candidates })
       expect(Date.now() - startedAt).toBeLessThan(outerBoundMs)
 
-      // and then: the ORIGINAL wrapper and grandchild are observed through their own pid files.
-      // Production must have killed the launcher; the grandchild must still be alive holding the
-      // inherited pipes (otherwise the degradation premise never held); and releasing the
-      // parent-owned control channel must take the original grandchild down with it.
+      // and then: the ORIGINAL wrapper is observed through its own pid file - production must
+      // have killed the launcher rather than merely abandoning it.
       const wrapperPid = await readPidFileWhenWritten(wrapperPidPath, HELPER_EXIT_BOUND_MS)
-      const grandchildIdentity = await readPidWhenWritten(grandchildPidPath, HELPER_EXIT_BOUND_MS, "grandchild.mjs")
-      grandchildIdentityForCleanup = grandchildIdentity
       expect(pidAlive(wrapperPid)).toBe(false)
-      expect(identityMatches(grandchildIdentity) && pidAlive(grandchildIdentity.pid)).toBe(true)
-      // The grandchild writes its pid file BEFORE connect(); awaiting its explicit connected
-      // marker guarantees the control snapshot below contains its socket on every runner.
-      expect(await waitForFileToExist(grandchildConnectedPath, HELPER_EXIT_BOUND_MS)).toBe(true)
-      const helperClosures = [...connections].map((socket) => new Promise<void>((resolve) => {
-        if (socket.destroyed) return resolve()
-        socket.once("close", () => resolve())
-      }))
-      closeControlChannel(control, connections)
-      await Promise.all(helperClosures)
-      expect(await pidTerminalWithin(grandchildIdentity, HELPER_EXIT_BOUND_MS)).toBe(true)
+
+      // and then (POSIX only): the grandchild outlives the killed launcher while still holding the
+      // inherited pipes - the hazard this degradation is built for - and releasing the
+      // parent-owned control channel takes that ORIGINAL grandchild down with it. Windows kills
+      // the launcher's whole process tree (the same reason memory-run-supervisor's integration
+      // suite tree-kills there instead of asserting survival), so the surviving-grandchild
+      // premise cannot be staged on that platform at all.
+      if (process.platform !== "win32") {
+        const grandchildIdentity = await readPidWhenWritten(grandchildPidPath, HELPER_EXIT_BOUND_MS, "grandchild.mjs")
+        grandchildIdentityForCleanup = grandchildIdentity
+        expect(identityMatches(grandchildIdentity) && pidAlive(grandchildIdentity.pid)).toBe(true)
+        // The grandchild writes its pid file BEFORE connect(); awaiting its explicit connected
+        // marker guarantees the control snapshot below contains its socket on every runner.
+        expect(await waitForFileToExist(grandchildConnectedPath, HELPER_EXIT_BOUND_MS)).toBe(true)
+        const helperClosures = [...connections].map((socket) => new Promise<void>((resolve) => {
+          if (socket.destroyed) return resolve()
+          socket.once("close", () => resolve())
+        }))
+        closeControlChannel(control, connections)
+        await Promise.all(helperClosures)
+        expect(await pidTerminalWithin(grandchildIdentity, HELPER_EXIT_BOUND_MS)).toBe(true)
+      }
     } finally {
-      // Fail-safe: even when an assertion above failed, nothing this test spawned may survive it.
+      // Fail-safe: even when an assertion above failed - or when the win32 branch never captured an
+      // identity at all - nothing this test spawned may survive it.
       closeControlChannel(control, connections)
-      if (grandchildIdentityForCleanup !== null) {
-        killIfAlive(grandchildIdentityForCleanup)
-        await pidTerminalWithin(grandchildIdentityForCleanup, HELPER_FAILSAFE_BOUND_MS)
+      const leaked = grandchildIdentityForCleanup ?? await readPidOnce(grandchildPidPath, "grandchild.mjs")
+      if (leaked !== null) {
+        killIfAlive(leaked)
+        await pidTerminalWithin(leaked, HELPER_FAILSAFE_BOUND_MS)
       }
     }
   }, 30_000)
