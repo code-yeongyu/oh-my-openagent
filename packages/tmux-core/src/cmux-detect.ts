@@ -44,7 +44,7 @@ function hasCmuxSocketPath(tmuxEnvironment: string): boolean {
  *
  * 3 is subordinate rather than authoritative because it is inherited: measured on
  * a live cmux host, starting a real tmux server inside a cmux pane leaves both
- * `CMUX_AGENT_LAUNCH_KIND=omo` and `CMUX_SOCKET_PATH` untouched in the server's
+ * `CMUX_AGENT_LAUNCH_KIND` and `CMUX_SOCKET_PATH` untouched in the server's
  * children while only `TMUX` correctly changes to the real socket
  * (`/private/tmp/tmux-501/<session>,<pid>,0`). Promoting the launch kind above
  * the socket shape would therefore report nested real tmux as cmux and misroute
