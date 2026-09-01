@@ -11,6 +11,7 @@ import {
   releasePromptAsyncReservation,
 } from "../hooks/shared/prompt-async-gate"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
+import { setSessionModel } from "../shared/session-model-state"
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
@@ -93,6 +94,31 @@ describe("createEventHandler - model fallback", () => {
     return { handler, abortCalls, promptCalls, promptAsyncCalls }
   }
 
+  const createChatFallbackMessageHandler = (modelFallback: ReturnType<typeof createModelFallbackHook>) =>
+    createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        ulwExecute: null,
+        ralphLoop: null,
+      }),
+    })
+
   afterEach(() => {
     readConnectedProvidersCacheSpy?.mockRestore()
     readProviderModelsCacheSpy?.mockRestore()
@@ -142,6 +168,56 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
+  })
+
+  test("#given message.updated omits model metadata after Opus 5 fails #when fallback applies #then it skips Opus 5 and advances to Kimi", async () => {
+    //#given
+    const sessionID = "ses_message_updated_missing_model_opus5"
+    const modelFallback = createModelFallbackHook()
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatFallbackMessageHandler(modelFallback)
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_missing_model_opus5",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "APIError",
+              data: {
+                message: "Bad Gateway: Opus 5 provider temporarily unavailable",
+                isRetryable: true,
+              },
+            },
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-5" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(output.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k3",
+    })
+    expect(output.message["variant"]).toBeUndefined()
   })
 
   test("#given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated", async () => {
@@ -506,7 +582,7 @@ describe("createEventHandler - model fallback", () => {
         keywordDetector: null,
         claudeCodeHooks: null,
         autoSlashCommand: null,
-        startWork: null,
+        ulwExecute: null,
         ralphLoop: null,
       }),
     })
@@ -561,6 +637,53 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toMatchObject({
+      providerID: "anthropic",
+      modelID: "claude-opus-5",
+    })
+    expect(output.message["variant"]).toBe("max")
+  })
+
+  test("#given session.status retry omits model metadata after Opus 5 was selected #when fallback applies #then it skips Opus 5 and advances to Kimi", async () => {
+    //#given
+    const sessionID = "ses_status_missing_model_opus5"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatFallbackMessageHandler(modelFallback)
+
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-5" })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "Bad Gateway: Opus 5 provider temporarily unavailable",
+            next: 1234,
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-5" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(output.message["model"]).toEqual({
       providerID: "opencode-go",
       modelID: "kimi-k3",
     })
@@ -654,7 +777,7 @@ describe("createEventHandler - model fallback", () => {
         keywordDetector: null,
         claudeCodeHooks: null,
         autoSlashCommand: null,
-        startWork: null,
+        ulwExecute: null,
         ralphLoop: null,
       }),
     })
@@ -704,7 +827,34 @@ describe("createEventHandler - model fallback", () => {
         properties: { sessionID },
       },
     })
-    await handler({ event: retryStatus })
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_status_idle_reset_opus5",
+            sessionID,
+            role: "user",
+            modelID: "claude-opus-5",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+    await handler({
+      event: {
+        ...retryStatus,
+        properties: {
+          ...retryStatus.properties,
+          status: {
+            ...retryStatus.properties.status,
+            message:
+              "All credentials for model claude-opus-5 are cooling down [retrying in ~5 days attempt #1]",
+          },
+        },
+      },
+    })
 
     //#then
     expect(abortCalls).toEqual([sessionID, sessionID])
@@ -737,7 +887,7 @@ describe("createEventHandler - model fallback", () => {
         keywordDetector: null,
         claudeCodeHooks: null,
         autoSlashCommand: null,
-        startWork: null,
+        ulwExecute: null,
         ralphLoop: null,
       }),
     })
@@ -900,7 +1050,7 @@ describe("createEventHandler - model fallback", () => {
         keywordDetector: null,
         claudeCodeHooks: null,
         autoSlashCommand: null,
-        startWork: null,
+        ulwExecute: null,
         ralphLoop: null,
       }),
     })
@@ -1029,7 +1179,7 @@ describe("createEventHandler - model fallback", () => {
         keywordDetector: null,
         claudeCodeHooks: null,
         autoSlashCommand: null,
-        startWork: null,
+        ulwExecute: null,
         ralphLoop: null,
       }),
     })
@@ -1070,25 +1220,74 @@ describe("createEventHandler - model fallback", () => {
     //#when - first retry cycle
     const first = await triggerRetryCycle("anthropic", "claude-opus-4-8-thinking")
 
-    //#then - first fallback entry applied (no-op skip: claude-opus-4-8 matches current model after normalization)
-    expect(first.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k3",
-    })
-    expect(first.message["variant"]).toBeUndefined()
+    //#then - first Opus 5 fallback entry is applied to the legacy Opus 4.8 input
+    expect(first.message["model"]).toMatchObject({ providerID: "anthropic", modelID: "claude-opus-5" })
+    expect(first.message["variant"]).toBe("max")
 
     //#when - second retry cycle
     const second = await triggerRetryCycle("opencode-go", "kimi-k3")
 
-    //#then - second fallback entry applied after the consolidated Kimi rung
-    expect(second.message["model"]).toMatchObject({
-      providerID: "zai-coding-plan",
-      modelID: "glm-5",
-    })
-    expect(second.message["variant"]).toBeUndefined()
-    expect(abortCalls).toEqual([sessionID, sessionID])
-    expect(promptCalls).toEqual([sessionID, sessionID])
+    //#then - restored Sol entry applied after the consolidated Kimi rung
+    expect(second.message["model"]).toMatchObject({ providerID: "openai", modelID: "gpt-5.6-sol" })
+    expect(second.message["variant"]).toBe("medium")
+
+    //#when - third retry cycle
+    const third = await triggerRetryCycle("openai", "gpt-5.6-sol")
+
+    //#then - fallback continues to GLM after the restored Sol rung
+    expect(third.message["model"]).toMatchObject({ providerID: "zai-coding-plan", modelID: "glm-5.2" })
+    expect(third.message["variant"]).toBeUndefined()
+    expect(abortCalls).toEqual([sessionID, sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)
+  })
+
+  test("#given session.error omits model metadata after Opus 5 fails #when fallback applies #then it skips Opus 5 and advances to Kimi", async () => {
+    //#given
+    const sessionID = "ses_error_missing_model_opus5"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatFallbackMessageHandler(modelFallback)
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          error: {
+            name: "UnknownError",
+            data: {
+              error: {
+                message: "Bad Gateway: Opus 5 provider temporarily unavailable",
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-5" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(output.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k3",
+    })
+    expect(output.message["variant"]).toBeUndefined()
   })
 
   test("does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default)", async () => {

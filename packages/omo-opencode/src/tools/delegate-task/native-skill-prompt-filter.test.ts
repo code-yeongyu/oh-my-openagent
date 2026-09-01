@@ -48,7 +48,7 @@ describe("createDelegateTask native skill prompt filtering", () => {
     })
     spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
     spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
-      models: { openai: ["gpt-5.4-mini"] },
+      models: { openai: ["gpt-5.6-luna-fast"] },
       connected: ["openai"],
       updatedAt: "2026-06-15T00:00:00.000Z",
     })
@@ -83,7 +83,7 @@ describe("createDelegateTask native skill prompt filtering", () => {
       },
       config: {
         async get() {
-          return { data: { model: "openai/gpt-5.4-mini" } }
+          return { data: { model: "openai/gpt-5.6-luna-fast" } }
         },
       },
       session: {

@@ -41,7 +41,7 @@ const MODE: AgentMode = "subagent"
 const BLOCKED_TOOLS = ["task"]
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
-  model: "anthropic/claude-sonnet-4-6",
+  model: "anthropic/claude-sonnet-5",
   temperature: 0.1,
 } as const
 
@@ -91,7 +91,7 @@ export function buildSisyphusJuniorPrompt(
     case "kimi-k2":
       return buildKimiK26SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt-5-5":
-      return buildGpt55SisyphusJuniorPrompt(useTaskSystem, promptAppend)
+      return buildGpt55SisyphusJuniorPrompt(useTaskSystem, promptAppend, model)
     case "gpt-5-4":
       return buildGpt54SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt":
@@ -156,8 +156,12 @@ export function createSisyphusJuniorAgentWithOverrides(
     base.top_p = override.top_p
   }
 
+  if (override?.variant !== undefined) {
+    base.variant = override.variant
+  }
+
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" } as AgentConfig
+    return { ...base, reasoningEffort: override?.reasoningEffort ?? "medium" } as AgentConfig
   }
 
   if (isGlmModel(model)) {

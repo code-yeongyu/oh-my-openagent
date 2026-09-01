@@ -34,6 +34,36 @@ describe("codex-process", () => {
     })
   })
 
+  test("#given Windows codex command #when resolving run command invocation #then uses cmd shim so the npm-installed codex.cmd resolves instead of ENOENT", () => {
+    // given
+    const command = "codex"
+    const args = ["exec", "--ephemeral", "diagnose"] as const
+
+    // when
+    const invocation = resolveRunCommandInvocation(command, args, "win32")
+
+    // then
+    expect(invocation).toEqual({
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", "codex.cmd", "exec", "--ephemeral", "diagnose"],
+    })
+  })
+
+  test("#given non-Windows codex command #when resolving run command invocation #then preserves direct execution", () => {
+    // given
+    const command = "codex"
+    const args = ["exec", "--ephemeral", "diagnose"] as const
+
+    // when
+    const invocation = resolveRunCommandInvocation(command, args, "linux")
+
+    // then
+    expect(invocation).toEqual({
+      command: "codex",
+      args: ["exec", "--ephemeral", "diagnose"],
+    })
+  })
+
   test("#given Windows non-shim command #when resolving run command invocation #then preserves direct execution", () => {
     // given
     const command = "git"

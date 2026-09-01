@@ -33,10 +33,17 @@ export async function installCachedPlugin(input: {
   await rm(tempPath, { recursive: true, force: true })
   try {
     await copyDirectory(input.sourcePath, tempPath)
-    await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
+    const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath })
-    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, ["ci", "--omit=dev"])
+    // Rewriting local file: dependencies desyncs package.json from package-lock.json, and npm ci
+    // aborts with EUSAGE on that drift (lazycodex#137; approach credited to the community fix in
+    // oh-my-openagent#6202). The temp cache dir is throwaway, so let npm install reconcile the lock
+    // when the rewrite changed package.json; keep the deterministic npm ci fast path otherwise.
+    const installArgs = rewroteLocalFileDependencies
+      ? ["install", "--omit=dev", "--no-audit", "--no-fund"]
+      : ["ci", "--omit=dev"]
+    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs)
     await removeCachedManagedNpmBinShims(tempPath)
     if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand, env)
     await assertNoRemovedSparkshellPromptReferences(tempPath)

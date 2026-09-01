@@ -40,7 +40,7 @@ const CODEX_AGGREGATE_COMPONENTS = [
   "@code-yeongyu/codex-comment-checker",
   "@code-yeongyu/codex-lsp",
   "@code-yeongyu/codex-rules",
-  "@code-yeongyu/codex-start-work-continuation",
+  "@code-yeongyu/codex-ulw-execute-continuation",
   "@code-yeongyu/codex-telemetry",
   "@code-yeongyu/codex-ultrawork",
   "@code-yeongyu/codex-ulw-loop",

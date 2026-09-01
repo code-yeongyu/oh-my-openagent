@@ -16,7 +16,7 @@ const STEERING_KIND_HELP = [
 	"  revise_criterion: --goal-id, --criterion-id, one of --scenario/--expected-evidence/--user-model, --evidence, --rationale",
 	"  annotate_ledger: --evidence, --rationale",
 	"  mark_blocked_superseded: --goal-id, optional --replacements, --evidence, --rationale",
-	"Example: omo ulw-loop steer --kind annotate_ledger --evidence \"observed behavior\" --rationale \"why this changes the plan\" --json",
+	"Example: omo-agent-toolkit ulw-loop steer --kind annotate_ledger --evidence \"observed behavior\" --rationale \"why this changes the plan\" --json",
 ].join("\n");
 
 export type CliSteeringProposal = UlwLoopSteeringProposal & { readonly goalId?: string; readonly scenario?: string; readonly expectedEvidence?: string; readonly userModel?: UlwLoopSuccessCriterionUserModel };

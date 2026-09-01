@@ -1,0 +1,25 @@
+Command:
+bun test \
+  packages/senpi-task/src/tools/control/send-always-steer.test.ts \
+  packages/senpi-task/src/tools/control/send.test.ts \
+  packages/senpi-task/src/tools/control/send-team.test.ts \
+  packages/senpi-task/src/tools/control/send-unify-integration.test.ts \
+  packages/senpi-task/src/tools/control/renderers.test.ts \
+  packages/senpi-task/src/tools/control/member-scoped-renderer.test.ts
+
+Exit: 0
+
+Observed GREEN:
+
+- Public `task_send` schema omits `deliver_as`.
+- Plain task messages forward `deliverAs: "steer"` unconditionally.
+- User-visible task_send calls omit `deliver:...`.
+- Lead and member team routing still steers running recipients.
+- A completed resident child still revives the same tracked session.
+- Renderer width, Korean word-boundary, structured shutdown, scope, and error cases remain green.
+
+Summary:
+49 pass
+0 fail
+137 expect() calls
+Ran 49 tests across 6 files.

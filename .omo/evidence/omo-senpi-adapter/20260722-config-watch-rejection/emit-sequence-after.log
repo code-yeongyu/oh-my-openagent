@@ -1,0 +1,11 @@
+{
+  "result": "survived",
+  "registerCount": 4,
+  "sequence": [
+    "REGISTER#1",
+    "REGISTER#2",
+    "REGISTER#3",
+    "REGISTER#4"
+  ],
+  "totalEvents": 4
+}

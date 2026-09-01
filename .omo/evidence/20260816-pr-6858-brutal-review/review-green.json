@@ -1,0 +1,25 @@
+{
+  "reviewDecision": "CHANGES_REQUESTED",
+  "review": {
+    "id": 4945309647,
+    "state": "CHANGES_REQUESTED",
+    "html_url": "https://github.com/code-yeongyu/oh-my-openagent/pull/6858#pullrequestreview-4945309647",
+    "commit_id": "5e530b4e2885a9a38d0fe108f27fa5a055b37142",
+    "submitted_at": "2026-08-16T03:34:53Z",
+    "user": "code-yeongyu"
+  },
+  "inline_comments": [
+    {
+      "id": 3790854396,
+      "path": ".omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console/qa.md",
+      "line": 22,
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/pull/6858#discussion_r3790854396"
+    },
+    {
+      "id": 3790854397,
+      "path": ".omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console/qa.md",
+      "line": 60,
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/pull/6858#discussion_r3790854397"
+    }
+  ]
+}

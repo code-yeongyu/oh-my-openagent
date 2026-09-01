@@ -14,6 +14,7 @@ import { resolveCategoryConfig } from "./category-config-resolver";
 type PrometheusOverride = Record<string, unknown> & {
   category?: string;
   model?: string;
+  reasoning?: string;
   variant?: string;
   reasoningEffort?: string;
   textVerbosity?: string;
@@ -84,8 +85,16 @@ export async function buildPrometheusAgentConfig(params: {
 
   const resolvedModel = modelResolution?.model;
   const resolvedVariant = modelResolution?.variant;
+  const currentModelVariant = shouldUseCurrentModel
+    ? requirement?.fallbackChain.find((entry) =>
+        isModelInFallbackChain(params.currentModel, [entry]),
+      )?.variant
+    : undefined;
 
-  const variantToUse = params.pluginPrometheusOverride?.variant ?? resolvedVariant;
+  const variantToUse =
+    params.pluginPrometheusOverride?.variant ?? resolvedVariant ?? currentModelVariant;
+  const reasoningToUse =
+    params.pluginPrometheusOverride?.reasoning ?? categoryConfig?.reasoning;
   const reasoningEffortToUse =
     params.pluginPrometheusOverride?.reasoningEffort ?? categoryConfig?.reasoningEffort;
   const textVerbosityToUse =
@@ -102,6 +111,7 @@ export async function buildPrometheusAgentConfig(params: {
   const base: Record<string, unknown> = {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
+    ...(reasoningToUse ? { reasoning: reasoningToUse } : {}),
     mode: "primary",
     prompt: getPrometheusPrompt(resolvedModel, params.disabledTools),
     permission: PROMETHEUS_PERMISSION,

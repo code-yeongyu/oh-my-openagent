@@ -11,10 +11,36 @@ type CommandExecuteBeforeInput = {
 
 type CommandExecuteBeforeOutput = {
   parts: Array<{ type: string; text?: string; [key: string]: unknown }>
-  message?: Record<string, unknown>
 }
 
-const NATIVE_LOOP_TRIGGERED_FLAG = "__omoNativeLoopTriggered"
+const NATIVE_GOAL_COMMAND_MARKER = "<omo-native-goal-command>"
+
+export function markNativeGoalCommand(
+  parts: CommandExecuteBeforeOutput["parts"],
+): void {
+  parts.push({
+    type: "text",
+    text: NATIVE_GOAL_COMMAND_MARKER,
+    synthetic: true,
+  })
+}
+
+export function consumeNativeGoalCommandMarker(
+  parts: CommandExecuteBeforeOutput["parts"],
+): boolean {
+  const markerIndex = parts.findIndex(
+    (part) => (
+      part.type === "text"
+      && part.text === NATIVE_GOAL_COMMAND_MARKER
+      && part["synthetic"] === true
+    ),
+  )
+  if (markerIndex === -1) {
+    return false
+  }
+  parts.splice(markerIndex, 1)
+  return true
+}
 
 function hasPartsOutput(value: unknown): value is CommandExecuteBeforeOutput {
   if (typeof value !== "object" || value === null) return false
@@ -63,16 +89,15 @@ export function createCommandExecuteBeforeHandler(args: {
         default:
           break
       }
-      output.message ??= {}
-      output.message[NATIVE_LOOP_TRIGGERED_FLAG] = true
+      markNativeGoalCommand(output.parts)
     }
 
     if (
-      hooks.startWork
-      && normalizedCommand === "start-work"
+      hooks.ulwExecute
+      && normalizedCommand === "ulw-execute"
       && hasPartsOutput(output)
     ) {
-      await hooks.startWork["command.execute.before"]?.(input, output)
+      await hooks.ulwExecute["command.execute.before"]?.(input, output)
       if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
         hooks.stopContinuationGuard.clear(sessionID)
         log("[stop-continuation] Stop state cleared by native command", {
@@ -83,5 +108,3 @@ export function createCommandExecuteBeforeHandler(args: {
     }
   }
 }
-
-export { NATIVE_LOOP_TRIGGERED_FLAG }

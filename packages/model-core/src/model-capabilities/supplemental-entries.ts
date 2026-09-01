@@ -95,8 +95,8 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 128000,
 		},
 	},
-	"gpt-5.4-mini-fast": {
-		id: "gpt-5.4-mini-fast",
+	"gpt-5.6-luna-fast": {
+		id: "gpt-5.6-luna-fast",
 		family: "gpt-mini",
 		reasoning: true,
 		temperature: false,

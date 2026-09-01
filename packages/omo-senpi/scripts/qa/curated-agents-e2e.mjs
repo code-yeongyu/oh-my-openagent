@@ -12,7 +12,7 @@ import {
 	CURATED_AGENT_OMO_CONFIG,
 	CURATED_AGENT_SCRIPT,
 } from "./curated-agents-e2e-scenarios.mjs";
-import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs";
+import { createSandbox, credentialDigest, digestDirectory, seedSandbox } from "./drive.mjs";
 import {
 	changedRealPaths,
 	classifyRealSenpiChanges,
@@ -75,6 +75,7 @@ function driveSenpi(senpiBin, scenario) {
 			env: {
 				...process.env,
 				SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
+				XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome,
 				SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
 				OMO_SENPI_QA: "1",
 			},
@@ -131,6 +132,7 @@ function main() {
 		? "IGNORED"
 		: "unset";
 	const beforeDigest = digestDirectory(realSenpiAgentDir);
+	const beforeCredential = credentialDigest(realSenpiAgentDir);
 	const beforeSnapshot = snapshotDir(realSenpiAgentDir);
 	const senpiBin = findOnPath(process.env.SENPI_BIN?.trim() || "senpi");
 	if (senpiBin === null) {
@@ -154,6 +156,7 @@ function main() {
 		parentOutput: `${run.stdout ?? ""}\n${run.stderr ?? ""}`,
 	});
 	const afterDigest = digestDirectory(realSenpiAgentDir);
+	const afterCredential = credentialDigest(realSenpiAgentDir);
 	const allRealSenpiChangedPaths = changedRealPaths(
 		beforeSnapshot,
 		snapshotDir(realSenpiAgentDir),
@@ -166,7 +169,7 @@ function main() {
 		...analysis.checks,
 		senpi_exit: run.status === 0 ? "PASS" : "FAIL",
 		...analyzeCuratedSandboxFiles(scenario.sandbox.cwd, probeContents),
-		real_senpi_untouched: qaAttributedPaths.length === 0 ? "PASS" : "FAIL",
+		real_senpi_untouched: beforeCredential === afterCredential ? "PASS" : "FAIL",
 	};
 	const payload = {
 		result: Object.values(checks).every((check) => check === "PASS")
@@ -182,6 +185,7 @@ function main() {
 		concurrentRealSenpiChangedPaths: concurrentSessionPaths,
 		allRealSenpiChangedPaths,
 		realSenpiDigestUnchanged: beforeDigest === afterDigest,
+		credentialIsolationClean: beforeCredential === afterCredential,
 		providedAgentDir,
 		senpiExit: run.status,
 		senpiSignal: run.signal ?? null,

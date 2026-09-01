@@ -8,8 +8,8 @@ import { toolResult } from "./tool-result"
 import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
 export const TaskCancelParams = Type.Object({
-  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to cancel." })),
-  name: Type.Optional(Type.String({ description: "Canonical task name, as an alternative to task_id." })),
+  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to cancel. Provide exactly one of task_id or name." })),
+  name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
   reason: Type.Optional(Type.String({ description: "Optional human-readable reason recorded on the cancelled task." })),
 })
 
@@ -18,7 +18,7 @@ export type TaskCancelInput = Static<typeof TaskCancelParams>
 const DESCRIPTION = [
   "Cancel a running child task and release its resources; the cancelled status is preserved so task_output can still report the outcome.",
   "Cancel is terminal and NOT resumable; cancelling a child that is not running is a no-op that reports its unchanged status.",
-  'Use this to end work you no longer need; to stop-but-keep the current child, use task_send(deliver_as:"interrupt").',
+  "Use this to end work you no longer need.",
 ].join(" ")
 
 export type TaskCancelDeps = {

@@ -1,0 +1,107 @@
+### PR #6485 -- unit RED/GREEN for the REFRAMED scope (2026-08-04)
+### The earlier unit RED (plain custom-provider id) was misleading: see SCOPE-CORRECTION-20260804.md.
+### These tests encode the case that actually reproduces through chat.params on current dev.
+
+========== RED: packages/model-core reverted to upstream/dev ==========
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:10 char:8
++ $red = bun test packages/model-core/src/model-settings-compatibility. ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\model-core\src\model-settings-compatibility.test.ts:
+572 |       providerID: "anthropic",
+573 |       modelID: "anthropic/claude-opus-4-8",
+574 |       desired: { temperature: 0.1 },
+575 |     })
+576 | 
+577 |     expect(result.temperature).toBeUndefined()
+                                     ^
+error: expect(received).toBeUndefined()
+
+Received: 0.1
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\omo\packages\model-core\src\model-settings-compatibility.test.ts:577:32)
+(fail) resolveCompatibleModelSettings > drops temperature for Claude Opus 4.8 without capability metadata [4.57ms]
+593 |       providerID: "azure-anthropic",
+594 |       modelID: "azure-anthropic/claude-opus-4-8-thinking",
+595 |       desired: { temperature: 0.1 },
+596 |     })
+597 | 
+598 |     expect(result.temperature).toBeUndefined()
+                                     ^
+error: expect(received).toBeUndefined()
+
+Received: 0.1
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\omo\packages\model-core\src\model-settings-compatibility.test.ts:598:32)
+(fail) resolveCompatibleModelSettings > drops temperature for a reasoning-suffixed Claude Opus 4.8 id with no 
+capability metadata [1.71ms]
+629 |       providerID: "openai",
+630 |       modelID,
+631 |       desired: { temperature: 0.1 },
+632 |     })
+633 | 
+634 |     expect(result.temperature).toBeUndefined()
+                                     ^
+error: expect(received).toBeUndefined()
+
+Received: 0.1
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\omo\packages\model-core\src\model-settings-compatibility.test.ts:634:32)
+(fail) resolveCompatibleModelSettings > drops temperature for reasoning-suffixed o-series model openai/o3:high [1.50ms]
+629 |       providerID: "openai",
+630 |       modelID,
+631 |       desired: { temperature: 0.1 },
+632 |     })
+633 | 
+634 |     expect(result.temperature).toBeUndefined()
+                                     ^
+error: expect(received).toBeUndefined()
+
+Received: 0.1
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\omo\packages\model-core\src\model-settings-compatibility.test.ts:634:32)
+(fail) resolveCompatibleModelSettings > drops temperature for reasoning-suffixed o-series model openai/o3(high) 
+[1.28ms]
+629 |       providerID: "openai",
+630 |       modelID,
+631 |       desired: { temperature: 0.1 },
+632 |     })
+633 | 
+634 |     expect(result.temperature).toBeUndefined()
+                                     ^
+error: expect(received).toBeUndefined()
+
+Received: 0.1
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\omo\packages\model-core\src\model-settings-compatibility.test.ts:634:32)
+(fail) resolveCompatibleModelSettings > drops temperature for reasoning-suffixed o-series model openai/o3 high [1.32ms]
+
+ 72 pass
+ 5 fail
+ 184 expect() calls
+Ran 77 tests across 1 file. [838.00ms]
+
+
+========== GREEN: fix applied ==========
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:15 char:10
++ $green = bun test packages/model-core/src/model-settings-compatibilit ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ 77 pass
+ 0 fail
+ 189 expect() calls
+Ran 77 tests across 1 file. [632.00ms]
+

@@ -10,6 +10,15 @@ Conventions for human contributors and AI agents working on this repository.
 - Tabs for indentation. Double quotes for strings.
 - Tests use vitest with `#given .. #when .. #then` descriptions or plain `// given / // when / // then` body comments.
 
+## Layout
+
+- `src/core.ts`: parse API — `parseApplyPatchRequests`, `extractCommentCheckRequests`, `toHookInput`, `isToolFailureOutput`, `isRecord`.
+- `src/apply-patch.ts`: `apply_patch` extraction supporting Codex `tool_input.command`, raw patch text, and OMO-compatible metadata.
+- `src/request-extractor.ts` / `src/hook-input.ts` / `src/core-values.ts`: request/input shaping and constants.
+- `src/runner.ts`: spawns the checker binary — `runCommentChecker`, `resolveCommentCheckerBinary`, `spawnProcess`.
+- `src/codex-hook.ts`: `PostToolUse` hook + CLI (`extractCodexCommentCheckRequests`, `runCommentCheckerPostToolUse`, `runCodexHookCli`).
+- `hooks/hooks.json`: registration. Heaviest suite: `test/codex-hook.test.ts` (513 LOC).
+
 ## Commands
 
 - `npm install` - install dependencies.

@@ -1,0 +1,2 @@
+$ node script/qa/web-terminal-visual-qa.mjs --self-test
+self-test PASS: xterm assets resolve; node-pty emits true-color ANSI + CJK

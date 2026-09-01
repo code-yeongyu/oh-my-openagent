@@ -64,6 +64,27 @@ describe("logTranscriptEvent", () => {
     expect(store.appended.length).toBe(0)
   })
 
+  test("#given a retry_fallback_exhausted event #when logged #then it is appended with the chain key and last error", () => {
+    // given
+    const store = recordingStore()
+    const event = {
+      type: "retry_fallback_exhausted",
+      chainKey: "kimi-coding/kimi-for-coding-highspeed",
+      lastError: "403 quota",
+    }
+
+    // when
+    logTranscriptEvent(store, "st_1", event)
+
+    // then
+    expect(store.appended.length).toBe(1)
+    expect(store.appended[0]?.event.type).toBe("retry_fallback_exhausted")
+    expect(store.appended[0]?.event.payload).toEqual({
+      chain_key: "kimi-coding/kimi-for-coding-highspeed",
+      last_error: "403 quota",
+    })
+  })
+
   test("#given an unrelated event type #when logged #then nothing is appended", () => {
     // given
     const store = recordingStore()

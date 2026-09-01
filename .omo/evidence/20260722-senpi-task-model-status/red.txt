@@ -1,0 +1,12 @@
+Command:
+cd /Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-category-model-status && bun test packages/senpi-task/src/tools/task/renderers.test.ts
+
+Observed RED:
+Expected to contain:
+category:ultrabrain (openai GPT-5.6 Sol reasoning:xhigh)
+
+Received:
+task category:ultrabrain (GPT-5.6 Sol reasoning:xhigh) background pending id:st_0000000c queue:3 reason:provider capacity
+
+Result:
+15 pass, 1 fail. The failure is the intended missing-provider regression, not a syntax/import/setup failure.

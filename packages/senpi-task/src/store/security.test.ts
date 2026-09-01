@@ -34,6 +34,7 @@ function taskWithId(taskId: string): TaskRecord {
       depth: 0,
       execution_mode: "direct",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     }),
     task_id: taskId,
   }
@@ -123,6 +124,22 @@ describe("parseTaskRecord persisted boundary", () => {
     const store = createTaskRecordStore({ project_dir: project })
     const resolvedModel = { ...RESOLVED_MODEL, variant: "high", reasoning_effort: "medium" }
     writePersistedRecord(project, "st_01d00002", { resolved_model: resolvedModel })
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.records[0]?.resolved_model).toEqual(resolvedModel)
+  })
+
+  test("#given persisted resolved model metadata containing reasoning effort only #when listed #then the field survives the parse round-trip", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    const resolvedModel = { ...RESOLVED_MODEL, reasoning_effort: "high" }
+    const taskId = "st_1d00002b"
+    writePersistedRecord(project, taskId, { resolved_model: resolvedModel })
 
     // when
     const result = store.list()

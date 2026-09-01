@@ -76,7 +76,7 @@ export function analyzeCuratedAgentRun(input) {
 		),
 		unknown_target_agents: verdict(
 			parentOutput.includes(
-				"Available agents: explore, librarian, metis, momus, oracle.",
+				"Available agents: explore, librarian, metis, momus.",
 			),
 		),
 		unknown_target_categories: verdict(
