@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "5.0.0-beta.18",
+  "version": "5.0.0-beta.31",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -85,7 +85,7 @@
     "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js",
     "packages/omo-codex/plugin/components/lsp/dist/cli.js",
     "packages/omo-codex/plugin/components/rules/dist/cli.js",
-    "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/dist/cli.js",
     "packages/omo-codex/plugin/components/teammode/dist/cli.js",
     "packages/omo-codex/plugin/components/telemetry/dist/cli.js",
     "packages/omo-codex/plugin/components/ultrawork/dist/cli.js",
@@ -113,6 +113,7 @@
     "install:codex-dev": "bun run script/build-codex-install.ts && bun run script/install-codex-dev.ts",
     "build:codex-plugin": "npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build",
     "build:senpi-plugin": "bun run build:lsp-daemon && bun run build:ast-grep-mcp && bun run build:senpi-plugin:stage",
+    "build:senpi-plugin:native": "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs",
     "build:senpi-plugin:stage": "bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs",
     "build:materialize-frontend": "node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict",
     "build:shared-skills-assets": "bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills",
@@ -165,23 +166,23 @@
     "@clack/prompts": "^1.7.0",
     "@code-yeongyu/comment-checker": "^0.8.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@opencode-ai/plugin": "1.18.19",
-    "@opencode-ai/sdk": "1.18.19",
-    "@opentui/core": "^0.5.6",
-    "@opentui/keymap": "^0.5.6",
-    "@opentui/solid": "^0.5.6",
+    "@opencode-ai/plugin": "1.18.22",
+    "@opencode-ai/sdk": "1.18.22",
+    "@opentui/core": "^0.5.8",
+    "@opentui/keymap": "^0.5.8",
+    "@opentui/solid": "^0.5.8",
     "commander": "^15.0.0",
     "detect-libc": "^2.1.2",
     "diff": "^9.0.0",
     "js-yaml": "^5.0.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
-    "picomatch": "^4.0.5",
-    "posthog-node": "^5.49.2",
+    "picomatch": "^4.0.7",
+    "posthog-node": "^5.51.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.8.23",
+    "@code-yeongyu/senpi": "2026.8.31",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
@@ -222,18 +223,18 @@
     "typescript": "^7.0.2"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "5.0.0-beta.18",
-    "oh-my-opencode-darwin-x64": "5.0.0-beta.18",
-    "oh-my-opencode-darwin-x64-baseline": "5.0.0-beta.18",
-    "oh-my-opencode-linux-arm64": "5.0.0-beta.18",
-    "oh-my-opencode-linux-arm64-musl": "5.0.0-beta.18",
-    "oh-my-opencode-linux-x64": "5.0.0-beta.18",
-    "oh-my-opencode-linux-x64-baseline": "5.0.0-beta.18",
-    "oh-my-opencode-linux-x64-musl": "5.0.0-beta.18",
-    "oh-my-opencode-linux-x64-musl-baseline": "5.0.0-beta.18",
-    "oh-my-opencode-windows-arm64": "5.0.0-beta.18",
-    "oh-my-opencode-windows-x64": "5.0.0-beta.18",
-    "oh-my-opencode-windows-x64-baseline": "5.0.0-beta.18"
+    "oh-my-opencode-darwin-arm64": "5.0.0-beta.31",
+    "oh-my-opencode-darwin-x64": "5.0.0-beta.31",
+    "oh-my-opencode-darwin-x64-baseline": "5.0.0-beta.31",
+    "oh-my-opencode-linux-arm64": "5.0.0-beta.31",
+    "oh-my-opencode-linux-arm64-musl": "5.0.0-beta.31",
+    "oh-my-opencode-linux-x64": "5.0.0-beta.31",
+    "oh-my-opencode-linux-x64-baseline": "5.0.0-beta.31",
+    "oh-my-opencode-linux-x64-musl": "5.0.0-beta.31",
+    "oh-my-opencode-linux-x64-musl-baseline": "5.0.0-beta.31",
+    "oh-my-opencode-windows-arm64": "5.0.0-beta.31",
+    "oh-my-opencode-windows-x64": "5.0.0-beta.31",
+    "oh-my-opencode-windows-x64-baseline": "5.0.0-beta.31"
   },
   "overrides": {
     "@earendil-works/pi-agent-core": "0.84.2",
@@ -249,5 +250,8 @@
   },
   "trustedDependencies": [
     "@code-yeongyu/comment-checker"
-  ]
+  ],
+  "patchedDependencies": {
+    "@code-yeongyu/senpi@2026.8.31": "patches/@code-yeongyu%2Fsenpi@2026.8.31.patch"
+  }
 }

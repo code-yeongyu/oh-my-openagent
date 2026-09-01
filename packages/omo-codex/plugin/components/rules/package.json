@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-rules",
-	"version": "5.0.0-beta.18",
+	"version": "5.0.0-beta.31",
 	"description": "Codex plugin that injects project rule files into model context through lifecycle hooks.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -47,7 +47,7 @@
 		"check": "tsc --noEmit && biome check . && npm run build"
 	},
 	"dependencies": {
-		"picomatch": "^4.0.5"
+		"picomatch": "^4.0.7"
 	},
 	"devDependencies": {
 		"@oh-my-opencode/rules-engine": "file:../../../../rules-engine",

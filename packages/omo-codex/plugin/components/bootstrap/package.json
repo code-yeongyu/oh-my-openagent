@@ -1,6 +1,6 @@
 {
 	"name": "@sisyphuslabs/codex-bootstrap",
-	"version": "5.0.0-beta.18",
+	"version": "5.0.0-beta.31",
 	"description": "Codex SessionStart bootstrap component that provisions LazyCodex runtime dependencies from a detached worker.",
 	"type": "module",
 	"private": true,

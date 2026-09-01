@@ -38,7 +38,13 @@ export async function resolveLatestMessageInfo(
       return {
         resolvedInfo: {
           agent: info.agent,
-          model: info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined),
+          model: info.model ?? (info.providerID && info.modelID
+            ? {
+                providerID: info.providerID,
+                modelID: info.modelID,
+                ...(info.variant ? { variant: info.variant } : {}),
+              }
+            : undefined),
           tools: info.tools,
         },
         encounteredCompaction,

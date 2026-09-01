@@ -108,7 +108,9 @@ Record the answer in `brief.md`; Phase 6 opens by turning it into `design-spec.m
 
 ## Phase 1 — Stand up the team (DEFAULT composition)
 
-A team is the DEFAULT for ulw-research, not an option: a lead one member surfaces almost always reshapes what another should search next, and debate needs live cooperating members, not fire-and-forget workers. Create it immediately after the brief:
+**When the user asked for MASS research, the team is not the collection surface.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that 8 member slots cannot produce. Read `mass-ulw`'s `references/planning.md` and run collection as chained dags at its mass scale: a 60+ node opening wave covering every angle the topic has, routed across `quick` / `unspecified-low` / `unspecified-high` / `deep` in one graph, each wave's EXPAND leads defining the next wave's nodes until convergence, and a synthesis that reduces through several parallel `architect` nodes into one `architect` reducer (`ultrabrain` substitutes when the config has no `architect` category). Everything else in this skill still binds: the format gate, the journal, the claim graph, the convergence rules, and both delivery gates. Keep a small team alongside the graph for the debate rounds of Phase 3 — attack is conversation, and dag nodes do not talk.
+
+Otherwise a team is the DEFAULT for ulw-research, not an option: a lead one member surfaces almost always reshapes what another should search next, and debate needs live cooperating members, not fire-and-forget workers. Create it immediately after the brief:
 
 ```
 team_create({

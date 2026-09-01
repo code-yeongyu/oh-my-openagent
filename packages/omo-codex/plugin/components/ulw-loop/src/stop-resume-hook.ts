@@ -10,7 +10,7 @@ import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
 
 const RESUME_CAP = 2;
 
-// Mirrors start-work-continuation's context-pressure bail-out: injecting a
+// Mirrors ulw-execute-continuation's context-pressure bail-out: injecting a
 // resume directive into an already-overflowing context makes things worse.
 const CONTEXT_PRESSURE_MARKERS = [
 	"context compacted",
@@ -136,7 +136,7 @@ function readCounter(counterPath: string): { count: number; ledgerLineCount: num
 	}
 }
 
-// Local ~10-LOC approximation of start-work-continuation's boulder check (no
+// Local ~10-LOC approximation of ulw-execute-continuation's boulder check (no
 // cross-component import allowed): any continuable work for this session means
 // that hook owns the Stop event, so this one stays silent.
 function boulderContinuationWillFire(cwd: string, sessionId: string): boolean {
@@ -168,7 +168,7 @@ function transcriptShowsContextPressure(transcriptPath: string): boolean {
 	}
 }
 
-// start-work-continuation owns an active Boulder plan until its final gate marks
+// ulw-execute-continuation owns an active Boulder plan until its final gate marks
 // the work complete, including the zero-remaining checklist state.
 function boulderPlanHasChecklist(cwd: string, entry: Record<string, unknown>): boolean {
 	const activePlan = entry["active_plan"];

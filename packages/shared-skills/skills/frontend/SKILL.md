@@ -107,7 +107,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 
 ## Ruleset 4 — designpowers (`references/designpowers/`)
 
-`README.md` routes the pinned `Owl-Listener/designpowers` corpus into this workflow. It supplies design context — personas, accessibility and cognitive constraints, critique, debt, handoff, synthetic user testing, motion, role prompts — that must be distilled into `DESIGN.md` first, then used as the implementation contract. It replaces nothing: not this skill, not `/visual-qa`, `/ulw-plan`, `/start-work`, or `/review-work`.
+`README.md` routes the pinned `Owl-Listener/designpowers` corpus into this workflow. It supplies design context — personas, accessibility and cognitive constraints, critique, debt, handoff, synthetic user testing, motion, role prompts — that must be distilled into `DESIGN.md` first, then used as the implementation contract. It replaces nothing: not this skill, not `/visual-qa`, `/ulw-plan`, `/ulw-execute`, or `/review-work`.
 
 ## Quick routes — most common requests
 

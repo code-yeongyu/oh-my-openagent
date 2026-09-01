@@ -5,7 +5,7 @@ import {
   withInternalNoReplyMarker,
 } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
-import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import type { PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
 import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"

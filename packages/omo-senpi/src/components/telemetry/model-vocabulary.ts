@@ -34,9 +34,8 @@ export const KNOWN_MODELS = Object.freeze({
     "gpt-5.6-terra", "grok-4.6", "kimi-k3",
   ]),
   "opencode-go": Object.freeze([
-    "deepseek-v4-pro", "glm-5.2", "kimi-k3", "mimo-v2.5-pro", "minimax-m2.7", "minimax-m3",
+    "deepseek-v4-pro", "glm-5.2", "glm-5.3", "kimi-k3", "mimo-v2.5-pro", "minimax-m2.7", "minimax-m3",
   ]),
-  "quotio-openai": Object.freeze(["gpt-5.6-luna-fast", "gpt-5.6-sol", "gpt-5.6-terra"]),
   "qwen-token-plan": Object.freeze(["qwen3.6-flash", "qwen3.8-max-preview"]),
   "qwen-token-plan-cn": Object.freeze(["qwen3.8-max-preview"]),
   vercel: Object.freeze([
@@ -47,7 +46,7 @@ export const KNOWN_MODELS = Object.freeze({
   ]),
   xai: Object.freeze(["grok-4.20-0309-non-reasoning", "grok-4.6"]),
   xiaomi: Object.freeze(["mimo-v2.5-pro"]),
-  "zai-coding-plan": Object.freeze(["glm-5.2"]),
+  "zai-coding-plan": Object.freeze(["glm-5.2", "glm-5.3"]),
 } as const)
 
 export type KnownProvider = keyof typeof KNOWN_MODELS

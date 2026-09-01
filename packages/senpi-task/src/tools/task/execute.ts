@@ -1,5 +1,6 @@
 import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 
+import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { executeBatch } from "./execute-batch"
 import { runSpawn } from "./execute-single"
 import { buildStartSpec, singleSpawnParams } from "./execute-spec"
@@ -75,6 +76,9 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
             itemParams = { ...itemParams, prompt: policy.prompt, load_skills: [] }
           }
         }
+        // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously,
+        // so the barrel is warmed here (memoized across every spawn in the process).
+        await loadSenpiBarrel()
         const spec = buildStartSpec(itemParams, target, parentSessionId, deps, ctx.cwd)
         if (spec.skills !== undefined) skillSummaries.set(item, spec.skills)
         return deps.manager.start(spec)

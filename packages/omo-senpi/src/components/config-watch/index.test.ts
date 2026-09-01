@@ -295,23 +295,74 @@ describe("createConfigWatchComponent", () => {
     const component = createComponent()
 
     component.register(pi, createContext([]))
-    expect(events.listenerCount()).toBe(3)
+    expect(events.listenerCount()).toBe(4)
     component.register(pi, createContext([]))
-    expect(events.listenerCount()).toBe(3)
+    expect(events.listenerCount()).toBe(4)
 
     pi.dispatch("session_shutdown")
     expect(events.listenerCount()).toBe(0)
   })
 
-  it("keeps one active registration when ready is emitted repeatedly", () => {
+  it("defers and coalesces the ready re-registration instead of echoing on the dispatch stack", async () => {
     const events = new FakeEvents()
     const pi = createPi(events)
     createComponent().register(pi, createContext([]))
 
+    const deferred = nextRegisterEmit(events)
     events.emit("config-watch:ready", undefined)
     events.emit("config-watch:ready", undefined)
 
+    // senpi emits READY on the same synchronous stack as REGISTER, so the
+    // re-registration must never happen inside the READY dispatch.
+    expect(events.registerEmits).toHaveLength(1)
+
+    await deferred
+    expect(events.registerEmits).toHaveLength(2)
     expect(events.registrations.size).toBe(1)
     expect(events.registrations.get("omo")?.id).toBe("omo")
-  })
+
+    // Both READY dispatches coalesce through one timer: no third emission.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(events.registerEmits).toHaveLength(2)
+  }, 10_000)
+
+  it("stands down the superseded instance when a second omo extension registers the same id", async () => {
+    const events = new FakeEvents()
+    // Mimic senpi's config-reload host: identity-guarded registration storage
+    // whose watcher rebuild emits READY on the same synchronous stack. Before
+    // the stand-down + deferred READY re-registration, two live instances
+    // alternated payload identities through this echo until RangeError.
+    const host = { rebuilds: 0, stored: new Map<string, unknown>() }
+    events.on("config-watch:register", (payload) => {
+      if (!isRegistration(payload)) return
+      if (host.stored.get(payload.id) === payload) return
+      host.stored.set(payload.id, payload)
+      host.rebuilds += 1
+      events.emit("config-watch:ready", undefined)
+    })
+    const logsFirst: Array<{ level: string; message: string; details?: unknown }> = []
+    const logsSecond: Array<{ level: string; message: string; details?: unknown }> = []
+
+    createComponent().register(createPi(events), createContext(logsFirst))
+    createComponent().register(createPi(events), createContext(logsSecond))
+
+    // The earlier instance saw the foreign registration and stood down
+    // synchronously: only the last registrant's listeners stay live.
+    expect(logsFirst.map((entry) => entry.message)).toContain(
+      "omo config-watch superseded by another omo extension instance; standing down",
+    )
+    expect(logsSecond).toEqual([])
+    expect(events.listenerCount()).toBe(4 + 1) // survivor's 4 + the fake host
+
+    // The survivor's deferred READY re-registration is identity-ignored by the
+    // host, so the rebuild echo terminates instead of ping-ponging.
+    await nextRegisterEmit(events)
+    expect(events.registerEmits).toHaveLength(3)
+    expect(events.registerEmits[2]).toBe(events.registerEmits[1])
+    expect(host.rebuilds).toBe(2)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(events.registerEmits).toHaveLength(3)
+    expect(host.stored.get("omo")).toBe(events.registerEmits[1])
+  }, 10_000)
 })
