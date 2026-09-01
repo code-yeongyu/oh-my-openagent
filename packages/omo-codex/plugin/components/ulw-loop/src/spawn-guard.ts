@@ -5,7 +5,7 @@ import type { PreToolUsePayload } from "./codex-hook.js";
 import { parsePreToolUsePayload } from "./codex-hook.js";
 import { isFinalRunCompletionCandidate } from "./goal-status.js";
 import { ulwLoopAttemptEvidenceDir, ulwLoopDir } from "./paths.js";
-import { GATE_REVIEWER_AGENT_NAMES } from "./surface.js";
+import { GATE_REVIEWER_AGENT_NAMES, resolveToolkitSurface } from "./surface.js";
 import type { UlwLoopPlan } from "./types.js";
 
 // spawn_agent = v1; collaborationspawn_agent = the delimiter-free flattened v2
@@ -58,19 +58,26 @@ function missingGateArtifact(payload: PreToolUsePayload, plan: UlwLoopPlan): str
 	if (goal === undefined || goal.status === "complete") return null;
 	if (!goal.successCriteria.every((criterion) => criterion.status === "pass")) return null;
 	const scope = { sessionId: payload.session_id } as const;
+	const surface = resolveToolkitSurface();
+	const requiredArtifacts =
+		surface === "omo-senpi" ? [`${goal.id}-manual-qa.md`] : [`${goal.id}-code-review.md`, `${goal.id}-manual-qa.md`];
 	if (plan.evidenceLayoutVersion === 2) {
 		const attemptDir = ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope);
-		for (const name of [`${goal.id}-code-review.md`, `${goal.id}-manual-qa.md`]) {
+		for (const name of requiredArtifacts) {
 			const relative = `${attemptDir}/${name}`;
 			if (!isNonEmptyFile(join(payload.cwd, relative))) return relative;
 		}
 		return null;
 	}
 	const flatReport = `.omo/evidence/${goal.id}-code-review.md`;
-	if (!isNonEmptyFile(join(payload.cwd, flatReport))) return flatReport;
+	if (surface !== "omo-senpi" && !isNonEmptyFile(join(payload.cwd, flatReport))) return flatReport;
+	if (surface === "omo-senpi") {
+		const manualQa = `.omo/evidence/${goal.id}-manual-qa.md`;
+		return isNonEmptyFile(join(payload.cwd, manualQa)) ? null : manualQa;
+	}
 	// v1 manual-QA approximation: any other non-empty evidence file counts.
 	if (!hasOtherEvidenceFile(join(payload.cwd, ".omo", "evidence"), `${goal.id}-code-review.md`))
-		return `.omo/evidence/<any manual-QA artifact besides ${goal.id}-code-review.md>`;
+		return `.omo/evidence/${goal.id}-manual-qa.md`;
 	return null;
 }
 

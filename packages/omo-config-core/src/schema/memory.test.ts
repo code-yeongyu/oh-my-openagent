@@ -36,9 +36,6 @@ const FULL_DEFAULTS: OmoMemorySettings = {
   recall: {
     enabled: true,
     max_items: 2,
-    budget_tokens: 600,
-    excerpt_chars: 200,
-    exclude: [],
   },
   compile_warn_tokens: 30000,
   agents: {},
@@ -88,10 +85,6 @@ describe("OmoMemorySettingsSchema defaults", () => {
       recall: {
         enabled: false,
         max_items: 5,
-        budget_tokens: 800,
-        excerpt_chars: 120,
-        min_score: 0.25,
-        exclude: ["notes/scratch.md"],
       },
       compile_warn_tokens: 50000,
       agents: {
@@ -216,7 +209,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
     expect(nestedResult.success).toBe(false)
   })
 
-  test("#given recall omitted #when parsing empty #then the M1 defaults apply", () => {
+  test("#given recall omitted #when parsing empty #then the gate defaults apply", () => {
     // given
     const input = {}
 
@@ -224,15 +217,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
     const parsed = OmoMemorySettingsSchema.parse(input)
 
     // then
-    expect(parsed.recall).toEqual({
-      enabled: true,
-      max_items: 2,
-      budget_tokens: 600,
-      excerpt_chars: 200,
-      exclude: [],
-    })
-    expect(parsed.recall).not.toHaveProperty("min_score")
-    expect(parsed.recall).not.toHaveProperty("mode")
+    expect(parsed.recall).toEqual({ enabled: true, max_items: 2 })
   })
 
   test("#given an empty recall block #when parsed #then nested defaults still materialize", () => {
@@ -245,28 +230,17 @@ describe("OmoMemorySettingsSchema defaults", () => {
     // then
     expect(parsed.recall.enabled).toBe(true)
     expect(parsed.recall.max_items).toBe(2)
-    expect(parsed.recall.budget_tokens).toBe(600)
-    expect(parsed.recall.excerpt_chars).toBe(200)
-    expect(parsed.recall.exclude).toEqual([])
-    expect(parsed.recall).not.toHaveProperty("min_score")
   })
 
-  test("#given an explicit recall override #when parsed #then the explicit values win and omitted knobs keep defaults", () => {
+  test("#given an explicit recall override #when parsed #then the explicit values win", () => {
     // given
-    const input = { recall: { enabled: false, max_items: 4, min_score: 0.1 } }
+    const input = { recall: { enabled: false, max_items: 4 } }
 
     // when
     const parsed = OmoMemorySettingsSchema.parse(input)
 
     // then
-    expect(parsed.recall).toEqual({
-      enabled: false,
-      max_items: 4,
-      budget_tokens: 600,
-      excerpt_chars: 200,
-      min_score: 0.1,
-      exclude: [],
-    })
+    expect(parsed.recall).toEqual({ enabled: false, max_items: 4 })
   })
 
   test("#given recall max_items outside 1..5 #when parsed #then validation fails", () => {
@@ -285,13 +259,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
 
   test("#given invalid recall field types #when parsed #then validation fails", () => {
     // given
-    const cases = [
-      { recall: { budget_tokens: 0 } },
-      { recall: { excerpt_chars: 0 } },
-      { recall: { enabled: "yes" } },
-      { recall: { exclude: "notes/**" } },
-      { recall: { min_score: "high" } },
-    ]
+    const cases = [{ recall: { enabled: "yes" } }, { recall: { max_items: 2.5 } }]
 
     // when
     const results = cases.map((input) => OmoMemorySettingsSchema.safeParse(input))
@@ -311,6 +279,25 @@ describe("OmoMemorySettingsSchema defaults", () => {
 
     // then
     expect(result.success).toBe(false)
+  })
+
+  test("#given the removed recall knobs #when parsed on the block or its layer #then the strict schemas reject them", () => {
+    // given
+    const removed = [
+      { budget_tokens: 600 },
+      { excerpt_chars: 200 },
+      { min_score: 0.1 },
+      { exclude: ["notes/scratch.md"] },
+    ]
+
+    // when / then
+    for (const recall of removed) {
+      expect(OmoMemorySettingsSchema.safeParse({ recall }).success).toBe(false)
+      expect(OmoMemorySettingsLayerSchema.safeParse({ recall }).success).toBe(false)
+      expect(
+        OmoMemorySettingsLayerSchema.safeParse({ agents: { "backend-lead": { recall } } }).success,
+      ).toBe(false)
+    }
   })
 
   test("#given a per-agent recall override #when parsed #then the layer accepts it as a deep-partial", () => {

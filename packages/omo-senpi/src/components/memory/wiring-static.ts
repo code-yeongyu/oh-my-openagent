@@ -18,6 +18,7 @@ import { registerMemorySkillsScope } from "./skills-scope"
 import { registerSkillsUsage, type SkillsUsageTracker } from "./skills-usage"
 import { registerMemoryUsage, type MemoryUsageTracker } from "./memory-usage"
 import type { createMemoryNoticeWiring } from "./memory-notice-wiring"
+import type { MemorianGateWiring } from "./memorian-wiring"
 import type { createMemoryRecallWiring } from "./recall-wiring"
 import { createReflectionTriggerWiring } from "./trigger-wiring"
 import { registerMemoryToolSurface } from "./tools"
@@ -40,6 +41,7 @@ export function registerMemoryStatic(input: {
   readonly nudgeWiring: ReturnType<typeof createMemoryNudgeWiring>
   readonly noticeWiring: ReturnType<typeof createMemoryNoticeWiring>
   readonly recallWiring: ReturnType<typeof createMemoryRecallWiring>
+  readonly memorianGateWiring: MemorianGateWiring
   readonly dreamTriggerWiring: DreamTriggerWiring
   readonly completionApi: (pi: SenpiExtensionAPI) => ReflectionCompletionApi | undefined
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
@@ -61,7 +63,7 @@ export function registerMemoryStatic(input: {
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
   const {
-    pi, ctx, options, promptCache, nudgeWiring, noticeWiring, recallWiring, dreamTriggerWiring,
+    pi, ctx, options, promptCache, nudgeWiring, noticeWiring, recallWiring, memorianGateWiring, dreamTriggerWiring,
     completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
     triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
     activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
@@ -115,6 +117,8 @@ export function registerMemoryStatic(input: {
     }
     const result = await journalWiringFor(identity).reconcileSession(eventCtx)
     await factsWiringFor(identity).onSettled(sessionId)
+    // Fire-and-forget by contract: the gate advises the NEXT turn, so this one never waits for it.
+    memorianGateWiring.onSettled(eventCtx)
     await onSettled?.(sessionId, eventCtx)
     return result
   })
@@ -204,6 +208,8 @@ export function registerMemoryStatic(input: {
   const triggerWiring = createReflectionTriggerWiring({
     resolveSession: triggerSessionFor,
     onLaunch: () => {},
+    // A compaction rewrites the transcript the pending nudges were judged against, so they die with it.
+    onCompactionAccepted: (conversationId) => memorianGateWiring.onCompactionAccepted(conversationId),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   triggerWiring.register(pi)

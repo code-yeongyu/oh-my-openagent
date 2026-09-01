@@ -47,6 +47,10 @@ const workflowExpectations = [
       "post-publish-verify",
     ],
   },
+  {
+    path: ".github/workflows/review-claims.yml",
+    jobs: ["gate", "claim", "release-claim", "stale-sweep"],
+  },
   { path: ".github/workflows/refresh-model-capabilities.yml", jobs: ["refresh"] },
   { path: ".github/workflows/sisyphus-agent.yml", jobs: ["agent"] },
   { path: ".github/workflows/stats.yml", jobs: ["stats"] },

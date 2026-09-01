@@ -32,7 +32,6 @@ import {
   reportEmbeddedPayload,
   resolveExpectedSidecarRelPaths,
   RUNTIME_MANIFEST_REL_PATH,
-  stageSidecarPayload,
 } from "./build-omo-binary"
 import ptyFixture from "./release-binary-pty-fixture.json"
 
@@ -41,6 +40,15 @@ const repoRoot = resolve(scriptDir, "..")
 
 function makeTempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
+}
+
+function stageParityFixture(stageDir: string, relPaths: readonly string[]): void {
+  for (const relPath of relPaths) {
+    const filePath = join(stageDir, ...relPath.split("/"))
+    mkdirSync(dirname(filePath), { recursive: true })
+    const contents = relPath.endsWith("runtime-manifest.json") ? "{}\n" : `fixture:${relPath}\n`
+    writeFileSync(filePath, contents, "utf8")
+  }
 }
 
 describe("RELEASE_BINARY_TARGETS", () => {
@@ -305,7 +313,8 @@ describe("embedded manifest parity (darwin-arm64)", () => {
       const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "darwin-arm64")!
       const stageRoot = makeTempDir("omo-parity-")
       const stageDir = join(stageRoot, "omo-runtime")
-      stageSidecarPayload(target, stageDir, "0.0.0-0.test")
+      const expectedRelPaths = resolveExpectedSidecarRelPaths(target)
+      stageParityFixture(stageDir, expectedRelPaths)
       const manifest = await buildRuntimeManifest(stageDir, {
         omoAiVersion: "0.0.0-0.test",
         enginePin: target.enginePin,
@@ -324,7 +333,7 @@ describe("embedded manifest parity (darwin-arm64)", () => {
         .filter((relPath) => relPath !== RUNTIME_MANIFEST_REL_PATH)
         .slice()
         .sort()
-      expect(embeddedRelPaths).toEqual(resolveExpectedSidecarRelPaths(target).slice().sort())
+      expect(embeddedRelPaths).toEqual(expectedRelPaths.slice().sort())
       expect(embedded.manifest.enginePin).toBe(target.enginePin)
       expect(embedded.manifest.omoAiVersion).toBe("0.0.0-0.test")
       rmSync(stageRoot, { recursive: true, force: true })
