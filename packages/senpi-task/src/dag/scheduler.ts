@@ -176,6 +176,10 @@ type SchedulerContext = {
   // remembers which wave indexes this instance reported so each index completes at most once.
   readonly emittedWaveAdmissions: Set<number>
   readonly emittedWaveCompletions: Set<number>
+  // Per-node child subscriptions armed for queued spawns (start returned status "pending"):
+  // waitFor resolves only at terminal, so this watch is the only signal that folds the task
+  // engine's later queue promotion into a scheduled -> running node transition.
+  readonly promotionWatches: Map<DagNodeId, () => void>
 }
 
 export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
@@ -224,6 +228,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     pendingAdmission: [],
     emittedWaveAdmissions: new Set<number>(),
     emittedWaveCompletions: new Set<number>(),
+    promotionWatches: new Map<DagNodeId, () => void>(),
   }
   // #7412 defect 1: control verbs (send/revive watchers, retry) commit through their OWN journal
   // instance, and a journal cache refreshes only on its own appends. Without this subscription a
@@ -437,6 +442,8 @@ async function cancelRun(context: SchedulerContext, runId: DagRunId, reason?: st
 async function performCancellation(context: SchedulerContext, reason?: string): Promise<void> {
   try {
     await whenAdmissionIdle(context)
+    // Watches go first so a promotion racing the cancel cannot flip nodes mid-cancellation.
+    for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
     const cancellationResults = await Promise.allSettled([...context.attachedTaskIds.values()].map((taskId) =>
       context.taskManager.cancelTask(taskId, reason, { abort: "skip" }),
     ))
@@ -672,11 +679,44 @@ function attachStarted(
         reason: { kind: "task_queued", queuePosition: result.queue_position },
       })
     }
+    watchQueuedPromotion(context, nodeId, result.task_id)
   } else if (result.status === "running") {
     transition(context, nodeId, "running", result.reused ? { kind: "resumed" } : { kind: "started" })
   }
   context.attachedTaskIds.set(nodeId, result.task_id)
   attachTaskSettlement(context, nodeId, result.task_id)
+}
+
+// A queued spawn reports status "pending": the concurrency queue will launch the child later, but
+// the scheduler's only other feedback channel (waitFor) resolves at terminal status. Without this
+// watch the node would sit in "scheduled" for its child's whole execution, rendering as "waiting"
+// in the widget while the header undercounts running children. Any child event re-checks the
+// record; the first one observed after the record flips to running folds into the transition.
+function watchQueuedPromotion(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
+  disposePromotionWatch(context, nodeId)
+  const foldPromotion = (): void => {
+    if (context.cancellationStarted) return
+    if (context.taskManager.get(taskId)?.status !== "running") return
+    disposePromotionWatch(context, nodeId)
+    // A task can terminalize straight from the queue (cancelled/errored before launch); by the
+    // time a stray event lands the node may already be folded, and a terminal node must never be
+    // dragged back to running (that path is reserved for explicit revives).
+    if (nodeById(context.journal.snapshot(), nodeId).state !== "scheduled") return
+    transition(context, nodeId, "running", { kind: "started" })
+  }
+  const unsubscribe = context.taskManager.subscribeChild(taskId, foldPromotion)
+  context.promotionWatches.set(nodeId, unsubscribe)
+  // Level-triggered arm check: the queue can grant, launch, and flip the record to running between
+  // startOwned's pending snapshot and this arm point, and a live-handle subscription never replays
+  // missed events - without this a node promoted in that window sits "scheduled" until terminal.
+  foldPromotion()
+}
+
+function disposePromotionWatch(context: SchedulerContext, nodeId: DagNodeId): void {
+  const dispose = context.promotionWatches.get(nodeId)
+  if (dispose === undefined) return
+  context.promotionWatches.delete(nodeId)
+  dispose()
 }
 
 function attachTaskSettlement(context: SchedulerContext, nodeId: DagNodeId, taskId: string): AttachedTask {
@@ -722,6 +762,7 @@ async function settleOne(context: SchedulerContext): Promise<boolean> {
   const task = context.attachedTasks.get(settled.nodeId)
   context.attachedTasks.delete(settled.nodeId)
   context.attachedTaskIds.delete(settled.nodeId)
+  disposePromotionWatch(context, settled.nodeId)
   try {
     if (settled.kind === "error") {
       failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))

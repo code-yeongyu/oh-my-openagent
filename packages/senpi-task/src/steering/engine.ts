@@ -193,7 +193,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   async function notifyStarted(taskId: string): Promise<void> {
     // Drain from the FRESH record (not a cached copy): a restarted engine must see exactly what
     // was persisted, in persisted order. Malformed entries never reach here - the store parser
-    // already dropped them with a diagnostic (todo-2 entry-drop policy).
+    // already dropped them with a diagnostic.
     const fresh = tryLoad(taskId)
     const queue = fresh?.pending_steering
     if (fresh === undefined || queue === undefined || queue.length === 0) return

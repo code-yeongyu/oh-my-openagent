@@ -33,6 +33,9 @@ export const expectedSkills = [
 	"visual-qa",
 ];
 
+// `ultrawork` is intentionally absent: its skill body is composed by sync-skills.mjs directly from
+// the canonical packages/prompts-core/prompts/ultrawork/codex.md, so it has no component skill
+// source directory to diff against. Its composition is asserted separately in sync-skills.test.mjs.
 export const componentSkillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
@@ -43,8 +46,15 @@ export const componentSkillSources = [
 	["teammode", "components/teammode/skills/teammode"],
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
-	["ultrawork", "components/ultrawork/skills/ultrawork"],
 ];
+
+export const canonicalUltraworkDirectiveRelativePath = join(
+	"packages",
+	"prompts-core",
+	"prompts",
+	"ultrawork",
+	"codex.md",
+);
 
 const codexCompatibilityEndMarkers = [
 	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
