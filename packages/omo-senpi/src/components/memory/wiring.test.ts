@@ -175,7 +175,7 @@ describe("memory pressure compile wiring", () => {
 })
 
 describe("memory recall wiring", () => {
-  test("#given a bound session whose memory matches the turn #when before_agent_start dispatches #then recall adds its own hidden message and leaves the system prompt to the projection", async () => {
+  test("#given a bound session whose memory matches the turn #when before_agent_start dispatches #then no lexical recall message is injected and the projection still lands", async () => {
     // given
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-recall-wiring-")))
     roots.push(root)
@@ -218,8 +218,8 @@ describe("memory recall wiring", () => {
       .filter((result): result is { message?: { customType?: string; display?: boolean }; systemPrompt?: string } => result !== undefined)
     const recall = messages.find((result) => result.message?.customType === RECALL_CUSTOM_TYPE)
     const notice = messages.find((result) => result.message?.customType === MEMORY_NOTICE_CUSTOM_TYPE)
-    expect(recall?.message?.display).toBe(false)
-    expect(recall?.systemPrompt).toBeUndefined()
+    expect(recall).toBeUndefined()
+    expect(pi.entries).toEqual([])
     expect(notice?.systemPrompt).toContain("persona")
   }, 30_000)
 })
