@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createRequire } from "node:module"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 
@@ -20,7 +20,7 @@ describe("omo-ai packed install", () => {
       expect(entries).toContain(join("package", "bin", "senpi-patch.mjs"))
 
       const consumer = join(root, "consumer")
-      Bun.spawnSync(["mkdir", "-p", consumer], { stdout: "ignore", stderr: "ignore" })
+      mkdirSync(consumer)
       writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "omo-ai-consumer", private: true }))
       const install = Bun.spawnSync(["bun", "add", "--trust", join(root, tarball!)], { cwd: consumer, stdout: "pipe", stderr: "pipe" })
       expect(install.exitCode).toBe(0)
@@ -34,6 +34,10 @@ describe("omo-ai packed install", () => {
       expect(senpiRoot).toBeDefined()
       const sessionRegistryPump = readFileSync(join(senpiRoot!, "dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js"), "utf8")
       expect(sessionRegistryPump).toContain("describeUnclaimedResult")
+      const agentSession = readFileSync(join(senpiRoot!, "dist/core/agent-session.js"), "utf8")
+      expect(agentSession).toContain('const TERRA_FAST_CONTEXT_WINDOW = 650_000;')
+      expect(agentSession).toContain('model = normalizeTerraFastModel(model);')
+      expect(agentSession).toContain("this.agent.state.model = normalizeTerraFastModel(this.agent.state.model);")
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
