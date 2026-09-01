@@ -1,0 +1,19 @@
+Review round 4 RED:
+
+Manager isolation:
+- With `TMUX=/tmp/cmuxterm-test.sock,1234,0`, window isolation selected literal
+  `isInsideTmux()` and returned true.
+- Expected native-tmux eligibility false, received true.
+
+Authenticated cmux containers:
+- Window spawn expected `{ success: false }`, received success.
+- Session spawn expected `{ success: false }`, received success.
+- Both reached `runTmuxCommand` with auth environment arguments.
+
+Summary:
+- Manager boundary: 2 pass, 1 fail.
+- Security boundary: 3 pass, 2 fail.
+
+The failures prove cmux fake `TMUX` must be distinguished from native tmux, and
+window/session primitives require the same authenticated-cmux fail-closed rule
+as pane spawn, activate, and replace.

@@ -8,6 +8,7 @@ function toDelegatedModelConfig(fallback: NonNullable<ReturnType<typeof getNextR
     providerID: fallback.providerID,
     modelID: fallback.modelID,
     variant: fallback.variant,
+    reasoning: fallback.reasoning,
     reasoningEffort: fallback.reasoningEffort,
     temperature: fallback.temperature,
     top_p: fallback.top_p,

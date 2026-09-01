@@ -20,6 +20,8 @@ export type {
   ReconcileOutcome,
   ReconcileOutcomeKind,
   ReconcileResult,
+  SuspendFailure,
+  SuspendInput,
+  SuspendSummary,
   TaskLifecycle,
-  TeardownSummary,
 } from "./types"

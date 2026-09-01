@@ -6,8 +6,6 @@ import { makeRecord } from "./__fixtures__/records"
 import { runTaskOutput } from "./output"
 import type { OutputManager, TaskOutputDeps, TaskOutputToolResult, TranscriptReadResult } from "./types"
 
-const WAIT_CONFIG = { min_ms: 5000, default_ms: 60000, max_ms: 600000 } as const
-
 function managerFrom(records: readonly TaskRecord[]): OutputManager {
   return {
     get: (taskId) => records.find((record) => record.task_id === taskId),
@@ -16,7 +14,6 @@ function managerFrom(records: readonly TaskRecord[]): OutputManager {
         scope.scope === "all" ? records : records.filter((record) => record.parent_session_id === scope.session_id)
       return filtered.map((record) => ({ record }))
     },
-    waitFor: () => Promise.reject(new Error("waitFor should not be called")),
   }
 }
 
@@ -24,7 +21,6 @@ function depsFrom(records: readonly TaskRecord[], reader?: () => TranscriptReadR
   return {
     manager: managerFrom(records),
     stateDir: "/tmp/state",
-    waitConfig: WAIT_CONFIG,
     now: () => Date.parse("2024-12-03T15:00:00.000Z"),
     transcriptReader: reader ?? (() => ({ entries: [], source: "none" })),
   }
@@ -57,6 +53,23 @@ describe("runTaskOutput", () => {
       expect(result.details.transcript).toContain("finished the work")
       expect(result.details.source).toBe("event-log")
     }
+  })
+
+  test("#given a source-truncated transcript #when read #then the RPC-visible result reports truncation", async () => {
+    const record = makeRecord({ task_id: "st_source_truncated", status: "completed" })
+    const deps = depsFrom([record], () => ({
+      entries: [{ kind: "assistant", text: "bounded transcript" }],
+      source: "event-log",
+      truncated: true,
+    }))
+
+    const result = await runTaskOutput(deps, { task_id: record.task_id, mode: "full" }, "session-parent")
+
+    expect(result.details).toMatchObject({
+      kind: "transcript",
+      transcript: "assistant: bounded transcript",
+      truncated: true,
+    })
   })
 
   test("#given default mode #when read #then a status snapshot with final_response is returned", async () => {
@@ -185,5 +198,51 @@ describe("runTaskOutput", () => {
     if (result.details.kind === "status") {
       expect(result.details.snapshot.task_id).toBe("st_named")
     }
+  })
+
+  test("#given a persisted_only record #when read in status mode #then the status text states it is suspended", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_susp" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("status")
+    if (result.details.kind === "status") {
+      expect(result.details.snapshot.residency_state).toBe("persisted_only")
+      expect(result.details.snapshot.suspended).toBeDefined()
+    }
+    expect(firstText(result)).toContain("suspended")
+  })
+
+  test("#given an rpc_detached record #when read in status mode #then the status text states it is suspended", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_susp" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("status")
+    if (result.details.kind === "status") {
+      expect(result.details.snapshot.residency_state).toBe("rpc_detached")
+      expect(result.details.snapshot.suspended).toBeDefined()
+    }
+    expect(firstText(result)).toContain("suspended")
+  })
+
+  test("#given a resident record #when read in status mode #then no suspended text appears (regression pin)", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_live", status: "running", residency_state: "resident" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_live" }, "session-parent")
+
+    // then
+    expect(firstText(result)).not.toContain("suspended")
   })
 })

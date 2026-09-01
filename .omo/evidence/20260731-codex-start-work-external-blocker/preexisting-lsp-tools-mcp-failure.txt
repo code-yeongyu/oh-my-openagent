@@ -1,0 +1,10 @@
+[TRIMMED] Same two failures with ALL of packages/omo-codex stashed, proving they are pre-existing and environment-driven.
+
+ ❯ test/process.test.ts (5 tests | 2 failed | 1 skipped) 197ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/process.test.ts > createSpawnCommand > #given windows executable command #when building spawn command 
++     "C:\\Users\\pss\\AppData\\Roaming\\npm\\typescript-language-server.CMD",
+ FAIL  test/process.test.ts > createSpawnCommand > #given windows cmd shim #when building spawn command #then it uses 
++     "C:\\Users\\pss\\AppData\\Roaming\\npm\\typescript-language-server.cmd",
+ Test Files  1 failed | 24 passed (25)
+      Tests  2 failed | 92 passed | 1 skipped (95)

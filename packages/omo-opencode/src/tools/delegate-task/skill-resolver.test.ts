@@ -226,11 +226,11 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     expect(result.error).not.toContain("DELEGATE_BYPASS_CONFIRMED")
   })
 
-  it("#given shared ulw-plan is disabled #when delegate load_skills requests its bare alias #then fallback discovery cannot bypass it", async () => {
+  it("#given bare ulw-plan is disabled #when delegate load_skills requests it #then fallback discovery cannot bypass it", async () => {
     // when
     const result = await resolveSkillContent(["ulw-plan"], {
       directory: TEST_DIR,
-      disabledSkills: new Set(["shared/ulw-plan"]),
+      disabledSkills: new Set(["ulw-plan"]),
     })
 
     // then
@@ -240,18 +240,16 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     expect(result.error).not.toContain("Prometheus")
   })
 
-  it("#given bare ulw-plan is disabled #when delegate load_skills requests its shared alias #then fallback discovery cannot bypass it", async () => {
+  it("#given the stale shared/ulw-plan prefix is requested #when delegate load_skills resolves #then it is unavailable (full cutover)", async () => {
     // when
     const result = await resolveSkillContent(["shared/ulw-plan"], {
       directory: TEST_DIR,
-      disabledSkills: new Set(["ulw-plan"]),
     })
 
     // then
     expect(result.content).toBeUndefined()
     expect(result.contents).toEqual([])
     expect(result.error).toContain("Skills not found: shared/ulw-plan")
-    expect(result.error).not.toContain("Prometheus")
   })
 
   it("#given a namespaced OMO skill #when requested by unique short name with different case #then resolves it", async () => {

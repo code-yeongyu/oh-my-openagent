@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
+import type { ManagedChildEvent, ManagedChildListener } from "../child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { ManagedChildHandle } from "../child-handle"
 import { createTaskManager } from "../manager"
@@ -23,14 +24,19 @@ export function tempProject(): string {
 }
 
 export function settings(overrides: Record<string, unknown> = {}): OmoTaskSettings {
-  return OmoTaskSettingsSchema.parse(overrides)
+  return OmoTaskSettingsSchema.parse({ global_concurrency: 0, ...overrides })
 }
 
 export type FakeHandle = {
   readonly handle: ManagedChildHandle
   settle: (outcome: RunnerOutcome) => void
+  emit: (event: ManagedChildEvent) => void
   readonly steerCalls: string[]
   readonly followUpCalls: string[]
+  subscribeCount(): number
+  unsubscribeCount(): number
+  waitForSubscription(): Promise<void>
+  waitForUnsubscription(): Promise<void>
 }
 
 export function makeHandle(taskId: string, pid?: number): FakeHandle {
@@ -42,6 +48,11 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
   })
   const steerCalls: string[] = []
   const followUpCalls: string[] = []
+  const listeners = new Set<ManagedChildListener>()
+  let subscribeCalls = 0
+  let unsubscribeCalls = 0
+  const subscriptionWaiters: Array<() => void> = []
+  const unsubscriptionWaiters: Array<() => void> = []
   const handle: ManagedChildHandle = {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
@@ -53,7 +64,16 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
       followUpCalls.push(text)
     },
     abort: async () => {},
-    subscribe: () => () => {},
+    subscribe: (listener) => {
+      subscribeCalls += 1
+      for (const resolve of subscriptionWaiters.splice(0)) resolve()
+      listeners.add(listener)
+      return () => {
+        unsubscribeCalls += 1
+        for (const resolve of unsubscriptionWaiters.splice(0)) resolve()
+        listeners.delete(listener)
+      }
+    },
     waitForOutcome: () => outcome,
     lastAssistantText: () => undefined,
     dispose: async () => {},
@@ -65,7 +85,23 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     })
     resolveCurrent(value)
   }
-  return { handle, settle, steerCalls, followUpCalls }
+  return {
+    handle,
+    settle,
+    emit: (event) => {
+      for (const listener of [...listeners]) listener(event)
+    },
+    steerCalls,
+    followUpCalls,
+    subscribeCount: () => subscribeCalls,
+    unsubscribeCount: () => unsubscribeCalls,
+    waitForSubscription: () => subscribeCalls > 0
+      ? Promise.resolve()
+      : new Promise((resolve) => subscriptionWaiters.push(resolve)),
+    waitForUnsubscription: () => unsubscribeCalls > 0
+      ? Promise.resolve()
+      : new Promise((resolve) => unsubscriptionWaiters.push(resolve)),
+  }
 }
 
 export class FakeRunner implements ManagedRunner {

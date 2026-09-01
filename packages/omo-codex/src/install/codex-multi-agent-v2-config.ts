@@ -1,11 +1,20 @@
 import { readFileSync } from "node:fs"
 import { dirname, isAbsolute, join } from "node:path"
 
-import { appendBlock, escapeRegExp, findTomlSection, removeSetting, replaceOrInsertSetting } from "./toml-section-editor"
+import {
+  appendBlock,
+  escapeRegExp,
+  findTomlSection,
+  removeSetting,
+  replaceOrInsertSetting,
+} from "./toml-section-editor"
+import { hasTomlSetting } from "./toml-setting-reader"
 
 const CODEX_AGENTS_HEADER = "agents"
 const CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2"
+const CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY = `${CODEX_MULTI_AGENT_V2_HEADER}.max_concurrent_threads_per_session`
 const CODEX_SUBAGENT_THREAD_LIMIT = 1000
+const CODEX_MULTI_AGENT_V2_THREAD_LIMIT = 16
 
 export type CodexMultiAgentVersion = "v1" | "v2" | null
 
@@ -45,22 +54,27 @@ export function ensureCodexMultiAgentV2Config(
     : modelKnown
       ? ensureAgentsMaxThreads(featureFlag.config)
       : raiseExistingAgentsMaxThreads(featureFlag.config)
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString()
   const preserveDisable = featureFlag.value === false && !v2Preferred
   const featureConfig = preserveDisable
     ? setMultiAgentV2Disable(agentsConfig)
     : v2Preferred
       ? removeMultiAgentV2Disable(agentsConfig)
       : agentsConfig
+  if (hasTomlSetting(featureConfig, CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY)) return featureConfig
   const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER)
   if (!section) {
     const enabledSetting = preserveDisable ? "enabled = false\n" : ""
     return appendBlock(
       featureConfig,
-      `[${CODEX_MULTI_AGENT_V2_HEADER}]\n${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}\n`,
+      `[${CODEX_MULTI_AGENT_V2_HEADER}]\n${enabledSetting}max_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_THREAD_LIMIT}\n`,
     )
   }
-  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", maxThreadsValue)
+  return replaceOrInsertSetting(
+    featureConfig,
+    section,
+    "max_concurrent_threads_per_session",
+    CODEX_MULTI_AGENT_V2_THREAD_LIMIT.toString(),
+  )
 }
 
 /**

@@ -17,6 +17,7 @@ import type { AgentDefinition, AgentLoaderDiagnostic, LoadAgentsOptions, LoadAge
  */
 export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
   const resolvedOptions = {
+    env: options.env ?? {},
     homeDir: resolve(options.homeDir ?? process.env.HOME ?? process.cwd()),
     projectDir: resolve(options.projectDir ?? process.cwd()),
   }

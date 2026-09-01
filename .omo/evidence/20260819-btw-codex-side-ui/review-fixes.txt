@@ -1,0 +1,618 @@
+Surface: Codex review fixes in OpenCode 1.18.18
+
+Failing-first regression:
+
+  create-plugin-module sidebar-disabled test:
+    ENOENT: tui.json did not exist
+
+  event-session-lifecycle test:
+    Export named 'shouldDispatchOpenClawSessionEvent' not found
+
+  Result: 13 pass, 2 fail
+
+After the fixes:
+
+  bun test \
+    packages/omo-opencode/src/testing/create-plugin-module.test.ts \
+    packages/omo-opencode/src/plugin/event-session-lifecycle.test.ts
+
+  Result: 17 pass, 0 fail
+
+  bun run --cwd packages/omo-opencode typecheck
+
+  Result: pass
+
+Final affected-domain gate:
+
+  Seven BTW, lifecycle, startup, transform, and TUI test files:
+  59 pass, 0 fail
+
+  bun run typecheck
+
+  Result: pass
+
+Real sidebar-disabled TUI:
+
+  - OpenCode ran with `tui.sidebar.enabled: false`.
+  - The OMO sidebar was absent.
+  - `/btw` remained the first slash autocomplete result.
+  - `/btw review isolation` opened a clean side session.
+  - The side model returned `SIDE-CONTEXT-PROOF`.
+  - The prompt displayed:
+    `BTW from main · main ready · ctrl+/ switch · ctrl+c close`.
+  - Physical Ctrl+C returned to the parent and deleted the side.
+
+OpenClaw dispatch driver:
+
+  - Marked `ses_side_review` as a BTW side session.
+  - Dispatched `session.idle` for `ses_side_review` and
+    `ses_parent_review` through the production
+    `dispatchOpenClawSessionEvent`.
+  - The localhost probe received exactly one event:
+
+    OPENCLAW_EVENT {"event":"stop","sessionId":"ses_parent_review",...}
+
+  - No event for `ses_side_review` reached the probe.
+
+Isolation and teardown:
+
+  46731 released
+  46732 released
+  46733 released
+  46734 released
+  review_tui_sessions=1
+
+All OpenCode processes used evidence-local XDG data, config, cache, and state
+directories. The shared real DB was read only.
+
+Cubic:
+
+  Cubic completed neutral because the repository reached its monthly review
+  limit (80,038 of 80,000 reviewed lines). The GitHub check output records
+  `AI review line limit reached`; it resumes on 1 September 2026.
+
+Latest Codex re-review:
+
+  Failing-first deletion regressions:
+  14 pass, 2 fail
+
+  After metadata-aware deletion and parent-detach handling:
+  16 pass, 0 fail
+
+  Reattached deletion production driver:
+
+    {"mainSessionID":"ses_parent_review","tmuxDeleted":0,"disconnected":1}
+
+  This proves persisted BTW metadata suppresses primary tmux deletion handling
+  even when the in-process registry starts empty.
+
+  Parent deletion production controller driver:
+
+    {"state":{"phase":"closed"},"current":"ses_side_review","navigations":[],"toasts":["BTW detached because its main session was deleted."]}
+
+  This proves deleting the parent removes stale switching targets while leaving
+  the currently displayed side transcript stable.
+
+  Final seven-file affected-domain gate:
+  61 pass, 0 fail
+
+  Final repository typecheck and pinned Bun 1.3.12 build:
+  pass
+
+Pending creation navigation re-review:
+
+  Failing-first controller result:
+  12 pass, 1 fail
+
+  After generation-bound cancellation:
+  13 pass, 0 fail
+
+  Production controller driver:
+
+    {"state":{"phase":"closed"},"prompt":"/btw slow question","deleted":["ses_late"],"navigations":[]}
+
+  This proves that navigating away while `session.create` is pending restores
+  the parent draft, deletes the late side session, and never steals focus.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+Hook inventory re-review:
+
+  Transform inventory:
+  8 slots; 50 core; 59 composed; 63 maximum with direct team handlers
+
+  Transform wiring regressions and markdown audit:
+  pass; markdown 16 pass, 0 fail
+
+  The plugin and root architecture inventories now include the always-on BTW
+  context transform and the resulting core/composed slot totals.
+
+  Final pinned Bun 1.3.12 twelve-file affected-domain gate:
+  98 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Boundary fallback and immediate cancellation restore re-review:
+
+  Failing-first result:
+  missing boundary fallback plus delayed draft restoration
+
+  Context, controller, and wiring regressions:
+  34 pass, 0 fail
+
+  Production boundary fallback driver:
+
+    {"messageCount":1,"boundaryPresent":true,"question":"question"}
+
+  Production cancellation driver:
+
+    {"restoredBeforeResponse":"/btw pending","draft":"/btw pending","deleted":["side"]}
+
+  This proves BTW instructions remain present without inherited parent messages,
+  and creation cancellation restores the cleared draft before the server
+  response while retaining late-side cleanup.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+Scoped feature inventory re-review:
+
+  Feature directory count:
+  24
+
+  Markdown audit:
+  16 pass, 0 fail
+
+  The feature-level and source-level AGENTS inventories now report 24 modules
+  and identify `btw-side` with its TUI, context, lifecycle, and isolation role.
+
+Deleted-before-create re-review:
+
+  Failing-first controller result:
+  deleted side reopened after pending response
+
+  Controller and wiring regressions:
+  pass
+
+  Production controller driver:
+
+    {"state":{"phase":"closed"},"draft":"/btw deleted","navigations":[],"deleted":[]}
+
+  This proves a side deletion observed before its create response is retained as
+  a bounded tombstone, so the nonexistent side is never opened or navigated to.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final pinned Bun 1.3.12 twelve-file affected-domain gate:
+  97 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+  Final pinned Bun 1.3.12 twelve-file affected-domain gate:
+  96 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Draft ownership and non-session teardown re-review:
+
+  Failing-first result:
+  draft overwrite plus missing teardown cleanup
+
+  Controller and wiring regressions:
+  24 pass, 0 fail
+
+  Production late-draft driver:
+
+    {"draft":"new parent draft","deleted":["side"]}
+
+  Production non-session cleanup driver:
+
+    {"state":{"phase":"closed"},"deleted":["side"]}
+
+  This proves late cancelled creation cannot overwrite a newer parent draft,
+  and leaving session routes triggers owned-side cleanup rather than retaining
+  or reopening the temporary side.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final pinned Bun 1.3.12 twelve-file affected-domain gate:
+  94 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Multi-creation and cleanup-ownership re-review:
+
+  Failing-first controller result:
+  20 pass, 2 fail
+
+  Controller and wiring regressions:
+  23 pass, 0 fail
+
+  Production multi-creation disposal driver:
+
+    {"midway":{"done":false,"deleted":["side_b"]},"final":{"done":true,"deleted":["side_b","side_a"]}}
+
+  Production cleanup-generation driver:
+
+    {"state":{"phase":"open","parentSessionID":"ses_parent","sideSessionID":"side_new","owned":true},"deleted":[]}
+
+  This proves disposal awaits every pending creation cleanup, and stale
+  navigation cleanup cannot delete or close a newer side state after losing its
+  closing generation.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+Disposal-during-create re-review:
+
+  Failing-first controller result:
+  19 pass, 1 fail
+
+  Controller and wiring regressions:
+  21 pass, 0 fail
+
+  Production controller driver:
+
+    {"before":{"disposalComplete":false,"deleted":[]},"after":{"disposalComplete":true,"deleted":["ses_side"]}}
+
+  This proves normal TUI disposal waits for pending side creation and the
+  late-created session's deletion before lifecycle shutdown completes.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final pinned Bun 1.3.12 twelve-file affected-domain gate:
+  93 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Disposal-during-close re-review:
+
+  Failing-first controller result:
+  19 pass, 1 fail
+
+  Controller and wiring regressions:
+  21 pass, 0 fail
+
+  Production controller driver:
+
+    {"before":{"disposalComplete":false,"deleted":[]},"after":{"disposalComplete":true,"deleted":["ses_side"]}}
+
+  This proves normal TUI disposal waits for an in-flight owned-side abort and
+  deletion instead of returning while cleanup is unfinished.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final pinned Bun 1.3.12 eleven-file affected-domain gate:
+  91 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Final route, attachment, and team-tool re-review:
+
+  Failing-first controller/tool results:
+  34 pass, 2 fail
+
+  Controller, route bridge, wiring, and tool regressions:
+  38 pass, 0 fail
+
+  Production route driver:
+
+    {"before":true,"after":false}
+
+  Production attachment-close driver:
+
+    {"canClose":false}
+
+  Production existing-team guard driver:
+
+    {"blocked":"BTW side conversations cannot delegate work.","readOnlyAllowed":true}
+
+  This proves `/btw` cannot continue on a route changed during adoption,
+  attachment-only drafts are not consumed by Ctrl+C, and existing-team mutation
+  tools are blocked while read-only team status remains available.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+Fatal classification propagation and CI fix:
+
+  Failing-first pinned Bun 1.3.12 result:
+  29 pass, 1 fail
+
+  Corrected pinned Bun context/transform regressions:
+  30 pass, 0 fail
+
+  Production messages-transform driver:
+
+    {"propagated":"Unable to classify session for BTW isolation."}
+
+  This proves persistent classification failure escapes the per-hook safe
+  runner and stops the request before tools or idle consumers. The Ubuntu CI
+  expectation now reflects immediate retry injecting two messages.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final eleven-file affected-domain gate:
+  90 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Immediate classification retry re-review:
+
+  Failing-first context and validator results:
+  5 pass, 4 fail
+
+  Context, parent-validator, wiring, lifecycle, and tool regressions:
+  34 pass, 0 fail
+
+  Production metadata-classification driver:
+
+    {"attempts":2,"tracked":false,"persistent":"Unable to classify session for BTW isolation."}
+
+  Production parent-validation driver:
+
+    {"exists":true,"calls":2}
+
+  This proves transient session metadata and parent lookups recover inside the
+  same request/reattachment. Ordinary sessions never retain false restrictions;
+  persistent unclassified requests stop before tools or idle consumers run.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final eleven-file affected-domain gate:
+  89 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Transient metadata restriction re-review:
+
+  Failing-first context-injector result:
+  6 pass, 2 fail
+
+  Context injector, lifecycle, and tool pre-execution regressions:
+  29 pass, 0 fail
+
+  Production provisional-restriction driver:
+
+    {"restrictedAfterFailure":true,"blocked":"BTW side conversations cannot delegate work.","restrictedAfterRecovery":false}
+
+  This proves metadata lookup failure immediately activates shared side
+  restrictions before model tools or idle events can escape, while a later
+  successful normal-session lookup clears only the provisional restriction.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final eleven-file affected-domain gate:
+  88 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Direct persisted-side switch re-review:
+
+  Failing-first result:
+  `waitUntilClosed` was unavailable
+
+  Controller, parent-validator, and wiring regressions:
+  20 pass, 0 fail
+
+  Production controller driver:
+
+    {"phase":"open","parentSessionID":"ses_parent_b","sideSessionID":"ses_side_b","owned":false}
+
+  This proves direct navigation from one adopted side to another awaits the old
+  side's exact closed transition before adopting the current persisted side.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final ten-file affected-domain gate:
+  87 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Persisted parent existence re-review:
+
+  Failing-first result:
+  missing `tui-parent-validator` module
+
+  Parent validator, cache, guard, and wiring regressions:
+  4 pass, 0 fail
+
+  Production validator driver:
+
+    {"missing":false,"recovered":true,"deletedDuringLookup":false}
+
+  This proves persisted adoption requires a locally or remotely existing parent,
+  retries a transient miss, and rejects a parent deleted while validation is in
+  flight.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final nine-file affected-domain gate:
+  69 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Delegation and oversized metadata re-review:
+
+  Failing-first results:
+  24 pass, 2 fail
+
+  Context injector and tool pre-execution regressions:
+  26 pass, 0 fail
+
+  Production delegation driver:
+
+    {"blocked":"BTW side conversations cannot delegate work.","parentArgs":{"category":"quick","subagent_type":"sisyphus-junior"}}
+
+  Production oversized-metadata driver:
+
+    {"bytes":65536,"maxBytes":65536,"boundary":"msg_boundary","systemRetained":false}
+
+  This proves `task`, `call_omo_agent`, and `team_create` are blocked in tracked
+  BTW sides while normal parent delegation still works. Oversized message info
+  and parts are reduced to the exact byte ceiling while preserving the boundary
+  message identity.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+Context-budget and attachment re-review:
+
+  Failing-first results:
+  missing context-budget exports; attachment-bearing draft created a side
+
+  Context injector, controller, and wiring regressions:
+  25 pass, 0 fail
+
+  Production context-budget driver:
+
+    {"messages":15,"bytes":64226,"maxBytes":65536,"boundary":"msg_99"}
+
+  Production attachment driver:
+
+    {"hasAttachments":true,"prepared":false,"input":"/btw describe image","parts":1,"toasts":["BTW supports text-only drafts. Remove attachments before starting BTW."]}
+
+  This proves inherited context preserves the stable boundary inside explicit
+  64-message and 64-KiB budgets. Attachment-bearing drafts are rejected without
+  clearing text or attachments from the parent composer.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+Orphaned side nesting re-review:
+
+  Failing-first cache result:
+  expected persisted metadata after parent deletion, received unhydrated
+
+  Cache, guard, and wiring regressions:
+  3 pass, 0 fail
+
+  Production cache/guard driver:
+
+    {"knownSide":true,"canAdopt":false}
+
+  This proves an orphaned side keeps enough validated identity to block nested
+  `/btw`, while the deleted-parent tombstone still prevents stale adoption.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final nine-file affected-domain gate:
+  67 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Deleted parent tombstone re-review:
+
+  Failing-first guard result:
+  expected false, received true
+
+  Cache, guard, and wiring regressions:
+  3 pass, 0 fail
+
+  Production guard driver:
+
+    {"before":true,"afterParentDeletion":false}
+
+  This proves fetched or cached side metadata cannot re-adopt a parent whose
+  deletion event has already been observed.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+Persisted side re-adoption re-review:
+
+  Failing-first cache result:
+  missing `tui-adoption-cache` module
+
+  Cache, guard, and wiring regressions:
+  3 pass, 0 fail
+
+  Production cache/controller driver:
+
+    {"cached":{"hydrated":true,"metadata":{"version":1,"parent_session_id":"ses_parent","boundary_message_id":"msg_parent"}},"state":{"phase":"open","parentSessionID":"ses_parent","sideSessionID":"ses_side","owned":false}}
+
+  This proves a persisted side can detach, retain validated metadata, and
+  re-adopt its parent/status controls when the user returns. Side or parent
+  deletion invalidates the cache.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final eight-file affected-domain gate:
+  66 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+  Final eight-file affected-domain gate:
+  63 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Parent deletion during creation re-review:
+
+  Failing-first controller result:
+  13 pass, 1 fail
+
+  After parent-deletion cancellation and closing-race hardening:
+  16 pass, 0 fail
+
+  Production controller driver:
+
+    {"state":{"phase":"closed"},"prompt":"/btw parent deletion","deleted":["ses_late"],"navigations":[],"toasts":["BTW cancelled because its main session was deleted."]}
+
+  This proves parent deletion invalidates pending creation, restores the draft,
+  deletes the late side, and leaves no stale navigation target. Closing tests
+  additionally prove unrelated navigation is preserved and side cleanup still
+  finishes if the parent disappears while abort is pending.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass
+
+  Final seven-file affected-domain gate:
+  62 pass, 0 fail
+
+  Final repository typecheck:
+  pass
+
+Delayed adoption re-review:
+
+  Failing-first guard result:
+  missing `tui-adoption-guard` module
+
+  Guard and TUI wiring regressions:
+  2 pass, 0 fail
+
+  Production guard driver:
+
+    {"initial":true,"afterNavigation":false,"afterDeletion":false,"afterDispose":false}
+
+  This proves that delayed metadata can only adopt the still-current session
+  and is discarded after navigation, deletion, or TUI disposal.
+
+  OpenCode package typecheck and pinned Bun 1.3.12 build:
+  pass

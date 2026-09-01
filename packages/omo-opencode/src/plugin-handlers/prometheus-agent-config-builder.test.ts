@@ -24,7 +24,7 @@ describe("buildPrometheusAgentConfig", () => {
       (category) => ({ model: `${category}/default-model` } as CategoryConfig)
     );
     resolveModelPipelineSpy = spyOn(shared, "resolveModelPipeline").mockReturnValue({
-      model: "anthropic/claude-opus-4-7",
+      model: "anthropic/claude-fable-5",
       provenance: "provider-fallback",
     });
     ;({ buildPrometheusAgentConfig } = await importFreshPrometheusAgentConfigBuilderModule())
@@ -42,7 +42,7 @@ describe("buildPrometheusAgentConfig", () => {
     describe("#when currentModel is NOT in Prometheus fallback chain", () => {
       test("falls through to fallback chain instead of using currentModel as override", async () => {
         // given - currentModel is a model NOT in Prometheus fallback chain
-        // Prometheus chain: claude-opus-4-7, gpt-5.4, glm-5, gemini-3.1-pro
+        // Prometheus chain: claude-fable-5, kimi-k3
         const currentModel = "some-provider/not-prometheus-compatible";
 
         // when
@@ -65,14 +65,14 @@ describe("buildPrometheusAgentConfig", () => {
             systemDefaultModel: undefined,
           }),
         });
-        expect(result.model).toBe("anthropic/claude-opus-4-7");
+        expect(result.model).toBe("anthropic/claude-fable-5");
       });
     });
 
     describe("#when currentModel IS in Prometheus fallback chain", () => {
-      test("preserves currentModel as uiSelectedModel for claude-opus-4-7", async () => {
+      test("preserves currentModel as uiSelectedModel for claude-fable-5", async () => {
         // given - currentModel matches a Prometheus fallback chain entry
-        const currentModel = "anthropic/claude-opus-4-7";
+        const currentModel = "anthropic/claude-fable-5";
 
         // when - should not throw and should produce a valid config
         const result = await buildPrometheusAgentConfig({
@@ -84,6 +84,7 @@ describe("buildPrometheusAgentConfig", () => {
 
         // then - config should be produced (currentModel accepted as valid)
         expect(result).toBeDefined();
+        expect(result.variant).toBe("xhigh");
         expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
           expect.objectContaining({
             intent: expect.objectContaining({
@@ -128,7 +129,7 @@ describe("buildPrometheusAgentConfig", () => {
   describe("#given explicit Prometheus model configured via plugin override", () => {
       test("explicit config wins over currentModel and fallback chain", async () => {
       // given
-      const currentModel = "anthropic/claude-opus-4-7";
+      const currentModel = "anthropic/claude-opus-4-8";
       const explicitModel = "custom-provider/custom-model";
 
       // when
@@ -163,7 +164,7 @@ describe("buildPrometheusAgentConfig", () => {
   describe("#given category with model configured", () => {
       test("category model wins when no explicit override", async () => {
       // given
-      const currentModel = "anthropic/claude-opus-4-7";
+      const currentModel = "anthropic/claude-opus-4-8";
       const categoryModel = "category-provider/category-model";
 
       resolveCategoryConfigSpy.mockReturnValue({
@@ -238,6 +239,70 @@ describe("buildPrometheusAgentConfig", () => {
       });
   });
 
+  describe("#given canonical reasoning configured", () => {
+    test("explicit reasoning wins over category reasoning", async () => {
+      // given
+      resolveCategoryConfigSpy.mockReturnValue({ reasoning: "high" } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: { category: "test-category", reasoning: "low" },
+        userCategories: { "test-category": { reasoning: "high" } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(result.reasoning).toBe("low");
+    });
+  });
+
+  describe("#given category fallback_models", () => {
+    test("materializes category fallback_models when Prometheus has no explicit fallback_models", async () => {
+      // given
+      const categoryFallbackModels = ["openai/gpt-5.4"];
+      resolveCategoryConfigSpy.mockReturnValue({
+        fallback_models: categoryFallbackModels,
+      } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: { category: "test-category" },
+        userCategories: { "test-category": { fallback_models: categoryFallbackModels } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(result.fallback_models).toEqual(categoryFallbackModels);
+    });
+
+    test.each([
+      ["explicit fallback_models", ["openai/gpt-5.5"]],
+      ["explicit empty fallback_models", []],
+    ])("preserves %s over category fallback_models", async (_label, explicitFallbackModels) => {
+      // given
+      const categoryFallbackModels = ["openai/gpt-5.4"];
+      resolveCategoryConfigSpy.mockReturnValue({
+        fallback_models: categoryFallbackModels,
+      } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: {
+          category: "test-category",
+          fallback_models: explicitFallbackModels,
+        },
+        userCategories: { "test-category": { fallback_models: categoryFallbackModels } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(result.fallback_models).toEqual(explicitFallbackModels);
+    });
+  });
+
   describe("#given no currentModel and no explicit config", () => {
     test("falls through to fallback chain", async () => {
       // given - no currentModel, no explicit config
@@ -264,7 +329,7 @@ describe("buildPrometheusAgentConfig", () => {
             },
           })
         );
-        expect(result.model).toBe("anthropic/claude-opus-4-7");
+        expect(result.model).toBe("anthropic/claude-fable-5");
       });
   });
 
@@ -284,7 +349,7 @@ describe("buildPrometheusAgentConfig", () => {
   });
 
   describe("#given a Prometheus prompt override tries to replace the base prompt", () => {
-    test("keeps the mandatory shared ulw-plan skill instruction when prompt is configured", async () => {
+    test("keeps the mandatory ulw-plan skill instruction when prompt is configured", async () => {
       // given
       const replacementOnlyPrompt = "OVERRIDE_PROMPT_NO_SHARED_SKILL";
 
@@ -299,7 +364,7 @@ describe("buildPrometheusAgentConfig", () => {
       // then
       expect(typeof result.prompt).toBe("string");
       if (typeof result.prompt === "string") {
-        expect(result.prompt).toContain('skill(name="shared/ulw-plan")');
+        expect(result.prompt).toContain('skill(name="ulw-plan")');
         expect(result.prompt).toContain(replacementOnlyPrompt);
         expect(result.prompt).not.toBe(replacementOnlyPrompt);
       }

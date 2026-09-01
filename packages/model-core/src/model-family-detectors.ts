@@ -22,12 +22,17 @@ export function isClaudeOpus48Model(model: string): boolean {
   return modelName.includes("claude-opus-4-8")
 }
 
+export function isClaudeOpus5Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return modelName.includes("claude-opus-5")
+}
+
 export function isClaudeFable5Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
   return modelName.includes("claude-fable-5")
 }
 
-const CLAUDE_OPUS_VERSION_RE = /claude-opus-(\d+)-(\d+)/
+const CLAUDE_OPUS_VERSION_RE = /claude-opus-(\d+)(?:-(\d+))?/
 
 /**
  * Claude Fable shares the Opus 4.7+ request surface (adaptive thinking only,
@@ -39,7 +44,7 @@ export function isClaudeOpus47OrLaterModel(model: string): boolean {
   const match = CLAUDE_OPUS_VERSION_RE.exec(modelName)
   if (!match) return false
   const major = Number(match[1])
-  const minor = Number(match[2])
+  const minor = match[2] === undefined ? 0 : Number(match[2])
   if (Number.isNaN(major) || Number.isNaN(minor)) return false
   return major > 4 || (major === 4 && minor >= 7)
 }
@@ -71,6 +76,13 @@ export function isKimiK27Model(model: string): boolean {
   return false
 }
 
+export function isKimiK3Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  if (/kimi-k3/.test(modelName)) return true
+  if (/k3[-.]?p?\d*$/.test(modelName)) return true
+  return false
+}
+
 export function isMiniMaxModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   return modelName.includes("minimax")
@@ -79,6 +91,25 @@ export function isMiniMaxModel(model: string): boolean {
 export function isGlmModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   return modelName.includes("glm")
+}
+
+/**
+ * Grok 4.5 / 4.6 need a digit boundary after the minor version: the xAI catalog
+ * also ships grok-4.20 (and grok-4.1/4.2/4.3 fast tiers), so a bare substring
+ * match on "grok-4-5" would swallow future grok-4.5x ids and "grok-4-2" would
+ * swallow grok-4.20 today. Suffixed ids (grok-4.5-fast) still match.
+ */
+const GROK_45_RE = /grok-4-5(?![0-9])/
+const GROK_46_RE = /grok-4-6(?![0-9])/
+
+export function isGrok45Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return GROK_45_RE.test(modelName)
+}
+
+export function isGrok46Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return GROK_46_RE.test(modelName)
 }
 
 const GEMINI_PROVIDERS = ["google/", "google-vertex/"] as const

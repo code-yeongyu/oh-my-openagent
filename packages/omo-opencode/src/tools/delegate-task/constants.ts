@@ -5,6 +5,7 @@ import type {
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { truncateDescription } from "../../shared/truncate-description"
 export {
+  BUILTIN_CATEGORY_REQUIRES_MODEL,
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
   CATEGORY_PROMPT_APPEND_RESOLVERS,

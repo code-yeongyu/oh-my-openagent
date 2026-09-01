@@ -202,8 +202,8 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
-			name: "start-work-continuation stop no state",
-			component: "start-work-continuation",
+			name: "ulw-execute-continuation stop no state",
+			component: "ulw-execute-continuation",
 			event: "stop",
 			payload: {
 				hook_event_name: "Stop",

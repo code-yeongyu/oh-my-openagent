@@ -17,7 +17,8 @@ export async function executeLspGotoDefinition(
 	try {
 			const result = await withLspClient(
 				filePath,
-				async (client) => client.definition(filePath, line, character, signal),
+				async (client, _workspaceRoot, resolvedFilePath) =>
+					client.definition(resolvedFilePath, line, character, signal),
 				"definition",
 				clientOptions(signal),
 			);
@@ -49,7 +50,8 @@ export async function executeLspFindReferences(
 	try {
 			const result = await withLspClient(
 				filePath,
-				async (client) => client.references(filePath, line, character, includeDeclaration, signal),
+				async (client, _workspaceRoot, resolvedFilePath) =>
+					client.references(resolvedFilePath, line, character, includeDeclaration, signal),
 				"references",
 				clientOptions(signal),
 			);

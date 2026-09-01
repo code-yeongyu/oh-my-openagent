@@ -37,22 +37,6 @@ function mergeNativeIntoAvailable(
   return merged
 }
 
-function buildAvailableSkillsSection(skills: AvailableSkill[]): string {
-  if (skills.length === 0) {
-    return ""
-  }
-
-  const rows = skills
-    .map((s) => `- \`${s.name}\`: ${s.description || s.name}`)
-    .join("\n")
-
-  return `<available_skills>
-Skills provide specialized instructions. Load via load_skills parameter when delegating tasks.
-
-${rows}
-</available_skills>`
-}
-
 function usesFreeOrLocalModel(model: { providerID: string; modelID: string; variant?: string } | undefined): boolean {
   if (!model) {
     return false
@@ -91,14 +75,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
     ? buildPlanAgentSystemPrepend(availableCategories, effectiveAvailableSkills)
     : ""
 
-  const skillsSection = !isPlan
-    ? buildAvailableSkillsSection(effectiveAvailableSkills)
-    : ""
-
-  const baseAgentsContext = agentsContext ?? planAgentPrepend
-  const effectiveAgentsContext = !isPlan && skillsSection
-    ? [baseAgentsContext, skillsSection].filter(Boolean).join("\n\n")
-    : baseAgentsContext
+  const effectiveAgentsContext = agentsContext ?? planAgentPrepend
 
   const effectiveMaxPromptTokens = maxPromptTokens
     ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)

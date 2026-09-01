@@ -1,0 +1,20 @@
+### BASELINE full suite at clean HEAD (all of this run's changes stashed)
+$ git log -1 --format=%H
+76fa83ecc41f05d52205cc0f718bc53db8423afd
+$ git status --short
+$ bun test packages/omo-senpi
+(fail) Senpi LSP daemon runtime staging > #given an existing staged runtime #when replacement fails after backup #then prior bytes are restored [5070.97ms]
+ 527 pass
+ 1 fail
+Ran 528 tests across 83 files. [42.92s]
+exit=1
+
+$ git stash pop
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (21b9335c75adec9983bbfab886913bfcd07d29bb)
+
+### WITH this run's changes
+$ bun test packages/omo-senpi
+(fail) Senpi LSP daemon runtime staging > #given an existing staged runtime #when replacement fails after backup #then prior bytes are restored [5074.45ms]
+exit=1

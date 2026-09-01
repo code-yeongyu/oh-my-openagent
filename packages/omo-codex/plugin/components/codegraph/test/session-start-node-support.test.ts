@@ -1,9 +1,14 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { runCodegraphSessionStartWorker } from "../src/hook.ts";
+
+function writeProjectDatabase(workspace: string): void {
+	mkdirSync(join(workspace, ".codegraph"), { recursive: true });
+	writeFileSync(join(workspace, ".codegraph", "codegraph.db"), "fixture");
+}
 
 describe("CodeGraph SessionStart worker Node support", () => {
 	it("#given an unsupported local Node and a PATH CodeGraph command with auto provisioning disabled #when worker runs #then it skips without touching the workspace", async () => {
@@ -52,7 +57,7 @@ describe("CodeGraph SessionStart worker Node support", () => {
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-provision-home-"));
 		const binPath = join(homeDir, ".omo", "codegraph", "bin", "codegraph");
 		const calls: Array<{ readonly args: readonly string[]; readonly command: string }> = [];
-		const provisionCalls: Array<{ readonly installDir?: string; readonly lockDir: string; readonly version: "1.0.1" }> = [];
+		const provisionCalls: Array<{ readonly installDir?: string; readonly lockDir: string; readonly version: "1.5.0" }> = [];
 		const outcomes: unknown[] = [];
 
 		try {
@@ -78,21 +83,75 @@ describe("CodeGraph SessionStart worker Node support", () => {
 					resolveCommand: () => ({ argsPrefix: [], command: "/usr/local/bin/codegraph", exists: true, source: "path" }),
 					runCommand: (_projectRoot, command, args) => {
 						calls.push({ args, command });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
+						writeProjectDatabase(workspace);
+						return Promise.resolve({ exitCode: 0, stdout: "", timedOut: false });
 					},
 				},
 			});
 
 			// then
 			expect(result).toEqual({ action: "initialized" });
-			expect(calls).toEqual([
-				{ args: ["status", "--json"], command: binPath },
-				{ args: ["init"], command: binPath },
-			]);
+			expect(calls).toEqual([{ args: ["init"], command: binPath }]);
 			expect(provisionCalls).toEqual([
-				{ installDir: join(homeDir, ".omo", "codegraph"), lockDir: join(homeDir, ".omo", "codegraph", ".locks"), version: "1.0.1" },
+				{ installDir: join(homeDir, ".omo", "codegraph"), lockDir: join(homeDir, ".omo", "codegraph", ".locks"), version: "1.5.0" },
 			]);
 			expect(outcomes).toEqual([{ action: "initialized", exitCode: 0, projectRoot: workspace, source: "provisioned", timedOut: false }]);
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+			rmSync(homeDir, { recursive: true, force: true });
+		}
+	});
+
+	it("#given bundled CodeGraph and a stale managed install #when the worker runs #then it upgrades and uses the managed runtime", async () => {
+		// given
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-managed-upgrade-"));
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-managed-upgrade-home-"));
+		const installDir = join(homeDir, ".omo", "codegraph");
+		const binPath = join(installDir, "bin", "codegraph");
+		mkdirSync(join(installDir, "bin"), { recursive: true });
+		mkdirSync(join(installDir, ".provisioned"), { recursive: true });
+		writeFileSync(binPath, "stale codegraph\n");
+		writeFileSync(
+			join(installDir, ".provisioned", "codegraph-1.4.1.json"),
+			`${JSON.stringify({ binPath, version: "1.4.1" })}\n`,
+		);
+		const provisionCalls: unknown[] = [];
+		const commandCalls: Array<{ readonly args: readonly string[]; readonly command: string }> = [];
+
+		try {
+			// when
+			const result = await runCodegraphSessionStartWorker({
+				cwd: workspace,
+				env: { HOME: homeDir },
+				nodeVersion: "22.14.0",
+				deps: {
+					ensureGitignored: () => true,
+					ensureProvisioned: (options) => {
+						provisionCalls.push(options);
+						return Promise.resolve({ binPath, provisioned: true });
+					},
+					managedInstallExists: () => true,
+					prepareWorkspace: () => ({
+						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
+						dataRoot: join(homeDir, ".omo/codegraph"),
+						linked: true,
+						mode: "global-linked",
+						projectLink: join(workspace, ".codegraph"),
+					}),
+					resolveCommand: () => ({ argsPrefix: ["codegraph.js"], command: "/opt/node22/bin/node", exists: true, source: "bundled" }),
+					resolveManagedBin: () => null,
+					runCommand: (_projectRoot, command, args) => {
+						commandCalls.push({ args, command });
+						writeProjectDatabase(workspace);
+						return Promise.resolve({ exitCode: 0, stdout: "", timedOut: false });
+					},
+				},
+			});
+
+			// then
+			expect(result).toEqual({ action: "initialized" });
+			expect(provisionCalls).toEqual([{ installDir, lockDir: join(installDir, ".locks"), version: "1.5.0" }]);
+			expect(commandCalls).toEqual([{ args: ["init"], command: binPath }]);
 		} finally {
 			rmSync(workspace, { recursive: true, force: true });
 			rmSync(homeDir, { recursive: true, force: true });
@@ -129,17 +188,15 @@ describe("CodeGraph SessionStart worker Node support", () => {
 					resolveCommand: () => ({ argsPrefix: ["codegraph.js"], command: nodeBin, exists: true, source: "bundled" }),
 					runCommand: (_projectRoot, command, args) => {
 						calls.push({ args, command });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
+						writeProjectDatabase(workspace);
+						return Promise.resolve({ exitCode: 0, stdout: "", timedOut: false });
 					},
 				},
 			});
 
 			// then
 			expect(result).toEqual({ action: "initialized" });
-			expect(calls).toEqual([
-				{ args: ["codegraph.js", "status", "--json"], command: nodeBin },
-				{ args: ["codegraph.js", "init"], command: nodeBin },
-			]);
+			expect(calls).toEqual([{ args: ["codegraph.js", "init"], command: nodeBin }]);
 			expect(outcomes).toEqual([{ action: "initialized", exitCode: 0, projectRoot: workspace, source: "bundled", timedOut: false }]);
 		} finally {
 			rmSync(workspace, { recursive: true, force: true });

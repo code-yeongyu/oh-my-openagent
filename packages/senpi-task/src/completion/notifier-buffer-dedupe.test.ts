@@ -20,6 +20,7 @@ function bufferedRecord(): TaskRecord {
     created_at: "2026-07-06T01:00:00.000Z",
     updated_at: "2026-07-06T01:00:03.000Z",
     final_response: "final",
+    notify_on_terminal: false,
     notification: { run_epoch: 0, notified_epoch: -1 },
   }
 }
@@ -30,6 +31,13 @@ function fakeStore(seed: TaskRecord) {
     load: (taskId: string): TaskRecord | null => records.get(taskId) ?? null,
     replace: (record: TaskRecord): void => {
       records.set(record.task_id, record)
+    },
+    mutate: (taskId: string, mutation: (record: TaskRecord) => TaskRecord): TaskRecord | null => {
+      const current = records.get(taskId)
+      if (current === undefined) return null
+      const next = mutation(current)
+      if (next !== current) records.set(taskId, next)
+      return next
     },
     appendEvent: (_taskId: string, _event: PersistedTaskEvent): string => "log.jsonl",
     list: () => ({ records: [...records.values()], diagnostics: [] }),

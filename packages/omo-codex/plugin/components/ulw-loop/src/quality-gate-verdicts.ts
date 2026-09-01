@@ -1,4 +1,4 @@
-import { literal, invalid, textField } from "./quality-gate-fields.js";
+import { invalid, literal, textField } from "./quality-gate-fields.js";
 
 export function passedVerdict(value: unknown, field: string): "passed" {
 	if (value === "not_applicable") invalid(`${field} must not be not_applicable.`, field);

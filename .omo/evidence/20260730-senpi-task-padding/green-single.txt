@@ -1,0 +1,19 @@
+Scenario: padded single task argument preparation
+Captured: 2026-07-30T05:33:00Z
+Command:
+  bun test packages/senpi-task/src/tools/task/argument-normalization.test.ts
+
+Binary observable:
+  PASS and the exact captured provider-shaped single call normalizes to one
+  clean single-spawn argument object.
+
+Output:
+  bun test v1.4.0-canary.1 (ae4b17de6)
+
+  packages/senpi-task/src/tools/task/argument-normalization.test.ts:
+  (pass) task argument normalization > #given a GPT-padded single spawn #when arguments are prepared #then serializer-only fields are removed
+
+  1 pass
+  0 fail
+  2 expect() calls
+  Ran 1 test across 1 file.

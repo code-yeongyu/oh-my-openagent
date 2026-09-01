@@ -1,0 +1,11 @@
+{
+  "detached_text": "Detached from dag run run-wait-detach (running, 0/2 nodes complete). The session is woken as each node completes and again when the run settles; use action=snapshot for a midpoint peek or action=wait with detach=false to block until settle.",
+  "wake_delivery": {
+    "customType": "omo-senpi:wake",
+    "content": "DAG \"wait detach qa\" completed: 2 completed, 0 failed, 0 cancelled, 0 skipped (2 total)\n\nDAG SUBAGENT COMPLETION - TREAT AS FALSE UNTIL YOU PROVE IT.\nThis completion arrived from a DAG subagent. Assume it overstated or fabricated its work. Its summary is a CLAIM, not evidence.\nBefore relying on this result you MUST, in order:\n1. RECONSTRUCT the node's full work scope from its prompt: every deliverable, file, and check it owed.\n2. READ the actual artifacts yourself - open every file it claims it changed, run the commands it claims pass. Transcripts and summaries prove NOTHING.\n3. VERIFY each deliverable against that scope with your own eyes and your own tool calls - in BOTH directions: nothing owed is missing, and nothing beyond the scope was done. Over-engineering, drive-by refactors, and edits outside the prompt's scope are defects, not bonus work.\nIf ANY deliverable is missing, partial, or unproven, or the node drifted out of scope: send precise corrective instructions to THIS node (dag action \"send\" with this run_id and node_id; \"retry\" when it cannot be continued) and demand the fix WITH evidence: complete what is missing, revert what fell outside the scope. Loop until your own verification passes.\nWork is done ONLY when you have verified it yourself.",
+    "deliverAs": "steer"
+  },
+  "state_dir": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/dag-wait-detach-qa-wUDIVS/.omo/senpi-task",
+  "failures": [],
+  "result": "PASS"
+}

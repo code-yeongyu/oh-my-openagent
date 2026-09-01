@@ -1,0 +1,16 @@
+### review finding: restore the original database environment before recounting
+### both drivers run with the SAME pre-existing XDG_DATA_HOME, as a caller might have
+### repo: /c/Users/pss/.omo-contrib/work/omo
+
+--- original-committed ---
+  decoy XDG_DATA_HOME : /tmp/omo-6376-decoyxdg-f4GR8Q
+  sessions before     : 0
+  sessions after      : 2838
+  same database read twice: NO - the two counts came from different databases
+
+--- fixed-working-copy ---
+  decoy XDG_DATA_HOME : /tmp/omo-6376-decoyxdg-isdKLe
+  sessions before     : 0
+  sessions after      : 0
+  same database read twice: yes
+
