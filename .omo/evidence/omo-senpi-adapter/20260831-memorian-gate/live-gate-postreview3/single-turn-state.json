@@ -1,0 +1,69 @@
+{
+  "sessionFiles": [
+    "2026-09-01T08-33-29-356Z_01a05b6d-0000-7000-8000-00000000000f.jsonl"
+  ],
+  "userTurnCount": 1,
+  "recall": [],
+  "stubInvocations": [
+    {
+      "at": "2026-09-01T08:33:30.204Z",
+      "argv": [
+        "-p",
+        "--system-prompt",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/runs/aff28a61-3cd9-4d68-a419-e83119b5b259/memorian-persona.md",
+        "--tools",
+        "nudge,read",
+        "-e",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/runs/aff28a61-3cd9-4d68-a419-e83119b5b259/nudge-extension.ts",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--session-dir",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/runs/aff28a61-3cd9-4d68-a419-e83119b5b259",
+        "--model",
+        "omo-mock/mock-1",
+        "Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/runs/aff28a61-3cd9-4d68-a419-e83119b5b259/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/runs/aff28a61-3cd9-4d68-a419-e83119b5b259/transcript-window.txt, then follow the system prompt."
+      ],
+      "nudgePath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/runs/aff28a61-3cd9-4d68-a419-e83119b5b259/nudges.ndjson",
+      "candidatesPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/runs/aff28a61-3cd9-4d68-a419-e83119b5b259/candidates.json",
+      "transcriptPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/runs/aff28a61-3cd9-4d68-a419-e83119b5b259/transcript-window.txt",
+      "memorianSentinel": "1",
+      "candidates": {
+        "version": 1,
+        "maxItems": 2,
+        "candidates": [
+          {
+            "path": "reference/project/test-note.md",
+            "description": "Project rebase ordering rule captured for memorian gate QA",
+            "excerpt": "The zebra-quokka rebase ordering rule says: rebase the oldest reviewed branch first, then replay the dependent branches in merge order so the stack never inverts.",
+            "score": 6.9
+          }
+        ],
+        "surfaced": []
+      },
+      "transcript": "user: remind me about the zebra-quokka rebase ordering rule before I restack the branches\n\nassistant: ok\n",
+      "persona": "# Memorian — memory nudge agent\n\nYou watch a conversation that already happened and decide whether a stored memory would materially change what the primary agent does next. You are not the primary agent and you never address the user. Your only output channel is the `nudge` tool; any text you write outside tool calls is discarded.\n\n## Inputs\n\nRead both files before deciding.\n\n- `$MEMORIAN_TRANSCRI"
+    }
+  ],
+  "pending": {
+    "dir": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6iaePN/memory/agents/project-0c45684b/runtime/recall/pending",
+    "files": [
+      {
+        "name": "01a05b6d-0000-7000-8000-00000000000f.json",
+        "payload": {
+          "version": 1,
+          "sessionId": "01a05b6d-0000-7000-8000-00000000000f",
+          "compactionEpoch": 0,
+          "writtenAt": "2026-09-01T08:33:30.208Z",
+          "nudges": [
+            {
+              "path": "reference/project/test-note.md",
+              "hint": "Rebase the oldest reviewed branch first so the dependent stack never inverts."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

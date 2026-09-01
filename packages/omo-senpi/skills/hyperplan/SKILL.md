@@ -23,19 +23,19 @@ This skill runs on the native lead team tools. Members are background children r
 |---------|------|---------------|
 | Spawn the team once | `team_create` | `inline_spec: { name, description, members: [...] }` → returns `team_run_id` |
 | Send a round task to a member | `task_send` | `to: "<member>"`, `team_run_id`, `message`, optional `summary` |
-| Collect a member's reply | `team_wait` | `team_run_id`, optional `from: "<member>"`, optional `timeout_ms` |
+| Collect member replies | injected notifications | replies auto-inject as they arrive — keep working or end your turn |
 | Hand off to the planner | `task` | `category` XOR `subagent_type`, `load_skills: ["ulw-plan"]`, `run_in_background: false` |
 | Disband the team | `team_delete` | `team_run_id`, `force: true` |
 
-Members receive only member-scoped `task_send` / `team_wait` inside their child process; they reply to you with `task_send({ to: "lead", message: "..." })`. You are the information broker — members never see each other's replies except through the bundles you forward.
+Members receive your rounds as injected follow-ups inside their child process; they reply to you with `task_send({ to: "lead", message: "..." })`. You are the information broker — members never see each other's replies except through the bundles you forward.
 
-**Delivery is pull-based.** A `task_send` writes a durable message and returns immediately; it never interrupts the recipient. Member replies come back to you two ways: your lead poller auto-injects them at the next tool-call boundary, OR you call `team_wait` to block for one. This skill uses explicit `team_wait` loops so each round is deterministic — after sending round N to all members, call `team_wait` once per expected reply before moving on.
+**Delivery is injection-driven.** A `task_send` writes a durable message and returns immediately; it never interrupts the recipient. Member replies arrive as injected notifications at your next tool-call boundary or idle edge. After sending round N to all members, keep doing independent lead work or end your turn — each reply lands as an injected notification, and the round is complete once every expected reply has arrived.
 
 ## HARD PRECONDITIONS
 
 Before starting, verify:
 
-1. **The lead team tools must be available** — `team_create`, `task_send`, `team_wait`, `team_delete`. They register by default with the task component. If they are absent, the task component was disabled; STOP and tell the user:
+1. **The lead team tools must be available** — `team_create`, `task_send`, `team_delete`. They register by default with the task component. If they are absent, the task component was disabled; STOP and tell the user:
    > "Hyperplan needs the omo-senpi team tools, which are disabled. Restart senpi without `--no-omo-task` (the task component is on by default), then retry."
 2. **You are the current top-level lead session** — the team tools are lead-only and never reach a child. If you are yourself a spawned member/child, this skill is the wrong tool; a member cannot lead a team.
 
@@ -205,7 +205,7 @@ Output format: numbered findings/critiques, each proposes a concrete alternative
 
 ## EXECUTION WORKFLOW
 
-You execute this in **7 phases**. Because delivery is pull-based, each round is: send tasks to all members, then drain their replies with `team_wait` before continuing.
+You execute this in **7 phases**. Because delivery is injection-driven, each round is: send tasks to all members, then collect their replies as injected notifications before continuing.
 
 **Critical separation**: You (the Lead) **distill** the surviving insights in Phase 5, but you DO NOT write the work plan. The plan is produced by a dedicated planner task in Phase 6 — this handoff is **mandatory**, not optional. Hyperplan = adversarial distillation + dedicated planner formalization. Skipping the handoff turns it back into vanilla orchestration.
 
@@ -235,7 +235,7 @@ team_create({
 })
 ```
 
-Capture the returned `team_run_id`. You pass it to every subsequent `task_send`, `team_wait`, and `team_delete` call.
+Capture the returned `team_run_id`. You pass it to every subsequent `task_send` and `team_delete` call.
 
 If `team_create` rejects `deep` as unresolvable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
 
@@ -260,7 +260,7 @@ When done, reply with your findings via task_send to "lead".
 </hyperplan-round-1-task>
 ```
 
-Then drain the replies: call `team_wait({ team_run_id })` repeatedly until all 5 members have replied (each `team_wait` returns one message; loop 5 times, or per-member with `from: "<member>"`). Give slow members room — a bounded `timeout_ms` per wait, and re-issue `team_wait` if one has not answered yet.
+Then collect the replies: each member's reply arrives as an injected notification — end your turn or do independent lead work until all 5 have landed. Give slow members room; if one stays silent past its expected window, nudge it once with `task_send` before treating the lane as stalled.
 
 ### Phase 3: Round 2 — Cross-attack
 
@@ -307,7 +307,7 @@ When done, reply with your attacks via task_send to "lead".
 </hyperplan-round-2-task>
 ```
 
-Drain all 5 cross-attack replies with `team_wait` before continuing.
+Collect all 5 cross-attack replies as injected notifications before continuing.
 
 ### Phase 4: Round 3 — Defense and refinement
 
@@ -336,7 +336,7 @@ When done, reply via task_send to "lead".
 </hyperplan-round-3-task>
 ```
 
-Drain all 5 refinement replies with `team_wait` before continuing.
+Collect all 5 refinement replies as injected notifications before continuing.
 
 ### Phase 5: Insight distillation (the Lead's job — YOU)
 
@@ -447,12 +447,12 @@ If `team_delete` fails, surface the error and suggest the user retry `team_delet
 | **Pre-writing tasks before dispatching to the planner** | **Anchors the planner to your draft and undermines its independent judgment. Dispatch raw insights, let the planner structure.** |
 | Handing the bundle to a team member instead of a planner task | Members are the debate, not the planner. The bundle goes to a `task` with `load_skills: ["ulw-plan"]`, never to `task_send`. |
 | Forgetting to clean up the team | Leaks runtime state. Always Phase 7 `team_delete`. |
-| Proceeding to the next round before draining replies | Pull delivery means an un-waited reply may not be in context yet. Always `team_wait` for every expected reply first. |
+| Proceeding to the next round before every reply arrived | Replies land one per member as injected notifications; never synthesize a round until every expected reply has arrived. |
 
 ## NOTES FOR THE LEAD (YOU)
 
 - Each `task_send` is **fire-and-forget** — it enqueues a durable message and returns. Members reply asynchronously.
-- After sending a round to all members, **drain replies with `team_wait`** before synthesizing. A `team_wait` timeout is not a stall by itself — re-issue it; quiet members are usually still working.
+- After sending a round to all members, **collect every reply as an injected notification** before synthesizing. Silence is not a stall by itself — quiet members are usually still working; nudge with `task_send` only after a member stays silent past its expected window.
 - Members do not see each other's replies directly — only the bundles you forward in Phases 3 and 4. You are the sole information broker.
 - Keep bundles concise. If aggregated findings are very large, summarize before forwarding while preserving the spirit of each finding.
 - Never soften the adversarial system prompts. The hostility IS the mechanism.

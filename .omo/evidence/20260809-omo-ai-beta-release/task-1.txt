@@ -1,0 +1,47 @@
+TASK 1 - scaffold packages/omo-native (npm omo-ai) + unify senpi pin to 2026.8.9
+
+WHAT WAS TESTED
+- TDD: packages/omo-native/test/senpi-pin.test.ts written BEFORE the pin bumps.
+
+RED (pins still 2026.7.26) - captured before the bump:
+  2 fail / 1 pass; omo-senpi peer+dev and senpi-task pins reported 2026.7.26, expected 2026.8.9.
+
+GREEN (after bumping omo-senpi peer/dev, senpi-task pins, package-shape.test.ts):
+  (pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [1.52ms]
+  (pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.07ms]
+  (pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.08ms]
+  
+   3 pass
+   0 fail
+   7 expect() calls
+  Ran 3 tests across 1 file. [77.00ms]
+
+PACKAGE REGISTRATION AUDIT
+        at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/script/package-registration-audit.test.ts:246:35)
+  (fail) package registration audit > #given managed packages #when root registration is audited #then workspaces typecheck and dev deps stay aligned [2.77ms]
+  (pass) package registration audit > #given an unknown packages workspace #when audited #then classification rejects it by path [0.06ms]
+  (pass) package registration audit > #given shared extraction guard #when audited #then every core package is covered [0.23ms]
+  (pass) package registration audit > #given package test scripts #when nested tests exist #then recursive globs are registered [6.32ms]
+  (pass) package registration audit > #given package dependencies #when ROADMAP layers are checked #then reverse edges stay at zero [0.97ms]
+  (pass) package registration audit > #given exact re-export shim scan #when inventory docs are checked #then total targets and every path are present [241.02ms]
+  
+   5 pass
+   1 fail
+   9 expect() calls
+  Ran 6 tests across 1 file. [335.00ms]
+
+TYPECHECK (packages/omo-native)
+      Matched by include pattern 'bin' in '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/tsconfig.json'
+  error TS6059: File '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/bin/omo.js' is not under 'rootDir' '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-opencode/src'. 'rootDir' is expected to contain all source files.
+    The file is in the program because:
+      Matched by include pattern 'bin' in '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/tsconfig.json'
+  tsgo rc=1
+
+LOCKFILE
+  build: all steps completed
+  
+  134 packages installed [14.37s]
+
+WHY SUFFICIENT
+The pin test fails on any drift between the three manifests and passes only at the literal exact
+pin, so a partial future bump cannot ship. Registration audit covers the new workspace entry.

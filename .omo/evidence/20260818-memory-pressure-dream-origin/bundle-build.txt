@@ -1,0 +1,26 @@
+Bundled 783 modules in 25ms
+
+  omo.js  1.19 MB  (entry point)
+
+Bundled 641 modules in 18ms
+
+  omo-task.js  0.85 MB  (entry point)
+
+Bundled 280 modules in 10ms
+
+  omo-member.js  173.0 KB  (entry point)
+
+Bundled 94 modules in 6ms
+
+  omo-memory-mcp.js  96.53 KB  (entry point)
+
+Bundled 90 modules in 5ms
+
+  memory-run-supervisor.mjs  25.98 KB  (entry point)
+
+Bundled 97 modules in 6ms
+
+  omo-init-deep-advisor.js  64.27 KB  (entry point)
+
+Built omo-senpi extensions: /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/plugin/extensions/omo.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/plugin/extensions/omo-task.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/plugin/extensions/omo-member.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-pressure-dream-origin/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+PASS: generated omo-senpi bundles are current

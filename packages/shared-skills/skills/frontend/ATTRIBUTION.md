@@ -210,6 +210,13 @@ no Lazyweb source, documentation text, or screenshot content is vendored. Lazywe
 remain the property of their owner, and the guide grants no license to ship, trace, or
 commit reference screenshots harvested through it.
 
+`frontend/references/design/interaction-skill.md` is a project-original, curl-only
+operating guide for consulting the beui.dev animated-component registry during interaction
+and motion work, written from live endpoint verification; no beui.dev source code,
+documentation text, or component implementations are vendored. beui.dev names remain the
+property of their owner, and the guide instructs reading component source for mechanism
+extraction only, not vendoring it into references or projects.
+
 `frontend/references/design/clone-from-url.md` is a project-original runtime-extraction
 workflow guide. Its browser + `getComputedStyle` clone approach follows the same
 MIT-licensed `JCodesMore/ai-website-cloner-template` clone-website workflow that `aside.md`

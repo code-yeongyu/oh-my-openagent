@@ -1,0 +1,21 @@
+Codex compatibility gate
+- command: bun run test:codex
+- exit code: 0
+- final Node test runner result: 519 tests, 519 pass, 0 fail,
+  0 cancelled, 0 skipped
+
+Repository typecheck
+- command: bun run typecheck
+- exit code: 0
+- covered root tsgo, script typecheck, and package typechecks
+
+Repository build
+- command: bun run build
+- exit code: 0
+- covered the main package build plus Codex component build path
+
+Diagnostics note
+The intended source diff contains package-lock.json files only. Lockfiles have
+no language-server semantic surface; JSON parsing, npm frozen installs,
+package builds/tests/typechecks, the Codex gate, and the repository build are
+the relevant validators.

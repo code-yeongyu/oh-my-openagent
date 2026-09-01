@@ -7,7 +7,7 @@ import {
 
 describe("transformModelForProvider", () => {
   describe("kimi-for-coding provider", () => {
-    test("preserves the canonical kimi-k3 model id", () => {
+    test("maps kimi-k3 to the short k3 model id", () => {
       // given
       const provider = "kimi-for-coding"
       const model = "kimi-k3"
@@ -17,8 +17,22 @@ describe("transformModelForProvider", () => {
       const runtimeModel = transformRuntimeModelForProvider(provider, model)
 
       // then
-      expect(displayModel).toBe("kimi-k3")
-      expect(runtimeModel).toBe("kimi-k3")
+      expect(displayModel).toBe("k3")
+      expect(runtimeModel).toBe("k3")
+    })
+
+    test("maps kimi-k3-256k to the short k3-256k model id", () => {
+      // given
+      const provider = "kimi-for-coding"
+      const model = "kimi-k3-256k"
+
+      // when
+      const displayModel = transformModelForProvider(provider, model)
+      const runtimeModel = transformRuntimeModelForProvider(provider, model)
+
+      // then
+      expect(displayModel).toBe("k3-256k")
+      expect(runtimeModel).toBe("k3-256k")
     })
   })
 
@@ -179,6 +193,56 @@ describe("transformModelForProvider", () => {
 
       // #then should pass through unchanged (google doesn't use claude)
       expect(result).toBe("claude-opus-4-7")
+    })
+  })
+
+  describe("antigravity gemini-3-flash (issue #117)", () => {
+    test("keeps antigravity-gemini-3-flash unchanged for google provider", () => {
+      // #given google provider and antigravity-gemini-3-flash model
+      const provider = "google"
+      const model = "antigravity-gemini-3-flash"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then it stays as the valid antigravity id (NOT -preview)
+      expect(result).toBe("antigravity-gemini-3-flash")
+    })
+
+    test("keeps google/antigravity-gemini-3-flash unchanged for google provider", () => {
+      // #given google provider and google/antigravity-gemini-3-flash model
+      const provider = "google"
+      const model = "google/antigravity-gemini-3-flash"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then it stays as the valid antigravity id (NOT -preview)
+      expect(result).toBe("google/antigravity-gemini-3-flash")
+    })
+
+    test("still rewrites plain gemini-3-flash to gemini-3-flash-preview", () => {
+      // #given google provider and plain gemini-3-flash model
+      const provider = "google"
+      const model = "gemini-3-flash"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then it becomes the -preview form (unchanged behavior)
+      expect(result).toBe("gemini-3-flash-preview")
+    })
+
+    test("still rewrites google/gemini-3-flash to google/gemini-3-flash-preview", () => {
+      // #given google provider and google/gemini-3-flash model
+      const provider = "google"
+      const model = "google/gemini-3-flash"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then it becomes the -preview form (unchanged behavior)
+      expect(result).toBe("google/gemini-3-flash-preview")
     })
   })
 

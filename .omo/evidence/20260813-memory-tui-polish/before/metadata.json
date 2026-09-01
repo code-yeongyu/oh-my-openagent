@@ -1,0 +1,27 @@
+{
+  "title": "Memory TUI entries BEFORE",
+  "connector": "xterm-replay",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "file-replay",
+    "path": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-tui-entry-polish/.omo/evidence/20260813-memory-tui-polish/before-ansi.txt"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 110,
+    "rows": 34
+  },
+  "cleanup": "no pty (replay)",
+  "files": {
+    "png": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-tui-entry-polish/.omo/evidence/20260813-memory-tui-polish/before/terminal.png",
+    "text": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-tui-entry-polish/.omo/evidence/20260813-memory-tui-polish/before/terminal.txt",
+    "ansi": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-tui-entry-polish/.omo/evidence/20260813-memory-tui-polish/before/terminal-ansi.txt",
+    "metadata": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-memory-tui-entry-polish/.omo/evidence/20260813-memory-tui-polish/before/metadata.json"
+  }
+}

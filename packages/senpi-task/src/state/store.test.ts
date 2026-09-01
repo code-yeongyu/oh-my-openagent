@@ -63,6 +63,7 @@ describe("TaskRecordStore", () => {
       agent_type: "sisyphus",
       execution_mode: "background",
       model: "gpt-5.2",
+      notify_on_terminal: false,
       tool_allow: ["read", "bash"],
       tool_deny: ["write"],
     })
@@ -85,6 +86,30 @@ describe("TaskRecordStore", () => {
     expect(reloaded).toEqual(completed)
   })
 
+  test("#given a task spawned with a description #when saved and reloaded #then the description survives the round trip", () => {
+    // given a record carrying the human label the task tool accepts
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    const record = createTaskRecord({
+      name: "task-1",
+      description: "Audit the waiting-line renderers",
+      parent_session_id: "parent-session",
+      root_session_id: "root-session",
+      depth: 1,
+      category: "quick",
+      execution_mode: "in-process",
+      model: "gpt-5.2",
+      notify_on_terminal: false,
+    })
+
+    // when
+    store.save(record)
+
+    // then the durable record keeps the label status views render
+    expect(record.description).toBe("Audit the waiting-line renderers")
+    expect(store.load(record.task_id)?.description).toBe("Audit the waiting-line renderers")
+  })
+
   test("#given sensitive event payload #when event is appended #then jsonl payload is redacted", () => {
     // given
     const project = tempProject()
@@ -95,6 +120,7 @@ describe("TaskRecordStore", () => {
       depth: 0,
       execution_mode: "direct",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     })
     store.save(record)
 
@@ -121,6 +147,7 @@ describe("TaskRecordStore", () => {
       depth: 0,
       execution_mode: "direct",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     })
     store.save(good)
     const tasksDir = join(resolveStateDir({ project_dir: project }), "tasks")
@@ -151,6 +178,7 @@ describe("TaskRecordStore", () => {
       depth: 0,
       execution_mode: "direct",
       model: "gpt-5.2",
+      notify_on_terminal: false,
     })
     const duplicate = {
       ...createTaskRecord({
@@ -159,6 +187,7 @@ describe("TaskRecordStore", () => {
         depth: 0,
         execution_mode: "direct",
         model: "gpt-5.2",
+        notify_on_terminal: false,
       }),
       task_id: original.task_id,
     }
@@ -190,6 +219,7 @@ describe("TaskRecordStore", () => {
         depth: 0,
         execution_mode: "direct",
         model: "gpt-5.2",
+        notify_on_terminal: false,
       }),
       {
         type: "start",

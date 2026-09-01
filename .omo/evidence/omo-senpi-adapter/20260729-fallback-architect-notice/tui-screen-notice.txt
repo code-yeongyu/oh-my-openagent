@@ -1,0 +1,26 @@
+Real senpi TUI (PTY 110x34, sandbox agent dir, omo-mock provider, scenario A refusal->fallback).
+Screen 1 (after first prompt) — upgrade card rendered by the registered renderer, no directive/reminder text visible:
+
+ design a caching layer for the fixture service
+
+ Error: mock classifier refusal
+ System prompt: fallback (senpi-current)
+ Warning: Model fallback: omo-mock/claude-fable-5 -> omo-mock/mock-weak (refusal)
+
+⚡ Fallback upgrade engaged
+Fable 5 declined that one — mock-weak takes the wheel, zero downtime.
+Top-tier reasoning stays on call: task(category: "architect") still consults Fable 5 at xhigh.
+mock-weak on execution + Fable 5 xhigh on hard thinking — two frontier brains, one session.
+
+ fallback model answered
+ Fallback model omo-mock/mock-weak responded
+
+Screen 2 (after second prompt) — user bubble byte-identical, reminder invisible:
+
+ next question about the cache
+
+ fallback model answered
+
+Transcript flags (tui-session-transcript.jsonl):
+omo-fallback-architect:notice display=True details={'from': 'omo-mock/claude-fable-5', 'to': 'omo-mock/mock-weak'}
+omo-fallback-architect:reminder display=False

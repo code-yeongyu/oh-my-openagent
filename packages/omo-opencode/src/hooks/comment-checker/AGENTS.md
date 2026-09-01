@@ -45,7 +45,7 @@ tool.execute.after (same callID, or apply_patch)
 ## CONFIG
 
 ```jsonc
-// oh-my-opencode.jsonc
+// .omo/omo.jsonc
 {
   "comment_checker": {
     "enabled": true,      // default: true

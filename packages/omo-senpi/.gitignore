@@ -1,2 +1,4 @@
 /plugin/extensions/
 /plugin/skills/
+/plugin/runtime/ast-grep-mcp/
+/plugin/runtime/agent-toolkit/

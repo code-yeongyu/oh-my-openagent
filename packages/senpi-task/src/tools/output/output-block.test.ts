@@ -1,24 +1,19 @@
 import { describe, expect, test } from "bun:test"
-import type { AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
 import { makeRecord } from "./__fixtures__/records"
-import { runTaskOutput } from "./output"
-import type { OutputManager, TaskOutputDeps, TranscriptReadResult } from "./types"
+import { runTaskOutput, TaskOutputParams } from "./output"
+import type { OutputManager, TaskOutputDeps, TaskOutputToolResult } from "./types"
 
-const WAIT_CONFIG = { min_ms: 1, default_ms: 50, max_ms: 100 } as const
+const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
-type MutableOutputManager = Omit<OutputManager, "waitFor"> & {
-  readonly waitFor: (taskId: string, options?: { readonly signal?: AbortSignal }) => Promise<TaskRecord>
+type ObservableOutputManager = OutputManager & {
+  readonly waitFor: (taskId: string) => Promise<TaskRecord>
   readonly waitForCalls: () => readonly string[]
 }
 
-function managerFrom(input: {
-  readonly records: readonly TaskRecord[]
-  readonly waitFor?: (taskId: string) => Promise<TaskRecord>
-}): MutableOutputManager {
-  let records = [...input.records]
+function managerFrom(records: readonly TaskRecord[]): ObservableOutputManager {
   const waitForCalls: string[] = []
   return {
     get: (taskId) => records.find((record) => record.task_id === taskId),
@@ -27,166 +22,68 @@ function managerFrom(input: {
         scope.scope === "all" ? records : records.filter((record) => record.parent_session_id === scope.session_id)
       return filtered.map((record) => ({ record }))
     },
-    async waitFor(taskId) {
+    waitFor: (taskId) => {
       waitForCalls.push(taskId)
-      const next = await input.waitFor?.(taskId)
-      if (next !== undefined) {
-        records = records.map((record) => (record.task_id === taskId ? next : record))
-        return next
-      }
-      const current = records.find((record) => record.task_id === taskId)
-      if (current === undefined) throw new Error(`missing test record ${taskId}`)
-      return current
+      return Promise.resolve(records.find((record) => record.task_id === taskId) ?? makeRecord({ task_id: taskId }))
     },
     waitForCalls: () => waitForCalls,
   }
 }
 
-function depsFrom(input: {
-  readonly manager: MutableOutputManager
-  readonly reader?: () => TranscriptReadResult
-  readonly now?: () => number
-}): TaskOutputDeps {
+function depsFrom(manager: ObservableOutputManager): TaskOutputDeps {
   return {
-    manager: input.manager,
+    manager,
     stateDir: "/tmp/state",
-    waitConfig: WAIT_CONFIG,
-    now: input.now ?? (() => Date.parse("2024-12-03T15:00:00.000Z")),
-    transcriptReader: input.reader ?? (() => ({ entries: [], source: "none" })),
+    now: () => Date.parse("2024-12-03T15:00:00.000Z"),
+    transcriptReader: () => ({ entries: [], source: "none" }),
   }
 }
 
-describe("runTaskOutput block", () => {
-  test("#given a blocking running child #when it starts waiting #then it emits progress before waitFor resolves", async () => {
-    const running = makeRecord({ task_id: "st_running", status: "running" })
-    let resolveWait: (record: TaskRecord) => void = () => {}
-    const manager = managerFrom({
-      records: [running],
-      waitFor: () => new Promise<TaskRecord>((resolve) => { resolveWait = resolve }),
-    })
-    const updates: Parameters<AgentToolUpdateCallback>[0][] = []
-    const pending = runTaskOutput(
-      depsFrom({ manager }),
-      { task_id: "st_running", timeout_ms: 999 },
-      "session-parent",
-      undefined,
-      (update) => { updates.push(update) },
-    )
+function firstText(result: TaskOutputToolResult): string {
+  const first = result.content[0]
+  return first?.type === "text" ? first.text : ""
+}
 
-    expect(updates).toHaveLength(1)
-    expect(updates[0]?.content).toEqual([{ type: "text", text: "waiting for st_running (running)" }])
-    expect(updates[0]?.details).toEqual({
-      kind: "waiting",
-      progress: { activity: "waiting for st_running (running)", startedAt: Date.parse("2024-12-03T15:00:00.000Z"), maxWaitMs: 100 },
-    })
+describe("runTaskOutput non-blocking peek", () => {
+  test("#given the task_output schema #when exposed to a model #then blocking controls are absent", () => {
+    // when
+    const properties = TaskOutputParams.properties
 
-    resolveWait(makeRecord({ task_id: "st_running", status: "completed", final_response: "done" }))
-    expect((await pending).details.kind).toBe("status")
+    // then
+    expect(properties).not.toHaveProperty("block")
+    expect(properties).not.toHaveProperty("timeout_ms")
+    expect(properties).not.toHaveProperty("wait_for")
   })
 
-  test("#given omitted block on a running child #when waitFor resolves #then the terminal transcript is returned", async () => {
+  test("#given a running child #when task_output reads its status #then it returns its running snapshot without waiting", async () => {
+    // given
     const running = makeRecord({ task_id: "st_running", status: "running" })
-    let resolveWait: (record: TaskRecord) => void = () => {}
-    const waitFor = () =>
-      new Promise<TaskRecord>((resolve) => {
-        resolveWait = resolve
-      })
-    const manager = managerFrom({ records: [running], waitFor })
-    const deps = depsFrom({
-      manager,
-      reader: () => ({
-        entries: [{ kind: "assistant", text: "terminal transcript" }],
-        source: "event-log",
-      }),
-    })
+    const manager = managerFrom([running])
 
-    const pending = runTaskOutput(deps, { task_id: "st_running", mode: "full" }, "session-parent")
-    resolveWait(makeRecord({ task_id: "st_running", status: "completed", final_response: "done" }))
-    const result = await pending
+    // when
+    const result = await runTaskOutput(depsFrom(manager), { task_id: running.task_id, mode: "status" }, "session-parent")
 
-    expect(manager.waitForCalls()).toEqual(["st_running"])
-    expect(result.details.kind).toBe("transcript")
-    if (result.details.kind === "transcript") {
-      expect(result.details.snapshot.status).toBe("completed")
-      expect(result.details.transcript).toContain("terminal transcript")
-    }
-  })
-
-  test("#given block false on a running child #when read #then it peeks without waiting", async () => {
-    const running = makeRecord({ task_id: "st_running", status: "running" })
-    const manager = managerFrom({
-      records: [running],
-      waitFor: () => Promise.reject(new Error("waitFor should not be called")),
-    })
-    const deps = depsFrom({ manager })
-
-    const result = await runTaskOutput(deps, { task_id: "st_running", block: false }, "session-parent")
-
+    // then
     expect(manager.waitForCalls()).toEqual([])
     expect(result.details.kind).toBe("status")
-    if (result.details.kind === "status") {
-      expect(result.details.snapshot.status).toBe("running")
-    }
+    if (result.details.kind === "status") expect(result.details.snapshot.status).toBe("running")
   })
 
-  test("#given block true on a running child #when the timeout wins #then its waiter is aborted and removed", async () => {
+  test.each([
+    ["block true", { block: true }],
+    ["block false", { block: false }],
+    ["blocking timeout", { timeout_ms: 1 }],
+  ] as const)("#given a legacy %s param #when task_output runs #then it redirects to notification-driven peeks", async (_label, legacyParam) => {
+    // given
     const running = makeRecord({ task_id: "st_running", status: "running" })
-    let waiterCount = 0
-    let onAbort: (() => void) | undefined
-    const manager: MutableOutputManager = {
-      get: () => running,
-      list: () => [{ record: running }],
-      waitFor: (_taskId, options) => new Promise<TaskRecord>((_resolve, reject) => {
-        waiterCount += 1
-        onAbort = () => {
-          waiterCount -= 1
-          reject(options?.signal?.reason)
-        }
-        options?.signal?.addEventListener("abort", onAbort, { once: true })
-      }),
-      waitForCalls: () => [],
-    }
+    const manager = managerFrom([running])
 
-    const result = await runTaskOutput(depsFrom({ manager }), { task_id: "st_running", timeout_ms: 1 }, "session-parent")
+    // when
+    const result = await runTaskOutput(depsFrom(manager), { task_id: running.task_id, ...legacyParam }, "session-parent")
 
-    expect(result.details.kind).toBe("timed_out")
-    expect(waiterCount).toBe(0)
-    expect(onAbort).toBeDefined()
-  })
-
-  test("#given block true on a running child #when the timeout wins #then timed_out is returned", async () => {
-    let currentNow = 1000
-    const running = makeRecord({ task_id: "st_running", status: "running" })
-    const manager = managerFrom({
-      records: [running],
-      waitFor: () => new Promise<TaskRecord>(() => {}),
-    })
-    const deps = depsFrom({
-      manager,
-      now: () => currentNow,
-    })
-
-    const pending = runTaskOutput(deps, { task_id: "st_running", block: true, timeout_ms: 1 }, "session-parent")
-    currentNow = 1001
-    const result = await pending
-
-    expect(result.details).toEqual({ kind: "timed_out", task_id: "st_running", waited_ms: 1 })
-  })
-
-  test("#given an already terminal child #when block true #then it returns immediately without waiting", async () => {
-    const completed = makeRecord({ task_id: "st_done", status: "completed", final_response: "done" })
-    const manager = managerFrom({
-      records: [completed],
-      waitFor: () => Promise.reject(new Error("waitFor should not be called")),
-    })
-    const deps = depsFrom({ manager })
-
-    const result = await runTaskOutput(deps, { task_id: "st_done", block: true, mode: "full" }, "session-parent")
-
+    // then
     expect(manager.waitForCalls()).toEqual([])
-    expect(result.details.kind).toBe("transcript")
-    if (result.details.kind === "transcript") {
-      expect(result.details.snapshot.status).toBe("completed")
-    }
+    expect(result.details.kind).toBe("invalid_arguments")
+    expect(firstText(result)).toBe(BLOCKING_REMOVED_GUIDANCE)
   })
 })

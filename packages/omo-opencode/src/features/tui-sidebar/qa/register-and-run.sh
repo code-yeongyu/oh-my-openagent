@@ -51,7 +51,7 @@ JS
 PROJECT="$OQA_PROJ"
 if [ "$DISABLED" -eq 1 ]; then
   mkdir -p "$PROJECT/.opencode"
-  cat >"$PROJECT/.opencode/oh-my-openagent.json" <<'JSON'
+  cat >"$PROJECT/.omo/omo.jsonc" <<'JSON'
 {
   "tui": {
     "sidebar": {

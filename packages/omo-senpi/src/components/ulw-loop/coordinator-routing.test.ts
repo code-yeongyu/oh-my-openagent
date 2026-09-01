@@ -6,7 +6,7 @@ import { describe, expect, it } from "bun:test"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import { createUlwLoopComponent } from "./index"
-import { activeStatus, createLogger } from "./ulw-loop.test-support"
+import { activeStatus, createLogger, sessionEventCtx } from "./ulw-loop.test-support"
 
 describe("omo-senpi ulw-loop continuation routing through the idle coordinator", () => {
   it("#given a coordinator in ctx #when a continuation fires #then it routes through the coordinator, not a direct user message", async () => {
@@ -14,19 +14,20 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
     const delivered: string[] = []
-    const idleCoordinator = new IdleInjectionCoordinator((content) => delivered.push(content))
+    const idleCoordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
       resolveOmoBin: () => "/tmp/omo",
+      planDirExists: () => true,
       runCommand: async (_bin, _args, _options) => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
     // when
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
 
     // then the continuation was delivered through the coordinator exactly once, and NOT via sendUserMessage
     expect(delivered).toHaveLength(1)
-    expect(delivered[0]).toContain("Continue the active omo ulw-loop run")
+    expect(delivered[0]).toContain("Continue the active omo-agent-toolkit ulw-loop run")
     expect(pi.userMessages).toEqual([])
   })
 
@@ -35,23 +36,24 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
     const delivered: string[] = []
-    const idleCoordinator = new IdleInjectionCoordinator((content) => delivered.push(content))
+    const idleCoordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
     idleCoordinator.enqueue({ key: "st_done", source: "task-completion", content: "task st_done completed" })
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
       resolveOmoBin: () => "/tmp/omo",
+      planDirExists: () => true,
       runCommand: async (_bin, _args, _options) => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
     // when
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
 
     // then exactly one injection carries both, completion first
     expect(delivered).toHaveLength(1)
-    expect(delivered[0]).toBe("task st_done completed\n\nContinue the active omo ulw-loop run.\nRun `omo ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.")
+    expect(delivered[0]).toBe("task st_done completed\n\nContinue the active omo-agent-toolkit ulw-loop run.\nRun `omo-agent-toolkit ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.")
   })
 
-  it("#given active boulder start-work continuation #when ulw-loop agent_end fires #then it enqueues nothing", async () => {
+  it("#given active boulder ulw-execute continuation #when ulw-loop agent_end fires #then it enqueues nothing", async () => {
     // given a workspace with active senpi boulder work
     const root = mkdtempSync(join(tmpdir(), "senpi-ulw-precedence-"))
     try {
@@ -79,9 +81,10 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
       const pi = new FakeExtensionAPI()
       const logger = createLogger()
       const delivered: string[] = []
-      const idleCoordinator = new IdleInjectionCoordinator((content) => delivered.push(content))
+      const idleCoordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
       await createUlwLoopComponent({
         resolveOmoBin: () => "/tmp/omo",
+        planDirExists: () => true,
         runCommand: async () => ({ code: 0, stdout: activeStatus() }),
       }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 

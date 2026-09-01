@@ -1,0 +1,50 @@
+RED
+Command:
+  bun test packages/omo-senpi/src/components/memory/worker/dream-dispatch.integration.test.ts
+
+Result before implementation:
+  0 pass
+  2 fail
+  2 expect() calls
+
+Failure excerpt:
+  Expected: "merged"
+  Received: "failed"
+  (fail) dream worker dispatch > #given a dream with people disabled #when the worker launches #then it selects dream inputs and touches no people path
+  (fail) dream worker dispatch > #given custom people limits #when the dream writes fixture entries #then it honors the resolved limits exactly
+
+GREEN
+Command:
+  bun test packages/omo-senpi/src/components/memory/worker/*.test.ts packages/memory-core/src/reflection/assets/assets.test.ts packages/omo-senpi/src/components/memory/sandbox.test.ts
+
+Result after implementation:
+  45 pass
+  0 fail
+  171 expect() calls
+  Ran 45 tests across 10 files.
+
+Covered acceptance:
+  - dream persona selected by request trigger
+  - skills-usage.json and dream-state.json copied into the run directory and exposed by env
+  - absent ledgers materialized as readable empty JSON objects
+  - resolved per-agent dream-policy.json exposed by DREAM_POLICY_PATH
+  - people.enabled:false produces no people path or write
+  - custom max_entries and max_entry_chars honored exactly
+  - existing reflection runner integration remains green
+  - worker reconciliation, finalization, supervisor, sandbox, and persona asset suites remain green
+
+SCOPED TYPECHECK GREEN
+Command:
+  bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.task22.tmp.json
+
+Result:
+  scoped typecheck: PASS
+
+The temporary project included only task-22's four touched TypeScript files and was removed after the check.
+
+CONCURRENT-WORK DISCREPANCY
+A package-wide typecheck was clean earlier in this task, then became blocked while verification was running by concurrently-created todo-17 files outside task-22 scope:
+  packages/omo-senpi/src/components/memory/commands/people.test.ts
+  packages/omo-senpi/src/components/memory/commands/people-ask.ts
+
+Observed failures were missing/incomplete todo-17 command modules and types. Task-22 files remained clean under the scoped strict typecheck. These concurrent files were not edited, staged, or included in this commit.

@@ -73,18 +73,37 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
         ...(transition.child_session_id === undefined ? {} : { child_session_id: transition.child_session_id }),
       }
     case "complete":
-      return { ...record, final_response: transition.final_response }
+      return { ...record, final_response: transition.final_response, ...runStatsField(transition.run_stats) }
     case "fail":
-      return { ...record, error_message: transition.error_message, ...(transition.killed === true ? { killed: true } : {}) }
+      return {
+        ...record,
+        error_message: transition.error_message,
+        ...(transition.killed === true ? { killed: true } : {}),
+        ...runStatsField(transition.run_stats),
+      }
     case "lose":
       return { ...record, error_message: transition.error_message }
     case "cancel":
     case "interrupt":
-      return transition.error_message === undefined ? record : { ...record, error_message: transition.error_message }
+      return {
+        ...record,
+        ...(transition.error_message === undefined ? {} : { error_message: transition.error_message }),
+        ...runStatsField(transition.run_stats),
+      }
+    case "persist_only": {
+      // In-process suspension: the owning engine is gone, so host_pid AND the last child pid are
+      // both meaningless. Status, epochs, terminal fields, and run stats ride through untouched.
+      const { host_pid: _hostPid, pid: _pid, ...rest } = record
+      return rest
+    }
+    case "detach_rpc": {
+      // RPC suspension: only host ownership is gone. The last pid is RETAINED so reconcile can
+      // still detect and terminate the orphaned OS process before any replacement spawns.
+      const { host_pid: _hostPid, ...rest } = record
+      return rest
+    }
     case "evict":
     case "dispose":
-    case "persist_only":
-    case "detach_rpc":
     case "mark_resident":
       return record
     default:
@@ -141,9 +160,22 @@ export function transitionTaskRecord(record: TaskRecord, transition: TaskTransit
 
 export function markRecordLostForReconciliation(
   record: TaskRecord,
-  input: { readonly timestamp: string; readonly error_message: string },
+  input: { readonly timestamp: string; readonly error_message: string; readonly updateReason?: boolean },
 ): TaskTransitionResult {
-  if (terminalStatuses.has(record.status)) {
+  const shouldUpdateReason = input.updateReason === true
+  if (terminalStatuses.has(record.status) && record.status !== "lost") {
+    return {
+      applied: false,
+      record,
+      audit: {
+        type: "late_transition_ignored",
+        attempted_status: "lost",
+        current_status: record.status,
+      },
+    }
+  }
+
+  if (record.status === "lost" && !shouldUpdateReason) {
     return {
       applied: false,
       record,
@@ -194,6 +226,10 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
     default:
       return assertNever(transition)
   }
+}
+
+function runStatsField(runStats: TaskRecord["run_stats"]): Pick<TaskRecord, "run_stats"> {
+  return runStats === undefined ? {} : { run_stats: runStats }
 }
 
 function assertNever(value: never): never {

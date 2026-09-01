@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-
+import type { Engine, LoadedRule, PiRulesConfig } from "@oh-my-opencode/rules-engine/engine";
+import { isNeverTruncatedRule } from "@oh-my-opencode/rules-engine/engine";
 import type { CodexRulesHookOptions } from "./codex-hook-options.js";
 import { configFromEnvironment } from "./config.js";
 import { withPromptBudget } from "./event-budget.js";
@@ -7,9 +8,6 @@ import { formatAdditionalContextOutput } from "./hook-output.js";
 import { completePostCompactRecovery, hydrateEngineState, persistEngineState } from "./persistent-cache.js";
 import { withPostCompactBudget } from "./post-compact-budget.js";
 import { buildPostCompactReadDirective } from "./post-compact-directive.js";
-import type { Engine } from "@oh-my-opencode/rules-engine/engine";
-import { isNeverTruncatedRule } from "@oh-my-opencode/rules-engine/engine";
-import type { LoadedRule, PiRulesConfig } from "@oh-my-opencode/rules-engine/engine";
 import { createRulesEngine } from "./rules-engine-factory.js";
 import { filterRulesAlreadyInTranscript, filterRulesNotInTranscriptText } from "./transcript-rule-filter.js";
 import type { TranscriptSearchOptions } from "./transcript-search.js";
@@ -120,10 +118,7 @@ function runPostCompactRecovery(input: PostCompactRecoveryInput): string {
 		engine.markStaticInjected(rule);
 	}
 	persistEngineState(engine, input.cachePath, input.channel);
-	return formatAdditionalContextOutput(
-		input.eventName,
-		combineStaticContext(bodyBlock, directive),
-	);
+	return formatAdditionalContextOutput(input.eventName, combineStaticContext(bodyBlock, directive));
 }
 
 function readRecoveryTranscriptText(transcriptPath: string | null): string | null {
@@ -153,7 +148,7 @@ function recoverDynamicRulePaths(
 			if (staticRulePaths.has(rulePath)) {
 				continue;
 			}
-			if (transcriptText !== null && transcriptText.includes(rulePath)) {
+			if (transcriptText?.includes(rulePath)) {
 				continue;
 			}
 			if (!existsSync(rulePath)) {

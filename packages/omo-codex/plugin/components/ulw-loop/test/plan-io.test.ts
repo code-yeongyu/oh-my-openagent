@@ -117,7 +117,7 @@ describe("readUlwLoopPlan", () => {
 	it("throws UlwLoopError when goals.json is missing", async () => {
 		// when/then
 		await expect(readUlwLoopPlan(repoRoot)).rejects.toThrow(UlwLoopError);
-		await expect(readUlwLoopPlan(repoRoot)).rejects.toThrow("omo ulw-loop create-goals");
+		await expect(readUlwLoopPlan(repoRoot)).rejects.toThrow("omo-agent-toolkit ulw-loop create-goals");
 	});
 
 	it("returns parsed plan when fixture is present", async () => {

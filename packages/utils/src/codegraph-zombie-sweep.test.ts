@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } f
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { CODEGRAPH_PINNED_VERSION } from "./codegraph/manifest"
 import { sweepCodegraphZombies } from "./codegraph/process-sweep"
 
 function writeDaemonLock(projectDir: string, body: string): string {
@@ -13,7 +14,7 @@ function writeDaemonLock(projectDir: string, body: string): string {
   return lockFile
 }
 
-function daemonLockBody(pid: number, version = "1.4.1"): string {
+function daemonLockBody(pid: number, version = CODEGRAPH_PINNED_VERSION): string {
   return `${JSON.stringify({ pid, socketPath: "/tmp/daemon.sock", startedAt: 1784615252733, version }, null, 2)}\n`
 }
 
@@ -55,14 +56,13 @@ describe("CodeGraph zombie sweep", () => {
     expect(killed).toEqual([])
   })
 
-  it("#given a fresh throttle stamp #when sweep runs without force #then it skips process enumeration", async () => {
+  it("#given a fresh daemon throttle stamp #when sweep runs without force #then workers are checked while the daemon lane stays throttled", async () => {
     // given
     const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-sweep-home-"))
+    let providerCalls = 0
     try {
       const nowMs = Date.UTC(2026, 6, 6, 1, 0, 0)
       const stampDate = new Date(nowMs - 30 * 60 * 1_000)
-
-      // when
       const first = await sweepCodegraphZombies({
         force: true,
         homeDir,
@@ -70,18 +70,24 @@ describe("CodeGraph zombie sweep", () => {
         ownedRoots: ["/tmp/omo"],
         processProvider: () => Promise.resolve([]),
       })
-      utimesSync(first.stampFile, stampDate, stampDate)
+      utimesSync(first.daemonStampFile, stampDate, stampDate)
+
+      // when
       const result = await sweepCodegraphZombies({
         homeDir,
         nowMs,
         ownedRoots: ["/tmp/omo"],
         processProvider: () => {
-          throw new Error("process provider should not run while throttled")
+          providerCalls += 1
+          return Promise.resolve([])
         },
       })
 
       // then
-      expect(result.action).toBe("throttled")
+      expect(result.action).toBe("swept")
+      expect(result.workerAction).toBe("swept")
+      expect(result.daemonAction).toBe("throttled")
+      expect(providerCalls).toBe(1)
     } finally {
       rmSync(homeDir, { force: true, recursive: true })
     }

@@ -35,16 +35,23 @@ function rpcHandle(calls: HandleCalls, hasTerminatePort: boolean): ManagedChildH
   }
 }
 
-function registryFor(handle: ManagedChildHandle) {
+function registryFor(handle: ManagedChildHandle, pendingSteering: readonly unknown[] = []) {
   const manager = {
     getResidentHandle: (taskId: string) => (taskId === handle.task_id ? handle : undefined),
     residentTaskIds: () => [handle.task_id],
     forget: () => undefined,
+    hasPendingSends: (taskId: string) => taskId === handle.task_id && pendingSteering.length > 0,
+    get: () => undefined,
   }
   return createManagerResidencyRegistry(() => manager)
 }
 
 describe("createManagerResidencyRegistry rpc teardown bridge", () => {
+  it("#given a resident with a queued steering message #when pending sends are checked #then the registry reports true", () => {
+    const resident = registryFor(rpcHandle({ abort: 0, terminate: 0 }, true), [{ message: "queued" }])
+    expect(resident.hasPendingSends("st_rpc")).toBe(true)
+  })
+
   it("#given an rpc resident #when lifecycle terminates it #then process termination runs without aborting the turn", async () => {
     // given
     const calls: HandleCalls = { abort: 0, terminate: 0 }

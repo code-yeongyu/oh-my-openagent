@@ -3,17 +3,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const FALLBACK_CATALOG = {
-	version: "fallback.gpt-5.6-sol-372k-high",
+	version: "fallback.gpt-5.6-sol-650k-high",
 	current: {
 		model: "gpt-5.6-sol",
-		model_context_window: 372_000,
+		model_context_window: 650_000,
 		model_reasoning_effort: "high",
 		plan_mode_reasoning_effort: "xhigh",
 	},
 	roles: {
 		default: {
 			model: "gpt-5.6-sol",
-			model_context_window: 372_000,
+			model_context_window: 650_000,
 			model_reasoning_effort: "high",
 			plan_mode_reasoning_effort: "xhigh",
 		},

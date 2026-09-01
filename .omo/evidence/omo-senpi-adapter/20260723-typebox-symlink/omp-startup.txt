@@ -1,0 +1,20 @@
+OMP interactive startup
+command:
+  PI_CODING_AGENT_DIR=/tmp/omo-senpi-omp-green-agent \
+    omp --plugin-dir packages/omo-senpi/plugin --no-session --no-skills --no-rules --cwd <worktree>
+
+observed:
+  omp v17.0.7
+  Welcome back!
+  branch: fix/omo-senpi-typebox-symlink
+  exit_code=0 after Ctrl-D
+  no "Failed to load extension"
+  no unresolved "typebox" warning
+  no unresolved "@earendil-works/pi-tui" warning
+
+Flag note:
+  OMP 17.0.7 rejects `--offline`, so that planned flag could not be used. `--no-tools` was intentionally omitted so the loaded plugin surface remained visible; no prompt was submitted and no model API call occurred.
+
+cleanup:
+  removed /tmp/omo-senpi-omp-green-agent
+  PTY bash_86 exited 0
