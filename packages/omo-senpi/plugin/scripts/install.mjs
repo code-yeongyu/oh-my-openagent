@@ -257,6 +257,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "reflection-persona.md"),
   join4("extensions", "dream-persona.md"),
   join4("extensions", "facts-persona.md"),
+  join4("extensions", "memorian-persona.md"),
   join4("skills", "ast-grep", "SKILL.md"),
   join4("skills", "coding-agent-sessions", "SKILL.md"),
   join4("skills", "debugging", "SKILL.md"),

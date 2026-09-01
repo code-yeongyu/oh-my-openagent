@@ -4988,8 +4988,45 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     test("should handle 10 tasks with limit 5 returning immediately", async () => {
       // given
       const config = { defaultConcurrency: 5 }
+      let releasePromptAsync: () => void = () => {}
+      const promptAsyncReleased = new Promise<void>((resolve) => {
+        releasePromptAsync = resolve
+      })
+      let promptAsyncCalls = 0
+      let promptAsyncCompletions = 0
+      let resolveFivePromptAsyncCalls: (() => void) | undefined
+      const fivePromptAsyncCalls = new Promise<void>((resolve) => {
+        resolveFivePromptAsyncCalls = resolve
+      })
+      let resolveFivePromptAsyncCompletions: (() => void) | undefined
+      const fivePromptAsyncCompletions = new Promise<void>((resolve) => {
+        resolveFivePromptAsyncCompletions = resolve
+      })
+      const gatedClient = {
+        session: {
+          create: async () => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          prompt: async () => ({}),
+          promptAsync: async () => {
+            promptAsyncCalls++
+            if (promptAsyncCalls === 5) {
+              resolveFivePromptAsyncCalls?.()
+            }
+            await promptAsyncReleased
+            promptAsyncCompletions++
+            if (promptAsyncCompletions === 5) {
+              resolveFivePromptAsyncCompletions?.()
+            }
+            return {}
+          },
+          messages: async () => ({ data: [] }),
+          todo: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+          abort: async () => ({}),
+        },
+      }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(gatedClient), config })
 
       const input = {
         description: "Test task",
@@ -5000,21 +5037,22 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       }
 
       // when
-      const startTime = Date.now()
-      const tasks = await Promise.all(
+      const taskResults = Promise.all(
         Array.from({ length: 10 }, () => manager.launch(input))
       )
-      const endTime = Date.now()
+      const tasks = await taskResults
+      await fivePromptAsyncCalls
 
-      // then
-      expect(endTime - startTime).toBeLessThan(200)
+      // then - all enqueue calls settle while every available prompt is blocked
+      expect(promptAsyncCalls).toBe(5)
       expect(tasks).toHaveLength(10)
       tasks.forEach(task => {
         expect(task.status).toBe("pending")
         expect(task.id).toMatch(/^bg_/)
       })
 
-      await waitUntil(() => tasks.filter(t => manager.getTask(t.id)?.status === "running").length >= 5, 600)
+      releasePromptAsync()
+      await fivePromptAsyncCompletions
 
       const updatedTasks = tasks.map(t => manager.getTask(t.id))
       const runningCount = updatedTasks.filter(t => t?.status === "running").length

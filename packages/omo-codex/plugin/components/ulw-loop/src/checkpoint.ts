@@ -3,15 +3,11 @@ import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
-	buildTaskScopedAggregateReconciliationHint,
 	canReconcileActiveFinalTaskScopedAggregateSnapshot,
 	canReconcileCompletedTaskScopedAggregateSnapshot,
+	codexSnapshotMismatchError,
 } from "./checkpoint-reconciliation.js";
-import {
-	formatCodexGoalReconciliation,
-	readCodexGoalSnapshotInput,
-	reconcileCodexGoalSnapshot,
-} from "./codex-goal-snapshot.js";
+import { readCodexGoalSnapshotInput, reconcileCodexGoalSnapshot } from "./codex-goal-snapshot.js";
 import { requireAllCriteriaPass, requireAllPlanCriteriaPass, requireEssentialCriteriaPass } from "./evidence.js";
 import {
 	codexGoalMode,
@@ -140,13 +136,16 @@ function buildLedger(
 	codexGoal: unknown,
 	aggregateCompletion: UlwLoopAggregateCompletion | undefined,
 ): UlwLoopLedgerEntry {
-	const watch = qualityGate?.codeReview.codeQualityStatus === "WATCH";
+	const watch = qualityGate?.surface === "lazycodex" && qualityGate.codeReview.codeQualityStatus === "WATCH";
 	const entry: UlwLoopLedgerEntry = {
 		at: now,
 		kind: ledgerKind(args.status, goal, aggregateCompletion),
 		goalId: goal.id,
 		status: goal.status,
-		evidence: watch ? `${args.evidence} | codeQuality=WATCH: ${qualityGate.codeReview.evidence}` : args.evidence,
+		evidence:
+			watch && qualityGate.surface === "lazycodex"
+				? `${args.evidence} | codeQuality=WATCH: ${qualityGate.codeReview.evidence}`
+				: args.evidence,
 	};
 	if (codexGoal !== undefined) entry.codexGoal = codexGoal;
 	if (qualityGate !== undefined) entry.qualityGate = qualityGate;
@@ -218,10 +217,7 @@ export async function checkpointUlwLoop(
 					));
 				const taskScoped = completedTaskScoped || activeFinalTaskScoped;
 				if (!taskScoped)
-					throw new UlwLoopError(
-						`${formatCodexGoalReconciliation(reconciliation)}${aggregate && snapshot?.status === "complete" && objective !== undefined ? buildTaskScopedAggregateReconciliationHint(goal, final) : ""}`,
-						"ulw_loop_codex_snapshot_mismatch",
-					);
+					throw codexSnapshotMismatchError({ reconciliation, snapshot, expectedObjective: expectedCodexObjective(plan, goal), taskScopedHint: { goal, aggregate, final } });
 			}
 			if (closesBatch) requireBatchFinalReady(plan, goal);
 			if (closesBatch && args.qualityGateJson === undefined)

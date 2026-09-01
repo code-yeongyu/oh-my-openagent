@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process"
 import {
   chmodSync,
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -89,18 +90,39 @@ function parseArgs(argv: readonly string[]): BuildOptions {
   return { outputDir, checkOnly }
 }
 
-function runSenpiPluginBuild(): void {
-  const buildRoot = mkdtempSync(join(tmpdir(), "omo-native-lsp-build-"))
+function runSenpiPluginBuild(outputDir: string): void {
+  const buildRoot = mkdtempSync(join(tmpdir(), "omo-native-build-"))
+  const lspSource = join(buildRoot, "lsp-daemon", "dist")
+  const astSource = join(buildRoot, "ast-grep-mcp", "cli.js")
+  cpSync(join(repoRoot, "packages", "lsp-daemon", "dist"), lspSource, { recursive: true })
+  cpSync(join(repoRoot, "packages", "ast-grep-mcp", "dist", "cli.js"), astSource)
   try {
-    const result = spawnSync("bun", ["run", "build:senpi-plugin"], {
+    const result = spawnSync("bun", ["run", "build:senpi-plugin:native"], {
       cwd: repoRoot,
-      env: { ...process.env, OMO_LSP_DAEMON_DIST: join(buildRoot, "dist") },
+      env: {
+        ...process.env,
+        OMO_LSP_DAEMON_DIST: lspSource,
+        OMO_LSP_DAEMON_TARGET: join(buildRoot, "plugin", "runtime", "lsp-daemon", "dist"),
+        OMO_AST_GREP_MCP_ENTRY: astSource,
+        OMO_AST_GREP_MCP_TARGET: join(buildRoot, "plugin", "runtime", "ast-grep-mcp", "cli.js"),
+        OMO_AGENT_TOOLKIT_SOURCE_ENTRY: join(buildRoot, "codex", "ulw-loop", "cli.js"),
+        OMO_AGENT_TOOLKIT_TARGET: join(buildRoot, "plugin", "runtime", "agent-toolkit"),
+        OMO_SENPI_PLUGIN_OUTPUT: join(buildRoot, "plugin"),
+        OMO_SKIP_MATERIALIZE: "1",
+      },
       stdio: "inherit",
     })
     if (result.error !== undefined) throw result.error
     if (result.status !== 0) {
-      throw new Error(`build:senpi-plugin failed with exit code ${result.status ?? 1}`)
+      throw new Error(`build:senpi-plugin:native failed with exit code ${result.status ?? 1}`)
     }
+    const stagedPluginDir = join(buildRoot, "plugin")
+    cpSync(join(sourcePluginDir, "runtime", "dag"), join(stagedPluginDir, "runtime", "dag"), { recursive: true })
+    for (const name of PAYLOAD_FILES) {
+      const sourcePath = join(sourcePluginDir, name)
+      if (existsSync(sourcePath)) copyFileSync(sourcePath, join(stagedPluginDir, name))
+    }
+    copyPluginPayload(outputDir, stagedPluginDir)
   } finally {
     rmSync(buildRoot, { recursive: true, force: true })
   }
@@ -129,16 +151,16 @@ function copyFileIfPresent(sourcePath: string, outputPath: string): void {
   chmodSync(outputPath, statSync(sourcePath).mode & 0o777)
 }
 
-function copyPluginPayload(outputDir: string): void {
+function copyPluginPayload(outputDir: string, pluginDir = sourcePluginDir): void {
   mkdirSync(outputDir, { recursive: true })
   for (const name of PAYLOAD_DIRECTORIES) {
-    const sourcePath = join(sourcePluginDir, name)
+    const sourcePath = join(pluginDir, name)
     if (existsSync(sourcePath)) copyTree(sourcePath, join(outputDir, name))
   }
   for (const name of PAYLOAD_FILES) {
-    copyFileIfPresent(join(sourcePluginDir, name), join(outputDir, name))
+    copyFileIfPresent(join(pluginDir, name), join(outputDir, name))
   }
-  copyFileIfPresent(join(sourcePluginDir, PAYLOAD_SCRIPT), join(outputDir, PAYLOAD_SCRIPT))
+  copyFileIfPresent(join(pluginDir, PAYLOAD_SCRIPT), join(outputDir, PAYLOAD_SCRIPT))
 }
 
 function findMissingArtifact(outputDir: string): string | undefined {
@@ -152,8 +174,7 @@ function main(argv: readonly string[]): number {
   const options = parseArgs(argv)
   if (!options.checkOnly) {
     rmSync(options.outputDir, { recursive: true, force: true })
-    runSenpiPluginBuild()
-    copyPluginPayload(options.outputDir)
+    runSenpiPluginBuild(options.outputDir)
   }
   const missing = findMissingArtifact(options.outputDir)
   if (missing !== undefined) {
