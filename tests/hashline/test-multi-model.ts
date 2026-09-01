@@ -29,6 +29,7 @@ for (let i = 0; i < rawArgs.length; i++) {
     }
     perModelTimeoutSec = parsed;
     i++;
+  }
 }
 
 // ── Colors ────────────────────────────────────────────────────

@@ -1,0 +1,32 @@
+Scenario: real Senpi padded two-item background batch
+Captured: 2026-07-30T05:57:00Z
+
+Invocation:
+  HOME="<throwaway-home>" \
+  SENPI_BIN="$(command -v senpi)" \
+  TASK_E2E_OUT_DIR=.omo/evidence/20260730-senpi-task-padding/live-task-e2e-attempt2 \
+  node packages/omo-senpi/scripts/qa/task-e2e.mjs
+
+Concrete input:
+  A real Senpi mock-provider tool call supplied `prompt:""`,
+  `run_in_background:true`, two meaningful task items, blank top-level and
+  item optional fields, and empty item skill arrays that must not block
+  inheritance.
+
+Binary observable:
+  PASS iff two persisted child task ids reach terminal completion and no
+  `Provide EITHER prompt OR tasks` text appears.
+
+Observed:
+  result: PASS
+  task ids:
+    st_019fb190
+    st_019fb191
+  batch_fanout_two_children: PASS
+  no_leaked_pids: PASS
+  real_senpi_untouched: PASS
+  XOR error present: false
+
+Raw sanitized artifacts:
+  live-task-e2e-attempt2/verdict.json
+  live-task-e2e-attempt2/batch.stdout.json.log

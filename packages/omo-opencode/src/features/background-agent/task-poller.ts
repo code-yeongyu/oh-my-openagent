@@ -1,6 +1,4 @@
 import { log } from "../../shared"
-import { CONFIG_BASENAME } from "../../shared/plugin-identity"
-
 import type { BackgroundTaskConfig } from "../../config/schema"
 import type { BackgroundTask } from "./types"
 import type { ConcurrencyManager } from "./concurrency"
@@ -153,7 +151,7 @@ async function interruptStaleTask(args: {
   if (task.status !== "running" || task.sessionId !== sessionID) return
 
   task.status = "cancelled"
-  task.error = `Stale timeout (${reason} for ${staleMinutes}min${errorSuffix}). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${timeoutConfigKey}' in .opencode/${CONFIG_BASENAME}.json.`
+  task.error = `Stale timeout (${reason} for ${staleMinutes}min${errorSuffix}). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${timeoutConfigKey}' in .omo/omo.jsonc.`
   task.completedAt = new Date()
 
   if (task.concurrencyKey) {

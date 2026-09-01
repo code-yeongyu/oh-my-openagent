@@ -36,22 +36,22 @@ describe("formatCombinedDescription with bare-name skills", () => {
     const skills: SkillInfo[] = [
       makeSkill("refactor", "full refactor skill"),
       makeSkill("remove-ai-slops", "full cleanup skill"),
-      makeSkill("start-work", "full start-work skill"),
+      makeSkill("ulw-execute", "full ulw-execute skill"),
     ]
     const commands: CommandInfo[] = [
       makeCommand("refactor", "short refactor command"),
       makeCommand("remove-ai-slops", "short cleanup command"),
-      makeCommand("start-work", "short start-work command"),
+      makeCommand("ulw-execute", "short ulw-execute command"),
       makeCommand("handoff", "handoff command"),
     ]
 
     const result = formatCombinedDescription(skills, commands, { includeSkills: true })
     expect(result).toContain("/refactor")
     expect(result).toContain("/remove-ai-slops")
-    expect(result).toContain("/start-work")
+    expect(result).toContain("/ulw-execute")
     expect(result).not.toContain("short refactor command")
     expect(result).not.toContain("short cleanup command")
-    expect(result).not.toContain("short start-work command")
+    expect(result).not.toContain("short ulw-execute command")
     expect(result).toContain("/handoff")
   })
 

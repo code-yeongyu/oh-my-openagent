@@ -1,0 +1,53 @@
+
+[45m[37m oMoMoMoMo... Install [39m[49m
+
+[2m[1/4][22m Checking OpenCode installation...
+[32m[OK][39m OpenCode 1.18.13 detected
+[2m[2/4][22m Adding oh-my-openagent plugin...
+[32m[OK][39m Plugin added [36m->[39m [2mC:\Users\pss\AppData\Local\Temp\omo-6395-sandbox-xP2nSx\control\.config\opencode\opencode.json[22m
+[2m[3/4][22m Writing oh-my-openagent configuration...
+[32m[OK][39m Config written [36m->[39m [2mC:\Users\pss\AppData\Local\Temp\omo-6395-sandbox-xP2nSx\control\.omo\omo.jsonc[22m
+[33m[!][39m [33m[ast-grep] skipped sg provisioning: missing C:\Users\pss\AppData\Local\Temp\omo-6395-mkt-2o5YGp\control\plugins\omo\dist\cli\skills\ast-grep\install.ps1[39m
+
+[2m┌─[22m[1m Installation Complete [22m[2m───────────────────────────────────────────────────────────────────[22m[2m┐[22m
+[2m│[22m [1m[37mConfiguration Summary[39m[22m                                                                      [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m   [34m[i][39m Platform: opencode                                                                   [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m   [2m○[22m [2mClaude[22m                                                                                 [2m│[22m
+[2m│[22m   [2m○[22m [2mOpenAI/ChatGPT[22m[2m (GPT-5.6 Sol for Oracle)[22m                                                [2m│[22m
+[2m│[22m   [2m○[22m [2mGemini[22m                                                                                 [2m│[22m
+[2m│[22m   [2m○[22m [2mGitHub Copilot[22m[2m (fallback)[22m                                                              [2m│[22m
+[2m│[22m   [2m○[22m [2mOpenCode Zen[22m[2m (opencode/ models)[22m                                                        [2m│[22m
+[2m│[22m   [2m○[22m [2mZ.ai Coding Plan[22m[2m (GLM fallbacks)[22m                                                       [2m│[22m
+[2m│[22m   [2m○[22m [2mKimi For Coding[22m[2m (Sisyphus/Prometheus fallback)[22m                                         [2m│[22m
+[2m│[22m   [2m○[22m [2mBailian Coding Plan[22m[2m (Qwen/GLM/Kimi fallback)[22m                                           [2m│[22m
+[2m│[22m   [2m○[22m [2mMiniMax Coding Plan (minimaxi.com)[22m[2m (MiniMax-M3 fallback)[22m                               [2m│[22m
+[2m│[22m   [2m○[22m [2mMiniMax Coding Plan (minimax.io)[22m[2m (MiniMax-M3 fallback)[22m                                 [2m│[22m
+[2m│[22m   [2m○[22m [2mVercel AI Gateway[22m[2m (universal proxy)[22m                                                    [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m [2m────────────────────────────────────────[22m                                                   [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m [1m[37mModel Assignment[39m[22m                                                                           [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m   [34m[i][39m Models auto-configured based on provider priority                                    [2m│[22m
+[2m│[22m   [2m*[22m Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel   [2m│[22m
+[2m└[22m[2m────────────────────────────────────────────────────────────────────────────────────────────[22m[2m┘[22m
+
+[34m[i][39m Note: Sisyphus agent performs best with Claude Opus 5. Other models work but may have reduced orchestration quality.
+[33m[!][39m [33mNo model providers configured. Using opencode/gpt-5-nano as fallback.[39m
+[33m*[39m [1m[32mInstallation complete![39m[22m
+  Run [36mopencode[39m to start!
+
+[34m[i][39m Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.
+[34m[i][39m Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md
+
+
+[2m┌─[22m[1m The Magic Word [22m[2m─────────────────────────────────────────────────[22m[2m┐[22m
+[2m│[22m [1mPro Tip:[22m Include [36multrawork[39m (or [36mulw[39m) in your prompt.               [2m│[22m
+[2m│[22m All features work like magic-parallel agents, background tasks,   [2m│[22m
+[2m│[22m deep exploration, and relentless execution until completion.      [2m│[22m
+[2m└[22m[2m───────────────────────────────────────────────────────────────────[22m[2m┘[22m
+
+[2moMoMoMoMo... Enjoy![22m
+

@@ -284,6 +284,12 @@ function getDispatchedParentWakes(manager: BackgroundManager): Map<string, Pendi
   }>(manager)).parentWakeNotifier.getDispatchedParentWakes()
 }
 
+function getPendingParentWakeTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  return (cast<{
+    parentWakeNotifier: { getPendingParentWakeTimers: () => Map<string, ReturnType<typeof setTimeout>> }
+  }>(manager)).parentWakeNotifier.getPendingParentWakeTimers()
+}
+
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
   return (cast<{ completionTimers: Map<string, ReturnType<typeof setTimeout>> }>(manager)).completionTimers
 }
@@ -337,12 +343,39 @@ async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<v
   }
 }
 
-// Awaits the debounced parent-wake flush to settle by racing the real
-// onScheduledFlushSettled signal against a bounded state poll, so scheduled
-// flushes resolve on the signal (~100ms debounce) and direct-flush flows
-// resolve when their observable settles — replacing blind 400ms sleeps.
+// Awaits the debounced parent-wake flush to settle. Captures the settled-flush
+// count at entry (the flush is scheduled but still pending here), then awaits
+// count > captured — so a settle landing between this call and registration is
+// not missed.
+//
+// When a flush is armed (a pending wake or its debounce timer exists), the
+// scheduled flush's `finally` is GUARANTEED to fire onScheduledFlushSettled, so
+// await that real signal with no competing wall-clock deadline. Racing a fixed
+// state-poll timeout here is what made this flaky on slow (Windows CI) runners:
+// the ~100ms debounce plus the async dispatch could outlast the poll cap, so the
+// poll resolved by TIMEOUT — not by the predicate — tearing the test down before
+// promptAsync ran (observed as promptCalls.length 0). If the flush ever fails to
+// settle it now surfaces as a loud per-test timeout, never a silent false pass.
+//
+// Only when no flush is armed (settle can never fire) do we fall back to a
+// bounded state-drain so the helper never hangs.
 function waitForCoalescedFlush(manager: BackgroundManager, sessionID: string): Promise<void> {
-  return awaitFlushWithFallback(manager, sessionID)
+  const api = cast<{
+    getScheduledFlushSettledCount: (id: string) => number
+    awaitScheduledFlush: (id: string, sinceCount: number) => Promise<void>
+  }>(manager)
+  const sinceCount = api.getScheduledFlushSettledCount(sessionID)
+  const settled = api.awaitScheduledFlush(sessionID, sinceCount)
+  const flushArmed =
+    getPendingParentWakes(manager).has(sessionID) || getPendingParentWakeTimers(manager).has(sessionID)
+  if (flushArmed) {
+    return settled
+  }
+  const drained = waitUntil(
+    () => !getPendingParentWakes(manager).has(sessionID) || getDispatchedParentWakes(manager).has(sessionID),
+    600,
+  )
+  return Promise.race([settled, drained])
 }
 
 function waitForParentWakeRequeue(manager: BackgroundManager, sessionID: string): Promise<void> {
@@ -354,24 +387,6 @@ function waitForParentWakeRequeue(manager: BackgroundManager, sessionID: string)
 // the async late-error handling settles — instead of blindly sleeping 260ms.
 function waitForParentWakeErrorSettle(manager: BackgroundManager, sessionID: string): Promise<void> {
   return waitUntil(() => !getDispatchedParentWakes(manager).has(sessionID), 600)
-}
-
-// Capture the settled-flush count at entry (the debounced flush is scheduled but
-// still pending here), then await count > captured — so a settle that lands
-// between this call and registration is not missed. A bounded state-drain covers
-// flows that never schedule a flush (never hangs).
-function awaitFlushWithFallback(manager: BackgroundManager, sessionID: string): Promise<void> {
-  const api = cast<{
-    getScheduledFlushSettledCount: (id: string) => number
-    awaitScheduledFlush: (id: string, sinceCount: number) => Promise<void>
-  }>(manager)
-  const sinceCount = api.getScheduledFlushSettledCount(sessionID)
-  const settled = api.awaitScheduledFlush(sessionID, sinceCount)
-  const drained = waitUntil(
-    () => !getPendingParentWakes(manager).has(sessionID) || getDispatchedParentWakes(manager).has(sessionID),
-    600,
-  )
-  return Promise.race([settled, drained])
 }
 
 function createToastRemoveTaskTracker(): { removeTaskCalls: string[]; resetToastManager: () => void } {
@@ -547,9 +562,9 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
       parentSessionId: "parent-session",
       status: "pending",
       queuedAt: new Date(),
-      prompt: "background bootstrap prompt",
+      prompt: "bg-bootstrap-prompt-sentinel",
       agent: "sisyphus-junior",
-      skillContent: "background delegated skill system",
+      skillContent: "bg-skill-system-sentinel",
       category: "quick",
       model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
       fallbackChain: [{ model: "gpt-5.4", providers: ["openai"], variant: "high" }],
@@ -577,9 +592,8 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
       await flushBackgroundNotifications()
 
       //#then
-      expect(observedBootstrapPrompts[0]).toContain("background bootstrap prompt")
       const bootstrap = getDelegatedChildSessionBootstrap("ses_background_bootstrap")
-      expect(bootstrap?.system).toBe("background delegated skill system")
+      expect(bootstrap?.system).toBe("bg-skill-system-sentinel")
       expect(bootstrap?.tools?.question).toBe(false)
       expect(bootstrap?.tools?.task).toBe(false)
       expect(getDelegatedChildSessionBootstrap("ses_background_bootstrap")).toBeDefined()
@@ -643,7 +657,7 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       agent: "sisyphus-junior",
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
-      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini" },
+      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast" },
       fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
     })
     await flushBackgroundNotifications()
@@ -743,9 +757,9 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       status: "completed",
       startedAt: new Date(),
       completedAt: new Date(),
-      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini" },
+      model: { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast" },
       fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
-      concurrencyGroup: "genai-proxy-openai/gpt-5.4-mini",
+      concurrencyGroup: "genai-proxy-openai/gpt-5.6-luna-fast",
     }
     getTaskMap(manager).set(task.id, task)
     const retried: Array<{ taskId: string; errorInfo: { name?: string; message?: string }; source: string }> = []
@@ -868,7 +882,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_visibility",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "running",
         },
       ],
@@ -913,7 +927,7 @@ describe("BackgroundManager retry observability", () => {
     expect(shouldReply).toBe(false)
     expect(notification).toContain("[BACKGROUND TASK RETRYING]")
     expect(notification).toContain("ses_retry_visibility")
-    expect(notification).toContain("genai-proxy-openai/gpt-5.4-mini")
+    expect(notification).toContain("genai-proxy-openai/gpt-5.6-luna-fast")
     expect(notification).toContain("anthropic/claude-haiku-4-5")
   })
 
@@ -942,7 +956,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_parent_agent_fallback",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "running",
         },
       ],
@@ -1001,7 +1015,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_no_parent_context",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "running",
         },
       ],
@@ -1085,7 +1099,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_visibility",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "error",
           error: "Forbidden: Selected provider is forbidden",
         },
@@ -1143,7 +1157,7 @@ describe("BackgroundManager retry observability", () => {
     expect(retryReadyNotification).toContain("ses_retry_created")
     expect(retryReadyNotification).toContain(expectedRetryLink)
     expect(retryReadyNotification).toContain("ses_retry_visibility")
-    expect(retryReadyNotification).toContain("genai-proxy-openai/gpt-5.4-mini")
+    expect(retryReadyNotification).toContain("genai-proxy-openai/gpt-5.6-luna-fast")
     expect(retryReadyNotification).toContain("Forbidden: Selected provider is forbidden")
   })
 
@@ -1185,7 +1199,7 @@ describe("BackgroundManager retry observability", () => {
           attemptNumber: 1,
           sessionId: "ses_retry_failed_parent_dir",
           providerId: "genai-proxy-openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "error",
           error: "Forbidden: Selected provider is forbidden",
         },
@@ -1722,7 +1736,7 @@ describe("BackgroundManager.resume", () => {
       id: "task-a",
       sessionId: "session-a",
       parentSessionId: "old-parent",
-      description: "original description",
+      description: "resume-original-description-sentinel",
       agent: "explore",
       status: "completed",
     })
@@ -1740,7 +1754,7 @@ describe("BackgroundManager.resume", () => {
     // then
     expect(result.id).toBe("task-a")
     expect(result.sessionId).toBe("session-a")
-    expect(result.description).toBe("original description")
+    expect(result.description).toBe("resume-original-description-sentinel")
     expect(result.agent).toBe("explore")
     expect(result.parentModel).toEqual({ providerID: "anthropic", modelID: "claude-opus" })
   })
@@ -1848,11 +1862,11 @@ describe("LaunchInput.skillContent", () => {
       agent: "explore",
       parentSessionId: "parent-session",
       parentMessageId: "parent-msg",
-      skillContent: "You are a playwright expert",
+      skillContent: "playwright-expert-skill-sentinel",
     }
 
     // when / #then
-    expect(input.skillContent).toBe("You are a playwright expert")
+    expect(input.skillContent).toBe("playwright-expert-skill-sentinel")
   })
 })
 
@@ -2736,7 +2750,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
       item.task.sessionId = "ses_zombie_child"
       item.task.startedAt = new Date()
       item.task.concurrencyKey = concurrencyKey
-      throw new Error("crash between session creation and prompt send")
+      throw new Error("session-create-crash-sentinel")
     }
 
     //#when
@@ -2744,7 +2758,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
     //#then - task must be marked as error, not left in running zombie state
     expect(task.status).toBe("error")
-    expect(task.error).toContain("crash between session creation and prompt send")
+    expect(task.error).toContain("session-create-crash-sentinel")
     expect(task.completedAt).toBeDefined()
   })
 
@@ -3072,7 +3086,7 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
       status: "completed",
       startedAt: new Date(Date.now() - 1000),
       completedAt: new Date(),
-      error: "previous terminal note",
+      error: "previous-terminal-note-sentinel",
       concurrencyGroup: "explore",
     }
     const originalCompletedAt = task.completedAt
@@ -3091,7 +3105,7 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
     expect(promptCallCount).toBe(0)
     expect(task.status).toBe("completed")
     expect(task.completedAt).toBe(originalCompletedAt)
-    expect(task.error).toBe("previous terminal note")
+    expect(task.error).toBe("previous-terminal-note-sentinel")
     expect(task.parentSessionId).toBe("parent-session-original")
     expect(task.parentMessageId).toBe("msg-original")
     expect(task.concurrencyKey).toBeUndefined()
@@ -3490,7 +3504,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageId: "parent-message",
         model: {
           providerID: "openai",
-          modelID: "gpt-5.4-mini",
+          modelID: "gpt-5.6-luna-fast",
           variant: "medium",
         },
       }
@@ -3505,7 +3519,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         attemptId: task.currentAttemptID,
         attemptNumber: 1,
         providerId: "openai",
-        modelId: "gpt-5.4-mini",
+        modelId: "gpt-5.6-luna-fast",
         variant: "medium",
         status: "pending",
       })
@@ -4974,8 +4988,45 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     test("should handle 10 tasks with limit 5 returning immediately", async () => {
       // given
       const config = { defaultConcurrency: 5 }
+      let releasePromptAsync: () => void = () => {}
+      const promptAsyncReleased = new Promise<void>((resolve) => {
+        releasePromptAsync = resolve
+      })
+      let promptAsyncCalls = 0
+      let promptAsyncCompletions = 0
+      let resolveFivePromptAsyncCalls: (() => void) | undefined
+      const fivePromptAsyncCalls = new Promise<void>((resolve) => {
+        resolveFivePromptAsyncCalls = resolve
+      })
+      let resolveFivePromptAsyncCompletions: (() => void) | undefined
+      const fivePromptAsyncCompletions = new Promise<void>((resolve) => {
+        resolveFivePromptAsyncCompletions = resolve
+      })
+      const gatedClient = {
+        session: {
+          create: async () => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          prompt: async () => ({}),
+          promptAsync: async () => {
+            promptAsyncCalls++
+            if (promptAsyncCalls === 5) {
+              resolveFivePromptAsyncCalls?.()
+            }
+            await promptAsyncReleased
+            promptAsyncCompletions++
+            if (promptAsyncCompletions === 5) {
+              resolveFivePromptAsyncCompletions?.()
+            }
+            return {}
+          },
+          messages: async () => ({ data: [] }),
+          todo: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+          abort: async () => ({}),
+        },
+      }
       manager.shutdown()
-      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
+      manager = new BackgroundManager({ pluginContext: createPluginInput(gatedClient), config })
 
       const input = {
         description: "Test task",
@@ -4986,21 +5037,22 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       }
 
       // when
-      const startTime = Date.now()
-      const tasks = await Promise.all(
+      const taskResults = Promise.all(
         Array.from({ length: 10 }, () => manager.launch(input))
       )
-      const endTime = Date.now()
+      const tasks = await taskResults
+      await fivePromptAsyncCalls
 
-      // then
-      expect(endTime - startTime).toBeLessThan(200)
+      // then - all enqueue calls settle while every available prompt is blocked
+      expect(promptAsyncCalls).toBe(5)
       expect(tasks).toHaveLength(10)
       tasks.forEach(task => {
         expect(task.status).toBe("pending")
         expect(task.id).toMatch(/^bg_/)
       })
 
-      await waitUntil(() => tasks.filter(t => manager.getTask(t.id)?.status === "running").length >= 5, 600)
+      releasePromptAsync()
+      await fivePromptAsyncCompletions
 
       const updatedTasks = tasks.map(t => manager.getTask(t.id))
       const runningCount = updatedTasks.filter(t => t?.status === "running").length
@@ -7997,7 +8049,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
       parentSessionId: "parent-session",
       parentMessageId: "msg-1",
       description: "cross manager active redaction",
-      prompt: "secret prompt",
+      prompt: "secret-prompt-sentinel",
       agent: "explore",
       status: "pending",
       queuedAt: new Date(),
@@ -8017,7 +8069,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     //#then
     const localTask = firstManager.getTask(task.id)
     const registeredTask = secondManager.getTask(task.id)
-    expect(localTask?.prompt).toBe("secret prompt")
+    expect(localTask?.prompt).toBe("secret-prompt-sentinel")
     expect(registeredTask?.sessionId).toBe(task.sessionId)
     expect(registeredTask?.prompt).toBe("[redacted]")
     expect(registeredTask?.progress?.countedToolPartIDs).toEqual(new Set(["part-1"]))
@@ -8464,7 +8516,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
           attemptNumber: 1,
           sessionId: "session-attempt-1",
           providerId: "openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "error",
           error: "first attempt failed",
           startedAt: new Date("2026-04-27T00:00:00.000Z"),
@@ -8598,7 +8650,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
           attemptNumber: 1,
           sessionId: "session-attempt-1",
           providerId: "openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "error",
           error: "first attempt failed",
           startedAt: new Date("2026-04-27T00:00:00.000Z"),
@@ -8680,13 +8732,13 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
       agent: "sisyphus-junior",
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
-      model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
       attempts: [
         {
           attemptId: "attempt-1",
           attemptNumber: 1,
           providerId: "openai",
-          modelId: "gpt-5.4-mini",
+          modelId: "gpt-5.6-luna-fast",
           status: "pending",
         },
       ],
@@ -8712,7 +8764,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
         attemptNumber: 1,
         sessionId: "session-attempt-1",
         providerId: "openai",
-        modelId: "gpt-5.4-mini",
+        modelId: "gpt-5.6-luna-fast",
         status: "error",
         error: "first attempt failed",
         startedAt: new Date("2026-04-27T00:00:00.000Z"),

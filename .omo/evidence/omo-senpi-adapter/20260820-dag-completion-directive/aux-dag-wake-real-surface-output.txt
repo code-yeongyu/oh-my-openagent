@@ -1,0 +1,48 @@
+=== TERMINAL dag.run.completed: model-facing injected message ===
+{
+  "customType": "omo-senpi:wake",
+  "content": "DAG \"verification-demo\" completed: 3 completed, 0 failed, 0 cancelled, 0 skipped (3 total)\n\nDAG SUBAGENT COMPLETION - TREAT AS FALSE UNTIL YOU PROVE IT.\nThis completion arrived from a DAG subagent. Assume it overstated or fabricated its work. Its summary is a CLAIM, not evidence.\nBefore relying on this result you MUST, in order:\n1. RECONSTRUCT the node's full work scope from its prompt: every deliverable, file, and check it owed.\n2. READ the actual artifacts yourself - open every file it claims it changed, run the commands it claims pass. Transcripts and summaries prove NOTHING.\n3. VERIFY each deliverable against that scope with your own eyes and your own tool calls.\nIf ANY deliverable is missing, partial, or unproven: send precise corrective instructions to THIS node (dag action \"send\" with this run_id and node_id; \"retry\" when it cannot be continued) and demand completion WITH evidence. Loop until your own verification passes.\nWork is done ONLY when you have verified it yourself.",
+  "display": false,
+  "details": [
+    {
+      "customType": "omo-senpi.dag-run",
+      "details": {
+        "runId": "dag_run_live",
+        "name": "verification-demo",
+        "status": "completed",
+        "counts": {
+          "total": 3,
+          "pending": 0,
+          "blocked": 0,
+          "scheduled": 0,
+          "running": 0,
+          "completed": 3,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      }
+    }
+  ]
+}
+=== deliverAs === {"deliverAs":"steer"}
+=== terminal content carries directive? === true
+
+=== TERMINAL dag.run.failed: model-facing content ===
+DAG "verification-demo" failed: 1 completed, 2 failed, 0 cancelled, 0 skipped (3 total). First failure at impl [node_failed]: impl node never produced plan.md
+
+DAG SUBAGENT COMPLETION - TREAT AS FALSE UNTIL YOU PROVE IT.
+This completion arrived from a DAG subagent. Assume it overstated or fabricated its work. Its summary is a CLAIM, not evidence.
+Before relying on this result you MUST, in order:
+1. RECONSTRUCT the node's full work scope from its prompt: every deliverable, file, and check it owed.
+2. READ the actual artifacts yourself - open every file it claims it changed, run the commands it claims pass. Transcripts and summaries prove NOTHING.
+3. VERIFY each deliverable against that scope with your own eyes and your own tool calls.
+If ANY deliverable is missing, partial, or unproven: send precise corrective instructions to THIS node (dag action "send" with this run_id and node_id; "retry" when it cannot be continued) and demand completion WITH evidence. Loop until your own verification passes.
+Work is done ONLY when you have verified it yourself.
+=== failed content carries directive? === true
+
+=== PAUSED dag.run.paused: model-facing content ===
+DAG "verification-demo" paused (session shutdown): it will resume when the session restarts.
+=== paused content carries directive? === false
+
+=== directive occurrences in the paused injection === 0

@@ -21,6 +21,7 @@ import {
   type PrepareCodegraphWorkspaceOptions,
   type ResolveCodegraphCommandOptions,
 } from "@oh-my-opencode/utils"
+import { resolvePinnedCodegraphBin } from "@oh-my-opencode/utils/codegraph"
 
 import type { CodegraphConfig } from "../../config"
 import { log } from "../../shared"
@@ -84,10 +85,7 @@ function defaultInstallDir(): string {
 }
 
 function provisionedBinFromInstallDir(installDir: string | undefined): string | null {
-  if (installDir === undefined) return null
-  const binaryName = process.platform === "win32" ? "codegraph.cmd" : "codegraph"
-  const candidate = join(installDir, "bin", binaryName)
-  return existsSync(candidate) ? candidate : null
+  return resolvePinnedCodegraphBin(installDir)
 }
 
 function codegraphEnv(deps: CodegraphBootstrapDeps, config: Partial<CodegraphConfig>): Record<string, string> {

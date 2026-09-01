@@ -1,0 +1,27 @@
+{
+  "pr_head": "5e530b4e2885a9a38d0fe108f27fa5a055b37142",
+  "current_head_runs": [
+    {
+      "id": 31792764349,
+      "name": "CLA Assistant",
+      "event": "pull_request_target",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 31792764346,
+      "name": "Package Labels",
+      "event": "pull_request_target",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "cited_senpi_run": {
+    "id": 31767086674,
+    "head_sha": "e1eb149cd72929d8ed2db88095f8c7012f1bc645",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31767086674"
+  },
+  "red_observable": "No CI workflow run exists for the current PR head; the cited Senpi run covers an older commit."
+}

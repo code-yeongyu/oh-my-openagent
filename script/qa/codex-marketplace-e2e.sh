@@ -461,7 +461,7 @@ EOF
     fail 5b "bootstrap state.json appeared with lastStatus within 120s" "step5-state.json"
   fi
 
-  local omo_bin="$QAHOME/bin/omo"
+  local omo_bin="$QAHOME/bin/omo-agent-toolkit"
   local omo_version_log="$FINAL/step5-omo-version.txt"
   if [ -x "$omo_bin" ]; then
     pass 5g "bootstrap linked the top-level omo runtime wrapper at $omo_bin" "step5-omo-version.txt"
@@ -641,9 +641,9 @@ EOF
   fi
   local upgraded_omo_log="$FINAL/step8-omo-version.txt"
   if [ -n "$IROOT2" ] &&
-    [ -f "$QAHOME/bin/omo" ] &&
-    grep -Fq "$IROOT2/dist/cli/index.js" "$QAHOME/bin/omo" &&
-    env PATH="$STRIPPED_PATH" CODEX_HOME="$QAHOME" OMO_RUNTIME=node "$QAHOME/bin/omo" --version >"$upgraded_omo_log" 2>&1 &&
+    [ -f "$QAHOME/bin/omo-agent-toolkit" ] &&
+    grep -Fq "$IROOT2/dist/cli/index.js" "$QAHOME/bin/omo-agent-toolkit" &&
+    env PATH="$STRIPPED_PATH" CODEX_HOME="$QAHOME" OMO_RUNTIME=node "$QAHOME/bin/omo-agent-toolkit" --version >"$upgraded_omo_log" 2>&1 &&
     [ -s "$upgraded_omo_log" ]; then
     pass 8d "upgrade bootstrap relinked the top-level omo wrapper to the upgraded root runtime" "step8-omo-version.txt"
   else

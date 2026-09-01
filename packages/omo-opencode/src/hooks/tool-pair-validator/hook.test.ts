@@ -1,366 +1,174 @@
-declare const describe: (name: string, fn: () => void) => void
-declare const it: (name: string, fn: () => void | Promise<void>) => void
-declare const expect: <T>(value: T) => {
-  toEqual(expected: unknown): void
-  toHaveLength(expected: number): void
-}
+import { describe, expect, it } from "bun:test"
 
-import { createToolPairValidatorHook } from "./hook"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state/state"
-
-const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
-const TOOL_RESULT_RECOVERY_CONTINUATION = "Recovered missing tool results. Continue from the repaired tool output."
-
-type TestPart = {
-  type: string
-  id?: string
-  callID?: string
-  toolUseId?: string
-  tool_use_id?: string
-  isError?: boolean
-  content?: string | Array<{ type: "text"; text: string }>
-  text?: string
-  synthetic?: boolean
-  state?: { status?: string; output?: string }
-}
-
-type TestMessage = {
-  info: { role: "assistant" | "user"; sessionID?: string }
-  parts: TestPart[]
-}
-
-async function runTransform(messages: TestMessage[]): Promise<void> {
-  const hook = createToolPairValidatorHook()
-  const transform = hook["experimental.chat.messages.transform"]
-
-  if (!transform) {
-    throw new Error("missing tool pair validator transform")
-  }
-
-  await transform({}, { messages: messages as never })
-}
+import { createToolPairValidatorHook } from "./hook"
+import { INTERRUPTED_TOOL_ERROR } from "./tool-result-repair"
+import { createToolPart, runToolPairValidator, type TestMessage } from "./hook.test-support"
 
 describe("createToolPairValidatorHook", () => {
-  it("leaves matching tool pairs unchanged", async () => {
-    //#given
-    const messages = [
-      { info: { role: "assistant" }, parts: [{ type: "tool", callID: "call_1" }] },
-      { info: { role: "user" }, parts: [{ type: "tool_result", tool_use_id: "call_1", content: "done" }] },
-    ] satisfies TestMessage[]
-
-    //#when
-    await runTransform(messages)
-
-    //#then
-    expect(messages).toEqual([
-      { info: { role: "assistant" }, parts: [{ type: "tool", callID: "call_1" }] },
-      { info: { role: "user" }, parts: [{ type: "tool_result", tool_use_id: "call_1", content: "done" }] },
-    ])
-  })
-
-  it("leaves terminal OpenCode tool parts unchanged", async () => {
-    //#given
-    const messages = [
-      {
-        info: { role: "assistant" },
-        parts: [
-          { type: "tool", callID: "call_completed", state: { status: "completed", output: "OK" } },
-          { type: "tool", callID: "call_error", state: { status: "error", output: "File not found" } },
-        ],
-      },
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "final answer" }] },
-    ] satisfies TestMessage[]
-
-    //#when
-    await runTransform(messages)
-
-    //#then
-    expect(messages).toEqual([
-      {
-        info: { role: "assistant" },
-        parts: [
-          { type: "tool", callID: "call_completed", state: { status: "completed", output: "OK" } },
-          { type: "tool", callID: "call_error", state: { status: "error", output: "File not found" } },
-        ],
-      },
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "final answer" }] },
-    ])
-  })
-
-  it("injects a missing tool_result into the next user message", async () => {
-    //#given
-    const messages = [
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
-      { info: { role: "user" }, parts: [{ type: "text", text: "continue" }] },
-    ] satisfies TestMessage[]
-
-    //#when
-    await runTransform(messages)
-
-    //#then
-    expect(messages[1]?.parts).toEqual([
-      {
-        type: "tool_result",
-        toolUseId: "toolu_1",
-        tool_use_id: "toolu_1",
-        isError: true,
-        content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
-      },
-      { type: "text", text: "continue" },
-    ])
-  })
-
-  it("injects a synthetic user message when the next user message is missing", async () => {
-    //#given
-    const messages = [
-      {
-        info: { role: "assistant" },
-        parts: [
-          { type: "tool_use", id: "toolu_1" },
-          { type: "text", text: "working" },
-          { type: "tool_use", id: "toolu_2" },
-        ],
-      },
-    ] satisfies TestMessage[]
-
-    //#when
-    await runTransform(messages)
-
-    //#then
-    expect(messages).toEqual([
-      {
-        info: { role: "assistant" },
-        parts: [
-          { type: "tool_use", id: "toolu_1" },
-          { type: "text", text: "working" },
-          { type: "tool_use", id: "toolu_2" },
-        ],
-      },
-      {
-        info: { role: "user" },
-        parts: [
-          {
-            type: "tool_result",
-            toolUseId: "toolu_1",
-            tool_use_id: "toolu_1",
-            isError: true,
-            content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
-          },
-          {
-            type: "tool_result",
-            toolUseId: "toolu_2",
-            tool_use_id: "toolu_2",
-            isError: true,
-            content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
-          },
-          {
-            type: "text",
-            text: TOOL_RESULT_RECOVERY_CONTINUATION,
-            synthetic: true,
-          },
-        ],
-      },
-    ])
-  })
-
-  it("injects a synthetic user message before a non-user next message", async () => {
-    //#given
-    const messages = [
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },
-    ] satisfies TestMessage[]
-
-    //#when
-    await runTransform(messages)
-
-    //#then
-    expect(messages).toHaveLength(3)
-    expect(messages).toEqual([
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
-      {
-        info: { role: "user" },
-        parts: [{
-          type: "tool_result",
-          toolUseId: "toolu_1",
-          tool_use_id: "toolu_1",
-          isError: true,
-          content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
-        }, {
-          type: "text",
-          text: TOOL_RESULT_RECOVERY_CONTINUATION,
-          synthetic: true,
-        }],
-      },
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },
-    ])
-  })
-
-  it("continues validating later assistant turns after inserting a synthetic repair message", async () => {
-    //#given
-    const messages = [
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_2" }] },
-      { info: { role: "user" }, parts: [{ type: "text", text: "continue" }] },
-    ] satisfies TestMessage[]
-
-    //#when
-    await runTransform(messages)
-
-    //#then
-    expect(messages).toEqual([
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
-      {
-        info: { role: "user" },
-        parts: [{
-          type: "tool_result",
-          toolUseId: "toolu_1",
-          tool_use_id: "toolu_1",
-          isError: true,
-          content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
-        }, {
-          type: "text",
-          text: TOOL_RESULT_RECOVERY_CONTINUATION,
-          synthetic: true,
-        }],
-      },
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_2" }] },
-      {
-        info: { role: "user" },
-        parts: [{
-          type: "tool_result",
-          toolUseId: "toolu_2",
-          tool_use_id: "toolu_2",
-          isError: true,
-          content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
-        }, { type: "text", text: "continue" }],
-      },
-    ])
-  })
-
-  it("injects only the missing tool_results for partial matches", async () => {
-    //#given
-    const messages = [
-      {
-        info: { role: "assistant" },
-        parts: [{ type: "tool_use", id: "toolu_1" }, { type: "tool", callID: "call_2" }],
-      },
-      {
-        info: { role: "user" },
-        parts: [
-          { type: "tool_result", tool_use_id: "toolu_1", content: "done" },
-          { type: "text", text: "continue" },
-        ],
-      },
-    ] satisfies TestMessage[]
-
-    //#when
-    await runTransform(messages)
-
-    //#then
-    expect(messages[1]?.parts).toEqual([
-      { type: "tool_result", tool_use_id: "toolu_1", content: "done" },
-      {
-        type: "tool_result",
-        toolUseId: "call_2",
-        tool_use_id: "call_2",
-        isError: true,
-        content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
-      },
-      { type: "text", text: "continue" },
-    ])
-  })
-
-  it("leaves tracked subagent sessions unchanged while normal sessions still repair", async () => {
-    //#given
-    _resetForTesting()
-    subagentSessions.add("ses_background_1")
-    const backgroundMessages = [
-      {
-        info: { role: "assistant", sessionID: "ses_background_1" },
-        parts: [{ type: "tool_use", id: "toolu_background_1" }],
-      },
-      {
-        info: { role: "assistant", sessionID: "ses_background_1" },
-        parts: [{ type: "text", text: "background agent keeps reasoning" }],
-      },
-    ] satisfies TestMessage[]
-    const originalBackgroundMessages = JSON.parse(JSON.stringify(backgroundMessages))
-    const mainMessages = [
-      {
-        info: { role: "assistant", sessionID: "ses_main_1" },
-        parts: [{ type: "tool_use", id: "toolu_main_1" }],
-      },
-      {
-        info: { role: "user", sessionID: "ses_main_1" },
-        parts: [{ type: "text", text: "continue main session" }],
-      },
-    ] satisfies TestMessage[]
-
-    try {
-      //#when
-      await runTransform(backgroundMessages)
-      await runTransform(mainMessages)
-
-      //#then
-      expect(backgroundMessages).toEqual(originalBackgroundMessages)
-      expect(mainMessages[1]?.parts).toEqual([
+  describe("#given an assistant turn whose tool parts already reached a terminal state", () => {
+    it("#then leaves completed and errored tool parts untouched", async () => {
+      // given
+      const messages: TestMessage[] = [
         {
-          type: "tool_result",
-          tool_use_id: "toolu_main_1",
-          toolUseId: "toolu_main_1",
-          isError: true,
-          content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+          info: { role: "assistant" },
+          parts: [
+            createToolPart({ callID: "call_completed", status: "completed", output: "OK" }),
+            createToolPart({ callID: "call_error", status: "error", error: "File not found" }),
+          ],
         },
-        { type: "text", text: "continue main session" },
-      ])
-    } finally {
-      _resetForTesting()
-    }
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "final answer" }] },
+      ]
+      const before = structuredClone(messages)
+
+      // when
+      await runToolPairValidator(createToolPairValidatorHook(), messages)
+
+      // then
+      expect(messages).toEqual(before)
+    })
   })
 
-  it("leaves tracked subagent user turns unchanged when tool_result is missing", async () => {
-    //#given
-    _resetForTesting()
-    subagentSessions.add("ses_background_2")
-    const backgroundMessages = [
-      {
-        info: { role: "assistant", sessionID: "ses_background_2" },
-        parts: [{ type: "tool_use", id: "toolu_background_2" }],
-      },
-      {
-        info: { role: "user", sessionID: "ses_background_2" },
-        parts: [{ type: "text", text: "continue background session" }],
-      },
-    ] satisfies TestMessage[]
-    const originalBackgroundMessages = JSON.parse(JSON.stringify(backgroundMessages))
+  describe("#given an assistant turn holding a running tool part", () => {
+    it("#then settles that part into a terminal error state in place", async () => {
+      // given
+      const messages: TestMessage[] = [
+        {
+          info: { role: "assistant", id: "msg_1" },
+          parts: [
+            { type: "text", text: "working" },
+            createToolPart({ callID: "toolu_running", status: "running", start: 1000 }),
+          ],
+        },
+      ]
 
-    try {
-      //#when
-      await runTransform(backgroundMessages)
+      // when
+      await runToolPairValidator(createToolPairValidatorHook(), messages)
 
-      //#then
-      expect(backgroundMessages).toEqual(originalBackgroundMessages)
-    } finally {
-      _resetForTesting()
-    }
+      // then
+      const repaired = messages[0]?.parts[1] as { state: Record<string, unknown> }
+      expect(repaired.state["status"]).toEqual("error")
+      expect(repaired.state["error"]).toEqual(INTERRUPTED_TOOL_ERROR)
+      expect((repaired.state["time"] as { start: number }).start).toEqual(1000)
+      expect(messages).toHaveLength(1)
+    })
   })
 
-  it("treats existing camelCase toolUseId results as already paired", async () => {
-    //#given
-    const messages = [
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
-      { info: { role: "user" }, parts: [{ type: "tool_result", toolUseId: "toolu_1", content: [{ type: "text", text: "done" }] }] },
-    ] satisfies TestMessage[]
+  describe("#given an assistant turn holding a pending tool part", () => {
+    it("#then settles it and preserves the recorded tool input", async () => {
+      // given
+      const messages: TestMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [createToolPart({ callID: "toolu_pending", status: "pending", input: { command: "ls" } })],
+        },
+        { info: { role: "user" }, parts: [{ type: "text", text: "continue" }] },
+      ]
 
-    //#when
-    await runTransform(messages)
+      // when
+      await runToolPairValidator(createToolPairValidatorHook(), messages)
 
-    //#then
-    expect(messages).toEqual([
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
-      { info: { role: "user" }, parts: [{ type: "tool_result", toolUseId: "toolu_1", content: [{ type: "text", text: "done" }] }] },
-    ])
+      // then
+      const repaired = messages[0]?.parts[0] as { state: Record<string, unknown> }
+      expect(repaired.state["status"]).toEqual("error")
+      expect(repaired.state["input"]).toEqual({ command: "ls" })
+      expect(messages[1]?.parts).toEqual([{ type: "text", text: "continue" }])
+    })
+  })
+
+  describe("#given a mix of terminal and non-terminal tool parts in one turn", () => {
+    it("#then repairs only the non-terminal part", async () => {
+      // given
+      const messages: TestMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [
+            createToolPart({ callID: "call_done", status: "completed", output: "done" }),
+            createToolPart({ callID: "call_stuck", status: "running" }),
+          ],
+        },
+      ]
+
+      // when
+      await runToolPairValidator(createToolPairValidatorHook(), messages)
+
+      // then
+      const done = messages[0]?.parts[0] as { state: Record<string, unknown> }
+      const stuck = messages[0]?.parts[1] as { state: Record<string, unknown> }
+      expect(done.state["status"]).toEqual("completed")
+      expect(done.state["output"]).toEqual("done")
+      expect(stuck.state["status"]).toEqual("error")
+    })
+  })
+
+  describe("#given the validator runs twice over the same array", () => {
+    it("#then the second pass finds nothing left to repair", async () => {
+      // given
+      const messages: TestMessage[] = [
+        { info: { role: "assistant" }, parts: [createToolPart({ callID: "toolu_1", status: "running" })] },
+      ]
+
+      // when
+      await runToolPairValidator(createToolPairValidatorHook(), messages)
+      const afterFirstPass = structuredClone(messages)
+      await runToolPairValidator(createToolPairValidatorHook(), messages)
+
+      // then
+      const first = afterFirstPass[0]?.parts[0] as { state: Record<string, unknown> }
+      const second = messages[0]?.parts[0] as { state: Record<string, unknown> }
+      expect(second.state["status"]).toEqual(first.state["status"])
+      expect(second.state["error"]).toEqual(first.state["error"])
+    })
+  })
+
+  describe("#given a user turn holding no tool parts", () => {
+    it("#then the validator never inserts a message", async () => {
+      // given
+      const messages: TestMessage[] = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "hello" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "hi" }] },
+      ]
+      const before = structuredClone(messages)
+
+      // when
+      await runToolPairValidator(createToolPairValidatorHook(), messages)
+
+      // then
+      expect(messages).toEqual(before)
+    })
+  })
+
+  describe("#given a tracked background subagent session", () => {
+    it("#then the subagent turn is diagnosed only while a normal session is still repaired", async () => {
+      // given
+      _resetForTesting()
+      subagentSessions.add("ses_background_1")
+      const backgroundMessages: TestMessage[] = [
+        {
+          info: { role: "assistant", sessionID: "ses_background_1" },
+          parts: [createToolPart({ callID: "toolu_background", status: "running" })],
+        },
+      ]
+      const originalBackgroundMessages = structuredClone(backgroundMessages)
+      const mainMessages: TestMessage[] = [
+        {
+          info: { role: "assistant", sessionID: "ses_main_1" },
+          parts: [createToolPart({ callID: "toolu_main", status: "running" })],
+        },
+      ]
+
+      try {
+        // when
+        await runToolPairValidator(createToolPairValidatorHook(), backgroundMessages)
+        await runToolPairValidator(createToolPairValidatorHook(), mainMessages)
+
+        // then
+        expect(backgroundMessages).toEqual(originalBackgroundMessages)
+        const repairedMain = mainMessages[0]?.parts[0] as { state: Record<string, unknown> }
+        expect(repairedMain.state["status"]).toEqual("error")
+      } finally {
+        _resetForTesting()
+      }
+    })
   })
 })

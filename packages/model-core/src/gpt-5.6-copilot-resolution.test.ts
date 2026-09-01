@@ -9,33 +9,37 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
       name: "hephaestus",
       requirement: AGENT_MODEL_REQUIREMENTS.hephaestus,
       expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedVariant: "medium",
     },
     {
       name: "momus",
       requirement: AGENT_MODEL_REQUIREMENTS.momus,
       expectedModel: "github-copilot/gpt-5.6-terra",
+      expectedVariant: "high",
     },
     {
       name: "ultrabrain",
       requirement: CATEGORY_MODEL_REQUIREMENTS.ultrabrain,
       expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedVariant: "max",
     },
     {
       name: "deep",
       requirement: CATEGORY_MODEL_REQUIREMENTS.deep,
-      expectedModel: "github-copilot/gpt-5.6-terra",
+      expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedVariant: "medium",
     },
     {
       name: "unspecified-low",
       requirement: CATEGORY_MODEL_REQUIREMENTS["unspecified-low"],
-      expectedModel: "github-copilot/gpt-5.6-luna",
+      expectedModel: "github-copilot/gpt-5.6-terra",
+      expectedVariant: "high",
     },
   ] as const
 
-  for (const { name, requirement, expectedModel } of selectionCases) {
+  for (const { name, requirement, expectedModel, expectedVariant } of selectionCases) {
     test(`${name} selects its Copilot GPT-5.6 model with its configured variant`, () => {
       // given
-      const expectedVariant = name === "hephaestus" ? "medium" : "high"
       const availableModels = new Set([expectedModel, "github-copilot/gpt-5.5"])
 
       // when
@@ -54,7 +58,7 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     })
   }
 
-  test("warm cache resolves transformed Vercel GPT-5.6 with high", () => {
+  test("warm cache does not pick up transformed Vercel GPT-5.6 now that vercel left the default lanes", () => {
     // given
     const availableModels = new Set(["vercel/openai/gpt-5.6-terra"])
 
@@ -67,13 +71,13 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
     // then
     expect(result).toEqual({
-      model: "vercel/openai/gpt-5.6-terra",
-      source: "provider-fallback",
-      variant: "high",
+      model: "system/default",
+      source: "system-default",
+      variant: undefined,
     })
   })
 
-  test("warm cache keeps transformed Vercel terra ahead of Copilot terra", () => {
+  test("warm cache prefers the Copilot rung over a transformed Vercel terra", () => {
     // given
     const availableModels = new Set([
       "github-copilot/gpt-5.6-terra",
@@ -89,13 +93,13 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
     // then
     expect(result).toEqual({
-      model: "vercel/openai/gpt-5.6-terra",
+      model: "github-copilot/gpt-5.6-terra",
       source: "provider-fallback",
       variant: "high",
     })
   })
 
-  test("Momus is the only GPT-5.6 xhigh rung that includes Copilot", () => {
+  test("Copilot is never included in a GPT-5.6 xhigh rung", () => {
     // given
     const requirements = [
       ...Object.values(AGENT_MODEL_REQUIREMENTS),
@@ -111,13 +115,26 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     )
 
     // then
-    expect(copilotXhighEntries).toEqual([
-      {
-        providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.6-sol",
-        variant: "xhigh",
-      },
-    ])
+    expect(copilotXhighEntries).toEqual([])
+  })
+
+  test("momus uses high for its Copilot Sol fallback when Terra is unavailable", () => {
+    // given
+    const availableModels = new Set(["github-copilot/gpt-5.6-sol"])
+
+    // when
+    const result = resolveModelWithFallback({
+      fallbackChain: AGENT_MODEL_REQUIREMENTS.momus.fallbackChain,
+      availableModels,
+      systemDefaultModel: "system/default",
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "github-copilot/gpt-5.6-sol",
+      source: "provider-fallback",
+      variant: "high",
+    })
   })
 
   const fallbackCases = [

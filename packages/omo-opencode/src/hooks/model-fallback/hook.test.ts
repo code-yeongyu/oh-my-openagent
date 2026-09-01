@@ -64,7 +64,7 @@ describe("model fallback hook", () => {
 
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-8",
+      modelID: "claude-opus-5",
     })
   })
 
@@ -93,7 +93,7 @@ describe("model fallback hook", () => {
 
     expect(firstOutput.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-8",
+      modelID: "claude-opus-5",
     })
 
     expect(

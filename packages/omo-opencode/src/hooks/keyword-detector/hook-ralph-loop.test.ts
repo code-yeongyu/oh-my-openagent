@@ -61,7 +61,7 @@ describe("keyword-detector ultrawork routing", () => {
 
     // then
     expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(output.parts[0]?.text).toContain("<ultrawork-mode>")
     expect(output.parts[0]?.text).toContain("ulw build a multi-agent backend architecture")
   })
 
@@ -81,7 +81,7 @@ describe("keyword-detector ultrawork routing", () => {
 
     // then
     expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(output.parts[0]?.text).toContain("<ultrawork-mode>")
     expect(output.parts[0]?.text).toContain("ultrawork ship the dashboard")
   })
 
@@ -191,7 +191,7 @@ describe("keyword-detector ultrawork routing", () => {
 
     // then
     const text = output.parts.find((p) => p.type === "text")?.text
-    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(text).toContain("<ultrawork-mode>")
     expect(text).toContain("do this")
   })
 
@@ -252,7 +252,7 @@ The system mentions ulw mode in passing.
 
     // then
     const text = output.parts.find((p) => p.type === "text")?.text
-    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(text).toContain("<ultrawork-mode>")
     expect(text).toContain("refactor the codebase")
     expect(startLoopCalls).toHaveLength(0)
   })

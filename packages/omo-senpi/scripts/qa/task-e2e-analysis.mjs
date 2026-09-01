@@ -5,32 +5,75 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-// senpi writes one machine-global append-only diagnostic log at getAgentDir()/senpi-debug.log
-// (senpi config.js getDebugLogPath). Every concurrent senpi process on the host can append to the real
-// ~/.senpi/agent copy, so the pollution gate exempts exactly this shared log.
+// Senpi writes machine-global append-only diagnostics under the real agent directory. Every concurrent
+// Senpi process on the host can append to these files, so they cannot identify QA pollution.
 export const SHARED_SENPI_LOG = "senpi-debug.log"
+// Machine-global append-only diagnostics every concurrent senpi process on the host writes: the
+// whole logs/ tree (debug journals per subsystem), the TUI crash dump, and the shared MCP cache.
+// They cannot identify QA pollution, exactly per the contract above.
+const SHARED_SENPI_LOGS = new Set([SHARED_SENPI_LOG, "senpi-crash.log", "cache/mcp-cache.json"])
+
+function isSharedSenpiDiagnostic(rel) {
+  return SHARED_SENPI_LOGS.has(rel) || rel.startsWith("logs/")
+}
 
 // Per-file content snapshot of a directory (relpath -> sha256), for precise pollution attribution.
 // Returns an empty map when the directory is absent.
-export function snapshotDir(root) {
+export function snapshotDir(root, { readdir = readdirSync, readFile = readFileSync } = {}) {
   const snapshot = new Map()
   if (!existsSync(root)) return snapshot
   const walk = (dir) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    let entries
+    try {
+      entries = readdir(dir, { withFileTypes: true })
+    } catch (error) {
+      if (isTransientSnapshotEntryError(error)) return
+      throw error
+    }
+    for (const entry of entries) {
       const abs = join(dir, entry.name)
       if (entry.isDirectory()) walk(abs)
-      else if (entry.isFile()) snapshot.set(abs.slice(root.length + 1), createHash("sha256").update(readFileSync(abs)).digest("hex"))
+      else if (entry.isFile()) {
+        const rel = abs.slice(root.length + 1)
+        try {
+          snapshot.set(rel, snapshotDigest(rel, abs, readFile))
+        } catch (error) {
+          if (!isTransientSnapshotEntryError(error)) throw error
+        }
+      }
     }
   }
   walk(root)
   return snapshot
 }
 
+function isTransientSnapshotEntryError(error) {
+  return error?.code === "ENOENT" || error?.code === "ENOTDIR"
+}
+
+function snapshotDigest(rel, abs, readFile) {
+  const content = readFile(abs)
+  if (rel !== "settings.json") return createHash("sha256").update(content).digest("hex")
+  try {
+    const settings = JSON.parse(content.toString("utf8"))
+    if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
+      return createHash("sha256").update(content).digest("hex")
+    }
+    // Volatile interactive-session stamps a concurrent host rewrites on its own lifecycle events
+    // (tip dismissals, per-boot changelog version); everything else stays gated.
+    delete settings.tipsHistory
+    delete settings.lastChangelogVersion
+    return createHash("sha256").update(JSON.stringify(settings)).digest("hex")
+  } catch {
+    return createHash("sha256").update(content).digest("hex")
+  }
+}
+
 // Real config/state paths that changed between two snapshots, EXCLUDING the shared diagnostic log.
 export function changedRealPaths(before, after) {
   const changed = []
-  for (const [rel, sha] of after) if (rel !== SHARED_SENPI_LOG && before.get(rel) !== sha) changed.push(rel)
-  for (const rel of before.keys()) if (rel !== SHARED_SENPI_LOG && !after.has(rel)) changed.push(rel)
+  for (const [rel, sha] of after) if (!isSharedSenpiDiagnostic(rel) && before.get(rel) !== sha) changed.push(rel)
+  for (const rel of before.keys()) if (!isSharedSenpiDiagnostic(rel) && !after.has(rel)) changed.push(rel)
   return changed
 }
 
@@ -94,7 +137,7 @@ export function findWakeNotification(events, taskId) {
   }
 }
 
-// task_send(deliver_as:"followUp") on a completed-resident child REVIVES it. Proof is the send tool
+// task_send on a completed-resident child REVIVES it. Proof is the send tool
 // result / details reporting kind "revived".
 export function findRevived(events) {
   return /"kind"\s*:\s*"revived"|Revived st_/.test(JSON.stringify(events))

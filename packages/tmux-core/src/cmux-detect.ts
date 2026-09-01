@@ -5,8 +5,10 @@
  * `cmux __tmux-compat` so they become native cmux splits instead of
  * failing because there is no real tmux server running.
  */
-export function isCmuxCompatEnvironment(): boolean {
-	const tmuxEnvironment = process.env.TMUX
+export function isCmuxCompatEnvironment(
+	environment: Record<string, string | undefined> = process.env,
+): boolean {
+	const tmuxEnvironment = environment.TMUX
 	return tmuxEnvironment?.includes("cmuxterm") === true ||
-		(Boolean(process.env.CMUX_SOCKET_PATH) && !tmuxEnvironment)
+		(Boolean(environment.CMUX_SOCKET_PATH) && !tmuxEnvironment)
 }

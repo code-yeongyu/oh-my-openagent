@@ -136,7 +136,7 @@ Confirm:
 **Your Mission**: Strategic analysis. Long-term impact assessment.
 
 **Advisor Consultation** (RECOMMEND to the planner - you cannot delegate yourself):
-Advise the planner to delegate a read-only architecture consultation to the \`oracle\` agent carrying:
+Advise the planner to delegate an advisory-only architecture consultation to the \`architect\` category carrying:
 - the user's request
 - the context you gathered
 - the analysis ask: options, trade-offs, long-term implications, risks
@@ -154,7 +154,7 @@ Advise the planner to delegate a read-only architecture consultation to the \`or
 - MUST: Document decisions and rationale
 
 **Directives for the Planner**:
-- MUST: Consult the oracle agent before finalizing the plan
+- MUST: Consult the architect category before finalizing the plan
 - MUST: Document architectural decisions with rationale
 - MUST NOT: Introduce complexity without justification
 
@@ -244,7 +244,7 @@ Advise the planner to delegate a read-only architecture consultation to the \`or
 - **\`lsp_symbols\` / \`lsp_find_references\`**: Find structural patterns - Refactoring, Build
 - **\`grep\` / \`find\` / \`read\`**: Codebase pattern discovery - Build, Research
 - **Structured read-only \`bash\` with \`gh\` / \`curl\`**: External docs, OSS implementations, best practices - Build, Architecture, Research
-- **\`oracle\` agent**: Read-only high-reasoning consultation - Architecture (planner delegates; you cannot)
+- **\`architect\` category**: Advisory-only big-picture design consultation - Architecture (planner delegates; you cannot)
 
 ---
 

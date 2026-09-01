@@ -1,0 +1,146 @@
+### CONSUMER REGRESSION SWEEP with this PR applied
+### 2026-07-28T01:29:30Z  index.mjs diff vs base:
+ packages/shared-skills/index.mjs | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+### ---
+
+=== bun test packages/shared-skills ===
+bun test v1.3.14 (0d9b296a)
+[materialize] wrote 148 frontend reference files from submodules
+[materialize] wrote 148 frontend reference files from submodules
+[materialize] wrote 148 frontend reference files from submodules
+
+ 69 pass
+ 0 fail
+ 573 expect() calls
+Ran 69 tests across 13 files. [4.63s]
+EXIT=0 for packages/shared-skills
+
+=== bun test packages/skills-loader-core ===
+bun test v1.3.14 (0d9b296a)
+
+ 235 pass
+ 0 fail
+ 606 expect() calls
+Ran 235 tests across 38 files. [8.22s]
+EXIT=0 for packages/skills-loader-core
+
+=== bun test packages/omo-opencode/src/cli ===
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-opencode\src\cli\cli-installer.telemetry.test.ts:
+
+[45m[37m oMoMoMoMo... Install [39m[49m
+
+[2m[1/4][22m Checking OpenCode installation...
+[32m[OK][39m OpenCode 1.4.0 detected
+[2m[2/4][22m Adding oh-my-openagent plugin...
+[32m[OK][39m Plugin added [36m->[39m [2m/tmp/opencode.jsonc[22m
+[2m[3/4][22m Writing oh-my-openagent configuration...
+[32m[OK][39m Config written [36m->[39m [2m/tmp/oh-my-opencode.jsonc[22m
+
+[2m┌─[22m[1m Installation Complete [22m[2m───────────────────────────────────────────────────────────────────[22m[2m┐[22m
+[2m│[22m [1m[37mConfiguration Summary[39m[22m                                                                      [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m   [34m[i][39m Platform: opencode                                                                   [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m   [2m○[22m [2mClaude[22m                                                                                 [2m│[22m
+[2m│[22m   [32m[OK][39m [37mOpenAI/ChatGPT[39m[2m (GPT-5.4 for Oracle)[22m                                                 [2m│[22m
+[2m│[22m   [2m○[22m [2mGemini[22m                                                                                 [2m│[22m
+[2m│[22m   [32m[OK][39m [37mGitHub Copilot[39m[2m (fallback)[22m                                                           [2m│[22m
+[2m│[22m   [2m○[22m [2mOpenCode Zen[22m[2m (opencode/ models)[22m                                                        [2m│[22m
+[2m│[22m   [2m○[22m [2mZ.ai Coding Plan[22m[2m (GLM fallbacks)[22m                                                       [2m│[22m
+[2m│[22m   [2m○[22m [2mKimi For Coding[22m[2m (Sisyphus/Prometheus fallback)[22m                                         [2m│[22m
+[2m│[22m   [2m○[22m [2mBailian Coding Plan[22m[2m (Qwen/GLM/Kimi fallback)[22m                                           [2m│[22m
+[2m│[22m   [2m○[22m [2mMiniMax Coding Plan (minimaxi.com)[22m[2m (MiniMax-M3 fallback)[22m                               [2m│[22m
+[2m│[22m   [2m○[22m [2mMiniMax Coding Plan (minimax.io)[22m[2m (MiniMax-M3 fallback)[22m                                 [2m│[22m
+[2m│[22m   [2m○[22m [2mVercel AI Gateway[22m[2m (universal proxy)[22m                                                    [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m [2m────────────────────────────────────────[22m                                                   [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m [1m[37mModel Assignment[39m[22m                                                                           [2m│[22m
+[2m│[22m                                                                                            [2m│[22m
+[2m│[22m   [34m[i][39m Models auto-configured based on provider priority                                    [2m│[22m
+[2m│[22m   [2m*[22m Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel   [2m│[22m
+[2m└[22m[2m────────────────────────────────────────────────────────────────────────────────────────────[22m[2m┘[22m
+
+[34m[i][39m Note: Sisyphus agent performs best with Claude Opus 4.5+. Other models work but may have reduced orchestration quality.
+[33m*[39m [1m[32mInstallation complete![39m[22m
+  Run [36mopencode[39m to start!
+
+[34m[i][39m Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.
+[34m[i][39m Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md
+
+
+[2m┌─[22m[1m The Magic Word [22m[2m─────────────────────────────────────────────────[22m[2m┐[22m
+[2m│[22m [1mPro Tip:[22m Include [36multrawork[39m (or [36mulw[39m) in your prompt.               [2m│[22m
+[2m│[22m All features work like magic-parallel agents, background tasks,   [2m│[22m
+[2m│[22m deep exploration, and relentless execution until completion.      [2m│[22m
+[2m└[22m[2m───────────────────────────────────────────────────────────────────[22m[2m┘[22m
+
+[2moMoMoMoMo... Enjoy![22m
+
+
+[2m┌─[22m[1m Authenticate Your Providers [22m[2m──────────────────────[22m[2m┐[22m
+[2m│[22m Run [36mopencode auth login[39m and select your provider:   [2m│[22m
+[2m│[22m   [2m*[22m GitHub [90m→ Copilot[39m                                [2m│[22m
+[2m└[22m[2m─────────────────────────────────────────────────────[22m[2m┘[22m
+
+
+  [36m⚙[39m [1mread_file[22m [2mfilePath=/src/index.ts[22m  
+
+packages\omo-opencode\src\cli\run\on-complete-hook.test.ts:
+129 |       messageCount: 10,
+130 |     }, deps)
+131 | 
+132 |     // then
+133 |     const [args] = spawnCalls[0]
+134 |     expect(args).toEqual(["powershell.exe", "-NoProfile", "-Command", "Write-Host done"])
+                       ^
+error: expect(received).toEqual(expected)
+
+@@ -1,5 +1,4 @@
+  [
+-   "powershell.exe",
+-   "-NoProfile",
+-   "-Command",
++   "sh",
++   "-c",
+    "Write-Host done",
+
+- Expected  - 3
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\cli\run\on-complete-hook.test.ts:134:18)
+(fail) executeOnCompleteHook > uses powershell when PowerShell is detected on Windows [13.19ms]
+174 |       messageCount: 10,
+175 |     }, deps)
+176 | 
+177 |     // then
+178 |     const [args] = spawnCalls[0]
+179 |     expect(args).toEqual(["C:\\Windows\\System32\\cmd.exe", "/d", "/s", "/c", "echo done"])
+                       ^
+error: expect(received).toEqual(expected)
+
+@@ -1,6 +1,4 @@
+  [
+-   "C:\Windows\System32\cmd.exe",
+-   "/d",
+-   "/s",
+-   "/c",
++   "sh",
++   "-c",
+    "echo done",
+
+- Expected  - 4
++ Received  + 2
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\omo-opencode\src\cli\run\on-complete-hook.test.ts:179:18)
+(fail) executeOnCompleteHook > falls back to cmd.exe on Windows when PowerShell is not detected [12.62ms]
+
+ 659 pass
+ 2 fail
+ 1444 expect() calls
+Ran 661 tests across 93 files. [10.72s]
+EXIT=1 for packages/omo-opencode/src/cli
+

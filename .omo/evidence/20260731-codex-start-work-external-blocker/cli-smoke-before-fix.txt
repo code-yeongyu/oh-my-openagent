@@ -1,0 +1,20 @@
+real ~/.codex/config.toml sha256 BEFORE: 47186A73B238672052CF31752C63F0D327751BBFBBCAFF8BBD82030754085D89
+
+=== A. ordinary answer, plan still has unchecked tasks ===
+last_assistant_message (escaped): Finished task one.
+observed: BLOCK (continuation injected)
+raw output length: 9968
+
+=== B. external blocker marker on the FIRST line ===
+last_assistant_message (escaped): <start-work-blocked-external>\nBlocker: deploy credential DEPLOY_TOKEN is not provisioned.\nResume when the token exists in the vault.
+observed: BLOCK (continuation injected)
+raw output length: 9968
+
+=== C. marker mentioned but NOT on the first line ===
+last_assistant_message (escaped): I might need to emit this later:\n<start-work-blocked-external>
+observed: BLOCK (continuation injected)
+raw output length: 9968
+
+temp workspace removed: C:\Users\pss\AppData\Local\Temp\swc-smoke-3d62375d
+real ~/.codex/config.toml sha256 AFTER:  47186A73B238672052CF31752C63F0D327751BBFBBCAFF8BBD82030754085D89
+unchanged: True

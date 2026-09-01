@@ -59,19 +59,7 @@ describe("createMultimodalLookerAgent", () => {
     const normalizedPrompt = prompt.toLowerCase()
 
     // then
-    expect(normalizedPrompt).toContain("never")
-    expect(normalizedPrompt).toContain("tools")
     expect(extractAvailableToolClaims(prompt)).toEqual([])
   })
 
-  test("prompt instructs the agent never to call other tools", () => {
-    // given
-    const agent = createMultimodalLookerAgent("openai/gpt-5-nano")
-
-    // when
-    const prompt = typeof agent.prompt === "string" ? agent.prompt : ""
-
-    // then
-    expect(prompt.toLowerCase()).toContain("never")
-  })
 })

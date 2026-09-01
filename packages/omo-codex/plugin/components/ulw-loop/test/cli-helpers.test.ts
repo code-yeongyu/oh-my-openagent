@@ -198,8 +198,8 @@ describe("parseRecordEvidenceArgs", () => {
 });
 
 describe("ULW_LOOP_HELP", () => {
-	it("mentions omo ulw-loop + every subcommand", () => {
-		expect(ULW_LOOP_HELP).toContain("omo ulw-loop");
+	it("mentions omo-agent-toolkit ulw-loop + every subcommand", () => {
+		expect(ULW_LOOP_HELP).toContain("omo-agent-toolkit ulw-loop");
 		expect(ULW_LOOP_HELP).toContain("create-goals");
 		expect(ULW_LOOP_HELP).toContain("complete-goals");
 		expect(ULW_LOOP_HELP).toContain("status");

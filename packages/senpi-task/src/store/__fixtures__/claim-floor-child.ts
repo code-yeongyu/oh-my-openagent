@@ -20,6 +20,7 @@ function baseRecord(taskId: string): TaskRecord {
     model: "test/model",
     created_at: "2026-07-20T00:00:00.000Z",
     updated_at: "2026-07-20T00:00:00.000Z",
+    notify_on_terminal: false,
     notification: { run_epoch: 0, notified_epoch: -1 },
   }
 }

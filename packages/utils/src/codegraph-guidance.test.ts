@@ -91,7 +91,7 @@ describe("CodeGraph initialization guidance", () => {
     expect(projectPath).toBe("/Users/me/project")
   })
 
-  test("#given CodeGraph 1.4.1 MCP reports an explicit projectPath that is not indexed #when parsed #then the project path is extracted", () => {
+  test("#given CodeGraph 1.5.0 MCP reports an explicit projectPath that is not indexed #when parsed #then the project path is extracted", () => {
     // given
     const output =
       "The project at /Users/me/project isn't indexed with codegraph (no .codegraph/ directory found walking up from it), so codegraph cannot query it. Use your built-in tools (Read/Grep/Glob) for that codebase instead, and don't call codegraph for it again this session. Indexing is the user's decision — they can run 'codegraph init' in that project to enable it."
@@ -106,7 +106,7 @@ describe("CodeGraph initialization guidance", () => {
     expect(projectPath).toBe("/Users/me/project")
   })
 
-  test("#given CodeGraph 1.4.1 MCP reports no project loaded for the session #when parsed #then the searched-from path is extracted", () => {
+  test("#given CodeGraph 1.5.0 MCP reports no project loaded for the session #when parsed #then the searched-from path is extracted", () => {
     // given
     const output = [
       "No CodeGraph project is loaded for this session.",
@@ -124,7 +124,7 @@ describe("CodeGraph initialization guidance", () => {
     expect(projectPath).toBe("/Users/me/project")
   })
 
-  test("#given CodeGraph 1.4.1 MCP reports a non-indexed project for a non-CodeGraph tool #when parsed #then no guidance is emitted", () => {
+  test("#given CodeGraph 1.5.0 MCP reports a non-indexed project for a non-CodeGraph tool #when parsed #then no guidance is emitted", () => {
     // given
     const output =
       "The project at /Users/me/project isn't indexed with codegraph (no .codegraph/ directory found walking up from it), so codegraph cannot query it."

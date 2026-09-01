@@ -57,7 +57,7 @@ describe("task tool over the real TaskManager", () => {
     // when
     const result = await execute(
       "call-2",
-      { prompt: "p", category: "quick", subagent_type: "oracle" },
+      { prompt: "p", category: "quick", subagent_type: "momus" },
       undefined,
       undefined,
       CTX,

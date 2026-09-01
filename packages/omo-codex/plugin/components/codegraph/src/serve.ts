@@ -16,6 +16,8 @@ import {
 	buildCodegraphChildEnv,
 	buildCodegraphEnv,
 } from "../../../../../utils/src/codegraph/env.ts";
+import { hasCodegraphManagedInstall, resolvePinnedCodegraphBin } from "../../../../../utils/src/codegraph/managed-runtime.ts";
+import type { ParentWatchdogConfig } from "../../../../../mcp-stdio-core/src/index.ts";
 import { CODEGRAPH_PINNED_VERSION } from "../../../../../utils/src/codegraph/manifest.ts";
 import {
 	buildCodegraphNodeSkipHint,
@@ -48,6 +50,7 @@ export interface CodegraphServeProcessOptions {
 	readonly output: Writable;
 	readonly stderr: CodegraphServeStderr;
 	readonly stdio: ServeStdio;
+	readonly parentWatchdog?: ParentWatchdogConfig;
 }
 
 export type CodegraphServeProcessRunner = (
@@ -70,6 +73,8 @@ export interface RunCodegraphServeOptions {
 	readonly cwd?: string;
 	readonly env?: Record<string, string | undefined>;
 	readonly homeDir?: string;
+	readonly managedInstallExists?: (installDir: string) => boolean;
+	readonly resolveManagedBin?: (installDir: string) => string | null;
 	readonly stdin?: Readable;
 	readonly stdout?: Writable;
 	readonly nodeVersion?: string;
@@ -77,6 +82,10 @@ export interface RunCodegraphServeOptions {
 	readonly runProcess?: CodegraphServeProcessRunner;
 	readonly stderr?: CodegraphServeStderr;
 	readonly ensureProvisioned?: CodegraphProvisioner;
+	// Test seam: production callers leave this unset so the bridge and the
+	// unavailable facade use the watchdog defaults (parentPid = process.ppid,
+	// 30s poll).
+	readonly parentWatchdog?: ParentWatchdogConfig;
 }
 
 const CODEGRAPH_SKIP_HINT =
@@ -107,12 +116,28 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	}
 
 	const trustedInstallDir = config.trustedCodegraphInstallDir;
+	const installDir = trustedInstallDir ?? join(homeDir, ".omo", "codegraph");
 	const resolutionOptions = {
 		env,
 		homeDir,
-		provisioned: () => provisionedBinFromInstallDir(trustedInstallDir),
+		provisioned: () => provisionedBinFromInstallDir(installDir),
 	} satisfies ResolveCodegraphCommandOptions;
 	let resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
+	const resolveManagedBin = options.resolveManagedBin ?? (options.resolve === undefined ? provisionedBinFromInstallDir : () => null);
+	const managedInstallExists = options.managedInstallExists ?? (options.resolve === undefined ? hasCodegraphManagedInstall : () => false);
+	const managedBin = resolveManagedBin(installDir);
+	if (resolution.source !== "env" && managedBin !== null) {
+		resolution = { argsPrefix: [], command: managedBin, exists: true, source: "provisioned" };
+	} else if (resolution.source !== "env" && codegraphConfig.auto_provision !== false && managedInstallExists(installDir)) {
+		const upgraded = await provisionMissingCodegraph({
+			config: codegraphConfig,
+			ensureProvisioned: options.ensureProvisioned ?? ensureCodegraphProvisioned,
+			homeDir,
+			resolution,
+			...(trustedInstallDir === undefined ? {} : { trustedInstallDir }),
+		});
+		if (upgraded !== null) resolution = upgraded;
+	}
 	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
 	if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync)) {
 		if (resolution.source === "path" && !nodeSupport.supported) {
@@ -136,7 +161,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	}
 
 	const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
-	const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, codegraphConfig.daemon === true, options.buildEnv);
+	const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, codegraphConfig.daemon !== false, options.buildEnv);
 	const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
 	return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
 		cwd: projectCwd,
@@ -145,6 +170,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 		output: options.stdout ?? processStdout,
 		stderr: options.stderr ?? processStderr,
 		stdio: "pipe",
+		parentWatchdog: options.parentWatchdog ?? {},
 	});
 }
 
@@ -155,6 +181,7 @@ async function runUnavailableMcp(reason: string, options: RunCodegraphServeOptio
 		output: options.stdout ?? processStdout,
 		reason,
 		serverVersion: CODEGRAPH_VERSION,
+		parentWatchdog: options.parentWatchdog ?? {},
 	});
 	return 0;
 }
@@ -213,9 +240,7 @@ function resolveProjectCwd(env: Record<string, string | undefined>, fallback: st
 }
 
 function provisionedBinFromInstallDir(installDir: string | undefined): string | null {
-	if (installDir === undefined) return null;
-	const candidate = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
-	return existsSync(candidate) ? candidate : null;
+	return resolvePinnedCodegraphBin(installDir);
 }
 
 export async function runCodegraphServeCli(): Promise<void> {

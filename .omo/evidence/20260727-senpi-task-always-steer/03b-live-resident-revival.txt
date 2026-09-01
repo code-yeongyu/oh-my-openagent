@@ -1,0 +1,45 @@
+Surface:
+Direct Bun driver importing the changed senpi-task manager fixture and `runTaskSend`.
+
+Invocation:
+
+```text
+1. Start `manual-resident`.
+2. Settle its first turn as completed with final response `RESIDENT-FIRST`.
+3. Call `runTaskSend(manager, { to: taskId, message: "RESIDENT-REVIVED" }, "manual-parent")`.
+4. Settle the revived turn and inspect the same task record.
+```
+
+The call contains no `deliver_as` or delivery-mode parameter.
+
+Observed output:
+
+```json
+{
+  "taskId": "st_019fa2ea",
+  "before": {
+    "status": "completed",
+    "residency": "resident",
+    "epoch": 0
+  },
+  "send": {
+    "kind": "revived",
+    "task_id": "st_019fa2ea",
+    "run_epoch": 1
+  },
+  "after": {
+    "status": "completed",
+    "residency": "resident",
+    "epoch": 1,
+    "final": "RESIDENT-REVIVED"
+  }
+}
+```
+
+Binary observable: PASS. The same task id and resident session revived from epoch 0 to epoch 1 and completed with the follow-up result.
+
+Broader harness note:
+
+`packages/omo-senpi/scripts/qa/task-e2e.mjs` was also attempted. Its spawned mock-provider child failed immediately with `Connection error` before any `task_send` call, so that run is not used as feature evidence. The child task log and verdict are retained under `task-e2e-debug/` for reviewer inspection.
+
+Cleanup receipt: the Bun driver called `cleanupProjects()`. The failed Senpi E2E child process exited; its known sandbox paths were removed separately.

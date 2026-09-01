@@ -3,7 +3,7 @@ import { z } from "zod"
 export const CodegraphConfigSchema = z.object({
   auto_init: z.boolean().default(true),
   auto_provision: z.boolean().default(true),
-  daemon: z.boolean().default(false),
+  daemon: z.boolean().default(true),
   enabled: z.boolean().default(true),
   excluded_roots: z.array(z.string()).optional(),
   install_dir: z.string().optional(),

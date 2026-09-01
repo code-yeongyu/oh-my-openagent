@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 
 import { normalizeUlwLoopSessionId, ulwLoopDir } from "./paths.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
@@ -10,7 +10,7 @@ import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
 
 const RESUME_CAP = 2;
 
-// Mirrors start-work-continuation's context-pressure bail-out: injecting a
+// Mirrors ulw-execute-continuation's context-pressure bail-out: injecting a
 // resume directive into an already-overflowing context makes things worse.
 const CONTEXT_PRESSURE_MARKERS = [
 	"context compacted",
@@ -73,15 +73,23 @@ function isResumableStatus(status: UlwLoopItem["status"]): boolean {
 // a separate file — a ledger append would change the count and self-reset.
 function consumeResumeBudget(stateDir: string, goalId: string): boolean {
 	const ledgerLineCount = countLedgerLines(join(stateDir, "ledger.jsonl"));
-	const counterPath = join(stateDir, `auto-resume-${goalId}.json`);
+	const counterPath = resolve(stateDir, `auto-resume-${goalId}.json`);
+	const stuckPath = resolve(stateDir, `auto-resume-${goalId}.stuck`);
+	// goals.json is untrusted input: a crafted goal id (e.g. `../../x`) must
+	// never drive a write outside the session state dir. Deny the resume.
+	if (!isInsideDir(stateDir, counterPath) || !isInsideDir(stateDir, stuckPath)) return false;
 	const previous = readCounter(counterPath);
 	const count = previous !== null && previous.ledgerLineCount === ledgerLineCount ? previous.count : 0;
 	if (count >= RESUME_CAP) {
-		writeFileSync(join(stateDir, `auto-resume-${goalId}.stuck`), `no ledger progress after ${count} resumes\n`);
+		writeFileSync(stuckPath, `no ledger progress after ${count} resumes\n`);
 		return false;
 	}
 	writeFileSync(counterPath, JSON.stringify({ count: count + 1, ledgerLineCount }));
 	return true;
+}
+
+function isInsideDir(dir: string, candidate: string): boolean {
+	return candidate.startsWith(resolve(dir) + sep);
 }
 
 function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId: string): string {
@@ -91,9 +99,9 @@ function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId: 
 	return [
 		`The ulw-loop run in this session still has unfinished goals (next: ${goal.id} — ${goal.title}).`,
 		"The turn ended before the loop completed. Resume it now:",
-		`1. Run \`omo ulw-loop status${option} --json\` to reload the plan, the active goal, and currentAttemptDir.`,
+		`1. Run \`omo-agent-toolkit ulw-loop status${option} --json\` to reload the plan, the active goal, and currentAttemptDir.`,
 		"2. Continue the active goal's remaining success criteria, recording evidence with record-evidence.",
-		`3. Checkpoint through \`omo ulw-loop checkpoint${option}\` when the goal's criteria are proven; a complete checkpoint prints the next goal instruction.`,
+		`3. Checkpoint through \`omo-agent-toolkit ulw-loop checkpoint${option}\` when the goal's criteria are proven; a complete checkpoint prints the next goal instruction.`,
 		"If the loop is genuinely blocked on the user, checkpoint the goal as blocked with the reason instead.",
 	].join("\n");
 }
@@ -128,7 +136,7 @@ function readCounter(counterPath: string): { count: number; ledgerLineCount: num
 	}
 }
 
-// Local ~10-LOC approximation of start-work-continuation's boulder check (no
+// Local ~10-LOC approximation of ulw-execute-continuation's boulder check (no
 // cross-component import allowed): any continuable work for this session means
 // that hook owns the Stop event, so this one stays silent.
 function boulderContinuationWillFire(cwd: string, sessionId: string): boolean {
@@ -160,7 +168,7 @@ function transcriptShowsContextPressure(transcriptPath: string): boolean {
 	}
 }
 
-// start-work-continuation owns an active Boulder plan until its final gate marks
+// ulw-execute-continuation owns an active Boulder plan until its final gate marks
 // the work complete, including the zero-remaining checklist state.
 function boulderPlanHasChecklist(cwd: string, entry: Record<string, unknown>): boolean {
 	const activePlan = entry["active_plan"];

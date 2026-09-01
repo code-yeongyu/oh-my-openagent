@@ -118,9 +118,19 @@ function resolveAgentTarget(
 
 function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedModelMetadata | undefined): ResolvedPlan {
   const resolvedModel = resolution.resolved_model ?? explicitModel
+  // Identical precedence to the category path below: reasoning outranks reasoningEffort outranks
+  // variant, and whichever is chosen becomes the child's thinking level through asSenpiThinkingLevel.
+  const appliedVariant = resolution.resolved_model?.reasoning ?? resolution.resolved_model?.reasoning_effort ?? resolution.resolved_model?.variant
   return {
     model: resolution.model,
+    ...(resolution.requested_model !== undefined
+      ? { requested_model: resolution.requested_model }
+      : {}),
+    ...(resolution.fallback_models !== undefined
+      ? { fallback_models: resolution.fallback_models }
+      : {}),
     ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
+    ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
     agentType: resolution.agentType,
     ...(resolution.instructions !== undefined ? { instructions: resolution.instructions } : {}),
     ...(resolution.toolAllowlist !== undefined ? { toolAllowlist: resolution.toolAllowlist } : {}),
@@ -143,18 +153,27 @@ function toPlanResolution(
   availableAgents: readonly string[],
 ): PlanResolution {
   if (resolution.kind === "resolved") {
+    const appliedVariant = resolution.spec.reasoning ?? resolution.spec.reasoningEffort ?? resolution.spec.variant
     return {
       kind: "resolved",
       plan: {
         model: `${resolution.spec.provider}/${resolution.spec.modelId}`,
+        ...(resolution.spec.requested_model !== undefined
+          ? { requested_model: resolution.spec.requested_model }
+          : {}),
+        ...(resolution.spec.fallback_models !== undefined
+          ? { fallback_models: resolution.spec.fallback_models }
+          : {}),
         resolved_model: {
           source: "category",
           provider: resolution.spec.provider,
           model_id: resolution.spec.modelId,
-          display: `${resolution.spec.provider}/${resolution.spec.modelId}`,
+          display: resolution.spec.displayName ?? `${resolution.spec.provider}/${resolution.spec.modelId}`,
           ...(resolution.spec.variant !== undefined ? { variant: resolution.spec.variant } : {}),
           ...(resolution.spec.reasoningEffort !== undefined ? { reasoning_effort: resolution.spec.reasoningEffort } : {}),
+          ...(resolution.spec.reasoning !== undefined ? { reasoning: resolution.spec.reasoning } : {}),
         },
+        ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
         category: resolution.category,
         ...(resolution.spec.prompt_append !== undefined && { promptAppend: resolution.spec.prompt_append }),
       },
@@ -183,6 +202,10 @@ function toPlanResolution(
       code: "model_unavailable",
       message: `No available model for category "${categoryName}" (attempted ${resolution.attemptedModel ?? "none"}).`,
       availableCategories: resolution.availableCategories,
+      // Dead-chain detail rides the error so the warning layer can surface it without re-resolving.
+      category: categoryName,
+      ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
+      ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
     },
   }
 }
