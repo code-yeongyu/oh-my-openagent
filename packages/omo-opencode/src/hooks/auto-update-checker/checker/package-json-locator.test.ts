@@ -62,4 +62,26 @@ describe("findPackageJsonUp", () => {
 
     expect(found).toBeNull()
   })
+
+  it("#given the interim @oh-my-opencode/omo-opencode manifest between the file and an accepted root #when walking up #then skips it and returns the accepted manifest", () => {
+    const nested = join(workdir, "pkg", "nested")
+    mkdirSync(nested, { recursive: true })
+    writeFileSync(join(nested, "file.js"), "")
+    writeFileSync(join(workdir, "pkg", "package.json"), JSON.stringify({ name: "@oh-my-opencode/omo-opencode", version: "0.1.0" }))
+    writeFileSync(join(workdir, "package.json"), JSON.stringify({ name: "oh-my-openagent", version: "9.9.9" }))
+
+    const found = findPackageJsonUp(join(nested, "file.js"))
+
+    expect(found).toBe(join(workdir, "package.json"))
+  })
+
+  it("#given no accepted-name manifest within the 10-level-capped walk #when walking up #then returns null", () => {
+    const nested = join(workdir, "a", "b", "c")
+    mkdirSync(nested, { recursive: true })
+    writeFileSync(join(workdir, "package.json"), JSON.stringify({ name: "@oh-my-opencode/omo-opencode", version: "0.1.0" }))
+
+    const found = findPackageJsonUp(nested)
+
+    expect(found).toBeNull()
+  })
 })

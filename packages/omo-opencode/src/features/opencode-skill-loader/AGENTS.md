@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-25 files (~2.8k LOC). Discovers, parses, merges, and resolves SKILL.md files from 4 scopes with priority deduplication.
+This module discovers, parses, merges, and resolves SKILL.md files from 4 scopes with priority deduplication. Harness-neutral loader, builtin skill, runtime skill, and skill matching primitives are extracted to [`packages/skills-loader-core/`](../../../../../packages/skills-loader-core); this directory is the OpenCode adapter shim.
 
 ## 4-SCOPE PRIORITY (highest → lowest)
 

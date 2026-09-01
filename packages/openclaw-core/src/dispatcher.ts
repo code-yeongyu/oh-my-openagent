@@ -1,0 +1,252 @@
+import { spawn } from "@oh-my-opencode/utils/runtime"
+import { validateGatewayUrl } from "./gateway-url-validation"
+import type { OpenClawGateway, WakeResult } from "./types"
+
+const DEFAULT_HTTP_TIMEOUT_MS = 10_000
+const DEFAULT_COMMAND_TIMEOUT_MS = 5_000
+const MIN_COMMAND_TIMEOUT_MS = 100
+const MAX_COMMAND_TIMEOUT_MS = 300_000
+
+export function interpolateInstruction(
+  template: string,
+  variables: Record<string, string | undefined>,
+): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
+    return variables[key] ?? ""
+  })
+}
+
+export function shellEscapeArg(value: string): string {
+  return "'" + value.replace(/'/g, "'\\''") + "'"
+}
+
+export function resolveCommandTimeoutMs(
+  gatewayTimeout?: number,
+  envTimeoutRaw = process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS,
+): number {
+  const parseFinite = (value: unknown): number | undefined => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return undefined
+    return value
+  }
+  const parseEnv = (value?: string): number | undefined => {
+    if (!value) return undefined
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  const rawTimeout =
+    parseFinite(gatewayTimeout) ??
+    parseEnv(envTimeoutRaw) ??
+    DEFAULT_COMMAND_TIMEOUT_MS
+
+  return Math.min(
+    MAX_COMMAND_TIMEOUT_MS,
+    Math.max(MIN_COMMAND_TIMEOUT_MS, Math.trunc(rawTimeout)),
+  )
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null
+}
+
+function firstStringValue(record: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string" && value.trim().length > 0) return value
+    if (typeof value === "number" && Number.isFinite(value)) return String(value)
+  }
+  return undefined
+}
+
+function extractWakeMetadata(payload: unknown): Pick<WakeResult, "messageId" | "platform" | "channelId" | "threadId"> {
+  const record = asRecord(payload)
+  if (!record) return {}
+
+  const nestedCandidates = [record, asRecord(record.data), asRecord(record.result), asRecord(record.message)]
+    .filter((candidate): candidate is Record<string, unknown> => candidate !== null)
+
+  let bestMatch: Pick<WakeResult, "messageId" | "platform" | "channelId" | "threadId"> = {}
+  let bestScore = -1
+
+  for (const candidate of nestedCandidates) {
+    const messageId = firstStringValue(candidate, ["messageId", "message_id", "id"])
+    const platform = firstStringValue(candidate, ["platform", "source"])
+    const channelId = firstStringValue(candidate, ["channelId", "channel_id", "channel"])
+    const threadId = firstStringValue(candidate, ["threadId", "thread_id", "thread"])
+
+    const score =
+      (messageId ? 4 : 0)
+      + (platform ? 3 : 0)
+      + (channelId ? 2 : 0)
+      + (threadId ? 1 : 0)
+
+    if (score > bestScore) {
+      bestMatch = { messageId, platform, channelId, threadId }
+      bestScore = score
+    }
+  }
+
+  return bestScore > 0 ? bestMatch : {}
+}
+
+function parseWakeMetadata(raw: string): Pick<WakeResult, "messageId" | "platform" | "channelId" | "threadId"> {
+  const trimmed = raw.trim()
+  if (!trimmed) return {}
+  try {
+    return extractWakeMetadata(JSON.parse(trimmed))
+  } catch (parseError) {
+    if (!(parseError instanceof Error)) return {}
+    const messageId = trimmed.match(/message\s+id:\s*([^\s]+)/i)?.[1]
+    const platform = trimmed.match(/sent\s+via\s+([a-z0-9_-]+)/i)?.[1]?.toLowerCase()
+    return {
+      ...(messageId ? { messageId } : {}),
+      ...(platform ? { platform } : {}),
+    }
+  }
+}
+
+export async function wakeGateway(
+  gatewayName: string,
+  gatewayConfig: OpenClawGateway,
+  payload: unknown,
+): Promise<WakeResult> {
+  if (!gatewayConfig.url || !validateGatewayUrl(gatewayConfig.url)) {
+    return {
+      gateway: gatewayName,
+      success: false,
+      error: "Invalid URL (HTTPS required)",
+    }
+  }
+
+  try {
+    const headers = {
+      "Content-Type": "application/json",
+      ...gatewayConfig.headers,
+    }
+
+    const timeout = gatewayConfig.timeout ?? DEFAULT_HTTP_TIMEOUT_MS
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+    const response = await fetch(gatewayConfig.url, {
+      method: gatewayConfig.method || "POST",
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    }).finally(() => {
+      clearTimeout(timeoutId)
+    })
+
+    if (!response.ok) {
+      return {
+        gateway: gatewayName,
+        success: false,
+        error: `HTTP ${response.status}`,
+        statusCode: response.status,
+      }
+    }
+
+    const metadata = parseWakeMetadata(await response.text())
+
+    return { gateway: gatewayName, success: true, statusCode: response.status, ...metadata }
+  } catch (error) {
+    return {
+      gateway: gatewayName,
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
+export async function wakeCommandGateway(
+  gatewayName: string,
+  gatewayConfig: OpenClawGateway,
+  variables: Record<string, string | undefined>,
+): Promise<WakeResult> {
+  if (!gatewayConfig.command) {
+    return {
+      gateway: gatewayName,
+      success: false,
+      error: "No command configured",
+    }
+  }
+
+  try {
+    const timeout = resolveCommandTimeoutMs(gatewayConfig.timeout)
+
+    const interpolated = gatewayConfig.command.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
+      const value = variables[key]
+      if (value === undefined) return _match
+      return shellEscapeArg(value)
+    })
+
+    const proc = spawn(["sh", "-c", interpolated], {
+      env: { ...process.env },
+      stdout: "pipe",
+      stderr: "ignore",
+      detached: process.platform !== "win32",
+    })
+    const stdoutPromise = new Response(proc.stdout).text()
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        terminateCommandProcess(proc, "SIGKILL")
+        reject(new Error("Command timed out"))
+      }, timeout)
+    })
+
+    try {
+      await Promise.race([proc.exited, timeoutPromise])
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+      }
+    }
+
+    if (proc.exitCode !== 0) {
+      throw new Error(`Command exited with code ${proc.exitCode}`)
+    }
+
+    const metadata = parseWakeMetadata(await stdoutPromise)
+
+    return { gateway: gatewayName, success: true, ...metadata }
+  } catch (error) {
+    return {
+      gateway: gatewayName,
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
+type KillableProcess = {
+  pid?: number
+  kill: (signal?: NodeJS.Signals) => void
+}
+
+export function terminateCommandProcess(proc: KillableProcess, signal: NodeJS.Signals): void {
+  try {
+    if (process.platform !== "win32" && proc.pid) {
+      try {
+        process.kill(-proc.pid, signal)
+        return
+      } catch (groupKillError) {
+        if (groupKillError instanceof Error) {
+          proc.kill(signal)
+          return
+        }
+        proc.kill(signal)
+        return
+      }
+    }
+
+    proc.kill(signal)
+  } catch (directKillError) {
+    if (directKillError instanceof Error) {
+      return
+    }
+    return
+  }
+}

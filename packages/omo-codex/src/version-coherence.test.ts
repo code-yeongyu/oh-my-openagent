@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join, relative } from "node:path"
 
 const repoRoot = join(import.meta.dir, "..", "..", "..")
@@ -17,11 +17,23 @@ function rootVersion(): string {
   return version
 }
 
+function pluginWorkspaceManifests(): string[] {
+  const manifest: unknown = JSON.parse(readFileSync(join(pluginRoot, "package.json"), "utf8"))
+  const workspaces = typeof manifest === "object" && manifest !== null
+    ? Reflect.get(manifest, "workspaces")
+    : undefined
+
+  if (!Array.isArray(workspaces)) {
+    throw new Error("Codex plugin package.json has no workspaces array")
+  }
+
+  return workspaces
+    .filter((workspace): workspace is string => workspace.startsWith("components/"))
+    .map((workspace) => join(pluginRoot, workspace, "package.json"))
+}
+
 function componentManifests(): string[] {
-  const componentsRoot = join(pluginRoot, "components")
-  return readdirSync(componentsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(componentsRoot, entry.name, "package.json"))
+  return pluginWorkspaceManifests()
 }
 
 function versionedManifests(): string[] {
@@ -61,9 +73,9 @@ describe("OMO Codex version coherence", () => {
     const expected = rootVersion()
     const hookManifests = [
       join(pluginRoot, "hooks", "hooks.json"),
-      ...readdirSync(join(pluginRoot, "components"), { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => join(pluginRoot, "components", entry.name, "hooks", "hooks.json")),
+      ...pluginWorkspaceManifests().map((manifest) =>
+        join(manifest, "..", "hooks", "hooks.json"),
+      ),
     ]
 
     // when / then

@@ -39,6 +39,83 @@ describe("OhMyOpenCodeConfigSchema team_mode", () => {
   })
 })
 
+describe("OhMyOpenCodeConfigSchema telemetry", () => {
+  it("allows telemetry omission", () => {
+    // given
+    const rawConfig = {}
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.telemetry).toBeUndefined()
+    }
+  })
+
+  it("accepts boolean telemetry settings", () => {
+    // given
+    const enabledConfig = { telemetry: true }
+    const disabledConfig = { telemetry: false }
+
+    // when
+    const enabledResult = OhMyOpenCodeConfigSchema.safeParse(enabledConfig)
+    const disabledResult = OhMyOpenCodeConfigSchema.safeParse(disabledConfig)
+
+    // then
+    expect(enabledResult.success).toBe(true)
+    expect(disabledResult.success).toBe(true)
+    if (enabledResult.success) {
+      expect(enabledResult.data.telemetry).toBe(true)
+    }
+    if (disabledResult.success) {
+      expect(disabledResult.data.telemetry).toBe(false)
+    }
+  })
+
+  it("rejects string telemetry settings", () => {
+    // given
+    const rawConfig = { telemetry: "yes" }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema tui", () => {
+  it("defaults the TUI sidebar to enabled", () => {
+    // given
+    const rawConfig = {}
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.parse(rawConfig)
+
+    // then
+    expect(result.tui?.sidebar.enabled).toBe(true)
+  })
+
+  it("allows the TUI sidebar to be disabled", () => {
+    // given
+    const rawConfig = {
+      tui: {
+        sidebar: {
+          enabled: false,
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.parse(rawConfig)
+
+    // then
+    expect(result.tui?.sidebar.enabled).toBe(false)
+  })
+})
+
 describe("OhMyOpenCodeConfigSchema agent_order", () => {
   it("accepts string agent ordering when provided", () => {
     // given

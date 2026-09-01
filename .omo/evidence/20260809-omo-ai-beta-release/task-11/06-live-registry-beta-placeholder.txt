@@ -1,0 +1,19 @@
+# Scenario 06 - live registry beta channel serves the documented placeholder
+root=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-beta.XXXXXX.1VUz7Li9gB
+prefix=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-beta.XXXXXX.1VUz7Li9gB/prefix
+npm_cache=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-beta.XXXXXX.1VUz7Li9gB/npm-cache
++ NPM_CONFIG_CACHE="$CACHE" npm i -g --prefix "$PREFIX" omo-ai@beta
+npm warn deprecated omo-ai@0.0.0-beta.0: Bootstrap placeholder so trusted publishing (OIDC) could be configured. The omo-ai product ships ONLY on the beta channel: npm install -g omo-ai@beta
+
+added 1 package in 201ms
+npm notice
+npm notice New major version of npm available! 11.18.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+install_exit=0
+installed_version=0.0.0-beta.0
+beta_placeholder_version=PASS
+scenario_06=PASS
++ rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-beta.XXXXXX.1VUz7Li9gB
+cleanup_receipt=rm -rf /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-beta.XXXXXX.1VUz7Li9gB; prefix+cache absent

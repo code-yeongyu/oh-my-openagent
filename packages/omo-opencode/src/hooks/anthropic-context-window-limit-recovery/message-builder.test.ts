@@ -18,15 +18,15 @@ const emptyTextMockFactory = () => ({
   replaceEmptyTextPartsAsync,
   findMessagesWithEmptyTextPartsFromSDK,
 })
-mock.module("../session-recovery/storage/empty-text", emptyTextMockFactory)
-mock.module("../session-recovery/storage/empty-text.ts", emptyTextMockFactory)
+mock.module("./storage/empty-text", emptyTextMockFactory)
+mock.module("./storage/empty-text.ts", emptyTextMockFactory)
 
 const textPartInjectorMockFactory = () => ({
   injectTextPart: () => false,
   injectTextPartAsync,
 })
-mock.module("../session-recovery/storage/text-part-injector", textPartInjectorMockFactory)
-mock.module("../session-recovery/storage/text-part-injector.ts", textPartInjectorMockFactory)
+mock.module("./storage/text-part-injector", textPartInjectorMockFactory)
+mock.module("./storage/text-part-injector.ts", textPartInjectorMockFactory)
 
 const messageBuilderModulePromise = import("./message-builder")
 

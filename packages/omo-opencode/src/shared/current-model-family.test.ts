@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test"
 
 const ACTIVE_SURFACE_EXTENSIONS = /\.(?:ts|mts|cts|mjs|js|json|jsonc|md|yaml|yml|toml)$/
-const LEGACY_GPT_MODEL_RE = /gpt-5(?:\.|-)(?:2|3)(?:\b|-|\.|_)/i
+const LEGACY_GPT_MODEL_RE = /gpt-5(?:\.|-)(?:2|3)(?![-\s]codex(?:\b|-|\.|_))(?:\b|-|\.|_)/i
 
 const ALLOWED_LEGACY_REFERENCES = new Set([
   "packages/omo-opencode/src/generated/model-capabilities.generated.json",

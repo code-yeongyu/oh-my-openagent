@@ -11,7 +11,10 @@ export function applyFallbackEntrySettings(input: {
   return {
     ...categoryModel,
     variant: variantOverride ?? effectiveEntry.variant ?? categoryModel.variant,
-    reasoningEffort: effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort,
+    reasoning: effectiveEntry.reasoning ?? categoryModel.reasoning,
+    reasoningEffort: effectiveEntry.reasoning === undefined && categoryModel.reasoning === undefined
+      ? effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort
+      : categoryModel.reasoningEffort,
     temperature: effectiveEntry.temperature ?? categoryModel.temperature,
     top_p: effectiveEntry.top_p ?? categoryModel.top_p,
     maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,

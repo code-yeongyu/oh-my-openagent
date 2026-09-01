@@ -1,0 +1,36 @@
+# RED capture - pre-change state
+Captured: 2026-08-17T20:28:09.353087
+Worktree HEAD: 04ccd594314cd7cdcc58e3f4fb2c8471b2c2ed5c
+
+$ rg -n 'project-original|no third-party source vendored' packages/shared-skills/skills/ultimate-browsing/ATTRIBUTION.md
+rc=0 (rg rc=1 means NO MATCH)
+4:project-original content plus two third-party tools that it installs at runtime
+10:## 1. Project-original content (no third-party source vendored)
+
+
+$ rg -n -A3 '^- .engine/\*\*' packages/shared-skills/skills/ultimate-browsing/ATTRIBUTION.md
+rc=0 (rg rc=1 means NO MATCH)
+15:- `engine/**` — the insane-search Tier-1 fetch engine (curl_cffi grid, WAF
+16-  detection, Playwright fallback templates, `bias_check.py` no-site-name gate).
+17-- `references/insane-search/**` and `references/agent-reach/**` — the Tier-1 and
+18-  Tier-1.5 reference docs.
+
+
+$ rg -n 'fivetaku|insane-search' packages/shared-skills/skills/ultimate-browsing/ATTRIBUTION.md
+rc=0 (rg rc=1 means NO MATCH)
+15:- `engine/**` — the insane-search Tier-1 fetch engine (curl_cffi grid, WAF
+17:- `references/insane-search/**` and `references/agent-reach/**` — the Tier-1 and
+
+
+$ rg -n -i 'UPSTREAM BASELINE|VERSION POLICY|KEEP LIST|WANT LIST|do not blind-rebase|re-vendor' packages/shared-skills/skills/ultimate-browsing/engine/AGENTS.md
+rc=1 (rg rc=1 means NO MATCH)
+
+
+$ rg -n -i 'upstream|version policy' packages/shared-skills/AGENTS.md
+rc=0 (rg rc=1 means NO MATCH)
+38:The `frontend` skill's brand / taste-skill / ui-ux-db / designpowers references are third-party content. Under the DMCA-safe model the repo holds ZERO committed copies; each upstream is a pinned git submodule under `upstreams/<name>` (NOT under `skills/`, so it never lands in the tarball), and the build materializes the referenced files path-mapped into `skills/frontend/references/{design,ui-ux-db,designpowers/vendor}`. File bodies are copied verbatim, except materialized `SKILL.md` frontmatter may normalize an unquoted single-line `description:` scalar into a JSON-quoted YAML string so Codex/OpenCode frontmatter parsing stays deterministic; the description text itself is unchanged.
+41:upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submodules (provenance, build input)
+42:  └─ packages/shared-skills/scripts/frontend-refs-manifest.mjs   # single source of truth: partition + upstream path map
+44:            └─ chokepoint: packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs  (submodule init + materialize)
+51:- ATTRIBUTION pins each upstream's SHA (`Pinned upstream commit:`); `script/update-frontend-upstreams.mjs` bumps the submodules + rewrites the pins (`--check` verifies pins == submodule HEAD, no network). `provenance-gate.test.ts` fails CI if any third-party path is committed, the materialize set is missing, or a pin drifts. `materialize-frontend-refs.test.ts` covers the allowed `SKILL.md` description quoting normalization.
+66:- **Skill CONTENT is PROSE — do NOT pin its wording with a test.** A skill body is instructions the model reads; asserting what it *says* (`toContain` a sentence, `not.toContain` old wording, word/char counts) guards a diff, not behavior, and blocks every legitimate edit — see `.omo/rules/test-discipline.md` §PROMPT TESTS. Guard only what a MACHINE consumes: packaging (`omo-opencode/src/shared-skills-package.test.ts`, above), personal-token scrubbing (`depersonalization-gate.test.ts` — a security exclusion), the third-party manifest (`frontend-thirdparty-manifest.test.ts`), the root-path probe (`shared-skills-root-path.test.ts`), and `upstreams.test.ts`. A pure-prose skill edit ships on review with NO new test; the prose-pinning contract tests that used to sit here were removed as pretend-coverage.

@@ -1,0 +1,59 @@
+ACTUAL RED - prior full gate
+source:
+  https://github.com/code-yeongyu/oh-my-openagent/pull/6310
+observed:
+  `bun run test:senpi` completed 319/320 tests.
+  `default runOmoCommand executes status` timed out after 20 seconds.
+
+ACTUAL INCOMPLETE FIXTURE ARTIFACT
+path:
+  <os.tmpdir>/omo-senpi-ulw-loop-Qm7moX
+observed before cleanup:
+  generated `omo` wrapper invoked `/Users/yeongyu/.bun/bin/bun`
+  wrapper did not use `exec`
+  `cwd.txt` was absent, so the runner never reached its first write
+  artifact modification time: 2026-07-22T17:57:15+09:00
+
+BASELINE STRESS
+command:
+  bun test packages/omo-senpi/src/components/ulw-loop/runtime.test.ts --rerun-each 100
+observed:
+  500 pass
+  0 fail
+  duration 147.81 seconds
+
+DETERMINISTIC RED - child runtime identity
+instrumentation:
+  The fake runner records process.execPath and process.versions.bun.
+command:
+  bun test packages/omo-senpi/src/components/ulw-loop/runtime.test.ts
+observed:
+  Expected bunVersion to be null.
+  Received "1.3.14".
+  4 pass
+  1 fail
+
+scope:
+  This deterministic assertion pins the causal fixture invariant.
+  It does not claim that a fresh isolated run reproduces the load-sensitive 20-second timeout.
+
+GREEN - absolute Node runner
+change:
+  Resolve Node once with `node -p process.execPath`.
+  Invoke the absolute Node binary.
+  Leave shell-wrapper behavior unchanged to isolate the runtime-selection toggle.
+command:
+  bun test packages/omo-senpi/src/components/ulw-loop/runtime.test.ts
+observed:
+  5 pass
+  0 fail
+  child bunVersion is null
+
+GREEN STRESS
+command:
+  bun test packages/omo-senpi/src/components/ulw-loop/runtime.test.ts --rerun-each 100
+observed:
+  500 pass
+  0 fail
+  duration 77.34 seconds
+  leftover_fixture_dirs=0

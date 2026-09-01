@@ -2,7 +2,6 @@ import { z } from "zod"
 
 export const HookNameSchema = z.enum([
   "todo-continuation-enforcer",
-  "session-recovery",
   "session-notification",
   "comment-checker",
   "tool-output-truncator",
@@ -17,15 +16,17 @@ export const HookNameSchema = z.enum([
   "rules-injector",
   "background-notification",
   "auto-update-checker",
+  "codegraph-bootstrap",
+  "ast-grep-sg-provision",
   "startup-toast",
   "keyword-detector",
   "agent-usage-reminder",
   "non-interactive-env",
   "interactive-bash-session",
 
-  "thinking-block-validator",
   "tool-pair-validator",
-  "ralph-loop",
+  "monitor-status-injector",
+  "goal",
   "category-skill-reminder",
 
   "compaction-context-injector",
@@ -41,7 +42,7 @@ export const HookNameSchema = z.enum([
   "no-sisyphus-gpt",
   "no-hephaestus-non-gpt",
   "hephaestus-agents-md-injector",
-  "start-work",
+  "ulw-execute",
   "atlas",
   "unstable-agent-babysitter",
   "task-resume-info",

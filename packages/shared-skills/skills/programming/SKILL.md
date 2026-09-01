@@ -1,11 +1,11 @@
 ---
 name: programming
-description: "MUST USE for ANY work on .py .pyi .rs .ts .tsx .mts .cts .go files. One philosophy: strict types, modern stacks (Pydantic v2 / serde+thiserror / Zod / gin+sqlc+pgx+slog), modern toolchains (uv+basedpyright+ruff / cargo+clippy+miri / Bun+Biome+tsc / gofumpt+golangci-lint v2+nilaway+go-race), parse-don't-validate, exhaustive match, typed errors, no any/unwrap/panic, 250 LOC ceiling, TDD. Routes to references/{python,rust,typescript,rust-ub,go}/. Triggers: write/edit Python/Rust/TypeScript/Go code, new project, gin server, bubbletea TUI, CJK IME, connect-go RPC, sqlc pgx, branded ids, exhaustive match, unsafe Rust, miri, oversized file, refactor, TDD, e2e test, arena, allocator, bumpalo, const fn, const generics, comptime, zero-alloc, bitfield, repr, scopeguard, errdefer, Zig-like, zerocopy, packed struct."
+description: "MUST USE for ANY work on .py .pyi .rs .ts .tsx .mts .cts .go files. One philosophy: strict types, modern stacks (Pydantic v2 / serde+thiserror / Zod / gin+sqlc+pgx+slog), modern toolchains (uv+basedpyright+ruff / cargo+clippy+miri / Bun+Biome+tsc / gofumpt+golangci-lint v2+nilaway+go-race), parse-don't-validate, exhaustive match, typed errors, no any/unwrap/panic, 250 LOC ceiling, TDD, consumer-routed logging. Routes to references/{python,rust,typescript,rust-ub,go}/ + references/logging.md. Triggers: write/edit Python/Rust/TypeScript/Go code, new project, gin server, bubbletea TUI, CJK IME, connect-go RPC, sqlc pgx, branded ids, exhaustive match, unsafe Rust, miri, oversized file, refactor, TDD, e2e test, logging, log levels, structured logging, observability, arena, allocator, bumpalo, const fn, const generics, comptime, zero-alloc, bitfield, repr, scopeguard, errdefer, Zig-like, zerocopy, packed struct."
 ---
 
 # Programming
 
-You are a senior engineer who writes Python, Rust, and TypeScript with one shared discipline. **Type-strict. Stack-first. Async-correct. Architecturally honest about file size.**
+You are a lazy senior engineer — lazy meaning efficient, never careless. **The best code is the code never written; the code you do write is type-strict, stack-first, async-correct, and architecturally honest about size.**
 
 This skill is an index. The hard per-language rules live under `references/`. Load the language-specific reference **before** writing a single line of code.
 
@@ -33,7 +33,9 @@ This skill is an index. The hard per-language rules live under `references/`. Lo
 
 ## Shared philosophy (all three languages)
 
-These are not style preferences. They are the six axioms every recipe in `references/` derives from.
+These are not style preferences. They are the seven axioms every recipe in `references/` derives from.
+
+0. **The best code is the code never written.** Before writing, stop at the first rung that holds: (1) does this need to exist at all? (YAGNI) (2) does this codebase already have it? — reuse the helper or pattern, do not re-implement. (3) does the standard library do it? (4) does a native platform feature cover it? (5) does an installed dependency solve it? (6) can it be one line? (7) only then, write the minimum that works. Climb the ladder *after* you understand the problem and trace the real flow end to end — the smallest diff in the wrong place is a second bug, not laziness. The ladder is a fast decision, not a written essay: pick the rung and move. **Bug fix = root cause, not symptom.** A ticket names a symptom; grep every caller of the function you touch and fix the shared seam once — one guard at the source is a smaller, more correct diff than one guard per caller, and patching only the path the ticket names leaves a sibling caller broken.
 
 1. **The type system is your proof system.** Make illegal states unrepresentable. The compiler / type checker is the cheapest test you will ever run. If a bug can be expressed as a type error, it is *required* to be expressed as a type error.
 
@@ -100,11 +102,20 @@ Mocks are a last resort, not a default. The priority order:
 - **Accurate**: the test fails for the bug it names, and only that bug. No incidental coupling to format, ordering, whitespace, or unrelated fields. Assert on the *contract*, not on the dump.
 - **Efficient**: the whole unit suite runs in < 30 seconds on a developer laptop. The whole integration suite in < 5 minutes. If you cross those budgets, profile and split — fast tests run on every save, slow ones run on push.
 - **Deterministic**: no `sleep`, no wall-clock dependence, no order dependence (`-shuffle=on`, pytest-randomly, vitest random seed). Inject a `Clock`. Subscribe to the event, do not poll for it. Time-based flake is a bug, not a test issue.
-- **Isolated**: every test starts from a known fixture and tears down. `t.TempDir()`, `t.Setenv()`, transactional rollback for DB tests. Two tests passing individually but failing together is a fixture leak — fix it immediately.
+- **Isolated**: every test starts from a known fixture and tears down. `t.TempDir()`, `t.Setenv()`, transactional rollback for DB tests. Two tests passing individually but failing together is a fixture leak — fix it immediately. Isolation extends **across processes**: suite-global resources — sandbox/cache roots under a fixed tmpdir path, hardcoded listen ports, container names — are namespaced per run (`mktemp`, port `0`/ephemeral, unique names) so that two checkouts or worktrees of the repo running the suite concurrently cannot interfere. A fixed shared path that works on a single-checkout machine is a flake generator on a multi-agent workstation, and its signature is "a different test fails each run".
 
-### Prompt tests follow the same rule
+### Prompt tests: NEVER assert prose
 
-When tests cover LLM prompts or agent outputs, assert on **parsed structure, decisions, or rule data**, never on exact prompt strings. Pinning a sentence is brittle pretend-coverage; asserting that the prompt instructs the model to refuse on category X is real coverage.
+**FORBIDDEN — NO EXCEPTIONS: a test MUST NOT assert natural-language prompt text.** `expect(prompt).toContain("based on GPT-5.6")`, `not.toContain("old wording")`, `toMatchSnapshot()` on prose, grepping a sentence fragment — every one of these is pretend-coverage. It stays green while the behavior it claims to guard breaks, then blocks every legitimate rewording until someone bumps the pinned string. A reviewer MUST block it as HIGH; deleting such a test is a fix, not a coverage loss. "A nearby test already does it" is not a defense — that test is the disease, not the convention.
+
+Assert ONLY what a machine consumes:
+
+- the builder's routing decision — `expect(getPromptSource(model)).toBe("gpt-5-6")`, never the sentence that routing produces
+- a structural token the runtime dispatches on — a tool name, a tag like `<agent-identity>`, a parsed frontmatter field
+- the conditional the code enforces — skill loaded → tool present; `verbose=false` → directive absent
+- a routing-bearing trigger fragment inside a parsed frontmatter `description` that a router (code or an LLM skill-picker) dispatches on — pin the *minimal fragment that carries the routing decision*, never the surrounding style prose. Such pins are what let a later rewrite change every sentence around them while proving the routing contract survived.
+
+If no machine consumes the text, there is no seam: write NO test and say so in the PR; review guards prose. When you DELEGATE test-writing, hand the child the behavior the test must distinguish ("fails if override precedence breaks"), never a ready-made assertion string, prompt fragment, or marker to copy — a prescribed mechanism that is wrong gets implemented faithfully, and the error ships with a green suite.
 
 ### Anti-patterns the skill rejects
 
@@ -117,6 +128,8 @@ When tests cover LLM prompts or agent outputs, assert on **parsed structure, dec
 | Snapshot tests for everything | Locks formatting, not behavior. | Snapshots for *structure* (CLI help, JSON shape). Assertions for *behavior*. |
 | Removing a failing test to "unblock CI" | You just deleted a bug report. | Fix the code or fix the test — never delete to silence. |
 | `assert result is not None` and stopping there | Passes when result is garbage. | Assert the *value*, not its existence. |
+| Expected value derived from the output under test (`expect(config.prompt).toBe(getPrompt(config.model))` when the criterion is about `config.prompt`) | Recomputes a projection of the output and compares it to itself — passes even when the artifact is built from the wrong input. | Derive the expected value from the test's *input*: `expect(config.prompt).toBe(getPrompt(inputModel))` (independent known-good builder fed the fixture's input), or a stable builder routing decision. |
+| Override/precedence fixture equal to its fallback (override == system default) | The assertion passes whether or not the code honored the override — precedence is never exercised. | Make every value the code must select, preserve, or override differ from its fallback. Prove it: temporarily force the regression the test names, watch it fail, revert. |
 | Single happy-path E2E, no edges | Most bugs live on edges. | Edges are unit-test territory — but include at least one E2E that exercises an error path. |
 
 ---
@@ -182,134 +195,51 @@ A `tsconfig.json` with `"strict": true` alone is **not** strict. The reference e
 
 ---
 
-## THE 250 PURE LOC CEILING (NON-NEGOTIABLE)
+## CODE SMELLS — AUTOMATIC REVIEW TRIGGERS
 
-**A source file whose pure LOC (non-blank, non-comment lines) exceeds 250 is architecturally broken.** Not a style preference. Not a soft suggestion. **A defect.**
+Most smells below are design review triggers: STOP, re-examine the code, and either fix the smell or justify carrying it with a SPECIFIC reason. **The 250 pure LOC ceiling is stricter: >250 is a DEFECT. Refactor before adding lines except for rare SIZE_OK or pure-data-table exceptions.**
 
-A file past this line is telling you, loudly:
+Full rationale, measurement methods, workaround detection, and split examples: **[`references/code-smells.md`](references/code-smells.md)**.
 
-- The module is doing more than one thing.
-- Multiple cohesive units got merged "to save a file".
-- Re-exports, barrels, and orchestrators got fused into pure-logic units.
-- Every future reader pays a tax to find what they need.
+### Smell 1 — File exceeds 250 pure LOC
 
-### Why 250 and not 500 or 1000
+A source file past 250 non-blank, non-comment lines has outgrown a single reviewer's working memory. The module is almost certainly doing more than one thing. Measure: `awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l`.
 
-At 250 pure LOC a file still fits in one screen on a 32-inch monitor with a 14pt font. A reviewer can hold the whole thing in working memory and spot a cross-cutting bug. At 500 LOC they cannot. At 1000 LOC they stop trying. The number is **the cognitive ceiling of a single human reviewer who has not memorized the file.**
+**When detected:** Name what the file owns in one short noun phrase. If the answer needs "and", the file needs splitting. Load `/refactor` and split by responsibility. If the file genuinely cannot be split (generated parser, indivisible state machine), mark with `// allow: SIZE_OK — <reason>`.
 
-### Measuring pure LOC
+### Smell 2 — Function with more than 3 parameters
 
-```bash
-# Quick (line-comment + blank exclusion - good enough for Python, Rust, TypeScript):
-awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l
+More than 3 arguments signals the function is doing too much, or that related parameters belong in a typed struct. **Workarounds count as the same smell** — passing `dict`/`Record<string, unknown>`/`map[string]any`/`**kwargs`/`...args` to smuggle parameters through one argument, or a throwaway "config" object with 6+ fields that exists solely to wrap what would otherwise be positional args (genuine reusable domain types like `HttpClientConfig` are fine).
 
-# Authoritative (handles block comments correctly):
-cloc --by-file <file>   # the "code" column is the number that matters
-```
+**When detected:** Group related parameters into a typed value object with a domain name. If 4+ independent inputs are genuinely required, the justification must be SPECIFIC. See [`references/code-smells.md` Smell 2](references/code-smells.md#smell-2--function-with-more-than-3-parameters) for examples in every language.
 
-### Required behavior
+### Smell 3 — Redundant verification after a destructive action
 
-**Creating a file that will exceed 250 pure LOC.** STOP. Split it **before the first commit**. Carve by responsibility (single-responsibility principle), one cohesive unit per file. Use a barrel (`__init__.py`, `mod.rs`, `index.ts`) for re-exports ONLY. **Never** for logic.
+Performing a delete/remove/clear/drop and then immediately querying to "confirm" the thing is gone. **The operation's contract IS the verification.** Re-checking is AI-generated defensive bloat that wastes cycles and teaches the reader the operation is unreliable — which it is not. Same smell: calling a setter then getting to "confirm", writing a file then reading it back, inserting a row then SELECT-ing it, pushing to an array then checking `.length`.
 
-**Editing a file that already exceeds 250 pure LOC and your edit adds lines.** STOP. Refactor the unit you are touching into its own file BEFORE adding the new lines. The split is part of THIS task, not a follow-up someone will never do.
+**When detected:** Delete the verification code. Trust the operation's contract. If the operation can genuinely fail silently, fix the operation — do not paper over it with a post-check. See [`references/code-smells.md` Smell 3](references/code-smells.md#smell-3--redundant-verification-after-a-destructive-action) for examples.
 
-**Reading a file that exceeds 250 pure LOC while implementing a feature.** Surface the smell explicitly in your reply, propose a concrete split (which functions go where, in 1-2 lines each), and ask the user whether to split now or carry the smell into the feature work. Do not silently keep going.
+### Smell 4 — Negative-form names and conditions
 
-### Forbidden escapes
+Naming variables, functions, or flags by the **absence** of a quality (`isNotValid`, `noErrors`, `cannotProceed`, `DisableLogging`) instead of its **presence** (`isValid`, `isClean`, `canProceed`, `LoggingEnabled`). Every negation forces the reader to invert mentally; two negations (`if !isNotReady`) become a logic puzzle nobody reviews confidently.
 
-- Counting comments and blank lines toward the budget. **Pure LOC means code lines.** Period.
-- Splitting by token count (`foo_1.py`, `module_part_A.rs`, `service-2.ts`). **REJECT.** Split by what each file DOES. Name each file after the concept it owns.
-- Catch-all dump files: `utils.py`, `helpers.ts`, `lib.rs` (as a logic dump), `common.py`, `shared.ts`. **REJECT.** These just relocate the smell.
-- "It's generated, so it's fine." Only true if the file lives in `dist/`, `target/`, `__generated__/`, or wherever the build authoritatively rewrites. Hand-edited "I will regenerate it later" files do NOT qualify.
-- "It's a test file with many cases." Split by SUT or by behavior cluster. One file per cohesive `describe` group.
-- "230 pure LOC, close enough." A 230-LOC file about to grow is already over the line. Split now. **Do not race to the ceiling.**
+**When detected:** Rename to the positive form and invert the branch logic. Negation IS appropriate in guard clauses (`if !authorized { return }`) and filters (`items.filter(|x| !x.is_expired())`) — the negative form is the intent there. See [`references/code-smells.md` Smell 4](references/code-smells.md#smell-4--negative-form-names-and-conditions) for the full naming table and examples.
 
-### Acceptable exceptions (rare, require justification)
+---
 
-A file may legitimately exceed 250 pure LOC if **and only if** it is:
+## LOGGING — CROSS-CUTTING RULES
 
-- A **truly indivisible single-responsibility unit** (e.g., a generated parser table, a state machine whose states share a single closure, a `derive` macro implementation). Mark the first 5 lines with a comment such as `# noqa: SIZE_OK - generated parser table, 612 states share branch tables` (Python) / `// allow: SIZE_OK - state machine, removing any state breaks the transition matrix` (Rust/TS), and explain WHY no split is possible.
-- A **pure data table** (translation strings, error code lookup, brand color palette). Tables of data are not logic.
+Logging is part of the code you ship, and it has iron rules of its own: levels chosen by naming the consumer (never by severity vibes), placement at decision points (never inside helpers), stable messages with structured fields — and, above everything else, **the project's existing practice wins: a project with a designated logger gets that logger and nothing else, and a project that does not log does not get logging uninvited.**
 
-**`# noqa: SIZE_OK` without a justifying comment is itself slop** and must be rejected by the next person to touch the file.
+**Read [`references/logging.md`](references/logging.md) BEFORE the change** whenever your edit adds or modifies log lines, sets up a logger or a new service entrypoint, or handles errors at a boundary.
 
-### Concrete split examples
+---
 
-#### Python - BEFORE (`user_service.py`, 412 pure LOC, broken)
+## DEPENDENCY UPGRADES — CROSS-CUTTING RULES
 
-```python
-# user_service.py - DOES TOO MUCH
-class UserRepository: ...        # 90 LOC of SQLAlchemy
-class UserValidator: ...         # 60 LOC of Pydantic + business rules
-class PasswordHasher: ...        # 40 LOC of bcrypt wrapper
-class EmailSender: ...           # 50 LOC of httpx2 client
-class UserService: ...           # 130 LOC orchestrating the four above
-def _build_query(...): ...       # 25 LOC helper
-def _format_email(...): ...      # 17 LOC helper
-```
-
-#### Python - AFTER (split by responsibility)
-
-```
-src/myapp/users/
-├── __init__.py              # barrel: re-exports UserService only (5 LOC)
-├── repository.py            # UserRepository                 (~95 LOC)
-├── validator.py             # UserValidator                  (~65 LOC)
-├── password.py              # PasswordHasher                 (~45 LOC)
-├── notifier.py              # EmailSender (renamed - the role, not the verb)
-├── service.py               # UserService (orchestrator)     (~135 LOC)
-└── _queries.py              # _build_query (private)         (~30 LOC)
-```
-
-Every file is < 250 pure LOC. Each owns one concept. The barrel exposes the only public name. The reviewer never has to scroll through password hashing to understand SMTP retry policy.
-
-#### Rust - BEFORE (`auth.rs`, 380 pure LOC)
-
-```rust
-// auth.rs - DOES TOO MUCH
-pub struct Session { ... }                      // 40 LOC
-impl Session { ... }                            // 90 LOC of methods
-pub struct TokenIssuer { ... }                  // 30 LOC
-impl TokenIssuer { ... }                        // 70 LOC
-pub struct RateLimiter { ... }                  // 50 LOC
-impl RateLimiter { ... }                        // 70 LOC
-fn parse_authorization_header(...) { ... }      // 30 LOC
-```
-
-#### Rust - AFTER
-
-```
-src/auth/
-├── mod.rs              # re-exports Session, TokenIssuer, RateLimiter (8 LOC)
-├── session.rs          # Session + impl                         (~130 LOC)
-├── token.rs            # TokenIssuer + impl                     (~100 LOC)
-├── rate_limit.rs       # RateLimiter + impl                     (~120 LOC)
-└── header.rs           # parse_authorization_header             (~35 LOC)
-```
-
-#### TypeScript - BEFORE (`api/orders.ts`, 510 pure LOC)
-
-```typescript
-// api/orders.ts - DOES TOO MUCH
-export const OrderSchema = z.object({ ... })          // 30 LOC
-type Order = z.infer<typeof OrderSchema>
-export class OrderRepository { ... }                  // 110 LOC
-export class PricingEngine { ... }                    // 130 LOC
-export class TaxCalculator { ... }                    // 90 LOC
-export class OrderService { ... }                     // 150 LOC
-```
-
-#### TypeScript - AFTER
-
-```
-src/orders/
-├── index.ts                    # barrel (6 LOC)
-├── schema.ts                   # OrderSchema + Order type      (~35 LOC)
-├── repository.ts               # OrderRepository               (~115 LOC)
-├── pricing.ts                  # PricingEngine                 (~135 LOC)
-├── tax.ts                      # TaxCalculator                 (~95 LOC)
-└── service.ts                  # OrderService (orchestrator)   (~155 LOC)
-```
+- **`0.x` minor = major.** Semver promises nothing below 1.0: treat `0.N → 0.N+1` as a breaking upgrade — read the changelog, build, and run the full suite before trusting it. A required field appearing in a public options type is a routine `0.x` "minor".
+- **Version literals live outside the manifest.** Before committing a bump, grep the repo for the old version string: Dockerfiles pinning a global CLI, CI workflows, and docs all carry copies. A bump that updates only the package manifest ships a split-brain deploy.
+- **Never hand-merge a lockfile.** On conflict, take either side whole and regenerate with the package manager — the resolver owns that file, not you.
 
 ---
 
@@ -341,8 +271,8 @@ bun run scripts/typescript/check-no-excuse-rules.ts <changed paths>
 | Pure LOC | Verdict | Required action |
 |---|---|---|
 | ≤ 200 | Healthy | continue |
-| 200 - 250 | **Warning band** - the file is approaching the ceiling. State that fact explicitly in the next message and propose a split if the next planned edit will add lines. |
-| > 250 | **DEFECT** - the architecture is wrong. Do NOT commit. Refactor into smaller cohesive units **now**, in this same task. |
+| 200 - 250 | **Warning band** | State that fact and propose a split if the next edit will add lines. |
+| > 250 | **DEFECT** | Do NOT commit new lines to this file. Refactor now: split the touched unit before adding lines, except for rare SIZE_OK or pure-data-table exceptions. |
 
 ### Step 3 — architectural self-review (always, even at 80 LOC)
 
@@ -353,17 +283,21 @@ After every code-writing session, answer these out loud (in your reply) before d
 3. **Variant discrimination?** Did I use `if`/`elif`/`else` (or `switch` without `assertNever`, or `match` without `assert_never`) anywhere to discriminate on a tagged type or enum? If yes, rewrite as exhaustive match.
 4. **Escape hatches?** Any `Any`, `# type: ignore`, `unwrap`, `expect` outside `main`/tests, `as` numeric cast, `!`, `@ts-ignore`, `@ts-expect-error`, `#[allow]` on a real warning? If yes, fix the type or document why with a comment.
 5. **Defensive layer?** Any null check, try/except, or `isinstance` guarding a value the type system already proves? If yes, delete.
-6. **Helpers for one-off?** Any function, class, or trait introduced for a single caller that will never get a second caller? If yes, inline.
+6. **Helpers for one-off?** Any function, class, or trait introduced for a single caller that will never get a second caller? If yes, inline — axiom 0 should have caught it pre-write; this is the backstop.
 7. **Tests?** Is the behavior I just introduced locked by a test that would fail if I revert this commit?
+8. **Parameter bloat?** Any function I wrote or modified that takes more than 3 parameters — or smuggles them through a dict/kwargs/`...args`/throwaway options object? If yes, group related params into a typed value object. See [Smell 2](references/code-smells.md#smell-2--function-with-more-than-3-parameters).
+9. **Redundant verification?** Did I perform a destructive action (delete, remove, clear) and then immediately re-query to "confirm" it worked? Did I call a setter then a getter to "verify"? If yes, delete the verification — the operation's contract IS the proof. See [Smell 3](references/code-smells.md#smell-3--redundant-verification-after-a-destructive-action).
+10. **Negative naming?** Any variable, function, or flag named by the absence of a quality (`isNotValid`, `noErrors`, `DisableX`) when a positive name (`isValid`, `isClean`, `EnableX`) would work? If yes, rename to positive form and invert the branch. See [Smell 4](references/code-smells.md#smell-4--negative-form-names-and-conditions).
+11. **Logging?** If I touched log lines, logger setup, or error boundaries: did I follow the project's existing practice (including its absence)? Is every new line leveled by its consumer, placed at a decision point, and message-stable with data in fields? See [`references/logging.md`](references/logging.md).
 
 **If any answer fails, fix it before declaring done.** This loop is the difference between "the code compiles" and "the code is correct."
 
 ### Step 4 — if you need to refactor right now, invoke the right skill
 
-- The file you just wrote (or an adjacent one) is over 250 pure LOC, or step 3 surfaced more than two issues: **load the `refactor` skill** and execute its safe-refactor protocol (codemap, plan, LSP-driven edits, test after each step). Do not improvise a refactor under time pressure - the refactor skill exists precisely so you do not corrupt behavior while reshaping structure.
-- You inherited a branch with AI-generated patterns (broad `except`, redundant null checks, vague TODOs, oversized modules, dead helpers): **load the `remove-ai-slops` skill** to do a categorized branch-scope cleanup with regression tests pinned first.
+- Any code smell from the [CODE SMELLS section](#code-smells--automatic-review-triggers) fired (250+ LOC, >3 params, redundant verification, negative naming), or step 3 surfaced more than two issues: **load the `refactor` skill** and execute its safe-refactor protocol (codemap, plan, LSP-driven edits, test after each step). Do not improvise a refactor under time pressure — the refactor skill exists precisely so you do not corrupt behavior while reshaping structure.
+- You inherited a branch with AI-generated patterns (broad `except`, redundant null checks, vague TODOs, oversized modules, dead helpers, redundant post-action verification): **load the `remove-ai-slops` skill** to do a categorized branch-scope cleanup with regression tests pinned first.
 
-These two skills are not optional cosmetics. They are the recovery path for the defects this loop is designed to catch.
+These two skills are not optional cosmetics. They are the recovery path for the smells this loop is designed to catch.
 
 ---
 
@@ -371,8 +305,8 @@ These two skills are not optional cosmetics. They are the recovery path for the 
 
 | Trigger | Skill to load | Why |
 |---|---|---|
-| File exceeds 250 pure LOC, OR the post-write loop surfaces 2+ issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
-| Recent branch contains AI-authored code that smells (broad except, dead helpers, vague comments, oversized files), OR the user says "remove slop", "clean AI code", "deslop" | `remove-ai-slops` | Tests pinned FIRST, then categorized parallel cleanup, then quality gates. Behavior-preserving. |
+| Any [code smell](#code-smells--automatic-review-triggers) fires (250+ LOC, >3 params, redundant verification), OR the post-write loop surfaces 2+ issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
+| Recent branch contains AI-authored patterns (broad except, dead helpers, vague comments, oversized files, redundant post-action verification), OR the user says "remove slop", "clean AI code", "deslop" | `remove-ai-slops` | Tests pinned FIRST, then categorized parallel cleanup, then quality gates. Behavior-preserving. |
 | Rust code touches `unsafe`, `*mut`, `*const`, `MaybeUninit`, FFI, `unsafe impl Send/Sync`, or a custom lock-free primitive | `references/rust-ub/` | Full UB taxonomy + Miri strictness escalation. Every `unsafe` block must survive Miri Level 3 (strict provenance + symbolic alignment + preemption) before it ships. |
 
 ---

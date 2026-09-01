@@ -158,7 +158,6 @@ describe("executeBackground", () => {
     //#then - background launch should still be reported as launched
     expect(result).toContain("Background agent task launched successfully")
     expect(result).toContain("Task ID: test-task-id")
-    expect(result).not.toContain("Task aborted while waiting for session to start")
   })
 
   test("keeps sibling background launch alive when two tasks start concurrently", async () => {

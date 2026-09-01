@@ -1,0 +1,26 @@
+{
+  "name": "@oh-my-opencode/openclaw-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Harness-neutral OpenClaw gateway, reply-listener daemon, session registry, and tmux injection primitives.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./*": {
+      "types": "./src/*.ts",
+      "import": "./src/*.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/tmux-core": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*"
+  }
+}

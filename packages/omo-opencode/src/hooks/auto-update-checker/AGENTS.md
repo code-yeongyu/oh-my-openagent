@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-27 files. Session Tier hook on `session.created`. Checks the npm registry for newer plugin versions, compares against the installed version, and surfaces update availability via startup toasts. Caches results to avoid repeated registry fetches. Throttled per channel (`latest`, `next`, `beta`). Skips CLI run mode and subagent sessions.
+~41 code files. Session Tier hook on `session.created`. Checks the npm registry for newer plugin versions, compares against the installed version, and surfaces update availability via startup toasts. Caches results to avoid repeated registry fetches. Throttled per channel (`latest`, `next`, `beta`). Skips CLI run mode and subagent sessions.
 
 ## FILE CATALOG
 
@@ -47,5 +47,5 @@ Three `zauc-mocks-*` directories in `src/hooks/` exist specifically to test this
 
 ## CROSS-REFERENCES
 
-- Parent: [`src/hooks/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/src/hooks/AGENTS.md) -- Session Tier hook list
-- [`src/cli/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/src/cli/AGENTS.md) -- CLI uses the same npm dist-tag helpers
+- Parent: [`src/hooks/AGENTS.md`](../AGENTS.md) -- Session Tier hook list
+- [`src/cli/AGENTS.md`](../../cli/AGENTS.md) -- CLI uses the same npm dist-tag helpers

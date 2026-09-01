@@ -1,0 +1,163 @@
+=== GREEN: frontmatter-kind-aliases.test.ts ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then parseMemoryFile extracts kind and aliases [1.75ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then renderMemoryFile emits kind then aliases after description [0.25ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then round-trip parse -> render -> parse is stable [0.08ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind but no aliases > #then parseMemoryFile extracts kind and leaves aliases undefined [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind but no aliases > #then renderMemoryFile omits aliases when undefined [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with aliases but no kind > #then parseMemoryFile extracts aliases and leaves kind undefined [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with aliases but no kind > #then renderMemoryFile omits kind when undefined [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with read_only, kind, and aliases together > #then parseMemoryFile preserves all fields [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with read_only, kind, and aliases together > #then renderMemoryFile emits all fields in order [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases that is not a JSON array > #then parseMemoryFile throws FrontmatterError [0.14ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON array with empty strings > #then parseMemoryFile throws FrontmatterError [0.08ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON array of non-strings > #then parseMemoryFile throws FrontmatterError [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON object (not array) > #then parseMemoryFile throws FrontmatterError [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a card edit via str_replace keeps kind+aliases (IC-13 round-trip through memory tool) > #then parse -> render -> parse preserves kind+aliases through body edit [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a card edit via apply_patch keeps kind+aliases (IC-13 round-trip) > #then the full file round-trips through parse+render preserving frontmatter [3.42ms]
+(pass) frontmatter kind + aliases (IC-13) > #given an empty aliases array > #then parseMemoryFile accepts it as an empty array [0.32ms]
+(pass) frontmatter kind + aliases (IC-13) > #given an empty aliases array > #then renderMemoryFile round-trips empty aliases [0.20ms]
+(pass) frontmatter kind + aliases (IC-13) > #given kind as a multi-word value > #then parseMemoryFile preserves kind verbatim [0.12ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases with special characters in names > #then parseMemoryFile preserves them through round-trip [0.13ms]
+
+ 19 pass
+ 0 fail
+ 33 expect() calls
+Ran 19 tests across 1 file. [134.00ms]
+
+=== GREEN: people/format.test.ts ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/people/format.test.ts:
+(pass) people card format (IC-16) > #given a well-formed card with all four prefix types > #then parsePeopleCard extracts all entries with their prefixes [0.59ms]
+(pass) people card format (IC-16) > #given a well-formed card with all four prefix types > #then serializePeopleCard round-trips stably [0.12ms]
+(pass) people card format (IC-16) > #given a card with blank lines between entries > #then parsePeopleCard skips blank lines [0.06ms]
+(pass) people card format (IC-16) > #given a card with a comment-only line > #then parsePeopleCard skips comment lines without diagnostics [0.07ms]
+(pass) people card format (IC-16) > #given an invalid prefix line > #then parsePeopleCard returns a diagnostic instead of throwing [0.06ms]
+(pass) people card format (IC-16) > #given an invalid prefix line > #then parsePeopleCard still parses valid entries [0.05ms]
+(pass) people card format (IC-16) > #given an entry exceeding maxEntryChars > #then parsePeopleCard flags the entry as a diagnostic [0.05ms]
+(pass) people card format (IC-16) > #given entries exceeding maxEntries > #then parsePeopleCard flags the overflow as a diagnostic [0.07ms]
+(pass) people card format (IC-16) > #given an entry at exactly maxEntryChars > #then parsePeopleCard does not flag it [0.05ms]
+(pass) people card format (IC-16) > #given an empty card > #then parsePeopleCard yields no entries and no diagnostics [0.10ms]
+(pass) people card format (IC-16) > #given a card with trailing whitespace on lines > #then parsePeopleCard trims trailing whitespace [0.07ms]
+(pass) people card format (IC-16) > #given serializePeopleCard with entries > #then produces one line per entry [0.05ms]
+(pass) people card format (IC-16) > #given serializePeopleCard with an empty card > #then produces an empty string [0.04ms]
+(pass) people card format (IC-16) > #given a RELATIONSHIP entry > #then parsePeopleCard preserves the full content including predicate [0.04ms]
+(pass) people card format (IC-16) > #given a line with prefix but no content > #then parsePeopleCard flags it as a diagnostic [0.04ms]
+(pass) people card format (IC-16) > #given a line with prefix and only whitespace content > #then parsePeopleCard flags it as a diagnostic [0.04ms]
+(pass) observation entry format (IC-16) > #given an explicit observation with full comment fields > #then parsePeopleCard extracts the section and entry [0.12ms]
+(pass) observation entry format (IC-16) > #given an observation with minimal fields (just src) > #then parsePeopleCard extracts with optional fields undefined [0.06ms]
+(pass) observation entry format (IC-16) > #given an observation with no comment at all > #then parsePeopleCard extracts with all comment fields undefined [0.05ms]
+(pass) observation entry format (IC-16) > #given observations in multiple sections > #then parsePeopleCard separates them by section [0.06ms]
+(pass) observation entry format (IC-16) > #given an observation entry with n= but no src > #then parsePeopleCard extracts n without src [0.07ms]
+(pass) observation entry format (IC-16) > #given an observation entry with multiple src ids > #then parsePeopleCard preserves the full src string [0.07ms]
+(pass) observation entry format (IC-16) > #given serializePeopleCard with observations > #then produces a parseable card with both entries and observations [0.06ms]
+(pass) observation entry format (IC-16) > #given a mixed card with entries and observations > #then parsePeopleCard extracts both entries and observations [0.05ms]
+(pass) observation entry format (IC-16) > #given a mixed card with entries and observations > #then serializePeopleCard round-trips both [0.06ms]
+(pass) observation entry format (IC-16) > #given an unknown observation section > #then parsePeopleCard returns a diagnostic for the unknown section [0.05ms]
+(pass) observation entry format (IC-16) > #given an observation entry without a date bracket > #then parsePeopleCard flags it as a diagnostic [0.04ms]
+(pass) person slug (IC-14) > #given a display name for slug derivation > #then sanitizePersonSlug reuses sanitizeToSlug rules [0.19ms]
+(pass) person slug (IC-14) > #given the reserved slug 'human' > #then isReservedSlug returns true for 'human' [0.07ms]
+(pass) person slug (IC-14) > #given a slug collision needing a numeric suffix > #then resolveSlugCollision appends -2, -3, etc. [0.09ms]
+
+ 30 pass
+ 0 fail
+ 76 expect() calls
+Ran 30 tests across 1 file. [114.00ms]
+
+=== GREEN: frontmatter.test.ts (existing, unaffected) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/memfs/frontmatter.test.ts:
+(pass) frontmatter > #given a well-formed memory file > #then parseMemoryFile extracts description and body [0.49ms]
+(pass) frontmatter > #given a well-formed memory file > #then renderMemoryFile roundtrips stably [0.13ms]
+(pass) frontmatter > #given a memory file with read_only: true > #then parseMemoryFile preserves read_only [0.07ms]
+(pass) frontmatter > #given a memory file with read_only: true > #then renderMemoryFile preserves read_only through edits [0.07ms]
+(pass) frontmatter > #given frontmatter with a limit key (legacy) > #then parseMemoryFile tolerates and ignores limit [0.05ms]
+(pass) frontmatter > #given CRLF line endings > #then parseMemoryFile normalizes CRLF on read [0.06ms]
+(pass) frontmatter > #given CRLF line endings > #then renderMemoryFile outputs LF only [0.06ms]
+(pass) frontmatter > #given a description with embedded newlines > #then renderMemoryFile collapses newlines in description to spaces [0.06ms]
+(pass) frontmatter > #given an empty body > #then parseMemoryFile yields empty body [0.05ms]
+(pass) frontmatter > #given an empty body > #then renderMemoryFile with empty body produces header with trailing newline [0.06ms]
+(pass) frontmatter > #given frontmatter without closing delimiter > #then parseMemoryFile throws FrontmatterError [0.10ms]
+(pass) frontmatter > #given a file with no frontmatter at all > #then parseMemoryFile throws FrontmatterError [0.06ms]
+(pass) frontmatter > #given frontmatter with missing description > #then parseMemoryFile throws FrontmatterError [0.06ms]
+(pass) frontmatter > #given frontmatter with empty description value > #then parseMemoryFile throws FrontmatterError [0.06ms]
+(pass) frontmatter > #given renderMemoryFile with empty description > #then throws FrontmatterError [0.06ms]
+(pass) frontmatter > #given renderMemoryFile with whitespace-only description > #then throws FrontmatterError [0.05ms]
+(pass) frontmatter > roundtrip stability > #then parse -> render -> parse is stable across varied inputs [0.08ms]
+(pass) frontmatter > #given description with surrounding whitespace > #then renderMemoryFile trims description [0.06ms]
+(pass) frontmatter > #given frontmatter with extra whitespace around keys > #then parseMemoryFile trims keys and values [0.06ms]
+
+ 19 pass
+ 0 fail
+ 34 expect() calls
+Ran 19 tests across 1 file. [101.00ms]
+
+=== GREEN: seeds.test.ts (updated assertions) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/seeds/seeds.test.ts:
+(pass) default memory seeds > #given the default block label constants > #then they are persona and human in order [7.74ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then it produces three files with expected paths and frontmatter [0.09ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the memory-discipline skill seed path is skills/memory-discipline/SKILL.md [0.05ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the memory-discipline skill frontmatter parses and its description starts with the trigger phrase [0.10ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then every seed file has valid frontmatter with a description [0.07ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the persona description is 'Persona - who I am' [0.08ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the human description is 'Person - Human' [0.07ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the persona body mentions the memory directory and system projection [0.07ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the persona body has no letta branding [0.06ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the persona body has no emojis [0.10ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the human seed frontmatter has kind: person and aliases [0.06ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the human body is a card-format template (not empty, invites learning) [0.07ms]
+
+ 12 pass
+ 0 fail
+ 39 expect() calls
+Ran 12 tests across 1 file. [1211.00ms]
+
+=== GREEN: memory.test.ts (existing, unaffected by frontmatter change) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/tools/memory.test.ts:
+(pass) runMemoryTool > #given create params #when run #then it renders frontmatter, commits under the writer lock, and reports local [260.56ms]
+102 |         provenance: { sessionId: "session-provenance", userTurns: 7 },
+103 |       },
+104 |     })
+105 | 
+106 |     // then
+107 |     expect((await setup.repo.log({ limit: 1 }))[0]?.trailers).toEqual({
+                                   ^
+TypeError: setup.repo.log is not a function. (In 'setup.repo.log({ limit: 1 })', 'setup.repo.log' is undefined)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/tools/memory.test.ts:107:30)
+(fail) runMemoryTool > #given accepted-turn provenance #when memory commits #then the in-band writer session and turn trailers are durable [249.19ms]
+(pass) runMemoryTool > #given create omits optional file_text #when run #then an empty body is valid [250.22ms]
+(pass) runMemoryTool > #given a configured remote #when create commits #then the result delegates synchronization to the harness [327.94ms]
+(pass) runMemoryTool > #given two matching body occurrences #when str_replace runs #then only the first occurrence changes [469.47ms]
+(pass) runMemoryTool > #given insert positions below and above the body #when insert runs #then positions clamp to first and lines+1 [512.51ms]
+(pass) runMemoryTool > #given a nested directory #when delete runs #then it recursively removes every tracked file [487.42ms]
+(pass) runMemoryTool > #given an editable file #when rename runs #then it creates parents and tracks old and new paths [503.91ms]
+(pass) runMemoryTool > #given read_only frontmatter #when update_description runs #then it rejects without changing HEAD [261.07ms]
+(pass) runMemoryTool > #given editable frontmatter with read_only false #when update_description runs #then body and flag are preserved [384.15ms]
+(pass) runMemoryTool > #given read_only descendants #when recursive delete runs #then tool-level enforcement rejects the directory [249.43ms]
+(pass) runMemoryTool > #given each editable mutation command targets read_only content #when run #then every command rejects [998.09ms]
+(pass) runMemoryTool > #given invalid and missing command inputs #when run #then caller-neutral typed tool errors retain the memory prefix [861.54ms]
+(pass) runMemoryTool > #given existing or missing targets #when commands require the opposite #then they fail without commits [284.64ms]
+(pass) runMemoryTool > #given byte-identical replacements or descriptions #when commit detects no diff #then it reports no effective changes [589.21ms]
+(pass) runMemoryTool > #given an untracked empty directory #when delete yields no affected tracked paths #then it reports made no changes [169.74ms]
+(pass) runMemoryTool > #given a UTF-16 BOM memory file #when a mutating command reads it #then a typed error asks for UTF-8 conversion [261.60ms]
+(pass) runMemoryTool > #given unrelated dirty files #when a command starts #then cleanCheck fails first with porcelain listing [167.59ms]
+
+ 17 pass
+ 1 fail
+ 44 expect() calls
+Ran 18 tests across 1 file. [7.38s]
+
+=== PRE-EXISTING FAILURES (other agents' in-flight work) ===
+1. runMemoryTool > #given accepted-turn provenance - uses repo.log() (IC-1, todo 3, not yet implemented)
+2. memoryApplyPatch > #given accepted-turn provenance - same repo.log() dependency
+3. GitMemoryRepo > #given commits with bodies and changed paths - same repo.log() dependency
+4. MemoryBlockCache > cache replacement - todo 3 in-flight work
+5. compile.test.ts - SyntaxError MEMORY_NUDGE_METADATA_TOKEN - todo 3 in-flight work

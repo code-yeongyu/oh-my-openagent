@@ -1,7 +1,21 @@
 import { spawn } from "node:child_process"
-import { existsSync, readdirSync, realpathSync } from "node:fs"
+import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import {
+  findNewestCachedCodexComponentCli,
+  resolveCodexComponentBinCandidates,
+  resolveDefaultCodexHome,
+  RUNTIME_WRAPPER_MARKER,
+} from "@oh-my-opencode/omo-codex/install"
+
+/**
+ * Sentinel forwarded to every delegated ulw-loop child. A delegation chain is
+ * expected to terminate in ONE hop (component bin or cached component CLI).
+ * Without it, a broken install (missing component CLI) made the legacy `omo`
+ * wrapper re-enter this resolver: wrapper -> omo CLI -> wrapper -> ... which
+ * fork-bombed thousands of live processes and exhausted system RAM.
+ */
+export const ULW_LOOP_DELEGATION_SENTINEL = "OMO_ULW_LOOP_DELEGATED"
 
 export type CodexUlwLoopCommand = {
   readonly executable: string
@@ -20,8 +34,13 @@ export function resolveCodexUlwLoopCommand(input: ResolveCodexUlwLoopCommandInpu
   const localComponentBin = resolveLocalUlwLoopBin(env, homeDir)
   if (localComponentBin !== null) return { executable: localComponentBin, argsPrefix: [] }
 
-  const componentCli = resolveNewestCachedUlwLoopCli(env.CODEX_HOME ?? join(homeDir, ".codex"))
+  const componentCli = findNewestCachedCodexComponentCli({
+    codexHome: env.CODEX_HOME ?? resolveDefaultCodexHome(homeDir),
+    componentName: "ulw-loop",
+  })
   if (componentCli !== null) return { executable: process.execPath, argsPrefix: [componentCli] }
+
+  if (env[ULW_LOOP_DELEGATION_SENTINEL] === "1") return null
 
   const legacyLocalBin = resolveLegacyLocalOmoBin(
     env,
@@ -40,34 +59,47 @@ export async function codexUlwLoop(args: readonly string[]): Promise<number> {
     return 1
   }
 
-  return new Promise((resolve) => {
-    const child = spawn(command.executable, [...command.argsPrefix, ...args], { stdio: "inherit" })
-    child.on("error", (error) => {
-      console.error(error.message)
-      resolve(1)
-    })
-    child.on("close", (code) => resolve(code ?? 1))
+  const { promise, resolve } = Promise.withResolvers<number>()
+  const child = spawn(command.executable, [...command.argsPrefix, ...args], {
+    stdio: "inherit",
+    env: { ...process.env, [ULW_LOOP_DELEGATION_SENTINEL]: "1" },
   })
+  child.on("error", (error) => {
+    console.error(error.message)
+    resolve(1)
+  })
+  child.on("close", (code) => resolve(code ?? 1))
+  return promise
 }
 
 function resolveLocalUlwLoopBin(env: NodeJS.ProcessEnv, homeDir: string): string | null {
-  const candidates = [
-    env.CODEX_LOCAL_BIN_DIR ? join(env.CODEX_LOCAL_BIN_DIR, "omo-ulw-loop") : undefined,
-    join(homeDir, ".local", "bin", "omo-ulw-loop"),
-    join(homeDir, ".codex", "bin", "omo-ulw-loop"),
-  ].filter((value): value is string => typeof value === "string")
-
+  const candidates = resolveCodexComponentBinCandidates({ executableName: "omo-ulw-loop", env, homeDir })
   return candidates.find((candidate) => existsSync(candidate)) ?? null
 }
 
 function resolveLegacyLocalOmoBin(env: NodeJS.ProcessEnv, homeDir: string, currentExecutablePaths: readonly string[]): string | null {
-  const candidates = [
-    env.CODEX_LOCAL_BIN_DIR ? join(env.CODEX_LOCAL_BIN_DIR, "omo") : undefined,
-    join(homeDir, ".local", "bin", "omo"),
-    join(homeDir, ".codex", "bin", "omo"),
-  ].filter((value): value is string => typeof value === "string")
+  const candidates = resolveCodexComponentBinCandidates({ executableName: "omo", env, homeDir })
+  return (
+    candidates.find(
+      (candidate) =>
+        existsSync(candidate) &&
+        !isCurrentExecutable(candidate, currentExecutablePaths) &&
+        !isGeneratedRuntimeWrapper(candidate),
+    ) ?? null
+  )
+}
 
-  return candidates.find((candidate) => existsSync(candidate) && !isCurrentExecutable(candidate, currentExecutablePaths)) ?? null
+/**
+ * A generated `omo` runtime wrapper just re-execs this same CLI, so treating
+ * it as a legacy delegation target creates a spawn cycle. Never delegate to it.
+ */
+function isGeneratedRuntimeWrapper(candidate: string): boolean {
+  try {
+    return readFileSync(candidate, "utf8").includes(RUNTIME_WRAPPER_MARKER)
+  } catch (error) {
+    if (error instanceof Error) return false
+    return false
+  }
 }
 
 function isCurrentExecutable(candidate: string, currentExecutablePaths: readonly string[]): boolean {
@@ -82,33 +114,4 @@ function realpathOrSelf(path: string): string {
     if (error instanceof Error) return path
     return path
   }
-}
-
-function resolveNewestCachedUlwLoopCli(codexHome: string): string | null {
-  const versionsRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo")
-  if (!existsSync(versionsRoot)) return null
-
-  const versions = readdirSync(versionsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort(compareVersionNames)
-    .reverse()
-
-  for (const version of versions) {
-    const candidate = join(versionsRoot, version, "components", "ulw-loop", "dist", "cli.js")
-    if (existsSync(candidate)) return candidate
-  }
-  return null
-}
-
-function compareVersionNames(left: string, right: string): number {
-  const leftParts = left.split(".").map((part) => Number.parseInt(part, 10))
-  const rightParts = right.split(".").map((part) => Number.parseInt(part, 10))
-  const length = Math.max(leftParts.length, rightParts.length)
-  for (let index = 0; index < length; index += 1) {
-    const leftValue = Number.isFinite(leftParts[index] ?? Number.NaN) ? leftParts[index] ?? 0 : 0
-    const rightValue = Number.isFinite(rightParts[index] ?? Number.NaN) ? rightParts[index] ?? 0 : 0
-    if (leftValue !== rightValue) return leftValue - rightValue
-  }
-  return left.localeCompare(right)
 }

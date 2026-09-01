@@ -47,6 +47,27 @@ describe("Codex ulw-loop routing", () => {
     expect(command).toEqual({ executable: process.execPath, argsPrefix: [newCli] })
   })
 
+  test("uses CODEX_HOME when selecting the newest cached ulw-loop component cli", () => {
+    // given
+    const root = join(tmpdir(), `omo-ulw-loop-codex-home-${randomUUID()}`)
+    const codexHome = join(root, "codex-home")
+    const homeDirCache = join(root, ".codex", "plugins", "cache", "sisyphuslabs", "omo", "9.9.9", "components", "ulw-loop", "dist", "cli.js")
+    const codexHomeCache = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js")
+    mkdirSync(dirname(homeDirCache), { recursive: true })
+    mkdirSync(dirname(codexHomeCache), { recursive: true })
+    writeFileSync(homeDirCache, "#!/usr/bin/env node\n")
+    writeFileSync(codexHomeCache, "#!/usr/bin/env node\n")
+
+    // when
+    const command = resolveCodexUlwLoopCommand({
+      env: { CODEX_HOME: codexHome },
+      homeDir: root,
+    })
+
+    // then
+    expect(command).toEqual({ executable: process.execPath, argsPrefix: [codexHomeCache] })
+  })
+
   test("skips the local omo bin when it points at the current CLI", () => {
     // given
     const root = join(tmpdir(), `omo-ulw-loop-self-${randomUUID()}`)

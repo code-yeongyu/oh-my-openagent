@@ -11,7 +11,8 @@ export function isProcessAlive(pid: number): boolean {
 		process.kill(pid, 0);
 		return true;
 	} catch (error) {
-		return (error as NodeJS.ErrnoException).code === "EPERM";
+		if (error instanceof Error) return errorCode(error) === "EPERM";
+		throw error;
 	}
 }
 
@@ -36,12 +37,12 @@ export function tryAcquireLock(lockPath: string, ownerPid: number = process.pid)
 
 function writeLockFile(lockPath: string, ownerPid: number): LockHandle | null {
 	try {
-		const fd = openSync(lockPath, "wx");
+		const fd = openSync(lockPath, "wx", 0o600);
 		writeSync(fd, `${ownerPid}\n`);
 		closeSync(fd);
 		return { release: () => unlinkQuietly(lockPath) };
 	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "EEXIST") return null;
+		if (errorCode(error) === "EEXIST") return null;
 		throw error;
 	}
 }
@@ -57,6 +58,13 @@ export function unlinkQuietly(path: string): void {
 	try {
 		unlinkSync(path);
 	} catch (error) {
-		void error;
+		if (error instanceof Error) return;
+		throw error;
 	}
+}
+
+function errorCode(error: unknown): string | undefined {
+	if (!error || typeof error !== "object" || !("code" in error)) return undefined;
+	const code = Reflect.get(error, "code");
+	return typeof code === "string" ? code : undefined;
 }

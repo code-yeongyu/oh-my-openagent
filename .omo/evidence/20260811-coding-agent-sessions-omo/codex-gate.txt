@@ -1,0 +1,41 @@
+WHAT WAS TESTED
+Canonical direct-host gate:
+  cd <task-worktree>
+  OMO_SKIP_MATERIALIZE=1 npx -y bun@1.3.12 run test:codex
+
+Focused process-test diagnostics:
+  Node 24.19.0 direct macOS:
+    node node_modules/vitest/vitest.mjs --run test/process.test.ts
+  Node 26.6.0 direct macOS:
+    node node_modules/vitest/vitest.mjs --run test/process.test.ts
+
+WHAT WAS OBSERVED
+Canonical Codex gate exit code: 0
+
+Final Node test summary:
+  tests: 519
+  pass: 519
+  fail: 0
+  cancelled: 0
+  skipped: 0
+  todo: 0
+
+The gate also completed installer, Git Bash MCP, LSP MCP, LSP daemon, Codex
+plugin/component builds, CodeGraph tests, third-party notice verification,
+Bun installer/core tests, and Node plugin/script tests.
+
+Focused process test:
+  Node 24: 5 pass, 0 fail
+  Node 26: 5 pass, 0 fail
+
+WHY IT IS ENOUGH
+The canonical repository gate passes on the direct host process surface used
+by CI. A prior Docker-only run failed one pre-existing PID-liveness assertion
+whose test waits on fixed 2-second and 200-ms sleeps. The package and lockfiles
+match `origin/dev`, direct Node 24/26 runs pass, and the complete host gate is
+green, proving that failure was container/load-sensitive rather than caused by
+the coding-agent-session change.
+
+WHAT WAS OMITTED
+Full 519-test output, dependency install logs, and generated bundle bodies were
+summarized. No credentials or private data were captured.

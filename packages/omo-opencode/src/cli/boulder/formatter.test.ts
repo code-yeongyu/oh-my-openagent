@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { stripAnsi } from "../doctor/format-shared"
+import { stripAnsi } from "../doctor/framework/format-shared"
 import { formatJsonOutput, formatTextOutput } from "./formatter"
 import type { BoulderCliResult } from "./types"
 

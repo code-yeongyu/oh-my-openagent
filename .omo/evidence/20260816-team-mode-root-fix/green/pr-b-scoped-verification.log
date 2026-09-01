@@ -1,0 +1,46 @@
+Scoped test command:
+  bun test \
+    packages/senpi-task/src/team \
+    packages/senpi-task/src/runners \
+    packages/senpi-task/src/manager \
+    packages/omo-senpi/src/components/task
+
+Result:
+  709 pass
+  0 fail
+  1824 expectations
+  124 files
+
+Reliability note:
+  The first full-scope run exposed that the credential-free real-Senpi catalog probe's 10-second
+  boundary was too narrow under the full 709-test CPU load. The probe deadline was widened to a
+  still-bounded 20 seconds and the integration test budget to 30 seconds. The focused real-Senpi
+  test then passed at approximately 12 seconds per profile, and the complete scope passed once.
+
+Typechecks:
+  bun run --cwd packages/senpi-task typecheck
+    exit 0
+
+  bun run --cwd packages/omo-senpi typecheck
+    exit 0
+
+Bundle generation:
+  npm exec --yes --package=bun@1.3.12 -- bash -c \
+    'node packages/omo-senpi/plugin/scripts/build-extension.mjs'
+    exit 0
+
+Bundle currency:
+  npm exec --yes --package=bun@1.3.12 -- bash -c \
+    'node packages/omo-senpi/plugin/scripts/build-extension.mjs --check'
+    exit 0
+    "omo-senpi extension build is current"
+
+Architecture:
+  - rpc/handle.ts: 153 pure lines
+  - rpc/turn-outcome.ts: 82 pure lines
+  - rpc/model-admission.ts: 125 pure lines
+  - rpc/spawn.ts: 208 pure lines
+  - rpc-process.ts: 101 pure lines
+
+The terminal outcome classifier was split from the handle orchestration before verification so each
+new production module remains below the repository's 250-pure-line ceiling.

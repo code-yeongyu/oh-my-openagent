@@ -1,0 +1,36 @@
+### RED capture - issue #6376 - 2026-07-28T01:26:56Z
+### branch: fix/6376-shared-skills-root-path  base upstream/dev @ 4a6b2bed2
+### product file UNMODIFIED (diff vs base must be empty):
+### (empty above == no product change yet; only the new test file was added)
+
+### the unmodified product file under test:
+import { fileURLToPath } from "node:url";
+
+export function sharedSkillsRootPath() {
+	return fileURLToPath(new URL("./skills/", import.meta.url));
+}
+
+=== bun test packages/shared-skills/shared-skills-root-path.test.ts ===
+bun test v1.3.14 (0d9b296a)
+
+packages\shared-skills\shared-skills-root-path.test.ts:
+53 | 		// when
+54 | 		const loaded = await loadFrom(bundleDirectory);
+55 | 		const resolved = loaded.sharedSkillsRootPath();
+56 | 
+57 | 		// then
+58 | 		expect(resolve(resolved)).toBe(resolve(join(root, "skills")));
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: "C:\Users\pss\AppData\Local\Temp\shared-skills-root-7Q92xY\skills"
+Received: "C:\Users\pss\AppData\Local\Temp\shared-skills-root-7Q92xY\cli\skills"
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\packages\shared-skills\shared-skills-root-path.test.ts:58:29)
+(fail) sharedSkillsRootPath > #given a bundle one level below the skills directory #when the root is resolved #then the parent directory is used [22.88ms]
+
+ 2 pass
+ 1 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [634.00ms]
+EXIT=1

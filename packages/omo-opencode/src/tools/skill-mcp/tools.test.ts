@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test"
+import { describe, it, expect, beforeEach, spyOn } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { createSkillMcpTool, applyGrepFilter } from "./tools"
 import { SkillMcpManager } from "../../features/skill-mcp-manager"
@@ -164,6 +164,107 @@ describe("skill_mcp tool", () => {
       // then
       expect(tool.description).toBeDefined()
     })
+
+    it("mentions cdp_url support", () => {
+      // given / #when
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => [],
+        getSessionID: () => "session",
+      })
+
+      // then
+      expect(tool.description).toContain("cdp_url")
+    })
+
+    it("includes cdp_url as an optional string in schema", () => {
+      // given / #when
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => [],
+        getSessionID: () => "session",
+      })
+      const cdpUrlSchema = tool.args.cdp_url
+      const cdpUrlDef = typeof cdpUrlSchema === "object" && cdpUrlSchema !== null
+        ? Reflect.get(cdpUrlSchema, "def")
+        : undefined
+      const cdpUrlInnerType = typeof cdpUrlDef === "object" && cdpUrlDef !== null
+        ? Reflect.get(cdpUrlDef, "innerType")
+        : undefined
+      const cdpUrlInnerDef = typeof cdpUrlInnerType === "object" && cdpUrlInnerType !== null
+        ? Reflect.get(cdpUrlInnerType, "def")
+        : undefined
+
+      // then
+      expect(cdpUrlSchema).toBeDefined()
+      expect(Reflect.get(cdpUrlDef as object, "type")).toBe("optional")
+      expect(Reflect.get(cdpUrlInnerDef as object, "type")).toBe("string")
+    })
+  })
+
+  describe("cdp_url execution", () => {
+    it("passes cdpUrl options through to manager.callTool when provided", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("browser-skill", {
+          playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
+        }),
+      ]
+      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue([{ type: "text", text: "ok" }] as never)
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => sessionID,
+      })
+
+      // when
+      await tool.execute({
+        mcp_name: "playwright",
+        tool_name: "browser_navigate",
+        arguments: { url: "https://example.com" },
+        cdp_url: "http://localhost:9222",
+      }, mockContext)
+
+      // then
+      expect(callToolSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ serverName: "playwright", sessionID: mockContext.sessionID }),
+        expect.any(Object),
+        "browser_navigate",
+        { url: "https://example.com" },
+        { cdpUrl: "http://localhost:9222" },
+      )
+    })
+
+    it("uses manager.callTool when cdp_url is omitted", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("browser-skill", {
+          playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
+        }),
+      ]
+      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue([{ type: "text", text: "ok" }] as never)
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => sessionID,
+      })
+
+      // when
+      await tool.execute({
+        mcp_name: "playwright",
+        tool_name: "browser_navigate",
+        arguments: { url: "https://example.com" },
+      }, mockContext)
+
+      // then
+      expect(callToolSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ serverName: "playwright", sessionID: mockContext.sessionID }),
+        expect.any(Object),
+        "browser_navigate",
+        { url: "https://example.com" },
+        undefined,
+      )
+    })
   })
 
   describe("session resolution", () => {
@@ -190,6 +291,7 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "some-tool",
         {},
+        undefined,
       )
     })
 
@@ -216,6 +318,7 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "some-tool",
         {},
+        undefined,
       )
     })
   })

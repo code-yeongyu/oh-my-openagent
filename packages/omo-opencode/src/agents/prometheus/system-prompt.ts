@@ -1,7 +1,4 @@
 import { loadPromptSync, prometheusPromptVariants } from "@oh-my-opencode/prompts-core"
-import { isGptModel, isGeminiModel } from "../types"
-
-export type PrometheusPromptSource = "default" | "gpt" | "gemini"
 
 export const PROMETHEUS_PERMISSION = {
   edit: "allow" as const,
@@ -10,26 +7,18 @@ export const PROMETHEUS_PERMISSION = {
   question: "allow" as const,
 }
 
-const QUESTION_TOOL_BLOCK_RE = /```typescript\r?\n\s*Question\(\{[\s\S]*?\}\)\s*\r?\n```/g
-
-function loadPrometheusVariant(variant: PrometheusPromptSource): string {
+function loadDefaultPrometheusPrompt(): string {
   return loadPromptSync({
-    source: prometheusPromptVariants[variant],
+    source: prometheusPromptVariants.default,
     name: "prometheus",
-    variant,
+    variant: "default",
   }).body
 }
 
-export const PROMETHEUS_SYSTEM_PROMPT = loadPrometheusVariant("default")
-
-export function getPrometheusPromptSource(model?: string): PrometheusPromptSource {
-  if (model && isGptModel(model)) return "gpt"
-  if (model && isGeminiModel(model)) return "gemini"
-  return "default"
-}
+export const PROMETHEUS_SYSTEM_PROMPT = loadDefaultPrometheusPrompt()
 
 export function getPrometheusPrompt(model?: string, disabledTools?: readonly string[]): string {
-  const variant = getPrometheusPromptSource(model)
-  const body = loadPrometheusVariant(variant)
-  return disabledTools?.includes("question") ? body.replace(QUESTION_TOOL_BLOCK_RE, "") : body
+  void model
+  void disabledTools
+  return PROMETHEUS_SYSTEM_PROMPT
 }

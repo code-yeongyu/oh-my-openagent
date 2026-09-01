@@ -1,7 +1,10 @@
-import { describe, expect, it } from "bun:test"
-import type { RuntimeFallbackPluginInput } from "./types"
+import { afterEach, describe, expect, it } from "bun:test"
+import type { AutoRetryHelpers } from "./auto-retry"
+import { createMessageUpdateHandler } from "./message-update-handler"
+import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
   return {
@@ -78,5 +81,155 @@ describe("hasVisibleAssistantResponse", () => {
 
     // then
     expect(result).toBe(false)
+  })
+})
+
+function createRuntimeFallbackContext(operations: string[]): RuntimeFallbackPluginInput {
+  return {
+    client: {
+      session: {
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        promptAsync: async () => ({}),
+      },
+      tui: {
+        showToast: async () => {
+          operations.push("toast")
+          return {}
+        },
+      },
+    },
+    directory: "/test/dir",
+  }
+}
+
+function createRuntimeFallbackDeps(operations: string[]): HookDeps {
+  return {
+    ctx: createRuntimeFallbackContext(operations),
+    config: {
+      enabled: true,
+      retry_on_errors: [429, 503, 529],
+      max_fallback_attempts: 3,
+      cooldown_seconds: 60,
+      timeout_seconds: 30,
+      notify_on_fallback: true,
+      restore_primary_after_cooldown: false,
+    },
+    options: undefined,
+    pluginConfig: {
+      categories: {
+        test: {
+          fallback_models: ["litellm/openai.eu.gpt-5.5"],
+        },
+      },
+    },
+    sessionStates: new Map(),
+    sessionLastAccess: new Map(),
+    sessionRetryInFlight: new Set(),
+    sessionAwaitingFallbackResult: new Set(),
+    sessionFallbackTimeouts: new Map(),
+    sessionStatusRetryKeys: new Map(),
+    internallyAbortedSessions: new Set(),
+  }
+}
+
+function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): AutoRetryHelpers {
+  return {
+    abortSessionRequest: async (_sessionID: string, source: string) => {
+      operations.push(`abort:${source}`)
+      if (source === "message.updated.quota-fallback") {
+        deps.internallyAbortedSessions.add(_sessionID)
+      }
+    },
+    clearSessionFallbackTimeout: () => {},
+    scheduleSessionFallbackTimeout: () => {},
+    autoRetryWithFallback: async (_sessionID: string, model: string) => {
+      operations.push(`retry:${model}`)
+      return { accepted: true, status: "dispatched" }
+    },
+    resolveAgentForSessionFromContext: async () => undefined,
+    cleanupStaleSessions: () => {},
+  }
+}
+
+describe("createMessageUpdateHandler runtime fallback dispatch", () => {
+  afterEach(() => {
+    SessionCategoryRegistry.clear()
+  })
+
+  it("#given quota-exceeded assistant error with a fallback #when message update is handled #then primary request is aborted before fallback dispatch and toast", async () => {
+    // given
+    const sessionID = "session-quota-fallback"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "The usage limit has been reached for this model.",
+        },
+      },
+    })
+
+    // then
+    expect(operations).toEqual([
+      "abort:message.updated.quota-fallback",
+      "retry:litellm/openai.eu.gpt-5.5",
+      "toast",
+    ])
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+})
+
+
+describe('Internal abort suppression guard (Layer-2)', () => {
+  it('#given assistant message with NO error while sessionRetryInFlight is set #when message update is handled #then guard returns early and PRESERVES sessionAwaitingFallbackResult (internal abort suppressed)', async () => {
+    // given: omo fallback in flight; assistant message with no visible content (omo own abort)
+    const sessionID = 'session-internal-guard'
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, 'test')
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionAwaitingFallbackResult.add(sessionID) // fallback result pending
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when: assistant message update with NO error (the abort omo itself caused)
+    await handler({ sessionID, info: { role: 'assistant', model: 'openai/gpt-5.4' } })
+
+    // then: sessionAwaitingFallbackResult is PRESERVED (guard returns early, doesn't clear it)
+    // and no abort/dispatch happens — the internal abort is silently suppressed
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(operations).toEqual([])
+  })
+})
+
+
+describe('Internal abort suppression guard (Layer-2)', () => {
+  it('#given assistant message with NO error while sessionRetryInFlight is set #when message update is handled #then guard returns early PRESERVING sessionStatusRetryKeys (internal abort suppressed, visible-response path skipped)', async () => {
+    // given: omo fallback in flight; assistant message with no visible content (omo own abort)
+    const sessionID = 'session-internal-guard'
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, 'test')
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.sessionStatusRetryKeys.set(sessionID, 'retry-key-1') // marker that visible-path would clear
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when: assistant message update with NO error (the abort omo itself caused)
+    await handler({ sessionID, info: { role: 'assistant', model: 'openai/gpt-5.4' } })
+
+    // then: guard returns early — sessionStatusRetryKeys is PRESERVED (visible-path skipped)
+    // sessionAwaitingFallbackResult is also PRESERVED
+    expect(deps.sessionStatusRetryKeys.get(sessionID)).toBe('retry-key-1')
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(operations).toEqual([])
   })
 })

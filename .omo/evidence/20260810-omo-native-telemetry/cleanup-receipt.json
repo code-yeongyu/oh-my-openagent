@@ -1,0 +1,28 @@
+{
+  "captureServer": {
+    "serverPid": 13104,
+    "killZeroFails": true,
+    "serverListening": false,
+    "port": 49319,
+    "portFree": true,
+    "lsofOutput": ""
+  },
+  "tempDirectories": [
+    {
+      "path": "<temp-enabled>",
+      "removed": true
+    },
+    {
+      "path": "<temp-dnt>",
+      "removed": true
+    },
+    {
+      "path": "<temp-config>",
+      "removed": true
+    },
+    {
+      "path": "<temp-capture>",
+      "removed": true
+    }
+  ]
+}

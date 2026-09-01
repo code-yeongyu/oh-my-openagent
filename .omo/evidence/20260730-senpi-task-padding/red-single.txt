@@ -1,0 +1,31 @@
+Scenario: padded single task argument preparation
+Captured: 2026-07-30T05:31:00Z
+Command:
+  bun test packages/senpi-task/src/tools/task/argument-normalization.test.ts
+
+Binary observable:
+  FAIL because the task tool has no prepareArguments compatibility shim.
+
+Output:
+  bun test v1.4.0-canary.1 (ae4b17de6)
+
+  packages/senpi-task/src/tools/task/argument-normalization.test.ts:
+  51 |     expect(typeof prepareArguments).toBe("function")
+                                               ^
+  error: expect(received).toBe(expected)
+
+  Expected: "function"
+  Received: "undefined"
+
+  at packages/senpi-task/src/tools/task/argument-normalization.test.ts:51:37
+  task argument normalization > #given a GPT-padded single spawn #when arguments are prepared #then serializer-only fields are removed
+
+  0 pass
+  1 fail
+  Ran 1 test across 1 file.
+
+Why this is the right RED:
+  The failure is at the production boundary the fix must add. It is not a
+  syntax, import, dependency, or fixture error. Without prepareArguments,
+  the captured provider-shaped prompt/tasks payload cannot be normalized
+  before TypeBox validation and semantic XOR validation.

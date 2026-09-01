@@ -1,0 +1,27 @@
+{
+  "title": "OMO Native latest Senpi smoke",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "omo version and help"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 120,
+    "rows": 32
+  },
+  "cleanup": "pty pid 27475 killed",
+  "files": {
+    "png": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-senpi-2026-8-11-4/.omo/evidence/20260811-senpi-beta-6/terminal-smoke/terminal.png",
+    "text": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-senpi-2026-8-11-4/.omo/evidence/20260811-senpi-beta-6/terminal-smoke/terminal.txt",
+    "ansi": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-senpi-2026-8-11-4/.omo/evidence/20260811-senpi-beta-6/terminal-smoke/terminal-ansi.txt",
+    "metadata": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-senpi-2026-8-11-4/.omo/evidence/20260811-senpi-beta-6/terminal-smoke/metadata.json"
+  }
+}

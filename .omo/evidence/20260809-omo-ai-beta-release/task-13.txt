@@ -1,0 +1,120 @@
+Task 13: omo setup stage 1 sibling-harness detection and read-only inventory
+Date: 2026-08-09
+
+PINNED AUTH SCHEMA VERSIONS
+
+Read-only probes required by the plan:
+
+  sqlite3 "file:$HOME/.omp/agent/agent.db?mode=ro" 'SELECT version FROM auth_schema_version'
+  7
+
+  sqlite3 "file:$HOME/.gjc/agent/agent.db?mode=ro" 'SELECT version FROM auth_schema_version'
+  4
+
+Checked-in constant: KNOWN_AUTH_SCHEMA_VERSIONS = new Set([4, 7])
+
+TDD RED
+
+Command:
+  bun test packages/omo-native/test/setup-detect.test.ts
+
+Excerpt:
+  bun test v1.4.0-canary.1 (b58cd4685)
+  packages/omo-native/test/setup-detect.test.ts:
+  # Unhandled error between tests
+  error: Cannot find module '../bin/lib/setup-detect.js' from
+  'packages/omo-native/test/setup-detect.test.ts'
+  0 pass
+  1 fail
+  1 error
+
+TDD GREEN
+
+Command:
+  bun test packages/omo-native/test/setup-detect.test.ts
+
+Result:
+  9 pass
+  0 fail
+  32 expect() calls
+
+Covered fixtures:
+  - all four stores present, exact table output, provider ids/types only
+  - each store absent in turn
+  - unknown auth_schema_version, detection-only with no parsed rows
+  - injected node:sqlite load failure, file-presence-only notices
+  - doctor INFO exact-condition gating
+  - TTY-only launch hint plus non-TTY and configured-senpi absence
+  - malformed auth JSON warning with exit 0
+  - two-pass file-hash, directory-listing, WAL, and SHM proof
+
+FOCUSED REGRESSION
+
+Command:
+  bun test packages/omo-native/test/setup-detect.test.ts packages/omo-native/test/launcher.test.ts packages/omo-native/test/doctor.test.ts
+
+Result:
+  38 pass
+  0 fail
+  144 expect() calls
+
+TYPECHECK
+
+Command:
+  tsgo --noEmit -p packages/omo-native/tsconfig.json
+
+Result: exit 0, no output
+
+MANUAL FIXTURE-HOME QA
+
+Invocation:
+  HOME="$HOME_FIX" \
+  SENPI_CODING_AGENT_DIR="$AGENT" \
+  XDG_DATA_HOME="$XDG" \
+  node packages/omo-native/bin/omo.js setup
+
+Output:
+  HARNESS | INSTALLED | PROVIDERS | CREDENTIAL TYPES | MODELS
+  senpi | yes | senpi-one | api_key | providers: senpi-models
+  opencode | yes | open-login, open-one | api, oauth | none
+  oh-my-pi | yes | omp-one | api_key | models.db: yes
+  gajae-code | yes | gjc-one | oauth | enabledModels: fixture-model; modelRoles: default
+  Run `omo setup --yes` to import available API credentials.
+
+Secret grep:
+  grep -E 'MANUAL-SECRET|SENPI-SECRET|OPENCODE-SECRET|SQLITE-SECRET' output
+Result: no matches
+
+READ-ONLY AND IDEMPOTENCY PROOF
+
+Before and after each of two setup runs:
+  find "$ROOT" -type f -print0 | sort -z | xargs -0 shasum -a 256
+  find "$ROOT" -print | sort
+
+Assertions:
+  diff -u before-hashes after-hashes       exit 0, no differences
+  diff -u before-listing after-listing     exit 0, no differences
+  diff -u first-output second-output       exit 0, no differences
+  find "$ROOT" ( -name '*-wal' -o -name '*-shm' )
+                                                no matches
+
+SQL audit in setup-detect.js:
+  SELECT version FROM auth_schema_version
+  SELECT provider, credential_type, disabled_cause FROM auth_credentials
+
+The data column is never selected.
+
+MALFORMED STORE QA
+
+Fixture senpi auth.json was truncated after a planted secret value.
+Invocation exited 0 and printed:
+  WARN senpi: could not parse auth.json: Expected ',' or '}' after property value in JSON at position 56 (line 1 column 57)
+
+The planted value did not occur in stdout or stderr.
+
+MODULE SIZE
+
+  167 packages/omo-native/bin/lib/setup-detect.js
+   28 packages/omo-native/bin/lib/setup-report.js
+
+Both launcher modules are below 250 lines and use only Node built-ins.

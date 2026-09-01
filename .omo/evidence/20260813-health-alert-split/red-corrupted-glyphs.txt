@@ -1,0 +1,78 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/status-live.test.ts:
+57 |     timers.advance(3)
+58 | 
+59 |     expect(ui.calls.map((call) => call.key)).toEqual(Array(4).fill(MEMORY_STATUS_KEY))
+60 |     // Literal glyphs, not `MEMORY_REFLECTING_FRAMES[n]`: deriving the expectation from the constant
+61 |     // the code under test indexes would keep this green even if the glyph table were corrupted.
+62 |     expect(ui.calls.map((call) => call.text)).toEqual([
+                                                   ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "mem:agent-test ⠋ reflecting",
+    "mem:agent-test ⠙ reflecting",
++   "mem:agent-test ⠋ reflecting",
+    "mem:agent-test ⠹ reflecting",
+    "mem:agent-test ⠸ reflecting",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/refactor-memory-health-alert-split/packages/omo-senpi/src/components/memory/status-live.test.ts:62:47)
+(fail) memory footer live > #given an active reflection run #when frames tick at the animation cadence #then the memory key cycles reflecting frames [0.70ms]
+(pass) memory footer live > #given the animation is running #when the interval is inspected #then it uses the 320ms cadence [0.08ms]
+(pass) memory footer live > #given a run that settles #when the run is marked inactive #then the timer stops and the segment line is restored [0.19ms]
+(pass) memory footer live > #given an animating run #when dispose runs for a session shutdown #then no interval survives and no further status is published [0.07ms]
+(pass) memory footer live > #given no bound identity #when activity is reported #then nothing animates and no timer starts [0.06ms]
+(pass) memory footer live > #given repeated activation for the same run #when setActive is called twice #then a single interval is live [0.06ms]
+(pass) memory footer live > #given an unchanged fingerprint #when refresh is requested twice #then the second refresh does no recompute [0.13ms]
+(pass) memory footer live > #given HEAD moves after a cached refresh #when the fingerprint changes #then the stale footer is replaced [0.11ms]
+(pass) memory footer live > #given a run is active #when a segment refresh is requested #then the spinner is not overwritten [0.07ms]
+(pass) memory footer live > #given a refresh source that throws #when refresh runs #then the failure is swallowed and no status is published [0.11ms]
+(pass) memory footer live > #given an animating run #when stop runs for a footer clear #then the interval dies and no further status is published [0.08ms]
+(pass) memory footer live > #given a stopped footer #when a later session activates a run #then animation resumes [0.08ms]
+(pass) memory footer live > #given a disposed footer #when activity or refresh arrive afterwards #then no status is published [0.07ms]
+
+packages/omo-senpi/src/components/memory/status-live-wiring.test.ts:
+93 | 
+94 |     live.syncActive("session-1", ui.ui)
+95 |     timers.advance(1)
+96 | 
+97 |     // Literal glyphs: expectations built from MEMORY_REFLECTING_FRAMES would survive a corrupted table.
+98 |     expect(ui.calls).toEqual([
+                          ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+      "key": "memory",
+-     "text": "mem:agent-test ⠋ reflecting",
++     "text": "mem:agent-test ⠙ reflecting",
+    },
+    {
+      "key": "memory",
+-     "text": "mem:agent-test ⠙ reflecting",
++     "text": "mem:agent-test ⠋ reflecting",
+    },
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/refactor-memory-health-alert-split/packages/omo-senpi/src/components/memory/status-live-wiring.test.ts:98:22)
+(fail) memory footer status live wiring > #given an active run for the bound identity #when frames tick #then the memory key animates reflecting [0.77ms]
+(pass) memory footer status live wiring > #given an animating run #when the run stops being active #then the segment line returns [1.05ms]
+(pass) memory footer status live wiring > #given an unbound session #when activity syncs #then no timer starts and no git runs [0.11ms]
+(pass) memory footer status live wiring > #given an unchanged fingerprint #when settles refresh repeatedly #then git head is read but the footer is published once [0.43ms]
+(pass) memory footer status live wiring > #given a cached footer #when HEAD moves #then the stale line is replaced [0.49ms]
+(pass) memory footer status live wiring > #given an animating run #when the footer is stopped #then no further status calls arrive [0.30ms]
+(pass) memory footer status live wiring > #given the same HEAD timestamp #when both footer surfaces render #then the live wiring uses the status.ts age string [0.52ms]
+(pass) memory footer status live wiring > #given a repo with no HEAD #when refresh runs #then nothing is published [0.30ms]
+
+ 19 pass
+ 2 fail
+ 35 expect() calls
+Ran 21 tests across 2 files. [104.00ms]
