@@ -28,6 +28,8 @@ export const OmoCategoryConfigObjectSchema = z.object({
   variant: z.string().optional(),
   /** @deprecated Use max_tokens. */
   maxTokens: z.number().optional(),
+  /** @deprecated Use top_p. */
+  topP: z.number().optional(),
   /** @deprecated Use provider_options.thinking or reasoning: "off". */
   thinking: OmoThinkingConfigSchema.optional(),
   /** @deprecated Use reasoning. */

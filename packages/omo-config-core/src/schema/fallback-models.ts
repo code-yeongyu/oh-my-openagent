@@ -42,6 +42,7 @@ export function normalizeLegacyModelFields(entry: Readonly<Record<string, unknow
   delete normalized["thinking"]
   delete normalized["textVerbosity"]
   delete normalized["maxTokens"]
+  delete normalized["topP"]
   delete normalized["providerOptions"]
 
   if (typeof entry["model"] === "string") normalized["model"] = canonicalModelString(entry["model"])
@@ -68,6 +69,9 @@ export function normalizeLegacyModelFields(entry: Readonly<Record<string, unknow
   if (entry["max_tokens"] !== undefined) normalized["max_tokens"] = entry["max_tokens"]
   else if (entry["maxTokens"] !== undefined) normalized["max_tokens"] = entry["maxTokens"]
 
+  if (entry["top_p"] !== undefined) normalized["top_p"] = entry["top_p"]
+  else if (entry["topP"] !== undefined) normalized["top_p"] = entry["topP"]
+
   return normalized
 }
 
@@ -92,6 +96,8 @@ const OmoLegacyFallbackModelObjectInputSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** @deprecated Use max_tokens. */
   maxTokens: z.number().optional(),
+  /** @deprecated Use top_p. */
+  topP: z.number().optional(),
   /** @deprecated Use provider_options. */
   providerOptions: z.record(z.string(), z.unknown()).optional(),
 }).strict()
