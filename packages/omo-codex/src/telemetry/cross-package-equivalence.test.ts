@@ -1,69 +1,93 @@
 import { describe, expect, it } from "bun:test"
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
+import { join } from "node:path"
 
-import * as cliIdentity from "./product-identity"
+const REPO_ROOT = join(import.meta.dir, "../../..", "..")
+const CODEX_ROOT = join(REPO_ROOT, "packages", "omo-codex")
+const COMPONENT_ROOT = join(CODEX_ROOT, "plugin", "components", "telemetry")
+const REMOVED_SYNC_SCRIPT_NAME = ["sync", "telemetry", "component"].join("-")
+const TELEMETRY_CORE_PACKAGE = "@oh-my-opencode/telemetry-core"
+const SYNCED_COMPONENT_SOURCE_PATTERN =
+  /(atomic-write|data-path|diagnostics|env-flags|posthog-activity-state)\.ts$/
 
-describe("cross-package telemetry identity equivalence", () => {
-  describe("#given the omo-codex CLI telemetry product-identity module and the Codex plugin component product-identity module", () => {
-    it("#when both are imported #then PRODUCT_NAME, PACKAGE_NAME, CACHE_DIR_NAME, EVENT_NAME, DEFAULT_POSTHOG_HOST, and DEFAULT_POSTHOG_API_KEY are identical", async () => {
-      const pluginIdentity = await import(
-        "../../plugin/components/telemetry/src/product-identity"
-      )
+function readText(path: string): string {
+  return readFileSync(path, "utf-8")
+}
 
-      expect(pluginIdentity.PRODUCT_NAME).toBe(cliIdentity.PRODUCT_NAME)
-      expect(pluginIdentity.PACKAGE_NAME).toBe(cliIdentity.PACKAGE_NAME)
-      expect(pluginIdentity.CACHE_DIR_NAME).toBe(cliIdentity.CACHE_DIR_NAME)
-      expect(pluginIdentity.EVENT_NAME).toBe(cliIdentity.EVENT_NAME)
-      expect(pluginIdentity.DEFAULT_POSTHOG_HOST).toBe(cliIdentity.DEFAULT_POSTHOG_HOST)
-      expect(pluginIdentity.DEFAULT_POSTHOG_API_KEY).toBe(cliIdentity.DEFAULT_POSTHOG_API_KEY)
-      expect(pluginIdentity.LEGACY_PARENT_PACKAGE).toBe(cliIdentity.LEGACY_PARENT_PACKAGE)
+function readJson(path: string): unknown {
+  const parsed: unknown = JSON.parse(readText(path))
+  return parsed
+}
+
+function getObjectProperty(value: unknown, key: string): unknown {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Expected object while reading ${key}`)
+  }
+  return Reflect.get(value, key)
+}
+
+function collectFiles(root: string, relativePrefix = ""): string[] {
+  const files: string[] = []
+  for (const entry of readdirSync(join(root, relativePrefix), { withFileTypes: true })) {
+    if (entry.name === "node_modules") continue
+    const relativePath = join(relativePrefix, entry.name)
+    const fullPath = join(root, relativePath)
+    if (entry.isDirectory()) {
+      files.push(...collectFiles(root, relativePath))
+    } else if (statSync(fullPath).isFile()) {
+      files.push(relativePath)
+    }
+  }
+  return files
+}
+
+describe("omo-codex telemetry single-source guard", () => {
+  describe("#given the omo-codex package tree", () => {
+    it("#when sync-copy references are searched #then no telemetry sync script or build hook remains", () => {
+      const files = collectFiles(CODEX_ROOT)
+      const offenders: string[] = []
+
+      for (const file of files) {
+        const fullPath = join(CODEX_ROOT, file)
+        if (file.endsWith(".png") || file.endsWith(".ico")) {
+          continue
+        }
+        const content = readText(fullPath)
+        if (content.includes(REMOVED_SYNC_SCRIPT_NAME)) {
+          offenders.push(file)
+        }
+      }
+
+      expect(offenders).toEqual([])
     })
   })
 
-  describe("#given the omo-codex CLI env-flags module and the Codex plugin component env-flags module", () => {
-    it("#when shouldDisablePostHog is checked under each opt-out env var #then both modules disable on the same flags", async () => {
-      const cliEnv = await import("./env-flags")
-      const pluginEnv = await import(
-        "../../plugin/components/telemetry/src/env-flags"
-      )
+  describe("#given the Codex telemetry component sources and package manifest", () => {
+    it("#when inspected #then the component consumes telemetry-core instead of committed synced sources", () => {
+      const componentPackageJson = readJson(join(COMPONENT_ROOT, "package.json"))
+      const devDependencies = getObjectProperty(componentPackageJson, "devDependencies")
+      const srcFiles = collectFiles(join(COMPONENT_ROOT, "src"))
 
-      const flags = [
-        "OMO_DISABLE_POSTHOG",
-        "OMO_SEND_ANONYMOUS_TELEMETRY",
-        "OMO_CODEX_DISABLE_POSTHOG",
-        "OMO_CODEX_SEND_ANONYMOUS_TELEMETRY",
-      ] as const
-      const previousValues = new Map<string, string | undefined>()
-      for (const flag of flags) {
-        previousValues.set(flag, process.env[flag])
-        delete process.env[flag]
-      }
-      try {
-        expect(cliEnv.shouldDisablePostHog()).toBe(false)
-        expect(pluginEnv.shouldDisablePostHog()).toBe(false)
+      expect(devDependencies).toMatchObject({
+        [TELEMETRY_CORE_PACKAGE]: "file:../../../../telemetry-core",
+      })
+      expect(srcFiles.filter((file) => SYNCED_COMPONENT_SOURCE_PATTERN.test(file))).toEqual([])
+      expect(readText(join(COMPONENT_ROOT, "src", "posthog.ts"))).toContain(TELEMETRY_CORE_PACKAGE)
+    })
+  })
 
-        for (const optOutFlag of ["OMO_DISABLE_POSTHOG", "OMO_CODEX_DISABLE_POSTHOG"] as const) {
-          process.env[optOutFlag] = "1"
-          expect(cliEnv.shouldDisablePostHog()).toBe(true)
-          expect(pluginEnv.shouldDisablePostHog()).toBe(true)
-          delete process.env[optOutFlag]
-        }
+  describe("#given the built telemetry component bundle", () => {
+    it("#when inspected #then telemetry-core is bundled self-contained into the runtime CLI", () => {
+      const bundlePath = join(COMPONENT_ROOT, "dist", "cli.js")
 
-        for (const sendFlag of ["OMO_SEND_ANONYMOUS_TELEMETRY", "OMO_CODEX_SEND_ANONYMOUS_TELEMETRY"] as const) {
-          process.env[sendFlag] = "0"
-          expect(cliEnv.shouldDisablePostHog()).toBe(true)
-          expect(pluginEnv.shouldDisablePostHog()).toBe(true)
-          delete process.env[sendFlag]
-        }
-      } finally {
-        for (const flag of flags) {
-          const previous = previousValues.get(flag)
-          if (previous === undefined) {
-            delete process.env[flag]
-          } else {
-            process.env[flag] = previous
-          }
-        }
-      }
+      expect(existsSync(bundlePath)).toBe(true)
+      const bundle = readText(bundlePath)
+
+      expect(bundle).not.toContain(`from "${TELEMETRY_CORE_PACKAGE}"`)
+      expect(bundle).not.toContain(`import("${TELEMETRY_CORE_PACKAGE}")`)
+      expect(bundle).toContain("omo_codex_daily_active")
+      expect(bundle).toContain("omo-codex:")
+      expect(bundle).toContain("posthog-activity.json")
     })
   })
 })

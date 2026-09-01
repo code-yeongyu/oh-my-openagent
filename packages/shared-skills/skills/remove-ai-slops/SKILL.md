@@ -30,6 +30,7 @@ The agent looks for these nine categories. The first three are stylistic, the ne
 2. **Over-defensive code** — null checks for guaranteed values, try/except around code that cannot raise, isinstance checks for statically typed params, default values for required params, backward-compat shims, redundant validation duplicated at multiple layers, **broad exception catching** (`except Exception`/`except BaseException` in Python, empty `catch {}` or `catch (e) { console.error(e) }` without narrowing in TypeScript/JavaScript).
    - KEEP: validation at system boundaries (user input, external APIs), I/O error handling, nullable DB fields. Top-level boundary catch-all (CLI `main()`, HTTP handler) with explicit logging + re-raise is acceptable.
    - REFACTOR: `except Exception` → catch the specific exception you expect. Empty `catch {}` → add `instanceof` narrowing or re-throw. `catch (e) { log(e) }` → narrow with `instanceof`, handle known cases, re-throw unknown.
+   - PROOF REQUIRED: before deleting any validation or error handling at a trust boundary, Phase 2 must include an **adversarial** regression (malformed or hostile input) that fails if the guard is removed. No adversarial test → the guard stays. Redundant defense to remove is a duplicate of a check that already runs *inside* the boundary; a guard with no proof of redundancy is load-bearing.
 
 3. **Excessive complexity** — deep nesting (>3 levels), nested ternaries, complex boolean expressions (combine 4+ predicates), long parameter lists (>5 args without a struct/dataclass/object), god functions (>50 lines doing many things), overly clever one-liners that sacrifice readability, `if/elif/else` chains for type/enum/literal discrimination (must be `match/case` + `assert_never`), `object` used as a type annotation (must be `Protocol`, `TypeVar`, or explicit union).
    - KEEP: established complexity patterns in this codebase, performance-critical hot paths that intentionally use a complex idiom. `if/else` for boolean conditions and range checks (not variant discrimination).
@@ -61,7 +62,7 @@ The agent looks for these nine categories. The first three are stylistic, the ne
    **Hard rule**: only apply when behavior equivalence is obvious. Do NOT change algorithms with subtle correctness implications. Do NOT micro-optimize hot paths without a benchmark. If in doubt, SKIP.
 
 ### Behavior coverage
-9. **Missing tests** — behavior present in changed files that is not locked by any regression test. The fix is not to remove code but to ADD the narrowest test that pins the behavior.
+9. **Missing tests** — behavior present in changed files that is not locked by any regression test. The fix is not to remove code but to ADD the narrowest test that pins the behavior. EXCEPTION: a PROSE file (prompt, `SKILL.md`, rule, markdown) has no behavioral seam — do NOT add a text/word-count/phrase pin for it; that guards a diff, not behavior. Cover only a machine-consumed value (parsed field, sentinel a runtime greps, a doc JSON sample through its real validator) or leave it to review.
 
 ### Structural
 10. **Oversized modules** — any source file exceeding **250 pure LOC** (non-blank, non-comment lines). This is an architectural defect, not a style preference. Measure: `awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(#|\/\/)/' <file> | wc -l`.
@@ -121,26 +122,41 @@ For each in-scope source file:
 
 1. Identify the public/observable behavior the file exposes (exported functions, HTTP handlers, CLI commands, classes used elsewhere).
 2. Check whether existing tests cover that behavior. Use `git grep` / project test conventions to find related test files.
-3. **If behavior is uncovered or weakly covered, write the narrowest regression test that pins current behavior BEFORE editing the file.** Tests should pin observable outputs, not implementation details.
+3. **If behavior is uncovered or weakly covered, write the narrowest regression test that pins current behavior BEFORE editing the file.** Tests should pin observable outputs, not implementation details. A PROSE file (prompt/`SKILL.md`/rule/markdown) is exempt — its wording is not behavior; skip the test and rely on review, or assert only a machine-consumed value.
 4. Run the test suite (or at minimum the relevant tests). They must be **green** before any cleanup begins.
 
 If you cannot establish a green baseline (e.g., test runner is broken), STOP and report. Do not proceed with cleanup on unverified ground.
 
-### Phase 3: Cleanup plan
+### Phase 3: Cleanup plan — existence first, then smells
 
-Produce an explicit plan **before** spawning the removal agents:
+The largest, safest deletion is code that should not have existed. **Before categorizing smells, run the deletion ladder on each changed unit:**
+
+- **Delete entirely** — the behavior is not needed (YAGNI, speculative, dead on arrival).
+- **Reuse** — an existing helper or pattern in this repo already does it; replace the reimplementation with a call to it.
+- **Platform / stdlib / native / dependency** — the language stdlib, the runtime, or an already-installed dependency already does it (a hand-rolled date picker → `<input type="date">`, a custom query parser → `URLSearchParams`, a bespoke debounce → the util already imported).
+- **Simplify in place** — it must exist; make it smaller.
+
+Only code that lands on **Simplify in place** proceeds to the smell categories. This turns the pass from "find smells to trim" into "first decide whether the code should exist, then trim what survives." One function replaced by a platform call is a bigger, safer win than any in-place cleanup — and it needs no per-line smell analysis.
+
+For a diff that **fixes a bug**, grep the callers of every shared function it touches. Prefer one root-cause fix at the shared seam over repeated guards at each caller — a per-caller patch that leaves a sibling caller broken is a partial fix, not a cleanup.
+
+Then produce an explicit plan **before** spawning the removal agents:
 
 ```
 File: src/foo.py
+  Ladder: 2 units simplify-in-place; 1 unit delete (native <input> replaces custom picker)
   Categories: dead code, excessive complexity, performance
   Order: dead code → complexity → performance
   Risk: medium (touches caching layer)
 
 File: src/bar.py
+  Ladder: all simplify-in-place
   Categories: obvious comments, over-defensive
   Order: comments → defensive
   Risk: low
 ```
+
+**Intentional shortcuts:** if the plan deliberately keeps a bounded simplification (a naive scan fine under N rows, a global lock, an O(n²) path), mark it in-code with a `debt:` comment naming the ceiling and the upgrade trigger (in omo, prefix with `// @allow` so the comment-checker treats it as intentional), and list it under "Remaining Risks / Deferred" in the report. That section is the debt ledger — a simplification with a known ceiling and no marker is indistinguishable from a bug.
 
 Order rule (safest → riskiest): comments → dead code → defensive → duplication → complexity → abstraction/boundary → performance → tests → oversized-modules. This minimizes blast radius of any one change.
 
@@ -170,13 +186,9 @@ task(
   prompt="""
 Remove AI slops from: {file_path}
 
-In addition to your default categories (obvious comments, over-defensive code, spaghetti nesting), also evaluate these categories:
-- Excessive complexity: god functions, long parameter lists, complex booleans, nested ternaries
-- Needless abstraction: pass-through wrappers, single-use helpers, speculative indirection
-- Boundary violations: wrong-layer imports, leaky responsibilities, hidden coupling
-- Dead code: unused imports, unreachable branches, stale flags, debug leftovers
-- Duplication: copy-paste branches, redundant helpers
-- Performance equivalences: O(n²)→O(n) via set lookup, hoist computation out of loops, eager→lazy collections, batch redundant calls, cache repeated len()/length
+First run the deletion ladder from Phase 3 on this file (delete entirely / reuse existing repo code / platform-stdlib-native / simplify in place); only code that must exist proceeds to smell removal.
+
+Then evaluate EVERY category defined in this skill's "Categories (what counts as slop)" section, applying that section's KEEP and REFACTOR rules verbatim — the Categories section you have loaded is canonical, do not work from a restated subset.
 
 Apply changes in this order (safest → riskiest): comments → dead code → defensive → duplication → complexity → abstraction/boundary → performance → oversized-modules.
 
@@ -251,18 +263,19 @@ Behavior Lock:
   - Baseline status: GREEN
 
 Cleanup Plan:
-  - path/to/file1.ts: [dead code → complexity → performance]
-  - path/to/file2.py: [comments → defensive]
+  - path/to/file1.ts: [ladder: 1 delete (native) + simplify-in-place] → [dead code → complexity → performance]
+  - path/to/file2.py: [ladder: all simplify-in-place] → [comments → defensive]
 
-Per-File Results:
+Per-File Results (each cut shows what replaces it):
   path/to/file1.ts
-    - Dead code: 3 removed (lines X-Y, A-B, C)
+    - Ladder/delete: custom DatePicker (48 lines) → <input type="date"> (native), flatpickr import removed
+    - Dead code: 3 removed (lines X-Y, A-B, C) → nothing (unreachable)
     - Excessive complexity: 1 simplified (nested ternary at L42 → if/else)
     - Performance: 1 (line N: list scan → set lookup, O(n²)→O(n), behavior identical)
     - Skipped (preserved): 2 (defensive null check at boundary; commented WHY at L88)
 
   path/to/file2.py
-    - Obvious comments: 5 removed
+    - Obvious comments: 5 removed → nothing
     - Over-defensive: 1 simplified (redundant isinstance on typed param)
 
 Quality Gates:
@@ -280,8 +293,14 @@ Critical Review:
 Issues Found & Fixed:
   - [None] OR [Issue description → Fix applied]
 
-Remaining Risks / Deferred:
+Net Impact:
+  - LOC: -74 (removed 91, added 17)
+  - Dependencies: -1 (flatpickr removed; native <input type="date"> used)
+  - Files deleted: 1 (src/date-picker-wrapper.ts — platform-native replacement)
+
+Remaining Risks / Deferred (this section is the debt ledger):
   - [None] OR [e.g., "boundary violation in module X flagged but not refactored — needs human judgment"]
+  - `debt:` markers kept this pass: [None] OR [file:line — ceiling → upgrade trigger]
 
 Final Status: CLEAN | ISSUES FIXED | REQUIRES ATTENTION
 ```

@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import {
   getSessionAgent,
+  handedBackSyncSessions,
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
 import {
@@ -33,6 +34,7 @@ import {
 import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
 import { isTokenLimitError } from "./token-limit-detection"
+import { isUnrecoverableRequestError } from "./unrecoverable-request-error"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
@@ -76,6 +78,11 @@ export async function injectContinuation(args: {
     return
   }
 
+  if (handedBackSyncSessions.has(sessionID)) {
+    log(`[${HOOK_NAME}] Skipped injection: sync subagent already handed back to parent`, { sessionID })
+    return
+  }
+
   if (isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped injection: continuation stopped for session`, { sessionID })
     return
@@ -83,6 +90,7 @@ export async function injectContinuation(args: {
 
   const hasRunningBgTasks = backgroundManager
     ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
+      || backgroundManager.hasPendingParentWake?.(sessionID) === true
     : false
 
   if (hasRunningBgTasks) {
@@ -166,9 +174,27 @@ export async function injectContinuation(args: {
 Remaining tasks:
 ${todoList}`
 
+  const hasBackgroundWorkBeforeDispatch = backgroundManager
+    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
+      || backgroundManager.hasPendingParentWake?.(sessionID) === true
+    : false
+
+  if (hasBackgroundWorkBeforeDispatch) {
+    log(`[${HOOK_NAME}] Skipped injection: background tasks running before prompt`, { sessionID })
+    return
+  }
+
   const injectionState = sessionStateStore.getExistingState(sessionID)
   if (injectionState?.wasCancelled) {
     log(`[${HOOK_NAME}] Skipped injection: session was cancelled before prompt`, { sessionID })
+    return
+  }
+
+  if (injectionState?.continuationBlockReason) {
+    log(`[${HOOK_NAME}] Skipped injection: continuation paused at turn boundary`, {
+      sessionID,
+      reason: injectionState.continuationBlockReason,
+    })
     return
   }
 
@@ -217,6 +243,9 @@ ${todoList}`
           injectionState.inFlight = false
           injectionState.lastInjectedAt = Date.now()
           injectionState.awaitingPostInjectionProgressCheck = true
+          injectionState.continuationResponseObserved = false
+          injectionState.continuationBlockReason = undefined
+          injectionState.pendingUserMessageID = undefined
           injectionState.consecutiveFailures = 0
         }
         return
@@ -236,6 +265,9 @@ ${todoList}`
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
       injectionState.awaitingPostInjectionProgressCheck = true
+      injectionState.continuationResponseObserved = false
+      injectionState.continuationBlockReason = undefined
+      injectionState.pendingUserMessageID = undefined
       injectionState.consecutiveFailures = 0
     }
   } catch (error) {
@@ -251,6 +283,9 @@ ${todoList}`
       if (isTokenLimitError(errorObj)) {
         injectionState.tokenLimitDetected = true
         log(`[${HOOK_NAME}] Token limit error detected during injection, stopping continuation`, { sessionID })
+      } else if (isUnrecoverableRequestError(error)) {
+        injectionState.unrecoverableErrorDetected = true
+        log(`[${HOOK_NAME}] Non-retryable request error detected during injection, stopping continuation`, { sessionID })
       }
     }
   }

@@ -1,9 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { scanRuleFiles } from "@oh-my-opencode/rules-engine/engine";
 import { afterEach, describe, expect, it } from "vitest";
-
-import { scanRuleFiles } from "../src/rules/scanner.js";
 
 const tempDirectories: string[] = [];
 

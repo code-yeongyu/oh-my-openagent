@@ -198,8 +198,8 @@ describe("parseRecordEvidenceArgs", () => {
 });
 
 describe("ULW_LOOP_HELP", () => {
-	it("mentions omo ulw-loop + every subcommand", () => {
-		expect(ULW_LOOP_HELP).toContain("omo ulw-loop");
+	it("mentions omo-agent-toolkit ulw-loop + every subcommand", () => {
+		expect(ULW_LOOP_HELP).toContain("omo-agent-toolkit ulw-loop");
 		expect(ULW_LOOP_HELP).toContain("create-goals");
 		expect(ULW_LOOP_HELP).toContain("complete-goals");
 		expect(ULW_LOOP_HELP).toContain("status");
@@ -209,12 +209,6 @@ describe("ULW_LOOP_HELP", () => {
 		expect(ULW_LOOP_HELP).toContain("criteria");
 		expect(ULW_LOOP_HELP).toContain("add-goal");
 		expect(ULW_LOOP_HELP).toContain("record-review-blockers");
-	});
-
-	it("never mentions the legacy typo", () => {
-		const typo = ["o", "m", "x"].join("");
-
-		expect(ULW_LOOP_HELP).not.toMatch(new RegExp(typo, "i"));
 	});
 });
 

@@ -1,0 +1,20 @@
+﻿<auto-slash-command>
+# /probetoken Command
+
+**Description**: QA probe for file-reference-resolver @token preservation (issue 5978)
+
+**Scope**: opencode-project
+
+---
+
+## Command Instructions
+
+<probe-body>
+File references ([file not found: <SANDBOX>\proj\.opencode\command\path)] in this skill are relative to this directory.
+Do not suppress types with [file not found: <SANDBOX>\proj\.opencode\command\ts-ignore] in TypeScript.
+Install with: bunx oh-my-openagent[file not found: <SANDBOX>\proj\.opencode\command\latest] install
+The next line is a REAL reference and must inline:
+INLINED_REAL_CONTENT_MARKER_5978
+
+</probe-body>
+</auto-slash-command>

@@ -1,0 +1,225 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/reflection/reservation.test.ts:
+(pass) persisted reflection reservation > #given journal state at threshold #when the persisted machine evaluates a successful settle #then it captures and reserves the cursor snapshot [13.15ms]
+58 |     const { identity, journal, store } = await fixture()
+59 |
+60 |     const result = await store.tryReserve(await captured(journal, "step-count"))
+61 |     const persisted = JSON.parse(await readFile(join(identity.paths.reflection, "active.lock"), "utf8"))
+62 |
+63 |     expect(result.run).toMatchObject({
+                            ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "launcherHostname": "fixture-host",
+-   "launcherPid": 4242,
+-   "launcherProcessStart": "fixture-start",
+-   "reservedAt": "2026-08-10T00:00:00.000Z",
++   "request": {
++     "conversationIds": [
++       "conversation-a",
++     ],
++     "snapshots": [
++       {
++         "conversationId": "conversation-a",
++         "snapshot": {
++           "end_message_id": "assistant-2",
++           "end_snapshot_line": 2,
++           "entries": [
++             {
++               "captured_at": "2026-08-10T07:33:04.546Z",
++               "kind": "assistant",
++               "source_line_id": "assistant-1:assistant",
++               "source_message_id": "assistant-1",
++               "text": "one",
++             },
++             {
++               "captured_at": "2026-08-10T07:33:04.546Z",
++               "kind": "assistant",
++               "source_line_id": "assistant-2:assistant",
++               "source_message_id": "assistant-2",
++               "text": "two",
++             },
++           ],
++           "start_line": 0,
++           "start_message_id": "assistant-1",
++         },
++       },
++     ],
++     "trigger": "step-count",
++   },
++   "runId": "run-1",
+  }
+
+- Expected  - 4
++ Received  + 34
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/reflection/reservation.test.ts:63:24)
+(fail) persisted reflection reservation > #given a new active reservation #when it is published #then launch-owner identity and reservation time are durable in the same record [5.32ms]
+(pass) persisted reflection reservation > #given simultaneous trigger requests #when reserved #then one becomes active and all others collapse into one atomic pending record [40.73ms]
+159 |   } catch (error) {
+160 |     if (errorCode(error) === "ENOENT") return null
+161 |     throw error
+162 |   }
+163 |   const parsed: unknown = JSON.parse(raw)
+164 |   if (!isReservedRun(parsed)) throw new Error(`Invalid reflection reservation: ${path}`)
+                                              ^
+error: Invalid reflection reservation: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/reflection-reservation-gEKSpg/agents/agent-test/runtime/reflection/active.lock
+      at readRun (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/reflection/reservation.ts:164:41)
+      at async readStateUnlocked (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/reflection/reservation.ts:140:26)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/reflection/reservation.ts:90:34)
+      at async withLock (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/locks/acquire.ts:156:18)
+(fail) persisted reflection reservation > #given dream outcomes #when runs complete #then dream state advances only for merged and no_changes [7.35ms]
+(pass) persisted reflection reservation > #given a failed active run #when completed #then its cursor is unchanged and valid pending work is promoted [15.12ms]
+(pass) persisted reflection reservation > #given successful compaction-triggered work #when completed #then its snapshot advances and the compaction flag clears exactly once [11.19ms]
+(pass) persisted reflection reservation > #given a pending threshold request made stale by successful cursor advancement #when dequeued #then it is dropped [14.13ms]
+(pass) persisted reflection reservation > #given automatic pending work below its threshold #when dequeued #then it is dropped but a manual pending request remains launchable [18.84ms]
+
+packages/memory-core/src/reflection/machine.test.ts:
+(pass) reflection trigger machine > #given a successful settle at the configured step threshold #when evaluated #then it requests a step-count reservation [0.16ms]
+(pass) reflection trigger machine > #given zero or undefined thresholds #when a successful run settles #then step count never launches [0.07ms]
+(pass) reflection trigger machine > #given an aborted or failed run #when it settles #then no automatic trigger launches [0.05ms]
+(pass) reflection trigger machine > #given compaction was accepted #when several successful boundaries settle #then its reservation is emitted exactly once [0.10ms]
+(pass) reflection trigger machine > #given an active threshold run #when compaction and manual requests arrive #then one pending slot unions conversations and preserves manual priority [0.08ms]
+104 |     let state = reserveTransition({}, request("step-count"), "active").state
+105 |     priorities.forEach((candidate, index) => {
+106 |       state = reserveTransition(state, candidate, `pending-${index}`).state
+107 |     })
+108 |     expect(state.active?.request.trigger).toBe("step-count")
+109 |     expect(state.pending?.request).toMatchObject({ trigger: "dream", origin: "manual" })
+                                         ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "origin": "manual",
+-   "trigger": "dream",
++   "conversationIds": [
++     "conversation-a",
++   ],
++   "focus": undefined,
++   "recentN": undefined,
++   "snapshots": [
++     {
++       "conversationId": "conversation-a",
++       "snapshot": {
++         "end_message_id": "end-6",
++         "end_snapshot_line": 6,
++         "entries": [],
++         "start_line": 0,
++         "start_message_id": "start",
++       },
++     },
++   ],
++   "trigger": "manual",
+  }
+
+- Expected  - 2
++ Received  + 18
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/reflection/machine.test.ts:109:36)
+(fail) reflection trigger machine > #given reflection and dream requests #when they compete for one pending slot #then the specified priority order and newest tie winner are preserved [0.18ms]
+120 |         snapshots: [{ conversationId: "conversation-b", snapshot: journal(7).snapshot }],
+121 |       },
+122 |       "dream-newer",
+123 |     )
+124 |     expect(newerIdle.state.pending?.runId).toBe("dream-idle")
+125 |     expect(newerIdle.state.pending?.request).toMatchObject({
+                                                   ^
+error: expect(received).toMatchObject(expected)
+
+  {
+    "conversationIds": [
+      "conversation-a",
+      "conversation-b",
+    ],
+    "focus": "newest dream",
+-   "origin": "idle",
++   "recentN": undefined,
++   "snapshots": [
++     {
++       "conversationId": "conversation-a",
++       "snapshot": {
++         "end_message_id": "end-6",
++         "end_snapshot_line": 6,
++         "entries": [],
++         "start_line": 0,
++         "start_message_id": "start",
++       },
++     },
++     {
++       "conversationId": "conversation-b",
++       "snapshot": {
++         "end_message_id": "end-7",
++         "end_snapshot_line": 7,
++         "entries": [],
++         "start_line": 0,
++         "start_message_id": "start",
++       },
++     },
++   ],
+    "trigger": "dream",
+  }
+
+- Expected  - 1
++ Received  + 23
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/memory-core/src/reflection/machine.test.ts:125:46)
+(fail) reflection trigger machine > #given two dream requests during an active reflection #when they merge #then one pending dream unions snapshots and the newest equal-priority request wins [0.11ms]
+(pass) reflection trigger machine > #given interleaved reflection and dream requests #when every bounded event sequence is applied #then at most one active and one pending run exist [0.46ms]
+(pass) reflection trigger machine > #given every completion outcome #when the active run completes #then only merged and no_changes advance its captured cursor [0.08ms]
+(pass) reflection trigger machine > #given a failed active run and a queued request #when completed #then the cursor stays unmoved and pending is promoted [0.06ms]
+(pass) reflection trigger machine > #given pending automatic work became stale #when dequeued #then it is dropped, while manual work survives [0.08ms]
+
+ 15 pass
+ 4 fail
+ 703 expect() calls
+Ran 19 tests across 2 files. [214.00ms]
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './run-reconciliation' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [92.00ms]
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/commands/doctor.test.ts:
+(pass) /doctor > #given a healthy repository #when doctor runs #then every deterministic check passes [532.95ms]
+(pass) /doctor > #given a persona still equal to the v1 seed #when doctor runs #then a soul-seed advisory is reported [520.43ms]
+(pass) /doctor > #given a persona that diverged from the v1 seed #when doctor runs #then no soul-seed advisory fires [518.48ms]
+(pass) /doctor > #given no repository #when doctor runs #then the repository check fails with an actionable hint [0.46ms]
+(pass) /doctor > #given a memory file with invalid frontmatter #when doctor runs #then the sweep fails and names the file [586.23ms]
+(pass) /doctor > #given a missing persona file #when doctor runs #then a persona warning is reported [513.85ms]
+(pass) /doctor > #given a lock owned by a dead pid #when doctor runs #then the stale lock is reported with its path [523.73ms]
+(pass) /doctor > #given a lock owned by a live pid #when doctor runs #then no stale lock is reported [556.91ms]
+194 |
+195 |     // when
+196 |     const text = await invoke(pi, "doctor", "", ctx)
+197 |
+198 |     // then
+199 |     expect(text).toContain("[warn] abandoned-runs")
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[warn] abandoned-runs"
+Received: "# Memory doctor: test-identity\n\n[ok] repository: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/memory-commands-OwImmY/agents/test-identity/repo\n[ok] frontmatter: 1 memory file valid\n[ok] persona: system/persona.md present\n[ok] soul-seed: persona differs from the v1 seed\n[ok] locks: no lock directory yet\n[ok] worktrees: no reflection worktrees\n[ok] tokens: ~11 tokens in system/ (warn at 30000)\n[info] skills: scanned 0 skill files"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/commands/doctor.test.ts:199:18)
+(fail) /doctor > #given an abandoned reservation run #when doctor runs #then manual-disposal paths are reported [541.47ms]
+(pass) /doctor > #given an unregistered worktree directory #when doctor runs #then the orphan is reported [515.90ms]
+(pass) /doctor > #given a system estimate over the warn threshold #when doctor runs #then a token advisory is reported [539.39ms]
+(pass) /doctor > #given a skill missing name frontmatter #when doctor runs #then the repair helper reports the fix [571.70ms]
+(pass) /doctor > #given an unbound session #when doctor runs #then an actionable error is returned [0.14ms]
+
+ 12 pass
+ 1 fail
+ 29 expect() calls
+Ran 13 tests across 1 file. [6.02s]

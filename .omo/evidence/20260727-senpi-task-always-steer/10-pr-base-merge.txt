@@ -1,0 +1,12 @@
+Published PR base update:
+
+- GitHub reported PR #6388 conflicting after `dev` advanced.
+- Remote history was not rewritten. Latest `origin/dev` was merged into the feature branch.
+- The only conflict was the generated `packages/omo-senpi/plugin/extensions/omo.js`.
+- The bundle was regenerated with `bun run build:senpi-plugin`; build exit 0.
+- Anchored conflict-marker scan: no matches.
+- `git diff --check`: exit 0.
+- `bun run --cwd packages/senpi-task test`: 554 pass, 0 fail.
+- `bun run test:senpi`: 403 pass, 0 fail.
+
+The base update is recorded as a normal merge commit and can be pushed without force.

@@ -23,7 +23,7 @@ async function makeRepo(): Promise<string> {
 }
 
 async function readBriefFixture(): Promise<string> {
-	return readFile(join(process.cwd(), "test", "fixtures", "sample-brief.md"), "utf8");
+	return readFile(new URL("./fixtures/sample-brief.md", import.meta.url), "utf8");
 }
 
 async function ledgerKinds(repoRoot: string): Promise<string[]> {
@@ -90,6 +90,16 @@ describe("seedDefaultSuccessCriteria", () => {
 			expect(c.status).toBe("pending");
 			expect(c.capturedEvidence).toBeNull();
 		}
+	});
+
+	it("marks happy path and highest-risk edge criteria as essential", () => {
+		const criteria = seedDefaultSuccessCriteria(0, "Implement auth endpoint");
+
+		expect(criteria.map((criterion) => [criterion.id, criterion.essential])).toEqual([
+			["C001", true],
+			["C002", true],
+			["C003", false],
+		]);
 	});
 });
 

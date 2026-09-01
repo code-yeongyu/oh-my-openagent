@@ -14,7 +14,20 @@ const mockGetSkillPluginConflictWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
 const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
+const mockRunOpenCodeStartupMigration = mock(() => ({
+  journalResumed: false,
+  migratedFrom: [],
+  reloadRequired: false,
+  results: [],
+  skippedConflictCount: 0,
+}))
 const mockLoadPluginConfig = mock(() => ({}))
+const mockLoadConfigChain = mock((directory: string) => ({
+  config: mockLoadPluginConfig(directory, {}),
+  messages: [],
+  path: null,
+  valid: true,
+}))
 const mockIsTmuxIntegrationEnabled = mock(
   (pluginConfig: { tmux?: { enabled?: boolean } | undefined }) => pluginConfig.tmux?.enabled ?? false,
 )
@@ -68,6 +81,8 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
     migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
+    runOpenCodeStartupMigration: mockRunOpenCodeStartupMigration,
+    loadConfigChain: mockLoadConfigChain as never,
     loadPluginConfig: mockLoadPluginConfig as never,
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
@@ -95,6 +110,8 @@ describe("oh-my-openagent plugin module", () => {
     mockInjectServerAuthIntoClient.mockClear()
     mockLogLegacyPluginStartupWarning.mockClear()
     mockMigrateLegacyWorkspaceDirectory.mockClear()
+    mockRunOpenCodeStartupMigration.mockClear()
+    mockLoadConfigChain.mockClear()
     mockLoadPluginConfig.mockClear()
     mockIsTmuxIntegrationEnabled.mockClear()
     mockCreateRuntimeTmuxConfig.mockClear()

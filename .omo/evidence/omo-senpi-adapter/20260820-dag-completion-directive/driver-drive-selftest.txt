@@ -1,0 +1,2 @@
+SELF-TEST OK
+EXIT=0

@@ -1,0 +1,12 @@
+lane2-dual-fixed complete
+
+omo config-watch superseded by another omo extension instance; standing down {
+  hint: "two omo extensions are loaded in this senpi process (e.g. a local dev plugin in senpi settings packages plus the omo launcher's bundled extension); remove one"
+}
+omo-senpi ulw-execute-continuation skipped { reason: 'not-continuable' }
+omo-senpi ulw-loop continuation skipped { reason: 'inactive' }
+memory facts sandbox degraded {
+  identity: 'project-cddffab4',
+  runId: 'facts-1f9d7c473d95-1',
+  warning: 'facts sandbox unavailable on win32: platform is unsupported; running unsandboxed because policy is auto'
+}

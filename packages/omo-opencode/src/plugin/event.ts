@@ -10,7 +10,6 @@ import { resolveSessionEventID } from "../shared/event-session-id";
 import { log } from "../shared/logger";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
-import { createUserAbortInterruptedRecoveryGuard } from "./user-abort-interrupted-recovery-guard";
 import { extractErrorMessage, extractErrorName } from "./event-error-utils";
 import { createEventHookDispatcher, createEventHookRunner, getEventSessionID } from "./event-hook-dispatcher";
 import { createModelFallbackEventHandler } from "./event-model-fallback";
@@ -22,7 +21,6 @@ import {
   handleSessionDeletedEvent,
   TMUX_ACTIVITY_EVENT_TYPES,
 } from "./event-session-lifecycle";
-import { handleRecoverableSessionError } from "./event-session-recovery";
 import { createEventTeamHandlers } from "./event-team-handlers";
 import type { EventInput, FirstMessageVariantGate, PluginEventContext } from "./event-types";
 
@@ -45,7 +43,6 @@ export function createEventHandler(args: {
       ? pluginConfig.runtime_fallback
       : (pluginConfig.runtime_fallback?.enabled ?? false));
   const isModelFallbackEnabled = hooks.modelFallback !== null && hooks.modelFallback !== undefined;
-  const userAbortInterruptedRecoveryGuard = createUserAbortInterruptedRecoveryGuard();
   const runEventHookSafely = createEventHookRunner();
   const dispatchToHooks = createEventHookDispatcher(hooks, runEventHookSafely);
   const recentSyntheticIdles = new Map<string, number>();
@@ -76,19 +73,6 @@ export function createEventHandler(args: {
     if (lastDispatchedAt !== undefined && now - lastDispatchedAt < dedupWindowMs) return false;
     recentAnyIdles.set(sessionID, now);
     return true;
-  };
-
-  const recoverInterruptedToolResultsOnIdleEvent = async (input: EventInput): Promise<boolean> => {
-    if (input.event.type !== "session.idle") return false;
-
-    const sessionID = getEventSessionID(input);
-    if (!sessionID || !hooks.sessionRecovery?.handleInterruptedToolResultsOnIdle) return false;
-    if (userAbortInterruptedRecoveryGuard.shouldSkipRecovery(sessionID)) {
-      log("[event] interrupted tool recovery skipped after user abort", { sessionID });
-      return false;
-    }
-
-    return hooks.sessionRecovery.handleInterruptedToolResultsOnIdle(sessionID);
   };
 
   const dispatchIdleOnlyHooks = async (input: EventInput): Promise<void> => {
@@ -137,20 +121,18 @@ export function createEventHandler(args: {
         const emittedAt = recentSyntheticIdles.get(sessionID);
         if (emittedAt !== undefined && now - emittedAt < dedupWindowMs) recentSyntheticIdles.delete(sessionID);
       }
-      if (await recoverInterruptedToolResultsOnIdleEvent(input)) return;
       if (sessionID) {
         const now = Date.now();
         recentRealIdles.set(sessionID, now);
         if (!shouldDispatchIdleEvent(sessionID, now)) return;
       }
-    } else if (syntheticIdle && await recoverInterruptedToolResultsOnIdleEvent(syntheticIdle)) {
-      return;
     }
 
     await dispatchToHooks(input);
     if (syntheticIdle) await dispatchSyntheticIdle(syntheticIdle);
 
     const { event } = input;
+    managers.tuiStateMirror?.onEvent(event);
     const props = event.properties as Record<string, unknown> | undefined;
 
     if (tmuxIntegrationEnabled && TMUX_ACTIVITY_EVENT_TYPES.has(event.type)) {
@@ -178,7 +160,6 @@ export function createEventHandler(args: {
         managers,
         firstMessageVariantGate,
         clearModelFallbackSession: modelFallbackHandler.clearSession,
-        clearUserAbortRecovery: (sessionID) => userAbortInterruptedRecoveryGuard.clear(sessionID),
       });
       await runEventHookSafely("teamLeadOrphanHandler", teamHandlers.teamLeadOrphanHandler, input);
       await runEventHookSafely("teamMemberStatusHandler", teamHandlers.teamMemberStatusHandler, input);
@@ -192,16 +173,16 @@ export function createEventHandler(args: {
         await dispatchOpenClawSessionEvent({ pluginConfig, pluginContext, managers, rawEvent: event.type, sessionID });
       }
       await dispatchIdleOnlyHooks(input);
+      await Promise.resolve().then(() => managers.monitorManager?.handleEvent({
+        type: "session.idle",
+        sessionId: resolveSessionEventID(props) ?? "",
+      }));
     }
 
     if (event.type === "message.updated") {
       const state = handleMessageUpdatedSessionState({
         props,
         noteSessionModel: modelFallbackHandler.setLastKnownModel,
-        clearUserAbortRecovery: (sessionID) => userAbortInterruptedRecoveryGuard.clear(sessionID),
-        noteAssistantError: (sessionID, error) => {
-          userAbortInterruptedRecoveryGuard.noteSessionError(sessionID, extractErrorName(error));
-        },
       });
       if (state.sessionID && ((typeof state.info?.finish === "string" && state.info.finish.length > 0) || state.info?.finish === true)) {
         invalidateContextWindowUsageCache(pluginContext as PluginInput, state.sessionID);
@@ -244,16 +225,7 @@ export function createEventHandler(args: {
         const error = props?.error;
         const errorName = extractErrorName(error);
         const errorMessage = extractErrorMessage(error);
-        if (sessionID) userAbortInterruptedRecoveryGuard.noteSessionError(sessionID, errorName);
-
-        const recovered = await handleRecoverableSessionError({
-          hooks,
-          pluginContext,
-          sessionID,
-          messageID: props?.messageID as string | undefined,
-          error,
-        });
-        if (!recovered && sessionID) {
+        if (sessionID) {
           await modelFallbackHandler.handleSessionError({ sessionID, errorName, errorMessage, props });
         }
       } catch (err) {

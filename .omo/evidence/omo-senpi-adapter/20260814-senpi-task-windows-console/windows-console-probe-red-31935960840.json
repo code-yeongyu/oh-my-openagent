@@ -1,0 +1,55 @@
+{
+  "workflow": 31935960840,
+  "job": 95137818135,
+  "job_url": "https://github.com/code-yeongyu/oh-my-openagent/actions/runs/31935960840/job/95137818135",
+  "head": "d30a99e66ea817be8eca680bfb01fb42b695ec35",
+  "job_conclusion": "failure",
+  "sentinel": "WINDOWS_CONSOLE_PROBE",
+  "payload": {
+    "result": "FAIL",
+    "visible": {
+      "pid": 7236,
+      "stdioRoundTrip": true,
+      "mode": "visible-control",
+      "consoleAttached": true,
+      "consoleAttachError": 187,
+      "consoleWindowHandle": 0,
+      "consoleWindowVisible": false,
+      "mainWindowHandle": 0,
+      "expectedVisible": true,
+      "childExited": true,
+      "parentExitCode": 0
+    },
+    "hidden": {
+      "pid": 5516,
+      "stdioRoundTrip": true,
+      "mode": "hidden-fixed",
+      "consoleAttached": true,
+      "consoleAttachError": 187,
+      "consoleWindowHandle": 0,
+      "consoleWindowVisible": false,
+      "mainWindowHandle": 0,
+      "expectedVisible": false,
+      "childExited": true,
+      "parentExitCode": 0
+    },
+    "isolation": {
+      "sandboxAgentDir": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\omo-rpc-window-probe-fGc1Gw\\agent",
+      "callerAgentDirIgnored": true,
+      "credentialsUntouched": true,
+      "credentialFiles": [
+        "auth.json",
+        "models.json",
+        "settings.json",
+        "trust.json"
+      ]
+    },
+    "cleanup": {
+      "visibleChildExited": true,
+      "hiddenChildExited": true,
+      "tempRootRemoved": true
+    }
+  },
+  "root_cause": "ProcessStartInfo.CreateNoWindow created a windowless console object for the Bun parent. Both children inherited that object, so neither child had a visible console HWND.",
+  "fix": "Call Win32 FreeConsole in the Bun parent before spawning the visible and hidden children."
+}

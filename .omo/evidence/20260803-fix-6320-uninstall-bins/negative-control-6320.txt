@@ -1,0 +1,20 @@
+== back up the product changes ==
+== revert ONLY the product to HEAD (test stays), neutralize the new remover ==
+  product diff vs HEAD: []
+== RED expected: bins survive, removedBinLinks undefined ==
+(fail) codex cleanup > #given managed Codex Light state and project-local Codex leftovers #when cleanup runs #then removes only managed global state and repairs local config [5010.50ms]
+441 |     expect(await pathExists(rootBin)).toBe(false)
+(fail) codex cleanup > #given installer-created bin links in the bin dir #when cleanup runs #then removes the managed omo bins and keeps unmanaged files [15.98ms]
+(fail) codex cleanup > #given no bin directory on disk #when cleanup runs #then reports no removed bin links and does not throw [12.11ms]
+ 10 pass
+ 1 skip
+ 3 fail
+
+== restore the fix ==
+== GREEN expected after restore ==
+ 13 pass
+ 1 skip
+ 0 fail
+worktree bin-related files present: packages/omo-codex/src/install/codex-cleanup-bins.ts
+yes
+

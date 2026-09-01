@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { requireAllCriteriaPass } from "../src/evidence.js";
+import { requireAllCriteriaPass, requireEssentialCriteriaPass } from "../src/evidence.js";
 import type { UlwLoopItem, UlwLoopSuccessCriterion } from "../src/types.js";
 import { UlwLoopError } from "../src/types.js";
 
@@ -96,5 +96,33 @@ describe("requireAllCriteriaPass", () => {
 			expect(error.details?.["goalId"]).toBe("G001");
 			expect(Array.isArray(error.details?.["unresolved"])).toBe(true);
 		}
+	});
+});
+
+describe("requireEssentialCriteriaPass", () => {
+	it("does NOT throw when essential criteria pass and non-essential criteria are pending", () => {
+		// given
+		const goal = makeGoal({
+			successCriteria: [
+				makeCriterion({ id: "C001", status: "pass", essential: true }),
+				makeCriterion({ id: "C002", status: "pending", essential: false }),
+			],
+		});
+
+		// when / then
+		expect(() => requireEssentialCriteriaPass(goal)).not.toThrow();
+	});
+
+	it("throws when an essential criterion is pending", () => {
+		// given
+		const goal = makeGoal({
+			successCriteria: [
+				makeCriterion({ id: "C001", status: "pending", essential: true }),
+				makeCriterion({ id: "C002", status: "pass", essential: false }),
+			],
+		});
+
+		// when / then
+		expect(() => requireEssentialCriteriaPass(goal)).toThrow(UlwLoopError);
 	});
 });

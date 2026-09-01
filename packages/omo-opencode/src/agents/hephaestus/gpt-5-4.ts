@@ -294,7 +294,7 @@ Style: one sentence, concrete, with at least one specific detail (file path, pat
 ${categorySkillsGuide}
 
 When delegating, check all available skills. User-installed skills get priority. Always evaluate all available skills before delegating. Example domain-skill mappings:
-- Frontend/UI work: \`frontend-ui-ux\` - Anti-slop design: bold typography, intentional color, meaningful motion
+- Frontend/UI work: \`frontend\` - Anti-slop design: bold typography, intentional color, meaningful motion
 - Browser testing: \`playwright\` - Browser automation, screenshots, verification
 - Git operations: \`git-master\` - Atomic commits, rebase/squash, blame/bisect
 - Tauri desktop app: \`tauri-macos-craft\` - macOS-native UI, vibrancy, traffic lights

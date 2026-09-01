@@ -1,6 +1,6 @@
-import plannerPrompt from "../../../../../../packages/prompts-core/prompts/ultrawork/planner.md" with { type: "text" }
+import { ULTRAWORK_PLANNER_PROMPT } from "@oh-my-opencode/prompts-core"
 
-export const ULTRAWORK_PLANNER_SECTION = plannerPrompt
+export const ULTRAWORK_PLANNER_SECTION = ULTRAWORK_PLANNER_PROMPT
 
 export function getPlannerUltraworkMessage(): string {
   return `<ultrawork-mode>

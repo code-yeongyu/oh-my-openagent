@@ -37,6 +37,8 @@ export function createEventHookRunner(): EventHookRunner {
 export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafely: EventHookRunner) {
   return async (input: EventInput): Promise<void> => {
     await runEventHookSafely("autoUpdateChecker", hooks.autoUpdateChecker?.event, input);
+    await runEventHookSafely("codegraphBootstrap", hooks.codegraphBootstrap?.event, input);
+    await runEventHookSafely("astGrepSgProvision", hooks.astGrepSgProvision?.event, input);
     await runEventHookSafely("legacyPluginToast", hooks.legacyPluginToast?.event, input);
     await runEventHookSafely("claudeCodeHooks", hooks.claudeCodeHooks?.event, input);
     await runEventHookSafely("backgroundNotificationHook", hooks.backgroundNotificationHook?.event, input);
@@ -58,7 +60,7 @@ export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafel
     await runEventHookSafely("agentUsageReminder", hooks.agentUsageReminder?.event, input);
     await runEventHookSafely("categorySkillReminder", hooks.categorySkillReminder?.event, input);
     await runEventHookSafely("interactiveBashSession", hooks.interactiveBashSession?.event, input);
-    await runEventHookSafely("ralphLoop", hooks.ralphLoop?.event, input);
+    await runEventHookSafely("goal", hooks.goal?.event, input);
     await runEventHookSafely("stopContinuationGuard", hooks.stopContinuationGuard?.event, input);
     await runEventHookSafely("compactionContextInjector", hooks.compactionContextInjector?.event, input);
     await runEventHookSafely("compactionTodoPreserver", hooks.compactionTodoPreserver?.event, input);

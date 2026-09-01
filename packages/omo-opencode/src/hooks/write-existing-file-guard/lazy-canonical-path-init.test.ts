@@ -34,6 +34,8 @@ describe("createWriteExistingFileGuardHook", () => {
       },
     }))
     const { createWriteExistingFileGuardHook } = await import(`./hook?test=${crypto.randomUUID()}`)
+    existsSyncMock.mockClear()
+    realpathNativeMock.mockClear()
     const existingFile = join(tempDir, "existing.txt")
     writeFileSync(existingFile, "content")
 

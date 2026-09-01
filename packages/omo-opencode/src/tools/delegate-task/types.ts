@@ -1,16 +1,61 @@
-import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
+import type { OhMyOpenCodeConfig } from "../../config"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
+import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import type { SessionPromptAsyncData, SessionPromptData, SessionStatusData } from "@opencode-ai/sdk"
 import type {
   AvailableCategory,
   AvailableSkill,
 } from "../../agents/dynamic-agent-prompt-builder"
 
-export type OpencodeClient = PluginInput["client"]
+type SessionPathInput = { readonly path: { readonly id: string } }
+type SessionMessagesQuery = { readonly directory?: string; readonly limit?: number }
+type SessionPromptInput = Omit<SessionPromptData | SessionPromptAsyncData, "url"> & {
+  readonly signal?: AbortSignal | null
+  readonly [key: string]: unknown
+}
+type SessionStatusInput = Omit<SessionStatusData, "url">
+
+type SessionCreateResult =
+  | { readonly data: { readonly id: string }; readonly error?: undefined }
+  | { readonly data?: undefined; readonly error: unknown }
+
+type SessionGetResult = {
+  readonly data?: { readonly directory?: string }
+  readonly error?: unknown
+}
+
+export interface OmoAgentClient {
+  readonly app: {
+    readonly agents: () => Promise<unknown>
+  }
+  readonly config: {
+    readonly get: () => Promise<unknown>
+  }
+  readonly model?: {
+    readonly list?: () => Promise<unknown>
+  }
+  readonly session: {
+    readonly abort: (input: SessionPathInput) => Promise<unknown>
+    readonly delete?: (input: SessionPathInput) => Promise<unknown>
+    readonly create: (input: {
+      readonly body: Record<string, unknown>
+      readonly query?: { readonly directory?: string }
+    }) => Promise<SessionCreateResult>
+    readonly get: (input: SessionPathInput) => Promise<SessionGetResult>
+    readonly messages: (input: SessionPathInput | (SessionPathInput & { readonly query?: SessionMessagesQuery })) => Promise<unknown>
+    readonly prompt?: (input: SessionPromptInput) => Promise<unknown>
+    readonly promptAsync?: (input: SessionPromptInput) => Promise<unknown>
+    readonly status: (input?: SessionStatusInput) => Promise<unknown>
+  }
+}
+
+export type OpencodeClient = OmoAgentClient
 
 export interface DelegateTaskArgs {
   description: string
+  descriptionSource?: "explicit" | "generated"
   prompt: string
   category?: string
   subagent_type?: string
@@ -66,6 +111,8 @@ export interface DelegateTaskToolOptions {
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
+  /** Reload model-bearing config at task invocation time so edits are honored without rebuilding tools. */
+  loadCurrentModelConfig?: () => Pick<OhMyOpenCodeConfig, "agents" | "categories">
   sisyphusAgentConfig?: SisyphusAgentConfig
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
@@ -76,6 +123,7 @@ export interface DelegateTaskToolOptions {
     get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
     dirs(): string[] | Promise<string[]>
   }
+  getLoadedSkills?: () => Promise<LoadedSkill[]>
 }
 
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
@@ -92,6 +140,5 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
-  /** OpenCode native skill list to merge into the <available_skills> block. */
   nativeSkillInfos?: { name: string; description: string; location: string }[]
 }

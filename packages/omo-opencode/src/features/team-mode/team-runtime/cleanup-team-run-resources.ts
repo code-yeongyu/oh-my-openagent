@@ -18,6 +18,22 @@ function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
 }
 
+function getLayoutCleanupTarget(runtimeState: Awaited<ReturnType<typeof loadRuntimeState>>) {
+  if (!runtimeState.tmuxLayout) return undefined
+  if (runtimeState.tmuxLayout.paneIds && runtimeState.tmuxLayout.paneIds.length > 0) {
+    return runtimeState.tmuxLayout
+  }
+
+  const paneIds = runtimeState.members.flatMap((member) => {
+    const ids = [member.tmuxPaneId, member.tmuxGridPaneId].filter((paneId): paneId is string => Boolean(paneId))
+    return member.agentType === "leader" ? [] : ids
+  })
+
+  return paneIds.length > 0
+    ? { ...runtimeState.tmuxLayout, paneIds }
+    : runtimeState.tmuxLayout
+}
+
 export async function cleanupTeamRunResources(args: {
   teamRunId: string
   config: TeamModeConfig
@@ -60,7 +76,7 @@ export async function cleanupTeamRunResources(args: {
   if (args.createdLayout && args.tmuxMgr) {
     try {
       const runtimeState = await loadRuntimeState(args.teamRunId, args.config)
-      await removeTeamLayout(args.teamRunId, runtimeState.tmuxLayout, args.tmuxMgr)
+      await removeTeamLayout(args.teamRunId, getLayoutCleanupTarget(runtimeState), args.tmuxMgr)
       cleanupReport.removedLayout = true
     } catch (layoutError) {
       cleanupReport.errors.push(`layout ${args.teamRunId}: ${normalizeError(layoutError).message}`)

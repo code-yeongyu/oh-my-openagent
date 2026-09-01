@@ -1,10 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { findPluginBundledCandidates } from "@oh-my-opencode/rules-engine/engine";
 import { afterEach, describe, expect, it } from "vitest";
-
 import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
-import { findPluginBundledCandidates } from "../src/rules/finder.js";
 
 const WINDOWS_RULE_DESCRIPTION = "Windows Git Bash guidance for Codex";
 const WINDOWS_RULE_PATH = "bundled-rules/windows-git-bash.md";
@@ -58,6 +57,26 @@ function restoreEnv(name: string, value: string | undefined): void {
 function occurrenceCount(value: string, search: string): number {
 	return value.split(search).length - 1;
 }
+
+describe("Windows Git Bash bundled rule content", () => {
+	function readWindowsRuleBody(): string {
+		return readFileSync(join(process.cwd(), WINDOWS_RULE_PATH), "utf8");
+	}
+
+	it("#given the bundled rule #when read #then it keeps valid frontmatter (description + alwaysApply)", () => {
+		const body = readWindowsRuleBody();
+
+		expect(body).toContain(`description: ${WINDOWS_RULE_DESCRIPTION}`);
+		expect(body).toContain("alwaysApply: true");
+	});
+
+	it("#given the bundled rule #when read #then it names the Git Bash runtime identifiers", () => {
+		const body = readWindowsRuleBody();
+
+		expect(body).toContain("git_bash");
+		expect(body).toContain("OMO_CODEX_GIT_BASH_PATH");
+	});
+});
 
 describe("Windows Git Bash bundled rule", () => {
 	it("#given packaged bundled rules #when discovering plugin-bundled candidates #then Windows Git Bash rule is included", () => {

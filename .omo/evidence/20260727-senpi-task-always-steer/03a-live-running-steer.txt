@@ -1,0 +1,36 @@
+Command:
+node packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs
+
+Relevant live-surface result:
+
+```json
+{
+  "passed": [
+    "real_credentials_untouched_and_caller_env_ignored",
+    "process_mode_routes_to_rpc_runner",
+    "spawn_process_pid_and_session_jsonl",
+    "steer_ack_mid_run",
+    "completion_push_arrives",
+    "no_leaked_rpc_child_pids"
+  ],
+  "leakedPids": 0,
+  "realCredentialsUntouched": true
+}
+```
+
+The scenario's literal task call omitted any delivery option:
+
+```json
+{"name":"task_send","arguments":{"to":"p1","message":"steer: keep going"}}
+```
+
+Binary observable: `steer_ack_mid_run` PASS.
+
+Broad-driver unrelated failures:
+
+- `kill_marks_error_killed_true`: no running RPC child appeared in the separate kill fixture.
+- `reconcile_lost_terminates_orphan`: no running RPC child appeared in the separate reconcile fixture.
+
+Those fixtures do not call the changed optionless `task_send` scenario. The change-specific RPC route, spawned child, steer acknowledgement, completion, credential isolation, and PID cleanup all passed.
+
+Cleanup receipt: the driver removed its sandbox and reported `leakedPids: 0`.

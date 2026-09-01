@@ -1,0 +1,29 @@
+Review gate RED:
+
+The first implementation made `isInsideTmuxEnvironment` return true for cmux.
+Code-quality review rejected that because literal tmux detection is also used
+by unsupported window/session isolation.
+
+The implementation was rolled back to literal tmux semantics and a separate
+inline-pane predicate was introduced with an intentionally incomplete baseline.
+
+Command:
+cd /Users/yeongyu/local-workspaces/omo-wt/review/pr-5811-cmux-eligibility &&
+bun test packages/tmux-core/src/tmux-utils.test.ts \
+  packages/tmux-core/src/tmux-utils/pane-spawn-runner.test.ts \
+  packages/omo-opencode/src/features/tmux-subagent/manager-cmux-eligibility.test.ts
+
+Observed:
+- FAIL: pane compatibility expected true, received false.
+- FAIL: cmux-only pane spawn expected success, received failure.
+- FAIL: real manager path did not query the `%0` source pane.
+
+Summary:
+25 pass
+3 fail
+43 expect() calls
+
+This RED also corrected the fixture: `TMUX` is absent while
+`CMUX_SOCKET_PATH=/tmp/cmux.sock` and `TMUX_PANE=%0` are present, matching
+cmux's pane identity contract instead of passing a synthetic target only at the
+lowest-level spawn function.

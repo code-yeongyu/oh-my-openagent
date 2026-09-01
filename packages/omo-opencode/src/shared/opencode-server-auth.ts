@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { log } from "./logger"
 
 /**
@@ -19,9 +20,7 @@ export function getServerBasicAuthHeader(): string | undefined {
 
 type UnknownRecord = Record<string, unknown>
 
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null
-}
+
 
 function isRequestFetch(value: unknown): value is (request: Request) => Promise<Response> {
   return typeof value === "function"

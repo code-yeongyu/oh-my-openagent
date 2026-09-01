@@ -54,6 +54,16 @@ oqa_db_query() {
   opencode db "$1" --format json 2>/dev/null
 }
 
+# Preserve HOME-based opencode shims after HOME is sandboxed. Some installed
+# opencode wrappers resolve the real binary via "$HOME/.opencode/bin/opencode";
+# after oqa_mk_isolated_xdg rewrites HOME, that path must still exist.
+oqa_preserve_home_opencode_bin() {
+  local real_home="$1" sandbox_home="$2"
+  [ -d "$real_home/.opencode/bin" ] || return 0
+  mkdir -p "$sandbox_home/.opencode" || return 1
+  ln -s "$real_home/.opencode/bin" "$sandbox_home/.opencode/bin" 2>/dev/null || return 1
+}
+
 # Create an isolated XDG sandbox so a spawned opencode never touches the real
 # DB. Sets globals OQA_XDG_ROOT + OQA_PROJ and exports XDG_*; registers the
 # root for cleanup.
@@ -63,10 +73,12 @@ oqa_db_query() {
 #   oqa_mk_isolated_xdg            # good
 #   root="$OQA_XDG_ROOT"           # read the global afterwards
 oqa_mk_isolated_xdg() {
-  local root
+  local root real_home
   root="$(mktemp -d -t oqa-xdg.XXXXXX)" || return 1
+  real_home="$HOME"
   OQA_TMPDIRS+=("$root")
   mkdir -p "$root/data" "$root/config" "$root/cache" "$root/state" "$root/home" "$root/proj"
+  oqa_preserve_home_opencode_bin "$real_home" "$root/home" || return 1
   export OQA_XDG_ROOT="$root"
   export HOME="$root/home"
   export OPENCODE_TEST_HOME="$root/home"
@@ -212,6 +224,32 @@ oqa__self_check() {
     oqa_pass "isolated HOME points inside sandbox"
   else
     oqa_log "FAIL: sandbox HOME not isolated (HOME='$home' OPENCODE_TEST_HOME='$test_home' root='$isodir')"; fails=$((fails+1))
+  fi
+
+  local shim_marker shim_result
+  shim_marker="$(mktemp -t oqa-shim.XXXXXX)"
+  bash -c '
+    set -u
+    . "'"${BASH_SOURCE[0]}"'"
+    fake_home="$(mktemp -d -t oqa-fake-home.XXXXXX)"
+    mkdir -p "$fake_home/.local/bin" "$fake_home/.opencode/bin"
+    printf "%s\n" "#!/usr/bin/env bash" "exec \"\$HOME/.opencode/bin/opencode\" \"\$@\"" > "$fake_home/.local/bin/opencode"
+    printf "%s\n" "#!/usr/bin/env bash" "exec \"\$HOME/.opencode/bin/opencode-real\" \"\$@\"" > "$fake_home/.opencode/bin/opencode"
+    printf "%s\n" "#!/usr/bin/env bash" "printf fake-opencode-ok" > "$fake_home/.opencode/bin/opencode-real"
+    chmod +x "$fake_home/.local/bin/opencode" "$fake_home/.opencode/bin/opencode" "$fake_home/.opencode/bin/opencode-real"
+    HOME="$fake_home"
+    PATH="$fake_home/.local/bin:$PATH"
+    oqa_mk_isolated_xdg
+    opencode > "'"$shim_marker"'"
+    oqa_cleanup
+    rm -rf "$fake_home"
+  '
+  shim_result="$(cat "$shim_marker" 2>/dev/null)"
+  rm -f "$shim_marker"
+  if [ "$shim_result" = "fake-opencode-ok" ]; then
+    oqa_pass "isolated HOME preserves HOME-based opencode shim"
+  else
+    oqa_log "FAIL: HOME-based opencode shim returned '$shim_result'"; fails=$((fails+1))
   fi
 
   if [ "$fails" -eq 0 ]; then

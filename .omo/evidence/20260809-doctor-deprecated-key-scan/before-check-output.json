@@ -1,0 +1,64 @@
+{
+  "name": "Configuration",
+  "status": "warn",
+  "message": "6 deprecated reasoning key(s) found",
+  "details": [
+    "Scanned: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc"
+  ],
+  "issues": [
+    {
+      "title": "Deprecated reasoning config key",
+      "description": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: categories.deep.variant",
+      "fix": "Replace variant with reasoning, or run: oh-my-openagent config migrate",
+      "severity": "warning",
+      "affects": [
+        "categories.deep.variant"
+      ]
+    },
+    {
+      "title": "Deprecated reasoning config key",
+      "description": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: categories.deep.provider_options.thinking",
+      "fix": "Replace thinking with reasoning, or run: oh-my-openagent config migrate",
+      "severity": "warning",
+      "affects": [
+        "categories.deep.provider_options.thinking"
+      ]
+    },
+    {
+      "title": "Deprecated reasoning config key",
+      "description": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: categories.deep.provider_options.textVerbosity",
+      "fix": "Replace textVerbosity with provider_options.textVerbosity, or run: oh-my-openagent config migrate",
+      "severity": "warning",
+      "affects": [
+        "categories.deep.provider_options.textVerbosity"
+      ]
+    },
+    {
+      "title": "Deprecated reasoning config key",
+      "description": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: agents.oracle.provider_options.thinking",
+      "fix": "Replace thinking with reasoning, or run: oh-my-openagent config migrate",
+      "severity": "warning",
+      "affects": [
+        "agents.oracle.provider_options.thinking"
+      ]
+    },
+    {
+      "title": "Deprecated reasoning config key",
+      "description": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: models.sol.provider_options.textVerbosity",
+      "fix": "Replace textVerbosity with provider_options.textVerbosity, or run: oh-my-openagent config migrate",
+      "severity": "warning",
+      "affects": [
+        "models.sol.provider_options.textVerbosity"
+      ]
+    },
+    {
+      "title": "Deprecated reasoning config key",
+      "description": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-doctor-qa-g6ckm78t/.omo/omo.jsonc: [codex].agents.explore.providerOptions.textVerbosity",
+      "fix": "Replace textVerbosity with provider_options.textVerbosity, or run: oh-my-openagent config migrate",
+      "severity": "warning",
+      "affects": [
+        "[codex].agents.explore.providerOptions.textVerbosity"
+      ]
+    }
+  ]
+}
