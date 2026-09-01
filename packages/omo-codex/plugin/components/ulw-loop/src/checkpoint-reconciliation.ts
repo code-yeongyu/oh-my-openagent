@@ -1,10 +1,34 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
+import type { CodexGoalReconciliation, CodexGoalSnapshot } from "./codex-goal-snapshot.js";
+import { codexGoalMismatchRecovery, formatCodexGoalReconciliation } from "./codex-goal-snapshot.js";
 import { codexGoalMode, isFinalRunCompletionCandidate } from "./goal-status.js";
 import { type UlwLoopScope, ulwLoopBriefPath } from "./paths.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
-import { ULW_LOOP_DIR, ULW_LOOP_GOALS, ULW_LOOP_LEDGER } from "./types.js";
+import { ULW_LOOP_DIR, ULW_LOOP_GOALS, ULW_LOOP_LEDGER, UlwLoopError } from "./types.js";
+
+export interface CodexSnapshotMismatchInput {
+	readonly reconciliation: CodexGoalReconciliation;
+	readonly snapshot: CodexGoalSnapshot | null | undefined;
+	readonly expectedObjective: string;
+	/** Only the checkpoint path can fall back to task-scoped aggregate reconciliation, so only it asks for that hint. */
+	readonly taskScopedHint?: { readonly goal: UlwLoopItem; readonly aggregate: boolean; readonly final: boolean };
+}
+
+export function codexSnapshotMismatchError(input: CodexSnapshotMismatchInput): UlwLoopError {
+	const { reconciliation, snapshot, taskScopedHint } = input;
+	const hint =
+		taskScopedHint?.aggregate === true && snapshot?.status === "complete" && snapshot.objective !== undefined
+			? buildTaskScopedAggregateReconciliationHint(taskScopedHint.goal, taskScopedHint.final)
+			: "";
+	const recovery = codexGoalMismatchRecovery(input.expectedObjective, snapshot);
+	return new UlwLoopError(
+		`${formatCodexGoalReconciliation(reconciliation)}${hint}\n${recovery.message}`,
+		"ulw_loop_codex_snapshot_mismatch",
+		{ details: recovery.details },
+	);
+}
 
 function normalizeObjective(value: string): string {
 	return value.replace(/\s+/g, " ").trim();

@@ -1,0 +1,10 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/recovery-nonblocking.test.ts:
+(pass) DAG resume without blocking on a reattached child > #given a paused run whose first node is still running #when the session resumes #then reuse and dag.run.resumed land while that child keeps running [53.07ms]
+(pass) DAG resume without blocking on a reattached child > #given a scheduler built with pre-attached tasks #when a node is retried #then the fresh instance does not re-attach the settled child [19.41ms]
+
+ 2 pass
+ 0 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [494.00ms]

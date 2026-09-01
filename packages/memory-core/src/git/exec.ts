@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
 import { GitNotFoundError, GitTimeoutError } from "./errors"
 

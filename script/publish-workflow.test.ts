@@ -39,6 +39,16 @@ function sliceWorkflowSectionToEnd(workflow: string, startMarker: string): strin
   return workflow.slice(start)
 }
 
+function sliceWorkflowStep(workflow: string, stepName: string): string {
+  const startMarker = `      - name: ${stepName}`
+  const start = workflow.indexOf(startMarker)
+  if (start < 0) {
+    throw new Error(`missing workflow step ${stepName}`)
+  }
+  const nextStep = workflow.indexOf("\n      - name: ", start + startMarker.length)
+  return workflow.slice(start, nextStep < 0 ? workflow.length : nextStep + 1)
+}
+
 function normalizeWorkflowText(workflow: string): string {
   return workflow.replace(/\r\n/g, "\n")
 }
@@ -118,6 +128,70 @@ describe("test workflows", () => {
     expect(provenanceOperationsRequirePinnedRun, "npm, platform, marketplace, and GitHub release operations must only run from the pinned follow-up dispatch").toBe(true)
     expect(releaseChecksOutPreparedSource, "GitHub release and marketplace operations must check out the prepared source directly").toBe(true)
     expect(releaseDoesNotRestampOrRetag, "the provenance-bearing release run must not mutate its release source").toBe(true)
+  })
+
+  test("passes the omo-ai version to the platform publish workflow", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const publishPlatformJob = sliceWorkflowSection(workflow, "  publish-platform:", "  release:")
+
+    // #when
+    const passesOmoAiVersion = publishPlatformJob.includes(
+      "omo_ai_version: ${{ needs.release-metadata.outputs.omo_ai_version }}",
+    )
+    const keepsVersionSourcedFromMetadata = publishPlatformJob.includes(
+      "version: ${{ needs.release-metadata.outputs.version }}",
+    )
+
+    // #then
+    expect(passesOmoAiVersion, "the publish-platform call must forward the mapped omo-ai version so binaries stamp it").toBe(true)
+    expect(keepsVersionSourcedFromMetadata, "the publish-platform call must keep sourcing the release version from release-metadata").toBe(true)
+  })
+
+  test("attaches and verifies release-binary assets on every GitHub release", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const releaseJob = sliceWorkflowSection(workflow, "  release:", "  post-publish-verify:")
+    const downloadStep = sliceWorkflowStep(releaseJob, "Download release-binary artifacts")
+    const uploadStep = sliceWorkflowStep(releaseJob, "Upload release assets")
+    const verifyStep = sliceWorkflowStep(releaseJob, "Verify uploaded assets")
+
+    // #when
+    const createIndex = releaseJob.indexOf("      - name: Create GitHub release")
+    const downloadIndex = releaseJob.indexOf("      - name: Download release-binary artifacts")
+    const uploadIndex = releaseJob.indexOf("      - name: Upload release assets")
+    const verifyIndex = releaseJob.indexOf("      - name: Verify uploaded assets")
+    const stepsFollowReleaseCreation =
+      createIndex >= 0 && downloadIndex > createIndex && uploadIndex > downloadIndex && verifyIndex > uploadIndex
+    const downloadStagesReleaseBinaries =
+      downloadStep.includes("actions/download-artifact@") &&
+      downloadStep.includes("pattern: release-binary-*") &&
+      downloadStep.includes("path: .omo/release-binaries")
+    const generatesCombinedChecksums = uploadStep.includes("shasum -a 256 omo-* > SHA256SUMS")
+    const uploadClobbersAssets = uploadStep.includes(
+      'gh release upload "v${VERSION}" .omo/release-binaries/omo-* .omo/release-binaries/SHA256SUMS --clobber',
+    )
+    const uploadSourcesVersionFromMetadata = uploadStep.includes(
+      "VERSION: ${{ needs.release-metadata.outputs.version }}",
+    )
+    const verifyRedownloadsEveryAsset =
+      verifyStep.includes('gh release download "v${VERSION}"') && verifyStep.includes("mktemp -d")
+    const verifyChecksEveryHash = verifyStep.includes("shasum -a 256 -c SHA256SUMS")
+    const verifyFailsBelowThirteenAssets = verifyStep.includes('"$ASSET_COUNT" -ne 13')
+    const stepsAreChannelNeutral = ![downloadStep, uploadStep, verifyStep].some((step) => step.includes("dist_tag"))
+    const verifyRunsUnconditionally = !verifyStep.includes("if:") && !verifyStep.includes("skip_platform")
+
+    // #then
+    expect(stepsFollowReleaseCreation, "release-binary steps must live inside the release job after Create GitHub release").toBe(true)
+    expect(downloadStagesReleaseBinaries, "the release job must stage every per-target binary under .omo/release-binaries").toBe(true)
+    expect(generatesCombinedChecksums, "the release job must generate the combined SHA256SUMS from the downloaded binaries (per-leg checksums would collide)").toBe(true)
+    expect(uploadClobbersAssets, "asset upload must clobber so reruns stay idempotent").toBe(true)
+    expect(uploadSourcesVersionFromMetadata, "asset upload must source the release version from release-metadata").toBe(true)
+    expect(verifyRedownloadsEveryAsset, "verification must re-download every uploaded asset from the GitHub release").toBe(true)
+    expect(verifyChecksEveryHash, "verification must re-check every SHA256SUMS entry").toBe(true)
+    expect(verifyFailsBelowThirteenAssets, "verification must fail the job unless exactly 13 assets (12 binaries + SHA256SUMS) verified").toBe(true)
+    expect(stepsAreChannelNeutral, "release-binary steps must run for both stable and dist-tagged releases").toBe(true)
+    expect(verifyRunsUnconditionally, "Verify uploaded assets must stay ungated so platform-skip reruns still prove the release contract").toBe(true)
   })
 
   test("exercise root checks across linux macos and windows", () => {
