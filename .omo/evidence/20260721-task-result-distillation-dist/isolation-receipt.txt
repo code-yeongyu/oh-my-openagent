@@ -1,0 +1,2 @@
+real_db=/home/rate/.local/share/opencode/opencode.db before=2979
+fake_llm_port=43612

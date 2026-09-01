@@ -1,0 +1,2 @@
+[2026-08-26T05:25:23.700Z] [live-server-route] registered {"directory":"/tmp/oqa-xdg.kXmK5I/proj","hasServerUrl":true,"registrationCount":1}
+[2026-08-26T05:25:40.676Z] [live-server-route] dispatch via live listener {"sessionID":"ses_fc37839f1ffeLCN52wav8cwM8H","source":"background-agent-parent-wake"}
