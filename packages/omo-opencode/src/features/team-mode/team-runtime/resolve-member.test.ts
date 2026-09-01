@@ -1,7 +1,14 @@
+/// <reference types="bun-types" />
+
+import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { randomUUID } from "node:crypto"
 import { readFileSync } from "node:fs"
-declare const require: (name: string) => any
-const { describe, expect, mock, test, beforeEach } = require("bun:test")
+
+import type { Agent, PermissionRuleset } from "@opencode-ai/sdk/v2"
+
+import { unsafeTestValue } from "../../../../../../test-support/unsafe-test-value"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
+import { replaceProjectAgentProvenance } from "../final-open-code-agent-registry"
 import type { Member } from "../types"
 
 const resolveCategoryExecutionMock = mock()
@@ -16,12 +23,55 @@ mock.module("./resolve-member-dependencies", () => ({
 
 const { resolveMember, TeamMemberResolutionError } = await import("./resolve-member?resolve-member-test")
 
-function createExecutorContext(): ExecutorContext {
+const TEAM_TOOLS = ["team_send_message", "team_task_list", "team_task_get", "team_task_update", "team_status", "call_omo_agent"] as const
+
+type ContextFixture = Readonly<{ context: ExecutorContext; appAgents: ReturnType<typeof mock>; configGet: ReturnType<typeof mock>; sessionGet: ReturnType<typeof mock> }>
+
+function createExecutorContext(directory = "/tmp/team-mode-test"): ExecutorContext {
   return {
-    client: {} as ExecutorContext["client"],
-    manager: {} as ExecutorContext["manager"],
-    directory: "/tmp/team-mode-test",
+    client: unsafeTestValue<ExecutorContext["client"]>({}),
+    manager: unsafeTestValue<ExecutorContext["manager"]>({}),
+    directory,
   }
+}
+
+function createPermissionRules(): PermissionRuleset {
+  return [...TEAM_TOOLS.map((permission) => ({ permission, pattern: "*", action: "allow" as const })), { permission: "task", pattern: "*", action: "deny" }, { permission: "question", pattern: "*", action: "deny" }]
+}
+
+function createFinalAgent(overrides: Partial<Agent> = {}): Agent {
+  return {
+    name: "project-worker", mode: "subagent", native: false, hidden: false,
+    permission: createPermissionRules(),
+    model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+    variant: "high", options: {}, ...overrides,
+  }
+}
+
+function createProjectMember(name = "worker"): Member {
+  return {
+    kind: "subagent_type", name, subagent_type: "project-worker",
+    backendType: "in-process", isActive: true,
+  }
+}
+
+function createRegistryContext(directory: string, response: unknown): ContextFixture {
+  const context = createExecutorContext(directory)
+  const appAgents = mock(async () => response)
+  const configGet = mock(async () => ({ data: { permission: { "*": "allow" } } }))
+  const sessionGet = mock(async () => ({ data: { directory, permission: [] } }))
+  Object.assign(context.client, {
+    app: { agents: appAgents },
+    config: { get: configGet },
+    session: { get: sessionGet },
+  })
+  return { context, appAgents, configGet, sessionGet }
+}
+
+function createProvenRegistryContext(response: unknown): ContextFixture {
+  const directory = `/tmp/project-agent-${randomUUID()}`
+  replaceProjectAgentProvenance(directory, ["project-worker"])
+  return createRegistryContext(directory, response)
 }
 
 describe("resolveMember", () => {
@@ -73,6 +123,12 @@ describe("resolveMember", () => {
     expect(resolveSubagentExecutionMock).not.toHaveBeenCalled()
     expect(result.agentToUse).toBe("sisyphus-junior")
     expect(result.systemContent).toBe("resolved-system-content")
+    expect(buildSystemContentMock).toHaveBeenCalledWith({
+      agentName: "sisyphus-junior",
+      categoryPromptAppend: "appendix",
+      maxPromptTokens: 512,
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+    })
   })
 
   test("strips sisyphusJuniorModel before resolving category members so each declared category keeps its own model", async () => {
@@ -146,9 +202,15 @@ describe("resolveMember", () => {
     expect(resolveCategoryExecutionMock).not.toHaveBeenCalled()
     expect(result.agentToUse).toBe("atlas")
     expect(result.systemContent).toBe("resolved-system-content")
+    expect(buildSystemContentMock).toHaveBeenCalledWith({
+      agentName: "atlas",
+      categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
+      model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
+    })
   })
 
-  test("throws TeamMemberResolutionError without category fallback when subagent resolution fails", async () => {
+  test("throws TeamMemberResolutionError without category fallback when an unknown type has no project source", async () => {
     // given
     const member = {
       backendType: "in-process",
@@ -158,15 +220,40 @@ describe("resolveMember", () => {
       subagent_type: "unknown-agent",
     } satisfies Member
 
-    resolveSubagentExecutionMock.mockRejectedValue(new Error("unknown agent"))
-
     // when
     const result = resolveMember(member, createExecutorContext(), "deep, quick")
 
     // then
     await expect(result).rejects.toBeInstanceOf(TeamMemberResolutionError)
-    await expect(result).rejects.toThrow("Failed to resolve member 'unknown': unknown agent")
+    await expect(result).rejects.toThrow("has no config-time provenance")
     expect(resolveCategoryExecutionMock).not.toHaveBeenCalled()
+    expect(resolveSubagentExecutionMock).not.toHaveBeenCalled()
+  })
+
+  test("resolves an exact proven project agent from the final registry without prompt or fallback injection", async () => {
+    // given
+    const fixture = createProvenRegistryContext({
+      data: [createFinalAgent({
+        permission: [{ permission: "team_*", pattern: "*", action: "allow" }, { permission: "call_omo_agent", pattern: "*", action: "allow" }, { permission: "task", pattern: "*", action: "deny" }, { permission: "question", pattern: "*", action: "deny" }],
+      })],
+    })
+
+    // when
+    const result = await resolveMember(createProjectMember(), fixture.context, "deep, quick", "lead")
+
+    // then
+    expect(result).toEqual({
+      memberName: "worker",
+      agentToUse: "project-worker",
+      model: { providerID: "openai", modelID: "gpt-5.4-mini", variant: "high" },
+      fallbackChain: undefined,
+      systemContent: undefined,
+    })
+    expect(fixture.appAgents).toHaveBeenCalledWith({
+      query: { directory: fixture.context.directory },
+    })
+    expect(resolveSubagentExecutionMock).not.toHaveBeenCalled()
+    expect(buildSystemContentMock).not.toHaveBeenCalled()
   })
 
   test("reuses buildSystemContent for both resolution kinds without custom prompt concatenation", async () => {
@@ -224,5 +311,97 @@ describe("resolveMember", () => {
     expect(source).not.toContain("member.prompt +")
     expect(source).not.toContain("+ member.prompt")
     expect(source).not.toContain(".join(")
+  })
+
+  test("uses the last matching permission rule when later project rules override a global wildcard", async () => {
+    // given
+    const projectRules = createPermissionRules()
+    const fixture = createProvenRegistryContext({
+      data: [createFinalAgent({
+        permission: [
+          { permission: "*", pattern: "*", action: "allow" },
+          ...projectRules,
+          { permission: "*", pattern: "*", action: "allow" },
+          ...projectRules,
+        ],
+      })],
+    })
+
+    // when
+    const result = resolveMember(createProjectMember(), fixture.context, "deep, quick", "lead")
+
+    // then
+    await expect(result).resolves.toMatchObject({ agentToUse: "project-worker" })
+  })
+
+  test.each([
+    ["a fuzzy registry name", { data: [createFinalAgent({ name: "Project Worker" })] }, "no exact final OpenCode registry entry"],
+    ["a malformed registry", { data: { name: "project-worker" } }, "no exact final OpenCode registry entry"],
+    ["a native agent", { data: [createFinalAgent({ native: true })] }, "native === false"],
+    ["a hidden agent", { data: [createFinalAgent({ hidden: true })] }, "must not be hidden"],
+    ["a primary-only agent", { data: [createFinalAgent({ mode: "primary" })] }, "mode must be 'subagent' or 'all'"],
+    ["a missing team permission", { data: [createFinalAgent({ permission: createPermissionRules().filter((rule) => rule.permission !== "team_status") })] }, "must unconditionally allow team_status"],
+    ["a later ask permission", { data: [createFinalAgent({ permission: [...createPermissionRules(), { permission: "team_status", pattern: "*", action: "ask" as const }] })] }, "must unconditionally allow team_status"],
+    ["a later deny permission", { data: [createFinalAgent({ permission: [...createPermissionRules(), { permission: "team_status", pattern: "*", action: "deny" as const }] })] }, "must unconditionally allow team_status"],
+  ])("rejects %s", async (_label, response, expectedMessage) => {
+    // given
+    const fixture = createProvenRegistryContext(response)
+
+    // when
+    const result = resolveMember(createProjectMember(), fixture.context, "deep, quick", "lead")
+
+    // then
+    await expect(result).rejects.toThrow(expectedMessage)
+    expect(fixture.configGet).not.toHaveBeenCalled()
+    expect(fixture.sessionGet).not.toHaveBeenCalled()
+  })
+
+  test("accepts a project agent without an explicit model", async () => {
+    // given
+    const { model: _model, variant: _variant, ...modelLessAgent } = createFinalAgent()
+    const fixture = createProvenRegistryContext({ data: [modelLessAgent] })
+
+    // when
+    const result = await resolveMember(createProjectMember(), fixture.context, "deep, quick", "lead")
+
+    // then
+    expect(result.model).toBeUndefined()
+  })
+
+  test("rejects a project agent used as the team lead", async () => {
+    // given
+    const fixture = createProvenRegistryContext({ data: [createFinalAgent()] })
+
+    // when
+    const result = resolveMember(createProjectMember("project-lead"), fixture.context, "deep, quick", "project-lead")
+
+    // then
+    await expect(result).rejects.toThrow("Project-defined agents cannot be team leads")
+  })
+
+  test.each(["constructor", "toString", "__proto__"])("routes an inherited Object.prototype subagent_type '%s' to the project-agent path, not the builtin registry",
+    async (inheritedName) => {
+      // given: a subagent_type that only exists on Object.prototype, never as an own registry key
+      const member = { backendType: "in-process", isActive: true, kind: "subagent_type", name: "worker", subagent_type: inheritedName } satisfies Member
+
+      // when: no provenance is registered for this directory, so the project path must reject
+      const result = resolveMember(member, createExecutorContext(), "deep, quick")
+
+      // then: it must be treated as an unproven project agent, not silently resolved via the prototype chain
+      await expect(result).rejects.toBeInstanceOf(TeamMemberResolutionError)
+      await expect(result).rejects.toThrow("has no config-time provenance")
+      expect(resolveSubagentExecutionMock).not.toHaveBeenCalled()
+    })
+
+  test("rejects a proven project agent whose final permission rules disagree with the launcher permission overlay", async () => {
+    // given: an agent that satisfies every REQUIRED_TEAM_TOOL but leaves call_omo_agent denied,
+    // so the BackgroundManager launch overlay ({ call_omo_agent: true, ... }) would flip an effective permission
+    const fixture = createProvenRegistryContext({ data: [createFinalAgent({ permission: [...createPermissionRules(), { permission: "call_omo_agent", pattern: "*", action: "deny" as const }] })] })
+
+    // when
+    const result = resolveMember(createProjectMember(), fixture.context, "deep, quick", "lead")
+
+    // then
+    await expect(result).rejects.toThrow("must already agree with the launch permission")
   })
 })

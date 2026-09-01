@@ -1,7 +1,8 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { getAgentConfigKey } from "../../../shared/agent-display-names"
+import { getAgentConfigKey, stripAgentListSortPrefix } from "../../../shared/agent-display-names"
 import type { OpencodeClient } from "../../../tools/delegate-task/types"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
@@ -78,21 +79,81 @@ export function createTeamCreateTool(
       const leadSessionId = args.leadSessionId ?? runtimeContext.sessionID
       if (!leadSessionId) throw new Error("team_create requires leadSessionId or tool context sessionID")
       const projectRoot = typeof runtimeContext.directory === "string" ? runtimeContext.directory : process.cwd()
+      const rawCallerAgentKey = typeof runtimeContext.agent === "string"
+        ? stripAgentListSortPrefix(runtimeContext.agent).trim().toLowerCase()
+        : undefined
+      if (
+        rawCallerAgentKey !== undefined
+        && !Object.hasOwn(AGENT_ELIGIBILITY_REGISTRY, rawCallerAgentKey)
+        && rawCallerAgentKey in AGENT_ELIGIBILITY_REGISTRY
+      ) {
+        throw new Error(
+          `team_create denied: caller '${rawCallerAgentKey}' is not a registered team lead agent.`,
+        )
+      }
       const callerTeamLead = resolveCallerTeamLead(runtimeContext.agent)
       if (callerTeamLead.displayName !== undefined) {
         const callerAgentKey = getAgentConfigKey(callerTeamLead.displayName)
-        const callerRegistryEntry = AGENT_ELIGIBILITY_REGISTRY[callerAgentKey]
+        const hasCallerRegistryEntry = Object.hasOwn(AGENT_ELIGIBILITY_REGISTRY, callerAgentKey)
+        if (callerTeamLead.isEligibleForTeamLead && !hasCallerRegistryEntry) {
+          throw new Error(
+            `team_create denied: caller '${callerAgentKey}' is not a registered team lead agent.`,
+          )
+        }
+        const callerRegistryEntry = hasCallerRegistryEntry
+          ? AGENT_ELIGIBILITY_REGISTRY[callerAgentKey]
+          : undefined
         if (callerRegistryEntry?.verdict === "hard-reject") {
           throw new Error(`team_create denied: caller '${callerAgentKey}' is a hard-reject agent and cannot create teams regardless of an explicit 'lead' in the spec. ${callerRegistryEntry.rejectionMessage ?? `Agent '${callerAgentKey}' is not eligible to lead a team.`}`)
         }
       }
       const defaultCategoryName = resolveDefaultInlineCategory(executorConfig?.userCategories)
       const spec = args.teamName
-        ? await deps.loadTeamSpec(args.teamName, config, projectRoot, { callerTeamLead })
+        ? await deps.loadTeamSpec(args.teamName, config, projectRoot, {
+            callerTeamLead,
+            allowUnknownSubagentTypes: true,
+          })
         : parseInlineTeamSpec(args.inline_spec, { callerTeamLead, defaultCategoryName })
+      const leadMember = spec.members.find((member) => member.name === spec.leadAgentId)
+      if (
+        leadMember?.kind === "subagent_type"
+        && !Object.hasOwn(AGENT_ELIGIBILITY_REGISTRY, leadMember.subagent_type)
+      ) {
+        throw new Error(
+          `Project-defined agent '${leadMember.subagent_type}' cannot be a team lead.`,
+        )
+      }
+      const hasProjectAgentMember = spec.members.some(
+        (member) =>
+          member.kind === "subagent_type"
+          && !Object.hasOwn(AGENT_ELIGIBILITY_REGISTRY, member.subagent_type),
+      )
       const participantRuntime = await findParticipantRuntime(leadSessionId, config, deps)
       if (participantRuntime && (participantRuntime.teamName !== spec.name || participantRuntime.leadSessionId !== leadSessionId)) {
         throw new Error(`team_create denied: session is already a participant of team ${participantRuntime.teamRunId}`)
+      }
+      if (
+        hasProjectAgentMember
+        && typeof args.leadSessionId === "string"
+        && args.leadSessionId !== runtimeContext.sessionID
+      ) {
+        const leadSession = await client.session.get({ path: { id: args.leadSessionId } })
+        if (leadSession.error !== undefined) {
+          throw new Error(
+            `team_create denied: failed to resolve explicit leadSessionId '${args.leadSessionId}': ${String(leadSession.error)}`,
+          )
+        }
+        const leadDirectory = leadSession.data?.directory
+        if (leadDirectory === undefined) {
+          throw new Error(
+            `team_create denied: explicit leadSessionId '${args.leadSessionId}' has no session directory.`,
+          )
+        }
+        if (path.resolve(leadDirectory) !== path.resolve(projectRoot)) {
+          throw new Error(
+            `team_create denied: explicit leadSessionId '${args.leadSessionId}' belongs to directory '${leadDirectory}', not '${projectRoot}'.`,
+          )
+        }
       }
       const runtimeState = await deps.createTeamRun(
         spec,

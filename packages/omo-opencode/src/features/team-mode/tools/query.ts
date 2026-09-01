@@ -72,7 +72,9 @@ export function createTeamListTool(config: TeamModeConfig, client: OpencodeClien
 
       const declaredTeamSpecsByName = new Map(
         await Promise.all(filteredDeclaredTeamSpecs.map(async (teamSpec) => {
-          const loadedTeamSpec = await deps.loadTeamSpec(teamSpec.name, config, projectRoot)
+          const loadedTeamSpec = await deps.loadTeamSpec(teamSpec.name, config, projectRoot, {
+            allowUnknownSubagentTypes: true,
+          })
           return [teamSpec.name, loadedTeamSpec.members.length] as const
         })),
       )

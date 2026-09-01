@@ -1,12 +1,64 @@
 import { createBuiltinAgents } from "../agents";
+import type { OhMyOpenCodeConfig } from "../config";
+import { replaceProjectAgentProvenance } from "../features/team-mode/final-open-code-agent-registry";
 import { collectDisabledSkillAliases } from "../plugin/skill-context";
 import { isTaskSystemEnabled } from "../shared";
+import { getAgentListDisplayName } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { assembleAgentConfig } from "./agent-config-assembly";
 import { finalizeAgentConfig } from "./agent-config-finalizer";
+import {
+  createProtectedAgentNameSet,
+  filterProtectedAgentOverrides,
+} from "./agent-override-protection";
 import { discoverAgentSkills } from "./agent-skill-discovery";
 import { loadAgentSources } from "./agent-source-loader";
-import type { ApplyAgentConfigParams } from "./agent-config-types";
+import type { AgentSources, ApplyAgentConfigParams } from "./agent-config-types";
+
+function collectProjectAgentNames(
+  sources: AgentSources,
+  pluginConfig: OhMyOpenCodeConfig,
+  finalAgents: Record<string, unknown>,
+  disabledAgentNames: ReadonlySet<string>,
+  builtinAgents: Record<string, unknown>,
+): readonly string[] {
+  const runtimeName = (sourceName: string) =>
+    getAgentListDisplayName(sourceName, pluginConfig.agents);
+  const laterSourceNames = new Set([
+    ...Object.keys(sources.agentDefinitionAgents),
+    ...Object.keys(sources.opencodeConfigAgents),
+  ].map(runtimeName));
+  const protectedAgentNames = [...Object.keys(builtinAgents)];
+  if (pluginConfig.sisyphus_agent?.disabled !== true && builtinAgents.sisyphus) {
+    protectedAgentNames.push("sisyphus", "sisyphus-junior");
+    if (pluginConfig.sisyphus_agent?.planner_enabled ?? true) {
+      protectedAgentNames.push("prometheus");
+    }
+    if (pluginConfig.sisyphus_agent?.default_builder_enabled ?? false) {
+      protectedAgentNames.push("OpenCode-Builder");
+    }
+  }
+  const protectedBuiltinAgentNames = createProtectedAgentNameSet(protectedAgentNames);
+  const survivingProjectAgents = filterProtectedAgentOverrides(
+    Object.fromEntries(
+      Object.entries(sources.opencodeProjectAgents).filter(
+        ([name]) => !disabledAgentNames.has(name.toLowerCase()),
+      ),
+    ),
+    protectedBuiltinAgentNames,
+  );
+
+  return [...new Set(
+    Object.entries(survivingProjectAgents)
+      .filter(([, config]) => config !== undefined)
+      .map(([name]) => runtimeName(name))
+      .filter(
+        (name) =>
+          Object.hasOwn(finalAgents, name)
+          && !laterSourceNames.has(name),
+      ),
+  )];
+}
 
 export async function applyAgentConfig(
   params: ApplyAgentConfigParams,
@@ -51,9 +103,20 @@ export async function applyAgentConfig(
     disabledAgentNames,
   });
 
-  return finalizeAgentConfig({
+  const agents = finalizeAgentConfig({
     config: params.config,
     pluginConfig: params.pluginConfig,
     configuredDefaultAgent,
   });
+  replaceProjectAgentProvenance(
+    params.ctx.directory,
+    collectProjectAgentNames(
+      sources,
+      params.pluginConfig,
+      agents,
+      disabledAgentNames,
+      builtinAgents,
+    ),
+  );
+  return agents;
 }

@@ -69,8 +69,16 @@ When both scopes define the same team name, project scope wins.
 
 ## Member kinds
 
-- **`kind: "subagent_type"`** — direct agent (atlas, sisyphus, sisyphus-junior, hephaestus). `prompt` optional.
+- **`kind: "subagent_type"`**: direct built-in or project-defined agent. Built-in examples include `atlas`, `sisyphus`, `sisyphus-junior`, and `hephaestus`. `prompt` optional.
 - **`kind: "category"`** — routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
+
+### Project-defined agent members
+
+Set `subagent_type` to the exact final name of an agent defined in the current project's `.opencode/agents/*.md`. Project-defined agents can be members, not team leads.
+
+OMO checks config-time provenance against the nearest registered snapshot for the active directory or one of its lexical ancestors, so descendant and member-worktree directories can use a project snapshot recorded at the project root. That nearest snapshot is authoritative: if it is empty or does not contain the agent, resolution fails closed without consulting older ancestors. Sibling paths do not qualify.
+
+The final agent must be visible, non-native, use mode `subagent` or `all`, and already agree with the Team launcher permissions: unconditionally allow `call_omo_agent`, `team_send_message`, `team_task_list`, `team_task_get`, `team_task_update`, and `team_status`; and define an unconditional allow or deny for `task`, `question`, and every agent-specific launcher deny. Member launch always narrows those disabled tools to deny, so a project agent may keep `task: allow` for direct primary-agent use without enabling nested Team delegation. OMO uses the active configuration for that project directory as-is: it does not add prompts, models, fallbacks, or permissions. A same-name definition from another later source does not qualify; the agent must come from the current project's file.
 
 ## Eligible agents
 
