@@ -1,16 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { detectHarnesses, needsSetupSuggestion } from "../bin/lib/setup-detect.js"
 import { formatSetupReport } from "../bin/lib/setup-report.js"
+import { teardownRoots, withDatabase } from "./teardown.test-support"
 
-// Bun 1.3.12 (the pinned CI runtime) ships no node:sqlite at all, so the module loads lazily and the
-// fixtures that need a real database skip there. Production degrades the same way: setup-detect.js
-// falls back to file-presence detection when the import throws.
+// Older Bun runtimes ship no node:sqlite at all, so the module loads lazily and the fixtures that
+// need a real database skip there. Production degrades the same way: setup-detect.js falls back to
+// file-presence detection when the import throws. The pinned CI runtime is now Bun 1.4.0, which does
+// provide node:sqlite on Windows too, so these fixtures really open database files under the temp
+// root - see teardown.test-support.ts for why teardown has to own those handles.
 const SQLITE_AVAILABLE = await (async () => {
   try {
     await import("node:sqlite")
@@ -40,18 +43,20 @@ function write(path: string, content: string): void {
 async function createDatabase(path: string, version: number, rows: Array<[string, string, string | null]>): Promise<void> {
   mkdirSync(dirname(path), { recursive: true })
   const DatabaseSync = await loadDatabaseSync()
-  const db = new DatabaseSync(path)
-  db.exec(`
-    CREATE TABLE auth_schema_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL);
-    INSERT INTO auth_schema_version VALUES (1, ${version});
-    CREATE TABLE auth_credentials (
-      id INTEGER PRIMARY KEY, provider TEXT NOT NULL, credential_type TEXT NOT NULL,
-      data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
-    );
-  `)
-  const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
-  for (const [provider, type, disabled] of rows) insert.run(provider, type, "SQLITE-SECRET", disabled)
-  db.close()
+  // withDatabase closes the handle on every exit path (including a throwing exec/run) and tracks it
+  // for teardown, so no Windows file handle inside the temp root can outlive the fixture.
+  withDatabase(new DatabaseSync(path), (db) => {
+    db.exec(`
+      CREATE TABLE auth_schema_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL);
+      INSERT INTO auth_schema_version VALUES (1, ${version});
+      CREATE TABLE auth_credentials (
+        id INTEGER PRIMARY KEY, provider TEXT NOT NULL, credential_type TEXT NOT NULL,
+        data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
+      );
+    `)
+    const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
+    for (const [provider, type, disabled] of rows) insert.run(provider, type, "SQLITE-SECRET", disabled)
+  })
 }
 
 function createFixture(): Fixture {
@@ -129,6 +134,7 @@ function createLauncherFixture(fixture: Fixture): string {
   }))
   write(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   write(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
+  write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const artifact of [
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",
@@ -137,16 +143,42 @@ function createLauncherFixture(fixture: Fixture): string {
 }
 
 function runLauncher(launcher: string, fixture: Fixture, args: string[], tty = false) {
+  // A developer machine exports the agent directory for its own install; an inherited OMO_* value
+  // would outrank the fixture's SENPI_* override and answer with real machine state.
+  // launcher.test.ts defends the same way.
+  const inherited = { ...process.env }
+  delete inherited.OMO_CODING_AGENT_DIR
+  delete inherited.PI_CODING_AGENT_DIR
   const env = {
-    ...process.env, HOME: fixture.home, SENPI_CODING_AGENT_DIR: fixture.agentDir,
+    ...inherited, HOME: fixture.home, SENPI_CODING_AGENT_DIR: fixture.agentDir,
     XDG_DATA_HOME: fixture.xdg,
   }
-  if (!tty) return spawnSync(process.execPath, [launcher, ...args], { encoding: "utf8", env })
-  return spawnSync("python3", [TTY_DRIVER, "", "", process.execPath, launcher, ...args], { encoding: "utf8", env })
+  // spawnSync only returns after the child has exited and been reaped, so no live child owns the
+  // fixture root by the time teardown runs; teardownRoots absorbs the Windows kernel lag that can
+  // still keep the exited child's handles attached for a few milliseconds.
+  const result = !tty
+    ? spawnSync(process.execPath, [launcher, ...args], { encoding: "utf8", env })
+    : spawnSync("python3", [TTY_DRIVER, "", "", process.execPath, launcher, ...args], { encoding: "utf8", env })
+  if (result.error) throw result.error
+  return result
+}
+
+/**
+ * Awaits the detached refresh child's cache rewrite by polling the exact observable it produces,
+ * with a bounded deadline. The child is detached and unref'd by contract, so there is no exit
+ * event to subscribe to; the rewritten cache file IS the signal.
+ */
+async function waitFor(probe: () => boolean, description: string): Promise<void> {
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    if (probe()) return
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+  throw new Error(`waited 15s for ${description}`)
 }
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+  teardownRoots(roots)
 })
 
 describe("omo setup sibling detection", () => {
@@ -189,8 +221,10 @@ describe("omo setup sibling detection", () => {
       ] as const
       for (const [name, storePath] of cases) {
         const fixture = createFixture()
-        await populateAll(fixture)
-        rmSync(storePath(fixture))
+        // This case proves absence, so keep every store absent. Populating the three unrelated
+        // stores would open six SQLite handles across the four iterations without strengthening
+        // the contract, and can consume the entire test timeout when the root suite is saturated.
+        expect(existsSync(storePath(fixture))).toBe(false)
         const report = formatSetupReport(await detect(fixture))
         expect(report).toContain(`${name} | no | none | none |`)
       }
@@ -247,17 +281,34 @@ describe("omo setup sibling detection", () => {
       expect(result.stdout).not.toContain("INFO no credentials found")
     })
 
-    test.skipIf(process.platform === "win32")("#when default launch is on a TTY #then one hint appears and non-TTY emits none", () => {
+    test.skipIf(process.platform === "win32")("#when default launch is on a TTY #then the hint is answered from the cache, cold first then warm", async () => {
       const fixture = createFixture()
       const launcher = createLauncherFixture(fixture)
       write(join(fixture.xdg, "opencode", "auth.json"), "{}")
       const nonTty = runLauncher(launcher, fixture, [])
       expect(`${nonTty.stdout}${nonTty.stderr}`).not.toContain("run `omo setup`")
+      // Cold cache: the first interactive launch must not block on live detection; it answers from
+      // the empty default and kicks off the detached refresh that writes the cache.
+      const cold = runLauncher(launcher, fixture, [], true)
+      expect(`${cold.stdout}${cold.stderr}`).not.toContain("sibling credentials detected")
+      const cachePath = join(fixture.agentDir, "harness-detect-cache.json")
+      await waitFor(
+        () => existsSync(cachePath) && JSON.parse(readFileSync(cachePath, "utf8")).suggestion === true,
+        "the detached refresh child to warm the cache",
+      )
       const tty = runLauncher(launcher, fixture, [], true)
       const output = `${tty.stdout}${tty.stderr}`
       expect(tty.status).toBe(0)
       expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
       write(join(fixture.agentDir, "auth.json"), JSON.stringify({ senpi: { type: "api_key", key: "SENPI-SECRET" } }))
+      // Stale fingerprint: this launch still answers from the cache (the one-launch staleness the
+      // design accepts), then the refresh child catches the cache up.
+      const stale = runLauncher(launcher, fixture, [], true)
+      expect(`${stale.stdout}${stale.stderr}`).toContain("sibling credentials detected")
+      await waitFor(
+        () => existsSync(cachePath) && JSON.parse(readFileSync(cachePath, "utf8")).suggestion === false,
+        "the detached refresh child to catch the cache up",
+      )
       const configured = runLauncher(launcher, fixture, [], true)
       expect(`${configured.stdout}${configured.stderr}`).not.toContain("sibling credentials detected")
     })
@@ -272,6 +323,24 @@ describe("omo setup sibling detection", () => {
       expect(result.status).toBe(0)
       expect(result.stdout).toContain("WARN senpi: could not parse auth.json")
       expect(result.stdout).not.toContain("SENPI-SECRET")
+    })
+  })
+})
+
+describe("setup detection", () => {
+  describe("#given credentials in the canonical branded agent directory", () => {
+    describe("#when no agent directory is configured", () => {
+      test("#then the canonical directory is the one detected", async () => {
+        const fixture = createFixture()
+        write(
+          join(fixture.home, ".omo", "agent", "auth.json"),
+          JSON.stringify({ "canonical-provider": { type: "api_key", key: "SENPI-SECRET" } }),
+        )
+
+        const inventory = await detectHarnesses({ home: fixture.home, env: { XDG_DATA_HOME: fixture.xdg } })
+
+        expect(inventory.harnesses.find((harness) => harness.id === "senpi")?.providers).toContain("canonical-provider")
+      })
     })
   })
 })

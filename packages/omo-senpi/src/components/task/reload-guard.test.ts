@@ -3,7 +3,12 @@ import { describe, expect, it } from "bun:test"
 import type { TaskRecord } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { evaluateReloadVeto, wireReloadGuard, type ReloadGuardManager } from "./reload-guard"
+import {
+  evaluateReloadVeto,
+  wireReloadGuard,
+  type ReloadGuardDagSource,
+  type ReloadGuardManager,
+} from "./reload-guard"
 
 function record(overrides: Partial<TaskRecord> & Pick<TaskRecord, "task_id" | "status">): TaskRecord {
   return {
@@ -26,6 +31,10 @@ function managerOf(records: readonly TaskRecord[]): ReloadGuardManager {
     residentTaskIds: () => records.map((entry) => entry.task_id),
     get: (taskId) => records.find((entry) => entry.task_id === taskId),
   }
+}
+
+function dagSource(runs: ReadonlyArray<{ readonly runId: string; readonly name: string; readonly status: string }>): ReloadGuardDagSource {
+  return { liveRuns: () => runs.filter((entry) => !["completed", "failed", "cancelled"].includes(entry.status)) }
 }
 
 describe("reload guard", () => {
@@ -100,5 +109,51 @@ describe("reload guard", () => {
 
     const results = await pi.dispatch("session_before_reload", { type: "session_before_reload" })
     expect(results).toEqual([undefined])
+  })
+
+  it("#given a live dag run and no running children #when the veto is evaluated #then reload is cancelled naming the run", () => {
+    const veto = evaluateReloadVeto(
+      managerOf([]),
+      dagSource([{ runId: "dag_1", name: "mass-ulw", status: "running" }]),
+    )
+
+    expect(veto).toEqual({
+      cancel: true,
+      reason:
+        "1 DAG run(s) still in flight: mass-ulw - wait for them to finish or cancel them (dag cancel) before reloading.",
+    })
+  })
+
+  it("#given only terminal dag runs #when the veto is evaluated #then reload is not blocked", () => {
+    const veto = evaluateReloadVeto(
+      managerOf([]),
+      dagSource([
+        { runId: "dag_1", name: "done", status: "completed" },
+        { runId: "dag_2", name: "broke", status: "failed" },
+        { runId: "dag_3", name: "stopped", status: "cancelled" },
+      ]),
+    )
+
+    expect(veto).toBeUndefined()
+  })
+
+  it("#given both a running child and a live dag run #when the veto is evaluated #then the reason names both", () => {
+    const veto = evaluateReloadVeto(
+      managerOf([record({ task_id: "st_1", status: "running", name: "explore-auth" })]),
+      dagSource([{ runId: "dag_1", name: "mass-ulw", status: "pending" }]),
+    )
+
+    expect(veto?.reason).toBe(
+      "1 subagent(s) still running: explore-auth - wait for them to finish or cancel them (task_cancel) before reloading."
+      + " 1 DAG run(s) still in flight: mass-ulw - wait for them to finish or cancel them (dag cancel) before reloading.",
+    )
+  })
+
+  it("#given a wired guard with a live dag run #when senpi emits session_before_reload #then the handler cancels the reload", async () => {
+    const pi = new FakeExtensionAPI()
+    wireReloadGuard(pi, managerOf([]), dagSource([{ runId: "dag_9", name: "release", status: "running" }]))
+
+    const results = await pi.dispatch("session_before_reload", { type: "session_before_reload" })
+    expect(results[0]).toHaveProperty("cancel", true)
   })
 })

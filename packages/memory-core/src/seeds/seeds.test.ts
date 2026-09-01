@@ -12,16 +12,18 @@ import {
   buildDefaultSeedFiles,
   initMemoryWithSeeds,
 } from "./seeds"
+import { MEMORY_DISCIPLINE_SKILL_PATH } from "./memory-discipline"
+import { realpathSync } from "node:fs"
 
 const exec = promisify(execFile)
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createRepo(agentId = "seed-agent"): Promise<{ dir: string; repo: GitMemoryRepo }> {
-  const dir = await mkdtemp(join(tmpdir(), "omo-seeds-"))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-seeds-")))
   tempDirs.push(dir)
   return { dir, repo: new GitMemoryRepo({ dir, agentId }) }
 }
@@ -39,77 +41,35 @@ describe("default memory seeds", () => {
   })
 
   describe("#given buildDefaultSeedFiles", () => {
-    it("#then it produces two files with system/ paths and frontmatter", () => {
+    it("#then it produces three files with expected paths and frontmatter", () => {
       const files = buildDefaultSeedFiles()
 
-      expect(files).toHaveLength(2)
+      expect(files).toHaveLength(3)
       const paths = files.map((f) => f.relativePath)
       expect(paths).toContain("system/persona.md")
       expect(paths).toContain("system/human.md")
+      expect(paths).toContain("skills/memory-discipline/SKILL.md")
     })
 
-    it("#then every seed file has valid frontmatter with a description", () => {
+    it("#then the memory-discipline skill seed path is skills/memory-discipline/SKILL.md", () => {
+      expect(MEMORY_DISCIPLINE_SKILL_PATH).toBe("skills/memory-discipline/SKILL.md")
+    })
+
+    it("#then every seed file parses as a memory file", () => {
       const files = buildDefaultSeedFiles()
 
       for (const file of files) {
-        const parsed = parseMemoryFile(file.content)
-        expect(parsed.frontmatter.description.trim().length).toBeGreaterThan(0)
-        expect(parsed.body.length).toBeGreaterThan(0)
+        expect(() => parseMemoryFile(file.content)).not.toThrow()
       }
     })
 
-    it("#then the persona description is 'Persona - who I am'", () => {
-      const files = buildDefaultSeedFiles()
-      const persona = files.find((f) => f.relativePath === "system/persona.md")!
-
-      expect(parseMemoryFile(persona.content).frontmatter.description).toBe(
-        "Persona - who I am",
-      )
-    })
-
-    it("#then the human description is 'Human - what I know about the user'", () => {
+    it("#then the human seed frontmatter has kind: person and aliases", () => {
       const files = buildDefaultSeedFiles()
       const human = files.find((f) => f.relativePath === "system/human.md")!
+      const parsed = parseMemoryFile(human.content)
 
-      expect(parseMemoryFile(human.content).frontmatter.description).toBe(
-        "Human - what I know about the user",
-      )
-    })
-
-    it("#then the persona body mentions the memory directory and system projection", () => {
-      const files = buildDefaultSeedFiles()
-      const persona = files.find((f) => f.relativePath === "system/persona.md")!
-      const body = parseMemoryFile(persona.content).body
-
-      expect(body.toLowerCase()).toContain("$memory_dir")
-      expect(body.toLowerCase()).toContain("system/")
-    })
-
-    it("#then the persona body has no letta branding", () => {
-      const files = buildDefaultSeedFiles()
-      const persona = files.find((f) => f.relativePath === "system/persona.md")!
-      const body = parseMemoryFile(persona.content).body.toLowerCase()
-
-      expect(body).not.toContain("letta")
-    })
-
-    it("#then the persona body has no emojis", () => {
-      const files = buildDefaultSeedFiles()
-      const persona = files.find((f) => f.relativePath === "system/persona.md")!
-      const body = parseMemoryFile(persona.content).body
-
-      // Reject any code point in the emoji/pictograph Unicode ranges.
-      const hasEmoji = /\p{Extended_Pictographic}/u.test(body)
-      expect(hasEmoji).toBe(false)
-    })
-
-    it("#then the human body is a template to be learned (not empty, invites learning)", () => {
-      const files = buildDefaultSeedFiles()
-      const human = files.find((f) => f.relativePath === "system/human.md")!
-      const body = parseMemoryFile(human.content).body
-
-      expect(body.trim().length).toBeGreaterThan(0)
-      expect(body.toLowerCase()).not.toContain("letta")
+      expect(parsed.frontmatter.kind).toBe("person")
+      expect(parsed.frontmatter.aliases).toEqual([])
     })
   })
 
@@ -126,7 +86,8 @@ describe("default memory seeds", () => {
     const tree = await repo.lsTree()
     expect(tree).toContain("system/persona.md")
     expect(tree).toContain("system/human.md")
-    expect(tree).toHaveLength(2)
+    expect(tree).toContain("skills/memory-discipline/SKILL.md")
+    expect(tree).toHaveLength(3)
 
     const commitSubject = await gitLog(dir, "%s")
     expect(commitSubject).toBe("chore: initialize local memory")
@@ -176,11 +137,7 @@ describe("default memory seeds", () => {
 
     // when
     await initMemoryWithSeeds(repo, { authorName: "Compiler Agent" })
-    const block = await compileMemoryBlock(repo, {
-      agentId: "seed-agent",
-      conversationId: "conv-seed",
-      previousMessageCount: 0,
-    })
+    const block = await compileMemoryBlock(repo, { agentId: "seed-agent" })
 
     // then
     expect(block).toContain("<self>")

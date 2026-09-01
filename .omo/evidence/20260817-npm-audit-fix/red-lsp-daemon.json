@@ -1,0 +1,34 @@
+{
+  "command": "npm --prefix packages/lsp-daemon audit --json --package-lock-only",
+  "exit_code": 1,
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 2,
+      "critical": 0,
+      "total": 2
+    }
+  },
+  "vulnerabilities": {
+    "nanoid": {
+      "severity": "high",
+      "installed": "3.3.12",
+      "affected_range": "<=3.3.17",
+      "advisories": [
+        "GHSA-28wg-ghj8-5hjv",
+        "GHSA-2v37-7h3g-55p8"
+      ]
+    },
+    "postcss": {
+      "severity": "high",
+      "installed": "8.5.15",
+      "affected_range": "<=8.5.22",
+      "advisories": [
+        "GHSA-r28c-9q8g-f849",
+        "GHSA-fxqj-rqcc-2cmp"
+      ]
+    }
+  }
+}

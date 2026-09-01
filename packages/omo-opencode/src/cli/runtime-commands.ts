@@ -1,8 +1,11 @@
-import type { Command } from "commander"
+import { InvalidArgumentError, type Command } from "commander"
 
 import { boulder } from "./boulder"
 import { codexUlwLoop } from "./codex-ulw-loop"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
+import { worktreeSweep } from "./worktree-sweep"
+import { parseOlderThanDays } from "./worktree-sweep/options"
+
 import { PLUGIN_NAME } from "../shared"
 import packageJson from "../../../../package.json" with { type: "json" }
 
@@ -41,6 +44,39 @@ export function configureRuntimeCommands(program: Command): void {
       const exitCode = await boulder({
         directory: options.directory,
         workId: options.workId,
+        json: options.json ?? false,
+      })
+      process.exit(exitCode)
+    })
+
+  program
+    .command("worktree-sweep")
+    .description("Report (and optionally remove) stale linked git worktrees")
+    .option("--apply", "Actually remove SWEEP worktrees and prune stale metadata (default is dry-run)")
+    .option("--older-than <days>", "Sweep unmerged worktrees older than N days (0 = merged-only)", (value: string) => {
+      try {
+        return parseOlderThanDays(value)
+      } catch (error) {
+        throw new InvalidArgumentError(error instanceof Error ? error.message : String(error))
+      }
+    })
+    .option("--repo <path>", "Repository to sweep (repeatable)", (value: string, previous: string[] = []) => [...previous, value])
+    .option("--json", "Output structured JSON result")
+    .addHelpText("after", `
+Examples:
+  $ omo-agent-toolkit worktree-sweep
+  $ omo-agent-toolkit worktree-sweep --older-than=14
+  $ omo-agent-toolkit worktree-sweep --repo /path/to/repo --repo /path/to/other --apply
+
+Lines: SWEEP <path> <ref> | KEEP(<reason>) <path> <ref> | PRUNE <path> <ref>
+KEEP reasons: locked, external, unmerged, dirty. Dry-run is the default; --apply
+removes with 'git worktree remove' (never --force) and then prunes.
+`)
+    .action(async (options: { readonly apply?: boolean; readonly olderThan?: number; readonly repo?: string[]; readonly json?: boolean }) => {
+      const exitCode = await worktreeSweep({
+        apply: options.apply === true,
+        olderThanDays: options.olderThan ?? 0,
+        repos: options.repo,
         json: options.json ?? false,
       })
       process.exit(exitCode)

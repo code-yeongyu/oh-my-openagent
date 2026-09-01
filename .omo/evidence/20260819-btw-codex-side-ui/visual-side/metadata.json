@@ -1,0 +1,27 @@
+{
+  "title": "Codex-aligned BTW side conversation",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "attached isolated completed BTW session"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 160,
+    "rows": 38
+  },
+  "cleanup": "pty pid 14278 killed",
+  "files": {
+    "png": "/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/feat/btw-codex-side-ui/.omo/evidence/20260819-btw-codex-side-ui/visual-side/terminal.png",
+    "text": "/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/feat/btw-codex-side-ui/.omo/evidence/20260819-btw-codex-side-ui/visual-side/terminal.txt",
+    "ansi": "/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/feat/btw-codex-side-ui/.omo/evidence/20260819-btw-codex-side-ui/visual-side/terminal-ansi.txt",
+    "metadata": "/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/feat/btw-codex-side-ui/.omo/evidence/20260819-btw-codex-side-ui/visual-side/metadata.json"
+  }
+}

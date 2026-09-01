@@ -44,7 +44,6 @@ const LANG_ALIASES: Record<string, string> = {
   cxx: "cpp", cs: "csharp", yml: "yaml", sol: "solidity", golang: "go",
 };
 
-// ---- regex constants ----
 
 const RE_BACKSLASH = /\\w|\\d|\\s|\\b/;
 const RE_DOT_STAR = /(?<!\$)\.\*|(?<!\$)\.\+/;
@@ -87,8 +86,6 @@ const RE_JS_INCOMPLETE = /^\s*(?:async\s+)?function\s+\$?\w+(?:\([^)]*\))?\s*$/m
 const RE_GO_INCOMPLETE = /^\s*func\s+\$?\w+(?:\([^)]*\))?\s*$/m;
 const RE_RUST_INCOMPLETE = /^\s*fn\s+\$?\w+(?:\([^)]*\))?\s*$/m;
 
-// ---- helpers ----
-
 function normalizeLanguage(lang: string): string | null {
   if (typeof lang !== "string") return null;
   const lower = lang.toLowerCase();
@@ -114,8 +111,6 @@ function isValidLimit(limit: unknown): boolean {
   return typeof limit === "number" && Number.isFinite(limit) && Number.isInteger(limit) && limit > 0;
 }
 
-// ---- public API: extractMetavars ----
-
 export function extractMetavars(text: string): MetavarSet {
   const single = new Set<string>();
   const multi = new Set<string>();
@@ -133,8 +128,6 @@ export function extractMetavars(text: string): MetavarSet {
 
   return { single, multi };
 }
-
-// ---- public API: validatePatternHints ----
 
 export function validatePatternHints(
   pattern: string,
@@ -272,8 +265,6 @@ export function validatePatternHints(
 
   return { ok: true, rejected: false, code: null, hints };
 }
-
-// ---- public API: validateRewriteHints ----
 
 export function validateRewriteHints(
   pattern: string,

@@ -23,6 +23,40 @@ const PERSONA = "---\ndescription: who the agent is\n---\n\nfixture persona body
 const HUMAN = "---\ndescription: who the user is\n---\n\nfixture human body\n"
 const NOTES = "---\ndescription: external note\n---\n\nexternal note body\n"
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0x02, 0x03])
+const HUMAN_CARD = [
+  "---",
+  "description: who the user is",
+  "kind: person",
+  'aliases: ["Boss"]',
+  "---",
+  "",
+  "IDENTITY: the person you work with",
+  "RELATIONSHIP: works-with: jane-doe",
+  "RELATIONSHIP: mentors: sam-rivers",
+  "",
+].join("\n")
+const JANE_CARD = [
+  "---",
+  "description: Person - Jane Doe",
+  "kind: person",
+  'aliases: ["Jane","JD"]',
+  "---",
+  "",
+  "IDENTITY: staff engineer",
+  "ATTRIBUTE: senior-engineer: prefers small diffs",
+  "RELATIONSHIP: reports-to: human",
+  "",
+].join("\n")
+const SAM_CARD = [
+  "---",
+  "description: Person - Sam Rivers",
+  "kind: person",
+  "---",
+  "",
+  "IDENTITY: designer",
+  "RELATIONSHIP: collaborates: unknown-person",
+  "",
+].join("\n")
 
 const fixtures: PalaceFixture[] = []
 
@@ -75,6 +109,29 @@ export async function createPalaceFixture(
 
 export async function cleanupPalaceFixtures(): Promise<void> {
   for (const fixture of fixtures.splice(0)) await fixture.cleanup()
+}
+
+/**
+ * Seeds the primary human card plus two people cards and commits them, so the derived
+ * relationship graph has three nodes and four RELATIONSHIP lines (one dangling target).
+ */
+export async function seedPalacePeople(
+  fixture: PalaceFixture,
+  options: { readonly injection?: boolean } = {},
+): Promise<string> {
+  const janeBody = options.injection
+    ? `${JANE_CARD}\nATTRIBUTE: ${INJECTION_PAYLOAD}\n`
+    : JANE_CARD
+  await writePalaceWorkingFile(fixture, "system/human.md", HUMAN_CARD)
+  await writePalaceWorkingFile(fixture, "people/jane-doe/card.md", janeBody)
+  await writePalaceWorkingFile(fixture, "people/sam-rivers/card.md", SAM_CARD)
+  const result = await fixture.repo.commitWrite(
+    ["system/human.md", "people/jane-doe/card.md", "people/sam-rivers/card.md"],
+    "chore: add people fixtures",
+    { agentId: fixture.identity, authorName: "Palace Fixture" },
+  )
+  fixture.head = result.sha
+  return result.sha
 }
 
 export async function writePalaceWorkingFile(

@@ -1,11 +1,117 @@
 import { writeFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { checkpointUlwLoop } from "../src/checkpoint.js";
 import { ulwLoopBriefPath } from "../src/paths.js";
 import { startNextUlwLoop } from "../src/plan-crud.js";
 import { criterion, expectCode, goal, passGoal, plan, repoWith, snapshot } from "./fixtures/checkpoint-builders.js";
 import { MISSING_ARTIFACT_PATH, qualityGateJson } from "./fixtures/quality-gate-builder.js";
+
+function requiredSection(gate: Record<string, Record<string, unknown>>, key: string): Record<string, unknown> {
+	const section = gate[key];
+	if (section === undefined) throw new Error(`missing gate section: ${key}`);
+	return section;
+}
+
+describe("checkpointUlwLoop final story surface resolution", () => {
+	beforeEach(() => {
+		delete process.env["OMO_AGENT_TOOLKIT_SURFACE"];
+	});
+
+	afterEach(() => {
+		delete process.env["OMO_AGENT_TOOLKIT_SURFACE"];
+	});
+
+	it("#given the omo-senpi surface #when the gate omits codeReview #then the final story completes", async () => {
+		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+		const gate = JSON.parse(await qualityGateJson(repo, undefined, "G001-finished", "omo-senpi")) as Record<
+			string,
+			Record<string, unknown>
+		>;
+		delete gate["codeReview"];
+		requiredSection(gate, "manualQa")["by"] = "main-session";
+		requiredSection(gate, "gateReview")["by"] = "category:deep";
+
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G002",
+			status: "complete",
+			evidence: "final work complete and validation passed",
+			codexGoalJson: snapshot("complete"),
+			qualityGateJson: JSON.stringify(gate),
+		});
+
+		expect(result.aggregateCompletion?.status).toBe("complete");
+		expect(result.plan.aggregateCompletion?.status).toBe("complete");
+	});
+
+	it("#given the same codeReview-free gate #when the surface is lazycodex #then the final story is rejected", async () => {
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+		const gate = JSON.parse(await qualityGateJson(repo, undefined, "G001-finished", "omo-senpi")) as Record<
+			string,
+			Record<string, unknown>
+		>;
+		delete gate["codeReview"];
+		requiredSection(gate, "manualQa")["by"] = "main-session";
+		requiredSection(gate, "gateReview")["by"] = "category:deep";
+
+		await expectCode(
+			() =>
+				checkpointUlwLoop(repo, {
+					goalId: "G002",
+					status: "complete",
+					evidence: "final work complete and validation passed",
+					codexGoalJson: snapshot("complete"),
+					qualityGateJson: JSON.stringify(gate),
+				}),
+			"ULW_LOOP_QUALITY_GATE_INVALID",
+		);
+	});
+
+	it("#given the omo-senpi surface #when the gate includes codeReview #then the final story is rejected", async () => {
+		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+		const gateJson = await qualityGateJson(repo, undefined, "G001-finished", "omo-senpi");
+
+		await expectCode(
+			() =>
+				checkpointUlwLoop(repo, {
+					goalId: "G002",
+					status: "complete",
+					evidence: "final work complete and validation passed",
+					codexGoalJson: snapshot("complete"),
+					qualityGateJson: gateJson,
+				}),
+			"ULW_LOOP_QUALITY_GATE_INVALID",
+		);
+	});
+
+	it("#given the omo-senpi surface #when the gate names lazycodex reviewers #then the final story is rejected", async () => {
+		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+		const gateJson = await qualityGateJson(repo);
+
+		await expectCode(
+			() =>
+				checkpointUlwLoop(repo, {
+					goalId: "G002",
+					status: "complete",
+					evidence: "final work complete and validation passed",
+					codexGoalJson: snapshot("complete"),
+					qualityGateJson: gateJson,
+				}),
+			"ULW_LOOP_QUALITY_GATE_INVALID",
+		);
+	});
+});
 
 describe("checkpointUlwLoop final story", () => {
 	it("requires quality-gate-json for the final goal complete", async () => {

@@ -1,6 +1,6 @@
 import { checkpoint } from "./checkpoint-continuation.js";
 import { hasFlag, readValue } from "./cli-arg-parser.js";
-import { printJsonError, ULW_LOOP_HELP } from "./cli-output.js";
+import { printJsonError, subcommandHelp, ULW_LOOP_HELP } from "./cli-output.js";
 import {
 	addGoal,
 	captureEvidence,
@@ -12,6 +12,7 @@ import {
 	steer,
 } from "./cli-subcommands.js";
 import { resolveUlwLoopSessionIdFromEnv, type UlwLoopScope } from "./paths.js";
+import { sessionIdRequiredMessage } from "./plan-missing-recovery.js";
 import { UlwLoopError } from "./types.js";
 
 export const ULW_LOOP_SUBCOMMANDS = [
@@ -52,6 +53,10 @@ export async function ulwLoopCommand(argv: readonly string[]): Promise<number> {
 			}
 			process.stdout.write(`${ULW_LOOP_HELP}\n`);
 			return 1;
+		}
+		if (command !== "help" && (hasFlag(rest, "--help") || hasFlag(rest, "-h"))) {
+			process.stdout.write(`${subcommandHelp(command)}\n`);
+			return 0;
 		}
 		switch (command) {
 			case "help":
@@ -104,7 +109,7 @@ function commandScope(argv: readonly string[]): UlwLoopScope | undefined {
 	if (sessionIdFlagPresent(argv)) {
 		const sessionId = readValue(argv, SESSION_ID_FLAG)?.trim();
 		if (!sessionId) {
-			throw new UlwLoopError(`${SESSION_ID_FLAG} requires a non-empty value.`, "ULW_LOOP_SESSION_ID_REQUIRED", {
+			throw new UlwLoopError(sessionIdRequiredMessage(SESSION_ID_FLAG), "ULW_LOOP_SESSION_ID_REQUIRED", {
 				details: { flag: SESSION_ID_FLAG },
 			});
 		}

@@ -74,7 +74,7 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     expect(result.agents?.librarian).toMatchObject({ model: "openai/gpt-5.6-luna-fast", variant: "low" })
     expect(result.agents?.explore).not.toMatchObject({ variant: "medium" })
     expect(result.agents?.librarian).not.toMatchObject({ variant: "medium" })
-    expect(result.categories?.quick).toMatchObject({ model: "opencode-go/qwen3.6-flash" })
+    expect(result.categories?.quick).toMatchObject({ model: "opencode-go/minimax-m3", variant: "high" })
   })
 
   for (const { name, overrides } of mixedProviderCases) {

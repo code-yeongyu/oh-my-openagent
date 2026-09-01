@@ -27,6 +27,11 @@ describe("memory identity layout constants", () => {
       "worktrees",
       "viewers",
       "push-queue",
+      "facts-queue",
+      "facts",
+      "notices",
+      "tool-receipts",
+      "recall",
     ])
   })
 })
@@ -90,6 +95,20 @@ describe("buildIdentityPaths", () => {
     expect(paths.worktrees).toBe(join(runtime, "worktrees"))
     expect(paths.viewers).toBe(join(runtime, "viewers"))
     expect(paths.pushQueue).toBe(join(runtime, "push-queue"))
+    expect(paths.factsQueue).toBe(join(runtime, "facts-queue"))
+    expect(paths.facts).toBe(join(runtime, "facts"))
+    expect(paths.notices).toBe(join(runtime, "notices"))
+    expect(paths.toolReceipts).toBe(join(runtime, "tool-receipts"))
+    expect(paths.recall).toBe(join(runtime, "recall"))
+    expect(paths.recallLedger).toBe(join(runtime, "recall", "ledger"))
+    expect(paths.recallPending).toBe(join(runtime, "recall", "pending"))
+  })
+
+  it("#given the recall runtime tree #when paths are built #then no receipts log is declared", () => {
+    // given / when
+    const paths = buildIdentityPaths("/mem", "backend-lead-0123abcd")
+    // then
+    expect(Object.values(paths).some((path) => path.endsWith("receipts.jsonl"))).toBe(false)
   })
 
   it("#given built paths #when runtime subdirs are enumerated #then every declared subdir is present under runtime", () => {

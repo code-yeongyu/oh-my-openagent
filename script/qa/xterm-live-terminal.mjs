@@ -80,10 +80,26 @@ const NAMED_KEYS = new Set([
 // An `input` token wrapped in {Braces} is pressed as a named key; anything else
 // is typed literally. Both flow through the browser terminal (xterm onData ->
 // pty), so the interaction is genuinely driven in the web terminal.
-async function driveInput(page, inputs, keyDelayMs) {
+export async function driveInput(page, inputs, keyDelayMs) {
   for (const raw of inputs) {
     const match = /^\{(.+)\}$/.exec(raw);
-    if (match && NAMED_KEYS.has(match[1])) {
+    if (
+      match?.[1] === "CtrlSlashByte" ||
+      match?.[1] === "Ctrl7Byte"
+    ) {
+      await page.evaluate((data) => window.__ptyInput(data), "\u001f");
+    } else if (match && /^(WheelUp|WheelDown)$/.test(match[1])) {
+      const terminal = await page.$(".xterm-screen");
+      const bounds = await terminal?.boundingBox();
+      if (!bounds) throw new Error("xterm viewport unavailable for wheel input");
+      await page.mouse.move(
+        bounds.x + bounds.width / 2,
+        bounds.y + bounds.height / 2,
+      );
+      await page.mouse.wheel({
+        deltaY: match[1] === "WheelDown" ? 720 : -720,
+      });
+    } else if (match && NAMED_KEYS.has(match[1])) {
       await page.keyboard.press(match[1] === "Space" ? " " : match[1], { delay: 15 });
     } else if (match && /^Ctrl\+(.)$/i.test(match[1])) {
       const key = /^Ctrl\+(.)$/i.exec(match[1])[1];

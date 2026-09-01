@@ -36,11 +36,11 @@ Phase 3 of config loading (`src/plugin-handlers/agent-config-handler.ts`) calls 
 
 ## COMPANION LOADERS
 
-- **`claude-code-plugin-loader`**: full plugins with commands, skills, hooks, MCPs
+- **`packages/claude-code-compat-core/src/features/claude-code-plugin-loader/`**: full plugins with commands, skills, hooks, MCPs
 - **`claude-code-mcp-loader`**: Tier 2 MCPs from `.mcp.json`
 
 ## RELATED
 
 - Phase 3 integration: `src/plugin-handlers/agent-config-handler.ts`
-- Plugin loader: `src/features/claude-code-plugin-loader/`
+- Plugin loader: `packages/claude-code-compat-core/src/features/claude-code-plugin-loader/`
 - MCP loader: `src/features/claude-code-mcp-loader/`

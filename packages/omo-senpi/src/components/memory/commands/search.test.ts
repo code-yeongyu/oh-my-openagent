@@ -6,11 +6,12 @@ import { join } from "node:path"
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke, tempIdentity } from "./commands.test-support"
 import { registerSearchCommand } from "./search"
+import { realpathSync } from "node:fs"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 async function writeSession(
@@ -38,7 +39,7 @@ async function writeSession(
 }
 
 async function setup(): Promise<{ sessionsDir: string; pi: MemoryFakeExtensionAPI }> {
-  const sessionsDir = await mkdtemp(join(tmpdir(), "memory-search-sessions-"))
+  const sessionsDir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-search-sessions-")))
   tempDirs.push(sessionsDir)
   await writeSession(sessionsDir, "sess-a", "sess-a", [
     { id: "msg-1", role: "user", text: "how do I run the linter before committing", timestamp: "2026-08-01T10:00:01.000Z" },

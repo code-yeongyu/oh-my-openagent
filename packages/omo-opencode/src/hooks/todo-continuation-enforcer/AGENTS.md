@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-17 source files (~1690 LOC). The "boulder" Continuation Tier hook: forces Sisyphus to keep rolling when incomplete todos remain. Fires on `session.idle`, injects a continuation prompt after a 2s countdown toast.
+~35 files (~6.7k LOC incl. tests). The "boulder" Continuation Tier hook: forces Sisyphus to keep rolling when incomplete todos remain. Fires on `session.idle`, injects a continuation prompt after a 2s countdown toast.
 
 ## HOW IT WORKS
 

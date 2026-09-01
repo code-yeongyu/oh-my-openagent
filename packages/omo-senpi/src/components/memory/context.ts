@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises"
+import { mkdir } from "@oh-my-opencode/memory-core/fs"
 
 import type { MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 
@@ -57,5 +57,9 @@ export async function ensureIdentityRuntimeDirs(paths: MemoryIdentityPaths): Pro
     paths.worktrees,
     paths.viewers,
     paths.pushQueue,
+    paths.factsQueue,
+    paths.facts,
+    paths.notices,
+    paths.toolReceipts,
   ].map((path) => mkdir(path, { recursive: true })))
 }

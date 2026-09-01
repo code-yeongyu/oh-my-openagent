@@ -22,6 +22,7 @@ const TASK_ALLOWED_AGENT_NAMES = [
   "sisyphus",
   "atlas",
   "hephaestus",
+  "prometheus",
 ] as const
 
 function createParams(agentNames: readonly string[]): {
@@ -92,6 +93,27 @@ describe("applyToolConfig task permission hard denials", () => {
 
           const permission = requirePermission(params.agentResult, agentName)
           expect(permission.task).toBe("allow")
+        })
+      }
+    })
+  })
+
+  describe("#given user-configured permission.task on main agents (#6990)", () => {
+    describe("#when applying tool config", () => {
+      for (const agentName of TASK_ALLOWED_AGENT_NAMES) {
+        it(`#then should preserve user permission.task for ${agentName}`, () => {
+          // given the user explicitly configured permission.task
+          const params = createParams([agentName])
+          params.agentResult[agentName].permission = { task: "ask" }
+
+          // when
+          applyToolConfig(params)
+
+          // then the user value survives instead of being clobbered to "allow"
+          const permission = requirePermission(params.agentResult, agentName)
+          expect(permission.task).toBe("ask")
+          // sanity: the other plugin-injected rules still apply
+          expect(permission.call_omo_agent).toBe("deny")
         })
       }
     })

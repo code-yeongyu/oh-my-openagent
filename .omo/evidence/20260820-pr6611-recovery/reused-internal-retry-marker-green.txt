@@ -1,0 +1,52 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/chat-message.test.ts:
+(pass) createChatMessageHandler - synthetic/internal messages > acknowledges fallback-marked synthetic retries through runtime fallback before other hooks mutate [2.03ms]
+(pass) createChatMessageHandler - synthetic/internal messages > does not acknowledge unrelated synthetic continuations as fallback retries [0.21ms]
+(pass) createChatMessageHandler - synthetic/internal messages > skips internally marked user messages before first-message gate is consumed [0.17ms]
+(pass) createChatMessageHandler - first message hook ordering > updates session agent and marks the first-message gate before chat hooks run [0.69ms]
+(pass) createChatMessageHandler - first message hook ordering > skips model fallback when runtime fallback is enabled [0.21ms]
+(pass) createChatMessageHandler - cache warning behavior > does not show provider cache warning when provider-models cache exists [292.12ms]
+(pass) createChatMessageHandler - cache warning behavior > does not show provider cache warning when OpenCode models cache exists [112.71ms]
+(pass) createChatMessageHandler - /start-work integration > falls back to Sisyphus through the full chat.message slash-command path when Atlas is unavailable [83.80ms]
+(pass) createChatMessageHandler - /start-work integration > smoke: resolves quoted human-readable plan names through the full /start-work chat.message path [94.83ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > clears stop state before raw /start-work resumes work through chat.message [0.41ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for /goal <objective> [0.24ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for /goal pause [0.18ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for /goal resume [0.19ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for /goal clear [0.24ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state for ordinary stopped chat messages [0.20ms]
+(pass) createChatMessageHandler - goal command handling and stop continuation clearing > does not clear stop state when the session was not stopped [0.45ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > does not route an auto-slash-expanded skill payload into goal handling [4.18ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > sets goal when /goal <objective> arrives through chat.message without native command expansion [0.21ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > pauses goal when /goal pause arrives [0.16ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > resumes goal when /goal resume arrives [0.15ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > clears goal when /goal clear arrives [0.15ms]
+(pass) createChatMessageHandler - /goal raw slash fallback > default goal auto-starts on first message when default_mode.goal is enabled [0.15ms]
+(pass) createChatMessageHandler - TUI variant passthrough > first message: does not override TUI variant when user has no selection [0.16ms]
+(pass) createChatMessageHandler - TUI variant passthrough > first message: preserves user-selected variant when already set [0.14ms]
+(pass) createChatMessageHandler - TUI variant passthrough > subsequent message: preserves TUI variant [0.13ms]
+(pass) createChatMessageHandler - TUI variant passthrough > subsequent message: does not inject variant when TUI sends none [0.14ms]
+(pass) createChatMessageHandler - TUI variant passthrough > first message: marks gate as applied regardless of variant presence [0.15ms]
+(pass) createChatMessageHandler - TUI variant passthrough > injects queued background notifications through chat.message hook [0.18ms]
+(pass) createChatMessageHandler - TUI variant passthrough > reuses the stored model for subsequent messages in the main session when the UI sends none [0.20ms]
+(pass) createChatMessageHandler - TUI variant passthrough > does not reuse a stored model for the first message of a session [0.14ms]
+(pass) createChatMessageHandler - TUI variant passthrough > does not reuse the main-session model for subagent sessions [0.16ms]
+(pass) createChatMessageHandler - TUI variant passthrough > does not override explicit agent model overrides with stored session model [0.16ms]
+(pass) createChatMessageHandler - TUI variant passthrough > treats prefixed list-display agent names as explicit model overrides [0.23ms]
+(pass) createChatMessageHandler - TUI variant passthrough > respects a mid-conversation model switch instead of reusing the previous stored model [0.19ms]
+(pass) createChatMessageHandler - TUI variant passthrough > strips legacy ZWSP-prefixed agent names from persisted prompt body session state (GH-3259) [0.17ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts:
+(pass) createAutoRetryHelpers > #given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted [2.87ms]
+(pass) createAutoRetryHelpers > #given an existing fallback result is pending #when the next retry is accepted as queued #then queued pending state supersedes the previous fallback [0.53ms]
+(pass) createAutoRetryHelpers > #given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085) [0.31ms]
+(pass) createAutoRetryHelpers > #given a reused internal continuation part #when auto retry dispatches a fallback #then it preserves the part identity and appends the fallback acknowledgement marker [0.30ms]
+(pass) createAutoRetryHelpers > #given a persisted user message with id and part ids #when auto retry runs #then the fallback prompt reuses the original messageID and part ids [0.20ms]
+(pass) createAutoRetryHelpers > #given internal abort marker is set #when abort request runs #then stale cleanup TTL is refreshed [0.22ms]
+(pass) createAutoRetryHelpers > #given stale internal abort marker #when stale session cleanup runs #then the marker is cleared [0.13ms]
+
+ 42 pass
+ 0 fail
+ 106 expect() calls
+Ran 42 tests across 2 files. [1381.00ms]

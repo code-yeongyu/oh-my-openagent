@@ -31,7 +31,41 @@ export interface FakeSendUserMessageCall {
   options?: { deliverAs?: "steer" | "followUp" }
 }
 
+export interface FakeRpcEvent {
+  name: string
+  data: unknown
+}
+
+type FakeExtensionEventHandler = (payload: unknown) => void
+const extensionEventHandlers = new WeakMap<FakeExtensionAPI, Map<string, Set<FakeExtensionEventHandler>>>()
+
+export function enableFakeExtensionEvents(pi: FakeExtensionAPI): void {
+  const handlersByName = new Map<string, Set<FakeExtensionEventHandler>>()
+  extensionEventHandlers.set(pi, handlersByName)
+  pi.events = {
+    emit: (name, data) => emitFakeExtensionEvent(pi, name, data),
+    on: (name, handler) => {
+      const handlers = handlersByName.get(name) ?? new Set<FakeExtensionEventHandler>()
+      handlers.add(handler)
+      handlersByName.set(name, handlers)
+      return () => {
+        handlers.delete(handler)
+      }
+    },
+  }
+}
+
+export function emitFakeExtensionEvent(pi: FakeExtensionAPI, name: string, payload: unknown): void {
+  for (const handler of extensionEventHandlers.get(pi)?.get(name) ?? []) handler(payload)
+}
+
+export function fakeExtensionEventHandlerCount(pi: FakeExtensionAPI, name: string): number {
+  return extensionEventHandlers.get(pi)?.get(name)?.size ?? 0
+}
+
 export class FakeExtensionAPI implements SenpiExtensionAPI {
+  // Mirrors the host's per-session cwd; left undefined to emulate hosts that predate it.
+  cwd?: string
   readonly handlers: Array<{ event: string; handler: FakeEventHandler }> = []
   readonly tools: Record<string, unknown>[] = []
   readonly commands: FakeCommandRegistration[] = []
@@ -40,7 +74,9 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly userMessages: FakeSendUserMessageCall[] = []
   readonly messageRenderers: FakeMessageRendererRegistration[] = []
   readonly mcpServers: Array<{ name: string; config: Record<string, unknown> }> = []
+  readonly rpcEvents: FakeRpcEvent[] = []
   events?: SenpiExtensionAPI["events"]
+  rpc?: { emit(name: string, data: unknown): void }
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 
