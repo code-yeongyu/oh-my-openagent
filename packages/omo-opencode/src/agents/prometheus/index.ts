@@ -3,4 +3,3 @@ export {
   PROMETHEUS_PERMISSION,
   getPrometheusPrompt,
 } from "./system-prompt"
-export type { PrometheusPromptSource } from "./system-prompt"

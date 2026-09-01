@@ -1,4 +1,5 @@
 import type { CategoryConfig } from "../config/schema";
+import type { FallbackModels } from "../config/schema/fallback-models";
 import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
@@ -13,6 +14,7 @@ import { resolveCategoryConfig } from "./category-config-resolver";
 type PrometheusOverride = Record<string, unknown> & {
   category?: string;
   model?: string;
+  reasoning?: string;
   variant?: string;
   reasoningEffort?: string;
   textVerbosity?: string;
@@ -20,6 +22,8 @@ type PrometheusOverride = Record<string, unknown> & {
   temperature?: number;
   top_p?: number;
   maxTokens?: number;
+  fallback_models?: FallbackModels;
+  prompt?: string;
   prompt_append?: string;
 };
 
@@ -81,8 +85,16 @@ export async function buildPrometheusAgentConfig(params: {
 
   const resolvedModel = modelResolution?.model;
   const resolvedVariant = modelResolution?.variant;
+  const currentModelVariant = shouldUseCurrentModel
+    ? requirement?.fallbackChain.find((entry) =>
+        isModelInFallbackChain(params.currentModel, [entry]),
+      )?.variant
+    : undefined;
 
-  const variantToUse = params.pluginPrometheusOverride?.variant ?? resolvedVariant;
+  const variantToUse =
+    params.pluginPrometheusOverride?.variant ?? resolvedVariant ?? currentModelVariant;
+  const reasoningToUse =
+    params.pluginPrometheusOverride?.reasoning ?? categoryConfig?.reasoning;
   const reasoningEffortToUse =
     params.pluginPrometheusOverride?.reasoningEffort ?? categoryConfig?.reasoningEffort;
   const textVerbosityToUse =
@@ -93,10 +105,13 @@ export async function buildPrometheusAgentConfig(params: {
   const topPToUse = params.pluginPrometheusOverride?.top_p ?? categoryConfig?.top_p;
   const maxTokensToUse =
     params.pluginPrometheusOverride?.maxTokens ?? categoryConfig?.maxTokens;
+  const fallbackModelsToUse =
+    params.pluginPrometheusOverride?.fallback_models ?? categoryConfig?.fallback_models;
 
   const base: Record<string, unknown> = {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
+    ...(reasoningToUse ? { reasoning: reasoningToUse } : {}),
     mode: "primary",
     prompt: getPrometheusPrompt(resolvedModel, params.disabledTools),
     permission: PROMETHEUS_PERMISSION,
@@ -105,6 +120,7 @@ export async function buildPrometheusAgentConfig(params: {
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),
     ...(maxTokensToUse !== undefined ? { maxTokens: maxTokensToUse } : {}),
+    ...(fallbackModelsToUse !== undefined ? { fallback_models: fallbackModelsToUse } : {}),
     ...(categoryConfig?.tools ? { tools: categoryConfig.tools } : {}),
     ...(thinkingToUse ? { thinking: thinkingToUse } : {}),
     ...(reasoningEffortToUse !== undefined
@@ -118,10 +134,14 @@ export async function buildPrometheusAgentConfig(params: {
   const override = params.pluginPrometheusOverride;
   if (!override) return base;
 
-  const { prompt_append, ...restOverride } = override;
+  const { prompt, prompt_append, ...restOverride } = override;
   const merged = { ...base, ...restOverride };
-  if (prompt_append && typeof merged.prompt === "string") {
-    merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append);
+  if (typeof merged.prompt === "string") {
+    for (const promptAddition of [prompt, prompt_append]) {
+      if (promptAddition) {
+        merged.prompt = merged.prompt + "\n" + resolvePromptAppend(promptAddition);
+      }
+    }
   }
   return merged;
 }

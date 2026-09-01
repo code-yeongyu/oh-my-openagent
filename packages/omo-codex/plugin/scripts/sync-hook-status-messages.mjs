@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { access, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 
+import { isCliEntry } from "./entry-guard.mjs";
 import { formatLazyCodexHookStatusMessage, normalizeLazyCodexHookStatusLabel } from "./hook-status-message.mjs";
 
 const defaultRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -29,6 +29,15 @@ async function writeJson(path, value) {
 async function readPackageVersion(path) {
 	const packageJson = await readJson(path);
 	return packageJson.version;
+}
+
+async function readAggregateHookPaths(root) {
+	const manifest = await readJson(join(root, ".codex-plugin", "plugin.json"));
+	if (typeof manifest.hooks === "string") return [manifest.hooks];
+	if (Array.isArray(manifest.hooks)) {
+		return manifest.hooks.filter((hookPath) => typeof hookPath === "string");
+	}
+	return ["./hooks/hooks.json"];
 }
 
 async function readComponentNames(root) {
@@ -79,10 +88,12 @@ export async function syncHookStatusMessages(root = defaultRoot, options = {}) {
 	const releaseVersion = readReleaseVersion(options);
 	const aggregateVersion = releaseVersion ?? (await readPackageVersion(join(root, ".codex-plugin", "plugin.json")));
 	const componentNames = await readComponentNames(root);
-	const aggregateHooksPath = join(root, "hooks", "hooks.json");
-	const aggregateHooks = await readJson(aggregateHooksPath);
-	syncHooksJson(aggregateHooks, () => aggregateVersion);
-	await writeJson(aggregateHooksPath, aggregateHooks);
+	for (const hookPath of await readAggregateHookPaths(root)) {
+		const aggregateHooksPath = join(root, hookPath.replace(/^\.\//, ""));
+		const aggregateHooks = await readJson(aggregateHooksPath);
+		syncHooksJson(aggregateHooks, () => aggregateVersion);
+		await writeJson(aggregateHooksPath, aggregateHooks);
+	}
 
 	for (const componentName of componentNames) {
 		const componentVersion =
@@ -91,6 +102,6 @@ export async function syncHookStatusMessages(root = defaultRoot, options = {}) {
 	}
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	await syncHookStatusMessages();
 }

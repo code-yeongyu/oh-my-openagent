@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -7,7 +7,7 @@ import { resolveSymlink } from "../../../shared/file-utils"
 import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
 import { findPackageJsonUp } from "../../../hooks/auto-update-checker/checker/package-json-locator"
-import { PACKAGE_NAME } from "../constants"
+import { PACKAGE_NAME } from "../framework/constants"
 import { ACCEPTED_PACKAGE_NAMES, getOpenCodeCacheDir, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
 
 interface PackageJsonShape {
@@ -82,6 +82,29 @@ function createPackageCandidates(rootDir: string): PackageCandidate[] {
   }))
 }
 
+function createTaggedInstallCandidates(rootDir: string): InstallCandidate[] {
+  const packagesDir = join(rootDir, "packages")
+  if (!existsSync(packagesDir)) return []
+
+  const candidates: InstallCandidate[] = []
+  for (const entryName of readdirSync(packagesDir).sort()) {
+    const packageName = ACCEPTED_PACKAGE_NAMES.find((name) => entryName.startsWith(`${name}@`))
+    if (packageName === undefined) continue
+    const installDir = join(packagesDir, entryName)
+    candidates.push({
+      cacheDir: installDir,
+      cachePackagePath: join(installDir, "package.json"),
+      packageCandidates: [
+        {
+          packageName,
+          installedPackagePath: join(installDir, "node_modules", packageName, "package.json"),
+        },
+      ],
+    })
+  }
+  return candidates
+}
+
 function selectInstalledPackage(candidate: InstallCandidate): PackageCandidate {
   return candidate.packageCandidates.find((packageCandidate) => existsSync(packageCandidate.installedPackagePath))
     ?? candidate.packageCandidates[0]
@@ -128,11 +151,13 @@ export function getLoadedPluginVersion(): LoadedVersionInfo {
       cachePackagePath: join(configDir, "package.json"),
       packageCandidates: createPackageCandidates(configDir),
     },
+    ...createTaggedInstallCandidates(configDir),
     {
       cacheDir,
       cachePackagePath: join(cacheDir, "package.json"),
       packageCandidates: createPackageCandidates(cacheDir),
     },
+    ...createTaggedInstallCandidates(cacheDir),
   ]
 
   const selectedCandidate = candidates.find((candidate) => candidate.packageCandidates.some((packageCandidate) => existsSync(packageCandidate.installedPackagePath)))

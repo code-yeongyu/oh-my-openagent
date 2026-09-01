@@ -1,5 +1,5 @@
 import type { UlwLoopSteeringMutationKind, UlwLoopSteeringSource } from "./constants.js";
-import type { UlwLoopPlan } from "./domain-types.js";
+import type { UlwLoopItem, UlwLoopPlan } from "./domain-types.js";
 
 export interface UlwLoopSteeringInvariantResult {
 	accepted: boolean;
@@ -44,13 +44,21 @@ export interface UlwLoopSteeringProposal {
 	now?: Date;
 }
 
+export interface UlwLoopSteeringPlanSnapshot {
+	readonly updatedAt: string;
+	readonly activeGoalId?: string;
+	readonly goalCount: number;
+	readonly goalIds: readonly string[];
+	readonly goals: readonly UlwLoopItem[];
+}
+
 export interface UlwLoopSteeringAudit {
 	kind: UlwLoopSteeringMutationKind;
 	source: UlwLoopSteeringSource;
 	targetGoalIds: string[];
 	criterionId?: string;
-	before?: unknown;
-	after?: unknown;
+	before?: UlwLoopSteeringPlanSnapshot;
+	after?: UlwLoopSteeringPlanSnapshot;
 	evidence: string;
 	rationale: string;
 	invariant: UlwLoopSteeringInvariantResult;

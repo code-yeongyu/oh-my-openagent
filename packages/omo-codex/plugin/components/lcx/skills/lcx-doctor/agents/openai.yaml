@@ -1,0 +1,11 @@
+interface:
+  display_name: "lcx-doctor (omo)"
+  short_description: "Diagnose LazyCodex/Codex install health against latest sources"
+  search_terms:
+    - "lcx-doctor"
+    - "lazycodex doctor"
+    - "lazycodex health check"
+    - "codex doctor"
+    - "lazycodex install broken"
+    - "omo-codex diagnose"
+  default_prompt: "Use $lcx-doctor to sync the latest LazyCodex and Codex sources under LAZYCODEX_SOURCE_ROOT or ${TMPDIR:-/tmp}/lazycodex-sources, inventory the local installation, compare versions, config, and wiring against the latest sources, probe the real surface, and report PASS/WARN/FAIL findings with evidence and remediations."

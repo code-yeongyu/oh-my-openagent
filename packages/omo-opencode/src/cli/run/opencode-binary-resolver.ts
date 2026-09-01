@@ -1,4 +1,5 @@
 import { delimiter, dirname, posix, win32 } from "node:path"
+import { bunWhich } from "../../shared/bun-which-shim"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const OPENCODE_COMMANDS = ["opencode", "opencode-desktop"] as const
@@ -20,7 +21,7 @@ function getPathTools(platform: NodeJS.Platform): PathTools {
 
 export function collectCandidateBinaryPaths(
   pathEnv: string | undefined,
-  which: (command: string) => string | null | undefined = Bun.which,
+  which: (command: string) => string | null | undefined = bunWhich,
   platform: NodeJS.Platform = process.platform,
 ): string[] {
   const seen = new Set<string>()
@@ -67,7 +68,7 @@ export async function canExecuteBinary(
 export async function findWorkingOpencodeBinary(
   pathEnv: string | undefined = process.env.PATH,
   probe: (binaryPath: string) => Promise<boolean> = canExecuteBinary,
-  which: (command: string) => string | null | undefined = Bun.which,
+  which: (command: string) => string | null | undefined = bunWhich,
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
   const candidates = collectCandidateBinaryPaths(pathEnv, which, platform)

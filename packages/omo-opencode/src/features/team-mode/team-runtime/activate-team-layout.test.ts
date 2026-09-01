@@ -126,6 +126,7 @@ describe("activateTeamLayout", () => {
       targetSessionId: "$caller",
       focusWindowId: "@10",
       gridWindowId: "@11",
+      paneIds: ["%11", "%21"],
     })
   })
 

@@ -1,0 +1,29 @@
+Command:
+  bun test packages/omo-senpi/src/components/task/team-service.test.ts packages/senpi-task/src/team/runtime.test.ts packages/senpi-task/src/team/member-respawn.test.ts packages/senpi-task/src/team/member-extensions.test.ts --bail
+
+Result:
+  GREEN (exit 0)
+
+Observed:
+  17 pass
+  0 fail
+  81 expectations
+
+Passing behavior:
+  - direct member creation uses `[member extension, ...inherited extensions]`;
+  - persisted-member respawn uses the same order;
+  - duplicate member and inherited entries are removed stably;
+  - inherited provider/extension relative ordering is preserved;
+  - `team-service.ts` no longer injects a duplicate member extension into inherited entries.
+
+Coverage note (accuracy):
+  The `team-service.ts` change is CLEANUP, not a behaviorally covered fix. Reverting it alone causes
+  zero test failures, because `assembleMemberExtensions` already dedupes member-first, so the removed
+  duplicate prefix was inert. It is kept so that exactly one module owns extension assembly. The
+  behavioral guarantees above are enforced by `member-extensions.test.ts`, `runtime.test.ts`, and
+  `member-respawn.test.ts`, which DO fail when `assembleMemberExtensions` is reverted (2 failures).
+
+Verification:
+  - changed-file LSP diagnostics: clean;
+  - `packages/senpi-task` typecheck: PASS;
+  - `packages/omo-senpi` typecheck: PASS.

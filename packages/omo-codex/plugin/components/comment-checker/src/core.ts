@@ -1,6 +1,5 @@
-export { parseApplyPatchRequests } from "./apply-patch.js";
+export { isRecord, parseApplyPatchRequests } from "@oh-my-opencode/comment-checker-core";
 export { toHookInput } from "./hook-input.js";
-export { isRecord } from "./record.js";
 export { extractCommentCheckRequests, isToolFailureOutput } from "./request-extractor.js";
 export type {
 	CheckerEdit,

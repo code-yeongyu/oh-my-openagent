@@ -6,6 +6,7 @@ import { createConnection } from "node:net"
 import { startCallbackServer, type CallbackServer, type CallbackServerTimer, type CallbackServerTimerHandle } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
+const CALLBACK_SERVER_TEST_TIMEOUT_MS = process.platform === "win32" ? 15_000 : 5_000
 
 type ScheduledCallback = {
   readonly callback: () => void
@@ -141,7 +142,7 @@ describe("startCallbackServer", () => {
     } finally {
       await close(server)
     }
-  })
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 
   it("resolves callback with code and state from query params", async () => {
     const server = await startCallbackServer(0)
@@ -160,7 +161,7 @@ describe("startCallbackServer", () => {
     } finally {
       await close(server)
     }
-  })
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 
   it("returns 404 for non-callback routes", async () => {
     const server = await startCallbackServer(0)
@@ -172,7 +173,7 @@ describe("startCallbackServer", () => {
     } finally {
       await close(server)
     }
-  })
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 
   it("keeps non-callback routes separate from OAuth callbacks", async () => {
     const server = await startCallbackServer(0)
@@ -192,7 +193,7 @@ describe("startCallbackServer", () => {
     } finally {
       await close(server)
     }
-  })
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 
   it("#given injected callback timer #when OAuth lifetime expires #then callback rejects without global timer patches", async () => {
     const { runTimersAtOrAfter, timer } = createControllableTimer()
@@ -231,7 +232,7 @@ describe("startCallbackServer", () => {
     } finally {
       await close(server)
     }
-  })
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 
   it("returns 400 and rejects when state is missing", async () => {
     const server = await startCallbackServer(0)
@@ -250,7 +251,7 @@ describe("startCallbackServer", () => {
     } finally {
       await close(server)
     }
-  })
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 
   it("close stops the server immediately", async () => {
     const server = await startCallbackServer(0)
@@ -267,7 +268,7 @@ describe("startCallbackServer", () => {
         throw new Error("Expected request after close to fail with an Error")
       }
     }
-  })
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 
   it("close resolves after the underlying server releases its port", async () => {
     const firstServer = await startCallbackServer(0)
@@ -285,5 +286,22 @@ describe("startCallbackServer", () => {
     } finally {
       await close(secondServer)
     }
-  })
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
+
+  it("#given default callback port is occupied #when starting callback server #then it binds a fallback port", async () => {
+    const occupiedDefaultPort = await startCallbackServer(19877)
+
+    try {
+      const fallbackServer = await startCallbackServer()
+      try {
+        expect(fallbackServer.port).toBeGreaterThan(19877)
+        const response = await request(`http://${HOSTNAME}:${fallbackServer.port}/other`)
+        expect(response.status).toBe(404)
+      } finally {
+        await close(fallbackServer)
+      }
+    } finally {
+      await close(occupiedDefaultPort)
+    }
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 })

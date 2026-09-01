@@ -5,8 +5,6 @@ export function categorizeTools(toolNames: string[]): AvailableTool[] {
     let category: AvailableTool["category"] = "other"
     if (name.startsWith("lsp_")) {
       category = "lsp"
-    } else if (name.startsWith("ast_grep")) {
-      category = "ast"
     } else if (name === "grep" || name === "glob") {
       category = "search"
     } else if (name.startsWith("session_")) {
@@ -20,7 +18,6 @@ export function categorizeTools(toolNames: string[]): AvailableTool[] {
 
 function formatToolsForPrompt(tools: AvailableTool[]): string {
   const lspTools = tools.filter((tool) => tool.category === "lsp")
-  const astTools = tools.filter((tool) => tool.category === "ast")
   const searchTools = tools.filter((tool) => tool.category === "search")
 
   const parts: string[] = []
@@ -31,10 +28,6 @@ function formatToolsForPrompt(tools: AvailableTool[]): string {
 
   if (lspTools.length > 0) {
     parts.push("`lsp_*`")
-  }
-
-  if (astTools.length > 0) {
-    parts.push("`ast_grep`")
   }
 
   return parts.join(", ")

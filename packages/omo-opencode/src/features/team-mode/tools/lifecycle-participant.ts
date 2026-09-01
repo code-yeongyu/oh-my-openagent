@@ -1,8 +1,8 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { lookupTeamSession, type TeamSessionEntry } from "../team-session-registry"
-import { listActiveTeams, loadRuntimeState } from "../team-state-store/store"
+import { listActiveTeams, loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
 import { getLeadMemberName } from "../team-runtime/shutdown-helpers"
-import type { RuntimeState } from "../types"
+import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 
 const ACTIVE_RUNTIME_STATUSES = new Set<RuntimeState["status"]>(["creating", "active", "shutdown_requested"])
 

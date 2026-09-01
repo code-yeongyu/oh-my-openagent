@@ -1,1 +1,1 @@
-export { getString, isRecord } from "./record.js";
+export { getString, isRecord } from "@oh-my-opencode/comment-checker-core";

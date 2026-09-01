@@ -1,0 +1,87 @@
+Verification checkpoint: 2026-07-30T05:48:00Z
+
+Focused task tests:
+  bun test packages/senpi-task/src/tools/task
+  PASS: 127 tests, 0 failures, 398 expectations, 24 files
+
+  bun test packages/omo-senpi/src/components/task
+  PASS: 155 tests, 0 failures, 392 expectations, 26 files
+
+Repository typecheck:
+  bun run typecheck
+  First run: FAIL with two readonly-array assignments in the new normalizer.
+  Fix: return mutable schema arrays from stringList() and taskItems().
+  Rerun: PASS through root, script, every package, omo-senpi, senpi-task,
+  and omo-opencode tsgo projects.
+
+Changed-surface gates:
+  bun test packages/senpi-task
+  PASS: 1039 tests, 0 failures, 1 snapshot, 3242 expectations, 163 files
+
+  bun run test:senpi
+  PASS: Senpi plugin build, omo-senpi tsgo, and 489 tests with 0 failures
+  across 78 files.
+
+Diagnostics:
+  The session LSP tool was attempted for every changed TypeScript file through
+  a cwd-local symlink. It resolves realpaths and hard-rejected the sibling
+  worktree as outside the request cwd. No LSP result is claimed.
+  Equivalent compiler diagnostics passed via `bun run typecheck`, including:
+    tsgo --noEmit -p packages/senpi-task/tsconfig.json
+    tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+
+Architectural self-review:
+  PASS
+  - All changed source/test files are below 250 pure LOC (maximum: 138).
+  - No `as any`, `@ts-ignore`, `@ts-expect-error`, or empty catch blocks.
+  - git diff --check is clean.
+  - No task manager, concurrency, persistence, or lifecycle behavior changed.
+  - True meaningful prompt+tasks remains a typed error.
+  - Dynamic category/agent listing, single/batch inputs, and hidden delivery
+    behavior remain present in the assembled prompt surfaces.
+  - The generated `packages/omo-senpi/plugin/extensions/omo.js` update is the
+    expected output of the required Senpi build gate.
+
+Final gate rerun:
+  ./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json
+  PASS: exit 0
+
+  bun test packages/senpi-task
+  PASS: 1039 tests, 0 failures, 1 snapshot, 3242 expectations, 163 files
+
+  bun run test:senpi
+  PASS: fresh Senpi plugin build, omo-senpi tsgo, and 489 tests with
+  0 failures, 1371 expectations, 78 files
+
+Post-rebase verification against latest dev:
+  Base:
+    origin/dev b6d047382141c5dcc141fa23ba8ba032b8cf7841
+
+  Generated bundle conflict:
+    packages/omo-senpi/plugin/extensions/omo.js
+    Resolution: regenerated both Senpi extension bundles from the rebased
+    source. No generated hunk was hand-merged.
+    Conflict markers after regeneration: 0
+
+  bun run typecheck
+  PASS: root, script, and every package tsgo project
+
+  bun run test:senpi
+  PASS: fresh plugin build and 493 tests with 0 failures, 1382 expectations,
+  78 files
+
+  Task-branch root suite:
+    bun test
+    12508 pass, 8 skip, 18 fail
+    The failures are outside the changed Senpi task surface and are concentrated
+    in Codex installer/telemetry tests.
+
+  Clean origin/dev baseline:
+    detached worktree at the exact base SHA
+    bun install --frozen-lockfile --ignore-scripts
+    bun test
+    12495 pass, 8 skip, 26 fail
+    The same Codex installer/telemetry failure family reproduces on untouched
+    origin/dev, along with additional unrelated failures. The root-suite
+    failures are therefore pre-existing on the selected PR base, not introduced
+    by this task fix.

@@ -14,9 +14,12 @@ export type ShellType = "unix" | "powershell" | "cmd" | "csh"
  * specific (BASH_VERSION, MSYSTEM, WSL_DISTRO_NAME) — TERM is excluded
  * because some PowerShell users set it manually.
  */
-export function detectShellType(): ShellType {
-  if (process.env.SHELL) {
-    const shell = process.env.SHELL
+export function detectShellType(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): ShellType {
+  if (env.SHELL) {
+    const shell = env.SHELL
     if (shell.includes("csh") || shell.includes("tcsh")) {
       return "csh"
     }
@@ -27,19 +30,19 @@ export function detectShellType(): ShellType {
   // PSModulePath is always set on Windows, so we must check these BEFORE it.
   // Indicators are shell-specific — no broad signals like TERM.
   if (
-    process.platform === "win32" &&
-    (process.env.BASH_VERSION ||
-      process.env.MSYSTEM ||
-      process.env.WSL_DISTRO_NAME)
+    platform === "win32" &&
+    (env.BASH_VERSION ||
+      env.MSYSTEM ||
+      env.WSL_DISTRO_NAME)
   ) {
     return "unix"
   }
 
-  if (process.env.PSModulePath) {
+  if (env.PSModulePath) {
     return "powershell"
   }
 
-  return process.platform === "win32" ? "cmd" : "unix"
+  return platform === "win32" ? "cmd" : "unix"
 }
 
 /**
@@ -166,20 +169,7 @@ export function buildEnvPrefix(
  * const cmd = `/bin/sh -c "opencode attach ${escaped} --session ${sessionId}"`
  * ```
  */
-export function shellEscapeForDoubleQuotedCommand(value: string): string {
-  // Order matters: escape backslash FIRST, then other characters
-  return value
-    .replace(/\\/g, "\\\\") // escape backslash first
-    .replace(/\$/g, "\\$") // escape dollar sign
-    .replace(/`/g, "\\`") // escape backticks
-    .replace(/"/g, "\\\"") // escape double quotes
-    .replace(/;/g, "\\;") // escape semicolon (command separator)
-    .replace(/\|/g, "\\|") // escape pipe (command separator)
-    .replace(/&/g, "\\&") // escape ampersand (command separator)
-    .replace(/#/g, "\\#") // escape hash (comment)
-    .replace(/\(/g, "\\(") // escape parentheses
-    .replace(/\)/g, "\\)") // escape parentheses
-}
+export { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
 
 export function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`

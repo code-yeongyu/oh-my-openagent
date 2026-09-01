@@ -7,15 +7,17 @@ import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 const MODEL = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
 const MODEL_WITH_VARIANT = { providerID: "google", modelID: "gemini-3.1-pro", variant: "high" }
 
-function makeMockCtx(): ToolContextWithMetadata & { captured: any[] } {
-  const captured: any[] = []
+type CapturedMetadata = { title?: string; metadata: Record<string, unknown> }
+
+function makeMockCtx(): ToolContextWithMetadata & { captured: CapturedMetadata[] } {
+  const captured: CapturedMetadata[] = []
   return {
     sessionID: "ses_parent",
     messageID: "msg_parent",
     agent: "sisyphus",
     abort: new AbortController().signal,
     callID: "call_001",
-    metadata: async (input: any) => { captured.push(input) },
+    metadata: async (input: { title?: string; metadata?: Record<string, unknown> }) => { captured.push(input as CapturedMetadata) },
     captured,
   }
 }
@@ -51,7 +53,7 @@ describe("metadata model unification", () => {
           onSyncSessionCreated: null,
         }, parentContext, "explore", MODEL, undefined, undefined, undefined, deps)
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -74,7 +76,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext, "explore", MODEL, undefined)
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -114,7 +116,7 @@ describe("metadata model unification", () => {
           parentContext, "explore", MODEL, undefined, "anthropic/claude-sonnet-4-6",
         )
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -136,7 +138,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext)
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -165,7 +167,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext, deps)
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -194,7 +196,7 @@ describe("metadata model unification", () => {
           onSyncSessionCreated: null,
         }, parentContext, "explore", undefined, undefined, undefined, undefined, deps)
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -217,7 +219,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext, "explore", undefined, undefined)
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -258,7 +260,7 @@ describe("metadata model unification", () => {
           parentContext, "explore", undefined, undefined, "anthropic/claude-sonnet-4-6",
         )
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -280,7 +282,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext)
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -307,7 +309,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext, deps)
 
-        const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+        const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL)
       })
@@ -341,7 +343,7 @@ describe("metadata model unification", () => {
         onSyncSessionCreated: null,
       }, parentContextWithoutModel, "explore", undefined, undefined, undefined, undefined, deps)
 
-      const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+      const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.model).toBeUndefined()
     })
@@ -369,7 +371,7 @@ describe("metadata model unification", () => {
           onSyncSessionCreated: null,
         }, parentContext, "explore", MODEL_WITH_VARIANT, undefined, undefined, undefined, deps)
 
-        const meta = ctx.captured.find((metadataEvent: any) => metadataEvent.metadata?.sessionId)
+        const meta = ctx.captured.find((metadataEvent: CapturedMetadata) => metadataEvent.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL_WITH_VARIANT)
       })
@@ -392,7 +394,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext, "explore", MODEL_WITH_VARIANT, undefined)
 
-        const meta = ctx.captured.find((metadataEvent: any) => metadataEvent.metadata?.sessionId)
+        const meta = ctx.captured.find((metadataEvent: CapturedMetadata) => metadataEvent.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL_WITH_VARIANT)
       })
@@ -433,7 +435,7 @@ describe("metadata model unification", () => {
           parentContext, "explore", MODEL_WITH_VARIANT, undefined, "google/gemini-3.1-pro high",
         )
 
-        const meta = ctx.captured.find((metadataEvent: any) => metadataEvent.metadata?.sessionId)
+        const meta = ctx.captured.find((metadataEvent: CapturedMetadata) => metadataEvent.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL_WITH_VARIANT)
       })
@@ -455,7 +457,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext)
 
-        const meta = ctx.captured.find((metadataEvent: any) => metadataEvent.metadata?.sessionId)
+        const meta = ctx.captured.find((metadataEvent: CapturedMetadata) => metadataEvent.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL_WITH_VARIANT)
       })
@@ -484,7 +486,7 @@ describe("metadata model unification", () => {
           },
         }), parentContext, deps)
 
-        const meta = ctx.captured.find((metadataEvent: any) => metadataEvent.metadata?.sessionId)
+        const meta = ctx.captured.find((metadataEvent: CapturedMetadata) => metadataEvent.metadata?.sessionId)!
         expect(meta).toBeDefined()
         expect(meta.metadata.model).toEqual(MODEL_WITH_VARIANT)
       })

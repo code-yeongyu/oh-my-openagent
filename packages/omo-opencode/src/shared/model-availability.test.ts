@@ -269,6 +269,18 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("github-copilot/claude-sonnet-5.1")
 	})
 
+	it("should normalize dash and dot version separators for non-Claude model families", () => {
+		const available = new Set([
+			"kimi-for-coding/kimi-k2-6",
+			"zai-coding-plan/glm-4.6",
+			"openai/gpt-5-4",
+		])
+
+		expect(fuzzyMatchModel("kimi-k2.6", available, ["kimi-for-coding"])).toBe("kimi-for-coding/kimi-k2-6")
+		expect(fuzzyMatchModel("glm-4-6", available, ["zai-coding-plan"])).toBe("zai-coding-plan/glm-4.6")
+		expect(fuzzyMatchModel("gpt-5.4", available, ["openai"])).toBe("openai/gpt-5-4")
+	})
+
 	// given available models from multiple providers
 	// when providers filter is specified
 	// then only search models from specified providers

@@ -1,0 +1,46 @@
+=== GREEN (todo 19 palace people-graph panel) ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/palace/people.test.ts:
+(pass) palace people graph > #given committed people cards #when the graph is collected #then nodes carry slug, name and kind from card frontmatter [422.81ms]
+(pass) palace people graph > #given RELATIONSHIP card lines #when the graph is collected #then edges match those lines and resolve to known slugs [412.59ms]
+(pass) palace people graph > #given a card line that is not a RELATIONSHIP #when the graph is collected #then it produces no edge [403.13ms]
+(pass) palace people graph > #given an uncommitted people card #when the graph is collected #then the node is labelled as absent from the system prompt [395.44ms]
+(pass) palace people graph > #given a repo without a people directory #when the graph is collected #then only the primary human node is present and no edges are derived [318.08ms]
+(pass) palace people graph > #given people.enabled false #when the graph is collected #then no people section is produced [360.71ms]
+(pass) palace people graph > #given a card whose entry exceeds the configured limit #when the graph is collected #then the diagnostic is surfaced with its card path [395.68ms]
+(pass) palace people graph > #given people.enabled true #when the palace is generated #then the inline payload carries the derived graph [461.70ms]
+(pass) palace people graph > #given people.enabled false #when the palace is generated #then the panel and its tab are absent [474.18ms]
+(pass) palace people graph > #given a people card carrying a script-breakout payload #when the palace is generated #then the raw payload never reaches the document [455.87ms]
+
+packages/omo-senpi/src/components/memory/palace/command.test.ts:
+(pass) palace command > #given a bound identity #when the palace command is registered #then it exposes a description and handler [0.18ms]
+(pass) palace command > #given darwin without remote-session env #when /palace runs #then the generated file is opened with open [383.59ms]
+(pass) palace command > #given linux and win32 hosts #when /palace runs #then the platform opener is used [444.42ms]
+(pass) palace command > #given a tmux or ssh session #when /palace runs #then the path is printed instead of opened [448.94ms]
+(pass) palace command > #given a headless context #when /palace runs #then the path is returned as command output text [344.68ms]
+(pass) palace command > #given no bound memory identity #when /palace runs #then it reports the unbound state without generating a file [0.20ms]
+
+packages/omo-senpi/src/components/memory/palace/collectors.test.ts:
+(pass) palace collectors > #given a committed memory repo #when core entries are collected #then system files carry projection paths and bodies [297.74ms]
+(pass) palace collectors > #given committed binary and text assets #when external entries are collected #then binaries report size only and never content [349.99ms]
+(pass) palace collectors > #given a dirty working tree #when core entries are collected #then uncommitted files are labelled as absent from the system prompt [577.26ms]
+(pass) palace collectors > #given reflection and ordinary commits #when history is collected #then reflection commits are tagged and caps are declared [515.07ms]
+(pass) palace collectors > #given merge and chore reflection subjects #when matched against the reflection pattern #then only reflection-scoped commits match [0.14ms]
+(pass) palace collectors > #given journal state and completion records #when reflection data is collected #then cursor state and recent outcomes are returned newest first [270.98ms]
+(pass) palace collectors > #given more completion records than the limit #when reflection data is collected #then only the newest N are kept [267.07ms]
+
+packages/omo-senpi/src/components/memory/palace/generator.test.ts:
+(pass) palace generator machine gate > #given a fixture memory repo #when the palace is generated #then inline data pins the persona entry, HEAD sha and identity metadata [368.83ms]
+(pass) palace generator machine gate > #given the default people gate #when the palace markup is parsed #then every tab has a matching panel [362.88ms]
+(pass) palace generator machine gate > #given people collection disabled #when the palace markup is parsed #then only the four always-on tabs remain [351.85ms]
+(pass) palace generator machine gate > #given the viewers runtime directory #when the palace is written #then the file is 0600 inside a 0700 directory [351.51ms]
+(pass) palace generator machine gate > #given memory content carrying a script-breakout payload #when the palace is generated #then the raw payload never appears and the escaped form does [374.06ms]
+(pass) palace generator machine gate > #given line-separator characters in memory content #when the palace is generated #then U+2028 and U+2029 are escaped in the inline payload [428.96ms]
+(pass) palace generator machine gate > #given a self-contained requirement #when the palace html is inspected #then it references no external fonts or CDNs [370.76ms]
+(pass) palace generator machine gate > #given a committed binary asset #when the palace is generated #then the external tab lists name and size but no binary body [350.99ms]
+
+ 31 pass
+ 0 fail
+ 105 expect() calls
+Ran 31 tests across 4 files. [11.19s]

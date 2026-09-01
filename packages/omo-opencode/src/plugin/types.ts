@@ -1,4 +1,5 @@
 import type { Plugin, ToolDefinition } from "@opencode-ai/plugin"
+import type { TmuxConfig } from "@oh-my-opencode/tmux-core"
 
 export type PluginContext = Parameters<Plugin>[0]
 export type PluginInstance = Awaited<ReturnType<Plugin>>
@@ -16,11 +17,4 @@ export type PluginInterface = Omit<
 
 export type ToolsRecord = Record<string, ToolDefinition>
 
-export type TmuxConfig = {
-  enabled: boolean
-  layout: "main-horizontal" | "main-vertical" | "tiled" | "even-horizontal" | "even-vertical"
-  main_pane_size: number
-  main_pane_min_width: number
-  agent_pane_min_width: number
-  isolation: "inline" | "window" | "session"
-}
+export type { TmuxConfig }

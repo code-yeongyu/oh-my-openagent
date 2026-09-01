@@ -1,10 +1,6 @@
-import {
-  findEmptyMessages,
-  findEmptyMessageByIndex,
-  findMessagesWithEmptyTextParts,
-  injectTextPart,
-  replaceEmptyTextParts,
-} from "../session-recovery/storage"
+import { findEmptyMessages, findEmptyMessageByIndex } from "./storage/empty-messages"
+import { findMessagesWithEmptyTextParts, replaceEmptyTextParts } from "./storage/empty-text"
+import { injectTextPart } from "./storage/text-part-injector"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import type { AutoCompactState } from "./types"
 import type { Client } from "./client"

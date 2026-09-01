@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import type { Message, Part } from "@opencode-ai/sdk"
 
 import { log } from "../shared/logger"
@@ -29,16 +30,19 @@ type MessageWithParts = {
 
 type MessagesTransformOutput = { messages: MessageWithParts[] }
 type MessagesTransformHooks = {
+  btwSideContextInjector?: CreatedHooks["btwSideContextInjector"]
   contextInjectorMessagesTransform?: CreatedHooks["contextInjectorMessagesTransform"]
   teamModeStatusInjector?: CreatedHooks["teamModeStatusInjector"]
   teamMailboxInjector?: CreatedHooks["teamMailboxInjector"]
-  thinkingBlockValidator?: CreatedHooks["thinkingBlockValidator"]
   toolPairValidator?: CreatedHooks["toolPairValidator"]
+  monitorStatusInjector?: CreatedHooks["monitorStatusInjector"]
+  categorySkillReminder?: CreatedHooks["categorySkillReminder"]
 }
 type MessagesTransformHookKey = keyof MessagesTransformHooks
 type MessagesTransformHookEntry = {
   readonly key: MessagesTransformHookKey
   readonly name: string
+  readonly fatal?: boolean
 }
 type UserMessageInfo = Extract<Message, { role: "user" }>
 type ModelIdentifier = {
@@ -47,11 +51,17 @@ type ModelIdentifier = {
 }
 
 const MESSAGES_TRANSFORM_HOOKS = [
+  {
+    key: "btwSideContextInjector",
+    name: "btwSideContextInjector",
+    fatal: true,
+  },
   { key: "contextInjectorMessagesTransform", name: "contextInjectorMessagesTransform" },
   { key: "teamModeStatusInjector", name: "teamModeStatusInjector" },
   { key: "teamMailboxInjector", name: "teamMailboxInjector" },
-  { key: "thinkingBlockValidator", name: "thinkingBlockValidator" },
   { key: "toolPairValidator", name: "toolPairValidator" },
+  { key: "monitorStatusInjector", name: "monitorStatusInjector" },
+  { key: "categorySkillReminder", name: "categorySkillReminder" },
 ] satisfies readonly MessagesTransformHookEntry[]
 
 function getSessionID(message: MessageWithParts): string | undefined {
@@ -80,9 +90,7 @@ function findLastUserTurn(messages: MessageWithParts[]): MessageWithParts | unde
   return undefined
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function readStringField(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key]
@@ -240,9 +248,15 @@ export function createMessagesTransformHandler(args: {
 }): (input: Record<string, never>, output: MessagesTransformOutput) => Promise<void> {
   return async (input, output): Promise<void> => {
     for (const hook of MESSAGES_TRANSFORM_HOOKS) {
+      const handler =
+        args.hooks[hook.key]?.["experimental.chat.messages.transform"]
+      if (hook.fatal) {
+        if (handler) await Promise.resolve(handler(input, output))
+        continue
+      }
       await runMessagesTransformHookSafely(
         hook.name,
-        args.hooks[hook.key]?.["experimental.chat.messages.transform"],
+        handler,
         input,
         output,
       )

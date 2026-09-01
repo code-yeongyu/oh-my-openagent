@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -53,6 +53,8 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
 			],
 		},
 	});
+	await mkdir(join(pluginRoot, "components", "comment-checker", "dist"), { recursive: true });
+	await writeFile(join(pluginRoot, "components", "comment-checker", "dist", "cli.js"), "console.log('comment checker cli')\n");
 
 	const result = await installMarketplaceLocally({
 		repoRoot,
@@ -75,8 +77,13 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
 	assert.equal(manifest.version, "4.7.6");
 	assert.equal(packageJson.version, "4.7.6");
 	assert.equal(componentPackageJson.version, "4.7.6");
-	assert.equal(hooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(4.7.6): Checking Comments");
-	assert.equal(componentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage, "LazyCodex(4.7.6): Checking Ulw-Loop Steering");
+	for (const statusMessage of [
+		hooks.hooks.PostToolUse[0].hooks[0].statusMessage,
+		componentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage,
+	]) {
+		assert.match(statusMessage, /^\(OmO 4\.7\.6\) \S/);
+		assert.doesNotMatch(statusMessage, /0\.1\.0/);
+	}
 	assert.deepEqual(snapshot, {
 		packageName: "lazycodex-ai",
 		version: "4.7.6",

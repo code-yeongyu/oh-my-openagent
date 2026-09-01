@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { CheckerEdit, CheckerToolInput, CommentCheckRequest, ToolResultLike } from "../src/core.ts";
-import { extractCommentCheckRequests, parseApplyPatchRequests, toHookInput } from "../src/core.ts";
+import { extractCommentCheckRequests, toHookInput } from "../src/core.ts";
+import {
+	metadataApplyPatchRequests,
+	mixedApplyPatch,
+	mixedApplyPatchRequests,
+} from "./fixtures/apply-patch-mixed-requests.ts";
 
 describe("extractCommentCheckRequests", () => {
 	it("#given apply_patch metadata files #when extracting #then supports direct result and metadata shapes", () => {
@@ -42,46 +47,44 @@ describe("extractCommentCheckRequests", () => {
 
 	it("#given apply_patch add move and delete hunks #when extracting from raw patch #then add and move are checked while delete is ignored", () => {
 		// given
-		const patch = [
-			"*** Begin Patch",
-			"*** Add File: src/added.ts",
-			"+// explains add",
-			"+const added = true;",
-			"*** Update File: src/original.ts",
-			"*** Move to: src/renamed.ts",
-			"@@",
-			"-const original = true;",
-			"+// explains rename",
-			"+const renamed = true;",
-			"*** Delete File: src/deleted.ts",
-			"*** End Patch",
-		].join("\n");
+		const patch = mixedApplyPatch;
 
 		// when
-		const requests = parseApplyPatchRequests(patch, "apply_patch");
+		const requests = extractCommentCheckRequests(applyPatchEvent(undefined, { input: { command: patch } }));
 
 		// then
-		expect(requests).toEqual([
-			{
-				sourceToolName: "apply_patch",
-				toolName: "Write",
-				filePath: "src/added.ts",
-				toolInput: {
-					file_path: "src/added.ts",
-					content: "// explains add\nconst added = true;\n",
+		expect(requests).toEqual(mixedApplyPatchRequests);
+	});
+
+	it("#given current apply_patch metadata corpus #when extracting #then observable requests stay pinned", () => {
+		// given
+		const event = applyPatchEvent({
+			files: [
+				{
+					filePath: "src/direct-added.ts",
+					before: "",
+					after: "// explains direct add\nconst directAdd = true;\n",
 				},
-			},
-			{
-				sourceToolName: "apply_patch",
-				toolName: "Edit",
-				filePath: "src/renamed.ts",
-				toolInput: {
-					file_path: "src/renamed.ts",
-					old_string: "const original = true;\n",
-					new_string: "// explains rename\nconst renamed = true;\n",
+				{
+					file_path: "src/direct-original.ts",
+					move_path: "src/direct-renamed.ts",
+					old: "const direct = false;\n",
+					new: "// explains direct edit\nconst direct = true;\n",
 				},
-			},
-		]);
+				{
+					path: "src/direct-deleted.ts",
+					before: "const deleted = true;\n",
+					after: "",
+					type: "delete",
+				},
+			],
+		});
+
+		// when
+		const requests = extractCommentCheckRequests(event);
+
+		// then
+		expect(requests).toEqual(metadataApplyPatchRequests);
 	});
 
 	it("#given failed tool output #when extracting #then text and isError failures emit no requests", () => {

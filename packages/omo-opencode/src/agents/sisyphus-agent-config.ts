@@ -1,6 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import { getFrontierToolSchemaPermission } from "./frontier-tool-schema-guard";
-import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
 import { buildClaudeThinkingConfig } from "./types";
 import type { AgentMode } from "./types";
 
@@ -12,7 +11,6 @@ function buildSisyphusPermission(model: string): AgentConfig["permission"] {
     question: "allow",
     call_omo_agent: "deny",
     ...getFrontierToolSchemaPermission(model),
-    ...getGptApplyPatchPermission(model),
   } as AgentConfig["permission"];
 }
 
@@ -40,6 +38,30 @@ export function buildGptSisyphusAgentConfig(
   return {
     ...buildBaseSisyphusAgentConfig(mode, model, prompt),
     reasoningEffort: "medium",
+  };
+}
+
+export function buildGlmSisyphusAgentConfig(
+  mode: AgentMode,
+  model: string,
+  prompt: string,
+): AgentConfig {
+  return buildBaseSisyphusAgentConfig(mode, model, prompt);
+}
+
+/**
+ * Grok 4.5/4.6 are xAI reasoning models: they take a reasoning effort
+ * (grok family caps allow low/medium/high) and reject Anthropic-style
+ * thinking blocks, so this is the base config plus effort only.
+ */
+export function buildGrokSisyphusAgentConfig(
+  mode: AgentMode,
+  model: string,
+  prompt: string,
+): AgentConfig {
+  return {
+    ...buildBaseSisyphusAgentConfig(mode, model, prompt),
+    reasoningEffort: "high",
   };
 }
 

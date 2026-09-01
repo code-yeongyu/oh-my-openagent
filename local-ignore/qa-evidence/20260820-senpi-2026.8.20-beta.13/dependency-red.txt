@@ -1,0 +1,12 @@
+=== dependency RED: omo pins a senpi version npm cannot resolve yet ===
+2026-08-20T15:35:10Z
+npm error 404 Note that you can also install from a
+npm error 404 tarball, folder, http url, or git url.
+npm error A complete log of this run can be found in: /Users/yeongyu/.npm/_logs/2026-08-20T15_35_10_763Z-debug-0.log
+--- omo worktree pin ---
+18:    "@code-yeongyu/senpi": "2026.8.20"
+
+=== RED for 2026.8.20-2 (pre-publish) ===
+2026-08-20T15:58:06Z
+npm error code E404
+npm error 404 No match found for version 2026.8.20-2

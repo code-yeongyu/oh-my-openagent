@@ -35,6 +35,7 @@ async function getLastAgentFromSessionMessages(
     const response = await client.session.messages({ path: { id: sessionID } })
     const messages = deps.normalizeSDKResponse(response, [] as Array<{
       id?: string
+      agent?: string
       info?: { agent?: string; time?: { created?: number } }
       parts?: Array<{ type?: string }>
     }>, {
@@ -56,7 +57,7 @@ async function getLastAgentFromSessionMessages(
         continue
       }
 
-      const agent = message.info?.agent
+      const agent = message.info?.agent ?? message.agent
       if (typeof agent === "string") {
         return agent.toLowerCase()
       }
@@ -79,14 +80,18 @@ export async function getLastAgentFromSession(
     ...deps,
   }
 
-  if (resolvedDeps.isSqliteBackend() && client) {
-    return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
+  const sqliteBackend = resolvedDeps.isSqliteBackend()
+  if (client) {
+    const sdkAgent = await getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
+    if (sdkAgent !== null) {
+      return sdkAgent
+    }
+    if (sqliteBackend) {
+      return null
+    }
   }
 
   const messageDir = resolvedDeps.getMessageDir(sessionID)
-  if (!messageDir && client) {
-    return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
-  }
   if (!messageDir) return null
 
   try {
@@ -122,6 +127,9 @@ export async function getLastAgentFromSession(
     }
   } catch (error) {
     if (!(error instanceof Error)) throw error
+    if (client) {
+      return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
+    }
     return null
   }
 

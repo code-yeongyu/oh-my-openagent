@@ -65,7 +65,7 @@ describe("model-resolution check", () => {
         info.agents.find((a) => a.name === "sisyphus"),
         "sisyphus agent resolution",
       )
-      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-7")
+      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-5")
       expect(sisyphus.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
 
@@ -79,13 +79,13 @@ describe("model-resolution check", () => {
         info.categories.find((c) => c.name === "visual-engineering"),
         "visual-engineering category resolution",
       )
-      expect(visual.requirement.fallbackChain[0]?.model).toBe("gemini-3.1-pro")
-      expect(visual.requirement.fallbackChain[0]?.providers).toContain("google")
+      expect(visual.requirement.fallbackChain[0]?.model).toBe("claude-opus-5")
+      expect(visual.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
   })
 
   describe("getModelResolutionInfoWithOverrides", () => {
-    // given: User has overrides in oh-my-opencode.json
+    // given: User has overrides in omo.json
     // when: Getting resolution info with config
     // then: Shows user override in Step 1 position
 
@@ -316,6 +316,26 @@ describe("model-resolution check", () => {
 
       // #then these known aliases do not create compatibility fallback warnings
       expect(issues).toHaveLength(0)
+    })
+
+    it("does not warn for OpenCode Go Qwen Max overrides with snapshot-backed diagnostics from refreshed models.dev", async () => {
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      // #given Qwen Max is configured for planner agents with the refreshed snapshot
+      const info = getModelResolutionInfoWithOverrides({
+        agents: {
+          prometheus: { model: "opencode-go/qwen3.7-max" },
+          atlas: { model: "opencode-go/qwen3.7-max" },
+        },
+      })
+
+      // #when collecting doctor capability issues
+      const issues = collectCapabilityResolutionIssues(info)
+
+      // #then Qwen Max uses snapshot-backed diagnostics (models.dev now includes Qwen data)
+      expect(issues).toHaveLength(0)
+      const atlas = expectDefined(info.agents.find((agent) => agent.name === "atlas"), "atlas agent resolution")
+      expect(atlas.capabilityDiagnostics?.resolutionMode).toBe("snapshot-backed")
     })
   })
 

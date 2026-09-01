@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-18 files. Tool-layer wrappers for `background_output` and `background_cancel`. Does NOT implement the background execution engine — that lives in `src/features/background-agent/`. This directory provides the LLM-facing tool interface.
+28 files. Tool-layer wrappers for `background_output` and `background_cancel`. Does NOT implement the background execution engine — that lives in `src/features/background-agent/`. This directory provides the LLM-facing tool interface.
 
 ## THREE TOOLS
 

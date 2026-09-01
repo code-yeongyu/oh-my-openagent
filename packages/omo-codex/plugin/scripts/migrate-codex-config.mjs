@@ -2,13 +2,19 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { pathToFileURL } from "node:url";
 
+import { isCliEntry } from "./entry-guard.mjs";
 import { FALLBACK_CATALOG, readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 import { configPaths } from "./migrate-codex-config/config-paths.mjs";
-import { forceDisableMultiAgentV2 } from "./migrate-codex-config/multi-agent-v2-guard.mjs";
+import { removeStaleContext7PlaceholderMcpServer } from "./migrate-codex-config/context7-placeholder-guard.mjs";
+import { removeUnsupportedRootMultiAgentMode } from "./migrate-codex-config/multi-agent-mode-guard.mjs";
+import {
+	forceDisableMultiAgentV2,
+	resolveMultiAgentVersionFromConfig,
+} from "./migrate-codex-config/multi-agent-v2-guard.mjs";
 import { ensureCodexReasoningConfig as applyReasoningProfile, readRootSettings } from "./migrate-codex-config/root-settings.mjs";
 import { readState, resolveStatePath, writeState } from "./migrate-codex-config/state.mjs";
+import { ensureSubagentConcurrencyLimit } from "./migrate-codex-config/subagent-limit-guard.mjs";
 
 export { readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 
@@ -16,19 +22,29 @@ export function ensureCodexReasoningConfig(config, profile = FALLBACK_CATALOG.cu
 	return applyReasoningProfile(config, profile);
 }
 
-export async function migrateCodexConfig({ env = process.env, cwd = process.cwd() } = {}) {
+export async function migrateCodexConfig({
+	env = process.env,
+	cwd = process.cwd(),
+	sessionModel = null,
+	requireSessionModel = false,
+} = {}) {
 	const catalog = await readModelCatalog(env);
 	const statePath = resolveStatePath(env);
 	const state = await readState(statePath);
 	const paths = await configPaths({ env, cwd });
 	const changed = [];
+	const modeChanged = [];
 	const nextState = { catalogVersion: catalog.version, files: {} };
 	for (const configPath of paths) {
 		const result = await migrateConfigFile(configPath, {
 			catalog,
 			previousState: state.files?.[configPath],
+			env,
+			sessionModel,
+			requireSessionModel,
 		});
 		if (result.changed) changed.push(configPath);
+		if (result.multiAgentModeChanged) modeChanged.push(configPath);
 		nextState.files[configPath] = {
 			catalogVersion: catalog.version,
 			written: result.written,
@@ -36,10 +52,19 @@ export async function migrateCodexConfig({ env = process.env, cwd = process.cwd(
 		};
 	}
 	await writeState(statePath, nextState);
-	return { changed };
+	return { changed, modeChanged };
 }
 
-export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG, previousState } = {}) {
+export async function migrateConfigFile(
+	configPath,
+	{
+		catalog = FALLBACK_CATALOG,
+		previousState,
+		env = process.env,
+		sessionModel = null,
+		requireSessionModel = false,
+	} = {},
+) {
 	const before = await readConfig(configPath);
 	const decision = shouldApplyCatalog(before, catalog, previousState);
 
@@ -51,11 +76,31 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 		reasoningApplied = config !== before;
 	}
 
-	const afterMultiAgentGuard = forceDisableMultiAgentV2(config);
+	const multiAgentOptions = { env, sessionModel, requireSessionModel, configPath };
+	const multiAgentVersion = resolveMultiAgentVersionFromConfig(config, multiAgentOptions);
+	const afterMultiAgentGuard = forceDisableMultiAgentV2(config, {
+		...multiAgentOptions,
+		multiAgentVersion,
+	});
 	const multiAgentChanged = afterMultiAgentGuard !== config;
 	if (multiAgentChanged) config = afterMultiAgentGuard;
 
-	const changed = reasoningApplied || multiAgentChanged;
+	const afterMultiAgentModeGuard = removeUnsupportedRootMultiAgentMode(config);
+	const multiAgentModeChanged = afterMultiAgentModeGuard !== config;
+	if (multiAgentModeChanged) config = afterMultiAgentModeGuard;
+
+	const afterContext7PlaceholderGuard = removeStaleContext7PlaceholderMcpServer(config);
+	const context7PlaceholderChanged = afterContext7PlaceholderGuard !== config;
+	if (context7PlaceholderChanged) config = afterContext7PlaceholderGuard;
+
+	const afterSubagentLimit = ensureSubagentConcurrencyLimit(config, {
+		...multiAgentOptions,
+		multiAgentVersion,
+	});
+	const subagentLimitChanged = afterSubagentLimit !== config;
+	if (subagentLimitChanged) config = afterSubagentLimit;
+
+	const changed = reasoningApplied || multiAgentChanged || multiAgentModeChanged || context7PlaceholderChanged || subagentLimitChanged;
 	if (changed) {
 		await mkdir(dirname(configPath), { recursive: true });
 		await writeFile(configPath, `${config.trimEnd()}\n`);
@@ -63,7 +108,7 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 
 	const written = decision.apply ? catalog.current : readRootSettings(config);
 	const managed = decision.apply ? true : decision.managed;
-	return { changed, written, managed };
+	return { changed, written, managed, multiAgentModeChanged };
 }
 
 function shouldApplyCatalog(config, catalog, previousState) {
@@ -100,7 +145,7 @@ async function readConfig(configPath) {
 	}
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	migrateCodexConfig().catch((error) => {
 		if (!(error instanceof Error)) throw error;
 		process.exit(0);

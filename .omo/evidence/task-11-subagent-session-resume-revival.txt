@@ -1,0 +1,61 @@
+Task 11: Fail-closed resume model resolution
+=============================================
+
+## Scope
+In packages/senpi-task/src/manager/parent-registry-context.ts add resolveResumeContext(spec)
+returning {ok: true, context} only when the EXACT persisted provider/model resolves in the live
+registry, else {ok: false, code: "model_unavailable", reason}. Keys on resolved_model.provider +
+resolved_model.model_id, NEVER on resolved_model.display. Does NOT mutate the record. No `as any`.
+
+## RED (failing-first)
+Before implementation, ran:
+  bun test packages/senpi-task/src/manager/parent-registry-context.test.ts
+
+Result:
+  SyntaxError: Export named 'resolveResumeContext' not found in module
+  .../parent-registry-context.ts
+  0 pass, 1 fail, 1 error
+
+## GREEN
+After implementation, ran:
+  bun test packages/senpi-task/src/manager/parent-registry-context.test.ts
+
+Result:
+  15 pass, 0 fail, 38 expect() calls
+  (6 new resolveResumeContext tests + 9 pre-existing tests)
+
+## Full suite verification
+  bun test packages/senpi-task/src/manager   -> 185 pass, 0 fail
+  bun test packages/senpi-task               -> 1215 pass, 0 fail
+  ./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json -> clean (no output)
+
+## QA (auxiliary)
+  Happy path: exact match resolution
+    - spec with resolved_model {provider: "omo-mock", model_id: "mock-1"} against a registry
+      containing that exact model -> {ok: true, context.model.id === "mock-1"}
+
+  Failure path (RED test written first): provider removed from registry -> typed failure
+    - spec with resolved_model {provider: "omo-mock", model_id: "does-not-exist"} against a
+      registry that does NOT contain it -> {ok: false, code: "model_unavailable", reason contains
+      "omo-mock" and "does-not-exist"}
+
+  Adversarial: misleading_success_output
+    - spec with provider+model_id pointing to mock-1 but display string "Mock 2" (matching a
+      DIFFERENT model in the registry) -> resolves to mock-1 (the canonical pair), NOT mock-2
+      (the display string). Proves the resolver keys on provider+model_id, not display.
+
+  Adversarial: stale_state
+    - No live parent registry available -> {ok: false, code: "model_unavailable"}
+    - No resolved_model on spec -> {ok: false, code: "model_unavailable"}
+
+## Tests written (given/when/then style)
+1. resolved_model provider+model_id exist in registry -> ok with exact model + registry context
+2. resolved_model provider was removed from registry -> model_unavailable, never drifts to substitute
+3. display differs from canonical provider/model_id -> still resolves correctly (keys on provider+model_id)
+4. display matches a DIFFERENT model in the registry -> resolves the provider+model_id match, never display match
+5. no live parent registry available -> model_unavailable, never silently drifting to default
+6. no resolved_model on spec -> model_unavailable
+
+## Probes
+- stale_state (provider removed from registry between spawn and resume): COVERED (test 2)
+- misleading_success_output (must key on provider+model_id not display): COVERED (tests 3, 4)
