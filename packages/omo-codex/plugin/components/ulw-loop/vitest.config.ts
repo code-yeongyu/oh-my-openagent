@@ -6,5 +6,6 @@ export default defineConfig({
 		environment: "node",
 		pool: "threads",
 		isolate: true,
+		env: { PI_SESSION_ID: "" },
 	},
 });

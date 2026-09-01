@@ -81,6 +81,7 @@ function spawnDetachedWorker(invocation: WorkerSpawnInvocation): void {
 		detached: true,
 		env: invocation.env,
 		stdio: "ignore",
+		windowsHide: true,
 	});
 	child.unref();
 }

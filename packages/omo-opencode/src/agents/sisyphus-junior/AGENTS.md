@@ -9,7 +9,7 @@ description: Developer reference for the Sisyphus-Junior category-spawned execut
 
 ## OVERVIEW
 
-10 files. Sisyphus-Junior is a focused task executor spawned by `delegate-task` when category routing requires it. Runs in subagent mode with its own fallback chain. Does not delegate further; executes directly.
+12 files. Sisyphus-Junior is a focused task executor spawned by `delegate-task` when category routing requires it. Runs in subagent mode with its own fallback chain. Does not delegate further; executes directly.
 
 ## FILES
 
@@ -25,6 +25,7 @@ description: Developer reference for the Sisyphus-Junior category-spawned execut
 | `kimi-k2-6.ts` | Kimi K2.6 prompt variant |
 | `kimi-k2-7.ts` | Kimi K2.7-native prompt variant |
 | `kimi-k3.ts` | Kimi K3-native prompt variant (reasoning depth with built-in stop conditions) |
+| `glm-5-2.ts` | GLM-5.2-native prompt variant |
 | `index.test.ts` | Unit tests |
 
 ## VARIANT SELECTION
@@ -37,7 +38,8 @@ Parent `agent.ts` selects prompt variant by model name:
 - Contains "gpt-5.4" -> `gpt-5-4.ts`
 - Contains "gpt" -> `gpt.ts`
 - Contains "gemini" -> `gemini.ts`
-- Default -> `default.ts` (Claude, GLM, etc.)
+- Contains "glm" -> `glm-5-2.ts`
+- Default -> `default.ts` (Claude, etc.)
 
 ## KEY BEHAVIORS
 

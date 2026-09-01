@@ -2,7 +2,7 @@ import type { AvailableSkill } from "../dynamic-agent-prompt-builder"
 import type { BrowserAutomationProvider } from "../../config/schema"
 import type { LoadedSkill, SkillScope } from "../../features/opencode-skill-loader/types"
 import { isDisabledSkillAlias } from "../../features/opencode-skill-loader"
-import { createBuiltinSkills } from "../../features/builtin-skills"
+import { createBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills"
 
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"

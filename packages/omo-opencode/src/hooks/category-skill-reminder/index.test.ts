@@ -8,7 +8,6 @@ import {
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createCategorySkillReminderHook } from "./index"
 
-const REMINDER_MARKER = "[Category+Skill Reminder]"
 
 function createHook(availableSkills: AvailableSkill[] = []) {
   return createCategorySkillReminderHook(
@@ -58,7 +57,8 @@ function findReminderParts(messages: MessageWithParts[]): Part[] {
   return messages.flatMap((message) => message.parts).filter(
     (part) => part.type === "text"
       && part.synthetic === true
-      && part.text.includes(REMINDER_MARKER),
+      && part.synthetic === true
+      && part.id === `prt_category_skill_reminder_${part.messageID}`,
   )
 }
 
@@ -261,7 +261,8 @@ describe("category-skill-reminder hook", () => {
     await transformMessages(hook, messages)
 
     const reminderIndex = latestTurn.parts.findIndex(
-      (part) => part.type === "text" && part.text.includes(REMINDER_MARKER),
+      (part) => part.type === "text" && part.synthetic === true
+      && part.id === `prt_category_skill_reminder_${part.messageID}`,
     )
     const latestTextIndex = latestTurn.parts.findIndex(
       (part) => part.type === "text" && part.text === "latest real text",
@@ -353,7 +354,7 @@ describe("category-skill-reminder hook", () => {
     {
       name: "no skills",
       skills: [] satisfies AvailableSkill[],
-      expected: [REMINDER_MARKER, "load_skills=[]"],
+      expected: ["load_skills=[]"],
     },
   ])("#given $name #when the reminder fires #then it formats the available skills", async ({ skills, expected }) => {
     const hook = createHook(skills)

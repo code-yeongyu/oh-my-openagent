@@ -1,0 +1,18 @@
+=== C5 REAL SURFACE: shipped maskProviderAndModel ===
+| provider (input) | model (input) | -> provider | -> model_id | note |
+|---|---|---|---|---|
+| `openrouter` | `claude-opus-5` | `custom` | `claude-opus-5` | public model via unknown gateway |
+| `my-gateway` | `gpt-5.6-sol` | `custom` | `gpt-5.6-sol` | public model via self-hosted gateway |
+| `deepseek` | `claude-opus-5` | `deepseek` | `claude-opus-5` | public model via non-shipping known provider |
+| `anthropic` | `claude-opus-5` | `anthropic` | `claude-opus-5` | public model via its own provider |
+| `my-gateway` | `my-finetune` | `custom` | `custom` | PRIVATE fine-tune via unknown gateway |
+| `anthropic` | `my-finetune` | `anthropic` | `custom` | PRIVATE fine-tune via known provider |
+| `my-gateway` | `acme-internal-codename` | `custom` | `custom` | PRIVATE internal codename |
+| `my-secret-corp-proxy` | `claude-opus-5` | `custom` | `claude-opus-5` | gateway name that could identify a company |
+
+exportable model vocabulary size: 22
+
+PRIVACY ASSERTIONS:
+  gateway name withheld:            PASS (provider -> "custom")
+  private model name withheld:      PASS (model_id -> "custom")
+  public model id exported:         PASS (model_id -> "claude-opus-5")

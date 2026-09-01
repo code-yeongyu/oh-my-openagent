@@ -1,15 +1,22 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
 export {
+  BACKGROUND_MODES,
+  COST_REPORT_STATUSES,
+  DURATION_SOURCE_STATUSES,
   isSpawnSpecV1,
   RESIDENCY_STATES,
   RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
+  TOKEN_COVERAGE_STATUSES,
   createTaskRecord,
   markRecordLostForReconciliation,
   messageability,
   transitionTaskRecord,
 } from "./state"
 export type {
+  BackgroundMode,
+  CostReportStatus,
+  DurationSourceStatus,
   LegacyProcessSpawnSpec,
   Messageability,
   PendingSteeringEntry,
@@ -26,6 +33,7 @@ export type {
   TaskTransition,
   TaskTransitionAudit,
   TaskTransitionResult,
+  TokenCoverageStatus,
 } from "./state"
 export { TaskRecordCollisionError, createTaskRecordStore, resolveStateDir } from "./store"
 export type {
@@ -47,13 +55,20 @@ export {
 } from "./status-line"
 export type { StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
-export { assistantLastLine, formatToolActivity } from "./progress"
+export {
+  assistantLastLine,
+  createChildProgress,
+  formatToolActivity,
+  type ToolProgressDetails,
+} from "./progress"
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
 export {
+  MEMBER_IDENTITY_ENV,
   SenpiTeamSpecError,
   TEAM_LEAD_SENTINEL,
   ensureTeamRuntimeDirs,
+  isTeamMemberProcess,
   loadTeamRegistry,
   normalizeSenpiTeamSpec,
   resolveProjectTeamSpecPath,
@@ -78,6 +93,7 @@ export {
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
+  resolveAvailableCategoryNames,
   resolveCategory,
 } from "./category"
 export type {
@@ -119,6 +135,7 @@ export {
   buildAutoUiResponse,
   buildChildArgs,
   buildRpcSpawn,
+  OMO_SENPI_TASK_RPC_CHILD,
   classifyChildExit,
   createRpcChildHandle,
   detectBunBinary,
@@ -126,6 +143,7 @@ export {
   parseExtensionEntries,
   resolveChildSessionDir,
   resolveSenpiExecutable,
+  resolveSenpiLauncher,
   tailStderr,
   terminateRpcChild,
 } from "./runners"
@@ -142,6 +160,7 @@ export type {
   RpcRunnerSpec,
   RpcSpawnDescriptor,
   RpcSpawnRuntime,
+  SenpiLauncher,
   RunnerErrorFacts,
   TerminateOptions,
 } from "./runners"
@@ -198,6 +217,7 @@ export {
   BUILTIN_AGENTS,
   BUILTIN_AGENT_DEFAULTS,
   CURATED_READONLY_AGENT_NAMES,
+  ULW_REVIEWER_AGENT_NAMES,
   EMPTY_SKILL_INVOCATIONS,
   PLAN_GATED_AGENT_NAMES,
   defineAgent,
@@ -228,11 +248,18 @@ export type {
   ResolvedAgentResult,
   SkillInvocationState,
 } from "./agents"
+export { buildNoticeBox, noticeTone } from "./notice-box"
+export type { NoticeLine, NoticeSpec, NoticeTheme, NoticeTone } from "./notice-box"
+// Render-runtime lazy boundary: the task component awaits this at registration so the render
+// helpers above can read the pi-tui namespace synchronously without statically binding the
+// omo-task.js/omo-member.js blobs to the pi-tui barrel.
+export { loadPiTui } from "./lazy/pi-tui"
 export {
   buildCompletionDetails,
   buildCompletionMessage,
   completionMessageLines,
   createCompletionNotifier,
+  DAG_VERIFICATION_DIRECTIVE,
   routeCompletion,
   shouldNotifyStatus,
 } from "./completion"
@@ -304,13 +331,14 @@ export {
   resolvePromptCacheSafeWaitSeconds,
   createFsSkillLoader,
   createTaskTool,
+  evaluateSpawnPolicy,
   excerptRendererPromptText,
   excerptRendererText,
   joinRendererTokens,
   linesComponent,
   listTaskAgents,
   listTaskCategories,
-  normalizeRendererText,
+  normalizeRendererText, recordSummary,
   rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,
@@ -333,6 +361,7 @@ export type {
   TaskTargetErrorCode,
   TaskTargetSelection,
   TaskToolContext,
+  SpawnPolicyVerdict,
   TaskToolDeps,
   TaskToolDetails,
   TaskToolMode,

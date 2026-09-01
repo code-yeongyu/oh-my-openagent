@@ -28,6 +28,8 @@ function notImplemented(name: string): never {
 function fakeManager(overrides: Partial<TaskManager>): TaskManager {
   return {
     start: () => notImplemented("start"),
+    startOwned: () => notImplemented("startOwned"),
+    findOwnedTask: () => undefined,
     continueTask: () => notImplemented("continueTask"),
     sendToTask: () => notImplemented("sendToTask"),
     interruptTask: () => notImplemented("interruptTask"),

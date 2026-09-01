@@ -1,0 +1,42 @@
+Task 4: memory-core memory-discipline skill seed
+
+Commands run (worktree /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning):
+
+1. RED first: added seed-list + frontmatter tests referencing ./memory-discipline
+   before the module existed.
+   $ bun test packages/memory-core/src/seeds
+   -> 0 pass, 1 fail, 1 error (module not found), confirming RED.
+
+2. Implemented src/seeds/memory-discipline.ts, wired into buildDefaultSeedFiles
+   (seeds.ts) and the barrel (index.ts).
+   $ bun test packages/memory-core
+   -> 301 pass, 0 fail, 2244 expect() calls, 36 files, single run.
+
+3. Typecheck:
+   $ cd packages/memory-core && bunx tsc --noEmit -p .
+   -> exit 0, no output.
+
+4. Anti-slop check:
+   $ rg -n "\u2014|\u2013" packages/memory-core/src/seeds/memory-discipline.ts
+   -> no matches (no em or en dashes in the new asset).
+
+Machine-consumed assertions (per test-discipline: no prose pinning):
+- buildDefaultSeedFiles includes skills/memory-discipline/SKILL.md and the
+  seeded repo commits it (lsTree contains the path, still one initial commit).
+- Frontmatter parses via memfs/frontmatter.ts parseMemoryFile.
+- Description starts with the trigger phrase "This skill should be used when".
+No assertion touches wording, length, or structure of the prose body.
+
+QA-by-read note on the prose:
+- Routing table covers the todo's three destinations (memory note vs skill vs
+  people record) plus an explicit do-not-save row.
+- Card + observation format bullets are copied verbatim from the plan's
+  Design context (People layout + formats section), including the entry shape
+  and the writer-ownership sentence.
+- /reflect, /dream, /search, /people usage each get one line, matching the
+  plan's semantics (manual /dream bypasses gates, /people --ask read-only).
+- Soul-rules section states the tell-the-user rationale without duplicating
+  the REMINDER v2 wording (REMINDER owns "save the moment they emerge" and
+  the person-routing sentence; the skill owns the routing table and formats).
+- Frontmatter: name memory-discipline, version 0.1.0, description begins with
+  the repo-conventional trigger phrase. No em/en dashes, no emojis, no filler.

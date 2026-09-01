@@ -1,0 +1,65 @@
+task 5: Runbook + docs + CHANGELOG for the omo-ai beta channel
+date: 2026-08-09
+plan: .omo/plans/omo-ai-beta-release.md (todo 5)
+
+FILES CHANGED
+- docs/reference/omo-ai-publishing.md (NEW runbook)
+- docs/reference/release-process.md (links the runbook)
+- docs/reference/cli.md (omo row = senpi-native edition via npm omo-ai, beta channel)
+- docs/guide/installation.md (senpi-edition install section + `omo setup` onboarding section)
+- README.md (quick-start table row + rewritten stale third-party-omo note naming omo-ai)
+- CHANGELOG.md (Unreleased/Added: omo-ai beta introduction, channel contract, upgrade order)
+
+REVIEWER-READ NOTES (accuracy check against todo-1/9 mechanics)
+- Bootstrap facts match the plan's measured 2026-08-03 state: placeholder omo-ai@0.0.0-beta.0
+  published with --tag beta via a same-day-revoked scoped token, then deprecated; latest pinned
+  forever because npm refuses latest deletion (E400 measured).
+- Beta-gate mechanism documented per gap-analysis B3: bare `npm i -g omo-ai` resolves range `*`,
+  prereleases never satisfy `*`, EVERY omo-ai version is a prerelease (placeholder + the todo-9
+  injective mapping X.Y.Z -> X.Y.Z-1 / X.Y.Z-foo -> X.Y.Z-0.foo), so resolution ends in ETARGET
+  (measured live 2026-08-09). Deprecation stated as cosmetic only; un-deprecating does not open
+  the bare channel; only a non-prerelease publish could, and the mapping forbids it.
+- Trusted Publisher section states the merge-gate framing exactly: WebAuthn save failed 3x on
+  2026-08-03, persistence UNVERIFIED, must be verified BEFORE MERGE because preflight-trust is
+  unconditional at publish.yml:345/:559/:920 and would fail the entire next release for every
+  package. Procedure fields match the plan (code-yeongyu / oh-my-openagent / publish.yml /
+  environment blank / Allow npm publish only), plus persistence screenshot + no-live-token check.
+  NOTE for the merge checklist: the actual npmjs.com verification is a user-assisted WebAuthn
+  action outside this docs task; the PR body checklist must carry it.
+- Beta channel contract: --tag beta always (hardcoded, independent of DIST_TAG); latest never
+  advances; remediation `npm dist-tag add omo-ai@0.0.0-beta.0 latest`. No latest-advancement or
+  stable-channel path is documented anywhere.
+- First-beta-release checklist is user-dispatched (Q2 decision) and mirrors todo 9's run-log
+  assertions: bin-ownership assertion, OIDC-only steps (no NODE_AUTH_TOKEN), dist-tag guard,
+  live verification incl. bare-channel ETARGET proof.
+- EEXIST upgrade order: pre-rename root packages (<= 4.19.4) own a global `omo` shim; upgrade or
+  uninstall them first, then npm i -g omo-ai@beta.
+- Manifest facts consistent with todo 1: bin map is exactly `omo`; omo-agent-toolkit npm bin is
+  explicitly NOT promised from omo-ai (stated in cli.md).
+- `omo setup` section matches todo 13/14 design: read-only detection across senpi/opencode/
+  oh-my-pi/gajae-code, provider ids + credential types only (never values), consent-gated import
+  (--yes/--dry-run), skip-if-present, OAuth report-only, atomic auth.json write with backup,
+  model report is report-only. Explicitly states it replaces the old manual configure-OmO/senpi
+  guidance.
+- No local `npm publish` instruction anywhere; no claim that omo-ai is installable today as a
+  released product (installation docs describe the beta channel contract, and the CHANGELOG entry
+  sits under Unreleased).
+- Style pass: no emojis, no em/en dashes, no filler words in any added line (rg-verified).
+
+ACCEPTANCE GREPS
+$ rg -c 'Trusted Publisher|WebAuthn|--tag beta|ETARGET|EEXIST|0.0.0-beta.0' docs/reference/omo-ai-publishing.md
+  per-token counts: Trusted Publisher=3, WebAuthn=1, --tag beta=2, ETARGET=2, EEXIST=2,
+  0.0.0-beta.0=5 -> 6/6 distinct tokens present (>=6 distinct hits: PASS)
+
+$ rg -n 'npm i -g omo-ai@beta' docs/ README.md
+  README.md:128, README.md:167, docs/reference/omo-ai-publishing.md:31,:65,:74,
+  docs/reference/cli.md:24, docs/guide/installation.md:158 -> 7 hits (>=2: PASS)
+
+$ rg -n 'omo-ai-publishing' docs/reference/release-process.md
+  runbook linked from release-process.md: PASS
+
+LINK AUDIT
+$ bun test packages/omo-opencode/src/shared/markdown-link-audit.test.ts
+  16 pass, 0 fail (all local links incl. the new runbook + README anchor resolve): PASS
+  failure-mode QA: the audit is the RED gate for broken links; run came back green first try,
+  no broken-link fix cycle was needed.

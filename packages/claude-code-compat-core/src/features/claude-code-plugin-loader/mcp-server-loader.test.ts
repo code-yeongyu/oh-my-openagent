@@ -1,20 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import type { LoadedPlugin } from "./types"
 
-const TEST_DIR = join(tmpdir(), `plugin-mcp-loader-test-${Date.now()}`)
-const PROJECT_DIR = join(TEST_DIR, "project")
-const PROJECT_SUBDIRECTORY = join(PROJECT_DIR, "packages", "app")
-const PLUGIN_DIR = join(TEST_DIR, "plugin")
-const MCP_CONFIG_PATH = join(PLUGIN_DIR, "mcp.json")
+// mkdtempSync, never a Date.now()-derived name: consecutive Date.now() calls in one
+// process return the same millisecond, so sibling suites collided on one directory and
+// each afterEach removed the other's live fixture. On Windows, removing an in-use tree
+// blocks until the hook budget expires ("a beforeEach/afterEach hook timed out").
+let testDir = ""
+let projectDir = ""
+let projectSubdirectory = ""
+let pluginDir = ""
+let mcpConfigPath = ""
 
 describe("loadPluginMcpServers", () => {
   beforeEach(() => {
-    mkdirSync(PROJECT_DIR, { recursive: true })
-    mkdirSync(PROJECT_SUBDIRECTORY, { recursive: true })
-    mkdirSync(PLUGIN_DIR, { recursive: true })
+    testDir = realpathSync(mkdtempSync(join(tmpdir(), "plugin-mcp-loader-test-")))
+    projectDir = join(testDir, "project")
+    projectSubdirectory = join(projectDir, "packages", "app")
+    pluginDir = join(testDir, "plugin")
+    mcpConfigPath = join(pluginDir, "mcp.json")
+    mkdirSync(projectDir, { recursive: true })
+    mkdirSync(projectSubdirectory, { recursive: true })
+    mkdirSync(pluginDir, { recursive: true })
     mock.module("../../shared/logger", () => ({
       log: () => {},
     }))
@@ -22,13 +31,13 @@ describe("loadPluginMcpServers", () => {
 
   afterEach(() => {
     mock.restore()
-    rmSync(TEST_DIR, { recursive: true, force: true })
+    rmSync(testDir, { recursive: true, force: true })
   })
 
   describe("#given plugin MCP entries with local scope metadata", () => {
     it("#when loading plugin MCP servers from a project subdirectory #then only entries within the same project are included", async () => {
       writeFileSync(
-        MCP_CONFIG_PATH,
+        mcpConfigPath,
         JSON.stringify({
           mcpServers: {
             globalServer: {
@@ -39,19 +48,19 @@ describe("loadPluginMcpServers", () => {
               command: "npx",
               args: ["matching-plugin-local"],
               scope: "local",
-              projectPath: PROJECT_DIR,
+              projectPath: projectDir,
             },
             nonMatchingLocal: {
               command: "npx",
               args: ["non-matching-plugin-local"],
               scope: "local",
-              projectPath: join(PROJECT_DIR, "other-project"),
+              projectPath: join(projectDir, "other-project"),
             },
             parentLocal: {
               command: "npx",
               args: ["parent-plugin-local"],
               scope: "local",
-              projectPath: join(PROJECT_SUBDIRECTORY, "nested-project"),
+              projectPath: join(projectSubdirectory, "nested-project"),
             },
           },
         })
@@ -61,13 +70,13 @@ describe("loadPluginMcpServers", () => {
         name: "demo-plugin",
         version: "1.0.0",
         scope: "project",
-        installPath: PLUGIN_DIR,
+        installPath: pluginDir,
         pluginKey: "demo-plugin@test",
-        mcpPath: MCP_CONFIG_PATH,
+        mcpPath: mcpConfigPath,
       }
 
       const originalCwd = process.cwd()
-      process.chdir(PROJECT_SUBDIRECTORY)
+      process.chdir(projectSubdirectory)
 
       try {
         const { loadPluginMcpServers } = await import(`./mcp-server-loader?t=${Date.now()}`)

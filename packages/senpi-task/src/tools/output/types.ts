@@ -16,6 +16,7 @@ export type TranscriptSource = "event-log" | "session-jsonl" | "none"
 export type TranscriptReadResult = {
   readonly entries: readonly TranscriptEntry[]
   readonly source: TranscriptSource
+  readonly truncated?: boolean
 }
 
 export type TranscriptReader = (input: { readonly taskId: string; readonly stateDir: string }) => TranscriptReadResult

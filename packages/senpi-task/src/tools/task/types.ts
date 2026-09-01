@@ -23,16 +23,28 @@ export type TaskAncestry = {
 
 export type ResolveAncestry = (parentSessionId: string) => TaskAncestry | undefined
 
+export type LoadedSkill = {
+  readonly name: string
+  readonly content: string
+  readonly location?: string
+}
+
 // v1 load_skills contract: resolve named skills to SKILL.md content and expose a ready-to-prepend
 // block plus which names resolved vs went missing (missing names never fail the spawn).
 export type SkillResolution = {
   readonly prepend: string
   readonly resolved: readonly string[]
   readonly missing: readonly string[]
+  readonly skills?: readonly LoadedSkill[]
 }
 
 export type SkillLoader = (names: readonly string[], cwd: string) => SkillResolution
 
+export type TaskSkillSummary = {
+  readonly requested: readonly string[]
+  readonly resolved: readonly string[]
+  readonly missing: readonly string[]
+}
 
 export type TaskCategoryInfo = {
   readonly name: string
@@ -82,6 +94,7 @@ export type TaskToolItemDetail = {
   readonly error_message?: string
   readonly queue_position?: number
   readonly run_in_background?: boolean
+  readonly skills?: TaskSkillSummary
 }
 
 export type TaskToolDetails = {
@@ -101,6 +114,7 @@ export type TaskToolDetails = {
   readonly items?: readonly TaskToolItemDetail[]
   readonly reason?: string
   readonly run_stats?: TaskRunStats
+  readonly skills?: TaskSkillSummary
 }
 
 export type { TaskToolParamsStatic }

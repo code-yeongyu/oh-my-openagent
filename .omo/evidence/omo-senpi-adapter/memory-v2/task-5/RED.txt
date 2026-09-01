@@ -1,0 +1,41 @@
+=== RED: failing test output (before implementation) ===
+
+Command: bun test packages/omo-senpi/src/components/memory/commands/sleeptime.test.ts
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/commands/sleeptime.test.ts:
+29 |     expect(text).toContain("Merge policy: auto")
+30 |     expect(text).toContain("Category: quick")
+31 |     expect(text).toContain("Timeout: 15 minutes")
+32 |     expect(text).toContain("Sandbox: auto")
+33 |     // then -- nudge block
+34 |     expect(text).toContain("Nudge: on")
+                      ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Nudge: on"
+Received: "# Sleeptime reflection: test-identity\n\nStep trigger: every 25 steps\nOn compaction: on\nMerge policy: auto\nCategory: quick\nTimeout: 15 minutes\nSandbox: auto\n\nEdit /tmp/omo.jsonc under memory.reflection, or memory.agents.test-identity.reflection for this identity only.\nReflect now: /reflect [--recent N | --conversation <ids>] [focus]"
+
+      at <anonymous> (.../sleeptime.test.ts:34:18)
+(fail) /sleeptime > #given default settings #when invoked #then resolved reflection, nudge, facts, dream, people, soul settings, the config path, and the reflect and dream hints render [1.92ms]
+83 |     expect(text).toContain("Step trigger: every 5 steps [agent override]")
+84 |     expect(text).toContain("Merge policy: integration [agent override]")
+85 |     expect(text).toContain("Timeout: 30 minutes [agent override]")
+86 |     expect(text).toContain("Category: quick")
+87 |     // then -- nudge overrides
+88 |     expect(text).toContain("Nudge: off [agent override]")
+                      ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Nudge: off [agent override]"
+Received: "# Sleeptime reflection: test-identity\n\nStep trigger: every 5 steps [agent override]\nOn compaction: on\nMerge policy: integration [agent override]\nCategory: quick\nTimeout: 30 minutes [agent override]\nSandbox: auto\n\nEdit /tmp/omo.jsonc under memory.reflection, or memory.agents.test-identity.reflection for this identity only.\nReflect now: /reflect [--recent N | --conversation <ids>] [focus]"
+
+      at <anonymous> (.../sleeptime.test.ts:88:18)
+(fail) /sleeptime > #given per-agent overrides on reflection, nudge, facts, dream, people, soul #when invoked #then overridden fields are marked and applied [0.35ms]
+(pass) /sleeptime > #given an unbound session #when invoked #then an actionable error is returned [0.11ms]
+
+ 1 pass
+ 2 fail
+ 14 expect() calls
+Ran 3 tests across 1 file. [102.00ms]

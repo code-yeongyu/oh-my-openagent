@@ -5,7 +5,7 @@ from pathlib import Path
 from .transcript import env_path, existing, jsonl_parallel, recent, stem_id
 from .types import Session
 
-SENPI_CONFIG_DIRS = (".senpi", ".pi")
+SENPI_CONFIG_DIRS = (".omo", ".senpi", ".pi")
 OH_MY_PI_CONFIG_DIRS = (".omp",)
 GAJAE_CODE_CONFIG_DIRS = (".gjc",)
 

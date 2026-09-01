@@ -57,6 +57,7 @@ akamai_bot_manager:
     - original
     - mobile_subdomain   # www.* → m.* — strong observational win in SSR sites
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - curl_grid_exhaust   # try more impersonate × referer × url combos
     - playwright_real_chrome
   notes: |
@@ -77,6 +78,7 @@ cloudflare_turnstile:
     - google_search
     - self_root
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - playwright_mcp       # MCP sufficient; Chromium TLS passes CF baseline
     - playwright_real_chrome
 
@@ -112,6 +114,7 @@ datadome_probable:
   tls_impersonate_candidates:
     - [safari, chrome]
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - playwright_real_chrome
   notes: |
     "_probable" suffix reminds us this is a growing attack surface — mark
@@ -127,6 +130,7 @@ perimeterx_human:
   tls_impersonate_candidates:
     - [safari, chrome]
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - playwright_real_chrome
   notes: |
     PerimeterX (now HUMAN Bot Defender). Distinct cookie family from
@@ -154,6 +158,7 @@ unknown_challenge:
     - original
     - mobile_subdomain
   fallback_when_challenge:
+    - surrogate_wayback   # Phase 2.5: archive/reader copy before a browser spin-up
     - playwright_mcp
     - playwright_real_chrome
   notes: |
