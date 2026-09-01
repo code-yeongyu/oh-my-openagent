@@ -30,8 +30,13 @@ const FULL_DEFAULTS: OmoMemorySettings = {
   },
   people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
   soul: { edit_notice: true },
+  write_notice: { enabled: true },
   sync: { enabled: true },
   search: { enabled: true },
+  recall: {
+    enabled: true,
+    max_items: 2,
+  },
   compile_warn_tokens: 30000,
   agents: {},
 }
@@ -74,8 +79,13 @@ describe("OmoMemorySettingsSchema defaults", () => {
       },
       people: { enabled: false, max_entries: 20, max_entry_chars: 100 },
       soul: { edit_notice: false },
+      write_notice: { enabled: false },
       sync: { remote: "file:///tmp/memory-mirror.git", enabled: true },
       search: { enabled: false },
+      recall: {
+        enabled: false,
+        max_items: 5,
+      },
       compile_warn_tokens: 50000,
       agents: {
         "backend-lead": {
@@ -141,6 +151,50 @@ describe("OmoMemorySettingsSchema defaults", () => {
     expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("reflection.trigger.on_compaction")
   })
 
+  test("#given write_notice defaults #when parsing empty #then the tool-result notice is enabled", () => {
+    // given
+    const input = {}
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.write_notice).toEqual({ enabled: true })
+  })
+
+  test("#given write_notice disabled #when parsed #then the explicit value is preserved", () => {
+    // given
+    const input = { write_notice: { enabled: false } }
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.write_notice.enabled).toBe(false)
+  })
+
+  test("#given write_notice with an unknown key #when parsed #then the strict schema rejects it", () => {
+    // given
+    const input = { write_notice: { bogus: true } }
+
+    // when
+    const result = OmoMemorySettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("#given a per-agent write_notice override #when parsed #then the layer accepts it as a deep-partial", () => {
+    // given
+    const input = { write_notice: { enabled: false }, agents: { "backend-lead": { write_notice: { enabled: true } } } }
+
+    // when
+    const parsed = OmoMemorySettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed).toEqual(input)
+  })
+
   test("#given unknown keys inside the memory block #when parsed #then the strict schema rejects them", () => {
     // given
     const rootUnknown = { enabled: true, bogus: true }
@@ -153,5 +207,107 @@ describe("OmoMemorySettingsSchema defaults", () => {
     // then
     expect(rootResult.success).toBe(false)
     expect(nestedResult.success).toBe(false)
+  })
+
+  test("#given recall omitted #when parsing empty #then the gate defaults apply", () => {
+    // given
+    const input = {}
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.recall).toEqual({ enabled: true, max_items: 2 })
+  })
+
+  test("#given an empty recall block #when parsed #then nested defaults still materialize", () => {
+    // given
+    const input = { recall: {} }
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.recall.enabled).toBe(true)
+    expect(parsed.recall.max_items).toBe(2)
+  })
+
+  test("#given an explicit recall override #when parsed #then the explicit values win", () => {
+    // given
+    const input = { recall: { enabled: false, max_items: 4 } }
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.recall).toEqual({ enabled: false, max_items: 4 })
+  })
+
+  test("#given recall max_items outside 1..5 #when parsed #then validation fails", () => {
+    // given
+    const tooLow = { recall: { max_items: 0 } }
+    const tooHigh = { recall: { max_items: 6 } }
+
+    // when
+    const lowResult = OmoMemorySettingsSchema.safeParse(tooLow)
+    const highResult = OmoMemorySettingsSchema.safeParse(tooHigh)
+
+    // then
+    expect(lowResult.success).toBe(false)
+    expect(highResult.success).toBe(false)
+  })
+
+  test("#given invalid recall field types #when parsed #then validation fails", () => {
+    // given
+    const cases = [{ recall: { enabled: "yes" } }, { recall: { max_items: 2.5 } }]
+
+    // when
+    const results = cases.map((input) => OmoMemorySettingsSchema.safeParse(input))
+
+    // then
+    for (const result of results) {
+      expect(result.success).toBe(false)
+    }
+  })
+
+  test("#given a recall mode field #when parsed #then the strict schema rejects it", () => {
+    // given
+    const input = { recall: { mode: "lexical" } }
+
+    // when
+    const result = OmoMemorySettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("#given the removed recall knobs #when parsed on the block or its layer #then the strict schemas reject them", () => {
+    // given
+    const removed = [
+      { budget_tokens: 600 },
+      { excerpt_chars: 200 },
+      { min_score: 0.1 },
+      { exclude: ["notes/scratch.md"] },
+    ]
+
+    // when / then
+    for (const recall of removed) {
+      expect(OmoMemorySettingsSchema.safeParse({ recall }).success).toBe(false)
+      expect(OmoMemorySettingsLayerSchema.safeParse({ recall }).success).toBe(false)
+      expect(
+        OmoMemorySettingsLayerSchema.safeParse({ agents: { "backend-lead": { recall } } }).success,
+      ).toBe(false)
+    }
+  })
+
+  test("#given a per-agent recall override #when parsed #then the layer accepts it as a deep-partial", () => {
+    // given
+    const input = { recall: { enabled: false }, agents: { "backend-lead": { recall: { max_items: 1 } } } }
+
+    // when
+    const parsed = OmoMemorySettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed).toEqual(input)
   })
 })

@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs"
 
-import { createAgentSession, SessionManager, type CreateAgentSessionOptions, type ToolDefinition } from "@code-yeongyu/senpi"
+import type { CreateAgentSessionOptions, ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { ResolvedModelRecord } from "../state"
+import { loadSenpiBarrel } from "../lazy/senpi-barrel"
 import { createChildHandle, createRestoredChildHandle, type ChildHandle, type ChildSession } from "./in-process/child-handle"
 import { buildChildSessionOptions, requireChildSessionDir, resolveMemberScopedToolNames } from "./in-process/child-options"
 import { RunnerError } from "./in-process/runner-error"
@@ -79,7 +80,8 @@ export type InProcessRunnerOptions = {
   readonly createSession?: CreateChildSession
 }
 
-const defaultCreateChildSession: CreateChildSession = async (options) => (await createAgentSession(options)).session
+const defaultCreateChildSession: CreateChildSession = async (options) =>
+  (await (await loadSenpiBarrel()).createAgentSession(options)).session
 
 export class InProcessRunner {
   readonly #sharedParentTools: readonly ToolDefinition[]
@@ -104,6 +106,9 @@ export class InProcessRunner {
 
     let session: ChildSession
     try {
+      // SessionManager and the child option helpers below read barrel values synchronously, so the
+      // barrel is loaded here (memoized: a cache hit in any process that already runs the engine).
+      const { SessionManager } = await loadSenpiBarrel()
       const options = buildChildSessionOptions({
         spec,
         sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec)),
@@ -142,6 +147,7 @@ export class InProcessRunner {
 
     let session: ChildSession
     try {
+      const { SessionManager } = await loadSenpiBarrel()
       const options = buildChildSessionOptions({
         spec: { ...spec, memberScopedTools },
         sessionManager: SessionManager.open(sessionPath, requireChildSessionDir(spec), spec.cwd),

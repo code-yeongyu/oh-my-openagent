@@ -4,6 +4,7 @@ import {
   formatStatusTarget,
   formatTargetWithModel,
   normalizeRendererText,
+  parseTeamMemberTaskIdentity,
   rendererVisibleWidth,
   taskIdentityLabel,
   toolCountSuffix,
@@ -79,11 +80,21 @@ export function formatTaskRow(record: TaskRecord): string {
   return parts.join(" ")
 }
 
-export function buildWidgetRows(records: readonly TaskRecord[]): string[] {
+function selectWidgetRecords(records: readonly TaskRecord[], residentTaskIds: ReadonlySet<string>): TaskRecord[] {
   const active = records.filter((record) => !isTerminal(record.status))
-  if (active.length === 0) return []
-  const shown = active.slice(0, MAX_WIDGET_ROWS).map((record) => formatCompactTaskRow(record, WIDGET_LINE_MAX, true))
-  const overflow = active.length - MAX_WIDGET_ROWS
+  const completedResidentMembers = records.filter((record) =>
+    record.status === "completed"
+    && residentTaskIds.has(record.task_id)
+    && parseTeamMemberTaskIdentity(record) !== undefined,
+  )
+  return [...active, ...completedResidentMembers]
+}
+
+export function buildWidgetRows(records: readonly TaskRecord[], residentTaskIds: ReadonlySet<string> = new Set()): string[] {
+  const selected = selectWidgetRecords(records, residentTaskIds)
+  if (selected.length === 0) return []
+  const shown = selected.slice(0, MAX_WIDGET_ROWS).map((record) => formatCompactTaskRow(record, WIDGET_LINE_MAX, true))
+  const overflow = selected.length - MAX_WIDGET_ROWS
   if (overflow > 0) shown.push(`+${overflow} more`)
   return shown
 }
@@ -160,16 +171,19 @@ export function backgroundWidgetRows(
   now: number,
   liveStats?: (taskId: string) => TaskRunStats | undefined,
   maxWidth = LIVE_WIDGET_LINE_MAX,
+  residentTaskIds: ReadonlySet<string> = new Set(),
 ): string[] {
-  const active = records.filter((record) => !isTerminal(record.status))
-  if (active.length === 0) return []
+  const selected = selectWidgetRecords(records, residentTaskIds)
+  if (selected.length === 0) return []
   const boundedWidth = Number.isFinite(maxWidth) && maxWidth > 0
     ? Math.min(LIVE_WIDGET_LINE_MAX, Math.floor(maxWidth))
     : LIVE_WIDGET_LINE_MAX
-  const shown = active.slice(0, MAX_WIDGET_ROWS).map((record) =>
-    formatLiveBackgroundRow(record, activity.get(record.task_id) ?? "running", now, boundedWidth, liveStats?.(record.task_id)),
+  const shown = selected.slice(0, MAX_WIDGET_ROWS).map((record) =>
+    record.status === "completed"
+      ? formatCompactTaskRow(record, boundedWidth, true)
+      : formatLiveBackgroundRow(record, activity.get(record.task_id) ?? "running", now, boundedWidth, liveStats?.(record.task_id)),
   )
-  const overflow = active.length - MAX_WIDGET_ROWS
+  const overflow = selected.length - MAX_WIDGET_ROWS
   if (overflow > 0) shown.push(`+${overflow} more`)
   return shown
 }

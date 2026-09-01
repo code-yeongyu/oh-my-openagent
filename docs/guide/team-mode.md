@@ -74,8 +74,7 @@ When both scopes define the same team name, project scope wins.
 
 ## Eligible agents
 
-- **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`.
-- **Conditional:** `hephaestus` (needs teammate permission `teammate: "allow"`; otherwise use `subagent_type: "sisyphus"`).
+- **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`, `hephaestus` (OpenCode grants `teammate: "allow"` by default).
 - **Hard-reject:** `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`.
 
 Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state. Use the `task` tool for those agents; its implementation module is named `delegate-task`.
@@ -93,7 +92,7 @@ Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state
 | Tool | Purpose |
 |------|---------|
 | `team_create` | Spawn a team. |
-| `team_delete` | Tear down (lead only, no active members). |
+| `team_delete` | Tear down (lead only; rejects active members unless `force: true`). |
 | `team_shutdown_request` | Lead asks a member to wrap up. |
 | `team_approve_shutdown` / `team_reject_shutdown` | Member or lead responds. |
 | `team_send_message` | Peer-to-peer mailbox; lead-only broadcast. |
@@ -123,8 +122,8 @@ When enabled, each member gets a dedicated tmux pane attached to that member's s
 
 - No nested teams (members cannot call `team_create`).
 - No synchronous reply waits (`team_send_message` is fire-and-forget).
-- No member-driven `delegate-task` (budget defaults to 0).
-- No shutdown bypass — `team_delete` rejects active members.
+- Members are asked not to spawn further children (member guidance prompt); the `task` tool is not budget-gated to 0. Nested `team_create` is denied.
+- `team_delete` rejects active members unless `force: true`.
 
 ## Diagnostics
 
@@ -135,17 +134,18 @@ When enabled, each member gets a dedicated tmux pane attached to that member's s
 ```
 ~/.omo/
 ├── teams/{name}/config.json                      # declared specs
-├── .highwatermark                                # parity marker for runtime state
 └── runtime/{teamRunId}/
     ├── state.json                                # durable runtime state
     ├── inboxes/{member}/{uuid}.json              # mailbox (atomic per-message files)
     ├── inboxes/{member}/.delivering-{uuid}.json  # transient live-delivery reservation
     ├── inboxes/{member}/processed/               # acked messages
-    └── tasks/{id}.json                           # shared task list
+    ├── tasks/{id}.json                           # shared task list
+    ├── tasks/claims/                             # task claim records
+    └── tasks/.highwatermark                      # tasklist id allocator
 ```
 
 `.delivering-{uuid}.json` files exist only while a message is being live-delivered via `promptAsync`. They are committed to `processed/` on delivery success, released back to `{uuid}.json` on failure, or reclaimed on team resume if stranded by a crash (10 minute TTL). `listUnreadMessages` ignores dotfile entries so the fallback poll never double-injects a reserved message.
 
 ## Reference
 
-Full design: `.omo/plans/team-mode.md`.
+Implementation notes: `packages/omo-opencode/src/features/team-mode/AGENTS.md` and `packages/team-core/AGENTS.md`.

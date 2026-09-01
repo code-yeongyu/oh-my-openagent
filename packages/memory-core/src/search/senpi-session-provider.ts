@@ -12,7 +12,7 @@
 // ancestors of forked branches are emitted once. Malformed lines are skipped
 // individually and never discard the rest of the file.
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, statSync } from "../fs/resilient"
 import { basename, join } from "node:path"
 import type { SearchDocument } from "./query"
 import type { TranscriptConversation, TranscriptProvider } from "./engine"
@@ -45,6 +45,11 @@ export interface SenpiSessionProviderOptions {
 
 const ARCHIVED_SUFFIX = ".archived"
 const SESSION_SUFFIX = ".jsonl"
+
+// Memory-owned hidden custom-message channels injected by the omo memory stack (memorian recall
+// hints and memory notices). Any OTHER custom message belongs to a foreign extension and is real
+// content: it stays searchable, exactly as it was before the recall feature.
+const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set(["omo-memorian:recall", "omo-memory:notice"])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -111,12 +116,22 @@ function safeStringify(value: unknown): string {
   }
 }
 
+function customTypeOf(message: Record<string, unknown>): string {
+  return typeof message.customType === "string" ? message.customType : ""
+}
+
 function toDocument(entry: Record<string, unknown>, conversationId: string): SearchDocument | undefined {
   if (entry.type !== "message" || typeof entry.id !== "string") return undefined
   const message = entry.message
   if (!isRecord(message)) return undefined
   const role = typeof message.role === "string" ? message.role : undefined
   if (!role) return undefined
+  // Memory-owned hidden channels, never conversation. Senpi persists these as `custom_message`
+  // entries today (already skipped above by the type gate), but session files are parsed without
+  // validation, so forks and older writers can carry the same payload as a role-custom message
+  // entry; those are dropped by channel. A foreign extension's custom message is searchable
+  // content and must survive.
+  if (role === "custom" && EXCLUDED_CUSTOM_TYPES.has(customTypeOf(message))) return undefined
 
   const mapped = mapContent(message.content)
   const toolName = typeof message.toolName === "string" ? message.toolName : undefined

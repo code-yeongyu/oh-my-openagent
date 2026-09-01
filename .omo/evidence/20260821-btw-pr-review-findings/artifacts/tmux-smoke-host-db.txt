@@ -1,0 +1,7 @@
+HOST_DB_BEFORE=7628
+PASS: TUI rendered under tmux (marker found; version 1.18.18)
+PASS: send-keys reached the TUI composer (sentinel echoed)
+PASS: tmux session torn down (has-session false)
+PASS: real DB untouched (session count 7628 unchanged)
+PASS: tui-smoke
+HOST_DB_AFTER=7628

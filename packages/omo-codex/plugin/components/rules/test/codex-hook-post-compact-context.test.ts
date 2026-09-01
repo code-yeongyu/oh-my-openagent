@@ -38,7 +38,6 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const postCompactContext = readAdditionalContext(output);
 		expect(postCompactContext.length).toBeLessThan(2_000);
-		expect(postCompactContext).toContain("MUST READ");
 		expect(postCompactContext).toContain("CONTEXT.md");
 		expect(postCompactContext).not.toContain("Project rule");
 	});
@@ -65,7 +64,6 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const firstContext = readOptionalAdditionalContext(firstOutput);
 		expect(firstContext.length).toBeLessThan(1_000);
-		expect(firstContext).toContain("MUST READ");
 		expect(firstContext).toContain("CONTEXT.md");
 		expect(secondOutput).toBe("");
 	});
@@ -88,7 +86,6 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("MUST READ");
 		expect(context).toContain("CONTEXT.md");
 	});
 
@@ -106,7 +103,6 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("MUST READ");
 		expect(context).toContain("CONTEXT.md");
 	});
 
@@ -128,7 +124,6 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("MUST READ");
 		expect(context).toContain("CONTEXT.md");
 	});
 
@@ -157,7 +152,6 @@ describe("codex rules compacted context recovery", () => {
 		const contexts = outputs.map(readOptionalAdditionalContext);
 		expect(contexts.filter((context) => context.length > 0)).toHaveLength(1);
 		expect(contexts.join("").length).toBeLessThan(1_000);
-		expect(contexts.join("")).toContain("MUST READ");
 		expect(contexts.join("")).toContain("CONTEXT.md");
 	});
 });

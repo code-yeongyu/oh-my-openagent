@@ -1,83 +1,96 @@
 /// <reference types="bun-types" />
 
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
 const DIST_INDEX = "dist/index.js"
-const SKIP_MESSAGE = "[skipped - dist not built]"
+const PROMETHEUS_SOURCE = "packages/prompts-core/prompts/prometheus/default.md"
+const BUNDLE_PROBE_SCRIPT = `
+const [distUrl, projectDirectory] = process.argv.slice(1);
+const module = await import(distUrl);
+const hooks = await module.default.server({
+  directory: projectDirectory,
+  client: {},
+  serverUrl: new URL("http://127.0.0.1:1"),
+}, {});
+try {
+  const config = {};
+  await hooks.config(config);
+  const agents = Object.values(config.agent ?? {}).filter(
+    (entry) => typeof entry === "object" && entry !== null && typeof entry.prompt === "string",
+  );
+  process.stdout.write(JSON.stringify(agents));
+} finally {
+  await hooks.dispose?.();
+}
+`
 
-const PROMPT_SIGNATURES = [
-  {
-    path: "packages/prompts-core/prompts/ultrawork/default.md",
-    label: "Ultrawork default",
-    signature: "ULTRAWORK MODE ENABLED!",
-  },
-  {
-    path: "packages/prompts-core/prompts/ultrawork/gemini.md",
-    label: "Ultrawork Gemini",
-    signature: "ULTRAWORK MODE ENABLED!",
-  },
-  {
-    path: "packages/prompts-core/prompts/ultrawork/gpt.md",
-    label: "Ultrawork GPT",
-    signature: "ULTRAWORK MODE ENABLED!",
-  },
-  {
-    path: "packages/prompts-core/prompts/atlas/default.md",
-    label: "Atlas default",
-    signature: "You are Atlas - the Master Orchestrator from OhMyOpenCode.",
-  },
-  {
-    path: "packages/prompts-core/prompts/atlas/gemini.md",
-    label: "Atlas Gemini",
-    signature: "Your value is ORCHESTRATION, not coding.",
-  },
-  {
-    path: "packages/prompts-core/prompts/atlas/gpt.md",
-    label: "Atlas GPT",
-    signature: "This prompt is outcome-first. Choose the most efficient path to the outcomes above.",
-  },
-  {
-    path: "packages/prompts-core/prompts/atlas/kimi.md",
-    label: "Atlas Kimi",
-    signature: "Trust the trained prior on the hard 30% (verification reasoning, failure diagnosis, dependency analysis).",
-  },
-  {
-    path: "packages/prompts-core/prompts/atlas/opus-4-7.md",
-    label: "Atlas Opus 4.7",
-    signature: "Opus 4.7 spawns fewer subagents than Opus 4.6 unless told otherwise.",
-  },
-  {
-    path: "packages/prompts-core/prompts/prometheus/default.md",
-    label: "Prometheus default",
-    signature: "Your FIRST action in every planning session is to LOAD the ulw-plan skill",
-  },
-  {
-    path: "packages/prompts-core/prompts/mode/team.md",
-    label: "Team mode",
-    signature: "Team-mode reference detected. Orchestrate via team_* tools",
-  },
-  {
-    path: "packages/prompts-core/prompts/mode/hyperplan.md",
-    label: "Hyperplan mode",
-    signature: "HYPERPLAN MODE ENABLED!",
-  },
-] as const
+type RuntimeAgent = {
+  mode?: unknown
+  permission?: unknown
+  prompt: string
+}
 
 describe("dist bundle prompt content", () => {
-  test("#given dist bundle #when scanned #then markdown prompt signatures are inlined", async () => {
+  test("#given the built plugin bundle #when its runtime agent factory is executed #then the bundled prompt equals its source artifact", async () => {
     const distIndex = Bun.file(DIST_INDEX)
-    if (!(await distIndex.exists())) {
-      console.info(SKIP_MESSAGE)
-      return
-    }
+    expect(await distIndex.exists(), `${DIST_INDEX} must exist before this CI-only test runs`).toBe(true)
 
-    const bundle = await distIndex.text()
+    const fixtureRoot = await mkdtemp(join(tmpdir(), "omo-dist-prompt-"))
+    const homeDirectory = join(fixtureRoot, "home")
+    const projectDirectory = join(fixtureRoot, "project")
+    await Promise.all([
+      Bun.write(join(homeDirectory, ".keep"), ""),
+      Bun.write(join(projectDirectory, ".keep"), ""),
+    ])
 
-    for (const prompt of PROMPT_SIGNATURES) {
-      expect(
-        bundle.includes(prompt.signature),
-        `${prompt.label} prompt content missing from dist/index.js (${prompt.path}): markdown inlining may have regressed`,
-      ).toBe(true)
+    try {
+      const node = Bun.which("node")
+      expect(node, "node is required to execute the published ESM bundle seam").not.toBeNull()
+      const child = Bun.spawn({
+        cmd: [
+          node!,
+          "--input-type=module",
+          "-e",
+          BUNDLE_PROBE_SCRIPT,
+          new URL(`../../../../${DIST_INDEX}`, import.meta.url).href,
+          projectDirectory,
+        ],
+        cwd: process.cwd(),
+        env: {
+          ...Bun.env,
+          HOME: homeDirectory,
+          XDG_CONFIG_HOME: join(homeDirectory, ".config"),
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+      expect(exitCode, `${stdout}\n${stderr}`.trim()).toBe(0)
+
+      const runtimeAgents = JSON.parse(stdout) as RuntimeAgent[]
+
+      const sourcePrompt = await readFile(PROMETHEUS_SOURCE, "utf8")
+      const runtimeAgent = runtimeAgents.find((agent) => agent.prompt === sourcePrompt)
+      expect(runtimeAgent, `${PROMETHEUS_SOURCE} was not returned by the built plugin runtime`).toBeDefined()
+      expect(runtimeAgent).toMatchObject({
+        mode: "primary",
+        permission: {
+          call_omo_agent: "deny",
+          edit: "allow",
+          question: "allow",
+          task: "allow",
+          webfetch: "allow",
+        },
+      })
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 })

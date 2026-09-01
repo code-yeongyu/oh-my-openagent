@@ -1,0 +1,13 @@
+Exact command:
+git merge-tree --write-tree HEAD origin/dev
+
+RED observable:
+Auto-merging packages/omo-senpi/plugin/extensions/omo-task.js
+CONFLICT (content): Merge conflict in packages/omo-senpi/plugin/extensions/omo-task.js
+
+Exit code: 1
+
+Unmerged stages:
+100644 2814fe7a20d77bd96ca034cc441cfbefffa39aa5 1	packages/omo-senpi/plugin/extensions/omo-task.js
+100644 10417273526ba6c4c1ee713b42e81e0400202636 2	packages/omo-senpi/plugin/extensions/omo-task.js
+100644 be4f04254008caf8d6d0f5651c420a38fac9a3bd 3	packages/omo-senpi/plugin/extensions/omo-task.js

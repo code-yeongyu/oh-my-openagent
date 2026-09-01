@@ -1,0 +1,20 @@
+{
+  "result": "PASS",
+  "checks": {
+    "enabled_process_exit": "PASS",
+    "enabled_read_event": "PASS",
+    "enabled_trailer_injected": "PASS",
+    "enabled_footer_injected": "PASS",
+    "disabled_process_exit": "PASS",
+    "disabled_read_event": "PASS",
+    "disabled_trailer_absent": "PASS",
+    "disabled_footer_absent": "PASS",
+    "real_agent_dirs_untouched": "PASS"
+  },
+  "realAgentDirsUntouched": true,
+  "changedRealDirs": [],
+  "sandboxAgentDirs": {
+    "enabled": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-Wgv3sg/agent",
+    "disabled": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-6vOBg0/agent"
+  }
+}

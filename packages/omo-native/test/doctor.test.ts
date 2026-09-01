@@ -42,6 +42,7 @@ function createFixture(): Fixture {
   }))
   writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
+  writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const [, artifact] of artifacts) writeFile(join(packageRoot, artifact))
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
@@ -144,6 +145,36 @@ describe("omo doctor", () => {
       const result = run(fixture, { SENPI_CODING_AGENT_DIR: alternate })
       expect(result.status).toBe(0)
       expect(result.stdout).toContain("WARN duplicate @code-yeongyu/omo-senpi")
+    })
+  })
+})
+
+function envWithoutAgentDir(home: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home }
+  delete env.OMO_CODING_AGENT_DIR
+  delete env.SENPI_CODING_AGENT_DIR
+  delete env.PI_CODING_AGENT_DIR
+  return env
+}
+
+describe("omo doctor", () => {
+  describe("#given no agent directory is configured", () => {
+    describe("#when diagnostics run", () => {
+      test("#then the canonical branded directory is the one inspected", () => {
+        const fixture = createFixture()
+        const home = join(fixture.root, "home")
+        writeFile(
+          join(home, ".omo", "agent", "settings.json"),
+          JSON.stringify({ packages: ["@code-yeongyu/omo-senpi"] }),
+        )
+
+        const result = spawnSync(process.execPath, [fixture.launcher, "doctor"], {
+          encoding: "utf8",
+          env: envWithoutAgentDir(home),
+        })
+
+        expect(result.stdout).toContain("WARN duplicate @code-yeongyu/omo-senpi package entry")
+      })
     })
   })
 })

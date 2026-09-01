@@ -1,0 +1,41 @@
+INITIAL ROOT ATTEMPT
+
+Command:
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun --config=bunfig.root.toml test
+
+Observed:
+
+  13881 pass
+  17 skip
+  9 fail
+  Ran 13907 tests across 1781 files. [322.30s]
+
+All nine failures were artifact-layout/installer checks:
+
+- published package layout;
+- seven install-codex/cache/manifest scenarios;
+- built Codex telemetry single-source guard.
+
+ROOT CAUSE
+
+The worktree dependency install intentionally used:
+
+  bun install --frozen-lockfile --ignore-scripts
+
+GitHub's root `test` job does not use `--ignore-scripts`; root `prepare` builds
+the package, Codex plugin, MCPs, LSP daemon, and staged artifacts before the
+test step. The nine tests inspect those built artifacts and correctly fail
+when the build prerequisite is absent.
+
+CORRECTIVE VERIFICATION ORDER
+
+A serialized monitor now runs the CI-faithful order:
+
+  bun run build
+  bun --config=bunfig.root.toml test
+  bun run test:codex
+
+This is a verification-environment correction only. No test was skipped,
+weakened, retried, or changed to hide the failure.

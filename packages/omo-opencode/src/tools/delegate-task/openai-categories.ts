@@ -86,66 +86,16 @@ Approach:
 - Minimal viable implementation
 - Skip unnecessary abstractions
 - Direct and concise
-</Category_Context>
+</Category_Context>`
 
-<Caller_Warning>
-THIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.6-luna-fast).
-
-The model executing this task is optimized for speed over depth. Your prompt MUST be:
-
-**EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:
-1. MUST DO: List every required action as atomic, numbered steps
-2. MUST NOT DO: Explicitly forbid likely mistakes and deviations
-3. EXPECTED OUTPUT: Describe exact success criteria with concrete examples
-
-**WHY THIS MATTERS:**
-- Smaller models benefit from explicit guardrails
-- Vague instructions may lead to unpredictable results
-- Implicit expectations may be missed
-**PROMPT STRUCTURE (MANDATORY):**
-\`\`\`
-TASK: [One-sentence goal]
-
-MUST DO:
-1. [Specific action with exact details]
-2. [Another specific action]
-...
-
-MUST NOT DO:
-- [Forbidden action + why]
-- [Another forbidden action]
-...
-
-EXPECTED OUTPUT:
-- [Exact deliverable description]
-- [Success criteria / verification method]
-\`\`\`
-
-If your prompt lacks this structure, REWRITE IT before delegating.
-</Caller_Warning>`
+const QUICK_CATEGORY_CALLER_GUIDANCE = `<Caller_Warning>Small/fast model: before delegating, write an explicit prompt with numbered must-do steps, forbidden deviations, and concrete success criteria.</Caller_Warning>`
 
 const UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on tasks that don't fit specific categories but require moderate effort.
+</Category_Context>`
 
-<Selection_Gate>
-BEFORE selecting this category, VERIFY ALL conditions:
-1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
-2. Task requires more than trivial effort but is NOT system-wide
-3. Scope is contained within a few files/modules
-
-If task fits ANY other category, DO NOT select unspecified-low.
-This is NOT a default choice - it's for genuinely unclassifiable moderate-effort work.
-</Selection_Gate>
-</Category_Context>
-
-<Caller_Warning>
-THIS CATEGORY USES A LIGHTWEIGHT MODEL (gpt-5.6-luna).
-
-**PROVIDE CLEAR STRUCTURE:**
-1. MUST DO: Enumerate required actions explicitly
-2. MUST NOT DO: State forbidden actions to prevent scope creep
-3. EXPECTED OUTPUT: Define concrete success criteria
-</Caller_Warning>`
+const UNSPECIFIED_LOW_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Use only when no specialist category fits, effort is moderate, and scope stays within a few files/modules. Prefer any matching specialist category.</Selection_Gate>
+<Caller_Warning>Provide explicit must-do steps, forbidden scope, and concrete success criteria.</Caller_Warning>`
 
 export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
@@ -166,12 +116,14 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
     name: "quick",
     config: { model: "kimi-for-coding/kimi-for-coding-highspeed" },
     description: "Trivial tasks - single file changes, typo fixes, simple modifications",
+    callerGuidance: QUICK_CATEGORY_CALLER_GUIDANCE,
     promptAppend: QUICK_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "unspecified-low",
-    config: { model: "openai/gpt-5.6-luna", variant: "xhigh" },
+    config: { model: "xai/grok-4.6", variant: "xhigh" },
     description: "Tasks that don't fit other categories, low effort required",
+    callerGuidance: UNSPECIFIED_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   },
 ]

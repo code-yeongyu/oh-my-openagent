@@ -8,7 +8,7 @@ test("#given a record with fallback attempts #when result details are built #the
   const fallbackAttempts = [
     { provider: "kimi-coding", model_id: "kimi-for-coding-highspeed", display: "kimi-for-coding-highspeed", source: "category" as const },
     {
-      provider: "quotio-openai",
+      provider: "openai-codex",
       model_id: "gpt-5.6-luna-fast",
       display: "gpt-5.6-luna-fast",
       reasoning_effort: "high",
@@ -20,7 +20,7 @@ test("#given a record with fallback attempts #when result details are built #the
     root_session_id: "session-root",
     depth: 0,
     execution_mode: "in-process",
-    model: "quotio-openai/gpt-5.6-luna-fast",
+    model: "openai-codex/gpt-5.6-luna-fast",
     notify_on_terminal: false,
     fallback_attempts: fallbackAttempts,
   }, 1)
@@ -40,7 +40,7 @@ test("#given a record with a task_summary #when result details are built #then t
     root_session_id: "session-root",
     depth: 0,
     execution_mode: "in-process",
-    model: "quotio-openai/gpt-5.6-luna-fast",
+    model: "openai-codex/gpt-5.6-luna-fast",
     notify_on_terminal: false,
   }, 1)
 

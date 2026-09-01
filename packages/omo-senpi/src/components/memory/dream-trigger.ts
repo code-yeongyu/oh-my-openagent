@@ -1,7 +1,7 @@
-// Dream trigger wiring (plan todo 12): opportunistic dream launches from idle, shutdown, and
-// manual origins. Automatic origins (idle, shutdown) pass three gates - dream.enabled,
-// min_hours_between since the last completed dream, and the unreflected-volume floor - while the
-// manual origin bypasses all three (letta manual-unconditional parity); todo 14 owns the manual
+// Dream trigger wiring (plan todo 12): opportunistic dream launches from idle, shutdown,
+// pressure, and manual origins. Transcript-driven automatic origins (idle, shutdown) pass three
+// gates - dream.enabled, min_hours_between, and the unreflected-volume floor. Pressure shares the
+// first two gates but bypasses transcript volume, while manual bypasses all three; todo 14 owns the manual
 // call site, this module ships the bypass path. The idle detector is an in-extension timer armed
 // on agent_settled, reset by input/agent_start/session_compact, and cancelled by
 // session_shutdown/session_abort; it fires only while the host still reports idle with no pending
@@ -19,7 +19,7 @@ import type {
 
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import { fireDream } from "./dream-trigger-fire"
-import type { DreamGateRejection, DreamTriggerSettings } from "./dream-trigger-gates"
+import { readLastDreamAtMs, type DreamGateRejection, type DreamTriggerSettings } from "./dream-trigger-gates"
 import type { ShutdownEvaluator } from "./shutdown-drain"
 
 export * from "./dream-trigger-gates"
@@ -83,6 +83,10 @@ export interface DreamTriggerWiring {
   shutdownEvaluator(): ShutdownEvaluator
   /** Manual entrypoint for todo 14's /dream. Bypasses every automatic gate. */
   requestManualDream(request?: ManualDreamRequest): Promise<DreamFireOutcome>
+  /** Status-refresh entrypoint for system-token pressure; bypasses idle and transcript-volume gates. */
+  requestPressureDream(sessionId: string): Promise<DreamFireOutcome>
+  /** Schedules a best-effort dream check for an overdue identity at session start. */
+  reconcileSessionStart(session: DreamTriggerSession): Promise<void>
   /** Resolves once every fire started so far has finished. */
   whenIdle(): Promise<void>
 }
@@ -90,9 +94,13 @@ export interface DreamTriggerWiring {
 export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): DreamTriggerWiring {
   const now = options.now ?? Date.now
   const scheduler = options.scheduler ?? defaultScheduler
-  const timers = new Map<string, { readonly handle: unknown; readonly eventCtx: unknown }>()
+  const timers = new Map<string, {
+    readonly handle: unknown
+    readonly eventCtx: unknown
+    readonly session?: DreamTriggerSession
+  }>()
   const inFlight = new Set<Promise<void>>()
-  const launch = (session: DreamTriggerSession, origin: "idle" | "shutdown" | "manual", request: ManualDreamRequest & {
+  const launch = (session: DreamTriggerSession, origin: "idle" | "shutdown" | "manual" | "pressure", request: ManualDreamRequest & {
     readonly signal?: AbortSignal
     readonly deadlineAt?: number
   }) =>
@@ -131,6 +139,16 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
     timers.set(session.conversationId, { handle, eventCtx })
   }
 
+  async function reconcileSessionStart(session: DreamTriggerSession): Promise<void> {
+    const settings = options.resolveSettings(session.identity)
+    if (!settings.enabled) return
+    const lastDreamAtMs = await readLastDreamAtMs(session.identityPaths.runtime)
+    if (lastDreamAtMs !== null && now() - lastDreamAtMs <= settings.minHoursBetween * 3_600_000) return
+    cancelTimer(session.conversationId)
+    const handle = scheduler.schedule(() => fire(session.conversationId), 60_000)
+    timers.set(session.conversationId, { handle, eventCtx: undefined, session })
+  }
+
   function resetFor(eventCtx: unknown): void {
     const session = options.resolveSession(eventCtx)
     if (session === undefined) return
@@ -141,8 +159,8 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
     const state = timers.get(conversationId)
     if (state === undefined) return
     timers.delete(conversationId)
-    if (!isIdleNow(state.eventCtx)) return
-    const session = options.resolveSession(state.eventCtx)
+    if (state.session === undefined && !isIdleNow(state.eventCtx)) return
+    const session = state.session ?? options.resolveSession(state.eventCtx)
     if (session === undefined || session.conversationId !== conversationId) return
     track(async () => {
       await launch(session, "idle", {})
@@ -177,6 +195,14 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
       if (session === undefined) return { fired: false, rejection: "no_session" }
       return launch(session, "manual", request)
     },
+
+    async requestPressureDream(sessionId: string): Promise<DreamFireOutcome> {
+      const session = options.resolveSessionById(sessionId)
+      if (session === undefined) return { fired: false, rejection: "no_session" }
+      return launch(session, "pressure", {})
+    },
+
+    reconcileSessionStart,
 
     async whenIdle(): Promise<void> {
       while (inFlight.size > 0) await Promise.all([...inFlight])

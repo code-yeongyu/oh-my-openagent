@@ -1,0 +1,21 @@
+=== omo doctor --reap with no pid ===
+FAIL --reap needs the pids to terminate: omo doctor --reap <pid> [pid...]
+exit=1
+
+=== omo doctor --reap <attached live engine pid 12811> (user session; MUST refuse) ===
+FAIL refusing pid 12811: its launcher (pid 12806) is alive, so it is a live session
+exit=1
+
+=== omo doctor --reap <this shell's pid, not an engine> (MUST refuse) ===
+FAIL refusing pid 58253: it is not an omo engine process
+exit=1
+
+=== omo doctor --reap notapid ===
+FAIL refusing "notapid": --reap takes process ids
+exit=1
+
+=== process table after refusals: the user's pids are all still alive ===
+12811 12806    02:24:22
+90387     1    23:19:37
+75183     1 01-02:20:03
+90878     1 01-01:52:19

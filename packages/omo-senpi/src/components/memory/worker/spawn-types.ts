@@ -1,4 +1,6 @@
-import type { FactsPayload, ReflectionWorktree, ReservedRun } from "@oh-my-opencode/memory-core"
+import type { FactsPayload, RecallCandidate, ReflectionWorktree, ReservedRun } from "@oh-my-opencode/memory-core"
+
+import type { FactsQueuedKey } from "../facts-failure-recording"
 import type { RunAttempt } from "./run-artifacts"
 
 export interface ReflectionSpawnPaths {
@@ -9,8 +11,10 @@ export interface ReflectionSpawnPaths {
   readonly persona: string
   readonly prompt: string
   readonly skillsUsage?: string
+  readonly memoryUsage?: string
   readonly dreamState?: string
   readonly dreamPolicy?: string
+  readonly systemTokens?: string
   readonly dreamTarget?: string
 }
 
@@ -21,6 +25,10 @@ export interface DreamPeoplePolicy {
 }
 
 export interface ReflectionSpawnArgs {
+  /** Fork mode reuses the parent session's request prefix so the provider cache can hit. */
+  readonly fork?: {
+    readonly parentSessionFile: string
+  }
   readonly runId?: string
   readonly attempt: number
   readonly hardDeadlineAt: number
@@ -31,9 +39,11 @@ export interface ReflectionSpawnArgs {
   readonly nextAttempt?: RunAttempt
   readonly kind?: "reflection" | "dream"
   readonly trigger?: ReservedRun["request"]["trigger"]
-  readonly origin?: "manual" | "idle" | "shutdown"
+  readonly origin?: "manual" | "idle" | "shutdown" | "pressure"
   readonly mergePolicy?: "auto" | "integration"
   readonly targetDoc?: string
+  readonly systemTokenBudget?: number
+  readonly systemTokenTarget?: number
   readonly worktree?: ReflectionWorktree
   readonly command: string
   readonly args: readonly string[]
@@ -86,13 +96,16 @@ export interface FactsRunLedgerEnvelope {
   readonly terminationGraceMs: number
   readonly deadlineAt: number
   readonly batchId: string
-  readonly queued: readonly { readonly conversationId: string; readonly end_message_id: string }[]
+  readonly queued: readonly FactsQueuedKey[]
   readonly headBeforeApply?: string
 }
 
 export type FactsSandbox = (spawnArgs: FactsSpawnArgs) => FactsSpawnArgs | Promise<FactsSpawnArgs>
 
 export interface PrepareReflectionSpawnInput {
+  /** Fork mode: the live parent session file to fork, and the parent's cwd for prefix identity. */
+  readonly parentSessionFile?: string
+  readonly parentCwd?: string
   readonly run: ReservedRun
   readonly worktree: ReflectionWorktree
   readonly reflectionSessionsDir: string
@@ -105,9 +118,60 @@ export interface PrepareReflectionSpawnInput {
   readonly env: NodeJS.ProcessEnv
   readonly mergePolicy: "auto" | "integration"
   readonly skillsUsageSource: string
+  readonly memoryUsageSource: string
   readonly dreamStateSource: string
   readonly peoplePolicy: DreamPeoplePolicy
+  readonly systemTokenBudget?: number
+  readonly systemTokenTarget?: number
   readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
+  readonly chmodFile?: (path: string, mode: number) => Promise<void>
+}
+
+/** One line of the judge's read-only transcript window. */
+export interface MemorianTranscriptTurn {
+  readonly role: "user" | "assistant"
+  readonly text: string
+}
+
+export interface MemorianSpawnPaths {
+  readonly runDir: string
+  readonly candidates: string
+  readonly transcript: string
+  readonly persona: string
+  readonly extension: string
+  /** NDJSON sink the child's nudge tool appends to; the parent is its only reader. */
+  readonly nudges: string
+}
+
+export interface MemorianSpawnArgs {
+  readonly hardDeadlineAt: number
+  readonly model: string
+  readonly thinking?: string
+  readonly command: string
+  readonly args: readonly string[]
+  readonly cwd: string
+  readonly env: NodeJS.ProcessEnv
+  readonly detached: true
+  readonly paths: MemorianSpawnPaths
+}
+
+export type MemorianSandbox = (spawnArgs: MemorianSpawnArgs) => MemorianSpawnArgs | Promise<MemorianSpawnArgs>
+
+export interface PrepareMemorianSpawnInput {
+  readonly runDir: string
+  readonly candidates: readonly RecallCandidate[]
+  /** Paths already surfaced this session; the persona sees them, the parent re-checks them. */
+  readonly surfaced: readonly string[]
+  /** Authoritative cap (memory.recall.max_items); the payload carries it for the persona. */
+  readonly maxItems: number
+  readonly transcript: readonly MemorianTranscriptTurn[]
+  readonly model: string
+  readonly thinking?: string
+  readonly hardDeadlineAt?: number
+  readonly env: NodeJS.ProcessEnv
+  readonly senpiCommand?: string
+  readonly senpiPrefixArgs?: readonly string[]
   readonly chmodFile?: (path: string, mode: number) => Promise<void>
 }
 

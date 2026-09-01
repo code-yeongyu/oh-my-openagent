@@ -7,9 +7,9 @@ import { taskResultLines } from "./renderers"
 
 const RESOLVED_MODEL = {
   source: "category" as const,
-  provider: "quotio-openai",
+  provider: "openai-codex",
   model_id: "gpt-5.6-luna-fast",
-  display: "quotio-openai/gpt-5.6-luna-fast",
+  display: "openai-codex/gpt-5.6-luna-fast",
 }
 
 describe("batch task model visibility", () => {
@@ -44,7 +44,7 @@ describe("batch task model visibility", () => {
     const itemLine = taskResultLines(output.details)[1]
 
     // then
-    expect(itemLine).toContain("category:quick(quotio-openai/gpt-5.6-luna-fast)")
+    expect(itemLine).toContain("category:quick(openai-codex/gpt-5.6-luna-fast)")
     expect(itemLine).not.toContain("requested/model")
   })
 })

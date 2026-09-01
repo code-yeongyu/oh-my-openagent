@@ -39,7 +39,7 @@ describe("member injection residency", () => {
         return child
       },
     })
-    const handle = runner.start({ task_id: "st_00000001", cwd: root, state_dir: root, prompt: "first" })
+    const handle = await runner.start({ task_id: "st_00000001", cwd: root, state_dir: root, prompt: "first" })
     await handle.waitForIdle()
     expect(handle.lastAssistantText()).toBe("first")
 

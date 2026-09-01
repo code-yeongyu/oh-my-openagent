@@ -1,4 +1,4 @@
-import { lstatSync, realpathSync } from "node:fs";
+import { lstatSync, realpathSync } from "../fs/resilient";
 import {
   dirname,
   extname,

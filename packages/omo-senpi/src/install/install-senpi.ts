@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
+import { resolveAgentHome } from "../components/agent-home/resolve-agent-home"
 import { installLocalLauncher, uninstallLocalLauncher } from "./local-launcher"
 import { ensurePluginArtifacts } from "./plugin-artifacts"
 import {
@@ -111,7 +112,7 @@ function resolveInstallContext(options: SenpiInstallOptions): {
   const env = options.env ?? process.env
   const allowBuild = options.pluginPath === undefined
   const repoRoot = resolve(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname(fileURLToPath(import.meta.url))) : dirname(resolve(options.pluginPath))))
-  const agentDir = resolve(options.agentDir ?? env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"))
+  const agentDir = resolve(options.agentDir ?? resolveAgentHome({ env, homeDir: env.HOME ?? homedir() }))
   const pluginPath = resolve(options.pluginPath ?? join(repoRoot, "packages", "omo-senpi", "plugin"))
   return {
     env,
