@@ -86,6 +86,20 @@ describe("sweepStaleOmoAgentSessionsWith", () => {
 		expect(fixture.killed).toEqual([])
 	})
 
+	it("#given listing sessions fails #when stale sweep called #then propagates the error for the manager to retry", async () => {
+		// given
+		const error = new Error("tmux server is unavailable")
+		const deps: SweepDeps = {
+			...fixture.deps,
+			listCandidateSessions: async () => {
+				throw error
+			},
+		}
+
+		// when / then
+		await expect(sweepStaleOmoAgentSessionsWith(deps)).rejects.toBe(error)
+	})
+
 	it("#given sessions with dead PIDs #when sweep called #then each dead session is killed once", async () => {
 		// given
 		fixture.setCandidates(["omo-agents-99991", "omo-agents-99992"])
@@ -185,5 +199,25 @@ describe("sweepTmuxSessionsWith", () => {
 		// then
 		expect(result).toEqual(["omo-team-A", "omo-team-B"])
 		expect(fixture.killed).toEqual(["omo-team-A", "omo-team-B"])
+	})
+
+	it("#given listing sessions fails #when generic sweep called #then logs and returns no kills", async () => {
+		// given
+		const error = new Error("tmux server is unavailable")
+		const log = mock(() => undefined)
+		const deps: SweepDeps = {
+			...fixture.deps,
+			log,
+			listCandidateSessions: async () => {
+				throw error
+			},
+		}
+
+		// when
+		const result = await sweepTmuxSessionsWith(deps, {})
+
+		// then
+		expect(result).toEqual([])
+		expect(log).toHaveBeenCalledTimes(1)
 	})
 })
