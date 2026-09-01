@@ -49,7 +49,7 @@ describe("resolveMember", () => {
       categoryModel: { providerID: "openai", modelID: "gpt-5.4" },
       categoryPromptAppend: "appendix",
       maxPromptTokens: 512,
-      fallbackChain: [{ providers: ["openai"], model: "gpt-5.4-mini" }],
+      fallbackChain: [{ providers: ["openai"], model: "gpt-5.6-luna-fast" }],
     })
 
     // when
@@ -118,7 +118,7 @@ describe("resolveMember", () => {
 
     resolveSubagentExecutionMock.mockResolvedValue({
       agentToUse: "atlas",
-      categoryModel: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      categoryModel: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
       fallbackChain: [{ providers: ["openai"], model: "gpt-5.4-nano" }],
     })
 
@@ -197,7 +197,7 @@ describe("resolveMember", () => {
     })
     resolveSubagentExecutionMock.mockResolvedValue({
       agentToUse: "atlas",
-      categoryModel: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      categoryModel: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
       fallbackChain: [],
     })
     const source = readFileSync(new URL("./resolve-member.ts", import.meta.url), "utf8")
@@ -218,7 +218,7 @@ describe("resolveMember", () => {
       agentName: "atlas",
       categoryPromptAppend: undefined,
       maxPromptTokens: undefined,
-      model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
     })
     expect(source).toContain("buildSystemContent({")
     expect(source).not.toContain("member.prompt +")

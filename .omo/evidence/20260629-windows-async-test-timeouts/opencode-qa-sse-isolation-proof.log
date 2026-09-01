@@ -1,6 +1,0 @@
-real_db_path=/Users/yeongyu/.local/share/opencode/opencode.db
-session_count_before=5737
-first matching event: {"type":"server.connected"}
-PASS: SSE /event opened and delivered server.connected
-session_count_after=5737
-PASS: real opencode DB session count unchanged

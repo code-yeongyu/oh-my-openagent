@@ -13,10 +13,10 @@ import {
 } from "./codex-config-marketplaces"
 import { ensureAutonomousPermissions } from "./codex-config-permissions"
 import { ensureHookTrusted, ensureOmoBuiltinMcpPolicies, ensurePluginEnabled } from "./codex-config-plugins"
-import { ensureCodexReasoningConfig } from "./codex-config-reasoning"
+import { applyReasoningOverride, ensureCodexReasoningConfig } from "./codex-config-reasoning"
 import { readCodexModelCatalog } from "./codex-model-catalog"
 import { removeUnsupportedCodexMultiAgentModeConfig } from "./codex-multi-agent-mode-config"
-import { ensureCodexMultiAgentV2Config } from "./codex-multi-agent-v2-config"
+import { ensureCodexMultiAgentV2Config, resolveCodexMultiAgentVersion } from "./codex-multi-agent-v2-config"
 import type { CodexAgentConfig, CodexInstallPlatform, CodexMarketplaceSource, TrustedHookState } from "./types"
 
 export async function updateCodexConfig(input: {
@@ -32,6 +32,8 @@ export async function updateCodexConfig(input: {
   readonly agentConfigs?: readonly CodexAgentConfig[]
   readonly autonomousPermissions?: boolean
   readonly preserveMarketplaceSource?: boolean
+  /** Unified omo config reasoning level; overrides the catalog's model_reasoning_effort (off maps to none). */
+  readonly reasoning?: string
 }): Promise<void> {
   await mkdir(dirname(input.configPath), { recursive: true })
   let config: string
@@ -58,8 +60,13 @@ export async function updateCodexConfig(input: {
   config = ensureFeatureEnabled(config, "plugin_hooks")
   config = ensureFeatureEnabled(config, "multi_agent")
   config = removeUnsupportedCodexMultiAgentModeConfig(config)
-  config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
-  config = ensureCodexMultiAgentV2Config(config)
+  config = ensureCodexReasoningConfig(
+    config,
+    applyReasoningOverride(await readCodexModelCatalog(input.repoRoot), input.reasoning),
+  )
+  config = ensureCodexMultiAgentV2Config(config, {
+    multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath),
+  })
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)
   if (!(input.preserveMarketplaceSource === true && hasMarketplaceBlock(config, input.marketplaceName))) {
     config = ensureMarketplaceBlock(config, input.marketplaceName, input.marketplaceSource)

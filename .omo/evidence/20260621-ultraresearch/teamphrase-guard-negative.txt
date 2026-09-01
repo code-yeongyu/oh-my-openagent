@@ -1,2 +1,0 @@
-phrase_missing_exit=1
-team-phrase removal detectable -> contract assertion would fail (real SKILL.md untouched)

@@ -1,0 +1,61 @@
+PR #6485 review rerun - 2026-07-31
+
+WHAT WAS TESTED
+
+1. Regression tests before the review fix:
+   bun test packages/model-core/src/model-settings-compatibility.test.ts packages/omo-opencode/src/plugin-handlers/agent-config-finalizer.test.ts
+2. The same regression tests after the review fix.
+3. Package typechecks:
+   bunx tsgo --noEmit -p packages/model-core
+   bunx tsgo --noEmit -p packages/omo-opencode
+4. Real OpenCode surface:
+   bash review-rerun-driver.sh /tmp/pr6485-review-live.txt
+5. Real OpenCode database isolation:
+   sqlite3 "$(opencode db path)" "SELECT count(*) FROM session;"
+   was run immediately before and after the driver.
+6. Runtime capability regression:
+   Oracle was configured with `custom-provider/future-model` and
+   `temperature: 0.1`; the isolated provider cache marks the bare
+   `future-model` ID as not supporting temperature.
+
+WHAT WAS OBSERVED
+
+- Before the review fix, all three supported inline reasoning suffixes retained
+  `temperature: 0.1`, and the ordered-map helper was not exported for the
+  identity regression test. The focused run reported `70 pass, 4 fail, 1 error`.
+- After the final review and CI fixes, the combined focused run reported:
+  `132 pass, 0 fail, 316 assertions`.
+- The prior Ubuntu CI failure was reproduced as two plan-inheritance fixtures
+  asserting that `gpt-5.4` retained temperature. Those fixtures now use
+  temperature-capable `anthropic/claude-sonnet-4-5`, preserving their
+  inheritance assertions without contradicting capability filtering.
+- Both package typechecks exited 0 with no diagnostics.
+- The driver built `dist/index.js` from current source and recorded `EXIT=0`.
+- Every `opencode debug paths` entry, including `tmp`, resolved inside the
+  throwaway `omo-6338-review-*` sandbox.
+- The real `opencode debug config` surface reported:
+  `oracle_model=custom-provider/future-model`
+  `oracle_temperature_present=false`
+  `configured_order_preserved=true`
+- The exact harness output is committed as
+  `review-capabilities-output-20260731.txt`.
+- The real OpenCode session count remained unchanged:
+  `2823 before -> 2823 after`, read through immutable read-only snapshots.
+- Explicit capability metadata now outranks family fallback. A direct library
+  driver observed:
+  `explicitTrue.temperature=0.7` with no changes, while unknown support for
+  the same Claude Opus family removed temperature as unsupported by family.
+
+WHY IT IS ENOUGH
+
+The regression tests pin each supported reasoning suffix, bundled and runtime
+model capabilities, the bare provider-cache lookup contract, and ordered-map
+identity. The live OpenCode surface proves that a runtime-metadata-only
+temperature restriction survives config loading, agent remapping, priority
+ordering, and finalization in the real harness. The unchanged real session
+count proves the QA did not add host sessions.
+
+WHAT WAS OMITTED
+
+Raw environment dumps, provider credentials, auth headers, config contents,
+and tokens were not captured. The sandbox was deleted when the driver exited.

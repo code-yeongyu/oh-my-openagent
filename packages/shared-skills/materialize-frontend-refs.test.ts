@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseFrontmatter } from "@oh-my-opencode/utils";
 import { isSkillMarkdownSourcePath, materializeFrontendRefs } from "./scripts/materialize-frontend-refs.mjs";
-import { brandStems, designpowersThirdPartyRelativePaths, frontendSkillRoot, thirdPartyRelativePaths, uiUxDbScripts } from "./scripts/frontend-refs-manifest.mjs";
+import { brandStems, designpowersThirdPartyRelativePaths, frontendSkillRoot, tasteSkillArtifactFiles, thirdPartyRelativePaths, uiUxDbScripts, upstreamsRoot } from "./scripts/frontend-refs-manifest.mjs";
 
 type SkillFrontmatter = {
 	readonly name?: unknown
@@ -76,12 +76,22 @@ describe("materialize-frontend-refs", () => {
 		expect(isSkillMarkdownSourcePath("skills/design-review/reference.md")).toBe(false);
 	});
 
-	test("materialized brand reference is verbatim upstream content", async () => {
+	test("materializes every taste-skill artifact byte-identical to its upstream source", () => {
 		if (result.skipped) return;
-		// given a known brand whose upstream keeps the leading Category blockquote
-		const appleContent = await Bun.file(join(frontendSkillRoot, "references", "design", "apple.md")).text();
-		// then the verbatim upstream blockquote is present (not abridged)
-		expect(appleContent).toContain("> Category:");
+		// given the non-SKILL.md taste-skill artifacts (the stitch worked-example DESIGN.md)
+		for (const [fileName, source] of Object.entries(tasteSkillArtifactFiles)) {
+			const upstream = readFileSync(join(upstreamsRoot, "taste-skill", source), "utf8");
+			const materialized = readFileSync(join(frontendSkillRoot, "references", "design", fileName), "utf8");
+			// then the artifact ships verbatim - no frontmatter normalization applies to non-SKILL.md sources
+			expect(materialized).toBe(upstream);
+		}
+	});
+
+	test("materialized brand reference is byte-identical to its upstream source", () => {
+		if (result.skipped) return;
+		const upstream = readFileSync(join(upstreamsRoot, "open-design", "design-systems", "apple", "DESIGN.md"), "utf8");
+		const materialized = readFileSync(join(frontendSkillRoot, "references", "design", "apple.md"), "utf8");
+		expect(materialized).toBe(upstream);
 	});
 
 	test("missing submodule is a soft skip in non-strict mode", () => {

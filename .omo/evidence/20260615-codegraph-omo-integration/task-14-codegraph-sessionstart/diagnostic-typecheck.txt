@@ -1,4 +1,0 @@
-$ tsc --noEmit
-
-[command] bun run --cwd packages/omo-codex/plugin/components/codegraph typecheck
-[exit] 0

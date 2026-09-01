@@ -1,0 +1,70 @@
+bun test v1.4.0-canary.1 (54bbd5dd9)
+
+packages/omo-opencode/src/startup-migration.test.ts:
+(pass) runOpenCodeStartupMigration > #given both legacy source groups #when startup migration runs #then it migrates, moves, and reports that the chain must reload [5.57ms]
+92 | 
+93 |     // when
+94 |     const result = run(fileSystem)
+95 | 
+96 |     // then
+97 |     expect(result.error).toBeUndefined()
+                              ^
+error: expect(received).toBeUndefined()
+
+Received: "EXDEV: backup rename failed '/home/alice/.config/opencode/oh-my-openagent.json' -> '/home/alice/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json'"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/fix-6574-exdev-migration/packages/omo-opencode/src/startup-migration.test.ts:97:26)
+(fail) runOpenCodeStartupMigration > #given a legacy source on another filesystem #when its backup rename throws EXDEV #then startup copies and removes the source [0.55ms]
+(pass) runOpenCodeStartupMigration > #given a backup rename fails for another reason #when startup migration runs #then it preserves the source and reports the error [0.31ms]
+(pass) runOpenCodeStartupMigration > #given no legacy source #when startup migration runs #then it does not create a target or backups [0.11ms]
+(pass) runOpenCodeStartupMigration > #given an invalid transformed document #when startup migration runs #then validation aborts before target and source changes [0.43ms]
+159 | 
+160 |     // when
+161 |     const recovered = run(fileSystem)
+162 | 
+163 |     // then
+164 |     expect(recovered.error).toBeUndefined()
+                                  ^
+error: expect(received).toBeUndefined()
+
+Received: "EXDEV: backup rename failed '/home/alice/.config/opencode/oh-my-openagent.json' -> '/home/alice/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json'"
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/fix-6574-exdev-migration/packages/omo-opencode/src/startup-migration.test.ts:164:29)
+(fail) runOpenCodeStartupMigration > #given a journal recorded the target write #when recovery crosses filesystems #then it copies the backup before evaluating migration sources [0.49ms]
+
+packages/omo-opencode/src/testing/create-plugin-module.test.ts:
+(pass) createPluginModule() > #given plugin config sets i18n.locale to zh > #then production startup applies the configured locale [6.60ms]
+(pass) createPluginModule() > #given OpenCode server config is present > #then startup self-heals the matching TUI plugin entry [2.38ms]
+(pass) createPluginModule() > #given OpenCode server config is present > #given sidebar is disabled #then startup does not write a TUI plugin entry [1.72ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #then startup exposes them through a runtime skill source URL [3.62ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #given the runtime skill source server is unavailable #then startup continues without a source URL [4.48ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #then dispose stops the runtime skill source [3.96ms]
+(pass) createPluginModule() > #given security-research is disabled > #then startup still exposes security-review through the runtime skill source [10.11ms]
+(pass) createPluginModule() > #given duplicate OMO plugin entries are configured > #then startup warns and returns no prompt-producing hooks [2.60ms]
+(pass) createPluginModule() > #given startup migration consumes legacy configuration > #then startup reloads the config and emits one migration summary toast [4.04ms]
+(pass) createPluginModule() > #given serverPlugin is initialized twice in one process > #then startup migration predicates run only once [4.99ms]
+440 |           client: { tui: { showToast } },
+441 |         } as Parameters<typeof pluginModule.server>[0])
+442 | 
+443 |         // then
+444 |         expect(hooks).toBeDefined()
+445 |         expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining("legacy configuration changes were not applied"))
+                                  ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+Expected: [
+  StringContaining "legacy configuration changes were not applied"
+]
+But it was not called.
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/fix-6574-exdev-migration/packages/omo-opencode/src/testing/create-plugin-module.test.ts:445:29)
+(fail) createPluginModule() > #given startup migration fails > #then startup keeps defaults and reports one loud error toast [2.71ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep never resolves #then startup still completes fire-and-forget [1.02ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep rejects #then the failure is logged and cannot propagate into startup [1.16ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep throws synchronously #then startup still completes [1.04ms]
+
+ 17 pass
+ 3 fail
+ 55 expect() calls
+Ran 20 tests across 2 files. [334.00ms]
+
+EXIT_CODE=1

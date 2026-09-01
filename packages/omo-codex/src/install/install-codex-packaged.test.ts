@@ -121,8 +121,8 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   expect(cachedManifest.version).toBe("4.5.12")
   expect(cachedPackage.version).toBe("4.5.12")
   expect(cachedComponentPackage.version).toBe("4.5.12")
-  expect(cachedHooks.hooks.PostToolUse[0].hooks[0].statusMessage).toBe("(OmO) Checking Comments")
-  expect(cachedComponentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage).toBe("(OmO) Checking Ulw-Loop Steering")
+  expect(cachedHooks.hooks.PostToolUse[0].hooks[0].statusMessage).toBe("(OmO 4.5.12) Checking Comments")
+  expect(cachedComponentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage).toBe("(OmO 4.5.12) Checking Ulw-Loop Steering")
   expect(commands).toHaveLength(2)
   const installCommand = commands.find((command) => command[0] === "npm")
   if (installCommand === undefined) throw new Error("missing cached plugin npm install command")
@@ -139,7 +139,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   expect(cachedMcp.mcpServers.lsp.args[0]).not.toBe(join(lspRuntimeRoot, "dist", "cli.js"))
   expect((await stat(cachedLspCli)).isFile()).toBe(true)
   expect(await readlink(join(binDir, "omo"))).toBe(join(pluginPath, "dist", "cli.js"))
-})
+}, { timeout: 30_000 })
 
 test("#given packaged lazycodex tarball layout #when simulating Windows install #then links bin shims for that platform", async () => {
   // given

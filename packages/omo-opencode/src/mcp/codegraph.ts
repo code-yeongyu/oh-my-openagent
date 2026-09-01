@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
-import { join } from "node:path"
-import { buildCodegraphEnv, resolveCodegraphCommand, resolveCodegraphNodeSupport } from "@oh-my-opencode/utils"
+import { buildCodegraphEnv, resolveCodegraphCommand, resolveCodegraphNodeSupport, shouldExcludeCodegraphProject } from "@oh-my-opencode/utils"
+import { resolvePinnedCodegraphBin } from "@oh-my-opencode/utils/codegraph"
 import type { ResolveCodegraphCommandOptions } from "@oh-my-opencode/utils"
 import type { CodegraphConfig } from "../config/schema/codegraph"
 import type { LocalMcpConfig } from "./lsp"
@@ -29,14 +29,21 @@ function provisionedBinFromInstallDir(
   installDir: string | undefined,
   fileExists: (filePath: string) => boolean,
 ): string | null {
-  if (installDir === undefined) return null
-  const candidate = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph")
-  return fileExists(candidate) ? candidate : null
+  return resolvePinnedCodegraphBin(installDir, { fileExists })
 }
 
 function codegraphEnvForConfig(config: Partial<CodegraphConfig> | undefined, homeDir: string | undefined): Record<string, string> {
-  const env = buildCodegraphEnv({ homeDir })
+  const env = buildCodegraphEnv({ homeDir, daemon: config?.daemon !== false })
   return config?.install_dir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.install_dir }
+}
+
+function isProjectExcluded(config: Partial<CodegraphConfig> | undefined, options: CodegraphMcpConfigOptions): boolean {
+  if (options.cwd === undefined) return false
+  const excludedRoots = config?.excluded_roots
+  return shouldExcludeCodegraphProject(options.cwd, {
+    homeDir: options.homeDir,
+    ...(excludedRoots === undefined ? {} : { excludedRoots }),
+  }).excluded
 }
 
 export function createCodegraphMcpConfig(options: CodegraphMcpConfigOptions = {}): LocalMcpConfig {
@@ -60,7 +67,9 @@ export function createCodegraphMcpConfig(options: CodegraphMcpConfigOptions = {}
     which,
   })
   const enabled =
-    resolvedCommand.exists && (resolvedCommand.source === "bundled" || resolvedCommand.source === "env" || nodeSupport.supported)
+    !isProjectExcluded(options.config, options)
+    && resolvedCommand.exists
+    && (resolvedCommand.source === "bundled" || resolvedCommand.source === "env" || nodeSupport.supported)
 
   return {
     type: "local",

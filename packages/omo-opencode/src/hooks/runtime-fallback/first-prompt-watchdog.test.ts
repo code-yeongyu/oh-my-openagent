@@ -136,7 +136,7 @@ function createHelpers(calls: RecordedCalls, resolvedAgentName?: string): AutoRe
 }
 
 const AGENT = "sisyphus-junior"
-const PRIMARY_MODEL = "openai/gpt-5.4-mini"
+const PRIMARY_MODEL = "openai/gpt-5.6-luna-fast"
 const FALLBACK_MODEL = "anthropic/claude-haiku-4-5"
 const PLUGIN_CONFIG_WITH_FALLBACK = {
   git_master: {
@@ -378,11 +378,11 @@ describe("observeEventForWatchdog", () => {
     observeEventForWatchdog(
       {
         type: "message.updated",
-        properties: { info: { sessionID, role: "user", model: "openai/gpt-5.4-mini", agent: "sisyphus-junior" } },
+        properties: { info: { sessionID, role: "user", model: "openai/gpt-5.6-luna-fast", agent: "sisyphus-junior" } },
       },
       createRecordingWatchdog(calls),
     )
-    expect(calls.user).toEqual([{ sessionID, model: "openai/gpt-5.4-mini", agent: "sisyphus-junior" }])
+    expect(calls.user).toEqual([{ sessionID, model: "openai/gpt-5.6-luna-fast", agent: "sisyphus-junior" }])
     expect(calls.progress).toEqual([])
     expect(calls.terminal).toEqual([])
   })

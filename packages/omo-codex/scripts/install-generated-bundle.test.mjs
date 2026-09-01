@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const entrypointPath = join(scriptsDir, "install-local.mjs");
@@ -53,3 +56,147 @@ test("#given generated installer output #when importing direct bundle #then comp
 		assert.equal(typeof module[name], "function", `${name} must be exported`);
 	}
 });
+
+test("#given no root model #when generated bundle updates config #then it does not introduce agents max_threads", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-generated-no-root-model-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(configPath, ['model_reasoning_effort = "high"', "", "[features]", "plugins = false", ""].join("\n"));
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.doesNotMatch(config, /^\s*max_threads\s*=/m);
+	assert.match(config, /max_concurrent_threads_per_session = 16/);
+});
+
+test("#given an inline-commented V2 thread cap #when generated bundle updates config twice #then preserves the line and ordering byte-for-byte", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-generated-explicit-v2-cap-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[features.multi_agent_v2]",
+			"usage_hint_enabled = false",
+			"max_concurrent_threads_per_session = 7 # user cap",
+			"show_tool_use = false",
+			"",
+		].join("\n"),
+	);
+
+	// when
+	const updateInput = {
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	};
+	await updateCodexConfig(updateInput);
+	const firstPass = await readFile(configPath, "utf8");
+	const firstV2Section = sectionText(firstPass, "[features.multi_agent_v2]");
+	await updateCodexConfig(updateInput);
+
+	// then
+	const secondPass = await readFile(configPath, "utf8");
+	assert.equal(sectionText(secondPass, "[features.multi_agent_v2]"), firstV2Section);
+	assert.match(
+		sectionText(secondPass, "[features.multi_agent_v2]"),
+		/usage_hint_enabled = false\nmax_concurrent_threads_per_session = 7 # user cap\nshow_tool_use = false/,
+	);
+});
+
+test("#given explicit v1 model_catalog_json and stale models_cache v2 #when generated bundle updates config #then explicit catalog preserves disable and cap", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-generated-catalog-v1-"));
+	const configPath = join(root, "config.toml");
+	const catalogPath = join(root, "custom-catalog.json");
+	await writeFile(
+		configPath,
+		[
+			'model = "gpt-5.6-sol"',
+			`model_catalog_json = "${catalogPath}"`,
+			"",
+			"[features]",
+			"multi_agent_v2 = false",
+			"",
+			"[agents]",
+			"max_threads = 16",
+			"",
+		].join("\n"),
+	);
+	await writeFile(catalogPath, JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v1" }] }));
+	await writeFile(join(root, "models_cache.json"), JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v2" }] }));
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	const v2Section = sectionText(config, "[features.multi_agent_v2]");
+	assert.match(v2Section, /^enabled = false$/m);
+	assert.match(config, /\[agents\][\s\S]*?max_threads = 1000/);
+	assert.doesNotMatch(config, /max_threads = 16/);
+});
+
+test("#given explicit v2 model_catalog_json and stale models_cache v1 #when generated bundle updates config #then explicit catalog clears managed disable and cap", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-generated-catalog-v2-"));
+	const configPath = join(root, "config.toml");
+	const catalogPath = join(root, "custom-catalog.json");
+	await writeFile(
+		configPath,
+		[
+			'model = "gpt-5.6-sol"',
+			`model_catalog_json = "${catalogPath}"`,
+			"",
+			"[features]",
+			"multi_agent_v2 = false",
+			"",
+			"[agents]",
+			"max_threads = 16",
+			"",
+		].join("\n"),
+	);
+	await writeFile(catalogPath, JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v2" }] }));
+	await writeFile(join(root, "models_cache.json"), JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v1" }] }));
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	const v2Section = sectionText(config, "[features.multi_agent_v2]");
+	assert.doesNotMatch(v2Section, /^enabled\s*=/m);
+	assert.doesNotMatch(config, /^\s*max_threads\s*=/m);
+	assert.match(v2Section, /max_concurrent_threads_per_session = 16/);
+});
+
+function sectionText(config, header) {
+	const start = config.indexOf(header);
+	if (start === -1) return "";
+	const afterStart = config.slice(start + header.length);
+	const nextSectionOffset = afterStart.search(/\n\[/);
+	return nextSectionOffset === -1 ? config.slice(start) : config.slice(start, start + header.length + nextSectionOffset);
+}

@@ -1,3 +1,4 @@
+// allow: SIZE_OK - This intentionally oversized test keeps process-wide Server.prototype patches serialized in one file.
 import { createServer, Server } from "node:net"
 import type { AddressInfo } from "node:net"
 import { networkInterfaces } from "node:os"
@@ -19,9 +20,10 @@ type TimeoutProbeResult = {
   server: Server | undefined
 }
 
-type BlockedRangeProbeResult = {
+type AvailabilityProbeResult<Result> = {
   errorMessage: string | undefined
   probedPorts: number[]
+  selectedResult: Result | undefined
 }
 
 function getRequiredPropertyDescriptor(target: object, propertyName: string): PropertyDescriptor {
@@ -198,25 +200,6 @@ async function startAlternateInterfaceBlockerWithDefaultHostFree(hostname: strin
   return undefined
 }
 
-async function startConsecutiveBlockers(
-  startPort: number,
-  portCount: number,
-  hostname: string = DEFAULT_HOSTNAME
-): Promise<Server[]> {
-  const servers: Server[] = []
-
-  try {
-    for (let offset = 0; offset < portCount; offset++) {
-      servers.push(await startTrackedServer(startPort + offset, hostname))
-    }
-
-    return servers
-  } catch (error) {
-    await Promise.all(servers.map((server) => closeTrackedServer(server)))
-    throw error
-  }
-}
-
 function isExpectedBindFailure(error: unknown): boolean {
   if (!(error instanceof Error)) {
     throw new Error("Expected port bind failure to throw an Error instance")
@@ -299,17 +282,22 @@ async function runTimedOutAvailabilityProbe(port: number): Promise<TimeoutProbeR
   }
 }
 
-async function runBlockedRangeAvailabilityProbe(startPort: number): Promise<BlockedRangeProbeResult> {
+async function runAvailabilityProbe<Result>(
+  startPort: number,
+  unavailableProbeCount: number,
+  operation: () => Promise<Result>,
+): Promise<AvailabilityProbeResult<Result>> {
   const listenDescriptor = getRequiredPropertyDescriptor(Server.prototype, "listen")
   const closeDescriptor = getRequiredPropertyDescriptor(Server.prototype, "close")
   const probedPorts: number[] = []
   let errorMessage: string | undefined
+  let selectedResult: Result | undefined
 
   Object.defineProperty(Server.prototype, "listen", {
     configurable: true,
-    value: function listenWithBlockedRange(this: Server, requestedPort: number): Server {
-      if (requestedPort >= startPort && requestedPort < startPort + MAX_PORT_ATTEMPTS) {
-        probedPorts.push(requestedPort)
+    value: function listenWithUnavailableProbes(this: Server, requestedPort: number): Server {
+      probedPorts.push(requestedPort)
+      if (requestedPort < startPort + unavailableProbeCount) {
         queueMicrotask(() => {
           this.emit("error", Object.assign(new Error(`mocked port ${requestedPort} unavailable`), { code: "EADDRINUSE" }))
         })
@@ -330,14 +318,14 @@ async function runBlockedRangeAvailabilityProbe(startPort: number): Promise<Bloc
 
   try {
     try {
-      await findAvailablePort(startPort)
+      selectedResult = await operation()
     } catch (error) {
       if (!(error instanceof Error)) {
         throw error
       }
       errorMessage = error.message
     }
-    return { errorMessage, probedPorts }
+    return { errorMessage, probedPorts, selectedResult }
   } finally {
     Object.defineProperty(Server.prototype, "listen", listenDescriptor)
     Object.defineProperty(Server.prototype, "close", closeDescriptor)
@@ -444,19 +432,29 @@ describe("port-utils", () => {
     })
 
     test("#when the first three ports are blocked #then returns the next free port", async () => {
-      const startPort = await findContiguousAvailableStart(4)
-      await startConsecutiveBlockers(startPort, 3)
+      const startPort = 40_000
 
-      const result = await findAvailablePort(startPort)
+      const { errorMessage, probedPorts, selectedResult: selectedPort } = await runAvailabilityProbe(
+        startPort,
+        3,
+        () => findAvailablePort(startPort),
+      )
 
-      expect(result).toBe(startPort + 3)
+      expect(selectedPort).toBe(startPort + 3)
+      expect(errorMessage).toBeUndefined()
+      expect(probedPorts).toEqual(Array.from({ length: 4 }, (_, offset) => startPort + offset))
     })
 
     test("#when every attempted port is blocked #then throws", async () => {
       const startPort = 40_000
 
-      const { errorMessage, probedPorts } = await runBlockedRangeAvailabilityProbe(startPort)
+      const { errorMessage, probedPorts, selectedResult: selectedPort } = await runAvailabilityProbe(
+        startPort,
+        MAX_PORT_ATTEMPTS,
+        () => findAvailablePort(startPort),
+      )
 
+      expect(selectedPort).toBeUndefined()
       expect(errorMessage).toBe(`No available port found in range ${startPort}-${startPort + MAX_PORT_ATTEMPTS - 1}`)
       expect(probedPorts).toEqual(Array.from({ length: MAX_PORT_ATTEMPTS }, (_, offset) => startPort + offset))
     })
@@ -472,11 +470,17 @@ describe("port-utils", () => {
     })
 
     test("#when the preferred port is blocked #then returns the next port with auto-selection", async () => {
-      const preferredPort = await findContiguousAvailableStart(2)
-      await startTrackedServer(preferredPort)
+      const preferredPort = 40_000
 
-      const result = await getAvailableServerPort(preferredPort)
-      expect(result).toEqual({ port: preferredPort + 1, wasAutoSelected: true })
+      const { errorMessage, probedPorts, selectedResult } = await runAvailabilityProbe(
+        preferredPort,
+        1,
+        () => getAvailableServerPort(preferredPort),
+      )
+
+      expect(selectedResult).toEqual({ port: preferredPort + 1, wasAutoSelected: true })
+      expect(errorMessage).toBeUndefined()
+      expect(probedPorts).toEqual([preferredPort, preferredPort + 1])
     })
   })
 

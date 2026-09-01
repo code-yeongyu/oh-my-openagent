@@ -1,8 +1,0 @@
-$ bun run --cwd packages/omo-codex/plugin check
-
-Result: PASS
-
-Important receipts:
-- build completed after syncing version, hook status messages, bundled MCP runtimes, skills, and component bundles.
-- plugin node test suite passed: 217 tests, 0 failed.
-- start-work word-budget regression passed after the guidance table was shortened.

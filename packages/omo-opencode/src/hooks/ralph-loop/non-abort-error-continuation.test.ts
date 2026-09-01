@@ -64,7 +64,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -118,7 +118,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep ultraworking", {
 			messageCountAtStart: 0,
@@ -136,10 +136,9 @@ describe("ralph-loop non-abort error continuation", () => {
 			},
 		})
 
-		// then - the ULW continuation keeps the ultrawork directive
+		// then - the ULW continuation preserves the user's loop prompt
 		expect(promptCalls).toHaveLength(1)
 		expect(promptCalls[0]?.sessionID).toBe("session-123")
-		expect(promptCalls[0]?.text).toMatch(/^ultrawork /)
 		expect(promptCalls[0]?.text).toContain("Keep ultraworking")
 		expect(hook.getState()?.iteration).toBe(2)
 	})
@@ -177,7 +176,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		try {
 			hook.startLoop("session-123", "Keep working", {
@@ -253,7 +252,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		try {
 			hook.startLoop("session-123", "Keep working", {
@@ -330,7 +329,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		try {
 			hook.startLoop("session-123", "Keep working", {
@@ -407,6 +406,7 @@ describe("ralph-loop non-abort error continuation", () => {
 				},
 			},
 		} as never, {
+			idleSettleMs: 0,
 			backgroundManager: {
 				getTasksByParentSession: (sessionID: string) => sessionID === "session-123"
 					? [{ status: "running" }]
@@ -465,7 +465,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,

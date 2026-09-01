@@ -1,0 +1,16 @@
+Command: cd packages/omo-codex/plugin/components/ulw-loop && npm run check && npm test
+Observed: exit 0.
+
+npm run check:
+- tsc --noEmit passed.
+- biome check .: Checked 82 files in 72ms. No fixes applied.
+- tsc -p tsconfig.build.json passed.
+
+npm test:
+- Vitest v4.1.8.
+- Test Files: 40 passed (40).
+- Tests: 412 passed (412).
+- Duration: 5.00s.
+
+Why enough: this is the component full gate required by todo 6 after the two TDD fixes discovered during real-surface QA.
+Omitted: full per-test stdout is summarized; no failing lines were present in the passing run.

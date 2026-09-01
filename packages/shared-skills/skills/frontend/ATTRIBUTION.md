@@ -68,12 +68,15 @@ The taste-skill files and image-generation skills under `frontend/references/des
 `imagegen-brandkit.md`) are path-mapped copies of the per-skill `SKILL.md` files from the
 taste-skill project (each `skills/<name>/SKILL.md` is renamed to
 `references/design/<name>.md`; `imagegen-brandkit.md` maps from `skills/brandkit/SKILL.md`).
+`stitch-design-example.md` is a path-mapped verbatim copy of `skills/stitch-skill/DESIGN.md`,
+the worked example of the design-system document that the stitch skill exports.
 They are not committed here; the build materializes them from the pinned submodule under
 `packages/shared-skills/upstreams/taste-skill`. Only the allowed frontmatter description
 quoting normalization described above may alter these materialized `SKILL.md` files.
 
 - Source: https://github.com/Leonxlnx/taste-skill
-- Pinned upstream commit: 06d6028b5c623016c59ce8536f578e5a1127b499
+- Official site: https://www.tasteskill.dev/
+- Pinned upstream commit: b17742737e796305d829b3ad39eda3add0d79060
 
 ```
 MIT License
@@ -200,6 +203,19 @@ capture evidence and a local reconnaissance run following the MIT-licensed
 `JCodesMore/ai-website-cloner-template` workflow; it is not copied from Aside or from the
 template. Aside names, trademarks, product text, and visual assets remain the property of
 their respective owners and are referenced only for descriptive design-analysis purposes.
+
+`frontend/references/design/lazyweb.md` is a project-original, curl-only operating guide
+for the Lazyweb (lazyweb.com) design-research API, written from live endpoint verification;
+no Lazyweb source, documentation text, or screenshot content is vendored. Lazyweb names
+remain the property of their owner, and the guide grants no license to ship, trace, or
+commit reference screenshots harvested through it.
+
+`frontend/references/design/interaction-skill.md` is a project-original, curl-only
+operating guide for consulting the beui.dev animated-component registry during interaction
+and motion work, written from live endpoint verification; no beui.dev source code,
+documentation text, or component implementations are vendored. beui.dev names remain the
+property of their owner, and the guide instructs reading component source for mechanism
+extraction only, not vendoring it into references or projects.
 
 `frontend/references/design/clone-from-url.md` is a project-original runtime-extraction
 workflow guide. Its browser + `getComputedStyle` clone approach follows the same

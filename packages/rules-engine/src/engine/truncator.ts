@@ -10,15 +10,19 @@ type BudgetResult = BudgetRule & {
 	truncated: boolean;
 };
 
+const NEVER_TRUNCATED_RULE_PATHS = new Set([
+	"bundled-rules/hephaestus.md",
+	"bundled-rules/hephaestus/gpt-5.5.md",
+	"bundled-rules/hephaestus/gpt-5.6.md",
+]);
+
 function truncationNotice(relativePath: string): string {
 	return TRUNCATION_NOTICE.replace("{path}", relativePath);
 }
 
 export function isNeverTruncatedRule(relativePath: string): boolean {
-	const normalized = relativePath.replace(/\\/g, "/");
-	const segments = normalized.split("/").filter((segment) => segment.length > 0);
-	const filename = segments.at(-1) ?? normalized;
-	return filename.toLowerCase() === "hephaestus.md";
+	const normalized = relativePath.replace(/\\/g, "/").toLowerCase();
+	return NEVER_TRUNCATED_RULE_PATHS.has(normalized);
 }
 
 function safeSliceEnd(body: string, end: number): number {

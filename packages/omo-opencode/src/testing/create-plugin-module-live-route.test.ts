@@ -16,6 +16,13 @@ const mockGetDuplicateOmoPluginWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
 const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
+const mockRunOpenCodeStartupMigration = mock(() => ({
+  journalResumed: false,
+  migratedFrom: [],
+  reloadRequired: false,
+  results: [],
+  skippedConflictCount: 0,
+}))
 const mockIsTmuxIntegrationEnabled = mock(
   (pluginConfig: { tmux?: { enabled?: boolean } | undefined }) => pluginConfig.tmux?.enabled ?? false,
 )
@@ -95,6 +102,13 @@ function createTestPluginModule(
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
     migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
+    runOpenCodeStartupMigration: mockRunOpenCodeStartupMigration,
+    loadConfigChain: mock((directory: string) => ({
+      config: mockLoadPluginConfig(directory, {}),
+      messages: [],
+      path: null,
+      valid: true,
+    })) as never,
     loadPluginConfig: mockLoadPluginConfig as never,
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,

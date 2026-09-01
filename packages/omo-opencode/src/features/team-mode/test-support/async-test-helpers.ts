@@ -1,7 +1,5 @@
 import type { BackgroundTask, LaunchInput } from "../../background-agent/types"
 
-const DEFAULT_LAUNCH_PROBE_TIMEOUT_MS = 5_000
-
 type Deferred<T> = {
   readonly promise: Promise<T>
   readonly resolve: (value: T | PromiseLike<T>) => void
@@ -16,9 +14,9 @@ export type LaunchConcurrencySnapshot = {
 export type LaunchConcurrencyProbe = {
   readonly launch: (input: LaunchInput) => Promise<BackgroundTask>
   readonly release: () => void
-  readonly releaseAndWaitForCompletion: <T>(promise: Promise<T>, message: string, timeoutMs?: number) => Promise<T>
+  readonly releaseAndWaitForCompletion: <T>(promise: Promise<T>) => Promise<T>
   readonly snapshot: () => LaunchConcurrencySnapshot
-  readonly waitForFirstBatch: (message: string, timeoutMs?: number) => Promise<LaunchConcurrencySnapshot>
+  readonly waitForFirstBatch: () => Promise<LaunchConcurrencySnapshot>
 }
 
 export type LaunchConcurrencyProbeOptions = {
@@ -36,20 +34,10 @@ function createDeferred<T>(): Deferred<T> {
   return { promise, resolve: resolveDeferred }
 }
 
-async function withCircuitBreaker<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | undefined
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error(message)), timeoutMs)
-      }),
-    ])
-  } finally {
-    if (timeout) clearTimeout(timeout)
-  }
-}
-
+// The waits below resolve on the real launch callbacks (firstBatchStarted / releaseLaunches),
+// so they are awaited directly with no wall-clock timer guarding them. A fixed intra-helper
+// deadline used to race those events and lost to slow Windows CI scheduling, which flaked the
+// concurrency tests; a genuine launch deadlock is now caught by the per-test timeout instead.
 export function createLaunchConcurrencyProbe(options: LaunchConcurrencyProbeOptions): LaunchConcurrencyProbe {
   const firstBatchStarted = createDeferred<void>()
   const releaseLaunches = createDeferred<void>()
@@ -83,13 +71,13 @@ export function createLaunchConcurrencyProbe(options: LaunchConcurrencyProbeOpti
       } satisfies BackgroundTask
     },
     release,
-    async releaseAndWaitForCompletion<T>(promise: Promise<T>, message: string, timeoutMs = DEFAULT_LAUNCH_PROBE_TIMEOUT_MS): Promise<T> {
+    async releaseAndWaitForCompletion<T>(promise: Promise<T>): Promise<T> {
       release()
-      return await withCircuitBreaker(promise, timeoutMs, message)
+      return await promise
     },
     snapshot,
-    async waitForFirstBatch(message: string, timeoutMs = DEFAULT_LAUNCH_PROBE_TIMEOUT_MS): Promise<LaunchConcurrencySnapshot> {
-      await withCircuitBreaker(firstBatchStarted.promise, timeoutMs, message)
+    async waitForFirstBatch(): Promise<LaunchConcurrencySnapshot> {
+      await firstBatchStarted.promise
       return snapshot()
     },
   }

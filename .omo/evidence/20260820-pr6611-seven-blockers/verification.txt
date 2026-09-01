@@ -1,0 +1,56 @@
+PR #6611 final local verification receipt (2026-08-20)
+
+Base head:
+  1cca53e227ee28e1920c349a9630c01fc7ad8486
+
+RED:
+  bun test <seven focused regression files>
+  113 pass, 7 fail (expected before implementation)
+
+Final focused/scoped:
+  Bun 1.3.12
+  runtime-fallback + plugin adapter + prompt route audit + prompt gate
+  424 pass, 0 fail, 42 files
+
+Final workspace suite:
+  Bun 1.3.12
+  15050 pass, 11 skip, 0 fail, 1961 files
+
+Typecheck:
+  Bun 1.3.12
+  bun run typecheck
+  exit 0
+
+Build:
+  Bun 1.3.12
+  bun run build
+  exit 0
+  dist/index.js sha256=a60f0a25ddb228cfa08497e399edffd9f1db1d75fcaf403e51932ab904839f66
+
+Real OpenCode QA:
+  OpenCode 1.18.18
+  exact dist/index.js loaded from worktree file URL
+  /global/health healthy
+  POST /session/<isolated>/prompt_async HTTP 204
+  SSE: server.connected, session.status, message.updated, message.part.updated
+  deterministic provider text: fake response 2
+  isolated DB sessions: 1
+  host DB sessions: 7585 before, 7585 after
+  sandbox removed: true
+  OpenCode server stopped: true
+  fake provider stopped: true
+
+Detailed sanitized artifacts:
+  red.txt
+  green-focused.txt
+  queue-generation-red.txt
+  queue-generation-green.txt
+  related-tests-final.txt
+  typecheck-final.txt
+  build-final.txt
+  bundle-sha256-final.txt
+  opencode-qa-common-self-check.txt
+  opencode-qa-sse-self-test.txt
+  opencode-source-qa.sh
+  opencode-source-qa.txt
+  qa-summary.md

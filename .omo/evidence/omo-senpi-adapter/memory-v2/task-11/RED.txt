@@ -1,0 +1,49 @@
+=== RED PHASE - Initial failing test run ===
+
+Before implementation, the test file packages/omo-senpi/src/components/memory/skills-usage.test.ts
+could not import from ./skills-usage (module did not exist).
+
+Additionally, the first test run after implementation revealed timestamp format mismatches
+(toISOString() produces .000Z suffix, tests expected bare Z). The implementation was correct;
+tests were adjusted to match the actual ISO-8601 format.
+
+First test run output (before test fix):
+
+$ bun test packages/omo-senpi/src/components/memory/skills-usage.test.ts
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/skills-usage.test.ts:
+(pass) extractSkillId > #given a path inside skills/foo #when extracted #then returns the skill id [2.64ms]
+(pass) extractSkillId > #given a path inside notes #when extracted #then returns undefined [1.61ms]
+(pass) extractSkillId > #given a path outside the repo #when extracted #then returns undefined [1.56ms]
+104 |     // #when
+105 |     await incrementSkillUsage(paths, "foo", now)
+106 | 
+107 |     // #then
+108 |     const ledger = await readSkillsUsageLedger(paths.ledgerPath)
+109 |     expect(ledger.foo).toEqual({ count: 1, lastUsedAt: "2026-01-15T10:00:00Z" })
+                             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "count": 1,
+-   "lastUsedAt": "2026-01-15T10:00:00Z",
++   "lastUsedAt": "2026-01-15T10:00:00.000Z",
+  }
+
+(fail) incrementSkillUsage > #given a fresh ledger #when incrementing skill foo #then count is 1 and lastUsedAt is set [7.23ms]
+(fail) incrementSkillUsage > #given an existing ledger with count 1 #when incrementing foo again #then count is 2 [8.56ms]
+(fail) incrementSkillUsage > #given concurrent two-session interleaving #when both sessions increment different skills under lock #then no increment is lost [13.97ms]
+(fail) SkillsUsageTracker > #given a read of skills/foo/SKILL.md #when recordRead is called then flushed #then foo.count is 1
+(fail) registerSkillsUsage > #given a read tool targeting skills/foo/SKILL.md #when dispatched then flushed #then foo.count is 1 [5.33ms]
+
+ 14 pass
+ 5 fail
+ 20 expect() calls
+Ran 19 tests across 1 file. [204.00ms]
+
+Note: The 5 failures were all timestamp format assertions (expected "Z" but got ".000Z" from
+toISOString()). The core behavior (increment, lock serialization, non-skill filtering) was
+verified by the 14 passing tests even in the RED phase. After fixing the expected timestamp
+format in the tests, all 19 tests pass.

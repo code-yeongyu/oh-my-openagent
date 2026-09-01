@@ -98,8 +98,8 @@ export function applyToolConfig(params: {
   const atlas = agentByKey(params.agentResult, "atlas", params.pluginConfig);
   if (atlas) {
     atlas.permission = {
-      ...atlas.permission,
       task: "allow",
+      ...atlas.permission,
       call_omo_agent: "deny",
       "task_*": "allow",
       teammate: "allow",
@@ -109,9 +109,9 @@ export function applyToolConfig(params: {
   const sisyphus = agentByKey(params.agentResult, "sisyphus", params.pluginConfig);
   if (sisyphus) {
     sisyphus.permission = {
+      task: "allow",
       ...sisyphus.permission,
       call_omo_agent: "deny",
-      task: "allow",
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
@@ -121,9 +121,9 @@ export function applyToolConfig(params: {
   const hephaestus = agentByKey(params.agentResult, "hephaestus", params.pluginConfig);
   if (hephaestus) {
     hephaestus.permission = {
+      task: "allow",
       ...hephaestus.permission,
       call_omo_agent: "deny",
-      task: "allow",
       question: questionPermission,
       teammate: "allow",
       ...denyTodoTools,
@@ -132,9 +132,9 @@ export function applyToolConfig(params: {
   const prometheus = agentByKey(params.agentResult, "prometheus", params.pluginConfig);
   if (prometheus) {
     prometheus.permission = {
+      task: "allow",
       ...prometheus.permission,
       call_omo_agent: "deny",
-      task: "allow",
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",

@@ -1,0 +1,23 @@
+Command:
+  bun test packages/senpi-task/src/tools/task/renderers-run-stats.test.ts
+
+Working directory:
+  /Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/senpi-task-hide-zero-cost
+
+Observed:
+  6 pass
+  1 fail
+  19 expect() calls
+
+Failing test:
+  taskResultLines run stats > #given run stats with zero cost #when rendered #then the empty price is omitted
+
+Failure:
+  Expected to not contain: "cost:"
+  Received: "task completed id:st_00000009 ran:1s tools:0 cost:$0.0000"
+
+Exit code:
+  1
+
+Why this is RED:
+  The unchanged production renderer exposes the exact regression the user reported: an otherwise empty zero-dollar price is rendered in the task-tool TUI row.

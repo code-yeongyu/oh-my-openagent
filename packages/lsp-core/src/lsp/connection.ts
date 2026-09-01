@@ -2,12 +2,33 @@ import { pathToFileURL } from "node:url";
 
 import { LspClientTransport } from "./transport.js";
 
-const INITIALIZE_SETTLE_MS = 300;
+interface InitializeCapabilities {
+	readonly diagnosticProvider?: unknown;
+	readonly documentFormattingProvider?: unknown;
+}
+
+function supportsDiagnosticPull(capabilities: InitializeCapabilities | undefined): boolean {
+	if (capabilities === undefined) return false;
+	return Object.hasOwn(capabilities, "diagnosticProvider");
+}
+
+/**
+ * Reads the whole-document formatting capability the server advertised at initialize time.
+ *
+ * The provider is either a boolean or an options object, and an explicit `false` means the
+ * server refuses the request, so both shapes are checked instead of mere key presence.
+ */
+function supportsDocumentFormatting(capabilities: InitializeCapabilities | undefined): boolean {
+	if (capabilities === undefined) return false;
+	const provider = capabilities.documentFormattingProvider;
+	if (provider === undefined || provider === null || provider === false) return false;
+	return provider === true || typeof provider === "object";
+}
 
 export class LspClientConnection extends LspClientTransport {
 	async initialize(): Promise<void> {
 		const rootUri = pathToFileURL(this.root).href;
-		await this.sendRequest(
+		const result = await this.sendRequest<{ readonly capabilities?: InitializeCapabilities }>(
 			"initialize",
 			{
 				processId: process.pid,
@@ -21,10 +42,10 @@ export class LspClientConnection extends LspClientTransport {
 						references: {},
 						documentSymbol: { hierarchicalDocumentSymbolSupport: true },
 						publishDiagnostics: {},
+						formatting: { dynamicRegistration: false },
 						rename: {
 							prepareSupport: true,
 							prepareSupportDefaultBehavior: 1,
-							honorsChangeAnnotations: true,
 						},
 						codeAction: {
 							codeActionLiteralSupport: {
@@ -53,9 +74,10 @@ export class LspClientConnection extends LspClientTransport {
 						symbol: {},
 						workspaceFolders: true,
 						configuration: true,
-						applyEdit: true,
+						...(this.hasWorkspaceApplyEditHandler() ? { applyEdit: true } : {}),
 						workspaceEdit: {
 							documentChanges: true,
+							resourceOperations: ["create", "rename", "delete"],
 						},
 					},
 				},
@@ -63,11 +85,11 @@ export class LspClientConnection extends LspClientTransport {
 			},
 			{ timeoutMs: this.initializeTimeoutMs },
 		);
-		await this.sendNotification("initialized");
+		this.setDiagnosticPullSupported(supportsDiagnosticPull(result?.capabilities));
+		this.setDocumentFormattingSupported(supportsDocumentFormatting(result?.capabilities));
+		await this.sendNotification("initialized", {});
 		await this.sendNotification("workspace/didChangeConfiguration", {
 			settings: { json: { validate: { enable: true } } },
 		});
-		// Some servers accept initialized before their diagnostics/indexing handlers are ready.
-		await new Promise((r) => setTimeout(r, INITIALIZE_SETTLE_MS));
 	}
 }
