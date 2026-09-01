@@ -1,0 +1,30 @@
+Command:
+bun test /Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/fix-senpi-task-always-steer/packages/senpi-task/src/tools/control/send-always-steer.test.ts
+
+Exit: 1
+
+Observed RED:
+
+1. Public schema still exposed the option:
+
+Expected to not contain: "deliver_as"
+Received: [ "to", "message", "deliver_as", "team_run_id", "summary", "all_scope" ]
+
+2. Plain task_send still routed through followUp:
+
+Expected:
+  "deliverAs": "steer"
+Received:
+  "deliverAs": "followUp"
+
+3. The user-visible call renderer still printed delivery mode:
+
+Expected to not contain: "deliver:"
+Received: "task_send to:st_1 deliver:followUp message:\"new direction\""
+
+Summary:
+0 pass
+3 fail
+Command exited with code 1
+
+The earlier environment-only failure (`Cannot find module '@code-yeongyu/senpi'`) was discarded as invalid RED. Dependencies were installed in the isolated worktree, then this behavior-specific RED was captured.

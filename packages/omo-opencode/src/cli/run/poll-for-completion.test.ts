@@ -38,6 +38,27 @@ function abortAfter(abortController: AbortController, delayMs: number): void {
   setTimeout(() => abortController.abort(), delayMs)
 }
 
+// Deterministic virtual clock for pollForCompletion. now() reads a mutable
+// counter; sleep() advances it by the requested ms and yields a microtask so
+// the loop's async continuations run without real wall-clock time. `onSleep`
+// lets a test inject state changes (e.g. session goes busy then idle) keyed to
+// virtual elapsed time, preserving the SAME causality the old real-time waits
+// exercised — but deterministically, with no wall-clock race.
+function createVirtualClock(onSleep?: (elapsedMs: number) => void): {
+  now: () => number
+  sleep: (ms: number) => Promise<void>
+} {
+  let currentMs = 0
+  return {
+    now: () => currentMs,
+    sleep: async (ms: number) => {
+      currentMs += ms
+      onSleep?.(currentMs)
+      await Promise.resolve()
+    },
+  }
+}
+
 beforeEach(() => {
   consoleLogSpy = spyOn(console, "log").mockImplementation(() => {})
   consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {})
@@ -100,13 +121,21 @@ describe("pollForCompletion", () => {
     eventState.hasReceivedMeaningfulWork = true
     eventState.currentTool = "task"
     const abortController = new AbortController()
+    // Virtual clock: abort at virtual 100ms — enough poll cycles to prove the
+    // active tool kept blocking completion — without burning real time.
+    const clock = createVirtualClock((elapsedMs) => {
+      if (elapsedMs >= 100) {
+        abortController.abort()
+      }
+    })
 
-    //#when - abort after enough time to verify it didn't exit
-    abortAfter(abortController, 100)
+    //#when
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
       minStabilizationMs: 500,
+      now: clock.now,
+      sleep: clock.sleep,
     })
 
     //#then - should be aborted, not completed (tool blocked exit)
@@ -116,21 +145,26 @@ describe("pollForCompletion", () => {
   })
 
   it("resets consecutive counter when session becomes busy between checks", async () => {
-    //#given
+    //#given - session goes busy on the first check, then idle again ~15ms later
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
     eventState.hasReceivedMeaningfulWork = true
     const abortController = new AbortController()
     let todoCallCount = 0
-    let busyInserted = false
+    const busyUntilMs = 15
+    // Virtual clock: flip the session idle again once 15ms of virtual time has
+    // elapsed, mirroring the old setTimeout(15) but deterministically.
+    const clock = createVirtualClock((elapsedMs) => {
+      if (elapsedMs >= busyUntilMs) {
+        eventState.mainSessionIdle = true
+      }
+    })
 
     ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
       todoCallCount++
-      if (todoCallCount === 1 && !busyInserted) {
-        busyInserted = true
+      if (todoCallCount === 1) {
         eventState.mainSessionIdle = false
-        setTimeout(() => { eventState.mainSessionIdle = true }, 15)
       }
       return { data: [] }
     })
@@ -142,17 +176,21 @@ describe("pollForCompletion", () => {
     )
 
     //#when
-    const startMs = Date.now()
+    const pollIntervalMs = 10
     const result = await pollForCompletion(ctx, eventState, abortController, {
-      pollIntervalMs: 10,
+      pollIntervalMs,
       requiredConsecutive: 3,
       minStabilizationMs: 10,
+      now: clock.now,
+      sleep: clock.sleep,
     })
-    const elapsedMs = Date.now() - startMs
 
-    //#then - took longer than 3 polls because busy interrupted the streak
+    //#then - completion took longer than the 3-consecutive-poll minimum (30ms)
+    //        because the busy window reset the streak. Same causality as the old
+    //        elapsedMs>30 check, but on the deterministic virtual clock — the
+    //        busy interruption forced at least one extra poll past the minimum.
     expect(result).toBe(0)
-    expect(elapsedMs).toBeGreaterThan(30)
+    expect(clock.now()).toBeGreaterThan(3 * pollIntervalMs)
   })
 
   it("returns 1 on session error", async () => {
@@ -163,12 +201,15 @@ describe("pollForCompletion", () => {
     eventState.mainSessionError = true
     eventState.lastError = "Test error"
     const abortController = new AbortController()
+    const clock = createVirtualClock()
 
-    //#when
+    //#when - errors out via the grace cycles well before any stabilization window
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
       minStabilizationMs: 500,
+      now: clock.now,
+      sleep: clock.sleep,
     })
 
     //#then
@@ -316,22 +357,31 @@ describe("pollForCompletion", () => {
   })
 
   it("coerces non-positive stabilization values to default stabilization", async () => {
-    //#given - explicit zero stabilization should still wait for default window
+    //#given - explicit zero stabilization should still wait for the default window
     const ctx = createMockContext()
     const eventState = createEventState()
     eventState.mainSessionIdle = true
     eventState.hasReceivedMeaningfulWork = false
     const abortController = new AbortController()
+    // Virtual clock: abort at virtual 100ms — well before the coerced 1000ms
+    // default window — so completion must NOT have happened by then.
+    const clock = createVirtualClock((elapsedMs) => {
+      if (elapsedMs >= 100) {
+        abortController.abort()
+      }
+    })
 
-    //#when - abort before default 1s window elapses
-    abortAfter(abortController, 100)
+    //#when - minStabilizationMs:0 must coerce to the 1000ms default, so aborting
+    //        at virtual 100ms means the run has not completed early
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 1,
       minStabilizationMs: 0,
+      now: clock.now,
+      sleep: clock.sleep,
     })
 
-    //#then - should not complete early
+    //#then - should not complete early (0 coerced to the default 1000ms window)
     expect(result).toBe(130)
   })
 
@@ -410,6 +460,60 @@ describe("pollForCompletion", () => {
 
     //#then - returns 1
     expect(result).toBe(1)
+  })
+
+  it("clears the error latch and completes when the session retries after an error (runtime fallback in flight)", async () => {
+    //#given - quota error latched, live status reports 'retry' then the session recovers to idle
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.mainSessionError = true
+    eventState.lastError = "kimi usage limit reached"
+    eventState.hasReceivedMeaningfulWork = true
+    let statusCalls = 0
+    ;(unsafeTestValue(ctx.client.session)).status = mock(async () => {
+      statusCalls++
+      if (statusCalls <= 3) {
+        return { data: { "test-session": { type: "retry" } } }
+      }
+      return { data: { "test-session": { type: "idle" } } }
+    })
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 10,
+    })
+
+    //#then - fallback recovery resumed the session; run completes instead of exiting 1
+    expect(result).toBe(0)
+    expect(eventState.mainSessionError).toBe(false)
+  })
+
+  it("does not exit 1 while the session is busy again after an error (fallback dispatch rearmed the session)", async () => {
+    //#given - error latched but live status reports the session is busy again
+    const ctx = createMockContext({
+      statuses: { "test-session": { type: "busy" } },
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.mainSessionError = true
+    eventState.lastError = "quota error"
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when - poll well past ERROR_GRACE_CYCLES, then abort
+    abortAfter(abortController, 100)
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 3,
+    })
+
+    //#then - aborted by the test (130), not terminated with exit 1
+    expect(result).toBe(130)
+    expect(eventState.mainSessionError).toBe(false)
   })
 
   it("returns 1 when CLI run requires meaningful work but the prompt never produces output", async () => {

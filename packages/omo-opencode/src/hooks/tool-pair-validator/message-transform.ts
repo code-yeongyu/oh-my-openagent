@@ -1,25 +1,23 @@
 import { subagentSessions } from "../../features/claude-code-session-state"
 import {
+  diagnoseSubAgentUnpairedToolParts,
   getMessageSessionID,
-  repairMissingToolResults,
-  repairSubAgentMissingToolResults,
+  repairUnpairedToolParts,
 } from "./tool-result-repair"
 import type { MessageWithParts } from "./types"
 
 export function validateToolPairsForMessages(messages: MessageWithParts[]): void {
-  for (let i = 0; i < messages.length; i++) {
-    const messageInfo = messages[i].info
-
-    if (messageInfo.role !== "assistant") {
+  for (const message of messages) {
+    if (message.info.role !== "assistant") {
       continue
     }
 
-    const sessionID = getMessageSessionID(messageInfo)
+    const sessionID = getMessageSessionID(message.info)
     if (sessionID && subagentSessions.has(sessionID)) {
-      repairSubAgentMissingToolResults(messages, i, sessionID)
+      diagnoseSubAgentUnpairedToolParts(message, sessionID)
       continue
     }
 
-    repairMissingToolResults(messages, i)
+    repairUnpairedToolParts(message)
   }
 }

@@ -1,0 +1,14 @@
+Command:
+npm --prefix packages/lsp-daemon ci
+
+Exit code:
+0
+
+Observed audit warning:
+2 high severity vulnerabilities
+Run `npm audit fix` to address all issues.
+
+Binary interpretation:
+The linked publish-path install succeeds, but npm reports the same two
+actionable high-severity vulnerable package records captured by the three
+RED JSON audits.

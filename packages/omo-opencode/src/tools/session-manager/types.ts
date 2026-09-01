@@ -81,6 +81,7 @@ export interface SessionReadArgs {
   include_todos?: boolean
   include_transcript?: boolean
   limit?: number
+  from_end?: boolean
 }
 
 export interface SessionSearchArgs {

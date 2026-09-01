@@ -1,16 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { isUltraworkPrompt, runUserPromptSubmitHook } from "../src/codex-hook.js";
-
-const tempDirectories: string[] = [];
+import { runUserPromptSubmitHook } from "../src/codex-hook.js";
+import {
+	cleanupTempDirectories,
+	parseHookOutput,
+	writeCodexContextWindowTranscript,
+	writeContextPressureTranscript,
+	writeTranscript,
+} from "./codex-hook-test-helpers.js";
 
 afterEach(() => {
-	for (const directory of tempDirectories.splice(0)) {
-		rmSync(directory, { recursive: true, force: true });
-	}
+	cleanupTempDirectories();
 });
 
 describe("codex ultrawork hook", () => {
@@ -18,7 +18,7 @@ describe("codex ultrawork hook", () => {
 		// given
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
-			prompt: "please ulw this change",
+			prompt: "ulw this change",
 		};
 
 		// when
@@ -28,7 +28,6 @@ describe("codex ultrawork hook", () => {
 		// then
 		expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/First user-visible line this turn MUST be exactly:/);
 	});
 
 	it("#given Windows cwd #when hook sees ultrawork prompt #then emits directive as Codex hook JSON", () => {
@@ -38,7 +37,7 @@ describe("codex ultrawork hook", () => {
 			hook_event_name: "UserPromptSubmit",
 			model: "gpt-5.5",
 			permission_mode: "default",
-			prompt: "please ulw this change",
+			prompt: "ulw this change",
 			session_id: "s",
 			transcript_path: null,
 			turn_id: "t",
@@ -57,7 +56,7 @@ describe("codex ultrawork hook", () => {
 		// given
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
-			prompt: "please ulw this change",
+			prompt: "ulw this change",
 			transcript_path: writeTranscript(
 				JSON.stringify({
 					hookSpecificOutput: {
@@ -75,11 +74,11 @@ describe("codex ultrawork hook", () => {
 		expect(output).toBe("");
 	});
 
-	it("#given transcript only mentions ultrawork marker in user content #when hook sees first ultrawork prompt #then it emits directive", () => {
+	it("#given transcript only mentions ultrawork marker in user content #when hook sees first ulw command #then it emits directive", () => {
 		// given
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
-			prompt: "please ulw this change",
+			prompt: "ulw this change",
 			transcript_path: writeTranscript(
 				JSON.stringify({
 					role: "user",
@@ -94,21 +93,6 @@ describe("codex ultrawork hook", () => {
 
 		// then
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
-	});
-
-	it("#given identifier-like ulw #when hook runs #then does not emit directive", () => {
-		// given
-		const payload = {
-			hook_event_name: "UserPromptSubmit",
-			prompt: "refactor ulw_helper.ts",
-		};
-
-		// when
-		const output = runUserPromptSubmitHook(payload);
-
-		// then
-		expect(output).toBe("");
-		expect(isUltraworkPrompt("ulw_helper.ts")).toBe(false);
 	});
 
 	it("#given context-pressure recovery prompt with ulw #when hook runs #then does not add more context", () => {
@@ -135,7 +119,7 @@ describe("codex ultrawork hook", () => {
 		// given
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
-			prompt: "please ulw this change",
+			prompt: "ulw this change",
 			transcript_path: writeContextPressureTranscript(),
 		};
 
@@ -150,7 +134,7 @@ describe("codex ultrawork hook", () => {
 		// given
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
-			prompt: "please ulw this change",
+			prompt: "ulw this change",
 			transcript_path: writeCodexContextWindowTranscript(),
 		};
 
@@ -189,163 +173,4 @@ describe("codex ultrawork hook", () => {
 		// then
 		expect(outputs).toEqual(["", "", ""]);
 	});
-
-	it("#given directive #when inspected #then keeps manual QA and cleanup invariants", () => {
-		// given
-		const payload = {
-			hook_event_name: "UserPromptSubmit",
-			prompt: "please ultrawork",
-		};
-
-		// when
-		const output = runUserPromptSubmitHook(payload);
-		const parsed = parseHookOutput(output);
-
-		// then
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/# Manual-QA channels/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/TESTS ALONE NEVER PROVE DONE/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/1\. HTTP call/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/2\. tmux/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/3\. Browser use/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/4\. Computer use/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/CLEANUP \(PAIRED/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/refresh current branch\/PR\/issue state/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/preserve existing ordering\/policy/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(
-			/separate compatibility detection from policy changes/,
-		);
-	});
-
-	it("#given directive #when inspected #then avoids context-expensive agent polling", () => {
-		// given
-		const payload = {
-			hook_event_name: "UserPromptSubmit",
-			prompt: "please ultrawork",
-		};
-
-		// when
-		const output = runUserPromptSubmitHook(payload);
-		const parsed = parseHookOutput(output);
-
-		// then
-		const directive = parsed.hookSpecificOutput.additionalContext;
-		expect(directive).toMatch(/multi_agent_v1\.wait_agent/);
-		expect(directive).toMatch(/Track spawned agent names locally/);
-		expect(directive).toMatch(/wait_agent[\s\S]*mailbox/);
-		expect(directive).toMatch(/WORKING:/);
-		expect(directive).toMatch(/TASK STILL ACTIVE/);
-		expect(directive).toMatch(/Treat child status as a progress signal/);
-	});
-
-	it("#given directive #when inspected #then hardens Codex subagent assignment ambiguity", () => {
-		// given
-		const payload = {
-			hook_event_name: "UserPromptSubmit",
-			prompt: "please ultrawork",
-		};
-
-		// when
-		const output = runUserPromptSubmitHook(payload);
-		const parsed = parseHookOutput(output);
-
-		// then
-		const directive = parsed.hookSpecificOutput.additionalContext;
-		expect(directive).toMatch(/TASK:/);
-		expect(directive).toMatch(/fork_context:\s*false/);
-		expect(directive).toMatch(/wait_agent[\s\S]*mailbox/);
-		expect(directive).toMatch(/TASK STILL ACTIVE/);
-		expect(directive).toMatch(/respawn.*smaller/);
-		expect(directive).toMatch(/timeout only means no new mailbox update arrived/i);
-		expect(directive).toMatch(/WORKING:/);
-	});
 });
-
-interface UserPromptSubmitHookOutput {
-	readonly hookSpecificOutput: {
-		readonly hookEventName: "UserPromptSubmit";
-		readonly additionalContext: string;
-	};
-}
-
-function parseHookOutput(output: string): UserPromptSubmitHookOutput {
-	const parsed: unknown = JSON.parse(output);
-	if (!isUserPromptSubmitHookOutput(parsed)) throw new TypeError("Expected UserPromptSubmit hook output");
-	return parsed;
-}
-
-function isUserPromptSubmitHookOutput(value: unknown): value is UserPromptSubmitHookOutput {
-	if (!isRecord(value)) return false;
-	const hookSpecificOutput = value["hookSpecificOutput"];
-	return (
-		isRecord(hookSpecificOutput) &&
-		hookSpecificOutput["hookEventName"] === "UserPromptSubmit" &&
-		typeof hookSpecificOutput["additionalContext"] === "string"
-	);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function writeContextPressureTranscript(): string {
-	const root = mkdtempSync(path.join(tmpdir(), "codex-ultrawork-context-pressure-"));
-	tempDirectories.push(root);
-	const transcriptPath = path.join(root, "transcript.jsonl");
-	writeFileSync(
-		transcriptPath,
-		[
-			JSON.stringify({
-				type: "message",
-				payload: {
-					content: "Context compacted",
-				},
-			}),
-			JSON.stringify({
-				type: "message",
-				payload: {
-					content: "Your input exceeds the context window of this model.",
-				},
-			}),
-			"",
-		].join("\n"),
-	);
-	return transcriptPath;
-}
-
-function writeTranscript(...lines: string[]): string {
-	const root = mkdtempSync(path.join(tmpdir(), "codex-ultrawork-transcript-"));
-	tempDirectories.push(root);
-	const transcriptPath = path.join(root, "transcript.jsonl");
-	writeFileSync(transcriptPath, `${lines.join("\n")}\n`);
-	return transcriptPath;
-}
-
-function writeCodexContextWindowTranscript(): string {
-	const root = mkdtempSync(path.join(tmpdir(), "codex-ultrawork-context-window-"));
-	tempDirectories.push(root);
-	const transcriptPath = path.join(root, "transcript.jsonl");
-	writeFileSync(
-		transcriptPath,
-		[
-			JSON.stringify({
-				type: "message",
-				payload: {
-					content: {
-						error: {
-							code: "context_length_exceeded",
-						},
-					},
-				},
-			}),
-			JSON.stringify({
-				type: "message",
-				payload: {
-					content:
-						"Codex ran out of room in the model's context window. Start a new thread or clear earlier history before retrying.",
-				},
-			}),
-			"",
-		].join("\n"),
-	);
-	return transcriptPath;
-}

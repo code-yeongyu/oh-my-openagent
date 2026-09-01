@@ -4,5 +4,6 @@ export interface SkillMcpArgs {
   resource_name?: string
   prompt_name?: string
   arguments?: string | Record<string, unknown>
+  cdp_url?: string
   grep?: string
 }

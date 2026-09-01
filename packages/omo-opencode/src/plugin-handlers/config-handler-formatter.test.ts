@@ -5,6 +5,7 @@ import * as agentConfigHandler from "./agent-config-handler"
 import * as commandConfigHandler from "./command-config-handler"
 import * as mcpConfigHandler from "./mcp-config-handler"
 import * as pluginComponentsLoader from "./plugin-components-loader"
+import type { PluginComponents } from "./plugin-components-loader"
 import * as providerConfigHandler from "./provider-config-handler"
 import * as shared from "../shared"
 import * as toolConfigHandler from "./tool-config-handler"
@@ -30,6 +31,23 @@ function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOp
       git_env_prefix: "GIT_MASTER=1",
     },
     ...overrides,
+  }
+}
+
+function createPluginComponentsWithCommand(): PluginComponents {
+  return {
+    commands: {
+      pluginCommand: {
+        agent: "sisyphus",
+        description: "from plugin",
+      },
+    },
+    skills: {},
+    agents: {},
+    mcpServers: {},
+    hooksConfigs: [],
+    plugins: [{ name: "fixture", version: "1.0.0" }],
+    errors: [],
   }
 }
 
@@ -135,5 +153,35 @@ describe("createConfigHandler formatter pass-through", () => {
 
     // then
     expect(config.formatter).toBe(false)
+  })
+
+  test("loads fresh plugin components for each config invocation so command mutation does not leak", async () => {
+    // given
+    const observedAgents: unknown[] = []
+    loadPluginComponentsSpy.mockImplementation(async () => createPluginComponentsWithCommand())
+    applyCommandConfigSpy.mockImplementation(async ({ pluginComponents }) => {
+      const command = pluginComponents.commands.pluginCommand
+      if (typeof command !== "object" || command === null || !("agent" in command)) {
+        throw new Error("plugin command fixture is missing an agent")
+      }
+      observedAgents.push(command.agent)
+      command.agent = "poisoned-by-first-config"
+    })
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig: createPluginConfig(),
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // when
+    await handler({})
+    await handler({})
+
+    // then
+    expect(observedAgents).toEqual(["sisyphus", "sisyphus"])
+    expect(loadPluginComponentsSpy).toHaveBeenCalledTimes(2)
   })
 })

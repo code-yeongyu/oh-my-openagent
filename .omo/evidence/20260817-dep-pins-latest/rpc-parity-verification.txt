@@ -1,0 +1,669 @@
+=== omo-senpi task component suite ===
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/task/lead-poller-lifecycle.test.ts:
+(pass) lead poller lifecycle > #given no shared coordinator #when team mail injects #then fallback is hidden custom steer [1.05ms]
+(pass) lead poller lifecycle > #given owned and foreign teams #when ticks repeat #then only one owned poller is created and reused [0.21ms]
+(pass) lead poller lifecycle > #given an owned lead without a captured session file #when the lifecycle ticks #then it does not reserve inbox delivery until persistence is possible [0.12ms]
+(pass) lead poller lifecycle > #given a compacting parent #when the lifecycle ticks #then the owned poller is suspended [0.09ms]
+(pass) lead poller lifecycle > #given an owned team whose members are suspended #when the lead session shuts down and resumes #then the same poller keeps the team [0.11ms]
+(pass) lead poller lifecycle > #given ownership disappears #when the lifecycle reconciles #then the old poller shuts down and cannot resolve [0.11ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when no run id is resolved #then an explicit id is required [0.19ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when no run id is resolved #then the reason lists the owned runs [0.13ms]
+(pass) lead poller lifecycle > #given one owned team #when resolveDefaultTeamRunId is called #then it resolves [0.10ms]
+(pass) lead poller lifecycle > #given no owned team #when resolveDefaultTeamRunId is called #then it reports none [0.07ms]
+(pass) lead poller lifecycle > #given multiple owned teams #when resolveDefaultTeamRunId is called #then it reports ambiguous with the owned runs [0.10ms]
+(pass) lead poller lifecycle > #given a shared delivery journal #when the lifecycle creates a poller #then the journal reaches the poller deps [0.07ms]
+(pass) lead poller lifecycle > #given coordinator delivery states #when an injection enqueues #then scheduling follows streaming idle and transition rules [0.12ms]
+(pass) lead poller lifecycle > #given the component shuts down #when disposed #then the interval and every poller stop [5.47ms]
+
+packages/omo-senpi/src/components/task/team-service.test.ts:
+(pass) createTeamService curated agent gating > #given a team member spec naming a curated read-only agent #when team_create validates members #then the curated rejection message surfaces [4.17ms]
+(pass) createTeamService lead messaging > #given a mapped recipient task #when the lead sends #then the correlation event is persisted on the recipient task [6.23ms]
+(pass) createTeamService lead messaging > #given an active runtime member without a sidecar entry #when the lead sends #then delivery succeeds without a correlation event [3.05ms]
+(pass) createTeamService lead messaging > #given main and provider extensions #when a team member starts #then member tools load before inherited OMO extensions [24.31ms]
+(pass) createTeamService named-team lookup > #given an unknown team_name with declared teams #when createTeam runs #then the error lists the declared teams [2.31ms]
+(pass) createTeamService ownership guard > #given a team owned by another session #when scoped service methods are called #then they reject with an ownership error [3.12ms]
+(pass) createTeamService ownership guard > #given the owning session #when scoped service methods are called #then they proceed [2.25ms]
+
+packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts:
+(pass) event-bridge session_start recovery chain > #given a resumed session with a revived record #when session_start fires #then the chain runs in the planned order with the session id threaded [0.71ms]
+(pass) event-bridge session_start recovery chain > #given no captured session id #when session_start fires #then the legacy sweep still runs with undefined while the scoped notification branch is skipped [0.10ms]
+(pass) event-bridge session_start recovery chain > #given a terminal child persisted before restart #when reconcile returns no outcome #then session_start still re-observes it for liveness [0.10ms]
+(pass) event-bridge session_start recovery chain > #given expired records #when session_start fires #then the awaited ttl cleanup runs after notification reconcile and logs deletions [0.11ms]
+(pass) event-bridge session_shutdown > #given a session_shutdown with a reason and a captured session id #when the event fires #then it suspends with parentSessionId and reason [0.14ms]
+(pass) event-bridge session_shutdown > #given a session_shutdown with no captured session id #when the event fires #then it warns and does not suspend [0.09ms]
+(pass) event-bridge session_shutdown > #given a session_shutdown with a missing reason #when the event fires #then it warns and does not suspend [0.07ms]
+
+packages/omo-senpi/src/components/task/dag-commands.test.ts:
+(pass) registerDagCommands > #given the component registers commands #when inspecting the api #then /dag exists [0.18ms]
+(pass) registerDagCommands > #given runs in two sessions #when /dag runs with no argument #then this session's runs print with statuses [0.32ms]
+(pass) registerDagCommands > #given a diamond run #when /dag <id> runs #then waves group nodes with dependency annotations [0.41ms]
+(pass) registerDagCommands > #given a diamond run #when /dag <id> runs #then per-node state, route, model, attempt, duration and error render [0.16ms]
+(pass) registerDagCommands > #given a diamond run #when /dag <id> runs #then the critical path and bottleneck are marked [0.12ms]
+(pass) registerDagCommands > #given an unknown run id #when /dag <id> runs #then it notifies instead of throwing [0.10ms]
+(pass) registerDagCommands > #given a session with zero runs #when /dag runs #then the empty state prints [0.09ms]
+(pass) registerDagCommands > #given no session id #when /dag runs #then the empty state prints and the manager is never queried [0.10ms]
+
+packages/omo-senpi/src/components/task/dag-status-ui.test.ts:
+(pass) createDagStatusUi.syncNow > #given a run transitioning across node states #when syncing after each transition #then the rows track the states [0.69ms]
+(pass) createDagStatusUi.syncNow > #given skipped and paused nodes #when syncing #then each state renders its own icon [0.09ms]
+(pass) createDagStatusUi.syncNow > #given a run header #when syncing #then the header carries the node counts [0.09ms]
+(pass) createDagStatusUi.syncNow > #given a non-tui run mode #when syncing #then nothing renders [0.11ms]
+(pass) createDagStatusUi.syncNow > #given every run terminal #when syncing #then the widget is cleared [0.12ms]
+(pass) createDagStatusUi.syncNow > #given a live run #when the widget renders #then it uses the dag key below the editor [0.07ms]
+(pass) createDagStatusUi.scheduleSync > #given a burst of scheduled syncs #when the debounce window elapses #then exactly one render happens [0.10ms]
+(pass) createDagStatusUi.scheduleSync > #given a nonterminal run #when the refresh interval elapses without input #then the widget repaints [0.09ms]
+(pass) createDagStatusUi.scheduleSync > #given a disposed widget #when timers advance #then no further render happens [0.06ms]
+(pass) createDagStatusUi.onActivity > #given repeated activity for one node #when rendering #then only the latest activity shows [0.08ms]
+(pass) createDagStatusUi.onActivity > #given a completed node #when its stale activity is still known #then the row shows no activity text [0.08ms]
+(pass) createDagStatusUi.onActivity > #given an activity event for an unknown run #when it arrives #then it is ignored without throwing [0.09ms]
+(pass) createDagStatusUi.onActivity > #given a run that disappears between list and snapshot #when syncing #then the run is skipped without throwing [0.10ms]
+(pass) createDagStatusUi.onActivity > #given no session id #when syncing #then no run is queried and nothing renders [0.06ms]
+
+packages/omo-senpi/src/components/task/engine-agents.test.ts:
+(pass) task engine builtin agent overlay > #given no omo.json agents #when the engine resolves agents #then the 5 builtin curated agents are present with their personas [1.15ms]
+(pass) task engine builtin agent overlay > #given an omo.json model override for a builtin agent #when the engine resolves agents #then the model wins and the builtin prompt and allowlist survive [1.24ms]
+(pass) task engine builtin agent overlay > #given an omo.json-only agent #when the engine resolves agents #then it is appended alongside the builtins [0.76ms]
+(pass) task engine builtin agent overlay > #given a process override for a curated agent #when the engine resolves agents #then in-process execution remains pinned [0.78ms]
+(pass) task engine builtin agent overlay > #given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable [0.89ms]
+(pass) task engine builtin agent overlay > #given the default engine agents #when the task tool description renders #then plain builtins are advertised and the plan-gated tier is classified separately [0.88ms]
+(pass) task engine builtin agent overlay > #given agents.momus.disable in omo.json #when the description renders #then momus is hidden and the other three stay listed [1.01ms]
+
+packages/omo-senpi/src/components/task/member-liveness.test.ts:
+(pass) team member liveness notifier > #given a SIGKILL member exit while the lead streams #when the terminal record is observed #then one structured liveness injection reaches the lead [0.44ms]
+(pass) team member liveness notifier > #given an injected liveness message not yet persisted #when persistence checks run #then ack waits for the exact JSONL marker [1.24ms]
+(pass) team member liveness notifier > #given a failed direct injection #when the delivery promise rejects #then local dedupe clears and a bounded retry sends again [0.19ms]
+(pass) team member liveness notifier > #given a failed coordinator delivery #when its promise rejects #then the liveness injection is requeued and delivered on retry [0.20ms]
+(pass) team member liveness notifier > #given the liveness epoch is already persisted #when a restarted notifier observes the terminal record #then it suppresses replay [0.06ms]
+(pass) team member liveness notifier > #given a normal member completion #when observed #then no liveness event is injected [0.06ms]
+(pass) team member liveness notifier > #given a completed resident process was later marked killed #when observed #then liveness preserves the completed turn as its last known state [0.06ms]
+(pass) team member liveness notifier > #given an errored member record suspended between shutdown and revival #when observed #then no liveness death event is injected [0.05ms]
+
+packages/omo-senpi/src/components/task/residency-registry.test.ts:
+(pass) createManagerResidencyRegistry rpc teardown bridge > #given an rpc resident #when lifecycle terminates it #then process termination runs without aborting the turn [0.20ms]
+(pass) createManagerResidencyRegistry rpc teardown bridge > #given an rpc resident without a terminate port #when lifecycle terminates it #then teardown rejects instead of leaking silently [0.09ms]
+
+packages/omo-senpi/src/components/task/index.test.ts:
+(pass) omo-senpi task component wiring > #given an explicit team member process #when the task component registers #then no lead task surface is wired [0.30ms]
+(pass) omo-senpi task component wiring > #given a fake ExtensionAPI boot #when the task component registers #then tools, commands, the completion renderer, and event handlers are wired [2.37ms]
+(pass) omo-senpi task component wiring > #given task and DAG lifecycle handlers #when startup and shutdown dispatch #then task reconciliation precedes DAG resume while DAG pause precedes task suspension and DAG disposal [0.17ms]
+(pass) omo-senpi task component wiring > #given a fake ExtensionAPI boot #when the task component registers #then only injection-driven lead team tools are wired [1.47ms]
+(pass) omo-senpi task component wiring > #given the removed-tool hint capability #when the task component registers #then team_wait receives steer guidance [1.41ms]
+(pass) omo-senpi task component wiring > #given the omo-task flag is false #when the component registers #then only the unconditional hygiene sweep handler is wired [0.15ms]
+(pass) omo-senpi task component wiring > #given a malformed omo.json #when the component registers #then it boots with defaults and still wires the tools [1.78ms]
+(pass) omo-senpi task component wiring > #given a wired bridge #when session_start fires repeatedly #then the team mailbox is reconciled on every start [3.37ms]
+(pass) omo-senpi task component wiring > #given a session start #when reconciliation runs #then reattach, cleanup, mailbox reclaim, notification retry, and lead polling stay ordered [1.08ms]
+(pass) omo-senpi task component wiring > #given a terminal member owned by lead A #when lead B reconciles then lead A reconciles #then only the owning lead receives replay [2.83ms]
+(pass) omo-senpi task component wiring > #given a liveness send before host persistence #when the process crashes and restarts #then no early ack suppresses replay and agent_end later commits the exact persisted marker [3.35ms]
+(pass) omo-senpi task component wiring > #given a captured ui #when session_before_switch fires #then the ui bridge is cleared [1.44ms]
+(pass) omo-senpi task component wiring > #given a captured ui #when session_shutdown fires #then the ui bridge is cleared [1.69ms]
+(pass) omo-senpi task component wiring > #given an ExtensionAPI missing registerMessageRenderer #when the component registers #then it skips with one warning and never crashes [0.09ms]
+
+packages/omo-senpi/src/components/task/status-row-format.test.ts:
+(pass) buildWidgetRows > #given more than five active tasks #when building rows #then it caps at five and adds a +N more row [0.37ms]
+(pass) buildWidgetRows > #given only terminal tasks #when building rows #then no rows render [0.04ms]
+(pass) buildWidgetRows > #given an active task #when building a row #then useful identity and execution context remain [0.08ms]
+(pass) buildWidgetRows > #given a 137-column active task #when building its widget row #then it remains one physical line [0.18ms]
+(pass) task_summary identity > #given a record with a task_summary #when building the widget row #then the summary leads over name and description [0.07ms]
+(pass) task_summary identity > #given a record with a task_summary #when formatting the full row #then the summary is the identity [0.15ms]
+(pass) backgroundWidgetRows > #given a wide terminal #when a live task row renders #then the longer summary and adjacent metadata remain visible [0.95ms]
+(pass) backgroundWidgetRows > #given a narrow terminal #when a live task row renders #then it stays on one bounded physical line [0.21ms]
+(pass) suspended residency labeling > #given a persisted_only record #when formatting a full row #then the status shows suspended [0.06ms]
+(pass) suspended residency labeling > #given an rpc_detached record #when formatting a full row #then the status shows suspended [0.04ms]
+(pass) suspended residency labeling > #given a resident record #when formatting a full row #then the status label is unchanged (regression pin) [0.05ms]
+(pass) suspended residency labeling > #given a persisted_only record #when building a widget row #then it contains suspended [0.07ms]
+(pass) suspended residency labeling > #given an rpc_detached record #when building a widget row #then it contains suspended [0.06ms]
+(pass) suspended residency labeling > #given a persisted_only record #when building a background widget row #then it contains suspended [0.11ms]
+(pass) formatTaskRow > #given resolved category metadata #when formatting #then the unified target carries the model and effort [0.06ms]
+(pass) formatTaskRow > #given a description #when formatting #then the human label leads [0.05ms]
+(pass) formatTaskRow > #given no resolved model #when formatting #then raw model remains [0.05ms]
+(pass) formatTaskRow > #given empty resolved detail labels #when formatting #then they are omitted [0.04ms]
+(pass) formatTaskRow > #given matching reasoning and variant #when formatting #then the effort renders once inside the target [0.04ms]
+(pass) formatTaskRow > #given malformed running progress #when formatting #then the excerpt is width-safe [0.10ms]
+
+packages/omo-senpi/src/components/task/commands.test.ts:
+(pass) registerTaskCommands > #given the component registers commands #when inspecting the api #then /tasks and /task-kill exist [0.15ms]
+(pass) registerTaskCommands > #given tasks in two sessions #when /tasks runs #then only the current session's rows print [0.25ms]
+(pass) registerTaskCommands > #given tasks in two sessions #when /tasks --all runs #then every session's rows print [0.09ms]
+(pass) registerTaskCommands > #given a cancellable task #when /task-kill selects it and confirms #then cancelTask runs for that id [0.18ms]
+(pass) registerTaskCommands > #given a task with a description #when /task-kill lists options #then the human label leads and the id trails [0.09ms]
+(pass) registerTaskCommands > #given a multi-word description #when /task-kill selects and confirms #then cancelTask runs for the task id, not a word of the label [0.07ms]
+(pass) registerTaskCommands > #given the selector is dismissed #when /task-kill runs #then nothing is cancelled [0.08ms]
+(pass) registerTaskCommands > #given no cancellable tasks #when /task-kill runs #then it notifies and never opens the selector [0.07ms]
+
+packages/omo-senpi/src/components/task/reload-guard.test.ts:
+(pass) reload guard > #given a running resident child #when the veto is evaluated #then reload is cancelled with an actionable reason [1.61ms]
+(pass) reload guard > #given running children #when labelled #then description wins over name over task id [0.07ms]
+(pass) reload guard > #given only terminal residents #when the veto is evaluated #then reload is not blocked [0.05ms]
+(pass) reload guard > #given no resident children #when the veto is evaluated #then reload is not blocked [0.04ms]
+(pass) reload guard > #given a wired guard #when senpi emits session_before_reload #then the handler returns the cancel result [0.11ms]
+(pass) reload guard > #given a running child #when the veto is consulted twice (senpi pre-check + internal check) #then both consultations return the identical result [0.08ms]
+(pass) reload guard > #given a wired guard with no running children #when senpi emits session_before_reload #then reload proceeds [0.06ms]
+
+packages/omo-senpi/src/components/task/dag-viewer-client.test.ts:
+(pass) dag viewer reference consumer > #given a 200-event live run #when catch-up races live delivery #then application is gap-free and duplicate-free [225.87ms]
+
+packages/omo-senpi/src/components/task/status-ui-background.test.ts:
+(pass) createTaskStatusUi.background progress > #given only terminal background tasks #when syncing #then no refresh timer remains active [0.33ms]
+(pass) createTaskStatusUi.background progress > #given an idle parent with a running background task #when time advances quietly #then live status refreshes [0.44ms]
+(pass) createTaskStatusUi.background progress > #given a live refresh timer #when the final background task completes #then the timer stops [0.35ms]
+(pass) createTaskStatusUi.background progress > #given two background children #when latest events arrive #then rows show identity, model, stats, activity, and elapsed time [0.60ms]
+
+packages/omo-senpi/src/components/task/team-service-delete.test.ts:
+(pass) createTeamService team deletion boundary > #given canonical, foreign-owned, and uppercased run ids #when teams are deleted #then shape and ownership fences stay distinct [3.28ms]
+
+packages/omo-senpi/src/components/task/dag-child-policy.test.ts:
+(pass) DAG child rpc extension policy > #given DAG-owned and ordinary rpc tasks #when child spawn args are built #then only the DAG child drops omo-senpi [1.01ms]
+
+packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts:
+(pass) task RPC launch profile parity > #given an explicit provider extension #when process model admission runs #then its model is visible without credentials [1143.71ms]
+(pass) task RPC launch profile parity > #given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch [855.35ms]
+
+packages/omo-senpi/src/components/task/planner.test.ts:
+(pass) createTaskChildPlanner > #given a category with model metadata #when planned #then resolved_model preserves display, variant, and reasoning effort [0.47ms]
+(pass) createTaskChildPlanner > #given visual-engineering falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata [0.36ms]
+(pass) createTaskChildPlanner > #given an explicit provider model #when planned #then explicit metadata does not invent variant or reasoning effort [0.09ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent #when planned against a registry serving its chain #then the plan carries the agent persona and an agent-sourced model [0.42ms]
+(pass) createTaskChildPlanner > #given an explicit model with subagent_type and no registry #when planned #then the agent persona is kept and the model stays explicit [0.07ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent with no registry #when planned #then it fails closed with the registry-unavailable error [0.07ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a category rather than an agent #when planned #then category resolution still applies [0.12ms]
+(pass) createTaskChildPlanner > #given a disabled agent sharing a category name #when planned without an explicit model #then category fallback remains available [0.11ms]
+(pass) createTaskChildPlanner > #given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement [0.06ms]
+(pass) createTaskChildPlanner > #given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories [0.10ms]
+(pass) createTaskChildPlanner > #given subagent_type naming a builtin agent whose chain no registry model satisfies #when planned #then it reports model_unavailable with the agent list [0.12ms]
+(pass) createTaskChildPlanner plan variant > #given a category with an explicit reasoning effort and a variant #when planned #then the applied variant is the reasoning effort [0.08ms]
+(pass) createTaskChildPlanner plan variant > #given a category with reasoning effort only #when planned #then the public plan carries that effort [0.08ms]
+(pass) createTaskChildPlanner plan variant > #given a category with variant only #when planned #then the public plan carries that variant [0.07ms]
+(pass) createTaskChildPlanner plan variant > #given a category resolving a variant-bearing fallback without reasoning effort #when planned #then the applied variant is the resolved variant [0.11ms]
+(pass) createTaskChildPlanner plan variant > #given an explicit provider model #when planned #then no variant is applied [0.04ms]
+(pass) createTaskChildPlanner plan variant > #given momus resolves a variant-bearing chain entry #when planned #then the applied variant matches the resolved model [0.10ms]
+
+packages/omo-senpi/src/components/task/mass-ulw-protocol-doc.test.ts:
+(pass) mass-ulw protocol doc > #given every backticked omo.dag.* name in the doc > #when checked against the shipped bridge and handler sources > #then each name exists as a string literal in the source [0.12ms]
+(pass) mass-ulw protocol doc > #given every backticked omo.dag.* name in the doc > #when checked against the shipped bridge and handler sources > #then the doc covers all four channels and all four request methods [0.06ms]
+(pass) mass-ulw protocol doc > #given every backticked dag.* journaled event type in the doc > #when compared with DAG_RUN_EVENT_TYPES > #then each doc type is a shipped type and every shipped type is documented [0.06ms]
+(pass) mass-ulw protocol doc > #given the documented overflow payload fields > #when compared with the shipped event union > #then the field names match exactly [0.11ms]
+(pass) mass-ulw protocol doc > #given the documented error codes > #when compared with DAG_RPC_ERROR_CODES > #then every shipped code appears in the doc [0.05ms]
+
+packages/omo-senpi/src/components/task/category-unavailable-warning.test.ts:
+(pass) createCategoryUnavailableWarningPlanner > #given a dead-chain model_unavailable #when planned #then it notifies and sends the custom message [0.28ms]
+(pass) createCategoryUnavailableWarningPlanner > #given repeated dead-chain failures #when planned #then it warns exactly once per session per category [0.09ms]
+(pass) createCategoryUnavailableWarningPlanner > #given a non-dead-chain model_unavailable #when planned #then it stays silent [0.06ms]
+(pass) createCategoryUnavailableWarningPlanner > #given global suppression #when planned #then it stays silent [0.08ms]
+(pass) createCategoryUnavailableWarningPlanner > #given a per-category opt-in over global suppression #when planned #then it warns [0.06ms]
+(pass) createCategoryUnavailableWarningPlanner > #given a per-category opt-out over global default #when planned #then it stays silent [0.05ms]
+(pass) createCategoryUnavailableWarningPlanner > #given a user-configured category with an explicit model #when a chain error arrives #then it stays silent [0.05ms]
+(pass) createCategoryUnavailableWarningPlanner > #given no captured ui #when planned #then the custom message still fires [0.04ms]
+(pass) createCategoryUnavailableWarningPlanner > #given the real child planner and a stripped registry #when a dead-chain category is planned #then the error carries chain details [0.12ms]
+
+packages/omo-senpi/src/components/task/usage-guidance.test.ts:
+(pass) task usage guidance > #given the once-per-session task hint #when rendered #then it teaches steer-only team delivery without a blocking wait [0.09ms]
+(pass) task usage guidance > #given background task guidance #when rendered #then it makes idle wake unconditional and limits midpoint inspection [0.05ms]
+(pass) task usage guidance > #given the hidden usage hint #when responsibilities are inspected #then invocation syntax stays on the tool surface [0.04ms]
+
+packages/omo-senpi/src/components/task/planner-model-name-boundary.test.ts:
+(pass) task planner model-name boundary > #given an own safe model name #when category planning resolves #then the friendly name is preserved [0.28ms]
+(pass) task planner model-name boundary > #given an inherited model name #when category planning resolves #then the inherited value is ignored [0.09ms]
+(pass) task planner model-name boundary > #given a throwing model name accessor #when category planning resolves #then the accessor is never invoked [0.08ms]
+(pass) task planner model-name boundary > #given terminal controls or an oversized model name #when category planning resolves #then unsafe names are ignored [0.11ms]
+
+packages/omo-senpi/src/components/task/event-bridge-rpc-snapshots.test.ts:
+(pass) event-bridge native task RPC snapshots > #given current and foreign session tasks #when session_start completes #then it emits an initial omo.task.updated snapshot only for the captured parent session [0.60ms]
+(pass) event-bridge native task RPC snapshots > #given an active captured session #when store mutations move its task through pending running and completed #then each lifecycle snapshot emits while foreign-session tasks stay excluded [0.18ms]
+(pass) event-bridge native task RPC snapshots > #given a host without rpc emission #when session start and store mutation run #then task snapshot publication is a graceful no-op [0.08ms]
+(pass) event-bridge native task RPC snapshots > #given an older host with emit but no request registration #when session_start fires #then snapshots still publish without handlers [0.11ms]
+
+packages/omo-senpi/src/components/task/process-sweep.test.ts:
+(pass) wireSessionStartProcessSweep() > #given the packaged daemon runtime #when session_start fires #then the stale-version sweep receives its version [0.33ms]
+(pass) wireSessionStartProcessSweep() > #given a paired daemon override #when session_start sweeps stale versions #then the active override daemon is spared [2004.55ms]
+(pass) wireSessionStartProcessSweep() > #given daemon runtime resolution fails #when session_start fires #then unrelated cleanup families still run [0.25ms]
+(pass) wireSessionStartProcessSweep() > #given a wired sweep #when session_start fires #then the family sweep runs [0.10ms]
+(pass) wireSessionStartProcessSweep() > #given the RPC child marker is set #when session_start fires #then the sweep is skipped [0.08ms]
+(pass) wireSessionStartProcessSweep() > #given a never-resolving sweep #when session_start fires #then the handler returns without blocking [0.09ms]
+(pass) wireSessionStartProcessSweep() > #given a failing sweep #when session_start fires #then the failure is logged and cannot propagate [0.10ms]
+(pass) wireSessionStartProcessSweep() > #given a synchronously throwing sweep #when session_start fires #then the failure is logged and cannot propagate [0.08ms]
+
+packages/omo-senpi/src/components/task/owned-member-liveness.test.ts:
+(pass) owned member liveness > #given an errored member record suspended between shutdown and revival #when re-observed #then no death notification fires [1.51ms]
+(pass) owned member liveness > #given a resident errored member record owned by this session #when observed #then the death notification still fires [1.18ms]
+
+packages/omo-senpi/src/components/task/parent-notifier.test.ts:
+(pass) createParentNotifier batched injection delivery > #given a completion #when enqueued through the coordinator #then hidden metadata is preserved [0.17ms]
+(pass) createParentNotifier batched injection delivery > #given one completion #when enqueued #then it defers through the coordinator and flushes as ONE steer [0.11ms]
+(pass) createParentNotifier batched injection delivery > #given two near-simultaneous completions #when the batch window closes #then BOTH arrive in ONE steer injection [0.07ms]
+(pass) createParentNotifier batched injection delivery > #given a re-enqueue of the same completion #when the batch window closes #then the key dedupes to one entry [0.07ms]
+(pass) createParentNotifier batched injection delivery > #given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both [0.10ms]
+(pass) createParentNotifier batched injection delivery > #given no coordinator is wired #when a completion enqueues #then it falls back to a direct steer on the renderer channel [0.05ms]
+
+packages/omo-senpi/src/components/task/completion-bridge.test.ts:
+(pass) completion bridge live background promotion > #given a foreground start promoted before terminal #when completion applies #then the live manager flag delivers a notification [3.35ms]
+(pass) completion bridge live background promotion > #given a genuinely foreground start #when completion applies without promotion #then sync-task notification suppression remains intact [1.63ms]
+
+packages/omo-senpi/src/components/task/status-ui-width.test.ts:
+(pass) createTaskStatusUi terminal width > #given a 120-column terminal #when the production widget renders #then the row is bounded and keeps activity plus elapsed [0.36ms]
+
+packages/omo-senpi/src/components/task/dag-tool.test.ts:
+(pass) dag tool registration > #given the dag tool factory #when a tool is created #then it registers exactly one tool named dag [0.99ms]
+(pass) dag tool start action > #given a valid definition #when start runs #then a run_id and snapshot round-trip through the DagManager [4.75ms]
+(pass) dag tool start action > #given an identical definition #when start runs twice #then the second call reuses the same run [4.19ms]
+(pass) dag tool start action > #given start without a definition #when the tool runs #then it rejects with invalid_definition [0.77ms]
+(pass) dag tool definition validation > #given a cyclic definition #when start runs #then it is rejected with diagnostics and NO run is created [1.05ms]
+(pass) dag tool definition validation > #given a node with both category and model #when start runs #then it is rejected with category_with_model [0.81ms]
+(pass) dag tool definition validation > #given a node with both category and subagent_type #when start runs #then it is rejected with both_targets [0.75ms]
+(pass) dag tool definition validation > #given a node with neither category nor subagent_type #when start runs #then it is rejected with no_target [0.87ms]
+(pass) dag tool definition validation > #given a node with subagent_type and model #when start runs #then the explicit-model spawn is accepted [3.67ms]
+(pass) dag tool attach and snapshot actions > #given a started run #when attach runs #then it round-trips the live snapshot [4.19ms]
+(pass) dag tool attach and snapshot actions > #given a started run #when snapshot runs #then it returns the manager's projection [4.26ms]
+(pass) dag tool attach and snapshot actions > #given an unknown run id #when snapshot runs #then it rejects with run_not_found [0.90ms]
+(pass) dag tool attach and snapshot actions > #given a run owned by another session #when snapshot runs #then it rejects with run_not_owned [3.82ms]
+(pass) dag tool wait action > #given a started run #when wait runs #then it resolves through the injected wait surface [4.58ms]
+(pass) dag tool wait action > #given no wait surface is wired #when wait runs #then ownership is still enforced before dispatch [0.81ms]
+(pass) dag tool cancel action > #given a started run #when cancel runs #then the reason reaches the injected cancel seam [3.84ms]
+(pass) dag tool cancel action > #given a run owned by another session #when cancel runs #then it rejects with run_not_owned and never dispatches [3.54ms]
+
+packages/omo-senpi/src/components/task/dag-rpc-bridge.test.ts:
+(pass) dag rpc bridge > #given a journal that fans out post-durability > #when events arrive #then every event is emitted exactly once on omo.dag.event in seq order [0.30ms]
+(pass) dag rpc bridge > #given a journal that fans out post-durability > #when a run starts mid-session and sync runs #then its events reach the ledger too [0.08ms]
+(pass) dag rpc bridge > #given a journal that fans out post-durability > #when the same seq is redelivered #then it is emitted once [0.05ms]
+(pass) dag rpc bridge > #given a session that owns a live run > #when the heartbeat interval elapses #then omo.dag.heartbeat carries every live run head seq [0.10ms]
+(pass) dag rpc bridge > #given a session that owns a live run > #when the run reaches a terminal status #then the heartbeat stops and no timer is left pending [0.07ms]
+(pass) dag rpc bridge > #given a session that owns a live run > #when only terminal runs exist at attach #then no heartbeat is ever emitted [0.05ms]
+(pass) dag rpc bridge > #given a session that owns a live run > #when the session shuts down mid-run #then the heartbeat timer is cleared [0.07ms]
+(pass) dag rpc bridge > #given a session that owns a live run > #when a session switch detaches the bridge #then no further run events are emitted [0.05ms]
+(pass) dag rpc bridge > #given unsequenced activity telemetry > #when a node bursts activity #then it coalesces to the latest payload on omo.dag.activity only [0.07ms]
+(pass) dag rpc bridge > #given unsequenced activity telemetry > #when two nodes are active #then coalescing is per node [0.06ms]
+(pass) dag rpc bridge > #given unsequenced activity telemetry > #when activity is published after detach #then nothing is emitted and no timer survives [0.05ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when the store mutates twice with identical state #then only one snapshot is emitted [0.17ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when a real mutation lands #then a fresh snapshot reflecting it is emitted [0.08ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when the payload is inspected #then it is snake_case and carries parent_session_id [0.07ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when more runs exist than the cap #then truncated_runs reports the overflow [0.65ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when the run count is at the cap #then truncated_runs is absent [0.40ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when mutations burst inside one debounce window #then they coalesce into a single emission [0.06ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when the session has no parent session id #then nothing is emitted on the snapshot channel [0.04ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when the bridge detaches #then a pending snapshot never lands and the fingerprint resets [0.06ms]
+(pass) dag rpc bridge > #given the omo.dag.updated snapshot channel > #when the granular ledger emits #then the snapshot channel carries no per-event deltas [0.07ms]
+(pass) dag rpc bridge > #given a configured heartbeat interval > #when task.dag.heartbeat_ms overrides the default #then beats follow the configured period [0.06ms]
+
+packages/omo-senpi/src/components/task/dag-wake.test.ts:
+(pass) dag wake > #given one failed run and an idle parent #when its terminal event arrives #then exactly one dag-run steer contains counts and the first failure [0.32ms]
+(pass) dag wake > #given two terminal runs in one window #when the fake timer flushes #then one coordinator steer carries both summaries [0.09ms]
+(pass) dag wake > #given a terminal during compaction #when session_start resumes the same session #then the buffered notification is redelivered [0.12ms]
+(pass) dag wake > #given mid-run wave and node events #when every fake timer runs #then wake call count remains exactly zero [0.07ms]
+(pass) dag wake > #given a DAG terminal and task completion in one window #when flushed #then the task completion is ordered first [0.06ms]
+
+packages/omo-senpi/src/components/task/session-cwd.test.ts:
+(pass) task component session cwd anchoring > #given a host exposing the session cwd #when the component registers #then task state anchors at the session cwd, not the launch dir [1.68ms]
+(pass) task component session cwd anchoring > #given a host that does not expose a session cwd #when the component registers #then it falls back to the process cwd [0.82ms]
+
+packages/omo-senpi/src/components/task/skill-invocation-tracker-references.test.ts:
+(pass) createSkillInvocationTracker - plan-artifact reference counting > #given three reads of plan A and one edit of plan B #when references are queried #then counts accumulate per path with the most-referenced first [0.37ms]
+(pass) createSkillInvocationTracker - plan-artifact reference counting > #given apply_patch events mentioning plan paths #when they arrive #then each distinct path counts once per event [0.15ms]
+(pass) createSkillInvocationTracker - plan-artifact reference counting > #given two plans touched once each #when references are queried #then the most recently touched wins the tie until one pulls ahead [0.12ms]
+(pass) createSkillInvocationTracker - plan-artifact reference counting > #given plan touches followed by session shutdown #when references are queried #then the map is cleared [0.09ms]
+(pass) createSkillInvocationTracker - plan-artifact reference counting > #given an unknown session id #when references are queried #then it reports none and no artifact [0.04ms]
+(pass) createSkillInvocationTracker - plan-artifact reference counting > #given windows and posix spellings of the same plan path #when both arrive #then they merge into one normalized reference [0.06ms]
+(pass) createSkillInvocationTracker - plan-artifact reference counting > #given the same plan suffix under two worktree roots #when both arrive #then the roots stay distinct [0.08ms]
+
+packages/omo-senpi/src/components/task/engine-runners.test.ts:
+(pass) task child memory tool exclusion > #given the ui-only tool names passed to the in-process runner #when inspected #then both memory tools are listed [0.09ms]
+(pass) task child memory tool exclusion > #given shared parent tools including memory tools #when an in-process child starts #then the child tool set excludes them [1.40ms]
+(pass) task child memory tool exclusion > #given the default runner factories #when the in-process runner is built #then construction succeeds with the ui-only names wired [0.21ms]
+
+packages/omo-senpi/src/components/task/task-rpc-bridge-security.test.ts:
+(pass) event-bridge task RPC security and bounds > #given a terminal record and a retained live tracker #when a snapshot emits #then durable terminal stats win [0.23ms]
+(pass) event-bridge task RPC security and bounds > #given foreign and absent task ids #when controls run #then every response is the same generic not-found result [0.45ms]
+(pass) event-bridge task RPC security and bounds > #given no attached parent session #when any task control runs #then every handler fails closed [0.10ms]
+(pass) event-bridge task RPC security and bounds > #given oversized controls snapshots and status output #when RPC handles them #then every boundary rejects or truncates explicitly [1.22ms]
+(pass) event-bridge task RPC security and bounds > #given more live tasks than the snapshot cap #when RPC emits #then only the newest live rows are retained [0.81ms]
+(pass) event-bridge task RPC security and bounds > #given a live child and registered controls #when the session switches or shuts down #then old listeners and handlers are fenced [0.20ms]
+
+packages/omo-senpi/src/components/task/runtime-context.test.ts:
+(pass) TaskRuntimeContext session facts > #given a live session manager with its file #when captured #then the exact file path is retained [0.10ms]
+
+packages/omo-senpi/src/components/task/engine-runner-routing.test.ts:
+(pass) task engine runner routing > #given an invalid event task id #when the adapter appends an audit event #then store rejection is contained [1.13ms]
+(pass) task engine runner routing > #given a process-mode spawn #when the manager launches #then the process runner receives the spec and the in-process runner does not [1.98ms]
+(pass) task engine runner routing > #given an in-process spawn #when the manager launches #then the in-process runner receives the spec and the process runner does not [1.47ms]
+
+packages/omo-senpi/src/components/task/session-transition-bridge.test.ts:
+(pass) createSessionTransitionBridge transition marking > #given a session about to switch #when onBeforeSwitch fires #then the runtime enters the switching transition [0.14ms]
+(pass) createSessionTransitionBridge transition marking > #given a session about to compact #when onBeforeCompact fires #then the runtime enters the compacting transition [0.05ms]
+(pass) createSessionTransitionBridge transition marking > #given a session shutting down #when onShutdown fires #then the runtime enters the shutdown transition [0.05ms]
+(pass) createSessionTransitionBridge transition marking > #given no pending transition #when a fresh session starts #then no flush is attempted [0.05ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered during compaction #when the same session compacts through #then the buffered completion is flushed and delivered [0.28ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered before a switch #when a different session replaces it #then the completion is dropped, not delivered [0.09ms]
+(pass) createSessionTransitionBridge buffered-completion round trip > #given a completion buffered before a switch #when the same session resumes #then the buffered completion is delivered [0.08ms]
+
+packages/omo-senpi/src/components/task/status-ui-spend.test.ts:
+(pass) createTaskStatusUi spend > #given live solo and process-member rows with cost facts #when rendered #then cost sits before tps without cache rate [0.43ms]
+
+packages/omo-senpi/src/components/task/message-renderers.test.ts:
+(pass) task-family custom message renderers > #given terminal control injection #when rendering task completion #then structured CJK details are sanitized [0.38ms]
+(pass) task-family custom message renderers > #given structured completion details #when rendering #then user-facing task facts replace protocol tags [0.13ms]
+(pass) task-family custom message renderers > #given a liveness event #when rendering #then member state and a sanitized crash reason are visible [0.11ms]
+(pass) task-family custom message renderers > #given a completed team member with a long target #when rendering at 140 cells #then minute duration tools and tps remain visible [0.12ms]
+(pass) task-family custom message renderers > #given a long completion continuation #when rendering at 54 cells #then the actual-width excerpt preserves English word boundaries [0.16ms]
+
+packages/omo-senpi/src/components/task/planner-runtime-fallback.test.ts:
+(pass) createTaskChildPlanner runtime fallback > #given a category with configured runtime fallbacks #when planned #then requested and ordered fallback metadata are preserved [0.35ms]
+(pass) createTaskChildPlanner runtime fallback > #given a builtin category whose chain head is unavailable #when planned #then the remaining chain rungs become fallback models [0.16ms]
+(pass) createTaskChildPlanner runtime fallback > #given a user fallback that lands on a chain rung #when planned #then the user entry keeps priority and only later chain rungs append [0.14ms]
+
+packages/omo-senpi/src/components/task/dag-runtime-config.test.ts:
+(pass) assembled DAG runtime configuration > #given subscriber_ring is one #when the assembled runtime emits a burst #then the shipped RPC subscriber receives a durable overflow [23.25ms]
+
+packages/omo-senpi/src/components/task/team-service-support.test.ts:
+(pass) makeShutdownMessenger > #given a mapped running member #when a shutdown notice is sent #then the notice steers into the running turn [2.48ms]
+
+packages/omo-senpi/src/components/task/planner-agent-effort.test.ts:
+(pass) agent plans carrying configured effort > #given an agent model entry with effort #when planned #then the effort becomes the child variant [0.22ms]
+(pass) agent plans carrying configured effort > #given an agent carrying both variant and effort #when planned #then effort wins exactly as it does for a category [0.09ms]
+(pass) agent plans carrying configured effort > #given an agent level variant and a per entry effort #when planned #then the per entry effort still reaches the child [0.08ms]
+(pass) agent plans carrying configured effort > #given an agent with plain string models #when planned #then no variant is invented [0.07ms]
+
+packages/omo-senpi/src/components/task/resumption-channel-emitter.test.ts:
+(pass) createResumptionChannelEmitter > #given a background child #when it spawns and then reaches a terminal state #then snapshots transition from one channel to zero [0.38ms]
+(pass) createResumptionChannelEmitter > #given a foreground owned team member #when the snapshot is emitted #then the member counts as active [0.10ms]
+(pass) createResumptionChannelEmitter > #given a foreground owned team member resolved through the real ownership helper #when the session snapshot is emitted #then the member counts as active [1.26ms]
+(pass) createResumptionChannelEmitter > #given an active child count of one #when a store mutation preserves that count #then no duplicate snapshot is emitted [0.10ms]
+(pass) createResumptionChannelEmitter > #given an ExtensionAPI without events #when the emitter lifecycle is driven #then registration and emissions are harmless no-ops [0.08ms]
+(pass) createResumptionChannelEmitter > #given the local event contract #when the literal is inspected #then it exactly matches the harness event name [0.03ms]
+
+packages/omo-senpi/src/components/task/task-rpc-bridge.test.ts:
+(pass) event-bridge native task telemetry and controls > #given durable and live task facts #when session_start emits a snapshot #then RPC preserves every available fact without inventing fields [0.38ms]
+(pass) event-bridge native task telemetry and controls > #given a live child subscription #when tool progress arrives #then RPC emits one updated live_progress snapshot [0.37ms]
+(pass) event-bridge native task telemetry and controls > #given a modern Senpi RPC API #when the bridge wires #then output send and cancel handlers reuse session-scoped task semantics [0.44ms]
+(pass) event-bridge native task telemetry and controls > #given a live child subscription #when the task settles #then the bridge unsubscribes and ignores later child events [0.12ms]
+(pass) event-bridge native task telemetry and controls > #given a live child subscription #when the session shuts down #then every task RPC listener is disposed [0.10ms]
+
+packages/omo-senpi/src/components/task/dag-runtime.test.ts:
+(pass) assembled DAG runtime > #given a running DAG node #when its assembled child emits progress #then RPC and the live widget share one activity subscription that tears down [19.57ms]
+(pass) assembled DAG runtime > #given an unknown node skill #when the assembled runtime creates the run #then snapshot records missing_skill and dispatch keeps the prompt [16.79ms]
+(pass) assembled DAG runtime > #given a terminal wake buffered during compaction #when the assembled runtime attaches on session start #then it redelivers exactly once [16.88ms]
+(pass) assembled DAG runtime > #given a live task component runtime #when a two-node dag runs #then scheduler, artifacts, rpc, widget, and one wake all observe the same run [56.71ms]
+(pass) assembled DAG runtime > #given a live-shaped in-process child whose abort rejects #when the assembled runtime cancels #then no unhandled rejection escapes and a later run still completes [32.54ms]
+(pass) assembled DAG runtime > #given an active run #when detach switches sessions before its task settles #then the old scheduler terminates without resolving ownership against the new session [23.47ms]
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishDurableEvents (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:421:58)
+      at writeCheckpoint (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:87:9)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:110:21)
+      at withLock (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/store.ts:570:12)
+      at appendPayload (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:90:32)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/manager.ts:347:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 650 |     cleanupRoots.push(cwd)
+651 |     const runner = new ScriptedRunner()
+652 |     const pi = Object.assign(new FakeExtensionAPI(), {
+653 |       rpc: {
+654 |         emit: (name: string) => {
+655 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.test.ts:655:51)
+      at emit (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:430:5)
+      at publishSchedulerEvent (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/src/components/task/dag-runtime.ts:118:65)
+      at deliver (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/senpi-task/src/dag/journal.ts:226:13)
+
+(pass) assembled DAG runtime > #given a throwing durable-event subscriber #when a run publishes checkpoints #then the scheduler and other subscribers still reach completion [18.55ms]
+(pass) assembled DAG runtime > #given a live adapter DAG #when shutdown pauses it and a later adapter starts #then the paused event is durable and the run is claimed, resumed, and completed [20.85ms]
+(pass) assembled DAG runtime > #given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then shipped RPC receives the recovery scheduler overflow [21.11ms]
+(pass) assembled DAG runtime > #given a paused adapter DAG whose lease holder PID is still live #when another adapter starts #then it never claims or resumes the run [7.65ms]
+
+packages/omo-senpi/src/components/task/dag-wake-source.test.ts:
+(pass) createDagWakeSource > #given one live run #when the run starts #then it emits activeCount 1 carrying that run as a channel [0.26ms]
+(pass) createDagWakeSource > #given a live run #when a second run starts #then the emission aggregates both channels as activeCount 2 [0.08ms]
+(pass) createDagWakeSource > #given two live runs #when both reach a terminal status #then the last emission clears the state with activeCount 0 [0.07ms]
+(pass) createDagWakeSource > #given a run left paused #when the session shuts down #then the final emission clears the state so no stale wake source outlives the session [0.05ms]
+(pass) createDagWakeSource > #given a run that starts, goes terminal and outlives shutdown #when every lifecycle hook fires #then the module never injects a message and never triggers a turn [0.09ms]
+(pass) createDagWakeSource > #given no resolvable session #when a run start is reported #then it still emits a cleared state rather than going silent [0.07ms]
+(pass) createDagWakeSource > #given a run pruned between list and snapshot #when the state is republished #then the surviving run still reports as live [0.09ms]
+
+packages/omo-senpi/src/components/task/skill-invocation-tracker.test.ts:
+(pass) createSkillInvocationTracker > #given a read of an ulw-plan SKILL.md #when the tool result arrives #then the session has invoked ulw-plan [0.14ms]
+(pass) createSkillInvocationTracker > #given a read of a start-work SKILL.md #when the tool result arrives #then the session has invoked start-work [0.06ms]
+(pass) createSkillInvocationTracker > #given a read of a non-skill file #when the tool result arrives #then nothing is recorded [0.07ms]
+(pass) createSkillInvocationTracker > #given a failed read of a skill file #when the tool result arrives #then nothing is recorded [0.05ms]
+(pass) createSkillInvocationTracker > #given a non-read tool result naming a skill path #when it arrives #then nothing is recorded [0.06ms]
+(pass) createSkillInvocationTracker > #given a slash skill input #when the input arrives #then the named skill is recorded [0.11ms]
+(pass) createSkillInvocationTracker > #given a plain input mentioning a skill #when the input arrives #then nothing is recorded [0.26ms]
+(pass) createSkillInvocationTracker > #given an invocation in session A #when session B is queried #then it stays locked [0.06ms]
+(pass) createSkillInvocationTracker > #given an invocation followed by session shutdown #when the session is queried #then the state is dropped [0.06ms]
+(pass) createSkillInvocationTracker > #given a windows-style skill path #when the tool result arrives #then the skill is recorded [0.05ms]
+(pass) createSkillInvocationTracker - user-request channel > #given a plain user input asking for ulw plan #when it arrives #then it is recorded as a user request but not an invocation [0.17ms]
+(pass) createSkillInvocationTracker - user-request channel > #given a slash skill input #when it arrives #then it counts as both an invocation and a user request [0.06ms]
+(pass) createSkillInvocationTracker - user-request channel > #given an ulw-plan mention only inside an ultrawork-mode block #when the input arrives #then no user request is recorded [0.05ms]
+(pass) createSkillInvocationTracker - user-request channel > #given an ulw-plan mention only inside a system-reminder block #when the input arrives #then no user request is recorded [0.05ms]
+(pass) createSkillInvocationTracker - plan-artifact channel > #given a write into a worktree .omo/plans file #when the tool result arrives #then the session has a plan artifact [0.06ms]
+(pass) createSkillInvocationTracker - plan-artifact channel > #given an edit of a relative .omo/plans path #when the tool result arrives #then the artifact is recorded [0.05ms]
+(pass) createSkillInvocationTracker - plan-artifact channel > #given a read of a plan file written by a planning child #when the tool result arrives #then the artifact is recorded [0.05ms]
+(pass) createSkillInvocationTracker - plan-artifact channel > #given an apply_patch whose patch body touches .omo/plans #when the tool result arrives #then the artifact is recorded [0.05ms]
+(pass) createSkillInvocationTracker - plan-artifact channel > #given non-plan writes and failed plan writes #when the tool results arrive #then no artifact is recorded [0.07ms]
+(pass) createSkillInvocationTracker - plan-artifact channel > #given a recorded request and artifact followed by session shutdown #when queried #then all state is dropped [0.06ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given the user asks in their own words (plan this before coding) #when the input arrives #then it counts as a user request [0.06ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given the user asks in their own words (make a plan first) #when the input arrives #then it counts as a user request [0.05ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given the user asks in their own words (계획부터 세워줘) #when the input arrives #then it counts as a user request [0.04ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given the user asks in their own words (작업 계획을 먼저 세우자) #when the input arrives #then it counts as a user request [0.03ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given the user asks in their own words (before you code, write a work plan) #when the input arrives #then it counts as a user request [0.03ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given an ordinary work instruction with no plan request #when the input arrives #then no user request is recorded [0.35ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given a pasted transcript merely mentioning plan writing #when the input arrives #then no user request is recorded [0.05ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given an explicit korean request to write the plan #when the input arrives #then it counts as a user request [0.05ms]
+(pass) createSkillInvocationTracker - own-words plan request > #given a plan request inside an injected ultrawork block #when the input arrives #then no user request is recorded [0.05ms]
+(pass) createSkillInvocationTracker - expanded skill block channel > #given an expanded ulw-plan skill block #when the input arrives #then it counts as invocation and user request [0.06ms]
+(pass) createSkillInvocationTracker - expanded skill block channel > #given an expanded block for an unrelated skill whose body mentions ulw-plan #when it arrives #then the gate is not armed [0.06ms]
+(pass) createSkillInvocationTracker - expanded skill block channel > #given another skill block followed by an own-words plan request #when it arrives #then both are recorded [0.05ms]
+(pass) createSkillInvocationTracker - expanded skill block channel > #given an unrelated skill block whose body mentions ulw-plan and no trailing request #when it arrives #then the gate stays closed [0.06ms]
+(pass) createSkillInvocationTracker - expanded skill block channel > #given an expanded start-work skill block #when it arrives #then start-work counts as invoked for the forbids check [0.05ms]
+(pass) createSkillInvocationTracker - agent-manufacturable sources stay closed > #given an extension-sourced input naming ulw-plan #when it arrives #then no user request is recorded [0.04ms]
+(pass) createSkillInvocationTracker - agent-manufacturable sources stay closed > #given an extension-sourced expanded skill block #when it arrives #then the gate is not armed [0.04ms]
+(pass) createSkillInvocationTracker - agent-manufacturable sources stay closed > #given an interactive input with no explicit source #when it arrives #then it is treated as user input [0.06ms]
+
+packages/omo-senpi/src/components/task/dag-e2e-lifecycle.test.ts:
+(pass) assembled DAG lifecycle end to end > #given a live run #when its session compacts #then events continue without a pause and the TUI refreshes after the post-compact event [22.94ms]
+(pass) assembled DAG lifecycle end to end > #given a pending adapter run #when shutdown persists a pause and a fresh adapter attaches #then it claims, resumes, and completes the run [21.18ms]
+(pass) assembled DAG lifecycle end to end > #given an eval-cell waiter that is abandoned #when a later cell re-attaches and calls done #then the shipped handle returns the result [14.64ms]
+(pass) assembled DAG lifecycle end to end > #given a shipped handle for a live child #when it cancels the run #then no abort rejection escapes and a later handle settles [44.99ms]
+(pass) assembled DAG lifecycle end to end > #given two terminal DAG notifications in one streaming flush window #when the window flushes #then exactly one batched steer is delivered [29.33ms]
+(pass) assembled DAG lifecycle end to end > #given the reference viewer attached to a live adapter run #when the run completes #then catch-up and live delivery contain zero gaps and zero duplicates [21.58ms]
+(pass) assembled DAG lifecycle end to end > #given bursty adapter mutations with an identical final state #when the snapshot window flushes #then omo.dag.updated emits that state once [10.33ms]
+
+packages/omo-senpi/src/components/task/dag-rpc-handlers.test.ts:
+(pass) dag rpc handlers > #given a session that owns dag runs > #when omo.dag.list is called #then it returns session-scoped summaries newest first [10.24ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when omo.dag.list requests a limit above the maximum #then the limit clamps to 256 [5.17ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when omo.dag.list filters by status #then only matching runs come back [4.13ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when omo.dag.snapshot is called #then the run snapshot round-trips [3.85ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when omo.dag.history pages a run #then it walks the ledger with an exclusive sinceSeq [8.46ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when omo.dag.history requests a limit above the maximum #then the limit clamps to 1000 [4.28ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when events are appended while a bounded page walk is in flight #then the page set does not shift [9.48ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when omo.dag.subscribe is called #then highWaterSeq is captured before the page is read [7.99ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when subscribe is followed by bounded history paging #then applied seqs are contiguous to the high water mark [10.47ms]
+(pass) dag rpc handlers > #given a session that owns dag runs > #when history filters by lane and type #then the filters reach the ledger read [7.36ms]
+(pass) dag rpc handlers > #given a request the engine must reject > #when a foreign session asks for a run #then every run-scoped handler answers run_not_owned [4.33ms]
+(pass) dag rpc handlers > #given a request the engine must reject > #when the run id is unknown #then the envelope carries run_not_found instead of throwing [0.89ms]
+(pass) dag rpc handlers > #given a request the engine must reject > #when params are malformed #then the envelope carries invalid_arguments [3.69ms]
+(pass) dag rpc handlers > #given a request the engine must reject > #when the ledger read fails #then the envelope carries history_unavailable [3.71ms]
+(pass) dag rpc handlers > #given a request the engine must reject > #when no session is active #then run queries answer run_not_owned and never touch the engine [3.60ms]
+(pass) dag rpc handlers > #given the extension surface > #when handlers are registered #then exactly the four dag query methods are bound once each [0.81ms]
+
+packages/omo-senpi/src/components/task/task-component.test.ts:
+(pass) OMO Senpi task component fallback completion > #given duplicate terminal delivery #when the task component notifies the lead #then it reports model fallback once at terminal completion [0.27ms]
+
+packages/omo-senpi/src/components/task/status-ui.test.ts:
+(pass) createTaskStatusUi.syncNow > #given a list-only manager #when a static running row renders #then no animation timer starts [0.21ms]
+(pass) createTaskStatusUi.syncNow > #given two running tasks in the current session #when syncing #then footer and two widget rows render scoped to the session [0.09ms]
+(pass) createTaskStatusUi.syncNow > #given controls across a stale malformed running record #when syncing #then rows sanitize controls without damaging CJK [0.16ms]
+(pass) createTaskStatusUi.syncNow > #given no captured ui context #when syncing #then it is a no-op [0.07ms]
+(pass) createTaskStatusUi.syncNow > #given a non-tui mode #when syncing #then UI is skipped [0.05ms]
+(pass) createTaskStatusUi.syncNow > #given all tasks terminal #when syncing #then the widget is cleared [0.05ms]
+(pass) createTaskStatusUi.scheduleSync > #given a just-started background child #when scheduling #then it subscribes before debounce fires [0.08ms]
+(pass) createTaskStatusUi.scheduleSync > #given several rapid schedule calls #when debounce fires #then syncNow runs once [0.11ms]
+(pass) createTaskStatusUi.scheduleSync > #given a pending debounce #when disposed #then the timer clears without rendering [0.08ms]
+
+ 371 pass
+ 0 fail
+ 1031 expect() calls
+Ran 371 tests across 53 files. [6.47s]
+
+=== omo-senpi typecheck ===
+$ tsgo --noEmit -p tsconfig.json
+
+=== senpi-task typecheck ===
+$ tsgo --noEmit -p tsconfig.json
+
+=== CI bun 1.3.12 bundle freshness ===
+Senpi LSP runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Senpi ast-grep-mcp runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js sha256=cbff6be91f343c59c4f7d05f9acf6b0f8bde6d05e19d5d6f5a46b45a6a26bd50
+Senpi agent-toolkit runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/plugin/runtime/agent-toolkit sha256=eeb16d3028fd8057997b5efdec3a983f7f2d25a15d5f7df075a14f2a5cf5f651
+Bundled 777 modules in 83ms
+
+  omo.js  1.17 MB  (entry point)
+
+Bundled 636 modules in 28ms
+
+  omo-task.js  0.85 MB  (entry point)
+
+Bundled 280 modules in 11ms
+
+  omo-member.js  173.24 KB  (entry point)
+
+Bundled 94 modules in 6ms
+
+  omo-memory-mcp.js  96.51 KB  (entry point)
+
+Bundled 90 modules in 5ms
+
+  memory-run-supervisor.mjs  25.98 KB  (entry point)
+
+Bundled 96 modules in 7ms
+
+  omo-init-deep-advisor.js  64.53 KB  (entry point)
+
+omo-senpi extension build is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-dep-pins-latest/packages/omo-senpi/plugin/extensions/omo.js

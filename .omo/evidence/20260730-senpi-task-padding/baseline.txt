@@ -1,0 +1,10 @@
+Captured: 2026-07-30T05:24:00Z
+Worktree: /Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-argument-padding-20260730
+Branch: fix/senpi-task-argument-padding-20260730
+Base: 915c5e4a9f922099bd15b96fdd4c0b128c70e034
+Bun: 1.4.0
+Initial git status: clean
+
+Main checkout unrelated changes intentionally left untouched:
+ M packages/model-core/src/agent-model-requirements.ts
+ M packages/model-core/src/model-requirements-agents.test.ts

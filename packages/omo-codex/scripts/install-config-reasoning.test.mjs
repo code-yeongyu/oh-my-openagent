@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { updateCodexConfig } from "./install/config.mjs";
-import { readCodexModelCatalog } from "./install/model-catalog.mjs";
+import { readCodexModelCatalog, updateCodexConfig } from "./install-dist/install-local.mjs";
 
 test("#given empty Codex config #when script installer updates config #then sets worker model and reasoning defaults", async () => {
 	// given
@@ -23,8 +22,8 @@ test("#given empty Codex config #when script installer updates config #then sets
 
 	// then
 	const content = await readFile(configPath, "utf8");
-	assert.match(content, /model = "gpt-5\.5"/);
-	assert.match(content, /model_context_window = 400000/);
+	assert.match(content, /model = "gpt-5\.6-sol"/);
+	assert.match(content, /model_context_window = 650000/);
 	assert.match(content, /model_reasoning_effort = "high"/);
 	assert.match(content, /plan_mode_reasoning_effort = "xhigh"/);
 });
@@ -62,8 +61,8 @@ test("#given existing model and reasoning config #when script installer updates 
 	assert.equal(content.match(/^model_context_window\s*=/gm)?.length, 1);
 	assert.equal(content.match(/^model_reasoning_effort\s*=/gm)?.length, 1);
 	assert.equal(content.match(/^plan_mode_reasoning_effort\s*=/gm)?.length, 1);
-	assert.match(content, /model = "gpt-5\.5"/);
-	assert.match(content, /model_context_window = 400000/);
+	assert.match(content, /model = "gpt-5\.6-sol"/);
+	assert.match(content, /model_context_window = 650000/);
 	assert.match(content, /model_reasoning_effort = "high"/);
 	assert.match(content, /plan_mode_reasoning_effort = "xhigh"/);
 	assert.doesNotMatch(content, /model = "gpt-5\.2"/);
@@ -149,6 +148,6 @@ test("#given fallback model catalog #when catalog file is unavailable #then no m
 	const catalog = await readCodexModelCatalog(root);
 
 	// then
-	assert.equal(catalog.current.model, "gpt-5.5");
+	assert.equal(catalog.current.model, "gpt-5.6-sol");
 	assert.equal(catalog.managedProfiles.some((profile) => profile.model === "gpt-5.4"), false);
 });

@@ -1,0 +1,28 @@
+runtime dist not built locally; skipping freshness check: /repo/packages/lsp-daemon/dist
+runtime dist not built locally; skipping freshness check: /repo/packages/ast-grep-mcp/dist/cli.js
+runtime dist not built locally; skipping freshness check: /repo/packages/omo-codex/plugin/components/ulw-loop/dist/cli.js
+Bundled 783 modules in 30ms
+
+  omo.js  1.19 MB  (entry point)
+
+Bundled 640 modules in 23ms
+
+  omo-task.js  0.85 MB  (entry point)
+
+Bundled 280 modules in 12ms
+
+  omo-member.js  173.24 KB  (entry point)
+
+Bundled 94 modules in 6ms
+
+  omo-memory-mcp.js  96.53 KB  (entry point)
+
+Bundled 90 modules in 4ms
+
+  memory-run-supervisor.mjs  25.98 KB  (entry point)
+
+Bundled 97 modules in 5ms
+
+  omo-init-deep-advisor.js  64.27 KB  (entry point)
+
+omo-senpi extension build is current: /repo/packages/omo-senpi/plugin/extensions/omo.js

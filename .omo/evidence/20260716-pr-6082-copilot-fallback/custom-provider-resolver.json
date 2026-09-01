@@ -1,0 +1,13 @@
+{
+  "model": "long-custom-provider/gpt-5.6-sol",
+  "variant": "xhigh",
+  "fallbackEntry": {
+    "providers": [
+      "openai",
+      "vercel"
+    ],
+    "model": "gpt-5.6-sol",
+    "variant": "xhigh"
+  },
+  "matchedFallback": true
+}

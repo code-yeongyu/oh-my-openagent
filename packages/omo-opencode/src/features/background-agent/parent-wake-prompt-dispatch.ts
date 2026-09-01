@@ -2,9 +2,10 @@ import {
   createInternalAgentTextPart,
   isAmbiguousPostDispatchPromptFailure,
   log,
+  withInternalNoReplyMarker,
 } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
-import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import type { PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
 import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
@@ -17,6 +18,7 @@ type ParentWakePromptDispatchInput = {
   readonly latestWake: PendingParentWake
   readonly forceNoReply?: boolean
   readonly retainPendingWake?: boolean
+  readonly skipPromptGateStatusCheck?: boolean
   readonly emptyAssistantTurnRetry: boolean
   readonly toolWaitDecision: ToolWaitDeferralDecision
   readonly getDispatchedWake: () => PendingParentWake | undefined
@@ -41,14 +43,18 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         : {}),
       settleMs: 0,
       queueBehavior: "defer",
-      checkStatus: input.forceNoReply !== true,
+      checkStatus: input.forceNoReply !== true && input.skipPromptGateStatusCheck !== true,
       checkToolState: input.forceNoReply !== true && !input.toolWaitDecision.skipPromptGateToolStateCheck,
       input: {
         path: { id: input.sessionID },
         body: {
           noReply: input.forceNoReply === true || !input.latestWake.shouldReply,
           ...input.latestWake.promptContext,
-          parts: [createInternalAgentTextPart(notificationContent)],
+          parts: [
+            input.forceNoReply === true || !input.latestWake.shouldReply
+              ? withInternalNoReplyMarker(createInternalAgentTextPart(notificationContent))
+              : createInternalAgentTextPart(notificationContent),
+          ],
         },
         query: { directory: input.directory },
       },

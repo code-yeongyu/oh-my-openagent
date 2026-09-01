@@ -1,6 +1,9 @@
 import type { GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import { discoverSkills } from "../../features/opencode-skill-loader"
-import { getAllSkills } from "../../features/opencode-skill-loader/skill-discovery"
+import {
+  getAllSkills,
+  isDisabledSkillAlias,
+} from "../../features/opencode-skill-loader/skill-discovery"
 import {
   extractSkillTemplate,
   injectGitMasterConfig,
@@ -22,6 +25,7 @@ type ResolveSkillContentOptions = {
   targetAgent?: string
   nativeSkills?: DelegateTaskToolOptions["nativeSkills"]
   nativeSkillEntries?: NativeSkillEntry[]
+  getLoadedSkills?: DelegateTaskToolOptions["getLoadedSkills"]
 }
 
 function isSkillAllowedForTargetAgent(skill: LoadedSkill, targetAgent: string | undefined): boolean {
@@ -49,6 +53,21 @@ async function loadNativeSkillEntries(
   }
 }
 
+async function loadBaseSkills(options: ResolveSkillContentOptions): Promise<LoadedSkill[]> {
+  if (options.getLoadedSkills) {
+    try {
+      const loadedSkills = await options.getLoadedSkills()
+      return [...loadedSkills]
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      log("[skill-resolver] getLoadedSkills() failed; falling back to disk-discovered skills", {
+        error: errorMessage,
+      })
+    }
+  }
+  return [...(await getAllSkills(options))]
+}
+
 export async function resolveSkillContent(
   skills: string[],
   options: ResolveSkillContentOptions,
@@ -57,11 +76,16 @@ export async function resolveSkillContent(
     return { content: undefined, contents: [], error: null }
   }
 
-  // Build the merged skill registry: OMO disk-discovered + OpenCode native (config.skills.paths).
-  // OMO wins on collisions, matching the existing mergeNativeSkills semantics.
-  const baseSkills: LoadedSkill[] = [...(await getAllSkills(options))]
-  const nativeEntries = await loadNativeSkillEntries(options.nativeSkills, options.nativeSkillEntries)
-  mergeNativeSkills(baseSkills, nativeEntries)
+  const baseSkills = await loadBaseSkills(options)
+  let nativeEntries = options.nativeSkillEntries
+  let nativeMerged = false
+
+  const mergeNativeEntries = async (): Promise<void> => {
+    if (nativeMerged) return
+    nativeEntries = await loadNativeSkillEntries(options.nativeSkills, nativeEntries)
+    mergeNativeSkills(baseSkills, nativeEntries, options.disabledSkills)
+    nativeMerged = true
+  }
 
   const resolved = new Map<string, string>()
   const notFound: string[] = []
@@ -78,8 +102,15 @@ export async function resolveSkillContent(
 
   for (const name of skills) {
     let skill = matchSkillByName(baseSkills, name)
-    if (!skill && options.browserProvider === undefined && !options.disabledSkills?.has(name)) {
+    if (!skill) {
+      await mergeNativeEntries()
+      skill = matchSkillByName(baseSkills, name)
+    }
+    if (!skill && options.browserProvider === undefined) {
       skill = matchSkillByName(await getUnfilteredDiscoveredSkills(), name)
+      if (skill && options.disabledSkills && isDisabledSkillAlias(skill, options.disabledSkills)) {
+        skill = undefined
+      }
     }
     if (!skill) {
       notFound.push(name)

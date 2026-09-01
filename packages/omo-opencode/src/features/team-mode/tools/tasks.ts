@@ -2,9 +2,9 @@ import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { OpencodeClient } from "../../../tools/delegate-task/types"
-import { loadRuntimeState } from "../team-state-store"
-import { createTask, getTask, listTasks, updateTaskStatus, claimTask } from "../team-tasklist"
-import type { RuntimeState, Task } from "../types"
+import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
+import { createTask, getTask, listTasks, updateTaskStatus, claimTask } from "@oh-my-opencode/team-core/team-tasklist"
+import type { RuntimeState, Task } from "@oh-my-opencode/team-core/types"
 
 type TeamTaskToolContext = ToolContext & {
   sessionID?: string

@@ -1,0 +1,24 @@
+Post-rebase verification
+
+Base: `origin/dev@0d90f168d`
+Behavior commit: `634864ac0`
+Evidence commit: `d11778317`
+
+- Focused launcher: 30 pass, 0 fail, 116 assertions.
+- OMO Native package: 74 pass, 6 documented environment skips, 0 fail,
+  292 assertions.
+- Full root suite: 14,433 pass, 11 documented skips, 0 fail, 1 snapshot,
+  72,410 assertions across 1,865 files.
+- Full repository typecheck: PASS.
+- Root production build: PASS.
+- OMO Native payload verifier: PASS (346 paths, 0 offenders,
+  4,596,353 bytes).
+- Senpi extension freshness check: PASS.
+- Packed manifest scan: 4 manifests, zero unsafe dependency names.
+- Bun/npm/unknown real-surface QA: PASS.
+- All QA prefixes, tarballs, remote fixtures, temporary transcripts, and
+  symlinks: CLEAN.
+
+LSP limitation: the current LSP server rejects external-worktree paths even
+through a main-root symlink. Final changed-file diagnostics remain an explicit
+post-merge completion gate on the clean main checkout.

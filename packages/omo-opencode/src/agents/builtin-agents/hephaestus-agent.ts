@@ -4,11 +4,10 @@ import type { CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isAnyProviderConnected } from "../../shared"
 import { log } from "../../shared/logger"
-import { createHephaestusAgent } from "../hephaestus"
+import { createHephaestusAgent, isHephaestusSupportedModel } from "../hephaestus"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
-import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 
 export function maybeCreateHephaestusConfig(input: {
@@ -80,6 +79,14 @@ export function maybeCreateHephaestusConfig(input: {
   }
   const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
 
+  if (!isHephaestusSupportedModel(hephaestusModel)) {
+    log("[agent-registration] Agent skipped: unsupported Hephaestus model", {
+      agent: "hephaestus",
+      configuredModel: hephaestusModel,
+    })
+    return undefined
+  }
+
   let hephaestusConfig = createHephaestusAgent(
     hephaestusModel,
     availableAgents,
@@ -94,12 +101,26 @@ export function maybeCreateHephaestusConfig(input: {
   const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
   if (hepOverrideCategory) {
     hephaestusConfig = applyCategoryOverride(hephaestusConfig, hepOverrideCategory, mergedCategories)
+    if (!isHephaestusSupportedModel(hephaestusConfig.model)) {
+      log("[agent-registration] Agent skipped: unsupported Hephaestus category model", {
+        agent: "hephaestus",
+        configuredModel: hephaestusConfig.model,
+      })
+      return undefined
+    }
   }
 
   hephaestusConfig = applyEnvironmentContext(hephaestusConfig, directory, { disableOmoEnv })
 
   if (hephaestusOverride) {
     hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)
+    if (!isHephaestusSupportedModel(hephaestusConfig.model)) {
+      log("[agent-registration] Agent skipped: unsupported Hephaestus override model", {
+        agent: "hephaestus",
+        configuredModel: hephaestusConfig.model,
+      })
+      return undefined
+    }
   }
 
   const resolvedModel = hephaestusConfig.model ?? ""
@@ -109,11 +130,6 @@ export function maybeCreateHephaestusConfig(input: {
     hephaestusOverride?.permission,
     (hephaestusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
   )
-
-  const gptDeny = getGptApplyPatchPermission(resolvedModel)
-  if (Object.keys(gptDeny).length > 0 && hephaestusConfig.permission) {
-    Object.assign(hephaestusConfig.permission, gptDeny)
-  }
 
   return hephaestusConfig
 }

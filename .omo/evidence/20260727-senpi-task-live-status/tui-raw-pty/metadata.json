@@ -1,0 +1,27 @@
+{
+  "title": "Senpi live task status driver",
+  "connector": "node-pty-raw",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "skipped",
+  "source": {
+    "kind": "command",
+    "label": "post-rebase actual status UI controller and formatter in a real PTY"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 140,
+    "rows": 12
+  },
+  "cleanup": "pty pid 6070 killed",
+  "files": {
+    "png": null,
+    "text": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status/.omo/evidence/20260727-senpi-task-live-status/tui-raw-pty/terminal.txt",
+    "ansi": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status/.omo/evidence/20260727-senpi-task-live-status/tui-raw-pty/terminal-ansi.txt",
+    "metadata": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-live-task-status/.omo/evidence/20260727-senpi-task-live-status/tui-raw-pty/metadata.json"
+  }
+}

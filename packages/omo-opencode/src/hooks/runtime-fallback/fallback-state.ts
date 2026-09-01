@@ -1,106 +1,18 @@
+import {
+  areRuntimeFallbackModelsEquivalent,
+  stringifyRuntimeFallbackModel,
+  stringifyRuntimeFallbackModelWithVariant,
+} from "@oh-my-opencode/model-core"
 import type { FallbackState, FallbackResult } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import type { RuntimeFallbackConfig } from "../../config"
-import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 
-export function stringifyRuntimeModel(model: unknown): string | undefined {
-  if (typeof model === "string") return model
-
-  if (typeof model === "object" && model !== null) {
-    const candidate = model as { providerID?: unknown; modelID?: unknown; variant?: unknown }
-    if (typeof candidate.providerID === "string" && typeof candidate.modelID === "string") {
-      const providerID = candidate.providerID.trim()
-      const modelID = candidate.modelID.trim()
-      const variant = typeof candidate.variant === "string" ? candidate.variant.trim() : undefined
-
-      if (!providerID || !modelID) return undefined
-
-      const baseModel = `${providerID}/${modelID}`
-      return variant
-        ? `${baseModel}(${variant})`
-        : baseModel
-    }
-  }
-
-  return undefined
-}
-
-export function stringifyRuntimeModelWithVariant(model: unknown, variant: unknown): string | undefined {
-  const baseModel = stringifyRuntimeModel(model)
-  const fallbackVariant = typeof variant === "string" ? variant.trim() : undefined
-  if (!baseModel || !fallbackVariant) return baseModel
-
-  const parsed = parseModelString(baseModel)
-  if (!parsed?.providerID || !parsed.modelID || parsed.variant) return baseModel
-
-  return `${parsed.providerID}/${parsed.modelID}(${fallbackVariant})`
-}
-
-function canonicalizeModelID(modelID: string): string {
-  const loweredModelID = modelID.toLowerCase()
-  const dottedModelID = loweredModelID.replace(/\./g, "-")
-
-  if (
-    dottedModelID.startsWith("claude-opus-") ||
-    dottedModelID.startsWith("claude-sonnet-") ||
-    dottedModelID.startsWith("claude-haiku-")
-  ) {
-    return dottedModelID
-      .replace(/-thinking$/i, "")
-      .replace(/-max$/i, "")
-      .replace(/-high$/i, "")
-  }
-
-  return dottedModelID
-}
-
-function canonicalizeProviderFamily(providerID: string, modelID: string): string {
-  const canonicalModelID = canonicalizeModelID(modelID)
-
-  if (
-    canonicalModelID.startsWith("claude-opus-") ||
-    canonicalModelID.startsWith("claude-sonnet-") ||
-    canonicalModelID.startsWith("claude-haiku-")
-  ) {
-    return "anthropic-compatible-claude"
-  }
-
-  return providerID.toLowerCase()
-}
-
-function parseCanonicalModel(model: string): { providerID: string; modelID: string } | undefined {
-  const parsed = parseModelString(model)
-  if (!parsed?.providerID || !parsed.modelID) return undefined
-
-  const canonicalModelID = canonicalizeModelID(parsed.modelID)
-  const variant = parsed.variant?.toLowerCase()
-
-  return {
-    providerID: canonicalizeProviderFamily(parsed.providerID, parsed.modelID),
-    modelID: variant ? `${canonicalModelID}::${variant}` : canonicalModelID,
-  }
-}
-
-function isEquivalentModel(candidate: string, current: string): boolean {
-  const parsedCandidate = parseCanonicalModel(candidate)
-  const parsedCurrent = parseCanonicalModel(current)
-
-  if (!parsedCandidate || !parsedCurrent) {
-    const candidateString = typeof candidate === "string" ? candidate : String(candidate)
-    const currentString = typeof current === "string" ? current : String(current)
-    return candidateString.toLowerCase() === currentString.toLowerCase()
-  }
-
-  return (
-    parsedCandidate.providerID === parsedCurrent.providerID &&
-    parsedCandidate.modelID === parsedCurrent.modelID
-  )
-}
+export const stringifyRuntimeModel = stringifyRuntimeFallbackModel
+export const stringifyRuntimeModelWithVariant = stringifyRuntimeFallbackModelWithVariant
 
 export function areRuntimeModelsEquivalent(candidate: string | undefined, current: string | undefined): boolean {
-  if (!candidate || !current) return false
-  return isEquivalentModel(candidate, current)
+  return areRuntimeFallbackModelsEquivalent(candidate, current)
 }
 
 export function createFallbackState(originalModel: unknown): FallbackState {
@@ -130,7 +42,7 @@ export function findNextAvailableFallback(
 ): string | undefined {
   for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
     const candidate = fallbackModels[i]
-    if (isEquivalentModel(candidate, state.currentModel)) {
+    if (areRuntimeFallbackModelsEquivalent(candidate, state.currentModel)) {
       log(`[${HOOK_NAME}] Skipping equivalent fallback model`, {
         model: candidate,
         currentModel: state.currentModel,

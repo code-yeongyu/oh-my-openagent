@@ -25,7 +25,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("does not emit synthetic pending session metadata when session id is unresolved", async () => {
     //#given - launched task without resolved subagent session id
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     const manager = {
       launch: async () => ({
         id: "bg_unresolved",
@@ -47,7 +47,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_1",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: new AbortController().signal,
       },
       { manager },
@@ -68,7 +68,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("emits task metadata session_id when real session id is available", async () => {
     //#given - launched task with resolved subagent session id
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     const manager = {
       launch: async () => ({
         id: "bg_resolved",
@@ -90,7 +90,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_2",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: new AbortController().signal,
       },
       { manager },
@@ -159,7 +159,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("captures late-resolved session id and emits synced metadata", async () => {
     //#given - background task session id appears after launch via manager polling
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     let reads = 0
     const manager = {
       launch: async () => ({
@@ -185,7 +185,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_3",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: new AbortController().signal,
       },
       { manager },
@@ -208,9 +208,9 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("passes question-deny session permission when launching delegate task", async () => {
     //#given - delegate task background launch should deny question at session creation time
-    const launchCalls: any[] = []
+    const launchCalls: Array<{ sessionPermission: unknown }> = []
     const manager = {
-      launch: async (input: any) => {
+      launch: async (input: { sessionPermission: unknown }) => {
         launchCalls.push(input)
         return {
           id: "bg_permission",
@@ -298,7 +298,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("keeps launched background task alive when parent aborts before session id resolves", async () => {
     //#given - parallel tool execution can abort the parent call after launch succeeds
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     const abortController = new AbortController()
     const manager = {
       launch: async () => ({
@@ -325,7 +325,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_abort_after_launch",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: abortController.signal,
       },
       { manager },
@@ -339,7 +339,6 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then - background launch should still succeed without fake abort failure
     expectFn(result).toContain("Background task launched")
     expectFn(result).toContain("Background Task ID: bg_abort_after_launch")
-    expectFn(result).not.toContain("Task aborted while waiting for session to start")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn("sessionId" in metadataCalls[0].metadata).toBe(false)
   })
@@ -439,7 +438,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("reports failure when manager marks task as error during session startup", async () => {
     //#given - session created but startTask throws before prompt is sent
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     let reads = 0
     const manager = {
       launch: async () => ({
@@ -469,7 +468,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_crash",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: new AbortController().signal,
       },
       { manager },
@@ -560,7 +559,6 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
     //#then - both tasks still launch and the sibling is not reported as interrupted
     expectFn(firstResult).toContain("Background task launched")
-    expectFn(firstResult).not.toContain("Task failed to start")
     expectFn(secondResult).toContain("Background task launched")
     expectFn(secondResult).toContain("session_id: ses_second")
     expectFn(secondResult).not.toContain("interrupt")

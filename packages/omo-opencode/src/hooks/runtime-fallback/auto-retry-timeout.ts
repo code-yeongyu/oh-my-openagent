@@ -1,8 +1,10 @@
-import type { HookDeps, RuntimeFallbackTimeout } from "./types"
+import type { AutoRetryDispatchOutcome, HookDeps, RuntimeFallbackTimeout } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
+import { restoreFallbackState, snapshotFallbackState } from "./fallback-state-snapshot"
+import { subagentSessions } from "../../features/claude-code-session-state"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -15,7 +17,7 @@ export function createFallbackTimeoutHelpers(
     newModel: string,
     resolvedAgent: string | undefined,
     source: string,
-  ) => Promise<void>,
+  ) => Promise<AutoRetryDispatchOutcome>,
 ) {
   const {
     config,
@@ -39,24 +41,47 @@ export function createFallbackTimeoutHelpers(
 
     const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
     if (timeoutMs <= 0) return
+    const wasSubagentSession = subagentSessions.has(sessionID)
+    const fallbackState = sessionStates.get(sessionID)
 
     const timer = setTimeout(async () => {
+      if (sessionFallbackTimeouts.get(sessionID) !== timer) {
+        log(`[${HOOK_NAME}] Session fallback timeout skipped after timer replacement`, { sessionID })
+        return
+      }
       sessionFallbackTimeouts.delete(sessionID)
 
-      const state = sessionStates.get(sessionID)
-      if (!state) return
+      if (wasSubagentSession && !subagentSessions.has(sessionID)) {
+        log(`[${HOOK_NAME}] Session fallback timeout skipped for completed subagent`, { sessionID })
+        return
+      }
+
+      if (!fallbackState || sessionStates.get(sessionID) !== fallbackState) {
+        log(`[${HOOK_NAME}] Session fallback timeout skipped for stale state generation`, {
+          sessionID,
+        })
+        return
+      }
+      const state = fallbackState
 
       if (sessionRetryInFlight.has(sessionID)) {
         log(`[${HOOK_NAME}] Overriding in-flight retry due to session timeout`, { sessionID })
       }
 
       await abortSessionRequest(sessionID, "session.timeout")
+      if (sessionStates.get(sessionID) !== state) {
+        log(`[${HOOK_NAME}] Session fallback timeout skipped for stale state generation`, {
+          sessionID,
+        })
+        return
+      }
       sessionRetryInFlight.delete(sessionID)
 
       if (state.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
       }
       state.pendingFallbackPromptMayHaveBeenAccepted = false
+      const stateSnapshot = snapshotFallbackState(state)
 
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
       if (fallbackModels.length === 0) return
@@ -69,7 +94,18 @@ export function createFallbackTimeoutHelpers(
 
       const result = prepareFallback(sessionID, state, fallbackModels, config)
       if (result.success && result.newModel) {
-        await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
+        const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
+        if (!dispatchOutcome.accepted) {
+          restoreFallbackState(state, stateSnapshot)
+          if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
+            scheduleSessionFallbackTimeout(sessionID, resolvedAgent)
+          }
+          log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
+            sessionID,
+            status: dispatchOutcome.status,
+            reason: dispatchOutcome.reason,
+          })
+        }
       }
     }, timeoutMs)
 

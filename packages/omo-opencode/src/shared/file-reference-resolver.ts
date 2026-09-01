@@ -84,9 +84,10 @@ export function resolveFilePath(filePath: string, cwd: string): string {
   return resolvePathForInput(expanded, cwd)
 }
 
-function readFileContent(resolvedPath: string): string {
+function readFileContent(resolvedPath: string): string | null {
+  // A missing path means the token was prose, not a real reference; signal "leave it untouched".
   if (!existsSync(resolvedPath)) {
-    return `[file not found: ${resolvedPath}]`
+    return null
   }
 
   const stat = statSync(resolvedPath)
@@ -129,6 +130,9 @@ export async function resolveFileReferencesInText(
     }
 
     const content = readFileContent(resolvedPath)
+    if (content === null) {
+      continue
+    }
     replacements.set(match.fullMatch, content)
   }
 
@@ -137,7 +141,7 @@ export async function resolveFileReferencesInText(
     resolved = resolved.replaceAll(pattern, replacement)
   }
 
-  if (findFileReferences(resolved).length > 0 && depth + 1 < maxDepth) {
+  if (replacements.size > 0 && findFileReferences(resolved).length > 0 && depth + 1 < maxDepth) {
     return resolveFileReferencesInText(resolved, cwd, depth + 1, maxDepth)
   }
 

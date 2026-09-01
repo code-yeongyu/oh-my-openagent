@@ -556,6 +556,30 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     expect(sessionIDs).toEqual(["ses_1", "ses_2"])
   })
 
+  test("getAllSessions sorts SDK sessions by time.updated descending", async () => {
+    // given
+    const mockSessions = [
+      { id: "ses_old", directory: "/test", time: { created: 1000, updated: 1000 } },
+      { id: "ses_new", directory: "/test", time: { created: 2000, updated: 3000 } },
+      { id: "ses_mid", directory: "/test", time: { created: 1500, updated: 2000 } },
+    ]
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, getAllSessions } = await import("./storage")
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
+
+    // when
+    const sessionIDs = await getAllSessions()
+
+    // then
+    expect(sessionIDs.slice(0, 3)).toEqual(["ses_new", "ses_mid", "ses_old"])
+  })
+
   test("readSessionMessages uses SDK when beta mode is enabled", async () => {
     // given
     const mockMessages = [

@@ -106,7 +106,8 @@ export function createSessionManagerTools(
       offset: tool.schema.number().optional().describe("Message offset. Positive: skip first N messages. Negative: count from end (-1 = last message). Default: 0"),
       include_todos: tool.schema.boolean().optional().describe("Include todo list if available (default: false)"),
       include_transcript: tool.schema.boolean().optional().describe("Include transcript log if available (default: false)"),
-      limit: tool.schema.number().optional().describe("Maximum number of messages to return (default: all)"),
+      limit: tool.schema.number().optional().describe("Maximum number of messages to return (default: all messages)"),
+      from_end: tool.schema.boolean().optional().describe("Read messages from the END of the session (default: false). Pass true to get the most-recent / final assistant message in the output. Recommended when you want the result of a completed task."),
     },
     execute: async (args: SessionReadArgs, _context) => {
       try {
@@ -130,7 +131,9 @@ export function createSessionManagerTools(
         }
 
         if (args.limit && args.limit > 0) {
-          messages = messages.slice(0, args.limit)
+          messages = args.from_end
+            ? messages.slice(-args.limit)
+            : messages.slice(0, args.limit)
         }
 
         const todos = args.include_todos ? await resolvedDeps.readSessionTodos(args.session_id) : undefined

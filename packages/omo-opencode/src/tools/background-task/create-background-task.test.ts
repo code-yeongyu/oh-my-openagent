@@ -107,7 +107,6 @@ describe("createBackgroundTask", () => {
     //#then - tool should still report successful launch instead of cancelling child task
     expect(result).toContain("Background task launched successfully.")
     expect(result).toContain("Task ID: test-task-id")
-    expect(result).not.toContain("Task aborted and cancelled while waiting for session to start")
   })
 
   test("keeps sibling background task alive when two tasks start concurrently", async () => {

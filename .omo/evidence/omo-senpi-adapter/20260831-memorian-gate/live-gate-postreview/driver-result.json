@@ -1,0 +1,299 @@
+{
+  "result": "PASS",
+  "branch": "feat/memorian-gate",
+  "senpiBin": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/node_modules/@code-yeongyu/senpi/dist/cli.js",
+  "senpiVersion": "2026.8.31",
+  "providedSenpiCodingAgentDir": "IGNORED",
+  "realSenpiUntouched": true,
+  "realOmoMemoryUntouched": true,
+  "realOmoMemoryFootprintBefore": {
+    "agents": 414,
+    "pendingFiles": [],
+    "tokenBearingFiles": []
+  },
+  "realOmoMemoryFootprintAfter": {
+    "agents": 414,
+    "pendingFiles": [],
+    "tokenBearingFiles": []
+  },
+  "realSenpiAgentDir": "/Users/yeongyu/.senpi/agent",
+  "sandboxRoots": [
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pkryq1",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ARnZNp",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-Fu2E1w",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-0ryP4y",
+      "exists": false
+    }
+  ],
+  "scenarioVerdicts": [
+    {
+      "scenario": "HAPPY",
+      "verdict": "PASS",
+      "assertions": 13,
+      "failed": []
+    },
+    {
+      "scenario": "DISABLED",
+      "verdict": "PASS",
+      "assertions": 5,
+      "failed": []
+    },
+    {
+      "scenario": "NO-CANDIDATES",
+      "verdict": "PASS",
+      "assertions": 4,
+      "failed": []
+    },
+    {
+      "scenario": "INVALID-NUDGE",
+      "verdict": "PASS",
+      "assertions": 5,
+      "failed": []
+    },
+    {
+      "scenario": "LOOP",
+      "verdict": "PASS",
+      "assertions": 2,
+      "failed": []
+    },
+    {
+      "scenario": "REAL-CHILD",
+      "verdict": "PASS",
+      "assertions": 4,
+      "failed": []
+    },
+    {
+      "scenario": "SINGLE-TURN",
+      "verdict": "PASS",
+      "assertions": 5,
+      "failed": []
+    }
+  ],
+  "total": 41,
+  "results": [
+    {
+      "name": "HAPPY corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=d3ea3846b11c files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "HAPPY turn 1 is the session's FIRST turn (exactly one user message)",
+      "ok": true,
+      "detail": "userTurns=1"
+    },
+    {
+      "name": "HAPPY turn 1 settle spawned the gate child exactly once",
+      "ok": true,
+      "detail": "invocations=1"
+    },
+    {
+      "name": "HAPPY child argv carries the production flag set (--no-extensions + -e + --tools nudge,read)",
+      "ok": true,
+      "detail": "[\"-p\",\"--system-prompt\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163cbfa2/memorian-persona.md\",\"--tools\",\"nudge,read\",\"-e\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163cbfa2/nudge-extension.ts\",\"--no-extensions\",\"--no-skills\",\"--no-prompt-templates\",\"--no-context-files\",\"--session-dir\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163cbfa2\",\"--model\",\"omo-mock/mock-1\",\"Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163cbfa2/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163cbfa2/transcript-window.txt, then follow the system prompt.\"]"
+    },
+    {
+      "name": "HAPPY child env carries the memorian sentinel and the nudge sink",
+      "ok": true,
+      "detail": "sentinel=1 nudgePath=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163cbfa2/nudges.ndjson"
+    },
+    {
+      "name": "HAPPY candidates payload handed to the child contains the seeded note",
+      "ok": true,
+      "detail": "{\"version\":1,\"maxItems\":2,\"candidates\":[{\"path\":\"reference/project/test-note.md\",\"description\":\"Project rebase ordering rule captured for memorian gate QA\",\"excerpt\":\"The zebra-quokka rebase ordering rule says: rebase the oldest reviewed branch first, then replay the dependent branches in merge order so the stack never inverts.\",\"score\":6.9}],\"surfaced\":[]}"
+    },
+    {
+      "name": "HAPPY turn 1 carries NO recall entry (the gate advises the NEXT turn)",
+      "ok": true,
+      "detail": "count=0"
+    },
+    {
+      "name": "HAPPY the validated nudge persisted to the pending store after turn 1",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/pending\",\"files\":[{\"name\":\"01a05b6d-0000-7000-8000-00000000000a.json\",\"payload\":{\"version\":1,\"sessionId\":\"01a05b6d-0000-7000-8000-00000000000a\",\"writtenAt\":\"2026-09-01T07:27:22.033Z\",\"nudges\":[{\"path\":\"reference/project/test-note.md\",\"hint\":\"Rebase the oldest reviewed branch first so the dependent stack never inverts.\"}]}}]}"
+    },
+    {
+      "name": "HAPPY turn 2 JSONL contains an omo-memorian:recall entry",
+      "ok": true,
+      "detail": "count=2 shapes=custom,custom_message"
+    },
+    {
+      "name": "HAPPY turn 2 content carries <recalled-memory source=\"[[reference/project/test-note.md]]\"",
+      "ok": true,
+      "detail": "\n<recalled-memory source=\"[[reference/project/test-note.md]]\">\nA stored memory surfaced. It is a hint, not current state — verify before relying on it; read the source path for full context.\nRebase the oldest reviewed branch first so the dependent stack never inverts.\n</recalled-memory>"
+    },
+    {
+      "name": "HAPPY turn 2 content carries the stub judge's hint verbatim",
+      "ok": true,
+      "detail": "\n<recalled-memory source=\"[[reference/project/test-note.md]]\">\nA stored memory surfaced. It is a hint, not current state — verify before relying on it; read the source path for full context.\nRebase the oldest reviewed branch first so the dependent stack never inverts.\n</recalled-memory>"
+    },
+    {
+      "name": "HAPPY the pending file was consumed by the injection",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "HAPPY the ledger marks the injected path as surfaced",
+      "ok": true,
+      "detail": "{\"present\":true,\"files\":[{\"name\":\"01a05b6d-0000-7000-8000-00000000000a.json\",\"surfaced\":[\"reference/project/test-note.md\"]}]}"
+    },
+    {
+      "name": "DISABLED corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=9263c69af1a2 files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "DISABLED session ran 2 turn(s)",
+      "ok": true,
+      "detail": "userTurns=2"
+    },
+    {
+      "name": "DISABLED zero omo-memorian:recall entries",
+      "ok": true,
+      "detail": "count=0 []"
+    },
+    {
+      "name": "DISABLED nothing pending for a later turn",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pkryq1/memory/agents/project-86bfe8ca/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "DISABLED the gate child never spawned",
+      "ok": true,
+      "detail": "invocations=0 []"
+    },
+    {
+      "name": "NO-CANDIDATES corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=7680269bef7f files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "NO-CANDIDATES session ran 2 turn(s)",
+      "ok": true,
+      "detail": "userTurns=2"
+    },
+    {
+      "name": "NO-CANDIDATES zero omo-memorian:recall entries",
+      "ok": true,
+      "detail": "count=0 []"
+    },
+    {
+      "name": "NO-CANDIDATES nothing pending for a later turn",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ARnZNp/memory/agents/project-752b2044/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "INVALID-NUDGE corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=3971890a0ee0 files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "INVALID-NUDGE session ran 2 turn(s)",
+      "ok": true,
+      "detail": "userTurns=2"
+    },
+    {
+      "name": "INVALID-NUDGE zero omo-memorian:recall entries",
+      "ok": true,
+      "detail": "count=0 []"
+    },
+    {
+      "name": "INVALID-NUDGE nothing pending for a later turn",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-Fu2E1w/memory/agents/project-bcfda2c1/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "INVALID-NUDGE the gate child DID spawn (the rejection is the parent validator's)",
+      "ok": true,
+      "detail": "invocations=2"
+    },
+    {
+      "name": "LOOP no facts/reflection projection derives from the injected nudge",
+      "ok": true,
+      "detail": "projections=4 recallDerived=0 []"
+    },
+    {
+      "name": "LOOP the source session really contains the injection",
+      "ok": true,
+      "detail": "count=2"
+    },
+    {
+      "name": "REAL-CHILD production argv keeps --no-extensions alongside the explicit -e extension",
+      "ok": true,
+      "detail": "[\"/Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/node_modules/@code-yeongyu/senpi/dist/cli.js\",\"-p\",\"--system-prompt\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna/memorian-run/memorian-persona.md\",\"--tools\",\"nudge,read\",\"-e\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna/memorian-run/nudge-extension.ts\",\"--no-extensions\",\"--no-skills\",\"--no-prompt-templates\",\"--no-context-files\",\"--session-dir\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna/memorian-run\",\"--model\",\"omo-mock/mock-1\",\"Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna/memorian-run/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna/memorian-run/transcript-window.txt, then follow the system prompt.\"]"
+    },
+    {
+      "name": "REAL-CHILD production argv restricts tools to nudge,read",
+      "ok": true,
+      "detail": "--tools nudge,read"
+    },
+    {
+      "name": "REAL-CHILD the real child booted and exited cleanly",
+      "ok": true,
+      "detail": "status=0 stderr="
+    },
+    {
+      "name": "REAL-CHILD the real child's NDJSON line matches the scripted nudge EXACTLY",
+      "ok": true,
+      "detail": "lines=1 first={\"path\":\"reference/project/test-note.md\",\"hint\":\"Rebase the oldest reviewed branch first so the dependent stack never inverts.\"}"
+    },
+    {
+      "name": "SINGLE-TURN corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=be65402fcb8e files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "SINGLE-TURN session ran 1 turn(s)",
+      "ok": true,
+      "detail": "userTurns=1"
+    },
+    {
+      "name": "SINGLE-TURN zero omo-memorian:recall entries",
+      "ok": true,
+      "detail": "count=0 []"
+    },
+    {
+      "name": "SINGLE-TURN the judged nudge is parked for a turn that never came",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-0ryP4y/memory/agents/project-e78fb207/runtime/recall/pending\",\"files\":[{\"name\":\"01a05b6d-0000-7000-8000-00000000000f.json\",\"payload\":{\"version\":1,\"sessionId\":\"01a05b6d-0000-7000-8000-00000000000f\",\"writtenAt\":\"2026-09-01T07:27:43.667Z\",\"nudges\":[{\"path\":\"reference/project/test-note.md\",\"hint\":\"Rebase the oldest reviewed "
+    },
+    {
+      "name": "SINGLE-TURN the gate child DID spawn (the rejection is the parent validator's)",
+      "ok": true,
+      "detail": "invocations=1"
+    },
+    {
+      "name": "isolation: real ~/.senpi/agent untouched (volatile paths excluded)",
+      "ok": true,
+      "detail": "52858ff24259 vs 52858ff24259"
+    },
+    {
+      "name": "isolation: real ~/.omo/memory has no QA-attributable pending nudge or corpus file",
+      "ok": true,
+      "detail": "before={\"agents\":414,\"pendingFiles\":[],\"tokenBearingFiles\":[]} after={\"agents\":414,\"pendingFiles\":[],\"tokenBearingFiles\":[]}"
+    },
+    {
+      "name": "cleanup: every sandbox removed",
+      "ok": true,
+      "detail": "[{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pkryq1\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ARnZNp\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-Fu2E1w\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-0ryP4y\",\"exists\":false}]"
+    }
+  ],
+  "failures": []
+}

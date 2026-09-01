@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
 import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
 
@@ -23,9 +24,7 @@ export type ChatParamsOutput = {
   options: Record<string, unknown>
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
   if (!isRecord(raw)) return null

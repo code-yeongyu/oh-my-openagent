@@ -1,0 +1,20 @@
+=== GREEN 4: all omo-senpi suites touching this change (one run) ===
+$ bun test src/components/memory/{facts-wiring,context,journal-wiring,skills-usage}.test.ts   (cwd packages/omo-senpi)
+(pass) memory journal wiring > #given a fresh session #when session_start fires #then the branch reconciles like a settle [2.33ms]
+(pass) memory journal wiring > #given an errored tool result #when settled #then the tool_call row joins resultOk false [1.72ms]
+(pass) memory journal wiring > #given a malformed event context #when handlers fire #then the reconcile is a no-op [0.19ms]
+
+ 38 pass
+ 0 fail
+ 84 expect() calls
+Ran 38 tests across 4 files. [227.00ms]
+
+=== GREEN 5: memory-core suites touching this change (one run) ===
+$ bun test src/facts/ src/locks/ src/identity/ src/journal/   (cwd packages/memory-core)
+(pass) facts queue reconcile > #given a malformed queue file #when listPending runs #then it is ignored instead of throwing [7.07ms]
+(pass) facts queue reconcile > #given consumed entries #when markConsumed runs #then the files are deleted and the watermark records the endpoint [9.75ms]
+
+ 59 pass
+ 0 fail
+ 771 expect() calls
+Ran 59 tests across 11 files. [380.00ms]

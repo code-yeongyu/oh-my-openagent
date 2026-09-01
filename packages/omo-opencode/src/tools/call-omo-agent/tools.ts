@@ -11,7 +11,6 @@ import { getAgentConfigKey, stripInvisibleAgentCharacters } from "../../shared/a
 import { normalizeFallbackModels } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { log } from "../../shared"
-import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 import { parseModelString } from "../../shared"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
@@ -19,6 +18,7 @@ import { resolveCallableAgents } from "./agent-resolver"
 import { createOrGetSession } from "./session-creator"
 import { processMessages } from "./message-processor"
 import { waitForCompletion } from "./completion-poller"
+import { getFirstFallbackModel } from "../../agents/builtin-agents/model-resolution"
 
 function createSyncExecutorDeps(modelFallbackControllerAccessor?: ModelFallbackControllerAccessor) {
   return {
@@ -76,6 +76,19 @@ function resolveModelAndFallbackChain(args: {
         model: agentCategoryModel,
         variant: variantToUse,
       })
+    }
+  } else {
+    const firstFallback = getFirstFallbackModel(agentRequirement)
+    if (firstFallback) {
+      const normalized = parseModelString(firstFallback.model)
+      if (normalized) {
+        model = firstFallback.variant ? { ...normalized, variant: firstFallback.variant } : normalized
+        log("[call_omo_agent] Resolved model from first fallbackChain entry", {
+          agent: subagentType,
+          model: firstFallback.model,
+          variant: firstFallback.variant,
+        })
+      }
     }
   }
 
@@ -161,7 +174,7 @@ export function createCallOmoAgent(
 
       // Check if agent is disabled
       if (disabledAgents.some((disabled) => stripInvisibleAgentCharacters(disabled).toLowerCase() === normalizedAgent)) {
-        return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your ${CONFIG_BASENAME}.json to use it.`
+        return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your .omo/omo.jsonc to use it.`
       }
 
       const { model: resolvedModel, fallbackChain } = resolveModelAndFallbackChain({
@@ -208,3 +221,4 @@ export function createCallOmoAgent(
     },
   });
 }
+

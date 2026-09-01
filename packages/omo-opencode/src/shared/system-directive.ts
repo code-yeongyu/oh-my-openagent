@@ -55,7 +55,6 @@ export function removeSystemReminders(text: string): string {
 
 export const SystemDirectiveTypes = {
   TODO_CONTINUATION: "TODO CONTINUATION",
-  RALPH_LOOP: "RALPH LOOP",
   BOULDER_CONTINUATION: "BOULDER CONTINUATION",
   DELEGATION_REQUIRED: "DELEGATION REQUIRED",
   SINGLE_TASK_ONLY: "SINGLE TASK ONLY",

@@ -1,12 +1,11 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { extractSessionMessages } from "./session-messages"
 
 export type RetryPromptPart = { type: "text"; text: string; id?: string }
 
 type UserRetryPartRecord = Record<string, unknown> & { type: "text"; text: string }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 export function resolveOriginalUserRetryMetadata(messagesResponse: unknown): {
   messageID?: string
