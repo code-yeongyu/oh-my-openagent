@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from "node:fs/promises"
+import { readFile, readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import type {

@@ -38,6 +38,8 @@ python -c "import cloakbrowser; print(cloakbrowser.__version__, cloakbrowser.CHR
 
 ## Launch + drive
 
+NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state everywhere. If you need that profile's login state, clone it first (`rsync -a <profile>/ <tmp-clone>/`) and launch with the clone as the user-data-dir; run any clearing on the clone only.
+
 ```bash
 # 1. Launch CloakBrowser with CDP on :9242 (background). With the venv active:
 python -c "import asyncio,cloakbrowser; asyncio.run(cloakbrowser.launch_async(headless=False, stealth_args=True, args=['--remote-debugging-port=9242']))" &

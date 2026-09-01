@@ -69,16 +69,24 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
       const controller = new AbortController()
       const signal = controller.signal
       let budgetWarned = false
+      const completedSteps: string[] = []
 
       const exhaust = (step: string): void => {
         controller.abort()
         if (budgetWarned) return
         budgetWarned = true
-        options.logger?.warn("memory shutdown drain hit its budget", {
+        const details = {
           step,
           reason: input.reason,
           sessionId: input.sessionId,
-        })
+          remainingMs: Math.max(0, input.deadlineAt - now()),
+          completedSteps,
+        }
+        if (step === "shutdown-evaluator") {
+          options.logger?.info("memory shutdown drain deferred optional work", details)
+        } else {
+          options.logger?.warn("memory shutdown drain hit its budget", details)
+        }
       }
 
       /** Races one step against the remaining budget. Returns false once the budget is gone. */
@@ -111,6 +119,7 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
             error: String(outcome),
           })
         }
+        completedSteps.push(name)
         return true
       }
 

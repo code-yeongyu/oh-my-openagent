@@ -23,7 +23,7 @@ type BunLock = {
   packages?: Record<string, [string, ...unknown[]]>
 }
 
-const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.5"
+const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.7"
 const REPOSITORY_ROOT = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = __repoRootFrom(REPOSITORY_ROOT)
 const FIRST_PARTY_SOURCE_PATHS = ["packages", "script", "test-support"] as const

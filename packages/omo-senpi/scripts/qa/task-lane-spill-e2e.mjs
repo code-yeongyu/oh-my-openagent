@@ -39,7 +39,12 @@ function snapshotRealAgentDirs() {
 // senpi-* names, but this file is the same thing: a machine-global append-only journal every
 // concurrent omo process on the host writes (17MB and growing during any live TUI session), so it
 // can no more identify QA pollution than senpi-debug.log can.
-const SHARED_OMO_DIAGNOSTICS = new Set(["omo-debug.log", "omo-crash.log"])
+const SHARED_OMO_DIAGNOSTICS = new Set([
+  "omo-debug.log",
+  "omo-crash.log",
+  "OmO-debug.log",
+  "OmO-crash.log",
+])
 
 function classifyRealAgentChanges(before, after, sandboxTokens) {
   const qaAttributedPaths = []
