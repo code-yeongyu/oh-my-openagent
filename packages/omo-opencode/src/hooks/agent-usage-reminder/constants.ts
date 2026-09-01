@@ -21,7 +21,6 @@ export const TARGET_TOOLS = new Set([
 export const AGENT_TOOLS = new Set([
   "task",
   "call_omo_agent",
-  "task",
 ]);
 
 export const REMINDER_MESSAGE = `

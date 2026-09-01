@@ -34,7 +34,7 @@ describe("omo-ai published package shape", () => {
 
     describe("#when the files array is audited", () => {
       test("#then it ships the launcher, plugin, and published Senpi patch installer", () => {
-        expect(manifest.files).toEqual(["bin", "plugin", "senpi-patch.mjs"])
+        expect(manifest.files).toEqual(["bin", "plugin"])
       })
     })
 
@@ -84,7 +84,7 @@ describe("omo-ai published package shape", () => {
       })
 
       test("#then postinstall applies the shipped Senpi patch", () => {
-        expect(manifest.scripts?.postinstall).toBe("node senpi-patch.mjs")
+        expect(manifest.scripts?.postinstall).toBe("node bin/senpi-patch.mjs")
       })
     })
   })

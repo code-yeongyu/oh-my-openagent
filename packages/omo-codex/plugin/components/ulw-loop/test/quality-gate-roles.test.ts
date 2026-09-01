@@ -85,18 +85,20 @@ function qualityGateError(input: unknown, surface?: "lazycodex" | "omo-senpi"): 
 	throw new Error("Expected UlwLoopError");
 }
 
-function senpiGate(): Record<string, unknown> {
-	return gateWith({
-		codeReview: { ...BASE_GATE.codeReview, by: "omo-senpi-code-reviewer" },
-		manualQa: { ...BASE_GATE.manualQa, by: "omo-senpi-qa-executor" },
-		gateReview: { ...BASE_GATE.gateReview, by: "omo-senpi-gate-reviewer" },
+function senpiGate(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+	const { codeReview: _codeReview, ...withoutCodeReview } = BASE_GATE;
+	return {
+		...withoutCodeReview,
+		manualQa: { ...BASE_GATE.manualQa, by: "main-session" },
+		gateReview: { ...BASE_GATE.gateReview, by: "category:deep" },
 		criteriaCoverage: {
 			...BASE_GATE.criteriaCoverage,
 			originalIntent: "User wanted the senpi surface to accept honest reviewer attribution.",
 			desiredOutcome: "A gate naming the omo-senpi reviewers validates on the omo-senpi surface.",
 			userOutcomeReview: "The senpi-surface gate passed with truthful reviewer identities.",
 		},
-	});
+		...overrides,
+	};
 }
 
 describe("validateQualityGate reviewer roles", () => {
@@ -124,29 +126,28 @@ describe("validateQualityGate reviewer roles", () => {
 		expect(() => validateQualityGate(senpiGate(), { reviewerSurface: "omo-senpi" })).not.toThrow();
 	});
 
-	it("#given lazycodex identities #when validated on the omo-senpi surface #then each role names the omo-senpi identity", () => {
+	it("#given a codeReview lane #when validated on the omo-senpi surface #then it is rejected", () => {
 		const error = qualityGateError(gateWith({}), "omo-senpi");
 		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
-		expect(error.message).toContain("omo-senpi-code-reviewer");
+		expect(error.message).toContain("no codeReview lane");
 	});
 
-	it("#given omo-senpi identities #when validated on the default lazycodex surface #then the gate is rejected", () => {
+	it("#given a four-section senpi gate #when validated on the default lazycodex surface #then codeReview is required", () => {
 		const error = qualityGateError(senpiGate());
 		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
-		expect(error.message).toContain("lazycodex-code-reviewer");
+		expect(error.message).toContain("codeReview");
 	});
 
 	it("#given swapped omo-senpi reviewer roles #when validated on the omo-senpi surface #then section-specific roles are enforced", () => {
-		const swapped = gateWith({
-			codeReview: { ...BASE_GATE.codeReview, by: "omo-senpi-qa-executor" },
-			manualQa: { ...BASE_GATE.manualQa, by: "omo-senpi-qa-executor" },
-			gateReview: { ...BASE_GATE.gateReview, by: "omo-senpi-gate-reviewer" },
+		const swapped = senpiGate({
+			manualQa: { ...BASE_GATE.manualQa, by: "category:deep" },
+			gateReview: { ...BASE_GATE.gateReview, by: "main-session" },
 		});
 
 		const error = qualityGateError(swapped, "omo-senpi");
 
 		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
-		expect(error.message).toContain("codeReview.by");
+		expect(error.message).toContain("manualQa.by");
 	});
 
 	it("#given swapped LazyCodex reviewer roles #when validated #then section-specific roles are enforced", () => {

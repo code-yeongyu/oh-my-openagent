@@ -122,6 +122,7 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
       await writeFile(join(pluginRoot, "extensions", "dream-persona.md"), "# dream persona fixture\n")
       await writeFile(join(pluginRoot, "extensions", "facts-persona.md"), "# facts persona fixture\n")
+      await writeFile(join(pluginRoot, "extensions", "memorian-persona.md"), "# memorian persona fixture\n")
       // The memory run supervisor ships as its own executable artifact beside the bundle, so a
       // packed root without it is genuinely incomplete and the installer is right to reject it.
       await writeFile(join(pluginRoot, "extensions", "memory-run-supervisor.mjs"), "#!/usr/bin/env node\n")

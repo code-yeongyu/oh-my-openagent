@@ -4,7 +4,7 @@
 // set) and writes are atomic .tmp -> rename at mode 0o600, following the
 // facts/soul durability conventions.
 
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 export const RECALL_LEDGER_VERSION = 1

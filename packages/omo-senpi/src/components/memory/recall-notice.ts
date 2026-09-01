@@ -22,7 +22,7 @@ export const renderRecallEntry: EntryRenderer<MemoryRecallRecord> = (entry, opti
       glyph: "·",
       title: joinFields(["Memory recalled", paths.join(", ")]),
       tone: "muted",
-      why: "A stored memory matched this turn; it is a hint, not current state.",
+      why: "A stored memory matched the previous turn; it is a hint, not current state.",
     },
     options,
     theme,

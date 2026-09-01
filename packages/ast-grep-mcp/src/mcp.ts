@@ -66,8 +66,6 @@ export const AST_GREP_ERROR_CODES = [
 
 export type AstGrepErrorCode = (typeof AST_GREP_ERROR_CODES)[number];
 
-// ---- tool descriptors ----
-
 const LANGUAGES = [
   "bash", "c", "cpp", "csharp", "css", "elixir", "go", "haskell", "html",
   "java", "javascript", "json", "kotlin", "lua", "nix", "php", "python",
@@ -206,8 +204,6 @@ export const AST_GREP_MCP_TOOLS: readonly McpToolDescriptor[] = [
   },
 ] as const;
 
-// ---- options ----
-
 export type ToolExecutor<Payload> = (
   input: never,
   sgPath: string,
@@ -232,8 +228,6 @@ export interface AstGrepMcpOptions {
   /** Test seam: production callers leave this unset so the watchdog uses its defaults. */
   readonly parentWatchdog?: ParentWatchdogConfig;
 }
-
-// ---- request handling ----
 
 export async function handleAstGrepMcpRequest(
   input: unknown,

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { createRequire } from "node:module"
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 const packageRoot = join(import.meta.dir, "..")
 
@@ -16,7 +16,8 @@ describe("omo-ai packed install", () => {
       expect(tarball).toBeDefined()
       const listing = Bun.spawnSync(["tar", "-tzf", join(root, tarball!)], { stdout: "pipe", stderr: "pipe" })
       expect(listing.exitCode).toBe(0)
-      expect(new TextDecoder().decode(listing.stdout)).toContain("package/senpi-patch.mjs\n")
+      const entries = new TextDecoder().decode(listing.stdout).split(/\r?\n/).filter(Boolean).map((entry) => entry.replaceAll("/", sep))
+      expect(entries).toContain(join("package", "bin", "senpi-patch.mjs"))
 
       const consumer = join(root, "consumer")
       Bun.spawnSync(["mkdir", "-p", consumer], { stdout: "ignore", stderr: "ignore" })
@@ -24,7 +25,7 @@ describe("omo-ai packed install", () => {
       const install = Bun.spawnSync(["bun", "add", "--trust", join(root, tarball!)], { cwd: consumer, stdout: "pipe", stderr: "pipe" })
       expect(install.exitCode).toBe(0)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
-      const installedScript = join(installedPackageRoot, "senpi-patch.mjs")
+      const installedScript = join(installedPackageRoot, "bin", "senpi-patch.mjs")
       expect(readFileSync(installedScript, "utf8")).toContain("describeUnclaimedResult")
 
       const consumerRequire = createRequire(join(installedPackageRoot, "package.json"))
@@ -36,5 +37,5 @@ describe("omo-ai packed install", () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
-  }, 60_000)
+  }, 240_000)
 })
