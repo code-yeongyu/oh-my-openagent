@@ -8,7 +8,7 @@ Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex 
 
 ## SKILLS (17 under `skills/<name>/`)
 
-`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `data-scientist`, `git-master`, `refactor`, `review-work`, `start-work`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
+`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `data-scientist`, `git-master`, `refactor`, `review-work`, `ulw-execute`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
 
 `ultimate-browsing` is the one skill carrying a real sub-project: `skills/ultimate-browsing/engine/` is a 17-module Python package with its own CLI, config schemas, and test suite. It is a deliberately pinned, locally diverged snapshot of `fivetaku/insane-search`, not a follow-HEAD mirror. Before changing or re-vendoring it, read [`skills/ultimate-browsing/engine/AGENTS.md` §UPSTREAM BASELINE AND VERSION POLICY](skills/ultimate-browsing/engine/AGENTS.md#upstream-baseline-and-version-policy).
 
@@ -28,7 +28,7 @@ skills/ (source)
            shared skills are skipped → ulw-plan/ultrawork in Codex come from components, NOT from here
         2. copies remaining shared skills
         3. adaptSkillForCodex(): inserts Codex Harness Tool Compatibility sections; overlays
-           start-work/review-work; writes agents/openai.yaml display metadata with the "(OmO) "
+           ulw-execute/review-work; writes agents/openai.yaml display metadata with the "(OmO) "
            prefix; filters out tests, caches, and source metadata
         → ships to ~/.codex/.../skills/
 ```

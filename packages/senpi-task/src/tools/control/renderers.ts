@@ -1,6 +1,6 @@
 import type { AgentToolResult, Theme, ThemeColor, ToolRenderResultOptions } from "@code-yeongyu/senpi"
-import { truncateToWidth } from "@earendil-works/pi-tui"
 
+import { piTui } from "../../lazy/pi-tui"
 import {
   excerptRendererPromptText,
   excerptRendererText,
@@ -62,6 +62,7 @@ export function renderTaskCancelResult(
 }
 
 function widthComponent(renderLine: (width: number) => string): RenderComponent {
+  const { truncateToWidth } = piTui()
   return {
     render: (width: number): string[] => [truncateToWidth(renderLine(width), width, ELLIPSIS)],
     invalidate: (): void => {},

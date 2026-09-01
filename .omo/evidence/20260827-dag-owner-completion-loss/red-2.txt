@@ -1,0 +1,87 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/manager/manager-capacity-paths.test.ts:
+102 | 
+103 |     // when
+104 |     await manager.cancelTask(holder.task_id)
+105 | 
+106 |     // then
+107 |     expect(await waiter).toMatchObject({ status: "error", error_message: expect.stringContaining("fallback") })
+                               ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "error_message": StringContaining "fallback",
+-   "status": "error",
++   "background_mode": "foreground",
++   "category": "quick",
++   "created_at": "2026-08-27T04:32:56.022Z",
++   "depth": 1,
++   "execution_mode": "in-process",
++   "fallback_attempts": [
++     {
++       "display": "vendor-a/primary",
++       "model_id": "primary",
++       "provider": "vendor-a",
++       "source": "category",
++     },
++     {
++       "display": "vendor-b/next",
++       "model_id": "next",
++       "provider": "vendor-b",
++       "source": "category",
++     },
++   ],
++   "fallback_models": [
++     {
++       "display": "vendor-c/later",
++       "model_id": "later",
++       "provider": "vendor-c",
++       "source": "category",
++     },
++   ],
++   "host_pid": 4404,
++   "model": "vendor-b/next",
++   "name": "fallback",
++   "notification": {
++     "notified_epoch": -1,
++     "run_epoch": 1,
++   },
++   "notify_on_terminal": false,
++   "parent_session_id": "parent-1",
++   "requested_model": {
++     "display": "vendor-a/primary",
++     "model_id": "primary",
++     "provider": "vendor-a",
++     "source": "category",
++   },
++   "residency_state": "resident",
++   "resolved_model": {
++     "display": "vendor-b/next",
++     "model_id": "next",
++     "provider": "vendor-b",
++     "source": "category",
++   },
++   "root_session_id": "parent-1",
++   "spawn_spec": {
++     "cwd": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-task-manager-mNhTTk",
++     "prompt": "do the thing",
++     "version": 1,
++   },
++   "status": "pending",
++   "task_id": "st_01a0417f",
++   "task_seq": 1,
++   "updated_at": "2026-08-27T04:32:56.024Z",
+  }
+
+- Expected  - 2
++ Received  + 59
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-owner-completion-loss/packages/senpi-task/src/manager/manager-capacity-paths.test.ts:107:26)
+(fail) TaskManager capacity paths > #given a fallback launch that becomes nonterminal before capacity frees #when the queued launch is aborted #then the waiter stays armed until a terminal failure is persisted [33.32ms]
+
+ 0 pass
+ 5 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1.82s]

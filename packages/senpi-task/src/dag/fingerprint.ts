@@ -19,7 +19,9 @@ export type DagNodeFingerprintInputV1 = {
 export type DagDefinitionFingerprintInputV1 = {
   readonly name: string
   readonly scheduler: {
-    readonly waveAdmission: "strict-barrier"
+    // Frontier admission since 2026-08-25: a node starts once every dependsOn node completed and
+    // a slot is free; waves are informational groupings only (was "strict-barrier").
+    readonly waveAdmission: "dependency-frontier"
     readonly failurePolicy: "continue-independent"
     readonly dependencyData: "filesystem-only"
   }

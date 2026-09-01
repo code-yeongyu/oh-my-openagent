@@ -35,6 +35,18 @@ The shape of the answers you need (commands in the runtime reference):
 | Is there an existing failing test or known repro? | Prefer amplifying an existing repro over inventing one. |
 | Are watchers (file watchers, hot reloaders, supervisors) going to restart the process mid-session? | If yes, turn them off before attaching. Restarts drop inspector connections and invalidate breakpoints. |
 
+### Output budget
+
+**Bound every inspection before you run it; unbounded output destroys the investigation's working context.**
+- Set a frame count, element count, or byte range for every query.
+- Prefer one targeted query over one broad dump: ask for the value that distinguishes hypotheses.
+- Page through more data only when the first bounded result says it is necessary; do not re-dump the whole object.
+- Treat any command whose output size you cannot predict as a command that needs a limit.
+- Before: GDB `bt` — After: GDB `bt 10` to inspect only the top ten frames.
+- Before: LLDB `memory read 0x1000` — After: `memory read 0x1000 -c 32` for a bounded byte range.
+- Before: LLDB `frame variable` — After: `frame variable --children-count 10 user` for one variable's children.
+- This is not presentation etiquette: a flooded context hides the decisive observation and can end the investigation.
+
 ### 4. Gate check
 
 If any answer is "I'm not sure", you are not ready for Phase 1. Investigate until certain. Guessing here cascades into false-positive hypotheses in Phase 2.

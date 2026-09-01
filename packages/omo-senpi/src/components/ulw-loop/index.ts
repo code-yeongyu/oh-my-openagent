@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
-import { findContinuableBoulderWork } from "../start-work-continuation/boulder-eligibility"
+import { findContinuableBoulderWork } from "../ulw-execute-continuation/boulder-eligibility"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { createUlwLoopFooterStatus, type UlwLoopFooterStatusOptions } from "./footer-status"
 import { resolveOmoBin, runOmoCommand } from "./omo-command"
