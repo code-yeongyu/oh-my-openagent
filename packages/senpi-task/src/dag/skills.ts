@@ -3,7 +3,7 @@ import * as fs from "node:fs"
 import { dirname, join } from "node:path"
 
 import { buildSkillPrepend, createFsSkillLoader } from "../tools/task/skills"
-import type { SkillLoader } from "../tools/task/types"
+import type { LoadedSkill, SkillLoader } from "../tools/task/types"
 import type { DagNodeInput } from "./graph"
 import type { DagMaterializeSkills } from "./manager"
 import type { DagFileStore } from "./store"
@@ -54,18 +54,19 @@ function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex")
 }
 
-// The loader hands back a ready-to-prepend block, not raw content. Asking for exactly one name
-// yields exactly one `<skill name="n">\n...\n</skill>` block followed by the block separator, so
-// the content is recovered by stripping the fixed wrapper - no re-implementation of the search
-// order, no fragile parsing of a multi-skill block.
-function skillContent(loadSkills: SkillLoader, name: string, cwd: string): string | undefined {
+// Third-party loaders may still expose only the v1 ready-to-prepend block. Native filesystem
+// loaders also expose the parsed content + location so DAG materialization preserves the exact
+// invocation wrapper used by direct task spawns.
+function skillContent(loadSkills: SkillLoader, name: string, cwd: string): LoadedSkill | undefined {
   const resolution = loadSkills([name], cwd)
   if (resolution.resolved.length === 0) return undefined
+  const loaded = resolution.skills?.find((skill) => skill.name === name)
+  if (loaded !== undefined) return loaded
   const prefix = `<skill name="${name}">\n`
   const suffix = "\n</skill>\n\n"
   const block = resolution.prepend
   if (!block.startsWith(prefix) || !block.endsWith(suffix)) return undefined
-  return block.slice(prefix.length, block.length - suffix.length)
+  return { name, content: block.slice(prefix.length, block.length - suffix.length) }
 }
 
 function materializeNode(
@@ -74,12 +75,12 @@ function materializeNode(
   cwd: string,
 ): { readonly node: DagNodeSkillMaterialization; readonly missing: readonly string[] } {
   const requested = node.load_skills ?? []
-  const contents: { readonly name: string; readonly content: string }[] = []
+  const contents: LoadedSkill[] = []
   const missing: string[] = []
   for (const name of requested) {
     const content = skillContent(loadSkills, name, cwd)
     if (content === undefined) missing.push(name)
-    else contents.push({ name, content })
+    else contents.push(content)
   }
   return {
     node: {

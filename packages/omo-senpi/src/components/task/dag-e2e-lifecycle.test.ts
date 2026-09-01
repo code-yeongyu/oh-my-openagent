@@ -1,4 +1,4 @@
-// allow: SIZE_OK - the six lifecycle scenarios share one assembled-runtime fixture so compaction, restart, detach, wake batching, viewer catch-up, and snapshot dedup are proven through the same adapter surface.
+// allow: SIZE_OK - the lifecycle scenarios share one assembled-runtime fixture so compaction, restart, detach, wake batching, detached tool wait, viewer catch-up, and snapshot dedup are proven through the same adapter surface.
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
@@ -47,9 +47,21 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
+// Failure ceiling, not synchronization: proves a promise settles promptly (or fails for blocking),
+// matching the bounded-wait convention from senpi-task.
+function within<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`did not settle within ${ms}ms`)), ms)
+    }),
+  ])
+}
+
 type ControlledChild = {
   readonly spec: ManagedStartSpec
   readonly settle: (output: string) => void
+  readonly fail: (message: string) => void
 }
 
 class ControlledRunner implements ManagedRunner {
@@ -75,7 +87,11 @@ class ControlledRunner implements ManagedRunner {
       lastAssistantText: () => undefined,
       dispose: () => Promise.resolve(),
     }
-    this.children.push({ spec, settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }) })
+    this.children.push({
+      spec,
+      settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }),
+      fail: (message) => outcome.resolve({ status: "error", failure: { kind: "child-turn-failed", message } }),
+    })
     this.#signals.get(this.children.length)?.resolve()
     return Promise.resolve(handle)
   }
@@ -177,6 +193,9 @@ type RuntimeFixtureOptions = {
   readonly coordinator?: IdleInjectionCoordinator
   readonly attach?: boolean
   readonly awaitAttach?: boolean
+  // Session id the fixture's engine reports; defaults to the module-wide sessionId. An adoption
+  // test attaches under a DIFFERENT id to model fork/compaction/restart re-homing (#7316).
+  readonly sessionId?: string
 }
 
 type RuntimeFixture = {
@@ -221,7 +240,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
   engine.runtime.captureFrom({
     mode: "tui",
     ui: fakeUi(widgetCalls),
-    sessionManager: { getSessionId: () => sessionId },
+    sessionManager: { getSessionId: () => options.sessionId ?? sessionId },
     isIdle: () => options.idle ?? false,
   })
   const bridgeTimers = new ManualTimers()
@@ -256,13 +275,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
     widgetCalls,
     async start(key, nodes = [{ id: "work" }]) {
       const started = await runDagTool(
-        {
-          manager: runtime.manager,
-          parentSessionId: () => sessionId,
-          rootSessionId: () => sessionId,
-          wait: runtime.wait,
-          cancel: runtime.cancel,
-        },
+        toolDeps(runtime),
         {
           action: "start",
           definition: {
@@ -281,6 +294,19 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
       if (started.details.kind !== "started") throw new Error(`expected dag start, received ${started.details.kind}`)
       return started.details.run_id as DagRunId
     },
+  }
+}
+
+function toolDeps(runtime: DagRuntime) {
+  return {
+    manager: runtime.manager,
+    parentSessionId: () => sessionId,
+    rootSessionId: () => sessionId,
+    wait: runtime.wait,
+    cancel: runtime.cancel,
+    retry: runtime.retry,
+    send: runtime.send,
+    amend: runtime.amend,
   }
 }
 
@@ -471,6 +497,85 @@ describe("assembled DAG lifecycle end to end", () => {
     restarted.runtime.dispose()
   })
 
+  test("#given a paused run whose owner session is gone #when a fresh session id attaches over a dead lease #then it adopts, re-homes, and completes the run", async () => {
+    // given a run paused by its original session, whose process has since died (#7316)
+    const project = fs.mkdtempSync(join(tmpdir(), "omo-dag-lifecycle-adopt-"))
+    cleanupRoots.push(project)
+    const runId = "dag-lifecycle-adopt" as DagRunId
+    await seedPendingRun(project, runId)
+    const first = await runtimeFixture({ project, attach: false })
+    pauseForShutdown(first.runtime)
+    first.runtime.dispose()
+    const store = createFileStore({ project_dir: project }, { fsync: false })
+    const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
+    if (paused === null) throw new Error("expected paused checkpoint")
+    store.writeCheckpoint(runId, { ...paused, previousLeaseHolderPid: 2_147_483_647 })
+
+    // when a session with a NEW id attaches (fork / compaction / restart under a new id)
+    const adopterRunner = new ControlledRunner()
+    const adopter = await runtimeFixture({ project, runner: adopterRunner, sessionId: "session-adopter", awaitAttach: false })
+    const adopted = await Promise.race([
+      adopterRunner.whenStarted(1).then(() => true),
+      // Today attach resolves WITHOUT adopting the foreign run, so the race falls through false.
+      adopter.attached.then(() => false),
+    ])
+
+    // then the adopter schedules the orphaned node instead of skipping it as foreign
+    expect(adopted).toBe(true)
+    adopterRunner.children[0]?.settle("adopted output")
+    await adopter.attached
+    expect(adopter.runtime.manager.list("session-adopter").some((run) => run.runId === runId)).toBe(true)
+    const result = await adopter.runtime.wait(runId, "session-adopter")
+    expect(result.status).toBe("completed")
+    expect(result.nodes.resume).toEqual(expect.objectContaining({ state: "completed", output: "adopted output" }))
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.parentSessionId).toBe("session-adopter")
+    adopter.runtime.dispose()
+  })
+
+  test("#given a paused run recovering on session start #when the bridge emits its first dag snapshot #then it reflects the recovered run, never the pre-recovery pause", async () => {
+    // given a paused run with a dead predecessor lease, exactly as a host restart leaves it
+    const project = fs.mkdtempSync(join(tmpdir(), "omo-dag-lifecycle-snapshot-"))
+    cleanupRoots.push(project)
+    const runId = "dag-lifecycle-first-snapshot" as DagRunId
+    await seedPendingRun(project, runId)
+    const first = await runtimeFixture({ project, attach: false })
+    pauseForShutdown(first.runtime)
+    first.runtime.dispose()
+    const store = createFileStore({ project_dir: project }, { fsync: false })
+    const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
+    if (paused === null) throw new Error("expected paused checkpoint")
+    store.writeCheckpoint(runId, { ...paused, previousLeaseHolderPid: 2_147_483_647 })
+
+    const runner = new ControlledRunner()
+    const fixture = await runtimeFixture({ project, runner, attach: false })
+    const statusOf = (event: { readonly name: string; readonly data: unknown }): string | undefined => {
+      if (event.name !== "omo.dag.updated") return undefined
+      const payload = event.data as { readonly runs?: ReadonlyArray<{ readonly run_id?: string; readonly status?: string }> }
+      return payload.runs?.find((run) => run.run_id === runId)?.status
+    }
+
+    // when the bridge flush window fires while recovery is still reconciling (#7316 defect 1)
+    const attaching = fixture.runtime.attach()
+    fixture.bridgeTimers.flush(50)
+    const preRecovery = fixture.rpc.events
+      .map(statusOf)
+      .filter((status): status is string => status !== undefined)
+
+    await runner.whenStarted(1)
+    runner.children[0]?.settle("first snapshot output")
+    await attaching
+    fixture.bridgeTimers.flush(50)
+
+    // then no consumer ever observed the stale pre-recovery pause, and the final snapshot is live
+    expect(preRecovery).not.toContain("paused")
+    const statuses = fixture.rpc.events
+      .map(statusOf)
+      .filter((status): status is string => status !== undefined)
+    expect(statuses.length).toBeGreaterThan(0)
+    expect(statuses.at(-1)).toBe("completed")
+    fixture.runtime.dispose()
+  })
+
   test("#given an eval-cell waiter that is abandoned #when a later cell re-attaches and calls done #then the shipped handle returns the result", async () => {
     // given
     const fixture = await runtimeFixture()
@@ -556,6 +661,47 @@ describe("assembled DAG lifecycle end to end", () => {
     expect(deliveries[0]?.content).toContain("wake second")
   })
 
+  test("#given a live run #when the dag TOOL waits with the default detach #then it returns immediately and the settle still delivers the terminal wake", async () => {
+    // given
+    const scheduled: Array<() => void> = []
+    const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
+    const coordinator = new IdleInjectionCoordinator(
+      (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
+      { scheduleFlush: (flush) => scheduled.push(flush) },
+    )
+    const fixture = await runtimeFixture({ coordinator, idle: false })
+    const runId = await fixture.start("wake-detached")
+    await fixture.runner.whenStarted(1)
+
+    // when the model-facing default wait runs against a live run
+    const waiting = runDagTool(toolDeps(fixture.runtime), { action: "wait", run_id: runId })
+    const outcome = await within(waiting, 250).then(
+      (result) => ({ kind: "resolved" as const, result }),
+      () => ({ kind: "blocked" as const }),
+    )
+    if (outcome.kind === "blocked") {
+      // release the blocked call so the fixture tears down cleanly, then fail for the right reason
+      fixture.runner.children[0]?.settle("release the blocked wait")
+      await waiting
+      throw new Error("the default wait blocked until settle instead of detaching")
+    }
+
+    // then it detached with the live snapshot, before the child settled
+    const waited = outcome.result
+    if (waited.details.kind !== "detached") throw new Error(`expected detached wait, received ${waited.details.kind}`)
+    expect(waited.details.snapshot.status).toBe("running")
+
+    // and when the run settles, the terminal wake still flushes through the coordinator
+    fixture.runner.children[0]?.settle("detached wake output")
+    await fixture.runtime.wait(runId, sessionId)
+    expect(scheduled).toHaveLength(1)
+    scheduled[0]?.()
+    expect(deliveries).toHaveLength(1)
+    expect(deliveries[0]?.deliverAs).toBe("steer")
+    expect(deliveries[0]?.content).toContain("wake detached")
+    expect(deliveries[0]?.content).toContain("completed")
+  })
+
   test("#given the reference viewer attached to a live adapter run #when the run completes #then catch-up and live delivery contain zero gaps and zero duplicates", async () => {
     // given
     const fixture = await runtimeFixture()
@@ -606,4 +752,49 @@ describe("assembled DAG lifecycle end to end", () => {
     expect(secondWindow).toHaveLength(1)
     expect((firstWindow[0]?.data as { runs: readonly { status: string }[] }).runs[0]?.status).toBe("running")
   })
+})
+
+describe("assembled DAG retry lifecycle end to end", () => {
+  test("#given a diamond run whose middle node fails #when the dag TOOL retries it #then wait settles completed and the untouched nodes keep their original children", async () => {
+    // given
+    const fixture = await runtimeFixture()
+    const runId = await fixture.start("retry-diamond", [
+      { id: "root" },
+      { id: "left", dependsOn: ["root"] },
+      { id: "right", dependsOn: ["root"] },
+      { id: "join", dependsOn: ["left", "right"] },
+    ])
+    await fixture.runner.whenStarted(1)
+    fixture.runner.children[0]?.settle("root output")
+    await fixture.runner.whenStarted(3)
+    const byNode = (index: number): string => String(fixture.runner.children[index]?.spec.taskId)
+    const rootTaskId = byNode(0)
+    // left fails, right completes: the join node is skipped by the dependent cascade
+    fixture.runner.children[1]?.fail("left blew up")
+    fixture.runner.children[2]?.settle("right output")
+    const failed = await fixture.runtime.wait(runId, sessionId)
+    expect(failed.status).toBe("failed")
+    expect(failed.nodes.join).toEqual(expect.objectContaining({ state: "skipped" }))
+    const rightTaskId = byNode(2)
+
+    // when the tool retries the failed node
+    const retried = await runDagTool(toolDeps(fixture.runtime), { action: "retry", run_id: runId })
+    expect(retried.details.kind).toBe("retried")
+    await fixture.runner.whenStarted(4)
+    fixture.runner.children[3]?.settle("left retried")
+    await fixture.runner.whenStarted(5)
+    fixture.runner.children[4]?.settle("join output")
+    const waited = await runDagTool(toolDeps(fixture.runtime), { action: "wait", run_id: runId, detach: false })
+
+    // then
+    if (waited.details.kind !== "waited") throw new Error(`expected wait, received ${waited.details.kind}`)
+    expect(waited.details.result.status).toBe("completed")
+    expect(waited.details.result.nodes.left).toEqual(expect.objectContaining({ state: "completed", output: "left retried" }))
+    expect(waited.details.result.nodes.join).toEqual(expect.objectContaining({ state: "completed", output: "join output" }))
+    const record = fixture.runtime.manager.record(runId, sessionId)
+    expect(record.nodes.find((node) => String(node.id) === "root")?.taskId).toBe(rootTaskId)
+    expect(record.nodes.find((node) => String(node.id) === "right")?.taskId).toBe(rightTaskId)
+    expect(events(fixture, runId).some((event) => event.type === "dag.node.retried")).toBe(true)
+    fixture.runtime.dispose()
+  }, { timeout: 20_000 })
 })

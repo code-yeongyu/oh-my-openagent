@@ -23,6 +23,9 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     notify_on_terminal,
     owner,
     pending_steering,
+    task_seq,
+    config_generation,
+    background_mode,
   } = input
   return {
     task_id: nowMs === undefined ? createTaskId() : createTaskId(nowMs),
@@ -53,5 +56,8 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     ...(tool_deny === undefined ? {} : { tool_deny }),
     ...(owner === undefined ? {} : { owner }),
     ...(pending_steering === undefined || pending_steering.length === 0 ? {} : { pending_steering }),
+    ...(task_seq === undefined ? {} : { task_seq }),
+    ...(config_generation === undefined ? {} : { config_generation }),
+    ...(background_mode === undefined ? {} : { background_mode }),
   }
 }

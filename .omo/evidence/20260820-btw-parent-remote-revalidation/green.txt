@@ -1,0 +1,21 @@
+GREEN — parent adoption always confirms remote status
+Date: 2026-08-20
+
+Command:
+/tmp/bun-v1.3.12/bun-darwin-aarch64/bun test --cwd /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/packages/omo-opencode src/features/btw-side/tui-parent-validator.test.ts src/features/btw-side/tui-wiring.test.ts
+
+Observed after the smallest production change:
+(pass) registerBtwSideTui > #given a real-shaped TUI API #when inline BTW runs #then a side session opens and both status surfaces render
+(pass) createBtwParentValidator > #given a persisted side #when its parent is remote or deleted during lookup #then only an existing parent validates
+(pass) createBtwParentValidator > #given stale local parent state #when the remote parent was deleted #then adoption requires remote confirmation
+
+3 pass
+0 fail
+24 expect() calls
+
+Behavior proved:
+- The first remote validation returns true.
+- A later remote missing status returns false even if the TUI local store is stale.
+- fetchStatus is called twice.
+- A deletion tombstone raised during an in-flight lookup still wins.
+- Real-shaped TUI registration and inline BTW wiring still pass.

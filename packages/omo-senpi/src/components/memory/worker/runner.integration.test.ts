@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, readdir, rm } from "node:fs/promises"
+import { readFile, readdir } from "node:fs/promises"
 import { join } from "node:path"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema, type OmoConfig } from "@oh-my-opencode/omo-config-core"
@@ -23,7 +24,7 @@ const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
 // cleanup races so every other cleanup defect still fails loudly.
 async function removeRoot(root: string): Promise<void> {
   try {
-    await rm(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
   } catch (error) {
     if (
       process.platform === "win32"
@@ -226,6 +227,28 @@ describe("SenpiSubprocessRunner integration", () => {
     ])
     expect(item.spawnCalls.map((spawn) => spawn.attempt)).toEqual([1, 2])
     expect(new Set(item.spawnCalls.map((spawn) => spawn.hardDeadlineAt)).size).toBe(1)
+    expect(result.completion).toMatchObject({
+      model: "kimi-coding/fallback",
+      thinking: "minimal",
+      outcome: "merged",
+    })
+    await assertWorktreesClean(item)
+  }, 60_000)
+
+  test("#given the primary model's providers are all cooling down #when the child dies with a 503 #then reflection relaunches on the next candidate and merges", async () => {
+    // given
+    const item = await harness({ childMode: "provider-cooldown" })
+
+    // when
+    const result = await item.runner.launch(item.run)
+
+    // then
+    expect(result.outcome).toBe("merged")
+    expect(item.spawnCalls.map((spawn) => spawn.args[spawn.args.indexOf("--model") + 1])).toEqual([
+      "extension-only/primary",
+      "kimi-coding/fallback",
+    ])
+    expect(item.spawnCalls.map((spawn) => spawn.attempt)).toEqual([1, 2])
     expect(result.completion).toMatchObject({
       model: "kimi-coding/fallback",
       thinking: "minimal",

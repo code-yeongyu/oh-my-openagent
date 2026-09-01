@@ -6,7 +6,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -32,6 +32,7 @@ import {
 } from "./memory.test-support"
 import { resolveReflectionTriggerConfig } from "./trigger-wiring"
 import { realpathSync } from "node:fs"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 const SESSION_ID = "session-compaction-survival"
 const BASE_SYSTEM_PROMPT = "You are senpi, a coding agent."
@@ -43,7 +44,7 @@ const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup()
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 interface CompactionFixture {

@@ -134,7 +134,7 @@ describe("TaskManager.startOwned", () => {
     expect(manager.findOwnedTask(owner)?.task_id).toBe(first.task_id)
   })
 
-  test("#given an existing owner with a different fingerprint #when started again #then it returns owner_conflict without another task", async () => {
+  test("#given a still-running owner with a different fingerprint #when started again #then it returns owner_conflict without another task", async () => {
     // given
     const { manager, store, inProcess } = makeManager()
     const first = await manager.startOwned(baseSpec(), owner)
@@ -152,6 +152,33 @@ describe("TaskManager.startOwned", () => {
     })
     expect(store.list().records).toHaveLength(1)
     expect(inProcess.startedSpecs).toHaveLength(1)
+  })
+
+  test("#given a TERMINAL owner with a different fingerprint #when started again #then ownership is replaced and a fresh task runs", async () => {
+    // given - a retried DAG node presents the same (kind,runId,nodeId) with an execAttempt-scoped
+    // fingerprint; the settled record must release its claim instead of failing the retry.
+    const { manager, store, inProcess } = makeManager()
+    const first = await manager.startOwned(baseSpec(), owner)
+    if (first.kind !== "started") throw new Error("expected first start")
+    store.transition(first.task_id, { type: "complete", timestamp: new Date().toISOString(), final_response: "done" })
+
+    // when
+    const retried = await manager.startOwned(baseSpec(), { ...owner, fingerprint: "fingerprint-2" })
+
+    // then
+    expect(retried.kind).toBe("started")
+    if (retried.kind !== "started") throw new Error("expected retried start")
+    expect(retried.reused).toBe(false)
+    expect(retried.task_id).not.toBe(first.task_id)
+    expect(inProcess.startedSpecs).toHaveLength(2)
+    expect(manager.findOwnedTask(owner)?.task_id).toBe(retried.task_id)
+    expect(store.load(retried.task_id)?.owner).toEqual({ ...owner, fingerprint: "fingerprint-2" })
+    // The superseded record keeps its dag kind marker so a pending spawn's launcher-stripping read
+    // still sees an owned child; only the authoritative claim moves to the newer record.
+    const released = store.load(first.task_id)
+    expect(released?.status).toBe("completed")
+    expect(released?.owner).toEqual(owner)
+    expect(store.list().records).toHaveLength(2)
   })
 
   test("#given caller journal knowledge is lost after dispatch #when a fresh manager starts the same owner #then recovery finds exactly one task", async () => {

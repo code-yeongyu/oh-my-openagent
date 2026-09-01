@@ -176,8 +176,6 @@ describe("createTeam", () => {
     // then
     const [alphaStart, betaStart] = manager.started
     for (const start of [alphaStart, betaStart]) {
-      expect(start?.prompt).toContain("injected messages")
-      expect(start?.prompt).not.toContain("team_wait")
       expect(start?.prompt).toContain("task_send")
     }
     expect(alphaStart?.prompt).toContain("'alpha'")

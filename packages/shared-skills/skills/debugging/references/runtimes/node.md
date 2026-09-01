@@ -98,6 +98,31 @@ bun test --inspect-brk                        # debug test runner
 
 **Critical**: Bun uses WebKit Inspector Protocol, not V8. `chrome://inspect` cannot connect directly. Use `debug.bun.sh` or the (currently buggy, per Bun docs) VS Code extension.
 
+### Scripted V8 inspector / CDP attach
+
+The inspector port also serves machine-readable HTTP discovery endpoints. `/json` lists
+inspectable targets; `/json/version` includes the WebSocket debugger URL. Connect that
+URL with the Chrome DevTools Protocol (CDP), rather than scraping `node inspect` text.
+`chrome-remote-interface` is the canonical scriptable npm client. When browser automation
+is already in play, use Playwright's `CDPSession` instead.
+
+```bash
+curl -s http://127.0.0.1:9229/json/version
+```
+
+```js
+const CDP = require('chrome-remote-interface');
+const version = await fetch('http://127.0.0.1:9229/json/version').then(r => r.json());
+const client = await CDP({ target: version.webSocketDebuggerUrl });
+await client.Runtime.enable();
+await client.Debugger.pause();
+```
+
+The same CDP commands can be sent through `chrome-remote-interface`; with Playwright,
+create a session with `await context.newCDPSession(page)` and call
+`await session.send('Runtime.enable')`. These V8/CDP examples do not apply to Bun's
+WebKit inspector protocol.
+
 ### Deno (native V8, Chrome DevTools / VS Code compatible)
 
 ```bash

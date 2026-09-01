@@ -1,17 +1,9 @@
 // Presentation layer for the memory reflection transcript entries.
 //
-// House style is Senpi's own notice family (`buildNoticeBox` behind
-// `noticeEntryRenderer`, used by cache-keepalive and rule-activation): a glyph +
-// bold tone-coloured title, a dim prose "why" line explaining what happened, and
-// a dim detail line that only appears when the transcript row is expanded.
 // Fields inside a line are separated by " · ", never emitted as `key:value` soup.
-//
-// `noticeEntryRenderer`/`NoticeSpec` are internal to senpi (absent from the 145
-// public exports and from package.json "exports"), so importing them would bind
-// us to private paths. We reproduce the same visual contract on top of the
-// in-repo `linesComponent`, which is what every sibling omo renderer already uses.
 
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
+import { buildNoticeBox, noticeTone, type NoticeLine } from "@oh-my-opencode/senpi-task/notice-box"
 import {
   ELLIPSIS,
   excerptRendererText,
@@ -20,11 +12,10 @@ import {
   optionalRendererText,
   rendererVisibleWidth,
 } from "@oh-my-opencode/senpi-task/renderer-text"
-import { linesComponent } from "@oh-my-opencode/senpi-task/task-renderers"
 import { truncateToWidth } from "@earendil-works/pi-tui"
 
 /** The subset of Theme an entry renderer needs; keeps fakes cheap in tests. */
-export type EntryRenderTheme = Pick<Theme, "fg" | "italic">
+export type EntryRenderTheme = Pick<Theme, "fg" | "bg">
 
 type RenderComponent = {
   render(width: number): string[]
@@ -108,31 +99,38 @@ export function outcomeSummary(outcome: string): string {
   }
 }
 
-/**
- * Build a notice-shaped component: bold tone-coloured title, dim why line, and a
- * dim detail line gated behind the expanded flag. Truncation happens on the plain
- * text before colouring so ANSI sequences are never sliced.
- */
+/** A visible notice line carrying its own tone, mirroring senpi's NoticeLine. */
+export type NoticeExtraLine = { readonly text: string; readonly tone?: ThemeColor }
+
+/** Keep the existing public shape while delegating all layout to the shared notice box. */
 export function noticeComponent(
   spec: {
     readonly glyph: string
     readonly title: string
     readonly tone: ThemeColor
     readonly why: string
+    readonly extra?: readonly NoticeExtraLine[]
     readonly detail?: string
   },
   options: { readonly expanded: boolean },
   theme: EntryRenderTheme,
 ): RenderComponent {
-  return linesComponent((width: number): readonly string[] => {
-    if (width <= 0) return [""]
-    const title = fit(`${spec.glyph} ${spec.title}`, width)
-    const lines = [theme.fg(spec.tone, title), theme.fg("dim", fit(spec.why, width))]
-    if (options.expanded && spec.detail !== undefined && spec.detail.length > 0) {
-      lines.push(theme.italic(theme.fg("dim", fit(spec.detail, width))))
-    }
-    return lines
-  })
+  const extra: NoticeLine[] = []
+  for (const line of spec.extra ?? []) {
+    if (line.text.length === 0) continue
+    extra.push({ text: line.text, tone: noticeTone(line.tone ?? "dim") })
+  }
+  return buildNoticeBox(
+    {
+      title: `${spec.glyph} ${spec.title}`,
+      tone: noticeTone(spec.tone),
+      why: spec.why,
+      extra,
+      ...(spec.detail === undefined || spec.detail.length === 0 ? {} : { expandedLine: spec.detail }),
+    },
+    options,
+    theme,
+  )
 }
 
 /**

@@ -90,6 +90,7 @@ if (process.env.FAKE_STDOUT) console.log(process.env.FAKE_STDOUT)
 if (process.env.FAKE_SIGNAL) process.kill(process.pid, process.env.FAKE_SIGNAL)
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
 `)
+  writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
 
   let shimPath: string | undefined
   if (options.shim !== false) {
@@ -127,6 +128,22 @@ function run(fixture: Fixture, args: string[], env: NodeJS.ProcessEnv = {}) {
 
 function capture(fixture: Fixture): { argv: string[]; env: NodeJS.ProcessEnv; target?: string } {
   return JSON.parse(readFileSync(fixture.captureFile, "utf8"))
+}
+
+/**
+ * Resolves a real interpreter for the runtime under test. `bun test` runs on bun and node ships as
+ * a sibling of it (and vice versa), but neither is guaranteed, so a missing interpreter skips its
+ * case rather than failing on the host's toolchain.
+ */
+function runtimeInterpreter(runtime: "node" | "bun"): string | undefined {
+  const current = runtime === "bun" ? Boolean(process.versions.bun) : !process.versions.bun
+  if (current) return process.execPath
+  const name = process.platform === "win32" ? `${runtime}.exe` : runtime
+  const sibling = join(dirname(process.execPath), name)
+  if (existsSync(sibling)) return sibling
+  const located = spawnSync(process.platform === "win32" ? "where" : "which", [runtime], { encoding: "utf8" })
+  const resolved = located.status === 0 ? located.stdout.split(/\r?\n/)[0]?.trim() : undefined
+  return resolved ? resolved : undefined
 }
 
 function expectedBunUpdateCommand(packageRoot: string): string {
@@ -194,7 +211,8 @@ describe("omo launcher", () => {
         expect(result.status).toBe(0)
 
         const brand = JSON.parse(capture(fixture).env.SENPI_BRAND ?? "{}")
-        expect(brand.name).toBe("omo")
+        expect(brand.name).toBe("OmO")
+        expect(brand.command).toBe("omo")
         expect(brand.configDir).toBe(".omo")
         expect(brand.flatLayout).toBe(false)
         expect(brand.envPrefix).toBe("OMO")
@@ -208,6 +226,31 @@ describe("omo launcher", () => {
           changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
         })
       })
+
+      // The launcher may re-exec itself under bun; whichever runtime wins, the engine must be told
+      // about it so it never flips back and spawns a second interpreter of its own. Both spellings
+      // are driven through a real interpreter, because the value has to track the process that
+      // actually runs the launcher rather than a constant either side could drift away from.
+      for (const runtime of ["node", "bun"] as const) {
+        const interpreter = runtimeInterpreter(runtime)
+        // Skipping is visible in the report; silently passing on a host without the interpreter
+        // would let the contract rot unnoticed.
+        test.skipIf(!interpreter)(`#then a launcher running on ${runtime} tells the engine SENPI_RUNTIME=${runtime}`, () => {
+          const fixture = createFixture()
+          // OMO_RUNTIME pins the decision, so this asserts the reported value and never depends on
+          // whether the host happens to have omo installed in a bun global tree.
+          const result = spawnSync(interpreter ?? process.execPath, [fixture.launcher, "say", "hi"], {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              CAPTURE_FILE: fixture.captureFile,
+              OMO_RUNTIME: runtime,
+            },
+          })
+          expect(result.status).toBe(0)
+          expect(capture(fixture).env.SENPI_RUNTIME).toBe(runtime)
+        })
+      }
 
       test("#then OMO_BIN names this launcher, so the product never resolves to the bare engine", () => {
         const fixture = createFixture({ hoisted: true })

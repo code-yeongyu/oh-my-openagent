@@ -1,136 +1,110 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { spawn, spawnSync, type ChildProcess } from "node:child_process"
-import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { createServer, type AddressInfo } from "node:net"
-import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { existsSync } from "node:fs"
+import { readFile, rm } from "node:fs/promises"
+import { join } from "node:path"
 import {
-  advanceTestClock,
-  createTestClock,
-  waitForFilesystemState,
-} from "./supervisor-test-signals"
+  createMemoryRunSupervisorIc8Harness,
+  IC8_PLATFORMS,
+  IC8_WAIT_MS,
+} from "./memory-run-supervisor-ic8-harness"
+import { terminateProcessGroup } from "./memory-run-supervisor-ic8-process-groups"
 
-// Real supervisor + bootstrap + model child spawns; a loaded CI runner needs far more than the
-// 5s these waiters originally assumed. The waits stay event-driven (fs/exit signals), so a true
-// hang still fails - only the ceiling moves.
-const WAIT_MS = 60_000
-setDefaultTimeout(WAIT_MS)
+setDefaultTimeout(IC8_WAIT_MS)
+const harness = createMemoryRunSupervisorIc8Harness()
+const {
+  advanceClock,
+  cleanup,
+  cleanupExitResources,
+  cleanupRunResources,
+  launchSupervisor,
+  makeRun,
+  processGroupIsAlive,
+  resourceCounts,
+  trackProcessGroup,
+  untrackProcessGroup,
+  waitForExit,
+  waitForPath,
+} = harness
 
-const supervisorPath = join(import.meta.dir, "memory-run-supervisor.ts")
-const childFixture = join(import.meta.dir, "__fixtures__", "supervisor-child.ts")
-const taskkillFixture = join(import.meta.dir, "__fixtures__", "supervisor-taskkill.ts")
-const roots: string[] = []
-const liveProcesses = new Set<number>()
-const platforms = ["posix", "win32"] as const
-
-async function waitForPath(path: string, timeoutMs = WAIT_MS): Promise<void> {
-  await waitForFilesystemState(dirname(path), () => existsSync(path) ? true : undefined, timeoutMs, path)
-}
-
-async function makeRun(mode: "graceful" | "stubborn"): Promise<{
-  runDir: string
-  clockPath: string
-  childExited: Promise<void>
-}> {
-  const runDir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-run-supervisor-ic8-")))
-  roots.push(runDir)
-  await mkdir(runDir, { recursive: true, mode: 0o700 })
-  const clockPath = await createTestClock(runDir, 1_000)
-  const exitServer = createServer()
-  await new Promise<void>((resolve, reject) => {
-    exitServer.once("error", reject)
-    exitServer.listen(0, "127.0.0.1", resolve)
-  })
-  const address = exitServer.address() as AddressInfo
-  const childExited = new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`waited ${WAIT_MS}ms for model child exit`)), WAIT_MS)
-    exitServer.once("connection", () => {
-      exitServer.close(() => {
-        clearTimeout(timeout)
-        resolve()
-      })
-    })
-  })
-  await writeFile(join(runDir, "ledger.json"), `${JSON.stringify({ version: 1, runId: "run-ic8", kind: "reflection" })}\n`)
-  await writeFile(join(runDir, "launch.json"), `${JSON.stringify({
-    version: 1,
-    runId: "run-ic8",
-    kind: "reflection",
-    command: process.execPath,
-    args: [childFixture, mode, runDir],
-    cwd: runDir,
-    env: { ...process.env, OMO_MEMORY_SUPERVISOR_EXIT_PORT: String(address.port) },
-    hardDeadlineAt: 2_000,
-    terminationGraceMs: 1_000,
-    maxOutputBytes: 65_536,
-    stdoutPath: join(runDir, "child-stdout.log"),
-    stderrPath: join(runDir, "child-stderr.log"),
-  })}\n`, { mode: 0o600 })
-  return { runDir, clockPath, childExited }
-}
-
-function launchSupervisor(runDir: string, clockPath: string, platform: typeof platforms[number]): ChildProcess {
-  const child = spawn(process.execPath, [supervisorPath, runDir], {
-    detached: true,
-    stdio: "ignore",
-    env: {
-      ...process.env,
-      OMO_MEMORY_SUPERVISOR_ALLOW_TEST_SEAMS: "1",
-      OMO_MEMORY_SUPERVISOR_PLATFORM: platform,
-      OMO_MEMORY_SUPERVISOR_CLOCK_PATH: clockPath,
-      OMO_MEMORY_SUPERVISOR_TASKKILL_COMMAND: JSON.stringify([process.execPath, taskkillFixture]),
-      OMO_MEMORY_SUPERVISOR_TASKKILL_RUN_DIR: runDir,
-      ...(process.platform === "win32" && platform === "posix"
-        ? { OMO_MEMORY_SUPERVISOR_POSIX_SIGNAL_COMMAND: JSON.stringify([process.execPath, taskkillFixture]) }
-        : {}),
-    },
-  })
-  if (child.pid !== undefined) liveProcesses.add(child.pid)
-  return child
-}
-
-async function advanceClock(path: string, value: number): Promise<void> {
-  await advanceTestClock(path, value)
-}
-
-function waitForExit(child: ChildProcess): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`waited ${WAIT_MS}ms for process exit`)), WAIT_MS)
-    child.once("error", reject)
-    child.once("close", (code, signal) => {
-      clearTimeout(timeout)
-      if (child.pid !== undefined) liveProcesses.delete(child.pid)
-      resolve({ code, signal })
-    })
-  })
-}
-
-// process.kill on win32 terminates only the named process, leaving the bootstrap and model child
-// holding the run directory; taskkill /T /F takes the whole tree so cleanup can proceed.
-function killTree(pid: number): void {
-  if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" })
-    return
-  }
-  process.kill(pid, "SIGKILL")
-}
-
-afterEach(async () => {
-  for (const pid of liveProcesses) {
-    try {
-      killTree(pid)
-    } catch (error) {
-      if (!(error instanceof Error) || !("code" in error) || error.code !== "ESRCH") throw error
-    }
-  }
-  liveProcesses.clear()
-  // Windows releases file handles asynchronously when killed processes die, so an immediate
-  // recursive rm can hit EBUSY there; bounded retries absorb the lag without weakening cleanup.
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })))
-})
+afterEach(async () => harness.cleanup())
 
 describe("memory run supervisor IC-8 containment", () => {
+  test("#given a connected model child #when the supervisor is killed and test cleanup runs #then cleanup terminates the child group and releases the socket", async () => {
+    // given
+    const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun("graceful")
+    const supervisor = launchSupervisor(runDir, clockPath, "posix")
+    const exit = waitForExit(supervisor)
+    await waitForPath(join(runDir, "child-started.json"))
+    await exitSocketAccepted
+    const ledger = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8")) as { readonly childPid: number }
+    expect(processGroupIsAlive(ledger.childPid)).toBe(true)
+
+    // when
+    supervisor.kill("SIGKILL")
+    await exit
+    await cleanupRunResources()
+    await childExited
+
+    // then
+    expect(processGroupIsAlive(ledger.childPid)).toBe(false)
+    expect(resourceCounts()).toEqual({
+      exitServers: 0,
+      acceptedSockets: 0,
+      childExitTimeouts: 0,
+    })
+  }, 10_000)
+
+  test("#given an unconnected exit server #when test cleanup runs #then the listener and timeout are released", async () => {
+    // given
+    const { childExited, exitSocketAccepted } = await makeRun("graceful")
+    expect(resourceCounts()).toEqual({
+      exitServers: 1,
+      acceptedSockets: 0,
+      childExitTimeouts: 1,
+    })
+
+    // when
+    await cleanupExitResources()
+
+    // then
+    expect(resourceCounts()).toEqual({
+      exitServers: 0,
+      acceptedSockets: 0,
+      childExitTimeouts: 0,
+    })
+    expect(await settlementState(exitSocketAccepted)).toBe("rejected")
+    expect(await settlementState(childExited)).toBe("rejected")
+  })
+
+  test("#given a missing run ledger #when cleanup reports the ledger error #then sockets and the run root are still removed", async () => {
+    // given
+    const { runDir } = await makeRun("graceful")
+    await rm(join(runDir, "ledger.json"))
+
+    // when
+    const result = cleanup()
+
+    // then
+    await expect(result).rejects.toThrow("ledger.json")
+    expect(resourceCounts()).toEqual({
+      exitServers: 0,
+      acceptedSockets: 0,
+      childExitTimeouts: 0,
+    })
+    expect(existsSync(runDir)).toBe(false)
+  })
+
+  test("#given taskkill returns nonzero #when a Windows process group is terminated #then cleanup fails closed", () => {
+    expect(() =>
+      terminateProcessGroup(123, {
+        platform: "win32",
+        runTaskkill: () => ({ status: 1 }),
+        killGroup: () => {},
+        probeGroup: () => {},
+      }),
+    ).toThrow("taskkill failed with exit code 1")
+  })
+
   test("#given injected Windows and a child that exits during grace #when the hard deadline arrives #then the supervisor cancels forced taskkill", async () => {
     // given
     const { runDir, clockPath, childExited } = await makeRun("graceful")
@@ -156,7 +130,7 @@ describe("memory run supervisor IC-8 containment", () => {
     expect(existsSync(join(runDir, "taskkill-invocation.json"))).toBe(false)
   }, 60_000)
 
-  for (const platform of platforms) {
+  for (const platform of IC8_PLATFORMS) {
     test(`#given the injected ${platform} branch #when the absolute deadline instants are advanced #then graceful and hard tree termination use those instants`, async () => {
       // given
       const { runDir, clockPath, childExited } = await makeRun("stubborn")
@@ -199,7 +173,7 @@ describe("memory run supervisor IC-8 containment", () => {
       const exit = waitForExit(supervisor)
       await waitForPath(join(runDir, "child-started.json"))
       const ledger = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8")) as { readonly childPid: number }
-      liveProcesses.add(ledger.childPid)
+      trackProcessGroup(ledger.childPid)
 
       // when
       supervisor.kill("SIGKILL")
@@ -208,10 +182,26 @@ describe("memory run supervisor IC-8 containment", () => {
       await advanceClock(clockPath, 2_000)
       await waitForPath(join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${ledger.childPid}.json`))
       await childExited
-      liveProcesses.delete(ledger.childPid)
+      untrackProcessGroup(ledger.childPid)
 
       // then
       expect(existsSync(join(runDir, "outcome.json"))).toBe(false)
     }, 60_000)
   }
 })
+
+async function settlementState(
+  signal: Promise<unknown>,
+): Promise<"resolved" | "rejected" | "pending"> {
+  let state: "resolved" | "rejected" | "pending" = "pending"
+  void signal.then(
+    () => {
+      state = "resolved"
+    },
+    () => {
+      state = "rejected"
+    },
+  )
+  await Promise.resolve()
+  return state
+}

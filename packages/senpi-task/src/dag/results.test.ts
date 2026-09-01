@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { createHash } from "node:crypto"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { createTaskRecord } from "../state"
 import type { TaskRecord, TaskRunStats } from "../state"
@@ -173,5 +173,65 @@ describe("persistDagNodeResult durable node artifacts", () => {
     const reused = readDagNodeResult({ store, runId, nodeId })
     expect(reused?.output).toBe("no stats output")
     expect(reused?.runStats).toBeUndefined()
+  })
+
+  test("#given a persisted node #when persisted again with a different body #then the second body replaces the first and the stats sidecar is replaced", () => {
+    // given
+    const projectDir = tempProject()
+    const store = createDagFileStore({ project_dir: projectDir })
+    const firstRecord = terminalRecord(projectDir, "first attempt body")
+    const secondRecord = terminalRecord(projectDir, "second attempt body")
+
+    // when
+    const firstOutcome = persistDagNodeResult({ store, runId, nodeId, record: firstRecord })
+    const secondOutcome = persistDagNodeResult({ store, runId, nodeId, record: secondRecord })
+
+    // then
+    expect(firstOutcome.kind).toBe("persisted")
+    expect(secondOutcome.kind).toBe("persisted")
+    const reused = readDagNodeResult({ store, runId, nodeId })
+    expect(reused?.output).toBe("second attempt body")
+    expect(reused?.runStats).toEqual(runStats)
+    const resultDir = dirname(store.paths.result(runId, nodeId))
+    expect(fs.readdirSync(resultDir).sort()).toEqual([`${nodeId}.stats.json`, `${nodeId}.txt`])
+  })
+
+  test("#given a fault mid-write during re-persist #then the prior artifact body remains intact and no orphan temp file is left", () => {
+    // given
+    const projectDir = tempProject()
+    const store = createDagFileStore({ project_dir: projectDir })
+    const firstRecord = terminalRecord(projectDir, "first attempt body that must survive")
+    const secondRecord = terminalRecord(projectDir, "second attempt body that will crash")
+    persistDagNodeResult({ store, runId, nodeId, record: firstRecord })
+
+    const originalWriteSync = fs.writeSync
+    const fault = new Error("simulated partial write fault")
+    const faultingWriteSync = (fd: number, data: string | Uint8Array, ...args: unknown[]): number => {
+      if (typeof data === "string" && data.includes("second attempt body that will crash")) {
+        const partial = data.slice(0, Math.floor(data.length / 2))
+        originalWriteSync(fd, partial)
+        throw fault
+      }
+      if (typeof data === "string") {
+        return originalWriteSync(fd, data, ...(args as [(number | null)?, BufferEncoding?]))
+      }
+      return originalWriteSync(fd, data, ...(args as [(number | null)?, (number | null)?, (number | null)?]))
+    }
+    const writeSpy = spyOn(fs, "writeSync").mockImplementation(faultingWriteSync as unknown as typeof fs.writeSync)
+
+    // when
+    let outcome: ReturnType<typeof persistDagNodeResult> | undefined
+    try {
+      outcome = persistDagNodeResult({ store, runId, nodeId, record: secondRecord })
+    } finally {
+      writeSpy.mockRestore()
+    }
+
+    // then
+    expect(outcome?.kind).toBe("failed")
+    const reused = readDagNodeResult({ store, runId, nodeId })
+    expect(reused?.output).toBe("first attempt body that must survive")
+    const resultDir = dirname(store.paths.result(runId, nodeId))
+    expect(fs.readdirSync(resultDir).sort()).toEqual([`${nodeId}.stats.json`, `${nodeId}.txt`])
   })
 })

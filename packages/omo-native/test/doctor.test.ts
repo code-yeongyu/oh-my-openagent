@@ -42,6 +42,7 @@ function createFixture(): Fixture {
   }))
   writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
+  writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const [, artifact] of artifacts) writeFile(join(packageRoot, artifact))
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })

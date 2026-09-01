@@ -13,7 +13,7 @@ function createMockContext(): PluginContext {
 function createMockHooks(): CreatedHooks {
   return {
     ralphLoop: null,
-    startWork: null,
+    ulwExecute: null,
     autoSlashCommand: null,
   } as unknown as CreatedHooks
 }

@@ -16,6 +16,10 @@ import {
 
 export { toPortableBuildPath }
 
+export function resolveBunExecutable(platform = process.platform) {
+  return platform === "win32" ? "bun.exe" : "bun"
+}
+
 // Keep this list byte-for-byte aligned with senpi loader.ts lines 145-165.
 export const SENPI_LOADER_ALIASES = [
   "@earendil-works/pi-coding-agent",
@@ -44,17 +48,19 @@ const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = join(packageRoot, "..", "..")
 const entryPath = join(packageRoot, "src", "extension", "bundled-index.ts")
-const outputPath = join(pluginRoot, "extensions", "omo.js")
+const outputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
+  ? join(pluginRoot, "extensions", "omo.js")
+  : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo.js")
 const taskEntryPath = join(packageRoot, "src", "extension", "omo-task.ts")
-const taskOutputPath = join(pluginRoot, "extensions", "omo-task.js")
+const taskOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-task.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-task.js")
 const memberEntryPath = join(repoRoot, "packages", "senpi-task", "src", "team", "member-extension", "index.ts")
-const memberOutputPath = join(pluginRoot, "extensions", "omo-member.js")
+const memberOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-member.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-member.js")
 const memoryMcpEntryPath = join(packageRoot, "src", "mcp", "memory-server.ts")
-const memoryMcpOutputPath = join(pluginRoot, "extensions", "omo-memory-mcp.js")
+const memoryMcpOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-memory-mcp.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-memory-mcp.js")
 const supervisorEntryPath = join(packageRoot, "src", "components", "memory", "worker", "memory-run-supervisor.ts")
-const supervisorOutputPath = join(pluginRoot, "extensions", "memory-run-supervisor.mjs")
+const supervisorOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "memory-run-supervisor.mjs") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "memory-run-supervisor.mjs")
 const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-deep-advisor", "runtime.ts")
-const advisorRuntimeOutputPath = join(pluginRoot, "extensions", "omo-init-deep-advisor.js")
+const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
 const builtinModuleNames = builtinModules
   .filter((moduleName) => !moduleName.startsWith("_"))
   .sort()
@@ -117,7 +123,7 @@ async function buildEntry(entry, output, buildDefines) {
   await mkdir(dirname(output), { recursive: true })
   const metafile = `${output}.meta.json`
   try {
-    run("bun", [
+    run(resolveBunExecutable(), [
       "build", entry, "--target", "node", "--format", "esm", "--outfile", output,
       "--minify-syntax", "--minify-whitespace", `--metafile=${metafile}`,
       ...Object.entries(buildDefines).flatMap(([name, value]) => ["--define", `${name}=${JSON.stringify(value)}`]),
@@ -216,7 +222,6 @@ export async function checkExtensionCurrent(options = {}) {
 function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
-    shell: process.platform === "win32",
     stdio: "inherit",
   })
   if (result.error !== undefined) throw result.error

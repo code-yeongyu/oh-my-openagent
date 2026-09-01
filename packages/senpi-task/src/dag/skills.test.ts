@@ -34,6 +34,20 @@ function writeSkill(cwd: string, name: string, body: string): void {
   fs.writeFileSync(join(directory, "SKILL.md"), body, "utf8")
 }
 
+function skillPrompt(cwd: string, name: string, body: string, prompt: string): string {
+  const skillPath = join(cwd, ".senpi", "skills", name, "SKILL.md")
+  const skillDir = join(cwd, ".senpi", "skills", name)
+  return [
+    `<skill name="${name}" location="${skillPath}">`,
+    `References are relative to ${skillDir}.`,
+    "",
+    body,
+    "</skill>",
+    "",
+    prompt,
+  ].join("\n")
+}
+
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex")
 }
@@ -64,7 +78,7 @@ describe("createDagSkillMaterializer at run creation", () => {
 
     // then
     const effectivePrompt = result.nodes[0]?.effectivePrompt ?? ""
-    expect(effectivePrompt).toBe('<skill name="programming">\nprogramming skill body\n</skill>\n\nship the feature')
+    expect(effectivePrompt).toBe(skillPrompt(cwd, "programming", "programming skill body", "ship the feature"))
     expect(effectivePrompt.indexOf("programming skill body")).toBeLessThan(effectivePrompt.indexOf("ship the feature"))
   })
 
@@ -115,9 +129,7 @@ describe("createDagSkillMaterializer at run creation", () => {
     expect(result.diagnostics).toEqual([
       { kind: "missing_skill", nodeId: "build" as DagNodeId, skill: "nonexistent", message: 'Skill "nonexistent" was not found.', at },
     ])
-    expect(result.nodes[0]?.effectivePrompt).toBe(
-      '<skill name="programming">\nprogramming skill body\n</skill>\n\nship the feature',
-    )
+    expect(result.nodes[0]?.effectivePrompt).toBe(skillPrompt(cwd, "programming", "programming skill body", "ship the feature"))
     expect(readDagSkillManifest(store, runId)?.nodes[0]?.missing).toEqual(["nonexistent"])
   })
 
@@ -185,9 +197,7 @@ describe("createDagSkillMaterializer wired into DagManager.start", () => {
 
     // then
     const record = manager.record(started.snapshot.runId, parentSessionId)
-    expect(record.definition.nodes[0]?.effectivePrompt).toBe(
-      '<skill name="programming">\nv1 skill body\n</skill>\n\nship the feature',
-    )
+    expect(record.definition.nodes[0]?.effectivePrompt).toBe(skillPrompt(cwd, "programming", "v1 skill body", "ship the feature"))
     expect(record.definition.nodes[0]?.prompt).toBe("ship the feature")
   })
 

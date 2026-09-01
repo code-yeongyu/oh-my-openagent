@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import {
+  dagDefinitionAmendedEvent,
   dagDiagnosticAddedEvent,
   dagEventLane,
+  dagNodeRetriedEvent,
   dagNodeReusedEvent,
+  dagNodeSteeredEvent,
   dagNodeTaskAttachedEvent,
   dagNodeTransitionedEvent,
   dagRunCancelledEvent,
@@ -47,7 +50,7 @@ describe("dagEventLane", () => {
   describe("#given all 14 journaled event types", () => {
     test("#then every one classifies as boundary without throwing", () => {
       // given / when / then
-      expect(DAG_RUN_EVENT_TYPES).toHaveLength(14)
+      expect(DAG_RUN_EVENT_TYPES).toHaveLength(17)
       for (const type of DAG_RUN_EVENT_TYPES) {
         let lane: string | undefined
         expect(() => {
@@ -208,6 +211,85 @@ describe("dag event builders", () => {
     })
   })
 
+  test("#given a retry #when dagNodeRetriedEvent #then spec-shaped payload", () => {
+    // when
+    const event = dagNodeRetriedEvent({
+      nodeId: nodeA,
+      priorTaskId: "task-prior",
+      execAttempt: 2,
+      promptChanged: true,
+    })
+
+    // then
+    expect(event).toEqual({
+      type: "dag.node.retried",
+      nodeId: nodeA,
+      priorTaskId: "task-prior",
+      execAttempt: 2,
+      promptChanged: true,
+    })
+  })
+
+  test("#given a retry without prior task #when dagNodeRetriedEvent #then priorTaskId omitted", () => {
+    // when
+    const event = dagNodeRetriedEvent({ nodeId: nodeA, execAttempt: 1, promptChanged: false })
+
+    // then
+    expect(event).toEqual({
+      type: "dag.node.retried",
+      nodeId: nodeA,
+      execAttempt: 1,
+      promptChanged: false,
+    })
+  })
+
+  test("#given a steer delivery #when dagNodeSteeredEvent #then spec-shaped payload", () => {
+    // when
+    const event = dagNodeSteeredEvent({ nodeId: nodeA, taskId: "task-1", delivery: "steer" })
+
+    // then
+    expect(event).toEqual({
+      type: "dag.node.steered",
+      nodeId: nodeA,
+      taskId: "task-1",
+      delivery: "steer",
+    })
+  })
+
+  test("#given a revive delivery #when dagNodeSteeredEvent #then spec-shaped payload", () => {
+    // when
+    const event = dagNodeSteeredEvent({ nodeId: nodeB, taskId: "task-2", delivery: "revive" })
+
+    // then
+    expect(event).toEqual({
+      type: "dag.node.steered",
+      nodeId: nodeB,
+      taskId: "task-2",
+      delivery: "revive",
+    })
+  })
+
+  test("#given an amendment #when dagDefinitionAmendedEvent #then spec-shaped payload", () => {
+    // when
+    const event = dagDefinitionAmendedEvent({
+      previousFingerprint: "fp-old",
+      fingerprint: "fp-new",
+      changedNodeIds: [nodeA],
+      addedNodeIds: [nodeB],
+      invalidatedNodeIds: [nodeA, nodeB],
+    })
+
+    // then
+    expect(event).toEqual({
+      type: "dag.definition.amended",
+      previousFingerprint: "fp-old",
+      fingerprint: "fp-new",
+      changedNodeIds: [nodeA],
+      addedNodeIds: [nodeB],
+      invalidatedNodeIds: [nodeA, nodeB],
+    })
+  })
+
   test("#given a diagnostic #when dagDiagnosticAddedEvent #then spec-shaped payload", () => {
     // given
     const diagnostic = {
@@ -257,6 +339,15 @@ describe("dag event builders", () => {
       }),
       dagNodeTaskAttachedEvent({ nodeId: nodeA, taskId: "t", attempt: 1 }),
       dagNodeReusedEvent({ nodeId: nodeA, taskId: "t", sourceRunId: runId }),
+      dagNodeRetriedEvent({ nodeId: nodeA, execAttempt: 1, promptChanged: false }),
+      dagNodeSteeredEvent({ nodeId: nodeA, taskId: "t", delivery: "steer" }),
+      dagDefinitionAmendedEvent({
+        previousFingerprint: "fp-old",
+        fingerprint: "fp-new",
+        changedNodeIds: [nodeA],
+        addedNodeIds: [],
+        invalidatedNodeIds: [nodeA],
+      }),
       dagDiagnosticAddedEvent({
         diagnostic: { kind: "run_flag", message: "m", at: "2026-01-01T00:00:00.000Z" },
       }),

@@ -1,6 +1,6 @@
 import type { CapturedConversation, DreamOrigin } from "@oh-my-opencode/memory-core"
 
-import { computeUnreflectedVolume, selectDreamConversations } from "./dream-selector"
+import { computeUnreflectedVolumeFast, loadConversations as defaultLoadConversations, selectLoadedConversations, type LoadedConversation } from "./dream-selector"
 import { evaluateDreamGates, readLastDreamAtMs, type DreamTriggerSettings } from "./dream-trigger-gates"
 import type { DreamFireOutcome, DreamTriggerSession, ManualDreamRequest } from "./dream-trigger"
 
@@ -14,32 +14,47 @@ export async function fireDream(input: {
   }
   readonly now: () => number
   readonly warnLaunchFailure: (error: unknown) => void
+  readonly loadConversations?: (transcriptsDir: string) => Promise<readonly LoadedConversation[]>
 }): Promise<DreamFireOutcome> {
   const { session, origin, settings, request, now } = input
+  const shouldLoadConversations = origin !== "pressure" && request.conversationIds === undefined
+  const loadConversations = input.loadConversations ?? ((transcriptsDir: string) =>
+    defaultLoadConversations(transcriptsDir, Math.max(settings.autoSelectMax * 4, 8)))
+  let loadedConversations: readonly LoadedConversation[] | undefined
+  const getLoadedConversations = async (): Promise<readonly LoadedConversation[]> => {
+    loadedConversations ??= await loadConversations(session.identityPaths.transcripts)
+    return loadedConversations
+  }
   const stopped = () =>
     isAborted(request.signal)
     || (request.deadlineAt !== undefined && now() >= request.deadlineAt)
   const decision = await evaluateDreamGates(origin, settings, {
     nowMs: now(),
     lastDreamAtMs: () => readLastDreamAtMs(session.identityPaths.runtime),
-    unreflectedBytes: () => computeUnreflectedVolume({
-      transcriptsDir: session.identityPaths.transcripts,
-      autoSelectMax: settings.autoSelectMax,
-      autoSelectMaxBytes: settings.autoSelectMaxChars,
-      now: () => new Date(now()),
-    }),
-  })
-  if (!decision.allowed) return { fired: false, rejection: decision.rejection }
-  if (stopped()) return { fired: false, rejection: "aborted" }
-  const selected = request.conversationIds === undefined
-    ? (await selectDreamConversations({
+    unreflectedBytes: async () => {
+      if (!shouldLoadConversations) return 0
+      return computeUnreflectedVolumeFast({
         transcriptsDir: session.identityPaths.transcripts,
         currentConversationId: session.conversationId,
         autoSelectMax: settings.autoSelectMax,
         autoSelectMaxBytes: settings.autoSelectMaxChars,
         now: () => new Date(now()),
-      }, { ...(request.focus === undefined ? {} : { focus: request.focus }) })).conversationIds
-    : request.conversationIds
+      })
+    },
+  })
+  if (!decision.allowed) return { fired: false, rejection: decision.rejection }
+  if (stopped()) return { fired: false, rejection: "aborted" }
+  const selected = origin === "pressure"
+    ? []
+    : request.conversationIds === undefined
+      ? selectLoadedConversations(await getLoadedConversations(), {
+          transcriptsDir: session.identityPaths.transcripts,
+          currentConversationId: session.conversationId,
+          autoSelectMax: settings.autoSelectMax,
+          autoSelectMaxBytes: settings.autoSelectMaxChars,
+          now: () => new Date(now()),
+        }, { ...(request.focus === undefined ? {} : { focus: request.focus }) }).conversationIds
+      : request.conversationIds
   if (stopped()) return { fired: false, rejection: "aborted" }
   const conversationIds: string[] = []
   const snapshots: CapturedConversation[] = []
@@ -57,7 +72,7 @@ export async function fireDream(input: {
     conversationIds.push(conversationId)
     snapshots.push({ conversationId, snapshot })
   }
-  if (conversationIds.length === 0) return { fired: false, rejection: "no_unreflected_content" }
+  if (origin !== "pressure" && conversationIds.length === 0) return { fired: false, rejection: "no_unreflected_content" }
   if (stopped()) return { fired: false, rejection: "aborted" }
   let result
   try {

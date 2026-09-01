@@ -1,0 +1,101 @@
+FINAL PR1 SELF-REVIEW
+
+OWNED DIFF
+
+- `packages/omo-opencode/src/cli/run/on-complete-hook.test.ts`
+- `packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-exit-resources.ts`
+- `packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-harness.ts`
+- `packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-process-groups.ts`
+- `packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts`
+- `packages/omo-senpi/src/components/onboarding/state.test.ts`
+- `script/ensure-vendored-lsp-daemon.test.ts`
+- `script/ensure-vendored-lsp-daemon.ts`
+- `script/fixtures/vendored-lsp-build-owner.ts`
+- `test-setup.ts`
+
+No CI workflow, package manifest, generated bundle, production hook, production
+onboarding, or production supervisor source is owned by PR1.
+
+FINAL PURE LOC
+
+  test-setup.ts=92
+  script/ensure-vendored-lsp-daemon.ts=215
+  script/ensure-vendored-lsp-daemon.test.ts=245
+  script/fixtures/vendored-lsp-build-owner.ts=14
+  packages/omo-opencode/src/cli/run/on-complete-hook.test.ts=249
+  packages/omo-senpi/src/components/onboarding/state.test.ts=242
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts=180
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-harness.ts=238
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-exit-resources.ts=223
+  packages/omo-senpi/src/components/memory/worker/memory-run-supervisor-ic8-process-groups.ts=57
+
+Every changed file is at or below the 250 pure-LOC ceiling.
+
+ARCHITECTURAL QUESTIONS
+
+1. Does each edit solve a verified failure?
+   - Yes. Every edit maps to a live CI failure, real two-process race, lost
+     event mutation, or resource-cleanup mutation.
+
+2. Does each new module have one responsibility?
+   - Yes. `ensure-vendored-lsp-daemon.ts` owns only single-flight preparation
+     of the vendored LSP test prerequisite. IC-8 scenario, run/process harness,
+     exit-resource ownership, and process-group signaling are split into
+     focused modules.
+
+3. Does the implementation reuse existing code?
+   - Yes. It reuses `packages/lsp-daemon/src/lock.ts` instead of duplicating
+     PID/stale-lock logic.
+
+4. Are errors typed and visible?
+   - Yes. npm install/build failures, missing output, and lock wait timeout
+     reject the preload with actionable errors. No catch block swallows them.
+
+5. Is TypeScript strict and suppression-free?
+   - Yes. Final LSP diagnostics report zero findings; full repository typecheck
+     exits 0; no `any`, `@ts-ignore`, or `@ts-expect-error` was added.
+
+6. Are tests deterministic?
+   - Yes. Event listeners are armed before triggers. Timeouts are circuit
+     breakers only. The LSP waiter uses a bounded 50ms owner-liveness state
+     recheck only while the vendored output is absent, alongside filesystem
+     watch events. No sleep, retry mask, `.skip`, or `.only` was added.
+
+7. Is the scope minimal?
+   - Yes. Model-preflight timing and RPC polling are explicitly deferred.
+     CI partitioning/XDG isolation remain owned by their already-merged PRs.
+     Bundler-version-sensitive Codex body diffs were removed rather than
+     included.
+
+FINAL GATES
+
+- final post-blocker targeted: 43 pass, 0 fail;
+- LSP diagnostics: 0 findings across six files;
+- full typecheck: exit 0;
+- faithful Senpi: 1884 pass, 0 fail;
+- final unsharded root: 13902 pass, 0 fail;
+- post-rebase Codex: every component/package suite green;
+- isolated OpenCode QA: pass, real DB count unchanged;
+- generated diff: 0;
+- `git diff --check`: 0 findings.
+
+CLEANUP RECEIPTS
+
+- stale-bundle QA worktree removed and unregistered;
+- pack directories removed by EXIT traps;
+- no claim-race or memory-supervisor child process remains;
+- both temporary LSP bridge symlinks removed;
+- no generated Codex/Senpi artifact diff remains;
+- tracked worktree is clean.
+
+FINAL REVIEW-FIX ADDITIONS
+
+- LSP dead-owner recovery uses an owner-PID state recheck and one aggregate
+  deadline; watch failure is non-fatal and command errors preserve detail.
+- IC-8 cleanup fails closed on taskkill errors, asserts process-group death,
+  continues through ledger/kill failures, settles unconnected promises, and
+  removes roots in all cases.
+- IC-8 scenario, harness, exit-resource, and process-group modules are split
+  below the 250 pure-LOC ceiling.
+- Non-test IC-8 modules use standard `import.meta.url`, not Bun-only
+  `import.meta.dir`.

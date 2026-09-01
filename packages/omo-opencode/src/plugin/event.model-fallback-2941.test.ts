@@ -58,7 +58,7 @@ function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createMo
 		keywordDetector: null,
 		claudeCodeHooks: null,
 		autoSlashCommand: null,
-		startWork: null,
+		ulwExecute: null,
 		ralphLoop: null,
 	})
 }

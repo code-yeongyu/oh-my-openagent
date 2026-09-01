@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {
@@ -90,6 +90,7 @@ export async function executeReflectionRun(input: {
           identity: options.identity,
           env,
           senpiCommand: options.senpiCommand,
+          senpiPrefixArgs: options.senpiPrefixArgs,
         })
         if (!launched) {
           await input.appendLaunched()

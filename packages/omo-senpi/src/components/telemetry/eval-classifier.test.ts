@@ -63,6 +63,8 @@ describe("eval tool bucket classification", () => {
     expect(polluted.nonEval.wavesMulti).toBe(nonEvalOnly.nonEval.wavesMulti)
     expect(polluted.nonEval.joinedCalls).toBe(nonEvalOnly.nonEval.joinedCalls)
     expect(polluted.nonEval.waveSizeHistogram).toBe(nonEvalOnly.nonEval.waveSizeHistogram)
+    expect(polluted.evalOuterJoinedCalls).toBe(6)
+    expect(polluted.mixedNonEvalJoinedCalls).toBe(3)
 
     expect(polluted.nonEval.wavesTotal).toBe(3)
     expect(polluted.nonEval.wavesMulti).toBe(2)
@@ -81,6 +83,8 @@ describe("eval tool bucket classification", () => {
     expect(summary.evalOnlyWaves).toBe(2)
     expect(summary.evalOnlyDurationMs).toBe(3_500)
     expect(summary.mixedWaves).toBe(1)
+    expect(summary.evalOuterJoinedCalls).toBe(3)
+    expect(summary.mixedNonEvalJoinedCalls).toBe(1)
     expect(summary.nonEval.wavesTotal).toBe(1)
   })
 

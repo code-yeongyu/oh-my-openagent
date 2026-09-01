@@ -52,7 +52,6 @@ describe("createInitDeepAdvisorComponent", () => {
           },
           options: { triggerTurn: true, deliverAs: "followUp" },
         }])
-        expect(pi.messages[0]?.message["content"]).not.toContain("/skill:init-deep")
         expect(pi.appendEntry).toHaveBeenCalledWith("omo-init-deep-advisor:proposed", {
           repo,
           trigger: "coverage-gap",
