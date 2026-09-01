@@ -2,8 +2,8 @@
 // frontmatter repair, which is the one documented auto-fix (letta parity).
 
 import { createHash } from "node:crypto"
-import { existsSync } from "node:fs"
-import { readdir, readFile } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 

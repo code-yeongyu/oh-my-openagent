@@ -23,7 +23,7 @@ Senpi telemetry adapter over `@oh-my-opencode/telemetry-core` PostHog primitives
 | `delegation-projection.ts` | Pure `TaskRecord` + terminal edge + steer counts -> `delegation_completed` property bag. Explicit scalar allowlist; every free-text record field is excluded by construction and pinned by an exact-key-set test. |
 | `omo-native-delegation.ts` | Subscribes the task terminal-observer ledger, dedupes on `(task_seq, run_epoch)`, counts `steered`/`steer_queued` jsonl lines for the current epoch, and captures `delegation_completed`. Fire-and-forget, unsubscribes on dispose. |
 | `omo-native-category-config.ts` | Captures a `category_config` snapshot per `config_generation`; a generation is spent only when the canonical exportable map changed. Custom category and model names never leave the machine. |
-| `model-vocabulary.ts` | `KNOWN_MODELS` / provider vocabulary so every shipped fallback-chain rung masks to itself, not `custom`. |
+| `model-vocabulary.ts` | `KNOWN_MODELS` / provider vocabulary so every shipped fallback-chain rung masks to itself, not `custom`, plus `ALL_KNOWN_MODEL_IDS` — the provider-independent flat set of exportable model ids. |
 | `schema-doc.test.ts` | Pins the generated schema block in `docs/reference/senpi-telemetry.md` against `OMO_NATIVE_EVENT_SCHEMAS`. |
 | `telemetry.test-support.ts` | Recorded transport factory, fixed clock, fake os provider for tests. |
 
@@ -37,7 +37,8 @@ Senpi telemetry adapter over `@oh-my-opencode/telemetry-core` PostHog primitives
 ## Privacy and opt-out
 
 - Env opt-outs (telemetry-core `env.ts`): `DO_NOT_TRACK`, `OMO_DISABLE_POSTHOG` / `OMO_SENPI_DISABLE_POSTHOG` (`1|true|yes`), `OMO_SEND_ANONYMOUS_TELEMETRY` / `OMO_SENPI_SEND_ANONYMOUS_TELEMETRY` (`0|false|no|yes`). Config gate: `isOmoTelemetryEnabled` from `omo-config-core`.
-- Never captured: prompt text, file paths, hostnames in clear, raw session ids, custom model or provider names.
+- Never captured: prompt text, file paths, hostnames in clear, raw session ids, custom provider names, and custom model names (any model id outside the shipped vocabulary — fine-tunes, private deployment names, internal codenames).
+- Provider and model are masked by DIFFERENT rules, and `maskProviderAndModel` is the single place that decides: `provider` is exported only when it is in `KNOWN_PROVIDERS` (a user-authored gateway name never leaves the machine), while `model_id` is exported whenever it matches `ALL_KNOWN_MODEL_IDS` regardless of the routing provider, because a shipped model id is a public product name. Changing this boundary means changing the published disclosure in `docs/reference/senpi-telemetry.md` in the same commit.
 - API keys come from `POSTHOG_API_KEY` or the write-only defaults named in `product-identity.ts` / telemetry-core constants; do not duplicate key literals elsewhere.
 - First-run disclosure notice is mandatory and marker-gated; it fires only when telemetry is actually enabled.
 

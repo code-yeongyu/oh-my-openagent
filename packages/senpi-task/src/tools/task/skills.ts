@@ -2,8 +2,9 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
-import { loadSkillsFromDir as discoverSkillsFromDir } from "@code-yeongyu/senpi"
+import type { loadSkillsFromDir as discoverSkillsFromDir } from "@code-yeongyu/senpi"
 
+import { senpiBarrel } from "../../lazy/senpi-barrel"
 import type { LoadedSkill, SkillLoader, SkillResolution } from "./types"
 
 export type FsSkillLoaderOptions = {
@@ -120,7 +121,9 @@ export function createFsSkillLoader(options: FsSkillLoaderOptions = {}): SkillLo
   const home = options.homeDir ?? homedir()
   const agentDir = options.agentDir ?? join(home, ".senpi", "agent")
   const extraDirs = options.extraDirs ?? []
-  const discover = options.loadSkillsFromDir ?? discoverSkillsFromDir
+  // The default discovery reads the senpi barrel lazily through the boundary; the loader runs on
+  // the task spawn path, which awaits loadSenpiBarrel() before resolving skills.
+  const discover = options.loadSkillsFromDir ?? ((dir: Parameters<typeof discoverSkillsFromDir>[0]) => senpiBarrel().loadSkillsFromDir(dir))
   return (names, cwd): SkillResolution => {
     const dirs = searchDirs(cwd, home, agentDir, extraDirs)
     const discoveryCache = new Map<string, ReturnType<typeof discoverSkillsFromDir>>()

@@ -326,7 +326,7 @@ describe("buildMemorySnapshot previousEntryAtISO", () => {
     await writeFile(join(dir, "system/persona.md"), "second\n", "utf8")
     await gitRepo.commitWrite(["system/persona.md"], "memory: second entry", {
       agentId: "omo-memory-rpc",
-      authorName: "Omo Agent",
+      authorName: "OmO Agent",
     })
     const log = await gitRepo.log({ limit: 2 })
     const context = await contextFixture()
