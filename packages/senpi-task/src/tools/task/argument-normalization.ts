@@ -32,10 +32,13 @@ function summaryText(value: unknown): string | undefined {
   return clampTaskSummary(typeof value === "string" ? value : undefined)
 }
 
+// A batch item whose prompt is missing or blank is NOT dropped here. Normalization is a serializer
+// cleanup pass, not a validation gate: silently discarding the item made the tool spawn fewer
+// children than submitted and report success. The item is preserved with an empty prompt so
+// resolveSpawnItems can reject the whole call and name the offending index.
 function taskItem(value: unknown): TaskItem | undefined {
   if (!isRecord(value)) return undefined
-  const prompt = nonBlankText(value.prompt)
-  if (prompt === undefined) return undefined
+  const prompt = nonBlankText(value.prompt) ?? ""
 
   const taskSummary = summaryText(value.task_summary)
   const description = nonBlankText(value.description)
@@ -65,8 +68,25 @@ function taskItems(value: unknown): TaskItem[] | undefined {
   })
 }
 
+// Provider padding is a CONTENTLESS filler item, not a malformed real one. A blank prompt alone is
+// not enough to classify: an item carrying a name, description, category, target, model, skills or
+// summary is work the caller meant to spawn, so it reaches validation and is reported rather than
+// absorbed here. That content check applies ONLY to blank prompts. A known padding token still wins
+// outright, because observed provider padding fills those sibling fields with junk too, so a token
+// item carrying content is still absorbed.
 function isProviderPaddingTask(item: TaskItem): boolean {
-  return PROVIDER_PADDING_PROMPTS.has(item.prompt.trim().toLowerCase())
+  const prompt = item.prompt.trim().toLowerCase()
+  if (PROVIDER_PADDING_PROMPTS.has(prompt)) return true
+  if (prompt.length > 0) return false
+  return (
+    item.task_summary === undefined &&
+    item.description === undefined &&
+    item.category === undefined &&
+    item.subagent_type === undefined &&
+    item.name === undefined &&
+    item.model === undefined &&
+    item.load_skills === undefined
+  )
 }
 
 export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {

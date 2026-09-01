@@ -20,7 +20,7 @@ type TargetInput = {
 }
 
 type SpawnItemInput = TargetInput & {
-  readonly prompt: string
+  readonly prompt?: string
   readonly task_summary?: string
   readonly description?: string
   readonly name?: string
@@ -56,9 +56,28 @@ export type SpawnItemTargetError = {
   readonly message: string
 }
 
+// One rejected batch item: which index, which field, and why. Reported for EVERY offending item in
+// the call so the caller never has to re-submit one index at a time.
+export type SpawnItemRejection = {
+  readonly index: number
+  readonly field: string
+  readonly reason: string
+}
+
+// `accepted` counts the items that passed validation and WOULD have spawned; the call is still
+// rejected atomically, so nothing actually spawns. Carrying it makes the caller-side accounting
+// invariant accepted + rejected == submitted checkable directly from the error.
+export type SpawnItemsInvalidError = {
+  readonly code: "invalid_items"
+  readonly rejected: readonly SpawnItemRejection[]
+  readonly accepted: number
+  readonly submitted: number
+  readonly message: string
+}
+
 export type ResolveSpawnItemsResult =
   | { readonly kind: "ok"; readonly items: readonly ResolvedSpawnItem[] }
-  | { readonly kind: "error"; readonly error: BatchShapeError | SpawnItemTargetError }
+  | { readonly kind: "error"; readonly error: BatchShapeError | SpawnItemTargetError | SpawnItemsInvalidError }
 
 const BOTH_TARGETS_MESSAGE = "Provide EITHER category OR subagent_type, not both. Remove one and retry."
 
@@ -76,6 +95,27 @@ const EMPTY_TASKS_MESSAGE = "tasks must contain at least one item."
 
 function present(value: string | undefined): value is string {
   return value !== undefined && value.trim().length > 0
+}
+
+const MISSING_PROMPT_REASON = "prompt is required and must be non-empty"
+
+function targetErrorField(code: TaskTargetErrorCode): string {
+  switch (code) {
+    case "both_targets":
+      return "category+subagent_type"
+    case "category_with_model":
+      return "category+model"
+    case "no_target":
+      return "category|subagent_type"
+  }
+}
+
+// The call is rejected atomically: nothing is spawned, so the caller can fix every named index and
+// resubmit the whole batch. Reporting the submitted count next to the rejected list makes the
+// accepted + rejected == submitted accounting checkable from the message alone.
+function invalidItemsMessage(rejected: readonly SpawnItemRejection[], submitted: number): string {
+  const details = rejected.map((entry) => `item ${entry.index} (${entry.field}: ${entry.reason})`).join("; ")
+  return `Rejected ${rejected.length} of ${submitted} task items; nothing was spawned. Fix and resubmit the whole batch. Invalid: ${details}.`
 }
 
 // category XOR subagent_type: both or neither is a typed tool error. Wording ports the omo
@@ -116,6 +156,7 @@ export function validateBatchShape(params: SpawnParamsInput): BatchShapeResult {
 export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsResult {
   const shape = validateBatchShape(params)
   if (shape.kind === "error") return shape
+  const isBatch = shape.kind === "batch"
 
   const inputs: readonly SpawnItemInput[] =
     params.tasks ??
@@ -130,6 +171,7 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
           },
         ])
   const items: ResolvedSpawnItem[] = []
+  const rejected: SpawnItemRejection[] = []
 
   for (const [index, input] of inputs.entries()) {
     const itemDefinesCategory = input.category !== undefined
@@ -141,8 +183,26 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
         ? undefined
         : params.subagent_type
     const effectiveModel = input.model ?? params.model
+
+    // A batch collects EVERY fault before returning, so the reported set never depends on item
+    // order and the caller fixes the whole call once. A single spawn keeps its typed first-error
+    // contract, which execute.ts and the tool surface already depend on.
+    if (!present(input.prompt)) {
+      if (!isBatch) {
+        return { kind: "error", error: { code: "no_prompt_or_tasks", message: NO_PROMPT_OR_TASKS_MESSAGE } }
+      }
+      rejected.push({ index, field: "prompt", reason: MISSING_PROMPT_REASON })
+      continue
+    }
+
+    // Inheritance is applied BEFORE validation, so an item that is valid only once it picks up the
+    // top-level category/subagent_type/model is never wrongly rejected.
     const target = validateTaskTarget({ category, subagent_type: subagentType, model: effectiveModel })
     if (target.kind === "error") {
+      if (isBatch) {
+        rejected.push({ index, field: targetErrorField(target.error.code), reason: target.error.message })
+        continue
+      }
       return {
         kind: "error",
         error: {
@@ -166,6 +226,21 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
       items.push({ ...common, kind: "category", category: target.category })
     } else {
       items.push({ ...common, kind: "subagent_type", subagentType: target.subagentType })
+    }
+  }
+
+  // Atomic: a single invalid item rejects the whole call and spawns nothing, matching how every
+  // other malformed-input path on this tool surface reports invalid_arguments.
+  if (rejected.length > 0) {
+    return {
+      kind: "error",
+      error: {
+        code: "invalid_items",
+        rejected,
+        accepted: items.length,
+        submitted: inputs.length,
+        message: invalidItemsMessage(rejected, inputs.length),
+      },
     }
   }
 
