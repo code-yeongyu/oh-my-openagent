@@ -1,9 +1,10 @@
 import { afterEach } from "bun:test"
 import { execFile } from "node:child_process"
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 import {
   GitMemoryRepo,
@@ -25,9 +26,30 @@ export const IDENTITY = "agent-memory-tools-test"
 const AUTHOR: GitCommitAuthor = { agentId: IDENTITY, authorName: "Memory Tools Test Agent" }
 
 export const roots: string[] = []
+const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
+
+// Every fixture is a real Git repo, so cleanup races the git children this suite just ran. Windows
+// releases their file handles asynchronously, and an unretried rm here bills its stall to the NEXT
+// test file's budget - the exact shape of the tools-apply-patch timeout on CI.
+async function removeRoot(root: string): Promise<void> {
+  try {
+    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+  } catch (error) {
+    // A lingering Windows handle can outlast the bounded retry window. Ignore only that platform's
+    // known cleanup races; every other cleanup defect still fails loudly.
+    if (
+      process.platform === "win32"
+      && error instanceof Error
+      && "code" in error
+      && typeof error.code === "string"
+      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
+    ) return
+    throw error
+  }
+}
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map(removeRoot))
 })
 
 export interface BoundFixture {

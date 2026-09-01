@@ -1,0 +1,125 @@
+PR #6858 repaired-head local verification
+Captured: 2026-08-16
+Worktree: /Volumes/mengmotaStorage/local-workspaces/omo-wt/review-pr-6858-brutal
+
+COMMAND:
+bun test packages/senpi-task/src/runners
+
+OBSERVED:
+125 pass
+1 Windows-only skip
+0 fail
+299 expect() calls
+Ran 126 tests across 24 files.
+
+COMMAND:
+bun run --cwd packages/senpi-task typecheck
+
+OBSERVED:
+$ tsgo --noEmit -p tsconfig.json
+exit 0
+
+COMMAND:
+bun run --cwd packages/omo-senpi typecheck
+
+OBSERVED:
+$ tsgo --noEmit -p tsconfig.json
+exit 0
+
+COMMAND:
+bun run --cwd packages/omo-codex typecheck
+
+OBSERVED:
+$ tsgo --noEmit -p tsconfig.json
+exit 0
+
+COMMAND:
+npm exec --yes --package=bun@1.3.12 -- bash -c 'node packages/omo-senpi/plugin/scripts/build-extension.mjs --check'
+
+OBSERVED:
+- Senpi LSP runtime current.
+- Senpi ast-grep-mcp runtime current.
+- Senpi agent-toolkit runtime current.
+- All six extension entries bundled.
+- omo-senpi extension build is current.
+- exit 0
+
+COMMAND:
+bun run test:senpi
+
+OBSERVED:
+1568 pass
+0 fail
+4352 expect() calls
+Ran 1568 tests across 238 files in 130.60s.
+
+COMMAND:
+bun run test:codex
+
+OBSERVED:
+519 pass
+0 fail
+0 skipped
+0 todo
+duration_ms 6098.607083
+
+DIAGNOSTICS:
+No LSP diagnostics in:
+- packages/omo-codex/src/install/install-codex-git-bash-preflight.test.ts
+- packages/omo-senpi/src/components/memory/commands/memory.test.ts
+- packages/senpi-task/src/runners/rpc-process.windows.test.ts
+- canonical Windows console probe and inspection helper
+
+ARCHITECTURE:
+- windows-console-probe.ts: 208 pure LOC
+- windows-console-inspection.ts: 59 pure LOC
+- install-codex-git-bash-preflight.test.ts: 167 pure LOC
+- memory.test.ts: 81 pure LOC
+- All changed TypeScript files remain under the 250 pure-LOC ceiling.
+
+FINAL LOCAL ADDITIONS:
+
+COMMAND:
+bun test
+
+OBSERVED:
+15485 pass
+7 intentional platform/TUI skips
+0 fail
+1 snapshot
+144137 expect() calls
+Ran 15492 tests across 2009 files in 434.37s.
+
+COMMAND:
+bun run typecheck
+
+OBSERVED:
+Root, script, and every workspace package typecheck exited 0.
+
+COMMAND:
+bun packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs
+
+OBSERVED:
+- production process route: PASS
+- wiringFixed: true
+- real RPC PID and child session JSONL present
+- steer/completion/kill checks passed
+- real credentials and whole real agent-directory digest unchanged
+- leakedPids: 0
+- separate reconcile breadcrumb check remained FAIL while orphanDead was true
+
+COMMAND:
+bun run test:senpi
+
+OBSERVED:
+1715 pass
+1 intentional Windows-only production-driver skip
+0 fail
+4844 expect() calls
+Ran 1716 tests across 255 files in 148.41s.
+
+PERFORMANCE ROOT FIXES:
+- 40-commit drift integration fixture: approximately 5 seconds before; approximately 316ms after one-process `git fast-import`.
+- terminal gate options unit test: approximately 5 seconds before; under 1ms after injecting the lock record fixture.
+- concurrent Git worktree registration: deterministic overlap RED `maxActive: 2`; GREEN `maxActive: 1`.
+- Git-backed MemoryBlockCache Windows timeout: RED at 5015ms in job `95143900936`; GREEN focused suite 5/5 in 1.59s with the existing 20-second Windows integration budget applied consistently.

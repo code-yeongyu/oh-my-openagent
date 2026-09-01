@@ -3,25 +3,14 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
-import {
-  MEMORY_NUDGE_METADATA_TOKEN,
-  MEMORY_SOUL_METADATA_TOKEN,
-} from "./compile"
 
 const tempDirs: string[] = []
-export const NOW = new Date("2026-05-04T00:00:00.000Z")
-
 interface CompiledBlockStructure {
   readonly sections: readonly string[]
   readonly projectionPaths: readonly string[]
   readonly memoryOpenTags: readonly string[]
   readonly metadata: {
     readonly agentId: string
-    readonly conversationId: string
-    readonly compiledAt: string
-    readonly previousMessageCount: number
-    readonly nudgeTurns?: number
-    readonly soulSha?: string
   }
 }
 
@@ -45,24 +34,12 @@ export function parseCompiledBlock(block: string): CompiledBlockStructure {
     : [...memory.matchAll(/^\s*<([a-z][a-z0-9_-]*)>$/gm)].map((match) => match[1] ?? "")
   const metadata = requiredRegion(block, "memory_metadata")
   const agentId = requiredMatch(metadata, /^- AGENT_ID: (.+)$/m)
-  const conversationId = requiredMatch(metadata, /^- CONVERSATION_ID: (.+)$/m)
-  const compiledAt = requiredMatch(metadata, /(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} (?:AM|PM) UTC[+-]\d{4})/)
-  const previousMessageCount = Number(requiredMatch(metadata, /^- (\d+) previous messages\b/m))
-  const nudgeMatch = metadata.match(new RegExp(`^- (\\d+) ${escapeRegExp(MEMORY_NUDGE_METADATA_TOKEN)}\\b`, "m"))
-  const soulMatch = metadata.match(new RegExp(`^- ${escapeRegExp(MEMORY_SOUL_METADATA_TOKEN)} reflection ([a-f0-9]{7})\\b`, "m"))
 
   return {
     sections,
     projectionPaths,
     memoryOpenTags,
-    metadata: {
-      agentId,
-      conversationId,
-      compiledAt,
-      previousMessageCount,
-      ...(nudgeMatch?.[1] === undefined ? {} : { nudgeTurns: Number(nudgeMatch[1]) }),
-      ...(soulMatch?.[1] === undefined ? {} : { soulSha: soulMatch[1] }),
-    },
+    metadata: { agentId },
   }
 }
 
@@ -81,10 +58,6 @@ function requiredMatch(input: string, pattern: RegExp): string {
   const value = input.match(pattern)?.[1]
   if (value === undefined) throw new Error(`missing compiled field: ${pattern.source}`)
   return value
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
 export async function repoWith(files: Array<{ relativePath: string; content: string }>) {

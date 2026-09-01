@@ -1,0 +1,27 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'MEMORY_PRESSURE_METADATA_TOKEN' not found in module '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-pressure-line/packages/omo-senpi/src/components/memory/prompt.ts'.
+-------------------------------
+
+
+packages/omo-senpi/src/components/memory/wiring.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find package 'typebox' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-pressure-line/packages/omo-senpi/src/components/memory/tools.ts'
+-------------------------------
+
+
+ 0 pass
+ 2 fail
+ 2 errors
+Ran 2 tests across 2 files. [2.53s]

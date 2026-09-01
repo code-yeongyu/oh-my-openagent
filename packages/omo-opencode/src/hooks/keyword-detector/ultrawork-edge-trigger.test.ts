@@ -62,7 +62,7 @@ describe("keyword-detector ultrawork edge trigger", () => {
     // then
     expect(toastCalls).toContain("Ultrawork Mode Activated")
     expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toContain("ULTRAWORK MODE ENABLED!")
+    expect(output.parts[0]?.text).toContain("<ultrawork-mode>")
     expect(output.parts[0]?.text).toContain(" hi there ulw ")
   })
 
@@ -86,7 +86,7 @@ describe("keyword-detector ultrawork edge trigger", () => {
     // then
     expect(toastCalls).toContain("Ultrawork Mode Activated")
     expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toContain("ULTRAWORK MODE ENABLED!")
+    expect(output.parts[0]?.text).toContain("<ultrawork-mode>")
     expect(output.parts[0]?.text).toContain("hey ulw fix the flaky keyword tests")
   })
 

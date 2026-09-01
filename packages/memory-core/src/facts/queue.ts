@@ -2,7 +2,7 @@
 // `facts-queue` lock; the enqueue watermark is MONOTONIC so a late-finishing older batch
 // can never republish a range overlapping a retained newer entry.
 
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import type { MemoryIdentityPaths } from "../identity"
@@ -186,7 +186,7 @@ export class FactsQueue {
     }
     const entries: (FactsQueueEntry & { readonly filePath: string })[] = []
     for (const name of names.sort()) {
-      if (!name.endsWith(".json") || name === "consumed.json") continue
+      if (!name.endsWith(".json") || name === "consumed.json" || name === "failures.json") continue
       const filePath = join(this.layout.queueDir, name)
       const raw = await readFile(filePath, "utf8").catch(() => undefined)
       if (raw === undefined) continue

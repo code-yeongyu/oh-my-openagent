@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -12,6 +12,8 @@ import { applyFactsRecovery } from "./recovery"
 const AUTHOR = { agentId: "facts-setter-race", authorName: "Facts Setter Race" }
 const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 const tempDirs: string[] = []
+
+setDefaultTimeout(WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
 function batch(batchId = "11111111-1111-4111-8111-111111111111"): FactsBatch {
   return {
@@ -131,7 +133,7 @@ describe("facts conditional mutation primitives", () => {
     expect((await repo.pathState.capture(september)).index).toEqual(indexBefore.get(september)?.index ?? null)
     expect(await repo.pathState.capture(september)).toEqual(recovery.paths.find((entry) => entry.path === september)!.pre)
     expect((await repo.log()).some((commit) => commit.trailers["Omo-Facts-Batch"] === recovery.batchId)).toBe(false)
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   test("preserves foreign bytes injected after hashing an existing path for deletion", async () => {
     const { dir, repo, injectAfterNextWorktreeHash } = await fixture()

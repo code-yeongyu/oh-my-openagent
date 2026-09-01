@@ -7,7 +7,7 @@ Use this skill to run a parallel security audit that separates real exploitabili
 Before starting, verify:
 
 1. `team_*` tools are available. If not, stop and tell the user:
-   `security-research requires team-mode. Set team_mode.enabled: true in your oh-my-openagent config, restart opencode, then retry.`
+   `security-research requires team-mode. Set team_mode.enabled: true in your .omo/omo.jsonc config, restart opencode, then retry.`
 2. You are in the main session, not a background subagent.
 3. You have a concrete target: repository, diff range, PR, release candidate, path list, or threat surface.
 

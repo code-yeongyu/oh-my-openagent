@@ -40,121 +40,109 @@ permissions:
   actions: write
 
 jobs:
-  test:
+  gate-reuse:
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
+      - name: Require successful CI for prepared release source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+        run: |
+          set -euo pipefail
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.12"
+          if [ -z "$PREPARED_RELEASE_SHA" ]; then
+            echo "Skipping duplicate gates on the release preparation dispatch."
+            exit 0
+          fi
 
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
+          retry_gh() {
+            local description="$1"
+            shift
+            local output=""
+            for api_retry in 1 2 3 4 5; do
+              if output="$("$@" 2>&1)"; then
+                printf '%s' "$output"
+                return 0
+              fi
+              echo "${description}: retry ${api_retry}/5" >&2
+              echo "$output" >&2
+              if [ "$api_retry" != "5" ]; then sleep 5; fi
+            done
+            echo "::error::${description} failed after 5 retries; GitHub API may be down." >&2
+            return 1
+          }
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+          # The prepared source is validated either by the post-merge push run or
+          # by the release-state PR's own pull_request run at the exact SHA
+          # (the grep/tag short-circuits return the stamp commit, which only
+          # ever has a pull_request run). Both are full ci.yml executions.
+          for attempt in $(seq 1 120); do
+            RUNS="$(retry_gh "Read CI workflow runs" gh api --method GET \
+              "repos/${{ github.repository }}/actions/workflows/ci.yml/runs" \
+              -f head_sha="$PREPARED_RELEASE_SHA" \
+              -f per_page=100)"
 
-      - name: Build vendored lsp-daemon package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-daemon
+            SUCCESS_ID="$(jq -r --arg sha "$PREPARED_RELEASE_SHA" '
+              [
+                .workflow_runs[]
+                | select(
+                    .head_sha == $sha
+                    and .status == "completed"
+                    and .conclusion == "success"
+                  )
+              ]
+              | sort_by(.created_at)
+              | last
+              | .id // empty
+            ' <<< "$RUNS")"
+            if [ -n "$SUCCESS_ID" ]; then
+              echo "CI workflow run ${SUCCESS_ID} succeeded for ${PREPARED_RELEASE_SHA}."
+              exit 0
+            fi
 
-      - name: Run tests
-        run: bun test
+            ACTIVE_COUNT="$(jq -r --arg sha "$PREPARED_RELEASE_SHA" '
+              [.workflow_runs[] | select(.head_sha == $sha and .status != "completed")]
+              | length
+            ' <<< "$RUNS")"
+            COMPLETED_COUNT="$(jq -r --arg sha "$PREPARED_RELEASE_SHA" '
+              [.workflow_runs[] | select(.head_sha == $sha and .status == "completed")]
+              | length
+            ' <<< "$RUNS")"
+
+            if [ "$ACTIVE_COUNT" = "0" ] && [ "$COMPLETED_COUNT" != "0" ]; then
+              jq -r --arg sha "$PREPARED_RELEASE_SHA" '
+                .workflow_runs[]
+                | select(.head_sha == $sha)
+                | "CI run \(.id): status=\(.status), conclusion=\(.conclusion), url=\(.html_url)"
+              ' <<< "$RUNS"
+              echo "::error::CI completed without a successful run for ${PREPARED_RELEASE_SHA}."
+              exit 1
+            fi
+
+            echo "Waiting for successful CI on ${PREPARED_RELEASE_SHA} (attempt ${attempt}/120)."
+            sleep 15
+          done
+
+          echo "::error::Timed out waiting for successful CI on ${PREPARED_RELEASE_SHA}."
+          exit 1
 
       - name: Write job summary
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: Release test gate
+          JOB_SUMMARY_TITLE: Release gate reuse decision
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Builds vendored LSP packages before release tests.
-            - Runs the full root `bun test` suite before publishing.
-          JOB_SUMMARY_NEXT: Fix the first failing test or vendored package build before rerunning release.
-        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
-
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.12"
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Type check
-        run: bun run typecheck
-
-      - name: Write job summary
-        if: always()
-        shell: bash
-        env:
-          JOB_SUMMARY_TITLE: Release typecheck gate
-          JOB_SUMMARY_STATUS: ${{ job.status }}
-          JOB_SUMMARY_DETAILS: |
-            - Builds vendored LSP tooling.
-            - Runs `bun run typecheck` before any publish job can start.
-          JOB_SUMMARY_NEXT: Start with the first TypeScript diagnostic; release jobs stay blocked until this is green.
-        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
-
-  codex-compatibility:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.12"
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Build vendored lsp-daemon package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-daemon
-
-      - name: Run Codex compatibility tests
-        run: bun run test:codex
-
-      - name: Write job summary
-        if: always()
-        shell: bash
-        env:
-          JOB_SUMMARY_TITLE: Release Codex compatibility (${{ matrix.os }})
-          JOB_SUMMARY_STATUS: ${{ job.status }}
-          JOB_SUMMARY_DETAILS: |
-            - Builds MCP runtime prerequisites.
-            - Runs `bun run test:codex` across the supported OS matrix.
-          JOB_SUMMARY_NEXT: Inspect the first failing Codex component or installer test for `${{ matrix.os }}`.
+            - Skips release validation on the preparation dispatch, which cannot publish.
+            - Waits for a successful CI push workflow run on the exact prepared SHA.
+            - Fails closed when CI fails, is cancelled, times out, or cannot be read.
+          JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   preflight-trust:
@@ -271,7 +259,7 @@ jobs:
       already_published: ${{ steps.omo-ai.outputs.already_published }}
       previous_lazycodex_version: ${{ steps.version.outputs.previous_lazycodex_version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Assert omo bin ownership
         run: |
@@ -368,43 +356,47 @@ jobs:
 
   prepare-release-state:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]
+    needs: [gate-reuse, preflight-trust, release-metadata]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
-      needs.test.result == 'success' &&
-      needs.typecheck.result == 'success' &&
-      needs.codex-compatibility.result == 'success' &&
+      needs.gate-reuse.result == 'success' &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success'
     permissions:
-      actions: read
       contents: write
-      id-token: write
       pull-requests: write
     outputs:
-      release_sha: ${{ steps.prepare.outputs.release_sha }}
+      release_sha: ${{ steps.publish_state.outputs.release_sha || steps.prepare.outputs.release_sha }}
     steps:
-      - uses: actions/checkout@v5
+      # The PAT checks out with persist-credentials disabled: repo-controlled
+      # generation below must never be able to read the release credential from
+      # git config. The token is exported explicitly only when the generated
+      # release state is ready to be pushed.
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+          persist-credentials: false
 
       - run: git fetch --force --tags
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.4.0"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Prepare and merge release state before publishing
+      - name: Prepare release state (generation)
         id: prepare
+        # Generation only: this step runs repo-controlled scripts and package
+        # managers, so it carries NO form of the release PAT in its environment.
+        # Credential-bearing operations live in the next step.
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
           RELEASE_REF: ${{ github.ref_name }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
         run: |
           set -euo pipefail
@@ -415,6 +407,7 @@ jobs:
               exit 1
             fi
             echo "release_sha=${PREPARED_RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "needs_push=false" >> "$GITHUB_OUTPUT"
             echo "Publishing from prepared source ${PREPARED_RELEASE_SHA}"
             exit 0
           fi
@@ -427,6 +420,7 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
             RELEASE_SHA="$(git rev-list --max-count=1 "refs/tags/v${VERSION}")"
             echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "needs_push=false" >> "$GITHUB_OUTPUT"
             echo "Release tag v${VERSION} already exists locally at ${RELEASE_SHA}"
             exit 0
           fi
@@ -434,6 +428,7 @@ jobs:
           RELEASE_SHA="$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
           if [ -n "$RELEASE_SHA" ]; then
             echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "needs_push=false" >> "$GITHUB_OUTPUT"
             echo "Release commit already exists on origin/${BASE_REF}: ${RELEASE_SHA}"
             exit 0
           fi
@@ -444,6 +439,7 @@ jobs:
           if [ "$CURRENT_VERSION" = "$VERSION" ]; then
             RELEASE_SHA="$(git rev-parse HEAD)"
             echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "needs_push=false" >> "$GITHUB_OUTPUT"
             echo "origin/${BASE_REF} is already stamped as v${VERSION}: ${RELEASE_SHA}"
             exit 0
           fi
@@ -466,33 +462,119 @@ jobs:
           npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false
           bun install --lockfile-only
 
+          # The version bump restamps OMO_SENPI_PACKAGE_VERSION inside the committed Senpi
+          # bundles; rebuild them so the release commit passes bundle-freshness CI.
+          node packages/omo-senpi/plugin/scripts/build-extension.mjs
+
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git add package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git add -f packages/omo-senpi/plugin/extensions
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
-          git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
 
-          PR_NUMBER="$(gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
+          echo "needs_push=true" >> "$GITHUB_OUTPUT"
+          echo "release_branch=${RELEASE_BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "Release state generated on ${RELEASE_BRANCH}; handing off to the privileged publish step."
+
+      - name: Publish prepared release state
+        id: publish_state
+        if: steps.prepare.outputs.needs_push == 'true'
+        # The only credential-bearing step: git push + gh PR operations. It runs
+        # no repo-controlled generation scripts. The PAT is injected into the
+        # git remote URL just for the push and removed immediately after.
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_BRANCH: ${{ steps.prepare.outputs.release_branch }}
+          RELEASE_REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          BASE_REF="${RELEASE_REF:-dev}"
+
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          trap 'git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"' EXIT
+          git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
+          git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
+
+          retry_gh() {
+            local description="$1"
+            shift
+            local output=""
+            for api_retry in 1 2 3 4 5; do
+              if output="$("$@" 2>&1)"; then
+                printf '%s' "$output"
+                return 0
+              fi
+              echo "${description}: retry ${api_retry}/5" >&2
+              echo "$output" >&2
+              if [ "$api_retry" != "5" ]; then sleep 5; fi
+            done
+            echo "::error::${description} failed after 5 retries; GitHub API may be down." >&2
+            return 1
+          }
+
+          create_release_pr() {
+            local pr_url=""
+            local recovered_number=""
+            for api_retry in 1 2 3 4 5; do
+              if pr_url="$(gh pr create --base "$BASE_REF" --head "$RELEASE_BRANCH" --title "release: v${VERSION}" --body "Automated release-state PR for v${VERSION}. This must merge before npm publication starts so protected-branch push failures cannot create a half-published release." 2>&1)"; then
+                printf '%s' "${pr_url##*/}"
+                return 0
+              fi
+              echo "Create release-state PR: retry ${api_retry}/5" >&2
+              echo "$pr_url" >&2
+              recovered_number="$(retry_gh "Recover created release-state PR" gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
+              if [ -n "$recovered_number" ]; then
+                printf '%s' "$recovered_number"
+                return 0
+              fi
+              if [ "$api_retry" != "5" ]; then sleep 5; fi
+            done
+            echo "::error::Create release-state PR failed after 5 retries." >&2
+            return 1
+          }
+
+          enable_release_auto_merge() {
+            local output=""
+            local enabled=""
+            for api_retry in 1 2 3 4 5; do
+              if output="$(gh pr merge "$PR_NUMBER" --merge --auto --delete-branch=false 2>&1)"; then
+                printf '%s' "$output"
+                return 0
+              fi
+              echo "Enable release-state PR auto-merge: retry ${api_retry}/5" >&2
+              echo "$output" >&2
+              enabled="$(retry_gh "Read release-state PR auto-merge" gh pr view "$PR_NUMBER" --json autoMergeRequest --jq '.autoMergeRequest != null')"
+              if [ "$enabled" = "true" ]; then
+                return 0
+              fi
+              if [ "$api_retry" != "5" ]; then sleep 5; fi
+            done
+            echo "::error::Enable release-state PR auto-merge failed after 5 retries." >&2
+            return 1
+          }
+
+          PR_NUMBER="$(retry_gh "List release-state PR" gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
           if [ -z "$PR_NUMBER" ]; then
-            PR_URL="$(gh pr create --base "$BASE_REF" --head "$RELEASE_BRANCH" --title "release: v${VERSION}" --body "Automated release-state PR for v${VERSION}. This must merge before npm publication starts so protected-branch push failures cannot create a half-published release.")"
-            PR_NUMBER="${PR_URL##*/}"
+            PR_NUMBER="$(create_release_pr)"
           fi
 
-          gh pr merge "$PR_NUMBER" --merge --auto --delete-branch=false
+          enable_release_auto_merge
 
           for attempt in $(seq 1 120); do
-            PR_STATE="$(gh pr view "$PR_NUMBER" --json state --jq '.state')"
+            PR_STATE="$(retry_gh "Read release-state PR state" gh pr view "$PR_NUMBER" --json state --jq '.state')"
             if [ "$PR_STATE" = "MERGED" ]; then
-              RELEASE_SHA="$(gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              RELEASE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
               echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
               echo "Release-state PR #${PR_NUMBER} merged at ${RELEASE_SHA}"
               exit 0
             fi
 
-            FAILURES="$(gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
+            FAILURES="$(retry_gh "Read release-state PR checks" gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
             if [ "$FAILURES" != "0" ]; then
               echo "::error::Release-state PR #${PR_NUMBER} has failing required checks; refusing to publish npm packages."
-              gh pr view "$PR_NUMBER" --json url,statusCheckRollup --jq '{url, statusCheckRollup}'
+              retry_gh "Read failing release-state PR checks" gh pr view "$PR_NUMBER" --json url,statusCheckRollup --jq '{url, statusCheckRollup}' || true
               exit 1
             fi
 
@@ -529,7 +611,7 @@ jobs:
       actions: write
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
@@ -583,20 +665,22 @@ jobs:
 
   publish-main:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]
+    # post-publish-verify runs the published-package probes in a job that cannot block the release, so the
+    # lazycodex publish decision has to cross the job boundary as an output.
+    outputs:
+      lazycodex_publish_skipped: ${{ steps.check-lazycodex.outputs.skip }}
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, publish-platform]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha != '' &&
-      needs.test.result == 'success' &&
-      needs.typecheck.result == 'success' &&
-      needs.codex-compatibility.result == 'success' &&
+      needs.gate-reuse.result == 'success' &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success' &&
       (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           # Publish the prepared release commit, not the workflow-dispatch SHA.
@@ -606,9 +690,9 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.12"
+          bun-version: "1.4.0"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -623,28 +707,54 @@ jobs:
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
+          set -uo pipefail
+
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
-          FAILED=()
+          ATTEMPTS="${PROPAGATION_ATTEMPTS:-20}"
+          DELAY="${PROPAGATION_DELAY:-15}"
+
+          PENDING=()
           for platform in "${PLATFORMS[@]}"; do
             for family in oh-my-opencode oh-my-openagent; do
-              pkg="${family}-${platform}"
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${pkg}/${VERSION}")
-              if [ "$STATUS" = "200" ]; then
-                echo "OK   ${pkg}@${VERSION}"
-              else
-                echo "MISS ${pkg}@${VERSION} (HTTP ${STATUS})"
-                FAILED+=("${pkg}")
-              fi
+              PENDING+=("${family}-${platform}")
             done
           done
 
-          if [ ${#FAILED[@]} -gt 0 ]; then
-            echo "::error::Missing platform package(s); refusing to publish wrappers."
-            for pkg in "${FAILED[@]}"; do
-              echo "::error::  ${pkg}@${VERSION}"
+          # The platform publish jobs have already succeeded when this runs, but the registry read
+          # path lags the write: a version can 404 for a short while after a successful publish.
+          # A single probe therefore proves nothing, so re-probe only what is still pending and
+          # fail once the window closes - a genuinely unpublished package still blocks the release.
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            STILL_PENDING=()
+            for pkg in "${PENDING[@]}"; do
+              STATUS="$(curl -sS -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/${pkg}/${VERSION}" || echo 000)"
+              if [ "$STATUS" = "200" ]; then
+                echo "OK   ${pkg}@${VERSION}"
+              else
+                # 000 means curl itself failed (network/DNS), which is not evidence of absence.
+                echo "WAIT ${pkg}@${VERSION} (HTTP ${STATUS})"
+                STILL_PENDING+=("${pkg}")
+              fi
             done
-            exit 1
-          fi
+
+            if [ "${#STILL_PENDING[@]}" -eq 0 ]; then
+              echo "All ${#PENDING[@]} platform package(s) are visible at ${VERSION}"
+              break
+            fi
+
+            PENDING=("${STILL_PENDING[@]}")
+
+            if [ "$attempt" -ge "$ATTEMPTS" ]; then
+              echo "::error::Missing platform package(s); refusing to publish wrappers. Still absent after ${ATTEMPTS} attempts:"
+              for pkg in "${PENDING[@]}"; do
+                echo "::error::  ${pkg}@${VERSION}"
+              done
+              exit 1
+            fi
+
+            echo "Waiting for platform package registry propagation (attempt ${attempt}/${ATTEMPTS}; ${#PENDING[@]} pending)"
+            sleep "$DELAY"
+          done
 
       - name: Check if already published
         id: check
@@ -819,7 +929,7 @@ jobs:
             .name = "lazycodex-ai" |
             .version = $omo_version |
             .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
-            .files = ["dist/cli", "dist/cli-node", "script/qa/strip-ansi.mjs", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-visual-qa.mjs", "script/qa/xterm-live-terminal.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/bootstrap/dist/cli.js", "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1", "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1", "packages/omo-codex/plugin/components/codegraph/dist/cli.js", "packages/omo-codex/plugin/components/codegraph/dist/serve.js", "packages/omo-codex/plugin/components/comment-checker/dist/cli.js", "packages/omo-codex/plugin/components/git-bash/dist/cli.js", "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "packages/omo-codex/plugin/components/lsp/dist/cli.js", "packages/omo-codex/plugin/components/rules/dist/cli.js", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/teammode/dist/cli.js", "packages/omo-codex/plugin/components/telemetry/dist/cli.js", "packages/omo-codex/plugin/components/ultrawork/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills", "!packages/omo-codex/plugin/node_modules", "!packages/omo-codex/plugin/**/node_modules", "!packages/omo-codex/plugin/components/workflow-selector"] |
+            .files = ["dist/cli", "dist/cli-node", "script/qa/strip-ansi.mjs", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-visual-qa.mjs", "script/qa/xterm-live-terminal.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/bootstrap/dist/cli.js", "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1", "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1", "packages/omo-codex/plugin/components/codegraph/dist/cli.js", "packages/omo-codex/plugin/components/codegraph/dist/serve.js", "packages/omo-codex/plugin/components/comment-checker/dist/cli.js", "packages/omo-codex/plugin/components/git-bash/dist/cli.js", "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "packages/omo-codex/plugin/components/lsp/dist/cli.js", "packages/omo-codex/plugin/components/rules/dist/cli.js", "packages/omo-codex/plugin/components/ulw-execute-continuation/dist/cli.js", "packages/omo-codex/plugin/components/teammode/dist/cli.js", "packages/omo-codex/plugin/components/telemetry/dist/cli.js", "packages/omo-codex/plugin/components/ultrawork/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills", "!packages/omo-codex/plugin/node_modules", "!packages/omo-codex/plugin/**/node_modules", "!packages/omo-codex/plugin/components/workflow-selector"] |
             .scripts = {} |
             .dependencies = {} |
             .devDependencies = {} |
@@ -850,6 +960,291 @@ jobs:
         if: needs.release-metadata.outputs.already_published != 'true'
         working-directory: packages/omo-native
         run: npm publish --ignore-scripts --access public --provenance --tag beta
+
+      - name: Restore package.json after lazycodex-ai publish attempt
+        if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
+        run: |
+          git checkout -- package.json
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Wrapper package publish
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Verifies platform packages exist before wrapper publish.
+            - Publishes `oh-my-opencode`, `oh-my-openagent`, and optionally `lazycodex-ai`.
+            - omo-ai mapped version: `${{ needs.release-metadata.outputs.omo_ai_version }}` (already published before this run: `${{ needs.release-metadata.outputs.already_published }}`).
+            - omo-ai beta publish, registry readiness, dist-tag guard, and live-install gates: `${{ job.status }}`.
+            - Smoke-tests the published LazyCodex package when it was published.
+          JOB_SUMMARY_NEXT: Check package existence probes first, then npm publish logs and the LazyCodex smoke section.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  publish-platform:
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state]
+    if: >-
+      always() &&
+      github.repository == 'code-yeongyu/oh-my-openagent' &&
+      inputs.prepared_release_sha != '' &&
+      inputs.skip_platform != true &&
+      needs.gate-reuse.result == 'success' &&
+      needs.preflight-trust.result == 'success' &&
+      needs.release-metadata.result == 'success' &&
+      needs.prepare-release-state.result == 'success'
+    uses: ./.github/workflows/publish-platform.yml
+    with:
+      version: ${{ needs.release-metadata.outputs.version }}
+      dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}
+      omo_ai_version: ${{ needs.release-metadata.outputs.omo_ai_version }}
+    secrets: inherit
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [release-metadata, prepare-release-state, publish-main, publish-platform]
+    if: >-
+      always() &&
+      inputs.prepared_release_sha != '' &&
+      needs.release-metadata.result == 'success' &&
+      needs.prepare-release-state.result == 'success' &&
+      needs.publish-main.result == 'success' &&
+      (inputs.skip_platform == true || needs.publish-platform.result == 'success')
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+          # GH_PAT (sisyphus-dev-ai, workflow scope) can mirror source that
+          # includes workflow changes; the default token cannot.
+          token: ${{ secrets.GH_PAT }}
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Generate changelog
+        run: |
+          bun run script/generate-changelog.ts > /tmp/changelog.md
+          cat /tmp/changelog.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+      - name: Checkout LazyCodex marketplace
+        if: needs.release-metadata.outputs.dist_tag == ''
+        uses: actions/checkout@v7
+        with:
+          repository: code-yeongyu/lazycodex
+          path: lazycodex-marketplace
+          token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync LazyCodex Codex marketplace
+        if: needs.release-metadata.outputs.dist_tag == ''
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/package.json
+          npm --prefix packages/omo-codex/plugin ci
+          bun run build:git-bash-mcp
+          bun run build:lsp-tools-mcp
+          bun run build:lsp-daemon
+          bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm
+          bun run build:cli-node
+          bun run --cwd packages/omo-codex/plugin build
+          bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
+          cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add .agents/plugins/marketplace.json .github/workflows/pr-source-guidance.yml plugins/omo
+          if git diff --cached --quiet; then
+            echo "LazyCodex marketplace already up to date"
+          else
+            git commit -m "chore: sync Codex marketplace v${VERSION}"
+            git push origin HEAD:main
+          fi
+
+      - name: Resolve LazyCodex release payload
+        id: lazycodex-release-state
+        if: needs.release-metadata.outputs.dist_tag == ''
+        env:
+          PREVIOUS_LAZYCODEX_VERSION: ${{ needs.release-metadata.outputs.previous_lazycodex_version }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PREVIOUS_LAZYCODEX_VERSION" ]; then
+            echo "No previous lazycodex-ai package found"
+            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
+            echo "previous_lazycodex_version=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STATE_DIR="$(mktemp -d)"
+          trap 'rm -rf "$STATE_DIR"' EXIT
+          PACKAGE_TGZ="$(npm pack "lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}" --pack-destination "$STATE_DIR" --silent)"
+          tar -xzf "$STATE_DIR/$PACKAGE_TGZ" -C "$STATE_DIR"
+
+          PREVIOUS_PACKAGE_ROOT="$STATE_DIR/package"
+          PREVIOUS_MARKETPLACE_ROOT="$STATE_DIR/previous-lazycodex"
+          CURRENT_MARKETPLACE_ROOT="$GITHUB_WORKSPACE/lazycodex-marketplace"
+          bun run script/sync-lazycodex-marketplace.ts "$PREVIOUS_PACKAGE_ROOT" "$PREVIOUS_MARKETPLACE_ROOT" --previous-payload
+
+          if diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" "$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" &&
+             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" "$CURRENT_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" &&
+             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/plugins/omo" "$CURRENT_MARKETPLACE_ROOT/plugins/omo"; then
+            echo "LazyCodex payload unchanged from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+            echo "lazycodex_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "LazyCodex payload changed from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create LazyCodex GitHub release
+        if: needs.release-metadata.outputs.dist_tag == '' && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          PREVIOUS_LAZYCODEX_VERSION: ${{ steps.lazycodex-release-state.outputs.previous_lazycodex_version }}
+          GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+        run: |
+          {
+            printf '%s\n' "Synced Codex Light marketplace payload from oh-my-openagent v${VERSION}."
+            printf '%s\n' ""
+            printf '%s\n' "Compared against: lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+          } > /tmp/lazycodex-release-notes.md
+
+          gh release view "v${VERSION}" --repo code-yeongyu/lazycodex >/dev/null 2>&1 || \
+            gh release create "v${VERSION}" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
+
+      - name: Create GitHub release
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_FLAGS=()
+          if [[ "$VERSION" == *"-"* ]]; then
+            RELEASE_FLAGS+=(--prerelease)
+          fi
+          gh release view "v${VERSION}" >/dev/null 2>&1 || \
+            gh release create "v${VERSION}" "${RELEASE_FLAGS[@]}" --title "v${VERSION}" --notes-file /tmp/changelog.md
+
+      - name: Download release-binary artifacts
+        if: inputs.skip_platform != true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-binary-*
+          path: .omo/release-binaries
+          merge-multiple: true
+
+      - name: Upload release assets
+        # Runs for both stable and dist-tagged releases: the compiled binaries
+        # and SHA256SUMS are part of the release contract on every channel.
+        # skip_platform reruns rely on the assets a prior run already uploaded.
+        if: inputs.skip_platform != true
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la .omo/release-binaries/
+          # Generate the combined checksum file from the 12 downloaded binaries:
+          # each matrix leg uploads only its own omo-* binary (per-leg SHA256SUMS
+          # would collide under merge-multiple), so the release job owns the
+          # release-level SHA256SUMS covering every binary.
+          (cd .omo/release-binaries && shasum -a 256 omo-* > SHA256SUMS)
+          cat .omo/release-binaries/SHA256SUMS
+          gh release upload "v${VERSION}" .omo/release-binaries/omo-* .omo/release-binaries/SHA256SUMS --clobber
+
+      - name: Verify uploaded assets
+        # Intentionally ungated: release assets are part of the release
+        # contract, so reruns that skip the platform jobs must still prove the
+        # assets are downloadable and hash-verified. Reruns are safe because
+        # upload is --clobber-idempotent and the per-target build is
+        # unconditional, so this can only stay green when the release actually
+        # carries its 13 assets (12 per-target omo binaries + SHA256SUMS).
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERIFY_DIR="$(mktemp -d)"
+          gh release download "v${VERSION}" --dir "$VERIFY_DIR"
+          ASSET_COUNT="$(find "$VERIFY_DIR" -maxdepth 1 -type f | wc -l)"
+          if [ "$ASSET_COUNT" -ne 13 ]; then
+            echo "::error::Release v${VERSION} must expose 13 assets (12 per-target omo binaries + SHA256SUMS); found ${ASSET_COUNT}."
+            exit 1
+          fi
+          (
+            cd "$VERIFY_DIR"
+            shasum -a 256 -c SHA256SUMS
+          )
+          echo "Verified ${ASSET_COUNT}/13 release assets for v${VERSION}"
+
+      - name: Delete draft release
+        run: gh release delete next --yes 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mirror release to master
+        # Non-blocking: npm is already published by this point, so a mirror
+        # failure must never fail the release. With no error swallow, a genuine
+        # failure still surfaces as a red step for visibility.
+        # Auth: uses the GH_PAT persisted by checkout (workflow scope) so the
+        # push can carry the release's .github/workflows/* diff — the default
+        # GITHUB_TOKEN cannot, which is why this silently failed the whole v4.x line.
+        # Fast-forward only: master always trails the new tag (releases move
+        # forward on dev), so the direct refspec push is a clean FF and satisfies
+        # the branch ruleset's non_fast_forward rule without needing a bypass.
+        continue-on-error: true
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          git push origin "v${VERSION}^{commit}:refs/heads/master"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release finalization
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Applies and commits release state when needed.
+            - Creates or reuses the release tag.
+            - Syncs LazyCodex marketplace payload and creates GitHub releases.
+            - Attempts the protected `master` mirror update after release.
+          JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  post-publish-verify:
+    runs-on: ubuntu-latest
+    needs: [release-metadata, prepare-release-state, publish-main, release]
+    # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
+    # already public by this point, so blocking the release job on them could only produce the worst
+    # outcome: packages on npm with no GitHub release and no marketplace sync. A failure here is still a
+    # red job that must be investigated - it just cannot strand a published release.
+    if: >-
+      always() &&
+      inputs.prepared_release_sha != '' &&
+      needs.release-metadata.result == 'success' &&
+      needs.publish-main.result == 'success' &&
+      needs.release.result == 'success'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Wait for omo-ai registry readiness
         env:
@@ -955,7 +1350,7 @@ jobs:
           rm -rf "$BARE_PREFIX" "$BARE_ERROR"
 
       - name: Smoke test published lazycodex-ai
-        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
+        if: inputs.publish_lazycodex == true && needs.publish-main.outputs.lazycodex_publish_skipped != 'true'
         env:
           OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
           DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
@@ -1053,210 +1448,15 @@ jobs:
             smoke_lazycodex_package "lazycodex-ai@latest"
           fi
 
-      - name: Restore package.json after lazycodex-ai publish attempt
-        if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
-        run: |
-          git checkout -- package.json
-
       - name: Write job summary
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: Wrapper package publish
+          JOB_SUMMARY_TITLE: Post-publish verification
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Verifies platform packages exist before wrapper publish.
-            - Publishes `oh-my-opencode`, `oh-my-openagent`, and optionally `lazycodex-ai`.
-            - omo-ai mapped version: `${{ needs.release-metadata.outputs.omo_ai_version }}` (already published before this run: `${{ needs.release-metadata.outputs.already_published }}`).
-            - omo-ai beta publish, registry readiness, dist-tag guard, and live-install gates: `${{ job.status }}`.
-            - Smoke-tests the published LazyCodex package when it was published.
-          JOB_SUMMARY_NEXT: Check package existence probes first, then npm publish logs and the LazyCodex smoke section.
-        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
-
-  publish-platform:
-    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]
-    if: >-
-      always() &&
-      github.repository == 'code-yeongyu/oh-my-openagent' &&
-      inputs.prepared_release_sha != '' &&
-      inputs.skip_platform != true &&
-      needs.test.result == 'success' &&
-      needs.typecheck.result == 'success' &&
-      needs.codex-compatibility.result == 'success' &&
-      needs.preflight-trust.result == 'success' &&
-      needs.release-metadata.result == 'success' &&
-      needs.prepare-release-state.result == 'success'
-    uses: ./.github/workflows/publish-platform.yml
-    with:
-      version: ${{ needs.release-metadata.outputs.version }}
-      dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}
-    secrets: inherit
-
-  release:
-    runs-on: ubuntu-latest
-    needs: [release-metadata, prepare-release-state, publish-main, publish-platform]
-    if: >-
-      always() &&
-      inputs.prepared_release_sha != '' &&
-      needs.release-metadata.result == 'success' &&
-      needs.prepare-release-state.result == 'success' &&
-      needs.publish-main.result == 'success' &&
-      (inputs.skip_platform == true || needs.publish-platform.result == 'success')
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
-          # GH_PAT (sisyphus-dev-ai, workflow scope) can mirror source that
-          # includes workflow changes; the default token cannot.
-          token: ${{ secrets.GH_PAT }}
-
-      - run: git fetch --force --tags
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.12"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Generate changelog
-        run: |
-          bun run script/generate-changelog.ts > /tmp/changelog.md
-          cat /tmp/changelog.md
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-      - name: Checkout LazyCodex marketplace
-        if: needs.release-metadata.outputs.dist_tag == ''
-        uses: actions/checkout@v5
-        with:
-          repository: code-yeongyu/lazycodex
-          path: lazycodex-marketplace
-          token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
-          fetch-depth: 0
-
-      - name: Sync LazyCodex Codex marketplace
-        if: needs.release-metadata.outputs.dist_tag == ''
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
-        run: |
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
-          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
-          mv tmp.json packages/omo-codex/plugin/package.json
-          npm --prefix packages/omo-codex/plugin ci
-          bun run build:git-bash-mcp
-          bun run build:lsp-tools-mcp
-          bun run build:lsp-daemon
-          bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm
-          bun run build:cli-node
-          bun run --cwd packages/omo-codex/plugin build
-          bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
-          cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git add .agents/plugins/marketplace.json .github/workflows/pr-source-guidance.yml plugins/omo
-          if git diff --cached --quiet; then
-            echo "LazyCodex marketplace already up to date"
-          else
-            git commit -m "chore: sync Codex marketplace v${VERSION}"
-            git push origin HEAD:main
-          fi
-
-      - name: Resolve LazyCodex release payload
-        id: lazycodex-release-state
-        if: needs.release-metadata.outputs.dist_tag == ''
-        env:
-          PREVIOUS_LAZYCODEX_VERSION: ${{ needs.release-metadata.outputs.previous_lazycodex_version }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "$PREVIOUS_LAZYCODEX_VERSION" ]; then
-            echo "No previous lazycodex-ai package found"
-            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
-            echo "previous_lazycodex_version=none" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          STATE_DIR="$(mktemp -d)"
-          trap 'rm -rf "$STATE_DIR"' EXIT
-          PACKAGE_TGZ="$(npm pack "lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}" --pack-destination "$STATE_DIR" --silent)"
-          tar -xzf "$STATE_DIR/$PACKAGE_TGZ" -C "$STATE_DIR"
-
-          PREVIOUS_PACKAGE_ROOT="$STATE_DIR/package"
-          PREVIOUS_MARKETPLACE_ROOT="$STATE_DIR/previous-lazycodex"
-          CURRENT_MARKETPLACE_ROOT="$GITHUB_WORKSPACE/lazycodex-marketplace"
-          bun run script/sync-lazycodex-marketplace.ts "$PREVIOUS_PACKAGE_ROOT" "$PREVIOUS_MARKETPLACE_ROOT" --previous-payload
-
-          if diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" "$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" &&
-             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" "$CURRENT_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" &&
-             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/plugins/omo" "$CURRENT_MARKETPLACE_ROOT/plugins/omo"; then
-            echo "LazyCodex payload unchanged from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
-            echo "lazycodex_changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "LazyCodex payload changed from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
-            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
-          fi
-          echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Create LazyCodex GitHub release
-        if: needs.release-metadata.outputs.dist_tag == '' && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-          PREVIOUS_LAZYCODEX_VERSION: ${{ steps.lazycodex-release-state.outputs.previous_lazycodex_version }}
-          GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
-        run: |
-          {
-            printf '%s\n' "Synced Codex Light marketplace payload from oh-my-openagent v${VERSION}."
-            printf '%s\n' ""
-            printf '%s\n' "Compared against: lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
-          } > /tmp/lazycodex-release-notes.md
-
-          gh release view "v${VERSION}" --repo code-yeongyu/lazycodex >/dev/null 2>&1 || \
-            gh release create "v${VERSION}" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
-
-      - name: Create GitHub release
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release view "v${VERSION}" >/dev/null 2>&1 || \
-            gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/changelog.md
-
-      - name: Delete draft release
-        run: gh release delete next --yes 2>/dev/null || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Mirror release to master
-        # Non-blocking: npm is already published by this point, so a mirror
-        # failure must never fail the release. With no error swallow, a genuine
-        # failure still surfaces as a red step for visibility.
-        # Auth: uses the GH_PAT persisted by checkout (workflow scope) so the
-        # push can carry the release's .github/workflows/* diff — the default
-        # GITHUB_TOKEN cannot, which is why this silently failed the whole v4.x line.
-        # Fast-forward only: master always trails the new tag (releases move
-        # forward on dev), so the direct refspec push is a clean FF and satisfies
-        # the branch ruleset's non_fast_forward rule without needing a bypass.
-        continue-on-error: true
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-        run: |
-          git push origin "v${VERSION}^{commit}:refs/heads/master"
-
-      - name: Write job summary
-        if: always()
-        shell: bash
-        env:
-          JOB_SUMMARY_TITLE: Release finalization
-          JOB_SUMMARY_STATUS: ${{ job.status }}
-          JOB_SUMMARY_DETAILS: |
-            - Applies and commits release state when needed.
-            - Creates or reuses the release tag.
-            - Syncs LazyCodex marketplace payload and creates GitHub releases.
-            - Attempts the protected `master` mirror update after release.
-          JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
+            - Waits for omo-ai registry readiness and guards its dist-tags.
+            - Verifies the omo-ai live install and smoke-tests the published LazyCodex package.
+            - Runs after the GitHub release so propagation delays cannot strand a published release.
+          JOB_SUMMARY_NEXT: Investigate the failing registry probe; the release itself already exists.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

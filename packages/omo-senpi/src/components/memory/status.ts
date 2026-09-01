@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises"
+import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
@@ -7,11 +7,13 @@ import type { MemoryIdentityContext } from "./context"
 import { readReflectionHealth } from "./worker/health"
 
 export const MEMORY_STATUS_KEY = "memory"
+export const MEMORY_PRESSURE_SOFT_RATIO = 0.8
 /** Footer budget: the assembled line drops optional segments right-to-left past this width. */
 export const MEMORY_STATUS_MAX_WIDTH = 60
 /** A streak at or above this many consecutive failures earns the `!N` badge. */
 const STREAK_BADGE_THRESHOLD = 3
-const HEALTH_SCAN_LIMIT = 20
+/** Shared health history bound so footer and RPC streaks are computed from the same window. */
+export const MEMORY_HEALTH_SCAN_LIMIT = 20
 const SECOND_MS = 1_000
 const MINUTE_MS = 60 * SECOND_MS
 const HOUR_MS = 60 * MINUTE_MS
@@ -51,6 +53,8 @@ export interface RefreshMemoryStatusInput {
   readonly now?: () => number
   readonly showFooter?: boolean
   readonly checkAdvisory?: boolean
+  /** Starts a spacing-gated background dream when the committed system tree reaches soft pressure. */
+  readonly requestPressureDream?: () => void
   /** Bound session whose reflection backlog feeds the ` (+N)` segment; omitted means no backlog. */
   readonly sessionId?: string
 }
@@ -79,6 +83,13 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
   if (input.checkAdvisory === false || input.alreadyNotified) return { notified: false, footerShown }
 
   const estimate = await estimateSystemTokens(repo, head)
+  if (estimate >= Math.floor(MEMORY_PRESSURE_SOFT_RATIO * input.compileWarnTokens)) {
+    try {
+      input.requestPressureDream?.()
+    } catch {
+      // The advisory must remain available even if pressure-dream scheduling fails synchronously.
+    }
+  }
   if (estimate < input.compileWarnTokens) return { notified: false, footerShown }
 
   input.ui.notify(
@@ -154,7 +165,7 @@ async function readStreak(context: MemoryIdentityContext): Promise<number> {
   try {
     const health = await readReflectionHealth(
       join(context.identityPaths.reflection, "completions"),
-      { limit: HEALTH_SCAN_LIMIT },
+      { limit: MEMORY_HEALTH_SCAN_LIMIT },
     )
     return health.streak
   } catch {
@@ -162,7 +173,7 @@ async function readStreak(context: MemoryIdentityContext): Promise<number> {
   }
 }
 
-async function estimateSystemTokens(repo: GitRepoForStatus, head: string): Promise<number> {
+export async function estimateSystemTokens(repo: GitRepoForStatus, head: string): Promise<number> {
   const paths = await repo.lsTree(head)
   const systemMarkdownPaths = paths.filter(isSystemMarkdown)
   if (systemMarkdownPaths.length === 0) return 0

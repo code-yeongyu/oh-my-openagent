@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test"
+import { existsSync, readdirSync, realpathSync } from "node:fs"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
 import { MemoryBlockCache, hashMemoryTemplate } from "./cache"
-import { existsSync, readdirSync, realpathSync } from "node:fs"
 
 const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
@@ -23,17 +23,11 @@ afterEach(async () => {
 })
 
 describe("MemoryBlockCache", () => {
-  it("#given the same template and HEAD #when compiled twice #then the cached block and timestamp are reused", async () => {
+  it("#given the same template identity and HEAD #when compiled twice #then the stable projection is reused", async () => {
     // given
     const { repo } = await createRepo()
-    let ticks = 0
     const cache = new MemoryBlockCache()
-    const options = {
-      agentId: "cache-agent",
-      conversationId: "cache-conversation",
-      previousMessageCount: 1,
-      clock: () => new Date(Date.UTC(2026, 0, 1, 0, 0, ticks++)),
-    }
+    const options = { agentId: "cache-agent" }
 
     // when
     const first = await cache.compile(repo, "raw prompt {CORE_MEMORY}", options)
@@ -41,21 +35,14 @@ describe("MemoryBlockCache", () => {
 
     // then
     expect(second).toBe(first)
-    expect(ticks).toBe(1)
     expect(cache.size).toBe(1)
-  })
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
-  it("#given either template content or HEAD changes #when compiled #then each logical session key retains only its latest variant", async () => {
+  it("#given either template content or HEAD changes #when compiled #then each stable key retains only its latest revision", async () => {
     // given
     const { dir, repo } = await createRepo()
-    let ticks = 0
     const cache = new MemoryBlockCache()
-    const options = {
-      agentId: "cache-agent",
-      conversationId: "cache-conversation",
-      previousMessageCount: 1,
-      clock: () => new Date(Date.UTC(2026, 0, 1, 0, 0, ticks++)),
-    }
+    const options = { agentId: "cache-agent" }
     const first = await cache.compile(repo, "template-a", options)
 
     // when
@@ -68,39 +55,33 @@ describe("MemoryBlockCache", () => {
     const headChanged = await cache.compile(repo, "template-b", options)
 
     // then
-    expect(templateChanged).not.toBe(first)
+    expect(templateChanged).toBe(first)
     expect(headChanged).not.toBe(templateChanged)
     expect(headChanged).toContain("second")
-    expect(ticks).toBe(3)
     expect(cache.size).toBe(2)
   }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
-  it("#given one session at a nudged threshold #when 100 changing nudge variants compile #then replacement keeps the cache bounded to one entry", async () => {
+  it("#given repeated calls for one stable projection #when compile runs many times #then the cache stays bounded to one entry", async () => {
     // given
     const { repo } = await createRepo()
     const cache = new MemoryBlockCache()
 
     // when
-    for (let nudgeTurns = 2; nudgeTurns < 102; nudgeTurns += 1) {
+    for (const iteration of [2, 3, 10, 100]) {
       try {
-        await cache.compile(repo, "template", {
-          agentId: "cache-agent",
-          conversationId: "one-session",
-          previousMessageCount: nudgeTurns,
-          nudgeTurns,
-        })
+        await cache.compile(repo, "template", { agentId: "cache-agent" })
       } catch (error) {
         // The windows runner fails this loop with a bare exit-1 git error and no stderr; surface
         // the repository state at the failure point so the cause is visible in CI logs.
         const dotGit = join(repo.dir, ".git")
         const objects = join(dotGit, "objects")
         const state = {
-          nudgeTurns,
+          iteration,
           dotGit: existsSync(dotGit),
           objects: existsSync(objects) ? readdirSync(objects) : null,
           headProbe: await repo.head().catch((probeError: unknown) => String(probeError)),
         }
-        throw new Error(`compile failed at iteration ${nudgeTurns}: ${JSON.stringify(state)}`, { cause: error })
+        throw new Error(`compile failed at iteration ${iteration}: ${JSON.stringify(state)}`, { cause: error })
       }
     }
 
@@ -108,29 +89,22 @@ describe("MemoryBlockCache", () => {
     expect(cache.size).toBe(1)
   }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
-  it("#given a consumed soul notice at an unchanged HEAD #when compiled again #then the notice variant is replaced and the line is gone", async () => {
+  it("#given two identities at the same HEAD #when compiled through one cache #then identity-stable projections remain isolated", async () => {
     // given
     const { repo } = await createRepo()
     const cache = new MemoryBlockCache()
-    const base = {
-      agentId: "cache-agent",
-      conversationId: "soul-session",
-      previousMessageCount: 1,
-    }
 
     // when
-    const noticed = await cache.compile(repo, "template", {
-      ...base,
-      soulNotice: { sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678" },
-    })
-    const quiet = await cache.compile(repo, "template", base)
-    const quietAgain = await cache.compile(repo, "template", base)
+    const first = await cache.compile(repo, "template", { agentId: "cache-agent" })
+    const second = await cache.compile(repo, "template", { agentId: "other-agent" })
+    const firstAgain = await cache.compile(repo, "template", { agentId: "cache-agent" })
 
     // then
-    expect(noticed).not.toBe(quiet)
-    expect(quietAgain).toBe(quiet)
-    expect(cache.size).toBe(1)
-  })
+    expect(firstAgain).toBe(first)
+    expect(second).not.toBe(first)
+    expect(second).toContain("- AGENT_ID: other-agent")
+    expect(cache.size).toBe(2)
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
   it("#given template content #when hashed #then the structure version participates in sha256", () => {
     // given / when / then

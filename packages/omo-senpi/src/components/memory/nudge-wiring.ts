@@ -1,3 +1,4 @@
+import type { EntryRenderer } from "@code-yeongyu/senpi"
 import type { GitMemoryRepo, MemoryToolProvenance } from "@oh-my-opencode/memory-core"
 
 import type { MemoryExtensionAPI } from "./capabilities"
@@ -8,6 +9,7 @@ import {
   MEMORY_MCP_TOOL_NAME,
   MEMORY_TOOL_NAME,
 } from "./tool-metadata"
+import { joinFields, noticeComponent } from "./worker/entry-renderers"
 
 export const ACCEPTED_TURNS_ENTRY_TYPE = "omo-memory:accepted-turns"
 
@@ -32,6 +34,29 @@ export interface MemoryNudgeWiring {
   register(pi: MemoryExtensionAPI): void
   nudgeTurns(repo: GitMemoryRepo, sessionId: string, identity: string): Promise<number | undefined>
   provenance(sessionId: string): MemoryToolProvenance | undefined
+}
+
+// House-notice renderer for the durable accepted-turns record. Not registered:
+// the entry is appended on every accepted user turn (hydration bookkeeping),
+// senpi hides unregistered custom entries, and createMemoryComponent's renderer
+// list is pinned in index.test.ts (out of this change's scope).
+export const renderAcceptedTurnsEntry: EntryRenderer<AcceptedTurnsRecord> = (entry, options, theme) => {
+  const record = entry.data
+  if (record === undefined) return undefined
+  const turns = record.priorUserTurns
+  const noun = turns === 1 ? "turn" : "turns"
+  return noticeComponent(
+    {
+      glyph: "·",
+      title: joinFields(["Memory accepted turns", `${turns} ${noun}`]),
+      tone: "muted",
+      why: `This session has recorded ${turns} accepted user ${noun}.`,
+      extra: [{ text: `baseline ${record.sessionBaselineTurns}`, tone: "dim" }],
+      detail: `session ${record.sessionId}`,
+    },
+    options,
+    theme,
+  )
 }
 
 export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): MemoryNudgeWiring {

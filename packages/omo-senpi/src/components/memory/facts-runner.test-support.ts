@@ -1,6 +1,7 @@
 import { afterEach, expect } from "bun:test"
+import { randomUUID } from "node:crypto"
 import { existsSync, writeFileSync } from "node:fs"
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -16,6 +17,7 @@ import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import { FactsExtractorRunner, type FactsExtractorRunnerOptions } from "./facts-runner"
+import type { FactsRunLedger } from "./facts-runner-types"
 
 export const AVAILABLE_MODEL: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
 export const childFixture = join(import.meta.dir, "worker", "__fixtures__", "facts-child.ts")
@@ -111,7 +113,9 @@ export function runnerOptions(
     supervisorPath: supervisorFixture,
     senpiCommand: process.execPath,
     senpiPrefixArgs: [senpiLauncher],
-    createBatchId: () => "11111111-1111-4111-8111-111111111111",
+    // Fresh per launch, exactly like production `randomUUID`: a pinned batchId would hide the
+    // failure-identity collision that pruned-name reuse used to cause.
+    createBatchId: () => randomUUID(),
     sandbox: (args) => ({
       ...args,
       command: process.execPath,
@@ -125,6 +129,26 @@ export function runnerOptions(
     now: () => new Date("2026-08-10T12:00:00.000Z"),
     ...overrides,
   }
+}
+
+/**
+ * Every facts run dir's ledger, in creation order. A drain produces several runs whose ledgers
+ * carry a frozen test clock, so the ordering frame is the directory's own creation timestamp
+ * (nanosecond `birthtimeNs`), never the injected `now`.
+ */
+export async function runLedgers(identity: MemoryIdentity): Promise<FactsRunLedger[]> {
+  const runs = join(identity.paths.facts, "runs")
+  const names = await readdir(runs)
+  const dated = await Promise.all(names.map(async (name) => ({
+    name,
+    createdAt: (await stat(join(runs, name), { bigint: true })).birthtimeNs,
+    ledger: JSON.parse(await readFile(join(runs, name, "ledger.json"), "utf8")) as FactsRunLedger,
+  })))
+  return dated
+    .sort((left, right) => (left.createdAt === right.createdAt
+      ? left.name.localeCompare(right.name)
+      : left.createdAt < right.createdAt ? -1 : 1))
+    .map((entry) => entry.ledger)
 }
 
 export async function onlyRunDir(identity: MemoryIdentity): Promise<string> {

@@ -31,7 +31,7 @@ export function createOmoJsonSchema(): Record<string, unknown> {
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
     $id: OMO_SCHEMA_ID,
-    title: "Omo Configuration",
+    title: "OmO Configuration",
     description: "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
     ...jsonSchema,
   }

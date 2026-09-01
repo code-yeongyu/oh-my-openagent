@@ -1,0 +1,24 @@
+Baseline run of `bun test packages/omo-native/test` on the UNMODIFIED base, with this shell's
+inherited OMO_CODING_AGENT_DIR / SENPI_CODING_AGENT_DIR still set. Summarized rather than copied:
+the raw output embeds this machine's live harness/provider inventory, which is not needed to make
+the point. See 00-baseline-package-tests-clean-env.txt for the full clean run.
+
+Result: 165 pass / 10 fail (base, before any edit in this branch).
+
+The 10 failures, deduplicated:
+(fail) omo doctor > #given SENPI_CODING_AGENT_DIR points to an alternate agent directory > #then doctor reads settings from that directory first
+(fail) omo doctor > #given settings contain the legacy package entry > #then the object shape warns without changing settings
+(fail) omo doctor > #given settings contain the legacy package entry > #then the string shape warns without changing settings
+(fail) omo doctor > #given settings JSON is malformed > #then diagnostics warn and continue without changing settings
+(fail) omo setup credential inheritance > #given a pre-existing auth file #when import writes #then mode backup and idempotency are exact
+(fail) omo setup credential inheritance > #given an existing senpi provider #when other keys import #then its entry stays structurally byte-identical
+(fail) omo setup credential inheritance > #given declined consent #when setup runs #then auth remains absent
+(fail) omo setup credential inheritance > #given malformed senpi auth #when accepted #then it warns and skips all writes
+(fail) omo setup credential inheritance > #given opencode api oauth mapped and gateway entries #when accepted #then only safe api ids import
+(fail) omo setup credential inheritance > #given pinned omp and gjc databases #when accepted #then allow-listed rows import and unknown schema is noticed
+
+Cause: these cases assert behavior of the UNCONFIGURED default agent directory (or set only
+SENPI_CODING_AGENT_DIR), and an inherited OMO_CODING_AGENT_DIR wins over both. Environment-induced,
+reproducible on the untouched base, unrelated to this change. Every other run in this directory
+scrubs OMO_CODING_AGENT_DIR / SENPI_CODING_AGENT_DIR / PI_CODING_AGENT_DIR, and that clean baseline
+is 175 pass / 0 fail.

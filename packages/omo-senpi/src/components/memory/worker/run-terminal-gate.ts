@@ -19,8 +19,9 @@ export async function withRunTerminalGate<T>(
   runId: string,
   operation: () => Promise<T>,
   lock: TerminalLock = withLock,
+  createRecord: typeof createLockRecord = createLockRecord,
 ): Promise<T> {
-  const record = await createLockRecord("reflection-finalize", { runId })
+  const record = await createRecord("reflection-finalize", { runId })
   return lock(join(runDir, "terminalization.lock"), record, operation, {
     waitTimeoutMs: Number.POSITIVE_INFINITY,
   })

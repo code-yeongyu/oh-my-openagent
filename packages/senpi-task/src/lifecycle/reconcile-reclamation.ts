@@ -5,6 +5,7 @@ import { isSpawnSpecV1, markRecordLostForReconciliation } from "../state"
 import { delay, nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { getLifecycleReattachPorts, type RespawnFailureCode } from "./port"
+import { markCrashedResident } from "./reconcile-crashed-resident"
 import { reclaimOrphanedResident } from "./residency"
 import type { ReconcileDeferredReason, ReconcileOutcome } from "./types"
 
@@ -72,7 +73,9 @@ async function reclaimResidentExclusive(
 
   const rollbackResidency: SuspendedResidency = claimed.execution_mode === "process" ? "rpc_detached" : "persisted_only"
   if (context.config.reattach_on_reconcile === false) {
-    return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, "reattach_disabled")
+    const marked = await markCrashedResident(context, claimed, "reattach disabled for crashed resident")
+    if (marked) await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
+    return { task_id: claimed.task_id, kind: "lost", reason: "reattach disabled for crashed resident" }
   }
   return reviveClaimed(context, claimed, rollbackResidency, sessionPath)
 }
@@ -114,8 +117,17 @@ export async function reviveClaimed(
     return { task_id: fresh.task_id, kind: "lost", reason: "reattach ports unavailable" }
   }
 
-  const respawned = await ports.respawn(fresh, sessionPath)
+  const reservation = ports.reserve(fresh)
+  if (!reservation.ok) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "capacity")
+  let respawned: Awaited<ReturnType<typeof ports.respawn>>
+  try {
+    respawned = await ports.respawn(fresh, sessionPath)
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
   if (!respawned.ok) {
+    reservation.release()
     if (respawned.disposition === "retryable") {
       return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, deferredCode(respawned.code))
     }
@@ -127,8 +139,15 @@ export async function reviveClaimed(
     return { task_id: fresh.task_id, kind: "lost", reason: respawned.reason }
   }
 
-  const reattached = await ports.reattach(fresh, respawned.handle)
+  let reattached: Awaited<ReturnType<typeof ports.reattach>>
+  try {
+    reattached = await ports.reattach(fresh, respawned.handle)
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
   if (!reattached.ok) {
+    reservation.release()
     if (reattached.kind === "already_attached") {
       return { task_id: fresh.task_id, kind: "resumed", reason: reattached.reason }
     }

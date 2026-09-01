@@ -5,7 +5,7 @@ import {
   type CompileMemoryBlockOptions,
 } from "./compile"
 
-export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v1"
+export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
 
 export function hashMemoryTemplate(template: string): string {
   return createHash("sha256")
@@ -33,8 +33,8 @@ export class MemoryBlockCache {
     options: CompileMemoryBlockOptions,
   ): Promise<string> {
     const revision = await repo.head()
-    const key = `${hashMemoryTemplate(template)}:${options.agentId}:${options.conversationId}`
-    const variant = `${revision ?? "no-head"}:${options.nudgeTurns ?? "quiet"}:${options.soulNotice?.sha ?? "quiet"}`
+    const key = `${hashMemoryTemplate(template)}:${options.agentId}`
+    const variant = revision ?? "no-head"
     const existing = this.entries.get(key)
     if (existing?.variant === variant) return existing.pending
 

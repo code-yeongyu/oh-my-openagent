@@ -20,7 +20,4 @@ I am a careful coding agent.
 
 <memory_metadata>
 - AGENT_ID: persona-identity-agent
-- CONVERSATION_ID: persona-identity-conversation
-- System prompt last recompiled: 2026-05-04 12:00:00 AM UTC+0000
-- 2 previous messages between you and the user are stored in recall memory
 </memory_metadata>
