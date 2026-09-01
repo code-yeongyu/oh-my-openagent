@@ -41,7 +41,7 @@ jobs:
             } else {
               core.info('No active review claim labels. Gate is green.');
             }
-      - name: Workflow summary
+      - name: Write job summary
         if: always()
         shell: bash
         run: |
@@ -91,7 +91,7 @@ jobs:
             }
             await github.rest.pulls.requestReviewers({ owner, repo, pull_number: pr.number, reviewers: [claimer] });
             core.info(`Requested review from claimer ${claimer}.`);
-      - name: Workflow summary
+      - name: Write job summary
         if: always()
         shell: bash
         run: |
@@ -152,7 +152,7 @@ jobs:
                 core.info(`Kept ${name}: claimed by ${latestLabeler[name] ?? 'unknown'}, review came from ${reviewer}.`);
               }
             }
-      - name: Workflow summary
+      - name: Write job summary
         if: always()
         shell: bash
         run: |
@@ -222,7 +222,7 @@ jobs:
                 core.info(`PR #${pr.number}: applied ${STALE}.`);
               }
             }
-      - name: Workflow summary
+      - name: Write job summary
         if: always()
         shell: bash
         run: |
