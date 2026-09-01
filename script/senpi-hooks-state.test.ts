@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import {
-  chmodSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   rmSync,
+  readFileSync,
   statSync,
   writeFileSync,
 } from "node:fs"
@@ -48,7 +48,17 @@ describe("patched Senpi hooks state snapshots", () => {
 
   test("recovers a trusted snapshot at a synchronized legacy truncate/write boundary", () => {
     const runner = join(import.meta.dir, "fixtures", "senpi-hooks-state-legacy-reader.ts")
-    const child = spawnSync(process.execPath, [runner], { encoding: "utf8" })
+    const child = spawnSync(process.execPath, [runner], { encoding: "utf8", timeout: 10_000 })
+    if (child.error !== undefined && "code" in child.error && child.error.code === "ETIMEDOUT") {
+      const marker = join(tmpdir(), `omo-hooks-legacy-reader-${child.pid}.json`)
+      try {
+        const { root, writerPid } = JSON.parse(readFileSync(marker, "utf8")) as { root: string; writerPid?: number }
+        if (writerPid !== undefined) spawnSync("kill", ["-TERM", `-${writerPid}`])
+        rmSync(root, { recursive: true, force: true })
+      } finally {
+        rmSync(marker, { force: true })
+      }
+    }
 
     expect(child.status, child.stderr).toBe(0)
     expect(JSON.parse(child.stdout)).toEqual({

@@ -12,7 +12,7 @@
 // ancestors of forked branches are emitted once. Malformed lines are skipped
 // individually and never discard the rest of the file.
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, statSync } from "../fs/resilient"
 import { basename, join } from "node:path"
 import type { SearchDocument } from "./query"
 import type { TranscriptConversation, TranscriptProvider } from "./engine"

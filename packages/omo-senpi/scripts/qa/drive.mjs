@@ -36,8 +36,8 @@ export function credentialDigest(agentDir) {
   return hash.digest("hex")
 }
 
-function credentialBytes(path, name) {
-  const content = readFileSync(path)
+function credentialBytes(path, name, readFile = readFileSync) {
+  const content = readFile(path)
   if (name !== "settings.json") return content
   try {
     const settings = JSON.parse(content.toString("utf8"))
@@ -59,14 +59,21 @@ export function snapshotProtectedState(root) {
   }))
 }
 
-export function snapshotDirectory(root) {
+export function snapshotDirectory(root, { readdir = readdirSync, readFile = readFileSync } = {}) {
   if (!existsSync(root)) return new Map()
   const files = []
-  collectFiles(root, files)
-  return new Map(files.sort().map((file) => [
-    file.slice(root.length + 1),
-    createHash("sha256").update(readFileSync(file)).digest("hex"),
-  ]))
+  collectFiles(root, files, readdir)
+  const snapshot = new Map()
+  for (const file of files.sort()) {
+    const relative = file.slice(root.length + 1)
+    try {
+      const bytes = relative === "settings.json" ? credentialBytes(file, "settings.json", readFile) : readFile(file)
+      snapshot.set(relative, createHash("sha256").update(bytes).digest("hex"))
+    } catch (error) {
+      if (!isTransientSnapshotEntryError(error)) throw error
+    }
+  }
+  return snapshot
 }
 
 export function changedSnapshotPaths(before, after) {
@@ -75,17 +82,34 @@ export function changedSnapshotPaths(before, after) {
     .sort()
 }
 
-export function digestDirectory(root) {
+export function classifyObservedChanges(paths) {
+  const volatile = []
+  const protectedState = []
+  const other = []
+  for (const path of paths) {
+    if (path.startsWith("sessions/") || path.startsWith("cache/") || path.startsWith("logs/") || path.endsWith(".log")) volatile.push(path)
+    else if (PROTECTED_STATE_FILES.includes(path)) protectedState.push(path)
+    else other.push(path)
+  }
+  return { volatile, protectedState, other }
+}
+
+export function digestDirectory(root, { readdir = readdirSync, readFile = readFileSync } = {}) {
   if (!existsSync(root)) return "absent"
   const files = []
-  collectFiles(root, files)
+  collectFiles(root, files, readdir)
   const hash = createHash("sha256")
   for (const file of files.sort()) {
     const rel = file.slice(root.length + 1)
-    hash.update(rel)
-    hash.update("\0")
-    hash.update(createHash("sha256").update(readFileSync(file)).digest("hex"))
-    hash.update("\0")
+    try {
+      const fileDigest = createHash("sha256").update(readFile(file)).digest("hex")
+      hash.update(rel)
+      hash.update("\0")
+      hash.update(fileDigest)
+      hash.update("\0")
+    } catch (error) {
+      if (!isTransientSnapshotEntryError(error)) throw error
+    }
   }
   return hash.digest("hex")
 }
@@ -169,8 +193,8 @@ function runSenpi(senpiBin, sandbox, prompt, script, extraEnv = {}) {
 function main() {
   const providedSenpiCodingAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset"
   const beforeDigest = credentialDigest(realSenpiAgentDir)
-  const beforeSenpiSnapshot = snapshotProtectedState(realSenpiAgentDir)
-  const beforeOmoSnapshot = snapshotProtectedState(realOmoAgentDir)
+  const beforeSenpiSnapshot = snapshotDirectory(realSenpiAgentDir)
+  const beforeOmoSnapshot = snapshotDirectory(realOmoAgentDir)
   const beforeSenpiProtectedState = snapshotProtectedState(realSenpiAgentDir)
   const beforeOmoProtectedState = snapshotProtectedState(realOmoAgentDir)
   const sandbox = createSandbox()
@@ -236,10 +260,16 @@ function main() {
 
 function printResult({ result, reason, ultraworkInjected, commentChecker, beforeDigest, beforeSenpiSnapshot, beforeOmoSnapshot, beforeSenpiProtectedState, beforeOmoProtectedState, sandbox, providedSenpiCodingAgentDir }) {
   const afterDigest = credentialDigest(realSenpiAgentDir)
-  const realSenpiObservedChangedPaths = changedSnapshotPaths(beforeSenpiSnapshot, snapshotProtectedState(realSenpiAgentDir))
-  const realOmoObservedChangedPaths = changedSnapshotPaths(beforeOmoSnapshot, snapshotProtectedState(realOmoAgentDir))
-  const realSenpiChangedPaths = changedSnapshotPaths(beforeSenpiProtectedState, snapshotProtectedState(realSenpiAgentDir))
-  const realOmoChangedPaths = changedSnapshotPaths(beforeOmoProtectedState, snapshotProtectedState(realOmoAgentDir))
+  const afterSenpiSnapshot = snapshotDirectory(realSenpiAgentDir)
+  const afterOmoSnapshot = snapshotDirectory(realOmoAgentDir)
+  const realSenpiObservedChangedPaths = changedSnapshotPaths(beforeSenpiSnapshot, afterSenpiSnapshot)
+  const realOmoObservedChangedPaths = changedSnapshotPaths(beforeOmoSnapshot, afterOmoSnapshot)
+  const senpiObserved = classifyObservedChanges(realSenpiObservedChangedPaths)
+  const omoObserved = classifyObservedChanges(realOmoObservedChangedPaths)
+  const realSenpiChangedPaths = [...senpiObserved.protectedState, ...senpiObserved.other].sort()
+  const realOmoChangedPaths = [...omoObserved.protectedState, ...omoObserved.other].sort()
+  const realSenpiProtectedChangedPaths = changedSnapshotPaths(beforeSenpiProtectedState, snapshotProtectedState(realSenpiAgentDir))
+  const realOmoProtectedChangedPaths = changedSnapshotPaths(beforeOmoProtectedState, snapshotProtectedState(realOmoAgentDir))
   const payload = {
     result,
     ...(reason ? { reason } : {}),
@@ -248,10 +278,14 @@ function printResult({ result, reason, ultraworkInjected, commentChecker, before
     realSenpiUntouched: realSenpiChangedPaths.length === 0,
     realSenpiChangedPaths,
     realSenpiObservedChangedPaths,
+    realSenpiVolatileChangedPaths: senpiObserved.volatile,
+    realSenpiProtectedChangedPaths,
     realSenpiCredentialDigestUntouched: beforeDigest === afterDigest,
     realOmoUntouched: realOmoChangedPaths.length === 0,
     realOmoChangedPaths,
     realOmoObservedChangedPaths,
+    realOmoVolatileChangedPaths: omoObserved.volatile,
+    realOmoProtectedChangedPaths,
     protectedStateFiles: PROTECTED_STATE_FILES,
     realHomesChecked: [realSenpiAgentDir, realOmoAgentDir],
     providedSenpiCodingAgentDir,
@@ -261,12 +295,23 @@ function printResult({ result, reason, ultraworkInjected, commentChecker, before
   console.log(JSON.stringify(payload))
 }
 
-function collectFiles(root, files) {
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
+function collectFiles(root, files, readdir = readdirSync) {
+  let entries
+  try {
+    entries = readdir(root, { withFileTypes: true })
+  } catch (error) {
+    if (isTransientSnapshotEntryError(error)) return
+    throw error
+  }
+  for (const entry of entries) {
     const path = join(root, entry.name)
-    if (entry.isDirectory()) collectFiles(path, files)
+    if (entry.isDirectory()) collectFiles(path, files, readdir)
     else if (entry.isFile()) files.push(path)
   }
+}
+
+function isTransientSnapshotEntryError(error) {
+  return error?.code === "ENOENT" || error?.code === "ENOTDIR"
 }
 
 function readSandboxText(root) {

@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { createRequire } from "node:module"
 import { isAbsolute, join } from "node:path"
 

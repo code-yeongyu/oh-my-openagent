@@ -1653,10 +1653,7 @@
         "recall": {
           "default": {
             "enabled": true,
-            "max_items": 2,
-            "budget_tokens": 600,
-            "excerpt_chars": 200,
-            "exclude": []
+            "max_items": 2
           },
           "type": "object",
           "properties": {
@@ -1669,36 +1666,11 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 5
-            },
-            "budget_tokens": {
-              "default": 600,
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "excerpt_chars": {
-              "default": 200,
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "min_score": {
-              "type": "number"
-            },
-            "exclude": {
-              "default": [],
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
             }
           },
           "required": [
             "enabled",
-            "max_items",
-            "budget_tokens",
-            "excerpt_chars",
-            "exclude"
+            "max_items"
           ],
           "additionalProperties": false
         },
@@ -1900,25 +1872,6 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 5
-                  },
-                  "budget_tokens": {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "excerpt_chars": {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "min_score": {
-                    "type": "number"
-                  },
-                  "exclude": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
                   }
                 },
                 "additionalProperties": false
@@ -13352,25 +13305,6 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 5
-                },
-                "budget_tokens": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "excerpt_chars": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "min_score": {
-                  "type": "number"
-                },
-                "exclude": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
                 }
               },
               "additionalProperties": false
@@ -13571,25 +13505,6 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 5
-                      },
-                      "budget_tokens": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "excerpt_chars": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "min_score": {
-                        "type": "number"
-                      },
-                      "exclude": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
                       }
                     },
                     "additionalProperties": false
@@ -15052,25 +14967,6 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 5
-                },
-                "budget_tokens": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "excerpt_chars": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "min_score": {
-                  "type": "number"
-                },
-                "exclude": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
                 }
               },
               "additionalProperties": false
@@ -15271,25 +15167,6 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 5
-                      },
-                      "budget_tokens": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "excerpt_chars": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "min_score": {
-                        "type": "number"
-                      },
-                      "exclude": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
                       }
                     },
                     "additionalProperties": false
@@ -16758,25 +16635,6 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 5
-                  },
-                  "budget_tokens": {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "excerpt_chars": {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "min_score": {
-                    "type": "number"
-                  },
-                  "exclude": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
                   }
                 },
                 "additionalProperties": false
@@ -16977,25 +16835,6 @@
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 5
-                        },
-                        "budget_tokens": {
-                          "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "excerpt_chars": {
-                          "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "min_score": {
-                          "type": "number"
-                        },
-                        "exclude": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       },
                       "additionalProperties": false
@@ -28408,25 +28247,6 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 5
-                      },
-                      "budget_tokens": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "excerpt_chars": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "min_score": {
-                        "type": "number"
-                      },
-                      "exclude": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
                       }
                     },
                     "additionalProperties": false
@@ -28627,25 +28447,6 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 5
-                            },
-                            "budget_tokens": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            "excerpt_chars": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            "min_score": {
-                              "type": "number"
-                            },
-                            "exclude": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
                             }
                           },
                           "additionalProperties": false
@@ -30108,25 +29909,6 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 5
-                      },
-                      "budget_tokens": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "excerpt_chars": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "min_score": {
-                        "type": "number"
-                      },
-                      "exclude": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
                       }
                     },
                     "additionalProperties": false
@@ -30327,25 +30109,6 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 5
-                            },
-                            "budget_tokens": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            "excerpt_chars": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            "min_score": {
-                              "type": "number"
-                            },
-                            "exclude": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
                             }
                           },
                           "additionalProperties": false

@@ -20,6 +20,8 @@ const trustedEntry = {
 }
 const snapshot = `${JSON.stringify({ version: 1, hooks: { hk_trusted: trustedEntry } })}\n`
 const writerPath = join(import.meta.dir, "senpi-hooks-state-legacy-writer.ts")
+const markerPath = join(tmpdir(), `omo-hooks-legacy-reader-${process.pid}.json`)
+actualFs.writeFileSync(markerPath, JSON.stringify({ root, statePath, runnerPid: process.pid }), "utf8")
 actualFs.mkdirSync(dirname(statePath), { recursive: true })
 
 let resolveWriterDone!: () => void
@@ -31,8 +33,11 @@ const ready = new Promise<void>((resolve, reject) => {
     resolve()
   })
   const writer = spawn(process.execPath, [writerPath, statePath, readyPath, releasePath, snapshot], {
+    detached: true,
     stdio: ["ignore", "ignore", "pipe"],
   })
+  const marker = JSON.parse(actualFs.readFileSync(markerPath, "utf8"))
+  actualFs.writeFileSync(markerPath, JSON.stringify({ ...marker, writerPid: writer.pid }), "utf8")
   let stderr = ""
   writer.stderr.on("data", (chunk) => { stderr += chunk })
   writer.on("exit", (code) => {
@@ -66,4 +71,5 @@ try {
   process.stdout.write(`${JSON.stringify({ released, state })}\n`)
 } finally {
   actualFs.rmSync(root, { recursive: true, force: true })
+  actualFs.rmSync(markerPath, { force: true })
 }
