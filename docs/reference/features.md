@@ -207,7 +207,7 @@ You can define custom categories in the `[opencode]` block of the unified config
 | `max_prompt_tokens` | number  | Maximum prompt tokens for delegated tasks                                   |
 | `is_unstable_agent` | boolean | Mark agent as unstable - forces background mode for monitoring              |
 | `disable`           | boolean | Disable this category and exclude it from task delegation                   |
-| `warn_unavailable`  | boolean | Suppress or emit unavailable-chain warnings for this category               |
+| `warn_unavailable`  | boolean | Suppress or emit unavailable-chain notices for this category               |
 
 #### Example Configuration
 
@@ -333,7 +333,7 @@ Commands are slash-triggered workflows that execute predefined templates.
 | -------------------- | ------------------------------------------------------------------------------------------ |
 | `/goal`              | Set, show, pause, resume, or clear the active thread goal                                  |
 | `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
-| `/start-work`        | Start Atlas work session from Prometheus plan                                              |
+| `/ulw-execute`        | Start Atlas work session from Prometheus plan                                              |
 | `/stop-continuation` | Stop all continuation mechanisms (todo continuation, Goal, boulder) for this session       |
 | `/remove-ai-slops`   | Remove AI-generated code smells from branch changes and review the result                   |
 | `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
@@ -407,14 +407,14 @@ The `/ulw-loop` slash command has been removed; continuous goal pursuit is now h
 - TDD verification after changes
 - Codemap generation
 
-### /start-work
+### /ulw-execute
 
 **Purpose**: Start execution from a Prometheus-generated plan
 
 **Usage**:
 
 ```
-/start-work [plan-name] [--worktree <path>] [--make-pr] [--ship]
+/ulw-execute [plan-name] [--worktree <path>] [--make-pr] [--ship]
 ```
 
 Switches the session to Atlas (Sisyphus if Atlas is unregistered), injects Prometheus plan + boulder + worktree/PR context, then Atlas executes. First actions are `create_goal` and todo registration, not immediate coding.
@@ -871,7 +871,7 @@ Current composition counts:
 | **keyword-detector**        | Message             | IntentGate detector. Activates `ultrawork`/`ulw`, `team`, `hyperplan`, and `hyperplan-ultrawork` from message keywords. |
 | **think-mode**              | Message             | On "think"/"ultrathink" in the user message, sets the message variant to `high` unless already a high variant.                                              |
 | **goal**                    | Event               | Re-injects a goal continuation prompt on session.idle while a goal is active; clears the goal on session.deleted.                                           |
-| **start-work**              | Message + command.execute.before | After /start-work is expanded, selects a Prometheus plan, initializes boulder state, scaffolds notepads, switches the session to Atlas, and injects plan context. |
+| **ulw-execute**              | Message + command.execute.before | After /ulw-execute is expanded, selects a Prometheus plan, initializes boulder state, scaffolds notepads, switches the session to Atlas, and injects plan context. |
 | **auto-slash-command**      | Message + command.execute.before | Expands detected slash commands into their command templates in the prompt.                                                                    |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |
 | **category-skill-reminder** | PostToolUse + Message Transform + Event | Reminds agents about available category skills for delegation.                                                                                              |

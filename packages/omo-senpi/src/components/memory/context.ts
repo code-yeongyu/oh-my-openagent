@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises"
+import { mkdir } from "@oh-my-opencode/memory-core/fs"
 
 import type { MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 

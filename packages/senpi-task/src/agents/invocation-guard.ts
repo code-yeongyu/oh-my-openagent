@@ -1,7 +1,7 @@
 // Plan-gated agents are plan-review specialists whose verdicts only make sense BEFORE execution
 // begins. The gate is deliberately strict: the USER must have explicitly requested the ulw-plan
 // workflow (a model-initiated SKILL.md read proves nothing), a plan artifact must have been
-// touched, and a session that already started executing (start-work) must not be pulled back into
+// touched, and a session that already started executing (ulw-execute) must not be pulled back into
 // plan review. This module owns the classification data and the pure verdict logic; the
 // session-scoped skill-invocation state is supplied by the host adapter (omo-senpi) via
 // TaskToolDeps.resolveSkillInvocations, keeping senpi-task harness-neutral.
@@ -13,8 +13,8 @@ export type AgentInvocationCondition = {
 }
 
 export const AGENT_INVOCATION_CONDITIONS = {
-  metis: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["start-work"] },
-  momus: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["start-work"] },
+  metis: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["ulw-execute"] },
+  momus: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["ulw-execute"] },
 } as const satisfies Readonly<Record<string, AgentInvocationCondition>>
 
 const CONDITIONS: Readonly<Record<string, AgentInvocationCondition>> = AGENT_INVOCATION_CONDITIONS
@@ -61,7 +61,7 @@ export function evaluateInvocationGuard(agentName: string, state: SkillInvocatio
   const condition = invocationConditionForAgent(agentName)
   if (condition === undefined) return { kind: "allow" }
 
-  // Forbidden skills win over missing requirements: once start-work ran, plan review is over for
+  // Forbidden skills win over missing requirements: once ulw-execute ran, plan review is over for
   // this session either way, so advice about arranging a plan review would be wrong.
   const violated = condition.forbidsSkills.find((skill) => state.hasInvoked(skill))
   if (violated !== undefined) {

@@ -73,6 +73,7 @@ describe("omo-senpi package shape", () => {
     const devDependencies = readStringRecord(manifest, "devDependencies")
     const peerDependencies = readStringRecord(manifest, "peerDependencies")
     const peerDependenciesMeta = readObjectRecord(manifest, "peerDependenciesMeta")
+    const rootPatchedDependencies = readStringRecord(rootManifest, "patchedDependencies")
 
     // then
     expect(readString(manifest, "name")).toBe("@oh-my-opencode/omo-senpi")
@@ -84,9 +85,12 @@ describe("omo-senpi package shape", () => {
       typecheck: "tsgo --noEmit -p tsconfig.json",
       test: "bun test src/**/*.test.ts",
     })
-    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.8.23")
+    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.8.31")
     expect(peerDependenciesMeta["@code-yeongyu/senpi"]).toMatchObject({ optional: true })
-    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.8.23")
+    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.8.31")
+    expect(rootPatchedDependencies["@code-yeongyu/senpi@2026.8.31"]).toBe(
+      "patches/@code-yeongyu%2Fsenpi@2026.8.31.patch",
+    )
     expect(dependencies).toMatchObject({
       "@oh-my-opencode/utils": "workspace:*",
       "@oh-my-opencode/comment-checker-core": "workspace:*",
