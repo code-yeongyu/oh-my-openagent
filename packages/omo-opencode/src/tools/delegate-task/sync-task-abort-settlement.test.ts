@@ -186,8 +186,14 @@ test("#given a completed foreground child whose abort hangs #when abort cleanup 
     },
   })
   let executionSettlement: Promise<void> | undefined
+  let executionDeadline: Promise<never> | undefined
+  let executionDeadlineHandle: ReturnType<typeof setTimeout> | undefined
 
   try {
+    executionDeadline = new Promise<never>((_resolve, reject) => {
+      executionDeadlineHandle = originalSetTimeout(() => reject(new Error("Execution settlement timed out")), 2_000)
+      executionDeadlineHandle.unref()
+    })
     process.on("unhandledRejection", onUnhandledRejection)
     globalThis.setTimeout = unsafeTestValue<typeof setTimeout>((callback: () => void, delay?: number) => {
       const effectiveDelay = delay ?? 0
@@ -223,16 +229,7 @@ test("#given a completed foreground child whose abort hangs #when abort cleanup 
     )
 
     //#when
-    let abortStartBudgetHandle: ReturnType<typeof setTimeout> | undefined
-    const abortStartBudget = new Promise<never>((_resolve, reject) => {
-      abortStartBudgetHandle = originalSetTimeout(
-        () => reject(new Error("Timed out waiting for foreground abort to start")),
-        100,
-      )
-      timerHandles.push(abortStartBudgetHandle)
-    })
-    await Promise.race([abortStarted, abortStartBudget])
-    if (abortStartBudgetHandle) clearTimeout(abortStartBudgetHandle)
+    await Promise.race([abortStarted, executionDeadline])
     expect(markerPresentWhenAbortStarted).toBe(true)
     await Promise.resolve()
 
@@ -264,6 +261,10 @@ test("#given a completed foreground child whose abort hangs #when abort cleanup 
     cancelSyncSessionDeletion(CHILD_SESSION_ID)
     for (const handle of timerHandles) clearTimeout(handle)
     resolveAbort?.()
-    await executionSettlement
+    try {
+      await Promise.race([executionSettlement, executionDeadline])
+    } finally {
+      if (executionDeadlineHandle) clearTimeout(executionDeadlineHandle)
+    }
   }
 })
