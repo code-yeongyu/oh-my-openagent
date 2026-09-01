@@ -1,18 +1,25 @@
 import { existsSync, readFileSync } from "node:fs"
 
-import { LEGACY_PLUGIN_NAME, PLUGIN_NAME, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
+import {
+  LEGACY_PLUGIN_NAME,
+  PLUGIN_NAME,
+  getOpenCodeConfigPaths,
+  getPluginEntryName,
+  parseJsonc,
+  type PluginEntry,
+} from "../../../shared"
 
 export interface PluginInfo {
   registered: boolean
   configPath: string | null
-  entry: string | null
+  entry: PluginEntry | null
   isPinned: boolean
   pinnedVersion: string | null
   isLocalDev: boolean
 }
 
 interface OpenCodeConfigShape {
-  plugin?: string[]
+  plugin?: PluginEntry[]
 }
 
 function detectConfigPath(): string | null {
@@ -22,29 +29,31 @@ function detectConfigPath(): string | null {
   return null
 }
 
-function parsePluginVersion(entry: string): string | null {
-  if (entry.startsWith(`${PLUGIN_NAME}@`)) {
-    const value = entry.slice(PLUGIN_NAME.length + 1)
+function parsePluginVersion(entry: PluginEntry): string | null {
+  const name = getPluginEntryName(entry)
+  if (name.startsWith(`${PLUGIN_NAME}@`)) {
+    const value = name.slice(PLUGIN_NAME.length + 1)
     if (!value || value === "latest") return null
     return value
   }
-  if (entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
-    const value = entry.slice(LEGACY_PLUGIN_NAME.length + 1)
+  if (name.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
+    const value = name.slice(LEGACY_PLUGIN_NAME.length + 1)
     if (!value || value === "latest") return null
     return value
   }
   return null
 }
 
-function findPluginEntry(entries: string[]): { entry: string; isLocalDev: boolean } | null {
+function findPluginEntry(entries: PluginEntry[]): { entry: PluginEntry; isLocalDev: boolean } | null {
   for (const entry of entries) {
-    if (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)) {
+    const name = getPluginEntryName(entry)
+    if (name === PLUGIN_NAME || name.startsWith(`${PLUGIN_NAME}@`)) {
       return { entry, isLocalDev: false }
     }
-    if (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
+    if (name === LEGACY_PLUGIN_NAME || name.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
       return { entry, isLocalDev: false }
     }
-    if (entry.startsWith("file://") && (entry.includes(PLUGIN_NAME) || entry.includes(LEGACY_PLUGIN_NAME))) {
+    if (name.startsWith("file://") && (name.includes(PLUGIN_NAME) || name.includes(LEGACY_PLUGIN_NAME))) {
       return { entry, isLocalDev: true }
     }
   }

@@ -170,6 +170,8 @@ import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ argv: process.argv.slice(2), env: process.env, versions: process.versions }))
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
 `)
+  mkdirSync(join(senpiRoot, "dist", "core"), { recursive: true })
+  writeFileSync(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   // A stand-in bun that proves it ran; the real bun end to end is QA's job against the real install.
   const markerFile = join(root, "fake-bun.marker")
   const bunBinary = join(bunInstall, "bin", "bun")

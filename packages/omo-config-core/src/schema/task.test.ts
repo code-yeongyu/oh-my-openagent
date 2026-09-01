@@ -73,6 +73,10 @@ describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
     expect(parsed.residency_max_children).toBe(0)
   })
 
+  test("#given parallelism 14 #when settings resolve without a residency override #then the bounded default resolves to 16", () => {
+    expect(resolveOmoTaskSettings({}, () => 14).residency_max_children).toBe(16)
+  })
+
   test("#given an explicit zero residency cap #when settings resolve #then the parallelism default never overrides it", () => {
     // given
     const input = { residency_max_children: 0 }

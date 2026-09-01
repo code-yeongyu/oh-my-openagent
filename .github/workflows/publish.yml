@@ -46,7 +46,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Require successful CI for prepared release source
         shell: bash
@@ -259,7 +259,7 @@ jobs:
       already_published: ${{ steps.omo-ai.outputs.already_published }}
       previous_lazycodex_version: ${{ steps.version.outputs.previous_lazycodex_version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Assert omo bin ownership
         run: |
@@ -373,7 +373,7 @@ jobs:
       # generation below must never be able to read the release credential from
       # git config. The token is exported explicitly only when the generated
       # release state is ready to be pushed.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
@@ -611,7 +611,7 @@ jobs:
       actions: write
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
@@ -680,7 +680,7 @@ jobs:
       needs.prepare-release-state.result == 'success' &&
       (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           # Publish the prepared release commit, not the workflow-dispatch SHA.
@@ -692,7 +692,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -707,28 +707,54 @@ jobs:
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
+          set -uo pipefail
+
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
-          FAILED=()
+          ATTEMPTS="${PROPAGATION_ATTEMPTS:-20}"
+          DELAY="${PROPAGATION_DELAY:-15}"
+
+          PENDING=()
           for platform in "${PLATFORMS[@]}"; do
             for family in oh-my-opencode oh-my-openagent; do
-              pkg="${family}-${platform}"
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${pkg}/${VERSION}")
-              if [ "$STATUS" = "200" ]; then
-                echo "OK   ${pkg}@${VERSION}"
-              else
-                echo "MISS ${pkg}@${VERSION} (HTTP ${STATUS})"
-                FAILED+=("${pkg}")
-              fi
+              PENDING+=("${family}-${platform}")
             done
           done
 
-          if [ ${#FAILED[@]} -gt 0 ]; then
-            echo "::error::Missing platform package(s); refusing to publish wrappers."
-            for pkg in "${FAILED[@]}"; do
-              echo "::error::  ${pkg}@${VERSION}"
+          # The platform publish jobs have already succeeded when this runs, but the registry read
+          # path lags the write: a version can 404 for a short while after a successful publish.
+          # A single probe therefore proves nothing, so re-probe only what is still pending and
+          # fail once the window closes - a genuinely unpublished package still blocks the release.
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            STILL_PENDING=()
+            for pkg in "${PENDING[@]}"; do
+              STATUS="$(curl -sS -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/${pkg}/${VERSION}" || echo 000)"
+              if [ "$STATUS" = "200" ]; then
+                echo "OK   ${pkg}@${VERSION}"
+              else
+                # 000 means curl itself failed (network/DNS), which is not evidence of absence.
+                echo "WAIT ${pkg}@${VERSION} (HTTP ${STATUS})"
+                STILL_PENDING+=("${pkg}")
+              fi
             done
-            exit 1
-          fi
+
+            if [ "${#STILL_PENDING[@]}" -eq 0 ]; then
+              echo "All ${#PENDING[@]} platform package(s) are visible at ${VERSION}"
+              break
+            fi
+
+            PENDING=("${STILL_PENDING[@]}")
+
+            if [ "$attempt" -ge "$ATTEMPTS" ]; then
+              echo "::error::Missing platform package(s); refusing to publish wrappers. Still absent after ${ATTEMPTS} attempts:"
+              for pkg in "${PENDING[@]}"; do
+                echo "::error::  ${pkg}@${VERSION}"
+              done
+              exit 1
+            fi
+
+            echo "Waiting for platform package registry propagation (attempt ${attempt}/${ATTEMPTS}; ${#PENDING[@]} pending)"
+            sleep "$DELAY"
+          done
 
       - name: Check if already published
         id: check
@@ -984,7 +1010,7 @@ jobs:
       needs.publish-main.result == 'success' &&
       (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
@@ -1011,7 +1037,7 @@ jobs:
 
       - name: Checkout LazyCodex marketplace
         if: needs.release-metadata.outputs.dist_tag == ''
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: code-yeongyu/lazycodex
           path: lazycodex-marketplace
@@ -1113,7 +1139,7 @@ jobs:
 
       - name: Download release-binary artifacts
         if: inputs.skip_platform != true
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: release-binary-*
           path: .omo/release-binaries
@@ -1210,12 +1236,12 @@ jobs:
       needs.publish-main.result == 'success' &&
       needs.release.result == 'success'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"

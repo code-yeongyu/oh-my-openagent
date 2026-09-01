@@ -5846,6 +5846,10 @@ var OmoMemorySyncSchema = object({
 var OmoMemorySearchSchema = object({
   enabled: boolean2().default(true)
 }).strict();
+var OmoMemoryRecallSchema = object({
+  enabled: boolean2().default(true),
+  max_items: number2().int().min(1).max(5).default(2)
+}).strict();
 var OmoMemoryNudgeSchema = object({
   enabled: boolean2().default(true),
   every_user_turns: number2().int().min(1).default(10)
@@ -5892,6 +5896,10 @@ var OmoMemorySyncLayerSchema = object({
 var OmoMemorySearchLayerSchema = object({
   enabled: boolean2().optional()
 }).strict();
+var OmoMemoryRecallLayerSchema = object({
+  enabled: boolean2().optional(),
+  max_items: number2().int().min(1).max(5).optional()
+}).strict();
 var OmoMemoryNudgeLayerSchema = object({
   enabled: boolean2().optional(),
   every_user_turns: number2().int().min(1).optional()
@@ -5931,6 +5939,7 @@ var OmoMemoryAgentOverridesSchema = object({
   write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
+  recall: OmoMemoryRecallLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional()
 }).strict();
 var OmoMemorySettingsSchema = object({
@@ -5960,6 +5969,7 @@ var OmoMemorySettingsSchema = object({
   write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
   sync: OmoMemorySyncSchema.default({ enabled: true }),
   search: OmoMemorySearchSchema.default({ enabled: true }),
+  recall: OmoMemoryRecallSchema.default({ enabled: true, max_items: 2 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
@@ -5976,6 +5986,7 @@ var OmoMemorySettingsLayerSchema = object({
   write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
+  recall: OmoMemoryRecallLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional(),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
 }).strict();
@@ -5998,6 +6009,7 @@ var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSche
 
 // ../../../../omo-config-core/src/schema/task.ts
 import { availableParallelism } from "node:os";
+var DEFAULT_RESIDENCY_MAX_CHILDREN = 16;
 var ResidencyMaxChildrenInputSchema = union([number2().int().nonnegative(), literal("unlimited")]);
 var OmoTaskWaitSchema = object({
   min_ms: number2().int().positive().default(5000),
@@ -6087,7 +6099,7 @@ function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism
   const record2 = record(string2(), unknown()).parse(input);
   return OmoTaskSettingsSchema.parse({
     ...record2,
-    residency_max_children: record2["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3),
+    residency_max_children: record2["residency_max_children"] ?? Math.min(DEFAULT_RESIDENCY_MAX_CHILDREN, Math.max(8, resolveParallelism() * 2)),
     global_concurrency: record2["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2)
   });
 }
@@ -6148,9 +6160,25 @@ var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
   enabled: boolean2().default(true)
 }).strict();
 
+// ../../../../omo-config-core/src/schema/format-on-mutation.ts
+var mode = _enum(["off", "best-effort", "required"]);
+var languages = record(string2(), boolean2()).optional();
+var OmoFormatOnMutationLayerSchema = object({
+  mode: mode.optional(),
+  languages,
+  maxFileBytes: number2().int().positive().optional(),
+  timeoutMs: number2().int().positive().optional()
+}).strict();
+var OmoFormatOnMutationSchema = OmoFormatOnMutationLayerSchema.extend({
+  mode: mode.default("best-effort"),
+  maxFileBytes: number2().int().positive().default(1048576),
+  timeoutMs: number2().int().positive().default(3000)
+}).strict();
+
 // ../../../../omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoTypedHarnessConfigSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
@@ -6162,6 +6190,7 @@ var OmoTypedHarnessConfigSchema = object({
   telemetry: OmoTelemetrySettingsLayerSchema.optional()
 }).strict();
 var OmoConfigProfileSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   codegraph: OmoCodegraphSettingsLayerSchema.optional(),
@@ -6176,6 +6205,7 @@ var OmoConfigProfileSchema = object({
   "[codex]": OmoTypedHarnessConfigSchema.optional()
 }).strict();
 var OmoConfigSchema = object({
+  formatOnMutation: OmoFormatOnMutationSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -6194,6 +6224,7 @@ var OmoConfigSchema = object({
   legacy_migrations: record(string2(), unknown()).optional()
 }).strict();
 var OmoConfigLayerSchema = object({
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -9255,6 +9286,7 @@ async function runJsonRpcStdioServer(config2) {
   const idleTimer = createIdleTimer(idleTimeoutMs, log, () => {
     isClosed = true;
     config2.onIdleTimeout?.();
+    config2.input.destroy();
   });
   const watchdog = createParentWatchdog(config2.parentWatchdog, (parentPid, pollIntervalMs) => {
     isClosed = true;
@@ -9458,8 +9490,8 @@ async function runBridgedCodegraphProcess(command, args, options) {
     destroyChildPipes();
     terminateCodegraphChild(child);
   });
-  const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
-    defaultResponseMode = mode;
+  const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode2) => {
+    defaultResponseMode = mode2;
   }, () => parentWatchdogFired);
   const responseForwardingDone = forwardCodegraphToClient(childOutput, options.output, pendingResponses, () => defaultResponseMode, () => parentWatchdogFired);
   const bridgeDone = Promise.all([clientForwardingDone, responseForwardingDone]);
@@ -9666,7 +9698,9 @@ async function runUnavailableCodegraphMcpServer(options) {
     },
     input: options.input,
     output: options.output,
-    parentWatchdog: options.parentWatchdog ?? {}
+    idleTimeoutMs: 0,
+    parentWatchdog: options.parentWatchdog ?? {},
+    ...options.lifecycleLog === undefined ? {} : { log: options.lifecycleLog }
   });
 }
 async function handleUnavailableCodegraphMcpRequest(input, options) {

@@ -49,7 +49,7 @@ const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   "ulw-research": true,
 }
 const namePattern = /^[a-z0-9-]{1,64}$/
-const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent)\b/i
+const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent|update_plan)\b/i
 // The ulw-loop CLI literally accepts `--codex-goal-json`; that interface name is not Codex
 // guidance, so mask it before scanning for leaked harness tokens.
 const cliInterfaceFlagPattern = /--codex-goal-json/g

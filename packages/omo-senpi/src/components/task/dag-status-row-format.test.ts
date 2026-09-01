@@ -52,7 +52,7 @@ describe("runRows node selection", () => {
     expect(rendered.some((row) => row.includes("r14"))).toBe(true)
     expect(rendered.some((row) => row.includes("r15"))).toBe(true)
     // then the budget still caps the pending tail and reports the overflow
-    expect(rendered.filter((row) => row.includes("○ p"))).toHaveLength(9)
+    expect(rendered.filter((row) => row.includes("◌ p"))).toHaveLength(9)
     expect(rendered.at(-1)).toBe("  +3 more")
   })
 
@@ -143,13 +143,14 @@ describe("runRows node elapsed", () => {
 
   it("#given a pending node without startedAt #when rendering #then no elapsed token appears", () => {
     // given
-    const nodes = [node({ id: "gamma", state: "pending" })]
+    const nodes = [node({ id: "gamma", state: "pending", createdAt: iso(-300_000) })]
 
     // when
     const rendered = rows({ runId: "dag_1", nodes }, { now: NOW, maxWidth: 120 })
 
-    // then the row stays icon + label + route
-    expect(rendered[1]).toBe("  ○ gamma · category:quick")
+    // then the row carries no elapsed-since-start token; a node that never started reports how long
+    // it has been waiting instead, which is what keeps a booting graph visibly alive.
+    expect(rendered[1]).toBe("  ◌ gamma · category:quick · waiting 5m 0s")
   })
 })
 
@@ -289,5 +290,51 @@ describe("runRows activity semantics", () => {
     // then
     expect(rendered[1]).not.toContain("grep")
     expect(rendered[1]).toContain("1m")
+  })
+})
+
+
+// The pending phase is where users decide the DAG is frozen: a node that has not started yet must
+// still prove the run is alive. These three cases pin that liveness contract.
+describe("runRows pending-phase liveness", () => {
+  it("#given a pending node with no startedAt #when rendered at two different clocks #then its waiting token advances", () => {
+    // given a node enqueued a minute before the first paint but never started
+    const nodes = [node({ id: "waiter", state: "pending", createdAt: iso(-60_000) })]
+    const run = { runId: "dag_live", nodes }
+
+    // when the same node is painted 30 seconds apart
+    const first = rows(run, { now: NOW, maxWidth: 120 })[1]
+    const second = rows(run, { now: NOW + 30_000, maxWidth: 120 })[1]
+
+    // then the row is not byte-identical: something on it moved
+    expect(first).not.toEqual(second)
+  })
+
+  it("#given pending, scheduled and blocked nodes #when rendered #then each carries a distinct icon", () => {
+    // given one node in each pre-running state
+    const nodes = [
+      node({ id: "a", state: "pending" }),
+      node({ id: "b", state: "scheduled" }),
+      node({ id: "c", state: "blocked" }),
+    ]
+
+    // when
+    const rendered = rows({ runId: "dag_icons", nodes }, { now: NOW, maxWidth: 120 })
+
+    // then the three leading glyphs differ from one another
+    const glyphs = rendered.slice(1, 4).map((row) => row.trimStart().charAt(0))
+    expect(new Set(glyphs).size).toBe(3)
+  })
+
+  it("#given a pending node carrying spawn activity #when rendered #then the activity text is surfaced", () => {
+    // given a node still booting its child, with live telemetry already flowing
+    const nodes = [node({ id: "booting", state: "pending" })]
+    const activity = new Map([["booting", "spawning child"]])
+
+    // when
+    const rendered = runRows(snapshot({ runId: "dag_boot", nodes }), activity, { now: NOW, maxWidth: 200 })
+
+    // then the boot telemetry reaches the row instead of being suppressed by the running-only gate
+    expect(rendered[1]).toContain("spawning")
   })
 })

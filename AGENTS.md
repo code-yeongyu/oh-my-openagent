@@ -82,7 +82,7 @@ oh-my-opencode/                      # workspace root (no root src/ — it moved
 │   │       ├── agents/              # 11 agents, 10 createXXXAgent factories (Prometheus special-cased via plugin-handlers/prometheus-agent-config-builder.ts)
 │   │       ├── hooks/               # ~54-62 lifecycle hooks (54 base / 61 team / 62 monitor) across 62 dirs (incl. 5 zauc-* mock dirs + shared/ + team-session-events/)
 │   │       ├── tools/               # 15 native tool dirs (14 tools + shared/); LSP served via a built-in MCP, ast-grep via the bundled skill
-│   │       ├── features/            # 25 feature modules (team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, mcp-oauth, claude-code-plugin-loader, boulder-state, btw-side, tui-sidebar, opengateway-provider, …)
+│   │       ├── features/            # 24 feature modules (team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, mcp-oauth, boulder-state, btw-side, tui-sidebar, opengateway-provider, …)
 │   │       ├── shared/              # cross-cutting utilities; logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
 │   │       ├── config/             # Zod v4 schema system (36 schema files)
 │   │       ├── cli/                 # Commander.js CLI, 12 commands: install(setup), run, doctor, cleanup(uninstall), version, get-local-version, refresh-model-capabilities, boulder, ulw-loop, config (migrate), worktree-sweep, mcp (oauth login/logout/status)
@@ -266,7 +266,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 | Add new tool | `packages/omo-opencode/src/tools/{name}/` + register in `src/plugin/tool-registry.ts` | Factory `createXXXTool` (most) or direct `ToolDefinition` (interactive_bash) |
 | Add new feature module | `packages/omo-opencode/src/features/{name}/` | Standalone module wired into `plugin/` layer |
 | Add new MCP (tier 1) | `packages/omo-opencode/src/mcp/` + register in `createBuiltinMcps()` | Remote HTTP or local stdio |
-| Add new built-in skill | `packages/omo-opencode/src/features/builtin-skills/skills/{name}.ts` + register in `skills.ts` | Implement `BuiltinSkill` interface |
+| Add new built-in skill | `packages/skills-loader-core/src/features/builtin-skills/skills/{name}.ts` + register in `skills.ts` | Implement `BuiltinSkill` interface |
 | Add new command | `packages/omo-opencode/src/features/builtin-commands/` | Templates in `templates/` |
 | Modify ultrawork prompts | `packages/prompts-core/prompts/ultrawork/*.md` | `packages/omo-opencode/src/hooks/keyword-detector/ultrawork/*.ts` are loader shims; keep `index.ts` and `source-detector.ts` routing stable |
 | Add new CLI subcommand | `packages/omo-opencode/src/cli/cli-program.ts` | Commander.js subcommand |
@@ -313,10 +313,10 @@ Digest-verified centrality (refs unmeasured unless noted):
 
 ## CONVENTIONS
 
-- **Runtime:** Bun only (1.4.0 in CI; `.devcontainer/Dockerfile` still pins 1.3.12 — that pin is drift, CI is authoritative). Never npm/yarn/pnpm. (Exceptions: `packages/lsp-tools-mcp` + `packages/lsp-daemon` are Node-targeted, vendored, and built with `npm` + vitest/biome.)
+- **Runtime:** Bun only (1.4.0, pinned identically in CI and `.devcontainer/Dockerfile`). Never npm/yarn/pnpm. (Exceptions: `packages/lsp-tools-mcp` + `packages/lsp-daemon` are Node-targeted, vendored, and built with `npm` + vitest/biome.)
 - **TypeScript:** strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`).
 - **Tests:** Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style — nested `describe` with `#given`/`#when`/`#then` prefixes, or inline `// given` / `// when` / `// then` comments. Never Arrange-Act-Assert comments.
-- **CI tests:** `bun test` runs the root Bun suite in one process; `script/ci-fast-path.mjs` (`classifyCiMode`) runs the full OS matrix only when platform-sensitive paths change or the `ci:full-matrix` label is set. No split isolation runner. `bun run test:fast` partitions locally (opencode-memory → senpi → root-rest via `bunfig.win2.toml`).
+- **CI tests:** every root-test leg runs the shared serial quarantine (`script/root-test-serial-quarantine.ts`) in one process, then parallelizes the remainder — Linux/macOS via `bunfig.root.parallel.toml`, Windows shard 2 via `bunfig.win2.parallel.toml`. `script/ci-fast-path.mjs` (`classifyCiMode`) runs the full OS matrix only when platform-sensitive paths change or the `ci:full-matrix` label is set. `bun run test:fast` partitions locally (opencode-memory → senpi → root-rest via `bunfig.win2.toml`).
 - **Test setup:** `test-setup.ts` preloaded via `bunfig.toml` resets session/cache state between tests.
 - **Factory pattern:** `createXXX()` for all tools, hooks, agents.
 - **File naming:** kebab-case for files and directories.
@@ -384,7 +384,7 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 
 | Harness | Committed wiring | Runs |
 |---------|------------------|------|
-| GitHub Codespaces / VS Code Dev Containers | [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) + [`.devcontainer/Dockerfile`](.devcontainer/Dockerfile) (Node 24 + Bun 1.3.12 + tmux; CI pins 1.4.0, so this image lags) | `postCreateCommand` runs `setup.sh` on container create |
+| GitHub Codespaces / VS Code Dev Containers | [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) + [`.devcontainer/Dockerfile`](.devcontainer/Dockerfile) (Node 24 + Bun 1.4.0 + tmux, matching CI) | `postCreateCommand` runs `setup.sh` on container create |
 | Plain Docker | [`script/agent/docker-dev.sh`](script/agent/docker-dev.sh) | builds the same Dockerfile, opens a shell |
 | Cursor cloud agents | [`.cursor/environment.json`](.cursor/environment.json) | `install` runs `setup.sh` on environment creation |
 | Claude Code | [`.claude/settings.json`](.claude/settings.json) | `SessionStart` runs `setup.sh`, `SessionEnd` launches `cleanup-hook.sh` |
@@ -451,3 +451,17 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 - **Agent state directory:** ONE canonical location, `~/.omo/agent`, resolved through `canonicalAgentDir()` in [`packages/omo-native/bin/lib/agent-dir.js`](packages/omo-native/bin/lib/agent-dir.js) (and its adapter-side twin `resolveAgentHome()` in `packages/omo-senpi/src/components/agent-home/`). EVERY omo entry point - the spawned engine, `omo doctor`, `omo setup`, the local launcher, the local installer - MUST resolve the directory through that helper instead of composing its own default; an explicit `OMO_CODING_AGENT_DIR` (or the legacy `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) still wins. Composing a private default is what made settings look erased on update.
 - **Workspace migration:** Runtime state migrated from `.sisyphus/` → `.omo/`. Legacy `.sisyphus/` still exists during transition; `packages/omo-opencode/src/shared/legacy-workspace-migration.ts` copies it forward on first load.
 - **CI nuance:** PRs targeting `master` are hard-blocked — they MUST target `dev`. CI auto-commits schema changes on master push and creates a draft "next" release on dev push.
+
+## Review claim labels (merge-gating)
+
+Three PR labels drive the review workflow; automation lives in `.github/workflows/review-claims.yml`:
+
+- `will-review` — a reviewer claims the PR ("I will review this"). Applying it auto-requests the labeler as reviewer and BLOCKS merge via the required `Review claim gate` check.
+- `in-review` — the claimer is actively reviewing. Same merge-blocking + auto-reviewer-request effects.
+- `stale-review` — a claim sat 3+ days without the claimer's review; the sweep removes the claim labels and applies this one. A fresh claim clears it.
+
+Rules:
+- Apply `will-review` when you plan to review a PR; switch to `in-review` when you start.
+- NEVER merge a PR carrying `will-review` or `in-review`; the gate check enforces this.
+- Claim labels are removed automatically ONLY when the claimer (the person who applied the label) submits an approve or request-changes review. Do not remove someone else's claim label by hand.
+- If a PR shows `stale-review`, it needs a (new) reviewer: claim it.

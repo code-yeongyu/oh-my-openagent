@@ -10,7 +10,7 @@ describe("reflectionRemediation", () => {
       // when
       const hint = reflectionRemediation(
         "category_unavailable",
-        'Reflection category "quick" could not resolve a usable model (cause: model_unavailable); missing providers: kimi-coding, quotio-openai',
+        'Reflection category "quick" could not resolve a usable model (cause: model_unavailable); missing providers: kimi-coding, openai-codex',
       )
 
       // then

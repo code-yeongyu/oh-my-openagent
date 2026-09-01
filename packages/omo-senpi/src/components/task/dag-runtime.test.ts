@@ -61,6 +61,7 @@ class ScriptedRunner implements ManagedRunner {
     readonly emit: (event: ManagedChildEvent) => void
     readonly listenerCount: () => number
     readonly settle: (output: string) => void
+    readonly disposed: Promise<void>
     readonly fail: (message: string) => void
   }> = []
   readonly #signals = new Map<number, ReturnType<typeof deferred<void>>>()
@@ -74,6 +75,7 @@ class ScriptedRunner implements ManagedRunner {
 
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const outcome = deferred<RunnerOutcome>()
+    const disposed = deferred<void>()
     const listeners = new Set<(event: ManagedChildEvent) => void>()
     const handle: ManagedChildHandle = {
       task_id: spec.taskId,
@@ -95,6 +97,7 @@ class ScriptedRunner implements ManagedRunner {
       lastAssistantText: () => undefined,
       dispose: () => {
         this.disposeCalls += 1
+        disposed.resolve()
         return Promise.resolve()
       },
     }
@@ -105,6 +108,7 @@ class ScriptedRunner implements ManagedRunner {
       },
       listenerCount: () => listeners.size,
       settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }),
+      disposed: disposed.promise,
       fail: (message) => outcome.resolve({ status: "error", failure: { kind: "child-turn-failed", message } }),
     })
     this.#signals.get(this.handles.length)?.resolve()
@@ -581,7 +585,6 @@ describe("assembled DAG runtime", () => {
       await within(runner.whenStarted(2))
       runner.handles[1]?.settle("runtime survived")
       const survived = await within(runtime.wait(survivor.snapshot.runId, sessionId))
-      await new Promise<void>((resolve) => setImmediate(resolve))
 
       // then
       expect(cancelled.status).toBe("cancelled")
@@ -591,7 +594,9 @@ describe("assembled DAG runtime", () => {
       expect(survived.nodes.survivor).toEqual(expect.objectContaining({ output: "runtime survived" }))
       expect(unhandled).toEqual([])
       runner.handles[0]?.settle("cancelled child reached its natural boundary")
-      await new Promise<void>((resolve) => setImmediate(resolve))
+      const disposed = runner.handles[0]?.disposed
+      if (disposed === undefined) throw new Error("cancelled child handle was not retained")
+      await within(disposed)
       expect(runner.disposeCalls).toBe(1)
     } finally {
       process.off("unhandledRejection", onUnhandled)
@@ -752,8 +757,10 @@ describe("assembled DAG runtime", () => {
     resumedRuntime.dispose()
   })
 
-  test("#given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then shipped RPC receives the recovery scheduler overflow", async () => {
-    // given
+  test("#given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then the overflow is journaled and shipped RPC receives the recovered snapshot", async () => {
+    // given - the bridge attaches AFTER recovery (#7316), so recovery-window events are never
+    // pushed live; the overflow marker must be durable in the journal for history-paging viewers,
+    // and RPC's first wholesale snapshot must already carry the recovered run.
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-recovery-ring-"))
     cleanupRoots.push(cwd)
     const runId = "dag-adapter-recovery-ring" as DagRunId
@@ -768,13 +775,14 @@ describe("assembled DAG runtime", () => {
       previousLeaseHolderPid: 2_147_483_647,
     })
     const runner = new ScriptedRunner()
-    const overflow = deferred<Extract<DagRunEvent, { type: "dag.stream.overflow" }>>()
+    const recoveredSnapshot = deferred<{ readonly status?: string }>()
     const pi = Object.assign(new FakeExtensionAPI(), {
       rpc: {
         emit: (name: string, data: unknown) => {
-          if (name !== "omo.dag.event" || typeof data !== "object" || data === null ||
-            !("type" in data) || data.type !== "dag.stream.overflow") return
-          overflow.resolve(data as Extract<DagRunEvent, { type: "dag.stream.overflow" }>)
+          if (name !== "omo.dag.updated" || typeof data !== "object" || data === null) return
+          const payload = data as { readonly runs?: ReadonlyArray<{ readonly run_id?: string; readonly status?: string }> }
+          const run = payload.runs?.find((entry) => entry.run_id === runId)
+          if (run !== undefined) recoveredSnapshot.resolve(run)
         },
         handle: () => undefined,
       },
@@ -798,12 +806,16 @@ describe("assembled DAG runtime", () => {
     await within(runner.whenStarted(1))
     runner.handles[0]?.settle("resumed through configured ring")
     await within(attaching)
-    const delivered = await within(overflow.promise)
+    const delivered = await within(recoveredSnapshot.promise)
 
-    // then
-    expect(delivered.droppedCount).toBeGreaterThan(0)
-    expect(delivered.recoverAfterSeq).toBeGreaterThanOrEqual(0)
-    expect(dagEvents(cwd, runId)).toContainEqual(delivered)
+    // then the overflow survived durably for history paging, and the pushed snapshot is recovered
+    const journaled = dagEvents(cwd, runId).find(
+      (event): event is Extract<DagRunEvent, { type: "dag.stream.overflow" }> => event.type === "dag.stream.overflow",
+    )
+    expect(journaled).toBeDefined()
+    expect(journaled?.droppedCount).toBeGreaterThan(0)
+    expect(journaled?.recoverAfterSeq).toBeGreaterThanOrEqual(0)
+    expect(delivered.status).toBe("completed")
     expect(runtime.manager.snapshot(runId, sessionId).status).toBe("completed")
     runtime.dispose()
   })

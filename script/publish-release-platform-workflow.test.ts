@@ -330,7 +330,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
 
     // upload shape: bare binaries + SHA256SUMS under .omo/release-binaries, npm-artifact parity on retention
     const uploadStep = binarySteps[2]!
-    expect(uploadStep).toContain("uses: actions/upload-artifact@v6")
+    expect(uploadStep).toContain("uses: actions/upload-artifact@v7")
     expect(uploadStep).toContain("name: release-binary-${{ matrix.platform }}")
     expect(uploadStep).toContain("path: .omo/release-binaries/")
     expect(uploadStep).toContain("retention-days: 1")
@@ -365,6 +365,8 @@ describe("release binary asset lane in the platform publish workflow", () => {
     expect(smokeStep).toContain("mktemp -d")
     expect(smokeStep).toContain("XDG_CONFIG_HOME")
     expect(smokeStep).toContain("OMO_CODING_AGENT_DIR")
+    // Node's Windows os.homedir() uses USERPROFILE, not Git Bash's HOME.
+    expect(smokeStep).toContain('export USERPROFILE="${HOME}"')
     // first-run self-provisioning must materialize before any PASS
     expect(smokeStep).toContain("binary-runtime/${OMO_AI_VERSION}")
     // pty round-trip on the pty-capable legs
@@ -387,6 +389,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
     )
     expect(muslSmokeFn).toContain("docker run")
     expect(muslSmokeFn).toContain("alpine:")
+    expect(muslSmokeFn).toContain("apk add --no-cache libstdc++")
     // windows x64 legs exec natively; windows-arm64 is checksum+size only
     expect(branch("windows-x64|windows-x64-baseline)")).toContain("assert_version_line")
     const windowsArm64 = branch("windows-arm64)")
@@ -427,6 +430,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
     // glibc leg execs natively, musl leg runs in an alpine container
     expect(job).toContain("omo-linux-arm64")
     expect(job).toContain("alpine:")
+    expect(job).toContain("apk add --no-cache libstdc++")
     // same exact version-line contract as the build-job smoke
     expect(job).toContain("(engine: senpi ${ENGINE_PIN})")
     expect(job).toContain("binary-runtime/${OMO_AI_VERSION}")

@@ -90,6 +90,7 @@ if (process.env.FAKE_STDOUT) console.log(process.env.FAKE_STDOUT)
 if (process.env.FAKE_SIGNAL) process.kill(process.pid, process.env.FAKE_SIGNAL)
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
 `)
+  writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
 
   let shimPath: string | undefined
   if (options.shim !== false) {

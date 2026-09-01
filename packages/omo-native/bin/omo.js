@@ -16,7 +16,7 @@ try {
   // it is quiet and fail-open by contract, and Windows/npm installs never enter it. The shebang
   // above and the bin mapping in package.json are all Windows shims ever read, and both stay.
   ensureBunBinShim({ scriptPath })
-  const reexeced = maybeReexecUnderBun({ scriptPath })
+  const reexeced = await maybeReexecUnderBun({ scriptPath })
   if (!reexeced) {
     if (process.argv[2] === "setup") await runSetup(process.argv.slice(3))
     else await runLauncher()

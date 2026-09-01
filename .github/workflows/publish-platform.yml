@@ -57,7 +57,7 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline, windows-arm64]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -186,7 +186,7 @@ jobs:
 
       - name: Upload artifact
         if: steps.check.outputs.skip != 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: binary-${{ matrix.platform }}
           path: |
@@ -271,6 +271,11 @@ jobs:
             export XDG_STATE_HOME="${SMOKE_ROOT}/xdg/state"
             export XDG_CACHE_HOME="${SMOKE_ROOT}/xdg/cache"
             export OMO_CODING_AGENT_DIR="${SMOKE_ROOT}/agent"
+            # Node's Windows os.homedir() follows USERPROFILE; HOME alone is
+            # only the Git Bash shell view and does not control provisioning.
+            if [[ "$TARGET" == windows-* ]]; then
+              export USERPROFILE="${HOME}"
+            fi
           }
 
           assert_version_line() {
@@ -308,7 +313,7 @@ jobs:
           musl_smoke() {
             # musl binaries cannot run on the glibc runner: alpine container.
             docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
-              alpine:3.21 sh -c "${BIN} --version" | grep -F "$EXPECTED_VERSION_LINE"
+              alpine:3.21 sh -c "apk add --no-cache libstdc++ >/dev/null && ${BIN} --version" | grep -F "$EXPECTED_VERSION_LINE"
           }
 
           verify_checksum_and_size_only() {
@@ -378,7 +383,7 @@ jobs:
 
       - name: Upload release binary artifact
         if: steps.release-assets.outputs.binary_exists != 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-binary-${{ matrix.platform }}
           path: .omo/release-binaries/omo-*
@@ -466,7 +471,7 @@ jobs:
       - name: Download artifact
         id: download
         if: steps.check.outputs.skip_all != 'true'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.platform }}
           path: .
@@ -488,7 +493,7 @@ jobs:
           ls -la "$PACKAGE_DIR/"
           ls -la "$PACKAGE_DIR/bin/"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
         with:
           node-version: "24"
@@ -588,7 +593,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Check release assets
         id: release-assets
@@ -610,14 +615,14 @@ jobs:
 
       - name: Download linux-arm64 release binary artifact
         if: steps.release-assets.outputs.linux_arm64_exists != 'true'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: release-binary-linux-arm64
           path: .omo/release-binaries
 
       - name: Download linux-arm64-musl release binary artifact
         if: steps.release-assets.outputs.linux_arm64_musl_exists != 'true'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: release-binary-linux-arm64-musl
           path: .omo/release-binaries
@@ -661,7 +666,7 @@ jobs:
           if [ "$MUSL_EXISTS" != "true" ]; then
             # alpine container for the musl binary.
             docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
-              alpine:3.21 sh -c "chmod +x .omo/release-binaries/omo-linux-arm64-musl && .omo/release-binaries/omo-linux-arm64-musl --version" \
+              alpine:3.21 sh -c "apk add --no-cache libstdc++ >/dev/null && chmod +x .omo/release-binaries/omo-linux-arm64-musl && .omo/release-binaries/omo-linux-arm64-musl --version" \
               | grep -F "$EXPECTED_VERSION_LINE"
           fi
 

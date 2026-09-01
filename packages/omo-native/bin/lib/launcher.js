@@ -89,12 +89,12 @@ function senpiEnvironment(senpiRoot) {
   return env
 }
 
-function spawnSenpi(args, withExtension) {
+async function spawnSenpi(args, withExtension) {
   const senpi = resolveSenpi()
   const finalArgs = withExtension
     ? ["--extension", join(packageRoot, "plugin"), ...args]
     : args
-  spawnNode(senpi.cliPath, finalArgs, { env: senpiEnvironment(senpi.packageRoot) })
+  await spawnNode(senpi.cliPath, finalArgs, { env: senpiEnvironment(senpi.packageRoot) })
 }
 
 function isInteractiveDefault(args) {
@@ -135,11 +135,11 @@ export async function runLauncher(args = process.argv.slice(2)) {
   reportLegacyFlatAdoption()
   const command = args[0]
   if (command === "ulw-loop") {
-    spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))
+    await spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))
     return
   }
   if (command === "doctor") {
-    runDoctor(await detectHarnesses())
+    runDoctor(await detectHarnesses(), args.slice(1))
     return
   }
   if (command === "setup") {
@@ -161,7 +161,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     return
   }
   if (earlyCommands.has(command) || command === "update") {
-    spawnSenpi(args, false)
+    await spawnSenpi(args, false)
     return
   }
   if (isInteractiveDefault(args)) {
@@ -170,5 +170,5 @@ export async function runLauncher(args = process.argv.slice(2)) {
       console.error("omo: sibling credentials detected; run `omo setup` to review them")
     }
   }
-  spawnSenpi(args, true)
+  await spawnSenpi(args, true)
 }
