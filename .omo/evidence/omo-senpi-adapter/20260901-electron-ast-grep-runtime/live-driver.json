@@ -1,0 +1,31 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realSenpiObservedChangedPaths": [],
+  "realSenpiVolatileChangedPaths": [],
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoChangedPaths": [],
+  "realOmoObservedChangedPaths": [],
+  "realOmoVolatileChangedPaths": [],
+  "realOmoProtectedChangedPaths": [],
+  "protectedStateFiles": [
+    "auth.json",
+    "models.json",
+    "settings.json",
+    "trust.json",
+    "models-store.json",
+    "hooks-state.json"
+  ],
+  "realHomesChecked": [
+    "/Users/alreadygiven/.senpi/agent",
+    "/Users/alreadygiven/.omo/agent"
+  ],
+  "providedSenpiCodingAgentDir": "IGNORED",
+  "sandboxAgentDir": "/private/var/folders/_9/n7j5ydvn20g78wqjtjjj02zc0000gn/T/omo-senpi-qa-oEFOel/agent",
+  "sandboxCwd": "/private/var/folders/_9/n7j5ydvn20g78wqjtjjj02zc0000gn/T/omo-senpi-qa-oEFOel/project"
+}
