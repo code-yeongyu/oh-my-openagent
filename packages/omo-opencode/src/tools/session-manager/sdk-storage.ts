@@ -39,14 +39,21 @@ async function fetchSdkResponse(operation: () => Promise<unknown>): Promise<unkn
   throw lastError
 }
 
+export interface GetSdkMainSessionsOptions {
+  includeArchived?: boolean
+}
+
 export async function getSdkMainSessions(
   client: PluginInput["client"],
   directory?: string,
+  options: GetSdkMainSessionsOptions = {},
 ): Promise<SessionMetadata[]> {
   const response = await fetchSdkResponse(() => client.session.list())
 
   const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
-  const mainSessions = sessions.filter((session) => !session.parentID)
+  const mainSessions = sessions.filter(
+    (session) => !session.parentID && (options.includeArchived || !session.time?.archived),
+  )
   if (directory) {
     return mainSessions
       .filter((session) => session.directory === directory)
@@ -56,13 +63,32 @@ export async function getSdkMainSessions(
   return mainSessions.sort((a, b) => b.time.updated - a.time.updated)
 }
 
-export async function getSdkAllSessions(client: PluginInput["client"]): Promise<string[]> {
+export interface SdkSessionPartition {
+  active: string[]
+  archived: string[]
+}
+
+// time.archived ships on the wire from opencode servers but the stable SDK
+// Session type does not declare it yet, so every read here is defensive and
+// sessions without the field count as active.
+function partitionSdkSessions(sessions: SessionMetadata[]): SdkSessionPartition {
+  const sorted = sessions.slice().sort((a, b) => b.time.updated - a.time.updated)
+  const active: string[] = []
+  const archived: string[] = []
+  for (const session of sorted) {
+    if (session.time?.archived) {
+      archived.push(session.id)
+    } else {
+      active.push(session.id)
+    }
+  }
+  return { active, archived }
+}
+
+export async function getSdkAllSessions(client: PluginInput["client"]): Promise<SdkSessionPartition> {
   const response = await fetchSdkResponse(() => client.session.list())
   const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
-  return sessions
-    .slice()
-    .sort((a, b) => b.time.updated - a.time.updated)
-    .map((session) => session.id)
+  return partitionSdkSessions(sessions)
 }
 
 export async function sdkSessionExists(client: PluginInput["client"], sessionID: string): Promise<boolean> {

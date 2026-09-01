@@ -12,12 +12,13 @@ Arguments:
 - limit (optional): Maximum number of sessions to return
 - from_date (optional): Filter sessions from this date (ISO 8601 format)
 - to_date (optional): Filter sessions until this date (ISO 8601 format)
+- include_archived (optional): Include archived sessions (default: false). Archived sessions are marked [archived].
 
 Example output:
 | Session ID | Messages | First | Last | Agents |
 |------------|----------|-------|------|--------|
 | ses_abc123 | 45 | 2025-12-20 | 2025-12-24 | build, oracle |
-| ses_def456 | 12 | 2025-12-19 | 2025-12-19 | build |`
+| ses_def456 [archived] | 12 | 2025-12-19 | 2025-12-19 | build |`
 
 export const SESSION_READ_DESCRIPTION = `Read messages and history from an OpenCode session.
 
@@ -49,17 +50,18 @@ Arguments:
 - session_id (optional): Search within specific session only (default: all sessions)
 - case_sensitive (optional): Case-sensitive search (default: false)
 - limit (optional): Maximum number of results to return (default: 20)
+- include_archived (optional): Include archived sessions in the scan (default: true). Matches from archived sessions are marked [archived]. Active sessions are always scanned before archived ones.
 
 Example output:
 Found 3 matches across 2 sessions:
 
-[ses_abc123] Message msg_001 (user)
+[ses_abc123] msg_001 (user)
 ...implement the **session manager** tool...
 
-[ses_abc123] Message msg_005 (assistant)
+[ses_abc123] msg_005 (assistant)
 ...I'll create a **session manager** with full search...
 
-[ses_def456] Message msg_012 (user)
+[ses_def456] [archived] msg_012 (user)
 ...use the **session manager** to find...`
 
 export const SESSION_INFO_DESCRIPTION = `Get metadata and statistics about an OpenCode session.
