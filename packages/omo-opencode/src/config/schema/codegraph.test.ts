@@ -17,7 +17,9 @@ describe("OhMyOpenCodeConfigSchema codegraph", () => {
 
       // then
       expect(result.codegraph).toEqual({
+        auto_init: true,
         auto_provision: true,
+        daemon: true,
         enabled: true,
       })
     })
@@ -37,7 +39,9 @@ describe("OhMyOpenCodeConfigSchema codegraph", () => {
 
       // then
       expect(result.codegraph).toEqual({
+        auto_init: true,
         auto_provision: true,
+        daemon: true,
         enabled: false,
       })
     })
@@ -60,7 +64,11 @@ describe("OhMyOpenCodeConfigSchema codegraph", () => {
       const result = OhMyOpenCodeConfigSchema.parse(input)
 
       // then
-      expect(result.codegraph).toEqual(input.codegraph)
+      expect(result.codegraph).toEqual({
+        ...input.codegraph,
+        auto_init: true,
+        daemon: true,
+      })
     })
   })
 

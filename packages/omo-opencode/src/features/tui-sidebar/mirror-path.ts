@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -14,7 +15,18 @@ export function mirrorStorageDir(): string {
   )
 }
 
+export function canonicalProjectDir(projectDir: string): string {
+  try {
+    return realpathSync.native(projectDir)
+  } catch (error) {
+    if (error instanceof Error) {
+      return resolve(projectDir)
+    }
+    throw error
+  }
+}
+
 export function mirrorFilePath(projectDir: string): string {
-  const projectHash = createHash("sha1").update(resolve(projectDir)).digest("hex").slice(0, 16)
+  const projectHash = createHash("sha1").update(canonicalProjectDir(projectDir)).digest("hex").slice(0, 16)
   return join(mirrorStorageDir(), `${projectHash}.json`)
 }

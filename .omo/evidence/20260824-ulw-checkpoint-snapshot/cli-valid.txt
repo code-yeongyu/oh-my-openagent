@@ -1,0 +1,23 @@
+WHAT WAS TESTED
+The built local CLI was driven in an isolated directory with two per-story goals.
+All three G001 criteria were marked pass, then:
+
+node dist/cli.js ulw-loop checkpoint \
+  --goal-id G001-goal-a \
+  --status complete \
+  --evidence "done" \
+  --codex-goal-json '{"id":"G001-goal-a","title":"Goal A","status":"complete","successCriteria":[]}' \
+  --json
+
+OBSERVED
+Exit code: 0.
+JSON: ok=true.
+Goal G001-goal-a status became complete.
+The ledger stored the original title-bearing codexGoal object.
+The next goal G002-goal-b became in_progress.
+
+WHY IT IS ENOUGH
+This is the real checkpoint CLI path against persisted .omo/ulw-loop state, not a parser-only unit test. It proves the title alias survives argument parsing, file-state loading, reconciliation, ledger persistence, and next-goal activation.
+
+WHAT WAS OMITTED
+The full successful JSON response was summarized because it contains repetitive plan state. No secrets were present.

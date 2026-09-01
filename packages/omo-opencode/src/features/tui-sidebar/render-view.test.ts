@@ -54,6 +54,21 @@ describe("tui sidebar renderView", () => {
     expect(nodes[0]?.kind).toBe("box")
   })
 
+  it("#given a redacted active goal #when describing #then it reports the active goal as private", () => {
+    // given
+    const view = computeView({
+      ...activeSections,
+      loop: { ...activeSections.loop, activeGoal: null },
+    })
+
+    // when
+    const description = describeView(view)
+
+    // then
+    expect(description).toContain("active private")
+    expect(description).not.toContain("active none")
+  })
+
   it("#given broken view #when describing #then it includes config invalid and run doctor", () => {
     // given
     const view = computeView({

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-
+import type { Engine, LoadedRule, PiRulesConfig } from "@oh-my-opencode/rules-engine/engine";
+import { isNeverTruncatedRule } from "@oh-my-opencode/rules-engine/engine";
 import type { CodexRulesHookOptions } from "./codex-hook-options.js";
 import { configFromEnvironment } from "./config.js";
 import { withPromptBudget } from "./event-budget.js";
@@ -7,11 +8,7 @@ import { formatAdditionalContextOutput } from "./hook-output.js";
 import { completePostCompactRecovery, hydrateEngineState, persistEngineState } from "./persistent-cache.js";
 import { withPostCompactBudget } from "./post-compact-budget.js";
 import { buildPostCompactReadDirective } from "./post-compact-directive.js";
-import type { Engine } from "@oh-my-opencode/rules-engine/engine";
-import { isNeverTruncatedRule } from "@oh-my-opencode/rules-engine/engine";
-import type { LoadedRule, PiRulesConfig } from "@oh-my-opencode/rules-engine/engine";
 import { createRulesEngine } from "./rules-engine-factory.js";
-import { getSparkShellRuntimeAwareness, SPARKSHELL_AWARENESS_DEDUP_KEY } from "./sparkshell-awareness.js";
 import { filterRulesAlreadyInTranscript, filterRulesNotInTranscriptText } from "./transcript-rule-filter.js";
 import type { TranscriptSearchOptions } from "./transcript-search.js";
 import { readTranscriptSearchText } from "./transcript-search.js";
@@ -48,7 +45,7 @@ export function runStaticInjection(
 	}
 
 	const effectiveConfig = eventName === "UserPromptSubmit" ? withPromptBudget(config) : config;
-	const engine = createRulesEngine(options, effectiveConfig);
+	const engine = createRulesEngine(options, effectiveConfig, model);
 	hydrateEngineState(engine, cachePath);
 	engine.state.cwd = cwd;
 
@@ -61,10 +58,7 @@ export function runStaticInjection(
 		},
 		transcriptSearchOptions,
 	);
-	const sparkshellAwareness = engine.state.staticDedup.has(SPARKSHELL_AWARENESS_DEDUP_KEY)
-		? ""
-		: getSparkShellRuntimeAwareness(options.env);
-	if (rules.length === 0 && sparkshellAwareness.length === 0) {
+	if (rules.length === 0) {
 		persistEngineState(engine, cachePath);
 		return "";
 	}
@@ -73,11 +67,8 @@ export function runStaticInjection(
 	for (const rule of rules) {
 		engine.markStaticInjected(rule);
 	}
-	if (sparkshellAwareness.length > 0) {
-		engine.state.staticDedup.add(SPARKSHELL_AWARENESS_DEDUP_KEY);
-	}
 	persistEngineState(engine, cachePath);
-	return formatAdditionalContextOutput(eventName, combineStaticContext(block, sparkshellAwareness));
+	return formatAdditionalContextOutput(eventName, block);
 }
 
 interface PostCompactRecoveryInput {
@@ -96,7 +87,7 @@ function runPostCompactRecovery(input: PostCompactRecoveryInput): string {
 		model: input.model,
 		transcriptPath: input.transcriptPath,
 	});
-	const engine = createRulesEngine(input.options, effectiveConfig);
+	const engine = createRulesEngine(input.options, effectiveConfig, input.model);
 	hydrateEngineState(engine, input.cachePath);
 	engine.state.cwd = input.cwd;
 
@@ -110,11 +101,8 @@ function runPostCompactRecovery(input: PostCompactRecoveryInput): string {
 		},
 	);
 	const dynamicRulePaths = recoverDynamicRulePaths(engine, transcriptText, loaded.rules);
-	const sparkshellAwareness = engine.state.staticDedup.has(SPARKSHELL_AWARENESS_DEDUP_KEY)
-		? ""
-		: getSparkShellRuntimeAwareness(input.options.env);
 
-	if (missingRules.length === 0 && dynamicRulePaths.length === 0 && sparkshellAwareness.length === 0) {
+	if (missingRules.length === 0 && dynamicRulePaths.length === 0) {
 		persistEngineState(engine, input.cachePath, input.channel);
 		return "";
 	}
@@ -129,14 +117,8 @@ function runPostCompactRecovery(input: PostCompactRecoveryInput): string {
 	for (const rule of missingRules) {
 		engine.markStaticInjected(rule);
 	}
-	if (sparkshellAwareness.length > 0) {
-		engine.state.staticDedup.add(SPARKSHELL_AWARENESS_DEDUP_KEY);
-	}
 	persistEngineState(engine, input.cachePath, input.channel);
-	return formatAdditionalContextOutput(
-		input.eventName,
-		combineStaticContext(bodyBlock, directive, sparkshellAwareness),
-	);
+	return formatAdditionalContextOutput(input.eventName, combineStaticContext(bodyBlock, directive));
 }
 
 function readRecoveryTranscriptText(transcriptPath: string | null): string | null {
@@ -166,7 +148,7 @@ function recoverDynamicRulePaths(
 			if (staticRulePaths.has(rulePath)) {
 				continue;
 			}
-			if (transcriptText !== null && transcriptText.includes(rulePath)) {
+			if (transcriptText?.includes(rulePath)) {
 				continue;
 			}
 			if (!existsSync(rulePath)) {

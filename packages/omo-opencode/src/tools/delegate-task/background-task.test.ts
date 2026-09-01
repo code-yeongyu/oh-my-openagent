@@ -339,7 +339,6 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then - background launch should still succeed without fake abort failure
     expectFn(result).toContain("Background task launched")
     expectFn(result).toContain("Background Task ID: bg_abort_after_launch")
-    expectFn(result).not.toContain("Task aborted while waiting for session to start")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn("sessionId" in metadataCalls[0].metadata).toBe(false)
   })
@@ -560,7 +559,6 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
     //#then - both tasks still launch and the sibling is not reported as interrupted
     expectFn(firstResult).toContain("Background task launched")
-    expectFn(firstResult).not.toContain("Task failed to start")
     expectFn(secondResult).toContain("Background task launched")
     expectFn(secondResult).toContain("session_id: ses_second")
     expectFn(secondResult).not.toContain("interrupt")

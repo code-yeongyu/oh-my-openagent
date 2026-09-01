@@ -3,18 +3,25 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 
 import {
+  CODEGRAPH_PINNED_VERSION,
   buildCodegraphEnv,
   ensureCodegraphGitignored,
   ensureCodegraphProvisioned,
   prepareCodegraphWorkspace,
   resolveCodegraphCommand,
+  resolveCodegraphNodeSupport,
+  shouldExcludeCodegraphProject,
   type BuildCodegraphEnvOptions,
   type CodegraphCommandResolution,
+  type CodegraphProjectExclusionDecision,
+  type CodegraphProjectExclusionOptions,
+  type CodegraphNodeSupport,
   type CodegraphProvisionResult,
   type CodegraphWorkspacePreparation,
   type PrepareCodegraphWorkspaceOptions,
   type ResolveCodegraphCommandOptions,
 } from "@oh-my-opencode/utils"
+import { resolvePinnedCodegraphBin } from "@oh-my-opencode/utils/codegraph"
 
 import type { CodegraphConfig } from "../../config"
 import { log } from "../../shared"
@@ -37,12 +44,17 @@ export interface CodegraphBootstrapEventInput {
 export interface CodegraphBootstrapDeps {
   readonly buildEnv: (options?: BuildCodegraphEnvOptions) => Record<string, string>
   readonly ensureGitignored: (projectRoot: string) => boolean
+  readonly excludeProject: (
+    projectRoot: string,
+    options?: CodegraphProjectExclusionOptions,
+  ) => CodegraphProjectExclusionDecision
   readonly ensureProvisioned: (options: {
     readonly installDir?: string
     readonly lockDir: string
-    readonly version: "1.0.1"
+    readonly version: typeof CODEGRAPH_PINNED_VERSION
   }) => Promise<CodegraphProvisionResult>
   readonly log: (message: string, data?: Record<string, unknown>) => void
+  readonly nodeSupport: () => CodegraphNodeSupport
   readonly prepareWorkspace: (
     projectRoot: string,
     options?: PrepareCodegraphWorkspaceOptions,
@@ -57,7 +69,7 @@ export interface CodegraphBootstrapDeps {
   readonly schedule: (task: () => Promise<void>) => void
 }
 
-const CODEGRAPH_VERSION = "1.0.1"
+const CODEGRAPH_VERSION = CODEGRAPH_PINNED_VERSION
 const COMMAND_TIMEOUT_MS = 60_000
 const bootstrappedProjects = new Set<string>()
 
@@ -73,10 +85,7 @@ function defaultInstallDir(): string {
 }
 
 function provisionedBinFromInstallDir(installDir: string | undefined): string | null {
-  if (installDir === undefined) return null
-  const binaryName = process.platform === "win32" ? "codegraph.cmd" : "codegraph"
-  const candidate = join(installDir, "bin", binaryName)
-  return existsSync(candidate) ? candidate : null
+  return resolvePinnedCodegraphBin(installDir)
 }
 
 function codegraphEnv(deps: CodegraphBootstrapDeps, config: Partial<CodegraphConfig>): Record<string, string> {
@@ -102,6 +111,15 @@ async function resolveOrProvisionCommand(
   const resolved = resolveInitialCommand(deps, config)
   if (resolved.exists) return resolved
   if (config.auto_provision === false) return null
+  const nodeSupport = deps.nodeSupport()
+  if (!nodeSupport.supported) {
+    deps.log("[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap", {
+      major: nodeSupport.major,
+      reason: nodeSupport.reason,
+      source: resolved.source,
+    })
+    return null
+  }
 
   const installDir = config.install_dir ?? defaultInstallDir()
   const provisioned = await deps.ensureProvisioned({
@@ -126,9 +144,27 @@ async function runBootstrap(
   deps: CodegraphBootstrapDeps,
 ): Promise<void> {
   try {
+    const autoInit = config.auto_init !== false
+    const codegraphPath = join(projectRoot, ".codegraph")
+    if (!autoInit && !existsSync(codegraphPath)) {
+      deps.log("[codegraph-bootstrap] CodeGraph auto_init disabled and .codegraph not present; skipping bootstrap", {
+        projectRoot,
+      })
+      return
+    }
+
     const command = await resolveOrProvisionCommand(deps, config)
     if (command === null) {
       deps.log("[codegraph-bootstrap] CodeGraph unavailable; skipping bootstrap", { projectRoot })
+      return
+    }
+    const nodeSupport = deps.nodeSupport()
+    if (command.source !== "bundled" && command.source !== "env" && !nodeSupport.supported) {
+      deps.log("[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap", {
+        major: nodeSupport.major,
+        projectRoot,
+        reason: nodeSupport.reason,
+      })
       return
     }
 
@@ -166,8 +202,10 @@ async function runBootstrap(
 const defaultDeps: CodegraphBootstrapDeps = {
   buildEnv: buildCodegraphEnv,
   ensureGitignored: ensureCodegraphGitignored,
+  excludeProject: shouldExcludeCodegraphProject,
   ensureProvisioned: ensureCodegraphProvisioned,
   log,
+  nodeSupport: resolveCodegraphNodeSupport,
   prepareWorkspace: prepareCodegraphWorkspace,
   resolveCommand: resolveCodegraphCommand,
   runCommand: runCodegraphCommand,
@@ -194,6 +232,19 @@ export function createCodegraphBootstrapHook(
 
         const projectRoot = resolveCodegraphProjectRoot(input.event.properties, ctx.directory)
         if (bootstrappedProjects.has(projectRoot)) return
+
+        const excludedRoots = codegraphConfig.excluded_roots
+        const exclusion = deps.excludeProject(projectRoot, {
+          ...(excludedRoots === undefined ? {} : { excludedRoots }),
+        })
+        if (exclusion.excluded) {
+          deps.log("[codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap", {
+            matchedRoot: exclusion.matchedRoot,
+            projectRoot,
+            reason: exclusion.reason,
+          })
+          return
+        }
 
         bootstrappedProjects.add(projectRoot)
         deps.schedule(() => runBootstrap(projectRoot, codegraphConfig, deps))

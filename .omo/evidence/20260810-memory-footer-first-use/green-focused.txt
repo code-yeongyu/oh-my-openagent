@@ -1,0 +1,26 @@
+Command:
+bun test packages/memory-core/src/git/repo.test.ts packages/omo-senpi/src/components/memory/status.test.ts packages/omo-senpi/src/components/memory/wiring.test.ts
+
+Observed after production changes:
+
+PASS GitMemoryRepo returns deterministic HEAD committer epoch seconds.
+PASS committed HEAD ninety seconds old renders `mem:<identity> 1m ago`.
+PASS compact age buckets render `just now`, `2h ago`, and `3d ago`.
+PASS advisory under threshold emits no notification.
+PASS advisory over threshold emits one warning.
+PASS already-notified suppresses a second warning.
+PASS missing HEAD emits no footer or advisory.
+PASS missing commit timestamp emits no footer.
+PASS future commit timestamp emits no footer.
+PASS only system/**/*.md contributes to advisory token estimate.
+PASS first memory tool result renders one footer.
+PASS later memory and memory_apply_patch results do not render again.
+PASS a new session resets the one-shot gate.
+
+20 pass
+0 fail
+46 expect() calls
+Ran 20 tests across 3 files. [4.58s]
+
+LSP diagnostic note:
+The built-in LSP server rejects every task-worktree path because the fresh worktree is outside the session request cwd. An ignored symlink inside the request cwd was also rejected after realpath resolution. Package `tsgo --noEmit` is therefore the authoritative diagnostics fallback and is captured separately in `typecheck.txt`.

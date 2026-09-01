@@ -4,6 +4,7 @@
  * Default values and configuration constants for the runtime fallback feature.
  */
 
+import { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "@oh-my-opencode/model-core"
 import type { RuntimeFallbackConfig } from "../../config"
 
 /**
@@ -16,39 +17,14 @@ export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   cooldown_seconds: 60,
   timeout_seconds: 30,
   notify_on_fallback: true,
+  restore_primary_after_cooldown: false,
 }
 
 /**
  * Error patterns that indicate rate limiting or temporary failures
  * These are checked in addition to HTTP status codes
  */
-export const RETRYABLE_ERROR_PATTERNS = [
-  /rate.?limit/i,
-  /too.?many.?requests/i,
-  /quota\s+will\s+reset\s+after/i,
-  /quota.?exceeded/i,
-  /exceeded.*quota/i,
-  /usage\s*quota/i,
-  /exhausted\s+your\s+capacity/i,
-  /limit\s+exhausted/i,
-  /all\s+credentials\s+for\s+model/i,
-  /cool(?:ing)?\s+down/i,
-  /model.{0,20}?not.{0,10}?supported/i,
-  /model_not_supported/i,
-  /service.?unavailable/i,
-  /overloaded/i,
-  /temporarily.?unavailable/i,
-  /try.?again/i,
-  /(?:^|\s)429(?:\s|$)/,
-  /(?:^|\s)503(?:\s|$)/,
-  /(?:^|\s)529(?:\s|$)/,
-  /使用上限/,
-  /频率限制/,
-  /请求过于频繁/,
-  /暂时不可用/,
-  /服务不可用/,
-  /请稍后重试/,
-]
+export const RETRYABLE_ERROR_PATTERNS = RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS
 
 /**
  * Hook name for identification and logging

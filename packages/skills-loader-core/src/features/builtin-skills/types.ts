@@ -4,9 +4,10 @@ export interface BuiltinSkill {
   name: string
   description: string
   template: string
+  resolvedPath?: string
   license?: string
   compatibility?: string
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, string>
   allowedTools?: string[]
   agent?: string
   model?: string

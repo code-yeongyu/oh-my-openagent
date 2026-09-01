@@ -1,7 +1,5 @@
-import { execFile } from "node:child_process";
-import { copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 // These relative imports resolve at BUILD time in the monorepo; esbuild
 // inlines the installer source modules into dist/cli.js so PLUGIN_ROOT ships
@@ -12,6 +10,7 @@ import {
 	linkCachedPluginAgents,
 } from "../../../../src/install/link-cached-plugin-agents.ts";
 import { linkCachedPluginBins, linkRootRuntimeBin } from "../../../../src/install/codex-cache-bins.ts";
+import { hasForeignAgentRegistration } from "../../../../src/install/codex-config-agents.ts";
 import { updateCodexConfig } from "../../../../src/install/codex-config-toml.ts";
 import { stampGitBashMcpEnv } from "../../../../src/install/codex-git-bash-mcp-env.ts";
 import { trustedHookStatesForPlugin } from "../../../../src/install/codex-hook-trust.ts";
@@ -25,8 +24,6 @@ export const SETUP_MARKETPLACE_NAME = "sisyphuslabs";
 export const SETUP_PLUGIN_NAME = "omo";
 export const GIT_BASH_INSTALL_HINT = "winget install --id Git.Git -e --source winget";
 
-export type SetupRunCommand = (command: string, args: readonly string[], options: { cwd: string }) => Promise<unknown>;
-
 export interface WorkerSetupOptions {
 	readonly codexHome: string;
 	readonly env: Record<string, string | undefined>;
@@ -35,8 +32,6 @@ export interface WorkerSetupOptions {
 	readonly platform: NodeJS.Platform;
 	/** Timestamp used for bootstrap.log entries; the worker passes its run time. */
 	readonly now?: number;
-	/** Test seam: command runner for the win32 Git Bash auto-install. */
-	readonly runCommand?: SetupRunCommand;
 	/** Test seam: overrides Git Bash discovery (win32 only). */
 	readonly resolveGitBash?: () => GitBashResolution;
 }
@@ -68,10 +63,8 @@ async function resolveGitBashStep(options: WorkerSetupOptions, degraded: Bootstr
 	if (options.platform !== "win32") return false;
 	try {
 		const resolution = await prepareGitBashForInstall({
-			cwd: options.pluginRoot,
 			env: options.env,
 			platform: options.platform,
-			runCommand: options.runCommand ?? defaultRunCommand,
 			...(options.resolveGitBash === undefined ? {} : { resolveGitBash: options.resolveGitBash }),
 		});
 		if (resolution.found) return true;
@@ -149,6 +142,16 @@ async function updateConfigStep(
 	const configPath = join(options.codexHome, "config.toml");
 	try {
 		await assertWritableConfigIfPresent(configPath);
+		// Orca mirrors the system [agents.*] entries into its runtime CODEX_HOME
+		// without copying the agents directory. Re-stamping our own registration
+		// for such a role would collide with the mirrored entry once Codex
+		// discovers <codexHome>/agents/<name>.toml (two different file paths for
+		// one role name -> upstream warning), so foreign pre-existing blocks are
+		// left untouched; directory discovery still loads the linked toml.
+		const existingConfig = await readConfigIfPresent(configPath);
+		const agentConfigs = inputs.agentConfigs.filter(
+			(agentConfig) => !hasForeignAgentRegistration(existingConfig, agentConfig),
+		);
 		// Re-stamping trusted hook hashes after an upgrade is what makes the
 		// next session's hooks trusted again once the user re-approved the
 		// bootstrap hook itself.
@@ -158,7 +161,7 @@ async function updateConfigStep(
 			pluginRoot: options.pluginRoot,
 		});
 		await updateCodexConfig({
-			agentConfigs: inputs.agentConfigs,
+			agentConfigs,
 			// Hard invariant: the bootstrap worker NEVER writes permission keys
 			// (approval/sandbox/network policies stay installer-flag-only).
 			autonomousPermissions: false,
@@ -197,6 +200,15 @@ function errorCode(error: unknown): string | undefined {
 	return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined;
 }
 
+async function readConfigIfPresent(configPath: string): Promise<string> {
+	try {
+		return await readFile(configPath, "utf8");
+	} catch (error) {
+		if (errorCode(error) === "ENOENT") return "";
+		throw error;
+	}
+}
+
 async function linkComponentBinsStep(options: WorkerSetupOptions, degraded: BootstrapDegradedEntry[]): Promise<void> {
 	const binDir = resolveCodexInstallerBinDir({ codexHome: options.codexHome, env: options.env });
 	try {
@@ -211,10 +223,8 @@ async function linkComponentBinsStep(options: WorkerSetupOptions, degraded: Boot
 	await linkRuntimeWrapperStep(options, binDir, degraded);
 }
 
-// The marketplace payload intentionally ships without <pluginRoot>/dist/cli
-// (thin payload), so linkRootRuntimeBin returning null is the expected
-// degraded mode there: record the omo-cli ledger entry and log the same
-// warning install-local.mjs prints instead of leaving a broken `omo` link.
+// Older marketplace payloads may not have <pluginRoot>/dist/cli. Keep that
+// degraded path explicit instead of leaving a broken `omo-agent-toolkit` link.
 async function linkRuntimeWrapperStep(
 	options: WorkerSetupOptions,
 	binDir: string,
@@ -230,18 +240,18 @@ async function linkRuntimeWrapperStep(
 		});
 		if (linked !== null) return;
 		degraded.push({
-			component: "omo-cli",
-			hint: "use npx lazycodex-ai for the omo CLI",
+			component: "omo-agent-toolkit",
+			hint: "use npx lazycodex-ai for the omo-agent-toolkit CLI",
 			reason: "marketplace payload has no dist/cli",
 		});
-		await appendBootstrapLog(options.pluginData, options.now ?? Date.now(), "omo-cli-degraded", {
-			warning: `Warning: skipped the omo runtime wrapper because ${cliPath} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
+		await appendBootstrapLog(options.pluginData, options.now ?? Date.now(), "omo-agent-toolkit-degraded", {
+			warning: `Warning: skipped the omo-agent-toolkit runtime wrapper because ${cliPath} is missing; omo-agent-toolkit ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
 		});
 	} catch (error) {
 		degraded.push({
-			component: "omo-cli",
+			component: "omo-agent-toolkit",
 			hint: BOOTSTRAP_DOCTOR_HINT,
-			reason: `failed to link the omo runtime wrapper into ${binDir}: ${errorMessage(error)}`,
+			reason: `failed to link the omo-agent-toolkit runtime wrapper into ${binDir}: ${errorMessage(error)}`,
 		});
 	}
 }
@@ -256,12 +266,6 @@ async function stampGitBashEnvStep(options: WorkerSetupOptions, degraded: Bootst
 			reason: `failed to stamp ${join(options.pluginRoot, ".mcp.json")}: ${errorMessage(error)}`,
 		});
 	}
-}
-
-const execFileAsync = promisify(execFile);
-
-async function defaultRunCommand(command: string, args: readonly string[], options: { cwd: string }): Promise<unknown> {
-	return execFileAsync(command, [...args], { cwd: options.cwd });
 }
 
 async function directoryNames(root: string): Promise<string[]> {

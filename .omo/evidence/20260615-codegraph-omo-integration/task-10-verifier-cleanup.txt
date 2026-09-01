@@ -1,5 +1,0 @@
-Cleanup receipt for TODO 10 verifier fix (2026-06-15)
-Created tmux sessions: none in this turn (schema-only CLI QA used).
-task-10 tmux sessions currently running: 0
-
-Temporary files created by this turn: none.

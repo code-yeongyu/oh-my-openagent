@@ -46,6 +46,20 @@ tmux send-keys -t <sess> "/debug-config" Enter
 tmux capture-pane -t <sess> -p -S -
 ```
 
+For TUI visual QA evidence, render the live TUI through the real xterm.js web
+terminal instead of scraping the tmux pane (`tmux capture-pane` degrades color
+and CJK width):
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "Codex TUI /debug-config" \
+  --command "codex" --input "/debug-config" --input "{Enter}" \
+  --evidence-dir .omo/evidence/<slug>/codex-debug-config-web-terminal
+```
+
+Attach the resulting `terminal.png` and keep `metadata.json` with the cleanup
+receipt. The tmux pane above proves the config text; this PNG proves the visual
+TUI surface in true color.
+
 ## 5. `codex debug` subcommands
 
 `codex debug models` (raw model catalog), `codex debug prompt-input` (the

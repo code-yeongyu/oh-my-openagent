@@ -1,9 +1,10 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import { isCmuxCompatEnvironment } from "../cmux-detect"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
 
@@ -61,6 +62,12 @@ export async function spawnTmuxWindow(
 		return { success: false }
 	}
 
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+		log("[spawnTmuxWindow] SKIP: authenticated cmux windows are unsupported")
+		return { success: false }
+	}
+
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		log("[spawnTmuxWindow] SKIP: tmux not found")
@@ -77,6 +84,7 @@ export async function spawnTmuxWindow(
 		"-n", ISOLATED_WINDOW_NAME,
 		"-P",
 		"-F", "#{pane_id}",
+		...authEnvArgs,
 		placeholderCmd,
 	]
 

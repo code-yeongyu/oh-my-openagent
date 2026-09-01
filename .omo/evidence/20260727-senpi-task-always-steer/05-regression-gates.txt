@@ -1,0 +1,29 @@
+Regression gates:
+
+1. `bun run --cwd packages/senpi-task test`
+   - Exit: 0
+   - Result: `554 pass`, `0 fail`, `1786 expect() calls`, 77 files.
+
+2. `bun run --cwd <worktree> test:senpi`
+   - Exit: 0
+   - Includes: Senpi plugin rebuild, omo-senpi `tsgo --noEmit`, and the omo-senpi test suite.
+   - Result after rebasing onto current `origin/dev`: `403 pass`, `0 fail`, `1174 expect() calls`, 70 files.
+
+3. `bun run --cwd packages/senpi-task typecheck`
+   - Exit: 0
+   - Output: `tsgo --noEmit -p tsconfig.json`
+
+4. `bun run --cwd packages/omo-senpi typecheck`
+   - Exit: 0
+   - Output: `tsgo --noEmit -p tsconfig.json`
+
+5. `bun run --cwd <worktree> build:senpi-plugin`
+   - Exit: 0 after regenerating the embedded directive.
+   - Generated extension and synced skill artifacts match their source inputs.
+
+6. `git diff --check`
+   - Exit: 0
+
+LSP note: see `04-lsp.txt`; the daemon timed out, so compiler gates are the clean blocking substitute rather than an invented LSP PASS.
+
+Unrelated generated drift from dependency installation was removed before review.

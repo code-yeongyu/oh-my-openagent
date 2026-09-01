@@ -69,8 +69,12 @@ export class MonitorBatcher {
     }
   }
 
-  flushNow(): void {
-    if (this.destroyed || this.lines.length === 0 || !this.batchCallback) {
+  flushNow(options?: { allowEmpty?: boolean }): void {
+    if (this.destroyed || !this.batchCallback) {
+      return
+    }
+
+    if (this.lines.length === 0 && options?.allowEmpty !== true) {
       return
     }
 

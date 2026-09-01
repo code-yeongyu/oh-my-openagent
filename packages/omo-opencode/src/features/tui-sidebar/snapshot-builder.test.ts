@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -135,13 +135,13 @@ describe("buildTuiRuntimeSnapshot", () => {
 
     // then
     expect(TuiRuntimeSnapshotSchema.safeParse(snapshot).success).toBe(true)
-    expect(snapshot.projectDir).toBe(resolve(projectDir))
+    expect(snapshot.projectDir).toBe(realpathSync.native(resolve(projectDir)))
     expect(snapshot.activeAgents).toEqual([
       { name: "sisyphus", status: "busy" },
       { name: "atlas", status: "retry" },
     ])
     expect(snapshot.jobBoard).toEqual([
-      { title: "sisyphus background task", status: "running", toolCalls: 3, lastTool: "grep" },
+      { title: "Explore runtime", status: "running", toolCalls: 3, lastTool: "grep" },
     ])
     expect(snapshot.loop).toEqual({
       kind: "live",
@@ -187,7 +187,7 @@ describe("buildTuiRuntimeSnapshot", () => {
       client: createClient({}),
       backgroundManager: createBackgroundManager([
         {
-          title: "Read customer secret sk-live-job",
+          title: "atlas background task",
           status: "running",
           toolCalls: 1,
           lastTool: "read",

@@ -14,7 +14,7 @@ export function readBoulderState(directory: string): BoulderState | null {
   try {
     const content = readFileSync(filePath, "utf-8")
     const parsed = JSON.parse(content)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).length === 0) {
       return null
     }
 
@@ -92,7 +92,7 @@ function normalizeWorkSessionFields(works: unknown): void {
 
 export function getBoulderWorks(state: BoulderState): BoulderWorkState[] {
   if (state.works && typeof state.works === "object") {
-    return Object.values(state.works)
+    return Object.values(state.works).filter((work): work is BoulderWorkState => work != null)
   }
 
   if (!state.active_plan || !state.plan_name || !state.started_at) {

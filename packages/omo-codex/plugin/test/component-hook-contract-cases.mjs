@@ -139,6 +139,30 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
+			name: "teammode post-tool-use create-thread title reminder",
+			component: "teammode",
+			event: "post-tool-use",
+			payload: {
+				hook_event_name: "PostToolUse",
+				session_id: "s-task12",
+				turn_id: "t-task12",
+				transcript_path: null,
+				cwd: tempRoot,
+				model: "gpt-5.5",
+				permission_mode: "default",
+				tool_name: "create_thread",
+				tool_use_id: "tool-task12",
+				tool_input: { prompt: "Investigate flaky release packaging" },
+				tool_response: { threadId: "thread-task12" },
+			},
+			assertOutput(stdout) {
+				const output = JSON.parse(stdout);
+				assert.equal(output.hookSpecificOutput.hookEventName, "PostToolUse");
+				assert.match(output.hookSpecificOutput.additionalContext, /codex_app\.set_thread_title/);
+				assert.match(output.hookSpecificOutput.additionalContext, /thread-task12/);
+			},
+		},
+		{
 			name: "lsp post-compact reset",
 			component: "lsp",
 			event: "post-compact",
@@ -156,12 +180,12 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
-			name: "lazycodex executor verifier subagent-stop blocks missing evidence",
+			name: "lazycodex worker verifier subagent-stop blocks missing evidence",
 			component: "lazycodex-executor-verify",
 			event: "subagent-stop",
 			payload: {
 				hook_event_name: "SubagentStop",
-				agent_type: "lazycodex-executor",
+				agent_type: "lazycodex-worker-medium",
 				agent_id: "agent-task12",
 				session_id: "s-task12",
 				transcript_path: join(tempRoot, "transcript.jsonl"),
@@ -178,8 +202,8 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
-			name: "start-work-continuation stop no state",
-			component: "start-work-continuation",
+			name: "ulw-execute-continuation stop no state",
+			component: "ulw-execute-continuation",
 			event: "stop",
 			payload: {
 				hook_event_name: "Stop",

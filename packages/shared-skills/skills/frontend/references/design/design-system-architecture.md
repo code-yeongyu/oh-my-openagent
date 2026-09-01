@@ -9,16 +9,25 @@ Every frontend project MUST have a `DESIGN.md` at its root. This file is the sin
 
 ## When to Create
 
-- **New project**: Create `DESIGN.md` during initial setup, before any UI component.
-- **Existing project without one**: Extract the design system from existing code before continuing work.
+- **New project**: If the user gave no concrete visual reference, select one Layer A style skill and one Layer B brand/design-system reference first. Treat them as source material for tokens, layout, component anatomy, states, motion, and taste; customize for the user's product without freestyling past the selected references. Then create `DESIGN.md` before UI, with Section 5 primitives and states defined before implementation.
+- **Existing project without one, but with implicit patterns/components**: Extract the design system from existing code before continuing work.
+- **Existing project without one and without a reusable component layer**: Ask whether to preserve the current look with copy-nearby styling or extract a `DESIGN.md` plus reusable components first. Do not silently choose.
 - **Existing project with one**: Read it. Follow it. Update it only when a genuinely new pattern emerges.
 
 ## DESIGN.md Structure
 
-The file has 7 sections. Every section is mandatory. Skip nothing.
+The file has 8 sections plus a greenfield-only `## 0. Research Log`. Every section is mandatory. Skip nothing.
 
 ```markdown
 # [Project Name] Design System
+
+## 0. Research Log (greenfield only)
+
+One line per research lane, written before the sections below — a lane with no line did not run:
+- Embedded refs: shortlisted [2-3 Layer B candidates] → picked [Layer A] + [Layer B] because [reason]
+- Lazyweb: [N] queries, [M] screens viewed → [layout grammar taken]
+- Imagen drafts: [paths] → picked [draft] as the reference-fidelity contract
+- Skipped lanes: [lane] — [tool/network reason]
 
 ## 1. Atmosphere & Identity
 
@@ -107,23 +116,26 @@ All spacing derives from a base of **4px**.
 - Breakpoints: sm 640px, md 768px, lg 1024px, xl 1280px, 2xl 1536px
 
 ### Rules
-- No magic numbers. Every spacing value maps to a token.
+- Tokenize design *intent* — spacing steps, content width, gutters, section gaps, density steps. Keep browser *mechanics* raw: `auto`, `%`, `min-content`, `max-content`, `fit-content`, `clamp()`, viewport/container units, intrinsic sizing. A `clamp(1rem, 4vw, 2rem)` gap or a `minmax(min(16rem, 100%), 1fr)` track is mechanics, not a magic number — do not force it into a token.
 - Asymmetric spacing is intentional, not accidental — document why.
 
 ## 5. Components
 
-Document reusable patterns as they emerge. Format:
+Document reusable patterns before implementation for greenfield work, and as they emerge or are extracted for existing work. Format:
 
 ### [Component Name]
 - **Structure**: HTML/JSX outline
 - **Variants**: list
 - **Spacing**: which tokens
-- **States**: default, hover, active, focus, disabled, loading, error
+- **States**: default, hover, active, focus, disabled, loading, empty, error
 - **Accessibility**: keyboard, ARIA, contrast
 - **Motion**: entry/exit animations
+- **Layout**: spatial primitive (stack / cluster / sidebar / grid / shell…) and, if the component scrolls or pins anything, its scroll owner
 
-Start with components used 2+ times. Do not pre-document components
-that don't exist yet.
+Greenfield starts with the primitives you are about to build, assembled from
+the selected references' component anatomy and adapted to the user's product.
+Existing projects start with components used 2+ times or already shared in
+code; do not invent future components just to fill the section.
 
 ## 6. Motion & Interaction
 
@@ -162,28 +174,40 @@ If borders:
 
 If tonal-shift:
 Surfaces use progressively lighter/darker shades. No borders, no shadows.
+
+## 8. Accessibility Constraints & Accepted Debt
+
+### Constraints
+- WCAG target: [e.g. 2.2 AA] — contrast floor [4.5:1 body / 3:1 large text], visible focus on every
+  interactive element, full keyboard reachability, `prefers-reduced-motion` respected (Section 6).
+
+### Accepted Debt
+| Item | Location | Why accepted | Owner / Exit |
+|------|----------|--------------|--------------|
+| [debt] | [file/screen] | [reason + user sign-off] | [when it gets fixed] |
+
+New debt is recorded here at the moment it is accepted — never silently.
 ```
 
 ## Creation Workflow
 
 ### For New Projects
 
-1. **Ask or infer the product domain** — SaaS dashboard? Marketing site? Dev tool?
-2. **Write the Atmosphere paragraph** — one chance to establish identity.
-3. **Define palette** — derive from atmosphere. Not random. Not generic.
-4. **Set typography** — match the atmosphere. Editorial = serif. Technical = mono-heavy. Clean = geometric sans.
-5. **Lock spacing** — base-4 system. Customize only the section-level values.
-6. **Document initial components** — only those you are about to build.
-7. **Choose depth strategy** — one. Not "a mix."
-8. **Write it to `DESIGN.md`** at project root.
+1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
+2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
+3. **Define the system** — atmosphere, palette, typography, spacing, and one depth strategy, grounded in the selected references and product semantics. Sanity-check the palette and type pairing with one `ui-ux-db` domain search (CLI in `references/ui-ux-db/README.md`).
+4. **Document initial primitives** — only components you are about to build, including variants and states.
+5. **Write it to `DESIGN.md`** at project root.
+6. **Build a primitive showcase first** — exercise each primitive's default, hover, active, focus, disabled, loading, empty, and error states at mobile/tablet/desktop widths before composing product screens.
 
 ### For Existing Projects (Extraction)
 
 1. **Read all CSS/styling files** — find the actual tokens in use.
-2. **Identify the implicit system** — what colors, fonts, spacing values repeat?
-3. **Codify it** — write the `DESIGN.md` reflecting what EXISTS, not what you wish existed.
-4. **Flag inconsistencies** — note where the code deviates from its own patterns.
-5. **Propose consolidation** — but do not apply it until approved.
+2. **Identify the implicit system** — what colors, fonts, spacing values, components, and states repeat?
+3. **If no reusable component layer exists**, ask whether to preserve the current look with copy-nearby edits or extract reusable components first.
+4. **Codify it** — write the `DESIGN.md` reflecting what EXISTS, not what you wish existed.
+5. **Flag inconsistencies** — note where the code deviates from its own patterns.
+6. **Propose consolidation** — but do not apply it until approved.
 
 ## Validation Rules
 
@@ -191,11 +215,14 @@ After every component implementation, check:
 
 - [ ] All colors reference tokens from Section 2. No raw hex outside `DESIGN.md`.
 - [ ] All font sizes match Section 3 scale. No arbitrary sizes.
-- [ ] All spacing values are multiples of `--space-1` (4px). No magic numbers.
-- [ ] Interactive elements have all required states from Section 6.
+- [ ] Spacing intent maps to a token (Section 4); browser mechanics (`clamp()`, intrinsic sizing, container units) stay raw. No arbitrary px.
+- [ ] Interactive elements have all required states from Section 5 and Section 6.
 - [ ] Depth treatment matches the chosen strategy from Section 7.
 - [ ] Component reused 2+ times? Documented in Section 5.
 - [ ] Motion follows the timing table. No arbitrary durations.
+- [ ] Component visual QA passed for each primitive and required state before product screens were composed.
+- [ ] Section 8 accessibility constraints hold for the new component; any new debt is recorded in Section 8, not silently accepted.
+- [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 375px with no horizontal scroll of primary content.
 
 ## Memory Management
 

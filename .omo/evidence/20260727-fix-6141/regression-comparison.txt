@@ -1,0 +1,42 @@
+### REGRESSION COMPARISON - issue #6141 - 2026-07-27T06:28:26Z
+Both sweeps run sequentially on a quiet host, same suites, same machine.
+
+--- CLEAN BASE totals ---
+=== bun test packages/omo-opencode/src/agents ===
+ 369 pass
+ 0 fail
+Ran 369 tests across 30 files. [1.50s]
+EXIT=0 for packages/omo-opencode/src/agents
+=== bun test packages/model-core ===
+ 312 pass
+ 0 fail
+Ran 312 tests across 27 files. [795.00ms]
+EXIT=0 for packages/model-core
+=== bun test packages/prompts-core ===
+ 26 pass
+ 0 fail
+Ran 26 tests across 5 files. [385.00ms]
+EXIT=0 for packages/prompts-core
+
+--- WITH THIS PR totals ---
+=== bun test packages/omo-opencode/src/agents ===
+ 374 pass
+ 0 fail
+Ran 374 tests across 30 files. [1254.00ms]
+EXIT=0 for packages/omo-opencode/src/agents
+=== bun test packages/model-core ===
+ 312 pass
+ 0 fail
+Ran 312 tests across 27 files. [716.00ms]
+EXIT=0 for packages/model-core
+=== bun test packages/prompts-core ===
+ 26 pass
+ 0 fail
+Ran 26 tests across 5 files. [403.00ms]
+EXIT=0 for packages/prompts-core
+
+--- failing on CLEAN BASE (0) ---
+--- failing WITH PR (0) ---
+
+--- NEW failures introduced by this PR (must be empty) ---
+--- end ---

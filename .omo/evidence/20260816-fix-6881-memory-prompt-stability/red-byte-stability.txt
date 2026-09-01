@@ -1,0 +1,47 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/prompt.test.ts:
+167 |     // when
+168 |     const beforeThreshold = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-before-threshold", 2))
+169 |     const afterThreshold = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-after-threshold", 12))
+170 |
+171 |     // then
+172 |     expect(afterThreshold?.systemPrompt).toBe(beforeThreshold?.systemPrompt)
+                                               ^
+error: expect(received).toBe(expected)
+
+  "BASE PROMPT
+
+  <!-- senpi-memory:prompt-agent:begin -->
+  Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md).
+
+  <self>
+  <projection>$MEMORY_DIR/system/persona.md</projection>
+  first
+  </self>
+
+  <memory_metadata>
+  - AGENT_ID: prompt-agent
+- - CONVERSATION_ID: session-before-threshold
+- - System prompt last recompiled: 2026-01-01 12:00:00 AM UTC+0000
+- - 2 previous messages between you and the user are stored in recall memory
++ - CONVERSATION_ID: session-after-threshold
++ - System prompt last recompiled: 2026-01-01 12:00:01 AM UTC+0000
++ - 12 previous messages between you and the user are stored in recall memory
++ - 12 user turns since your last memory save. Save durable facts now, or decide nothing qualifies.
++ - Soul updated by reflection a1b2c3d since your last run
+  </memory_metadata>
+  <!-- senpi-memory:prompt-agent:end -->"
+
+- Expected  - 3
++ Received  + 5
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-6881-memory-prompt-stability/packages/omo-senpi/src/components/memory/prompt.test.ts:172:42)
+(fail) createMemoryPromptHandler > #given the same identity and HEAD across sessions and turns #when volatile notices change #then the system block stays byte-identical and notices travel as a late message [466.40ms]
+
+ 0 pass
+ 11 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [729.00ms]
+exit_status=1

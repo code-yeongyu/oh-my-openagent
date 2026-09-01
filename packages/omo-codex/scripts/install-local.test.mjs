@@ -62,14 +62,15 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
 	});
 
 	assert.equal(result.installed.length, 1);
-	const wrapper = await readFile(join(codexHome, "bin", "omo"), "utf8");
+	const wrapper = await readFile(join(codexHome, "bin", "omo-agent-toolkit"), "utf8");
 	assert.match(wrapper, /OMO_GENERATED_RUNTIME_WRAPPER/);
+	assert.match(wrapper, /export OMO_INVOCATION_NAME=omo-agent-toolkit/);
+	assert.match(wrapper, /export OMO_EDITION=codex/);
 	assert.match(
 		wrapper,
 		new RegExp(escapeRegExp(escapePosixDoubleQuoted(toPosixPath(join(repoRoot, "dist", "cli", "index.js"))))),
 	);
 	assert.match(wrapper, /CODEX_HOME/);
-	assert.match(wrapper, /OMO_SPARKSHELL_APP_SERVER_SOCKET/);
 	assert.match(wrapper, /omo-ulw-loop/);
 });
 
@@ -99,9 +100,10 @@ test("#given repoRoot without root CLI dist #when installing locally #then warns
 
 	const cliPath = join(repoRoot, "dist", "cli", "index.js");
 	assert.ok(
-		logs.some((line) => line.includes("omo runtime wrapper") && line.includes(cliPath)),
+		logs.some((line) => line.includes("omo-agent-toolkit runtime wrapper") && line.includes(cliPath)),
 		`expected a warning naming the missing ${cliPath}; got:\n${logs.join("\n")}`,
 	);
+	await assert.rejects(readFile(join(codexHome, "bin", "omo-agent-toolkit"), "utf8"));
 	await assert.rejects(readFile(join(codexHome, "bin", "omo"), "utf8"));
 });
 
@@ -161,6 +163,7 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
 	const pluginRoot = join(codexPackageRoot, "plugin");
 	await writePluginAt(pluginRoot, "alpha", "1.2.3");
 	await writeFile(join(pluginRoot, "dist", "cli.js"), "console.log('plugin cli')\n");
+	await writeFile(join(pluginRoot, "dist", "cli.ps1"), "Write-Output 'plugin cli'\n");
 	await writeJson(join(pluginRoot, "hooks", "hooks.json"), {
 		hooks: {
 			UserPromptSubmit: [
@@ -169,6 +172,7 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
 						{
 							type: "command",
 							command: "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit",
+							commandWindows: 'powershell -File "${PLUGIN_ROOT}\\dist\\cli.ps1" hook user-prompt-submit',
 							timeout: 10,
 							statusMessage: "checking alpha",
 						},
@@ -181,13 +185,15 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
 	await installMarketplaceLocally({
 		repoRoot,
 		codexHome,
+		platform: "win32",
+		gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
 		runCommand: async () => {},
 		log: () => {},
 	});
 
 	const config = await readFile(join(codexHome, "config.toml"), "utf8");
 	assert.match(config, /\[hooks\.state\."alpha@debug-marketplace:hooks\/hooks\.json:user_prompt_submit:0:0"\]/);
-	assert.match(config, /trusted_hash = "sha256:[a-f0-9]{64}"/);
+	assert.match(config, /trusted_hash = "sha256:605b27c7b1f93c02aa2f8052fd9df870a221c3dc432795c48b223fe48afcebc0"/);
 });
 
 test("#given bad plugin source path #when installing #then rejects traversal", async () => {

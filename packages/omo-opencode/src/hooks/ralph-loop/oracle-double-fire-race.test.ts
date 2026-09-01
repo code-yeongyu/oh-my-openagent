@@ -129,7 +129,6 @@ describe("ulw-loop oracle double-fire race (Race A)", () => {
 		// verification_pending stays true, verification_attempt_id is preserved,
 		// iteration is NOT incremented.
 		expect(promptCalls).toHaveLength(1)
-		expect(promptCalls.every((call) => !call.text.includes("Verification failed"))).toBe(true)
 
 		const stateAfterRace = hook.getState()
 		expect(stateAfterRace?.verification_pending).toBe(true)

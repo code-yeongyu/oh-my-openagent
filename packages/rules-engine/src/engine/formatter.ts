@@ -92,16 +92,7 @@ function orderStaticRules(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
 }
 
 function isHephaestusRule(rule: LoadedRule): boolean {
-	return displayFilename(rule).toLowerCase() === "hephaestus.md";
-}
-
-function displayFilename(rule: LoadedRule): string {
-	const normalizedPath = rule.relativePath.length > 0 ? rule.relativePath : rule.path;
-	const segments = normalizedPath
-		.replace(/\\/g, "/")
-		.split("/")
-		.filter((segment) => segment.length > 0);
-	return segments.at(-1) ?? normalizedPath;
+	return isNeverTruncatedRule(rule.relativePath.length > 0 ? rule.relativePath : rule.path);
 }
 
 function uniqueRulesByBody(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {

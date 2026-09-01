@@ -1,0 +1,12 @@
+$ bun run test:senpi
+2417 pass
+1 Windows-only process-driver skip
+0 fail
+7796 expect() calls
+Ran 2418 tests across 323 files. [159.24s]
+
+Evidence resolver:
+10 pass
+0 fail
+31 expect() calls
+Ran 10 tests across 1 file. [1479.00ms]

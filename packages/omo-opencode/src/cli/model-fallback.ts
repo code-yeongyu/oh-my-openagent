@@ -18,11 +18,12 @@ import {
 	resolveModelFromChain,
 } from "./fallback-chain-resolution"
 import { transformModelForProvider } from "./provider-model-id-transform"
+import { isExcludedFallbackLaneModel } from "./fallback-lane-policy"
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
 export const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
-const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
 
 type CompatibleFallbackSettings = {
   variant?: string
@@ -120,6 +121,7 @@ function attachFallbackModels<T extends AgentConfig | CategoryConfig>(
   }
 
   const fallbackModels = uniqueFallbacks.slice(primaryIndex + 1)
+    .filter((entry) => !isExcludedFallbackLaneModel(entry.model))
   if (fallbackModels.length === 0) {
     return config
   }
@@ -136,7 +138,9 @@ function attachAllFallbackModels<T extends AgentConfig | CategoryConfig>(
   availability: ReturnType<typeof toProviderAvailability>,
 ): T {
   const uniqueFallbacks = collectAvailableFallbacks(fallbackChain, availability)
-  const fallbackModels = uniqueFallbacks.filter((entry) => entry.model !== config.model)
+  const fallbackModels = uniqueFallbacks
+    .filter((entry) => entry.model !== config.model)
+    .filter((entry) => !isExcludedFallbackLaneModel(entry.model))
   if (fallbackModels.length === 0) {
     return config
   }
@@ -194,13 +198,13 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     if (role === "explore") {
       let agentConfig: AgentConfig
       if (avail.native.openai) {
-        agentConfig = { model: "openai/gpt-5.4-mini-fast" }
+        agentConfig = { model: "openai/gpt-5.6-luna-fast", variant: "low" }
       } else if (avail.native.claude) {
         agentConfig = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
         agentConfig = { model: "opencode/gpt-5-nano" }
       } else if (avail.opencodeGo) {
-        agentConfig = { model: "opencode-go/qwen3.5-plus" }
+        agentConfig = { model: "opencode-go/qwen3.7-plus" }
       } else if (avail.copilot) {
         agentConfig = { model: "github-copilot/gpt-5-mini" }
       } else {

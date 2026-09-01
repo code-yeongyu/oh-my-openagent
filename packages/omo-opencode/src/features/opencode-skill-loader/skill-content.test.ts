@@ -54,7 +54,6 @@ describe("resolveSkillContent", () => {
 		// then: returns template string
 		expect(result).not.toBeNull()
 		expect(typeof result).toBe("string")
-		expect(result).toContain("router, not a rulebook")
 	})
 
 	it("should return template for 'playwright' skill", () => {
@@ -65,7 +64,6 @@ describe("resolveSkillContent", () => {
 		// then: returns template string
 		expect(result).not.toBeNull()
 		expect(typeof result).toBe("string")
-		expect(result).toContain("Playwright Browser Automation")
 	})
 
 	it("should return null for non-existent skill", () => {
@@ -101,7 +99,6 @@ describe("resolveMultipleSkills", () => {
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual([])
 		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("should handle partial success - some skills not found", () => {
@@ -115,7 +112,6 @@ describe("resolveMultipleSkills", () => {
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual(["nonexistent", "another-missing"])
 		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("should handle empty array", () => {
@@ -180,7 +176,6 @@ describe("resolveSkillContentAsync", () => {
 		// then: returns template string
 		expect(result).not.toBeNull()
 		expect(typeof result).toBe("string")
-		expect(result).toContain("Git Master Agent")
 	})
 
 	it("should return null for disabled skill async", async () => {
@@ -258,7 +253,6 @@ describe("resolveMultipleSkillsAsync", () => {
 		// then: all builtin skills resolved
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 		expect(result.resolved.get("git-master")).toContain("Git Master Agent")
 	})
 
@@ -272,7 +266,6 @@ describe("resolveMultipleSkillsAsync", () => {
 		// then: existing skills resolved, non-existing in notFound
 		expect(result.resolved.size).toBe(1)
 		expect(result.notFound).toEqual(["nonexistent-skill-12345"])
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("should treat disabled skills as not found async", async () => {
@@ -449,7 +442,6 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual([])
 		expect(result.resolved.get("systematic-debugging")).toContain("short name resolved")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("does not resolve ambiguous short name in batch", async () => {

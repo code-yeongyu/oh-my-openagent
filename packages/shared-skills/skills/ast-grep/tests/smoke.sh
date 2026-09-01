@@ -49,7 +49,7 @@ fake_sg() {
   cat > "$target" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = "--version" ]; then
-  printf 'ast-grep 0.43.0 fake\n'
+  printf 'ast-grep 0.45.0 fake\n'
 else
   printf 'fake ast-grep\n'
 fi

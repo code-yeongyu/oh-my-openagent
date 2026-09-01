@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
@@ -85,6 +85,20 @@ describe("tui-sidebar mirror IPC", () => {
     expect(fileA.endsWith(".json")).toBe(true)
   })
 
+  it("#given two paths to the same project #when resolving mirror files #then they map to the same file", () => {
+    // given
+    const projectDir = makeTempDir("project-realpath")
+    const linkDir = join(makeTempDir("link-parent"), "project-link")
+    symlinkSync(projectDir, linkDir, "dir")
+
+    // when
+    const directFile = mirrorFilePath(projectDir)
+    const linkedFile = mirrorFilePath(linkDir)
+
+    // then
+    expect(linkedFile).toBe(directFile)
+  })
+
   it("#given no mirror file #when reading #then it returns null", () => {
     // given
     const projectDir = makeTempDir("absent")
@@ -155,6 +169,21 @@ describe("tui-sidebar mirror IPC", () => {
 
     // when
     const snapshot = readMirror(projectDir)
+
+    // then
+    expect(snapshot).toEqual(expected)
+  })
+
+  it("#given a snapshot written through an alias path #when reading through the real path #then it returns the parsed snapshot", () => {
+    // given
+    const projectDir = makeTempDir("alias-read")
+    const linkDir = join(makeTempDir("alias-link-parent"), "project-link")
+    symlinkSync(projectDir, linkDir, "dir")
+    const expected = snapshotFor(linkDir, Date.now())
+
+    // when
+    writeRawMirror(linkDir, expected)
+    const snapshot = readMirror(realpathSync.native(projectDir))
 
     // then
     expect(snapshot).toEqual(expected)

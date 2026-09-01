@@ -26,7 +26,12 @@ export function resolveLazyCodexPluginVersion(input: {
   readonly marketplaceName: string
   readonly pluginName: string
   readonly distributionManifest?: DistributionManifest
+  readonly versionOverride?: string
 }): string {
+  const override = input.versionOverride?.trim()
+  if (override !== undefined && override.length > 0) {
+    return override
+  }
   if (input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo" && input.distributionManifest !== undefined) {
     return input.distributionManifest.version
   }
@@ -34,9 +39,13 @@ export function resolveLazyCodexPluginVersion(input: {
 }
 
 export async function stampLazyCodexPluginVersion(input: { readonly pluginRoot: string; readonly version: string }): Promise<void> {
-  await stampJsonVersion(join(input.pluginRoot, ".codex-plugin", "plugin.json"), input.version)
+  const manifestPath = join(input.pluginRoot, ".codex-plugin", "plugin.json")
+  const hookPaths = await readPluginHookPaths(manifestPath)
+  await stampJsonVersion(manifestPath, input.version)
   await stampJsonVersion(join(input.pluginRoot, "package.json"), input.version)
-  await stampHookStatusMessages(join(input.pluginRoot, "hooks", "hooks.json"), input.version)
+  for (const hookPath of hookPaths) {
+    await stampHookStatusMessages(join(input.pluginRoot, hookPath), input.version)
+  }
   await stampComponentVersions(input)
 }
 
@@ -68,6 +77,27 @@ async function stampJsonVersion(path: string, version: string): Promise<void> {
     if (error instanceof Error) return
     throw error
   }
+}
+
+async function readPluginHookPaths(manifestPath: string): Promise<readonly string[]> {
+  try {
+    const parsed: unknown = JSON.parse(await readFile(manifestPath, "utf8"))
+    if (!isPlainRecord(parsed)) return []
+    if (typeof parsed.hooks === "string" && parsed.hooks.trim().length > 0) return [stripDotSlash(parsed.hooks)]
+    if (Array.isArray(parsed.hooks)) {
+      return parsed.hooks
+        .filter((hookPath) => typeof hookPath === "string" && hookPath.trim().length > 0)
+        .map(stripDotSlash)
+    }
+    return []
+  } catch (error) {
+    if (error instanceof Error) return []
+    throw error
+  }
+}
+
+function stripDotSlash(path: string): string {
+  return path.startsWith("./") ? path.slice(2) : path
 }
 
 async function stampHookStatusMessages(path: string, version: string): Promise<void> {
@@ -112,5 +142,13 @@ function stampHookGroups(hooks: unknown, version: string): void {
 
 function stampHookStatusMessage(hook: unknown, version: string): void {
   if (!isPlainRecord(hook) || typeof hook.statusMessage !== "string") return
-  hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):/, `LazyCodex(${version}):`)
+  hook.statusMessage = hook.statusMessage.replace(
+    /^(?:LazyCodex\([^)]+\):|\(OmO(?:\s+[^)]+)?\))\s*/,
+    `(OmO ${normalizeHookStatusVersion(version)}) `,
+  )
+}
+
+function normalizeHookStatusVersion(version: string): string {
+  const normalized = version.trim()
+  return normalized.length === 0 ? "local" : normalized
 }

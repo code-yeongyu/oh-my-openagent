@@ -90,8 +90,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       const runInBackground = delegateTaskArgs.run_in_background === true
 
-      const nativeSkillEntries = await loadNativeSkillEntries(options.nativeSkills)
-
       const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(delegateTaskArgs.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
@@ -100,11 +98,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         directory: options.directory,
         targetAgent: delegateTaskArgs.subagent_type,
         nativeSkills: options.nativeSkills,
-        nativeSkillEntries,
+        getLoadedSkills: options.getLoadedSkills,
       })
       if (skillError) {
         return skillError
       }
+      const nativeSkillEntries = await loadNativeSkillEntries(options.nativeSkills)
       const nativeSkillInfos = buildPromptNativeSkillInfos(
         availableSkills,
         nativeSkillEntries,
@@ -145,6 +144,11 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
         : undefined
 
+      const currentModelConfig = options.loadCurrentModelConfig?.()
+      const modelOptions = currentModelConfig === undefined
+        ? options
+        : { ...options, userCategories: currentModelConfig.categories, agentOverrides: currentModelConfig.agents }
+
       let agentToUse: string
       let categoryModel: DelegatedModelConfig | undefined
       let categoryPromptAppend: string | undefined
@@ -155,7 +159,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       let maxPromptTokens: number | undefined
 
       if (delegateTaskArgs.category) {
-        const resolution = await resolveCategoryExecution(delegateTaskArgs, options, inheritedModel, systemDefaultModel)
+        const resolution = await resolveCategoryExecution(delegateTaskArgs, modelOptions, inheritedModel, systemDefaultModel)
         if (resolution.error) {
           return resolution.error
         }
@@ -195,7 +199,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           return executeUnstableAgentTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
       } else {
-        const resolution = await resolveSubagentExecution(delegateTaskArgs, options, parentContext.agent, categoryExamples)
+        const resolution = await resolveSubagentExecution(delegateTaskArgs, modelOptions, parentContext.agent, categoryExamples)
         if (resolution.error) {
           return resolution.error
         }

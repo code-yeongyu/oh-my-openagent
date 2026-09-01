@@ -97,7 +97,7 @@ function loopNodes(loop: LoopState, theme: ThemeLike): ViewNode[] {
           text({ fg: theme.success }, `pass ${loop.pass}`),
           text({ fg: theme.error }, `fail ${loop.fail}`),
           text({ fg: theme.textMuted }, `pending ${loop.pending} blocked ${loop.blocked}`),
-          text({ fg: theme.accent }, `active ${truncate(loop.activeGoal ?? "none")}`),
+          text({ fg: theme.accent }, `active ${truncate(activeGoalLabel(loop.activeGoal))}`),
         ]),
       ]
     default:
@@ -116,7 +116,7 @@ function loopLines(loop: LoopState): string[] {
         `pass ${loop.pass}`,
         `fail ${loop.fail}`,
         `pending ${loop.pending} blocked ${loop.blocked}`,
-        `active ${loop.activeGoal ?? "none"}`,
+        `active ${activeGoalLabel(loop.activeGoal)}`,
       ]
     default:
       return assertNever(loop)
@@ -217,4 +217,8 @@ function section(title: string, theme: ThemeLike, children: readonly ViewNode[])
 
 function truncate(value: string): string {
   return value.length <= LABEL_MAX ? value : `${value.slice(0, LABEL_MAX - 3)}...`
+}
+
+function activeGoalLabel(activeGoal: string | null): string {
+  return activeGoal ?? "private"
 }

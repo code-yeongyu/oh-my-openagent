@@ -2,14 +2,21 @@ import { isPlainRecord } from "./codex-cache-fs"
 import { lstat, readFile, readdir, rm, rmdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { isAbsolute, join, relative, resolve } from "node:path"
+import { removeManagedCodexBins } from "./codex-cleanup-bins"
 import { cleanupCodexConfig, MANAGED_CODEX_AGENT_NAMES } from "./codex-cleanup-config"
+import { codexHomeResolvesToFilesystemRoot, validateManagedCleanupTarget } from "./codex-cleanup-safety"
+import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
+import { readInstalledCodexBinDir } from "./codex-installed-bin-dir"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
+import type { SkippedCleanupPath } from "./codex-cleanup-safety"
 import type { ProjectLocalCodexCleanupResult } from "./codex-project-local-cleanup"
 
 const INSTALLED_AGENTS_MANIFEST = ".installed-agents.json"
 
 export interface CodexCleanupOptions {
   readonly codexHome?: string
+  readonly binDir?: string
+  readonly platform?: NodeJS.Platform
   readonly projectDirectory?: string
   readonly env?: { readonly [key: string]: string | undefined }
   readonly now?: () => Date
@@ -21,8 +28,10 @@ export interface CodexCleanupResult {
   readonly configChanged: boolean
   readonly configBackupPath?: string
   readonly removedPaths: readonly string[]
+  readonly skippedPaths: readonly SkippedCleanupPath[]
   readonly removedAgentLinks: readonly string[]
   readonly skippedAgentLinks: readonly string[]
+  readonly removedBinLinks: readonly string[]
   readonly projectCleanup: ProjectLocalCodexCleanupResult
 }
 
@@ -31,19 +40,42 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
   const codexHome = resolve(input.codexHome ?? env.CODEX_HOME ?? join(homedir(), ".codex"))
   const configPath = join(codexHome, "config.toml")
 
+  // Read before anything is removed: this record lives inside the managed trees that the
+  // removal loop below deletes.
+  const installedBinDir = await readInstalledCodexBinDir(codexHome)
+
   const agentPaths = await collectInstalledAgentPaths(codexHome, configPath)
   const configCleanup = await cleanupCodexConfig(configPath, input.now)
   const agentCleanup = await removeManifestListedAgentLinks(codexHome, agentPaths)
 
   const removedPaths: string[] = []
+  const skippedPaths: SkippedCleanupPath[] = []
   const managedStatePaths = new Set([
     ...managedGlobalStatePaths(codexHome),
     ...(await collectBootstrapDataDirsByGlob(codexHome)),
   ])
   for (const path of managedStatePaths) {
-    if (await removeManagedPathBestEffort(path)) removedPaths.push(path)
+    if (await removeManagedPathBestEffort(path, { codexHome, onSkip: (skip) => skippedPaths.push(skip) })) {
+      removedPaths.push(path)
+    }
   }
   await pruneEmptyRuntimeDirBestEffort(codexHome)
+
+  // A filesystem-root codexHome would resolve the installer bin dir to a shared system
+  // directory, so it is refused here for the same reason validateManagedCleanupTarget refuses
+  // the state paths.
+  // An explicit argument or a `CODEX_LOCAL_BIN_DIR` set for this run is a deliberate
+  // instruction and wins. Otherwise the location recorded at install time is used, because
+  // recomputing the default would sweep the wrong directory when the install used a one-shot
+  // override.
+  const binDir = resolveCodexInstallerBinDir({
+    binDir: firstConfiguredPath(input.binDir, env.CODEX_LOCAL_BIN_DIR, installedBinDir),
+    codexHome,
+    env,
+  })
+  const removedBinLinks = codexHomeResolvesToFilesystemRoot(codexHome)
+    ? []
+    : await removeManagedCodexBins(binDir, input.platform ?? process.platform)
 
   const projectDirectory = input.projectDirectory ?? env.OMO_CODEX_PROJECT ?? process.cwd()
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
@@ -59,13 +91,25 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
     configChanged: configCleanup.changed,
     configBackupPath: configCleanup.backupPath,
     removedPaths,
+    skippedPaths,
     removedAgentLinks: agentCleanup.removed,
     skippedAgentLinks: agentCleanup.skipped,
+    removedBinLinks,
     projectCleanup,
   }
 }
 
 export { cleanupCodexLightConfigText } from "./codex-cleanup-config"
+export type { SkippedCleanupPath } from "./codex-cleanup-safety"
+
+// A blank value counts as unset, matching how resolveCodexInstallerBinDir treats it, so an
+// empty `CODEX_LOCAL_BIN_DIR` does not shadow the recorded install location.
+function firstConfiguredPath(...values: ReadonlyArray<string | null | undefined>): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) return value
+  }
+  return undefined
+}
 
 function managedGlobalStatePaths(codexHome: string): readonly string[] {
   return [
@@ -113,6 +157,8 @@ function isManagedBootstrapOwnerName(name: string): boolean {
 
 export interface RemoveManagedPathSeams {
   readonly afterFirstAttempt?: () => Promise<void> | void
+  readonly codexHome: string
+  readonly onSkip?: (skip: SkippedCleanupPath) => void
 }
 
 // Removal is best-effort with a single retry: a mid-flight bootstrap worker
@@ -121,8 +167,14 @@ export interface RemoveManagedPathSeams {
 // second `lazycodex-ai uninstall` run clears it.
 export async function removeManagedPathBestEffort(
   path: string,
-  seams: RemoveManagedPathSeams = {},
+  seams: RemoveManagedPathSeams,
 ): Promise<boolean> {
+  const skip = validateManagedCleanupTarget({ codexHome: seams.codexHome, path })
+  if (skip !== null) {
+    seams.onSkip?.(skip)
+    return false
+  }
+
   const removedOnFirstAttempt = await attemptRemove(path)
   await seams.afterFirstAttempt?.()
   const removedOnRetry = await attemptRemove(path)
@@ -145,9 +197,14 @@ async function attemptRemove(path: string): Promise<boolean> {
 async function pruneEmptyRuntimeDirBestEffort(codexHome: string): Promise<void> {
   try {
     await rmdir(join(codexHome, "runtime"))
-  } catch {
-    // best-effort: missing, non-empty, or locked runtime dirs are left as-is
+  } catch (error) {
+    if (isExpectedRuntimePruneFailure(error)) return
+    throw error
   }
+}
+
+function isExpectedRuntimePruneFailure(error: unknown): boolean {
+  return ["ENOENT", "ENOTEMPTY", "EEXIST", "EPERM", "EBUSY", "ENOTDIR"].includes(nodeErrorCode(error) ?? "")
 }
 
 async function collectInstalledAgentPaths(codexHome: string, configPath: string): Promise<readonly string[]> {

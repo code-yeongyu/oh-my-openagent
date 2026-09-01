@@ -12,7 +12,7 @@ an isolated `CODEX_HOME` + a local mock model means no real API call and the rea
 that asserts its scenario against the live machine, so the scripts are both the
 QA tools and their own regression checks.
 
-Verified against `codex-cli 0.139.0` (node, jq, tmux, bun on macOS). Confirm with
+Verified against `codex-cli 0.140.0` (node, jq, tmux, bun on macOS). Confirm with
 `codex --version`; check a flag with `codex <cmd> --help`.
 
 ## Golden rules (read before running anything)
@@ -42,6 +42,12 @@ cd <this-skill-dir>                        # .agents/skills/codex-qa
 bash scripts/lib/common.sh --self-check    # confirm deps + isolation harness
 ```
 
+**Docker is the default QA surface.** Run this QA inside a disposable container
+that has the latest codex and a copy of your config, with the host `~/.codex`
+untouched: `script/agent/qa-docker.sh` (see [references/docker-qa.md](references/docker-qa.md)).
+The local scripts below are the fallback for when Docker is unavailable or on
+Windows.
+
 ## Router: pick your case
 
 | You need to… | Run | Deep dive |
@@ -62,6 +68,25 @@ bash scripts/lib/common.sh --self-check    # confirm deps + isolation harness
 | `scripts/install-verify.sh` | local omo installs into the isolated home; `config.toml` enables `omo@sisyphuslabs`; component bins + agent TOMLs linked in the sandbox; real `~/.codex` unchanged |
 | `scripts/hook-unit-probe.sh` | the `ultrawork` component injects `<ultrawork-mode>` on an `ulw` UserPromptSubmit (also a manual `--component/--event` mode) |
 | `scripts/tui-smoke.sh` | the real codex TUI boots in the isolated home, renders, and survives (no early exit); captures the pane |
+
+To tell a dev dogfood build apart from a published one on a REAL `~/.codex` (NOT the isolated QA home), the repo ships `bun run install:codex-dev`, which stamps the plugin version as `dev` — visible as the `(OmO dev)` hook-status prefix every turn and as a `[DEV]` badge in `omo get-local-version`. Use it to confirm which build is loaded during manual dogfooding; it writes to the real home, so it is NEVER part of the isolated QA flow above.
+
+When TUI visual QA evidence is needed, follow
+`docs/reference/web-terminal-visual-qa.md`: render the TUI through the real
+xterm.js web terminal - NEVER the `tmux capture-pane` frame, which degrades
+color and CJK width:
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "Codex TUI QA" \
+  --command "codex" --input "{Enter}" \
+  --evidence-dir .omo/evidence/<slug>/codex-web-terminal
+```
+
+The helper runs a real pty, renders it in xterm.js under Chrome, and writes
+`terminal.txt`, `terminal-ansi.txt`, `terminal.png` (true color), and
+`metadata.json` (`--from-file <capture.ansi>` replays a saved raw stream). Use
+that artifact set for TUI visual QA; use `app-server-drive.sh --plugin` for
+assertion-grade hook behavior.
 
 ## Match QA to your change scope
 

@@ -1,9 +1,8 @@
-import { resolve } from "node:path"
-
 import { getLastAgentFromSession } from "../../hooks/atlas/session-last-agent"
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { MIRROR_SCHEMA_VERSION } from "./constants"
 import { readActiveLoop } from "./loop-reader"
+import { canonicalProjectDir } from "./mirror-path"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
 import type { AgentStatus, JobRow } from "./state-types"
 import type { BackgroundTaskSnapshot } from "../background-agent/types"
@@ -45,7 +44,7 @@ export async function buildTuiRuntimeSnapshot(
 
   return {
     version: MIRROR_SCHEMA_VERSION,
-    projectDir: resolve(input.projectDir),
+    projectDir: canonicalProjectDir(input.projectDir),
     updatedAt: Date.now(),
     activeAgents: await activeAgentsFromStatuses(statuses, input.client, input.sessionAgentResolver ?? getLastAgentFromSession),
     jobBoard: input.backgroundManager.getTasksSnapshot().map(toJobRow),
@@ -92,7 +91,7 @@ function activeStatus(status: string): ActiveAgentStatus | null {
 
 function toJobRow(task: BackgroundTaskSnapshot): JobRow {
   return {
-    title: `${task.agent} background task`,
+    title: task.title || `${task.agent} background task`,
     status: task.status,
     toolCalls: task.toolCalls,
     lastTool: task.lastTool,

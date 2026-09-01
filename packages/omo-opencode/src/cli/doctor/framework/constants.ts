@@ -24,6 +24,7 @@ export const CHECK_IDS = {
   TUI_PLUGIN: "tui-plugin",
   TOOLS: "tools",
   MODELS: "models",
+  TELEMETRY: "telemetry",
   TEAM_MODE: "team-mode",
   CODEX: "codex",
 } as const
@@ -34,6 +35,7 @@ export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.TUI_PLUGIN]: "TUI Plugin",
   [CHECK_IDS.TOOLS]: "Tools",
   [CHECK_IDS.MODELS]: "Models",
+  [CHECK_IDS.TELEMETRY]: "Telemetry",
   [CHECK_IDS.TEAM_MODE]: "Team Mode",
   [CHECK_IDS.CODEX]: "Codex",
 } as const

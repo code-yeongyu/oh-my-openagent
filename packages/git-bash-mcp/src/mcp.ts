@@ -1,6 +1,6 @@
 import type { Readable, Writable } from "node:stream";
 import { errorResponse, isPlainRecord, jsonRpcId, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
-import type { JsonRpcResponse } from "@oh-my-opencode/mcp-stdio-core";
+import type { JsonRpcResponse, McpLifecycleLog, ParentWatchdogConfig } from "@oh-my-opencode/mcp-stdio-core";
 import { resolveGitBash, resolveGitBashForCurrentProcess, type GitBashResolution } from "./git-bash-resolver";
 import { runGitBashCommand, type GitBashRunResult, type RunGitBashCommand } from "./runner";
 
@@ -14,12 +14,16 @@ const EXEC_COMMAND_TIMEOUT_ENV_KEYS = [
 ] as const;
 
 export interface GitBashMcpOptions {
+  readonly lifecycleLog?: McpLifecycleLog;
   readonly platform?: string;
   readonly env?: { readonly [key: string]: string | undefined };
   readonly exists?: (path: string) => boolean;
   readonly where?: (command: "bash") => readonly string[];
   readonly runGitBash?: RunGitBashCommand;
   readonly defaultTimeoutMs?: number;
+  // Test seam: production callers leave this unset so the watchdog uses its
+  // defaults (parentPid = process.ppid, 30s poll).
+  readonly parentWatchdog?: ParentWatchdogConfig;
 }
 
 export type { JsonRpcResponse };
@@ -66,6 +70,12 @@ export async function runMcpStdioServer(input: Readable, output: Writable, optio
     output,
     handler: handleGitBashMcpRequest,
     handlerOptions: options,
+    // Idle stays disabled: the codex host (win32) only auto-reconnects its own
+    // codex_apps server; an exited user-configured stdio server stays down
+    // until codex restarts, so an idle kill would break a live session.
+    idleTimeoutMs: 0,
+    parentWatchdog: options.parentWatchdog ?? {},
+    log: options.lifecycleLog,
     parseErrorResponse: () => errorResponse(null, -32601, "Method not found"),
   });
 }

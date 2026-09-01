@@ -16,6 +16,7 @@ import { appendGoalToPlan, deriveGoalCandidates, makeGoal } from "./plan-goal-fa
 import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 import { iso, UlwLoopError } from "./types.js";
+import { parseValidationBatches } from "./validation-batch.js";
 
 export { deriveGoalCandidates, seedDefaultSuccessCriteria } from "./plan-goal-factory.js";
 
@@ -57,7 +58,7 @@ function clearGoalBlockerFields(goal: UlwLoopItem): void {
 
 export async function createUlwLoopPlan(
 	repoRoot: string,
-	args: { brief: string; codexGoalMode?: UlwLoopCodexGoalMode; force?: boolean },
+	args: { brief: string; codexGoalMode?: UlwLoopCodexGoalMode; force?: boolean; validationBatchesJson?: string },
 	scope?: UlwLoopScope,
 ): Promise<UlwLoopPlan> {
 	return withUlwLoopMutationLock(repoRoot, scope, async () => {
@@ -75,6 +76,7 @@ export async function createUlwLoopPlan(
 		);
 		const plan: UlwLoopPlan = {
 			version: 1,
+			evidenceLayoutVersion: 2,
 			createdAt: now,
 			updatedAt: now,
 			briefPath: ulwLoopBriefRelativePath(scope),
@@ -83,6 +85,8 @@ export async function createUlwLoopPlan(
 			codexGoalMode: args.codexGoalMode ?? "aggregate",
 			goals,
 		};
+		const validationBatches = await parseValidationBatches(args.validationBatchesJson, goals);
+		if (validationBatches !== undefined) plan.validationBatches = validationBatches;
 		if (plan.codexGoalMode === "aggregate") plan.codexObjective = aggregateCodexObjectiveForScope(scope);
 		await mkdir(ulwLoopDir(repoRoot, scope), { recursive: true });
 		await writeFile(
@@ -105,7 +109,7 @@ function completedPlanExistsError(scope?: UlwLoopScope): UlwLoopError {
 	return new UlwLoopError(
 		[
 			`Existing ulw-loop aggregate is already complete at ${ulwLoopGoalsRelativePath(scope)}.`,
-			"Start a new run with `omo ulw-loop create-goals --session-id <new-id> ...` to isolate fresh state.",
+			"Start a new run with `omo-agent-toolkit ulw-loop create-goals --session-id <new-id> ...` to isolate fresh state.",
 			"Use --force only when you intentionally want to overwrite the completed evidence.",
 		].join(" "),
 		"ULW_LOOP_PLAN_EXISTS_COMPLETE",

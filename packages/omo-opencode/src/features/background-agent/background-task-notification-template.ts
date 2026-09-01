@@ -98,12 +98,14 @@ export function buildBackgroundTaskNotificationText(input: {
       body = `${formatTaskSummaryLine(task)}\n`
     }
 
+    const resultCollectionInstruction = "All sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above."
+
     return `<system-reminder>
 ${header}
 
 ${body.trim()}
 
-Use \`background_output(task_id="<id>")\` to retrieve each result.${hasFailures ? `\n\n**ACTION REQUIRED:** ${failedTasks.length} task(s) failed. Check errors above and decide whether to retry or proceed.` : ""}
+${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failedTasks.length} task(s) failed. Check errors above and decide whether to retry or proceed.` : ""}
 </system-reminder>`
   }
 

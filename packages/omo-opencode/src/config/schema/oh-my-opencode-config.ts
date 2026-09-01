@@ -18,8 +18,8 @@ import { KeywordDetectorConfigSchema } from "./keyword-detector"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
 import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
+import { GoalConfigSchema } from "./goal"
 import { MonitorConfigSchema } from "./monitor"
-import { RalphLoopConfigSchema } from "./ralph-loop"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
 import { TeamModeConfigSchema } from "./team-mode"
 import { SkillsConfigSchema } from "./skills"
@@ -27,7 +27,7 @@ import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
 import { TuiConfigSchema } from "./tui"
-import { StartWorkConfigSchema } from "./start-work"
+import { UlwExecuteConfigSchema } from "./ulw-execute"
 import { WebsearchConfigSchema } from "./websearch"
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -58,6 +58,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   mcp_env_allowlist: z.array(z.string()).optional(),
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
+  /** Enable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry. */
+  telemetry: z.boolean().optional().describe("Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry."),
   /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */
   model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
@@ -68,7 +70,9 @@ export const OhMyOpenCodeConfigSchema = z.object({
   experimental: ExperimentalConfigSchema.optional(),
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
-  ralph_loop: RalphLoopConfigSchema.optional(),
+  goal: GoalConfigSchema.optional(),
+  /** Deprecated compatibility shim. Old \`ralph_loop\` key is parsed and migrated to \`goal\` in validate.ts. */
+  ralph_loop: z.record(z.string(), z.unknown()).optional(),
   /**
    * Enable runtime fallback (default: false)
    * Set to false to disable, or use object for advanced config:
@@ -96,8 +100,10 @@ export const OhMyOpenCodeConfigSchema = z.object({
   tmux: TmuxConfigSchema.optional(),
   tui: TuiConfigSchema.default({ sidebar: { enabled: true } }).optional(),
   sisyphus: SisyphusConfigSchema.optional(),
-  start_work: StartWorkConfigSchema.optional(),
-  /** Default mode auto-activation settings (ultrawork, ralph loop) */
+  ulw_execute: UlwExecuteConfigSchema.optional(),
+  /** Deprecated compatibility shim. Old \`start_work\` key is parsed and migrated to \`ulw_execute\` in validate.ts. */
+  start_work: UlwExecuteConfigSchema.optional(),
+  /** Default mode auto-activation settings (ultrawork, goal) */
   default_mode: DefaultModeConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),

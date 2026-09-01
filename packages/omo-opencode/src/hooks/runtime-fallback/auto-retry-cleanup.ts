@@ -4,7 +4,7 @@ import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { clearDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
 
-const SESSION_TTL_MS = 30 * 60 * 1000
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000
 
 export function createStaleSessionCleanup(
   deps: HookDeps,

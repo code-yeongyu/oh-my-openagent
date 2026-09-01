@@ -49,14 +49,25 @@ export async function readPluginManifest(pluginRoot: string): Promise<PluginMani
   if (parsed.version !== undefined && (typeof parsed.version !== "string" || parsed.version.trim() === "")) {
     throw new Error(`${pluginRoot} plugin.json version must be a non-empty string`)
   }
-  if (parsed.hooks !== undefined && (typeof parsed.hooks !== "string" || parsed.hooks.trim() === "")) {
-    throw new Error(`${pluginRoot} plugin.json hooks must be a non-empty string`)
+  if (parsed.hooks !== undefined && !isPluginHooksManifestValue(parsed.hooks)) {
+    throw new Error(`${pluginRoot} plugin.json hooks must be a non-empty string or string array`)
   }
   return {
     name: parsed.name,
     version: typeof parsed.version === "string" ? parsed.version.trim() : undefined,
-    hooks: typeof parsed.hooks === "string" ? parsed.hooks.trim() : undefined,
+    hooks: normalizePluginHooksManifestValue(parsed.hooks),
   }
+}
+
+function isPluginHooksManifestValue(value: unknown): boolean {
+  if (typeof value === "string") return value.trim() !== ""
+  return Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim() !== "")
+}
+
+function normalizePluginHooksManifestValue(value: unknown): string | readonly string[] | undefined {
+  if (typeof value === "string") return value.trim()
+  if (Array.isArray(value)) return value.map((item) => item.trim())
+  return undefined
 }
 
 export function validatePathSegment(value: string, label: string): void {

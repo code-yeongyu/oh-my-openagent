@@ -19,7 +19,7 @@ export interface MarketplaceManifest {
 export interface PluginManifest {
   readonly name: string
   readonly version?: string
-  readonly hooks?: string
+  readonly hooks?: string | readonly string[]
 }
 
 export interface InstalledPlugin {
@@ -84,7 +84,10 @@ export interface CodexInstallOptions {
   readonly platform?: CodexInstallPlatform
   readonly env?: { readonly [key: string]: string | undefined }
   readonly gitBashResolver?: GitBashResolver
+  readonly codegraphMcpEnabled?: boolean
   readonly autonomousPermissions?: boolean
+  /** Unified omo config reasoning level; overrides the bundled catalog model_reasoning_effort (off -> none). */
+  readonly reasoning?: string
   readonly astGrepInstaller?: RunAstGrepSkillInstall
   readonly runCommand?: RunCommand
   readonly log?: (message: string) => void

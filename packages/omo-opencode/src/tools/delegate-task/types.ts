@@ -1,6 +1,8 @@
 import type { BackgroundManager } from "../../features/background-agent"
+import type { OhMyOpenCodeConfig } from "../../config"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
+import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { SessionPromptAsyncData, SessionPromptData, SessionStatusData } from "@opencode-ai/sdk"
 import type {
   AvailableCategory,
@@ -36,6 +38,7 @@ export interface OmoAgentClient {
   }
   readonly session: {
     readonly abort: (input: SessionPathInput) => Promise<unknown>
+    readonly delete?: (input: SessionPathInput) => Promise<unknown>
     readonly create: (input: {
       readonly body: Record<string, unknown>
       readonly query?: { readonly directory?: string }
@@ -108,6 +111,8 @@ export interface DelegateTaskToolOptions {
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
+  /** Reload model-bearing config at task invocation time so edits are honored without rebuilding tools. */
+  loadCurrentModelConfig?: () => Pick<OhMyOpenCodeConfig, "agents" | "categories">
   sisyphusAgentConfig?: SisyphusAgentConfig
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
@@ -118,6 +123,7 @@ export interface DelegateTaskToolOptions {
     get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
     dirs(): string[] | Promise<string[]>
   }
+  getLoadedSkills?: () => Promise<LoadedSkill[]>
 }
 
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
@@ -134,6 +140,5 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
-  /** OpenCode native skill list to merge into the <available_skills> block. */
   nativeSkillInfos?: { name: string; description: string; location: string }[]
 }

@@ -35,7 +35,7 @@ describe("shared skills package manifest", () => {
 
   test("#given shared user skills #when copied into the package #then frontmatter and resource directories are preserved", async () => {
     // given
-    const copiedSkills = ["debugging", "programming", "refactor", "remove-ai-slops"] as const
+    const copiedSkills = ["coding-agent-sessions", "debugging", "programming", "refactor", "remove-ai-slops"] as const
 
     // when
     const skillFiles = await Promise.all(
@@ -51,7 +51,38 @@ describe("shared skills package manifest", () => {
       expect(skill.content).toContain(`name: ${skill.name}`)
     }
     expect((await stat("packages/shared-skills/skills/debugging/references")).isDirectory()).toBe(true)
+    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/scripts")).isDirectory()).toBe(true)
+    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/references")).isDirectory()).toBe(true)
     expect((await stat("packages/shared-skills/skills/programming/references")).isDirectory()).toBe(true)
     expect((await stat("packages/shared-skills/skills/programming/scripts")).isDirectory()).toBe(true)
+  })
+
+  test("#given coding-agent-sessions skill #when package exclusions are read #then dev fixtures and caches are excluded", async () => {
+    // when
+    const ignoreRules = new Set(
+      (await Bun.file("packages/shared-skills/skills/coding-agent-sessions/.npmignore").text())
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0),
+    )
+
+    // then
+    expect(ignoreRules).toEqual(
+      new Set([
+        ".omo/",
+        ".gitignore",
+        ".mypy_cache/",
+        ".pytest_cache/",
+        ".ruff_cache/",
+        "__pycache__/",
+        "**/__pycache__/",
+        "*.py[cod]",
+        "pyrightconfig.json",
+        "scripts/tests/",
+      ]),
+    )
+    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/find-agent-sessions.py")).isFile()).toBe(true)
+    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/agent_sessions/cli.py")).isFile()).toBe(true)
+    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/references/all-platforms.md")).isFile()).toBe(true)
   })
 })

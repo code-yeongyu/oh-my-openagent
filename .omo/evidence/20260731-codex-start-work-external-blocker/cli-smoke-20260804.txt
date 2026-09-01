@@ -1,0 +1,40 @@
+# cli-smoke rerun 2026-08-04 after review hardening.
+# Changes: exit-code + stderr capture (a crashed hook can no longer read as a stop),
+# portable component path, refusal to run against a missing build, and case E for the
+# tightened contract (a bare marker with no stated blocker must NOT end the turn).
+
+real ~/.codex/config.toml sha256 BEFORE: 2D70A22821B092AACB25ABE1E129CE37ADA71AA15EB5BC23BB09F03D01019B14
+
+=== A. ordinary answer, plan still has unchecked tasks ===
+last_assistant_message (escaped): Finished task one.
+observed: BLOCK (continuation injected)
+hook exit code: 0
+raw output length: 10092
+
+=== B. external blocker marker on the FIRST line ===
+last_assistant_message (escaped): <start-work-blocked-external>\nBlocker: deploy credential DEPLOY_TOKEN is not provisioned.\nResume when the token exists in the vault.
+observed: NO OUTPUT (Stop allowed)
+hook exit code: 0
+raw output length: 0
+
+=== C. marker mentioned but NOT on the first line ===
+last_assistant_message (escaped): I might need to emit this later:\n<start-work-blocked-external>
+observed: BLOCK (continuation injected)
+hook exit code: 0
+raw output length: 10092
+
+=== D. ultrawork opener followed by blocker marker ===
+last_assistant_message (escaped): ULTRAWORK MODE ENABLED!\n<start-work-blocked-external>\nBlocker: deploy credential DEPLOY_TOKEN is not provisioned.
+observed: NO OUTPUT (Stop allowed)
+hook exit code: 0
+raw output length: 0
+
+=== E. bare marker with no stated blocker ===
+last_assistant_message (escaped): <start-work-blocked-external>
+observed: BLOCK (continuation injected)
+hook exit code: 0
+raw output length: 10092
+
+temp workspace removed: C:\Users\pss\AppData\Local\Temp\swc-smoke-a09ff984
+real ~/.codex/config.toml sha256 AFTER:  2D70A22821B092AACB25ABE1E129CE37ADA71AA15EB5BC23BB09F03D01019B14
+unchanged: True

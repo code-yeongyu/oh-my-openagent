@@ -35,10 +35,14 @@ export async function runLazyCodexInstallLocalCli(input: {
   readonly argv: readonly string[]
   readonly defaultRepoRoot: string
   readonly entrypointPath: string
+  readonly invokedPath?: string
   readonly cwd: string
   readonly env: NodeJS.ProcessEnv
   readonly log: (line: string) => void
 }): Promise<number> {
+  const logWarning = (message: string): void => {
+    if (message.startsWith("Warning:")) input.log(message)
+  }
   const parsed = parseLazyCodexInstallCliArgs(input.argv)
   if (parsed.kind === "help") {
     input.log(formatLazyCodexInstallHelp())
@@ -64,11 +68,12 @@ export async function runLazyCodexInstallLocalCli(input: {
         repoRoot: resolve(parsed.repoRoot),
         autonomousPermissions: true,
         env: input.env,
+        log: logWarning,
       })
       input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
       return 0
     }
-    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log })
+    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath })
   }
 
   const repoRoot = parsed.repoRoot ? resolve(parsed.repoRoot) : input.defaultRepoRoot
@@ -76,6 +81,7 @@ export async function runLazyCodexInstallLocalCli(input: {
     repoRoot,
     autonomousPermissions: parsed.autonomousPermissions,
     env: input.env,
+    log: logWarning,
   })
   input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
   return 0

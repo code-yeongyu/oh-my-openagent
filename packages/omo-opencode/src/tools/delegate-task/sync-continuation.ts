@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
-import { isPlanFamily } from "./constants"
+import { getDeliverableTag, isPlanFamily } from "./constants"
 import { handedBackSyncSessions } from "../../features/claude-code-session-state"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
@@ -16,6 +16,7 @@ import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { log } from "../../shared/logger"
+import { cancelSyncSessionDeletion, scheduleSyncSessionDeletion } from "./sync-session-cleanup"
 
 type ResumeModel = { providerID: string; modelID: string }
 
@@ -24,6 +25,7 @@ type ResumeContext = {
   resumeModel?: ResumeModel
   resumeVariant?: string
   anchorMessageCount?: number
+  anchorMessageID?: string
 }
 
 function shouldAttemptPollErrorRecovery(pollError: string): boolean {
@@ -70,11 +72,12 @@ async function resolveResumeContext(
             : undefined),
           resumeVariant: info.variant,
           anchorMessageCount: messages.length,
+          anchorMessageID: messages.at(-1)?.info?.id,
         }
       }
     }
 
-    return { anchorMessageCount: messages.length }
+    return { anchorMessageCount: messages.length, anchorMessageID: messages.at(-1)?.info?.id }
   } catch (error) {
     if (!(error instanceof Error)) throw error
     const resumeMessageDir = getMessageDir(continuationID)
@@ -105,6 +108,7 @@ export async function executeSyncContinuation(
   if (!continuationID) {
     throw new Error("task_id is required to continue a sync task")
   }
+  cancelSyncSessionDeletion(continuationID)
   const taskId = `resume_sync_${continuationID.slice(0, 8)}`
   const startTime = new Date()
 
@@ -121,6 +125,7 @@ export async function executeSyncContinuation(
   let resumeModel: ResumeModel | undefined
   let resumeVariant: string | undefined
   let anchorMessageCount: number | undefined
+  let anchorMessageID: string | undefined
   let handedBackToParent = false
 
   try {
@@ -129,6 +134,7 @@ export async function executeSyncContinuation(
     resumeModel = resumeContext.resumeModel
     resumeVariant = resumeContext.resumeVariant
     anchorMessageCount = resumeContext.anchorMessageCount
+    anchorMessageID = resumeContext.anchorMessageID
 
     const resumeModelForMetadata = resumeModel && resumeVariant !== undefined
       ? { ...resumeModel, variant: resumeVariant }
@@ -184,6 +190,7 @@ export async function executeSyncContinuation(
        toastManager.removeTask(taskId)
      }
      const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+     scheduleSyncSessionDeletion(client, continuationID)
      return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
    }
 
@@ -194,6 +201,7 @@ export async function executeSyncContinuation(
         toastManager,
         taskId,
         anchorMessageCount,
+        anchorMessageID,
       }, syncPollTimeoutMs)
       if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
         if (anchorMessageCount === undefined) {
@@ -201,6 +209,7 @@ export async function executeSyncContinuation(
         }
         const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
           strictAbortRecovery: true,
+          deliverableTag: getDeliverableTag(resumeAgent),
         })
         if (!recoveredResult.ok) {
           return pollError
@@ -225,7 +234,9 @@ ${buildTaskMetadataBlock({
         return pollError
       }
 
-      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
+      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+        deliverableTag: getDeliverableTag(resumeAgent),
+      })
       if (!result.ok) {
         return result.error
       }
@@ -257,5 +268,8 @@ ${buildTaskMetadataBlock({
          })
        }
      }
+     // Every terminal continuation path must restore the cleanup grace timer,
+     // including prompt/poll failures after revival cancelled the old timer.
+     scheduleSyncSessionDeletion(client, continuationID)
    }
 }

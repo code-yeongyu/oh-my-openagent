@@ -70,6 +70,7 @@ if (isEntrypointInvocation(process.argv[1] ?? "")) {
 			argv: process.argv.slice(2),
 			defaultRepoRoot: resolveDefaultRepoRoot(),
 			entrypointPath,
+			invokedPath: process.argv[1] ?? "",
 			cwd: process.cwd(),
 			env: process.env,
 			log: console.log,

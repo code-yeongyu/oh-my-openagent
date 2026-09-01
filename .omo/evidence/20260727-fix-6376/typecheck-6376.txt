@@ -1,0 +1,3 @@
+### TYPECHECK - issue #6376 - 2026-07-28T01:28:53Z
+=== tsgo --noEmit -p packages/omo-opencode ===
+EXIT_omo_opencode=0

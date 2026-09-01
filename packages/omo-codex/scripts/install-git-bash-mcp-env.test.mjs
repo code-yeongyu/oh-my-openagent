@@ -62,6 +62,30 @@ test("#given a non-Windows install #when stamping #then the manifest stays byte-
 	assert.equal(await readFile(join(pluginRoot, ".mcp.json"), "utf8"), MANIFEST);
 });
 
+test("#given a package-relative CodeGraph MCP path #when stamping on non-Windows #then codegraph server arg becomes absolute", async (t) => {
+	const pluginRoot = await mkdtemp(join(tmpdir(), "git-bash-mcp-env-"));
+	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
+	await writeFile(
+		join(pluginRoot, ".mcp.json"),
+		`${JSON.stringify(
+			{
+				mcpServers: {
+					codegraph: { args: ["components/codegraph/dist/serve.js"], command: "node" },
+					git_bash: { command: "node", args: ["../../git-bash-mcp/dist/cli.js", "mcp"] },
+				},
+			},
+			null,
+			"\t",
+		)}\n`,
+	);
+
+	const changed = await stampGitBashMcpEnv({ pluginRoot, env: {}, platform: "darwin" });
+
+	assert.equal(changed, true);
+	const parsed = JSON.parse(await readFile(join(pluginRoot, ".mcp.json"), "utf8"));
+	assert.deepEqual(parsed.mcpServers.codegraph.args, [join(pluginRoot, "components", "codegraph", "dist", "serve.js")]);
+});
+
 test("#given the override already stamped #when stamping again #then nothing changes", async (t) => {
 	const pluginRoot = await createPluginRoot();
 	t.after(() => rm(pluginRoot, { recursive: true, force: true }));

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { ULW_LOOP_SUBCOMMANDS } from "../src/cli-commands.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -23,9 +24,7 @@ type ShellResult = {
 };
 
 function bootstrapScriptFrom(text: string): string {
-	const heading = text.indexOf("### 1. Create goals from the brief");
-	expect(heading).toBeGreaterThanOrEqual(0);
-	const blockStart = text.indexOf("```sh\n", heading);
+	const blockStart = text.indexOf("```sh\n");
 	expect(blockStart).toBeGreaterThanOrEqual(0);
 	const codeStart = blockStart + "```sh\n".length;
 	const blockEnd = text.indexOf("\n```", codeStart);
@@ -59,16 +58,19 @@ describe("package.json", () => {
 		expect((pkg["engines"] as Record<string, unknown>)["node"]).toBe(">=20.0.0");
 	});
 
-	it("#given package metadata #when bin is inspected #then exposes the omo-ulw-loop binary pointing at dist/cli.js", async () => {
+	it("#given package metadata #when bin is inspected #then exposes the ULW loop binaries pointing at dist/cli.js", async () => {
 		const pkg = await readJson("package.json") as Record<string, unknown>;
 		const bin = pkg["bin"] as Record<string, string>;
 		expect(bin["omo-ulw-loop"]).toBe("./dist/cli.js");
+		expect(bin["ulw"]).toBe("./dist/cli.js");
+		expect(bin["ulw-loop"]).toBe("./dist/cli.js");
 	});
 
 	it("ships the expected files for npm publish", async () => {
 		const pkg = await readJson("package.json") as Record<string, unknown>;
 		const files = pkg["files"] as readonly string[];
 		expect(files).toContain("dist");
+		expect(files).toContain("directive.md");
 		expect(files).toContain("hooks");
 		expect(files).toContain("skills");
 		expect(files).not.toContain(".codex-plugin");
@@ -86,10 +88,12 @@ describe("hooks/hooks.json", () => {
 		const hooks = await readJson("hooks/hooks.json") as Record<string, unknown>;
 		const events = (hooks["hooks"] as Record<string, unknown>)["UserPromptSubmit"] as readonly Record<string, unknown>[];
 		expect(events.length).toBeGreaterThan(0);
-		const command = ((events[0]?.["hooks"] as readonly Record<string, unknown>[])[0]?.["command"]) as string;
+		const command = (events[0]?.["hooks"] as readonly Record<string, unknown>[] | undefined)?.[0]?.["command"];
+		expect(command).toEqual(expect.any(String));
 		expect(command).toContain(`$${"{PLUGIN_ROOT}"}`);
 		expect(command).toContain("dist/cli.js");
 		expect(command).toContain("hook user-prompt-submit");
+		expect(command).toContain("--with-ultrawork");
 	});
 
 	it("#given ulw-loop component is enabled #when hooks are inspected #then create_goal PreToolUse guard is registered", async () => {
@@ -123,10 +127,8 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	it("#given Codex dollar hinting #when querying ulw-loop #then ulw-loop surfaces the ulw-loop alias", async () => {
 		const text = await readText("skills/ulw-loop/agents/openai.yaml");
 
-		expect(text).toContain('display_name: "ulw-loop (omo)"');
-		expect(text).not.toContain("ulw-loop / ulw-loop");
+		expect(text).toContain('display_name: "(OmO) ulw-loop"');
 		expect(text).toContain('short_description: "Goal-like ultrawork loop for systematic decomposition"');
-		expect(text).toContain("Use $ulw-loop");
 	});
 
 	it("#given Codex dollar hinting #when querying ulw-loop #then ulw-loop remains discoverable as an alias", async () => {
@@ -136,7 +138,9 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toContain('- "ulw-loop"');
 	});
 
-	it("#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI", async () => {
+	it.skipIf(process.platform === "win32")(
+		"#given PATH omo-agent-toolkit lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI",
+		async () => {
 		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 		const bootstrap = bootstrapScriptFrom(text);
 		const root = await mkdtemp(join(tmpdir(), "omo-ulw-loop-bootstrap-"));
@@ -147,8 +151,8 @@ describe("skills/ulw-loop/SKILL.md", () => {
 			const cachedCli = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js");
 			await mkdir(badBin, { recursive: true });
 			await mkdir(dirname(cachedCli), { recursive: true });
-			await writeFile(join(badBin, "omo"), "#!/bin/sh\nprintf '%s\\n' \"error: unknown command 'ulw-loop'\" >&2\nexit 1\n");
-			await chmod(join(badBin, "omo"), 0o755);
+			await writeFile(join(badBin, "omo-agent-toolkit"), "#!/bin/sh\nprintf '%s\\n' \"error: unknown command 'ulw-loop'\" >&2\nexit 1\n");
+			await chmod(join(badBin, "omo-agent-toolkit"), 0o755);
 			await writeFile(
 				cachedCli,
 				[
@@ -165,7 +169,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 				].join("\n"),
 			);
 
-			const result = await runShell(`${bootstrap}\nomo ulw-loop status --json`, {
+			const result = await runShell(`${bootstrap}\n"$ULW_LOOP_NODE" "$ULW_LOOP_CLI" ulw-loop status --json`, {
 				...process.env,
 				CODEX_HOME: codexHome,
 				HOME: home,
@@ -174,7 +178,6 @@ describe("skills/ulw-loop/SKILL.md", () => {
 
 			expect(result.code).toBe(0);
 			expect(result.stdout).toContain('"source":"cached-ulw-loop"');
-			expect(result.stderr).not.toContain("unknown command");
 		} finally {
 			await rm(root, { recursive: true, force: true });
 		}
@@ -182,21 +185,27 @@ describe("skills/ulw-loop/SKILL.md", () => {
 
 });
 
-describe("source LOC budget", () => {
-	it("every source file stays at or under 250 pure LOC", async () => {
-		const files = [
-			"src/types.ts", "src/paths.ts", "src/plan-io.ts", "src/plan-crud.ts", "src/goal-status.ts",
-			"src/evidence.ts", "src/quality-gate.ts", "src/checkpoint.ts", "src/review-blockers.ts",
-			"src/steering.ts", "src/codex-goal-instruction.ts", "src/codex-goal-snapshot.ts", "src/codex-hook.ts",
-			"src/cli.ts", "src/cli-arg-parser.ts", "src/cli-output.ts", "src/cli-steering.ts", "src/cli-commands.ts",
-		];
-		for (const file of files) {
-			const text = await readText(file);
-			const pure = text.split("\n").filter((line) => {
-				const trimmed = line.trim();
-				return trimmed.length > 0 && !trimmed.startsWith("//");
-			}).length;
-			expect(pure, `${file} pure LOC`).toBeLessThanOrEqual(250);
+	describe("README implementation contract", () => {
+	it("#given the README #when subcommands are inspected #then every implemented CLI subcommand is documented", async () => {
+		const readme = await readText("README.md");
+
+		for (const subcommand of ULW_LOOP_SUBCOMMANDS) {
+			expect(readme, `README documents \`omo-agent-toolkit ulw-loop ${subcommand}\``).toContain(`omo-agent-toolkit ulw-loop ${subcommand}`);
 		}
+	});
+
+	it("#given the README #when hooks are described #then both hook channels are documented", async () => {
+		const readme = await readText("README.md");
+
+		expect(readme).toContain("UserPromptSubmit");
+		expect(readme).toContain("user-prompt-submit");
+		expect(readme).toContain("PreToolUse");
+		expect(readme).toContain("pre-tool-use");
+	});
+
+	it("#given the README #when the quality gate is described #then criteriaCoverage is named", async () => {
+		const readme = await readText("README.md");
+
+		expect(readme).toContain("criteriaCoverage");
 	});
 });

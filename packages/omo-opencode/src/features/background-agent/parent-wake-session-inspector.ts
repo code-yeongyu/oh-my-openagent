@@ -1,15 +1,15 @@
 import { log, normalizeSDKResponse } from "../../shared"
-import { isPromptMessageInspectionAborted } from "../../shared/prompt-async-gate/message-inspection-error"
-import type { PromptMessagesQuery } from "../../shared/prompt-async-gate/types"
+import { isPromptMessageInspectionAborted } from "@oh-my-opencode/utils/prompt-async-gate/message-inspection-error"
+import type { PromptMessagesQuery } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import type { PendingParentWake } from "./parent-wake-dedupe"
+import type { ParentWakeSessionMessage } from "./parent-wake-session-message"
 import {
   getParentWakeSessionHistoryDeferralDecision,
   hasAssistantOrToolOutputAfterParentWake,
   hasAssistantOutputAfterParentWakeAdmission,
   hasRecordedParentWakePromptMessage,
   parentWakeUserMessageIsInProgress,
-  type ParentWakeSessionMessage,
   type ToolWaitDeferralDecision,
 } from "./parent-wake-session-history"
 

@@ -1,6 +1,6 @@
 ---
 name: pre-publish-review
-description: "Nuclear-grade 16-agent pre-publish release gate. Runs /get-unpublished-changes to detect all changes since last npm release, spawns up to 10 ultrabrain agents for deep per-change analysis, invokes /review-work (5 agents) for holistic review, and 1 oracle for overall release synthesis. Use before EVERY npm publish. Triggers: 'pre-publish review', 'review before publish', 'release review', 'pre-release review', 'ready to publish?', 'can I publish?', 'pre-publish', 'safe to publish', 'publishing review', 'pre-publish check'."
+description: "Nuclear-grade 16-agent pre-publish release gate. Runs /get-unpublished-changes to detect all changes since last npm release, spawns up to 10 ultrabrain agents for deep per-change analysis, invokes /review-work (5 agents) for holistic review, and 1 oracle for overall release synthesis. Runs ONLY when the user explicitly asks for a pre-publish review — a plain publish/release request MUST NOT trigger this; /publish ships directly. Triggers: 'pre-publish review', 'review before publish', 'release review', 'pre-release review', 'ready to publish?', 'can I publish?', 'pre-publish', 'safe to publish', 'publishing review', 'pre-publish check'."
 ---
 
 # Pre-Publish Review — 16-Agent Release Gate
@@ -89,6 +89,7 @@ For each change group, spawn one ultrabrain agent. Each gets only its portion of
 ```
 task(
   category="ultrabrain",
+  model="gpt-5.6-sol",
   run_in_background=true,
   load_skills=[],
   description="Deep analysis: {GROUP_NAME}",
@@ -165,6 +166,7 @@ Spawn a sub-agent that loads the `/review-work` skill. The review-work skill int
 ```
 task(
   category="unspecified-high",
+  model="gpt-5.6-sol",
   run_in_background=true,
   load_skills=["review-work"],
   description="Run /review-work on all unpublished changes",
@@ -195,6 +197,7 @@ The oracle gets the full picture — all commits, full diff stat, and changed fi
 ```
 task(
   subagent_type="oracle",
+  model="gpt-5.6-sol",
   run_in_background=true,
   load_skills=[],
   description="Oracle: overall release synthesis and version bump recommendation",
