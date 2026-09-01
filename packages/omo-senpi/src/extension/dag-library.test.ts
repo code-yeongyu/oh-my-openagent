@@ -39,7 +39,7 @@ function installGlobals(
   Reflect.set(globalThis, "read", async (path: string) => readFileSync(path, "utf8"))
   Reflect.set(globalThis, "env", (key?: string) => (key === undefined ? envMap : envMap[key]))
   Reflect.set(globalThis, "tool", {
-    dag: async (args: DagCall) => {
+    workflow: async (args: DagCall) => {
       calls.push(args)
       return reply(args)
     },
@@ -169,7 +169,7 @@ describe("dag definition library", () => {
     })
   })
 
-  describe("#given a stubbed tool.dag", () => {
+  describe("#given a stubbed tool.workflow", () => {
     it("#then start loads, rotates, and starts the run in one call and the handle wires done/cancel", async () => {
       await writeFile(join(libDir, "nightly.json"), JSON.stringify(NIGHTLY))
       const calls = installGlobals(envMap)
@@ -181,6 +181,8 @@ describe("dag definition library", () => {
 
       expect(run.run_id).toBe("run-42")
       expect(calls.map((call) => call.action)).toEqual(["start", "wait", "cancel"])
+      // The library's done() blocks for the final result, so it opts out of the tool's detached default.
+      expect(calls[1]).toEqual({ action: "wait", run_id: "run-42", detach: false })
       const started = calls[0]!.definition as { key: string; nodes: Array<{ prompt: string }> }
       expect(started.key).toBe("nightly-audit-t1")
       expect(started.nodes[0]!.prompt).toContain("nightly-audit-t1")

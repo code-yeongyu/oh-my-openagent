@@ -90,6 +90,7 @@ if (process.env.FAKE_STDOUT) console.log(process.env.FAKE_STDOUT)
 if (process.env.FAKE_SIGNAL) process.kill(process.pid, process.env.FAKE_SIGNAL)
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
 `)
+  writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
 
   let shimPath: string | undefined
   if (options.shim !== false) {
@@ -211,6 +212,7 @@ describe("omo launcher", () => {
 
         const brand = JSON.parse(capture(fixture).env.SENPI_BRAND ?? "{}")
         expect(brand.name).toBe("OmO")
+        expect(brand.command).toBe("omo")
         expect(brand.configDir).toBe(".omo")
         expect(brand.flatLayout).toBe(false)
         expect(brand.envPrefix).toBe("OMO")
