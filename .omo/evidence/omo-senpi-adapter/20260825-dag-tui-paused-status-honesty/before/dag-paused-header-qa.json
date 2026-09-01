@@ -1,0 +1,22 @@
+{
+  "resuming_header": "⏸ ship-it paused wave 1/1 0/2 done, 1 running",
+  "resuming_rows": [
+    "⏸ ship-it paused wave 1/1 0/2 done, 1 running",
+    "  ▶ alpha · category:quick · 0s",
+    "  ○ beta · category:quick"
+  ],
+  "suspended_header": "⏸ ship-it paused wave 1/1 0/2 done, 1 running",
+  "paused_header": "⏸ ship-it paused wave 1/1 0/2 done",
+  "live_lease_pid": 41929,
+  "state_dir": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/dag-paused-header-qa-eS6gvK/.omo/senpi-task",
+  "failures": [
+    "live lease reads resuming: \"⏸ ship-it paused wave 1/1 0/2 done, 1 running\"",
+    "live lease drops the pause glyph: \"⏸ ship-it paused wave 1/1 0/2 done, 1 running\"",
+    "live lease uses the neutral run icon: \"⏸ ship-it paused wave 1/1 0/2 done, 1 running\"",
+    "dead lease over a running node reads suspended: \"⏸ ship-it paused wave 1/1 0/2 done, 1 running\"",
+    "suspended header drops the pause glyph: \"⏸ ship-it paused wave 1/1 0/2 done, 1 running\"",
+    "plain paused uses the neutral run icon: \"⏸ ship-it paused wave 1/1 0/2 done\"",
+    "plain paused drops the pause glyph: \"⏸ ship-it paused wave 1/1 0/2 done\""
+  ],
+  "result": "FAIL"
+}

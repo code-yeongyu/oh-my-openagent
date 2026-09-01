@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import { isRetryableModelMiss } from "./model-miss"

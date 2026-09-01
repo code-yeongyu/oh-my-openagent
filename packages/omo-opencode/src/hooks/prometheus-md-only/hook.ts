@@ -56,7 +56,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
          throw new Error(
            `[${HOOK_NAME}] Prometheus is a planning agent. File operations restricted to .omo/*.md plan files only. ` +
            `Do NOT route this change through a subagent either - delegated implementation is still implementation. ` +
-           `Record the intended change as a todo in the plan; implementation starts only when the user runs /start-work. ` +
+           `Record the intended change as a todo in the plan; implementation starts only when the user runs /ulw-execute. ` +
            `Attempted to modify: ${filePath}.`
          )
        }

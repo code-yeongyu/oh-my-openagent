@@ -17,7 +17,7 @@ describe("build-omo-schema-document", () => {
     // then
     expect(schema.$schema).toBe(expectedDraft)
     expect(schema.$id).toBe(OMO_SCHEMA_ID)
-    expect(schema.title).toBe("Omo Configuration")
+    expect(schema.title).toBe("OmO Configuration")
     const properties = isRecord(schema.properties) ? schema.properties : {}
     expect(properties.categories).toBeDefined()
     expect(properties.agents).toBeDefined()

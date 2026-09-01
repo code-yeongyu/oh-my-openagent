@@ -48,6 +48,9 @@ export interface DagBridgeRunSnapshot {
   readonly waves: readonly DagBridgeSnapshotWave[]
   // One entry per accepted amendment; only the count reaches the wire.
   readonly amendHistory?: readonly unknown[]
+  // Host pid holding the resume lease on a paused run; absent unless a claim is held. A viewer
+  // needs it to tell a run being resumed right now from one that is genuinely parked.
+  readonly leaseHolderPid?: number
 }
 
 export const DAG_MAX_RUN_SNAPSHOTS = 256
@@ -92,5 +95,6 @@ function runSnapshotPayload(run: DagBridgeRunSnapshot) {
     edges: run.edges.map((edge) => ({ from: edge.from, to: edge.to })),
     waves: run.waves.map((wave) => ({ index: wave.index, node_ids: wave.nodeIds })),
     ...(amendCount === 0 ? {} : { amend_count: amendCount }),
+    ...(run.leaseHolderPid === undefined ? {} : { lease_holder_pid: run.leaseHolderPid }),
   }
 }

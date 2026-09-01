@@ -51,7 +51,7 @@ When using a designpowers role reference:
 
 - name the role in the prompt text;
 - include a self-contained task, deliverable, scope, and verification expectation;
-- route actual phase ownership to frontend design/perfection, `/ulw-plan`, `/start-work`, `/visual-qa`, or `/review-work`;
+- route actual phase ownership to frontend design/perfection, `/ulw-plan`, `/ulw-execute`, `/visual-qa`, or `/review-work`;
 - record findings in the state file or review packet only when backed by artifacts or located observations.
 
 ## Reconciliation Ladder

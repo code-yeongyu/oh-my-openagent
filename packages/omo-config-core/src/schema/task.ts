@@ -2,6 +2,11 @@ import { availableParallelism } from "node:os"
 
 import * as z from "zod"
 
+// Keep the default bounded on high-core hosts: residency pins complete child sessions in-process.
+// Eight is the low-end baseline, two children per worker is enough parallel headroom, and sixteen
+// prevents a 14-core machine from silently retaining 42 full AgentSessions per parent session.
+const DEFAULT_RESIDENCY_MAX_CHILDREN = 16
+
 // 0 is the numeric spelling of "unlimited" for every cap below: the senpi-task engine maps a 0
 // concurrency limit to Infinity and treats a 0 residency cap exactly like the "unlimited" literal.
 const ResidencyMaxChildrenInputSchema = z.union([z.number().int().nonnegative(), z.literal("unlimited")])
@@ -38,6 +43,7 @@ export const OmoTaskDagSettingsSchema = z.object({
 export const OmoTaskSettingsSchema = z.object({
   default_execution_mode: z.enum(["in-process", "process"]).default("in-process"),
   default_concurrency: z.number().int().nonnegative().default(5),
+  global_concurrency: z.number().int().nonnegative().default(8),
   provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   model_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   max_depth: z.number().int().nonnegative().default(1),
@@ -86,6 +92,7 @@ export const OmoTaskWarningsLayerSchema = z.object({
 export const OmoTaskSettingsLayerSchema = z.object({
   default_execution_mode: z.enum(["in-process", "process"]).optional(),
   default_concurrency: z.number().int().nonnegative().optional(),
+  global_concurrency: z.number().int().nonnegative().optional(),
   provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   model_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   max_depth: z.number().int().nonnegative().optional(),
@@ -111,6 +118,8 @@ export function resolveOmoTaskSettings(
   const record = z.record(z.string(), z.unknown()).parse(input)
   return OmoTaskSettingsSchema.parse({
     ...record,
-    residency_max_children: record["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3),
+    residency_max_children:
+      record["residency_max_children"] ?? Math.min(DEFAULT_RESIDENCY_MAX_CHILDREN, Math.max(8, resolveParallelism() * 2)),
+    global_concurrency: record["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2),
   })
 }

@@ -1,8 +1,7 @@
-import { spawnSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { homedir as osHomedir } from "node:os"
-import { delimiter, join } from "node:path"
-import { propagateResult } from "./child-process.js"
+import { posix, win32 } from "node:path"
+import { propagateResult, runChild } from "./child-process.js"
 
 // A bun global install lives under <BUN_ROOT>/install/global/, and `bun add -g` links the launcher
 // into <BUN_ROOT>/bin. The link TARGET is what identifies the install, so every comparison below
@@ -16,8 +15,12 @@ function normalize(path) {
   return path.replaceAll("\\", "/").replaceAll(/\/{2,}/g, "/")
 }
 
-function bunRoot(env, homedir) {
-  return env.BUN_INSTALL ? env.BUN_INSTALL : join(homedir(), ".bun")
+function pathApi(platform) {
+  return platform === "win32" ? win32 : posix
+}
+
+export function bunRoot(env, homedir, platform) {
+  return env.BUN_INSTALL ? env.BUN_INSTALL : pathApi(platform).join(homedir(), ".bun")
 }
 
 /**
@@ -26,8 +29,8 @@ function bunRoot(env, homedir) {
  * different spellings - `/tmp` against `/private/tmp` on macOS, or any symlinked home - and a real
  * bun install would silently fail to be recognized. A root that does not exist is used verbatim.
  */
-function canonicalRoot(env, homedir, realpath) {
-  const root = bunRoot(env, homedir)
+function canonicalRoot(env, homedir, platform, realpath) {
+  const root = bunRoot(env, homedir, platform)
   try {
     return realpath(root)
   } catch {
@@ -39,6 +42,10 @@ function binaryName(platform) {
   return platform === "win32" ? "bun.exe" : "bun"
 }
 
+function pathDelimiter(platform) {
+  return platform === "win32" ? ";" : ":"
+}
+
 /**
  * True when the executed script belongs to a Bun global install. The caller passes the script's
  * REAL path: the launcher is reached through a symlink under the bun root's bin directory, and
@@ -47,8 +54,9 @@ function binaryName(platform) {
 export function isUnderBunGlobalTree(scriptRealPath, options = {}) {
   const env = options.env ?? process.env
   const homedir = options.homedir ?? osHomedir
+  const platform = options.platform ?? process.platform
   const realpath = options.realpath ?? realpathSync
-  const root = normalize(canonicalRoot(env, homedir, realpath)).replace(/\/+$/, "")
+  const root = normalize(canonicalRoot(env, homedir, platform, realpath)).replace(/\/+$/, "")
   return normalize(scriptRealPath).startsWith(`${root}${GLOBAL_TREE_MARKER}`)
 }
 
@@ -67,19 +75,23 @@ export function findBunBinary(options = {}) {
   const homedir = options.homedir ?? osHomedir
   const platform = options.platform ?? process.platform
   const exists = options.exists ?? existsSync
+  const paths = pathApi(platform)
   const name = binaryName(platform)
 
-  const candidates = [join(bunRoot(env, homedir), "bin", name), join(homedir(), ".bun", "bin", name)]
+  const candidates = [
+    paths.join(bunRoot(env, homedir, platform), "bin", name),
+    paths.join(homedir(), ".bun", "bin", name),
+  ]
   for (const candidate of candidates) {
     if (exists(candidate)) return candidate
   }
 
   const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path")
-  const entries = pathKey ? (env[pathKey] ?? "").split(delimiter).filter(Boolean) : []
+  const entries = pathKey ? (env[pathKey] ?? "").split(pathDelimiter(platform)).filter(Boolean) : []
   for (const entry of entries) {
     for (const extension of pathExtensions(env, platform)) {
       // On win32 the name already carries .exe; PATHEXT decides which other spellings are runnable.
-      const candidate = join(entry, platform === "win32" ? `bun${extension}` : name)
+      const candidate = paths.join(entry, platform === "win32" ? `bun${extension}` : name)
       if (exists(candidate)) return candidate
     }
   }
@@ -107,19 +119,23 @@ export function resolveBunReexec(input) {
 }
 
 /**
- * Runs the decision. Returns true when bun took over the process, in which case the caller must
+ * Runs the decision. Resolves true when bun took over the process, in which case the caller must
  * return immediately: the child has already run to completion and its exit status is propagated.
+ *
+ * The wait is asynchronous for the same reason the engine spawn is: this is the outer half of the
+ * launcher chain, and a node process blocked in `spawnSync` here dies to a SIGTERM without ever
+ * telling the bun child - which owns the engine - that anything happened.
  *
  * Node's execArgv is deliberately dropped - node flags are not bun flags, and forwarding them
  * would fail the very launch this re-exec is meant to make work.
  */
-export function maybeReexecUnderBun(input) {
+export async function maybeReexecUnderBun(input) {
   const decision = resolveBunReexec(input)
   if (!decision.reexec) return false
-  const spawn = input.spawn ?? spawnSync
+  const run = input.spawn ?? runChild
   const propagate = input.propagate ?? propagateResult
   const argv = input.argv ?? process.argv
-  const result = spawn(decision.bunPath, [input.scriptPath, ...argv.slice(2)], {
+  const result = await run(decision.bunPath, [input.scriptPath, ...argv.slice(2)], {
     stdio: "inherit",
     windowsHide: true,
   })

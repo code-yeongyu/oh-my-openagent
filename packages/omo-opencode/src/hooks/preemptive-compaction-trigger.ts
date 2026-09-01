@@ -128,7 +128,6 @@ export async function runPreemptiveCompactionIfNeeded(args: {
       })
       if (toastError instanceof Error) return
     })
-    if (error instanceof Error) return
   } finally {
     compactionInProgress.delete(sessionID)
   }
