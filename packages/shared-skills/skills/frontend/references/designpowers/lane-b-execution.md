@@ -1,25 +1,25 @@
 # Lane B: Design Execution Guidance
 
-Lane B feeds `start-work` workers and always loads `frontend` for UI implementation. It does not install a separate builder. Its job is to carry designpowers composition, interaction, motion, content, responsive, adaptive, token, and cognitive-accessibility guidance into worker prompts while keeps ownership of decomposition, implementation, QA, evidence, and ledger updates.
+Lane B feeds `ulw-execute` workers and always loads `frontend` for UI implementation. It does not install a separate builder. Its job is to carry designpowers composition, interaction, motion, content, responsive, adaptive, token, and cognitive-accessibility guidance into worker prompts while keeps ownership of decomposition, implementation, QA, evidence, and ledger updates.
 
 ## Phase Owner
 
 | Capability | Materialized designpowers source | owner | Mapping |
 |---|---|---|---|
-| Visual hierarchy, layout, color, typography, touch targets, and WCAG contrast | `ui-composition` | `start-work` worker plus `frontend` | Add visual constraints and acceptance checks to worker assignments. `frontend` remains the required UI implementation skill. |
-| States, feedback, loading, error, keyboard, touch, and recovery behavior | `interaction-design` | `start-work` worker plus `frontend` | Require every interactive component to define default, hover, focus, active, disabled, loading, success, and error states where applicable. |
-| Purposeful motion and reduced-motion alternatives | `motion-choreography` | `start-work` worker plus `frontend` | Require motion specs to explain what changed, what to look at next, or how elements relate; require safe alternatives. |
-| Content-driven breakpoints and zoom behavior | `responsive-patterns` | `start-work` worker plus `frontend` | Require responsive proof at narrow, mid, desktop, and 200 percent zoom scenarios when the surface is visual. |
-| User preference adaptation | `adaptive-interfaces` | `start-work` worker plus `frontend` | Require support for relevant preferences such as color scheme, contrast, reduced motion, text sizing, and density. |
-| Mental load, wayfinding, focus management, memory demands, and recovery paths | `cognitive-accessibility` | `start-work` worker plus `frontend` | Add COGA-style checks directly to worker acceptance criteria for flows, forms, navigation, and dense tools. |
-| Plain-language labels, headings, alt text, link text, errors, and instructions | `accessible-content` and `voice-and-tone` | `start-work` worker plus `frontend` | Require final copy, no placeholders, useful errors, readable labels, and consistent tone. |
+| Visual hierarchy, layout, color, typography, touch targets, and WCAG contrast | `ui-composition` | `ulw-execute` worker plus `frontend` | Add visual constraints and acceptance checks to worker assignments. `frontend` remains the required UI implementation skill. |
+| States, feedback, loading, error, keyboard, touch, and recovery behavior | `interaction-design` | `ulw-execute` worker plus `frontend` | Require every interactive component to define default, hover, focus, active, disabled, loading, success, and error states where applicable. |
+| Purposeful motion and reduced-motion alternatives | `motion-choreography` | `ulw-execute` worker plus `frontend` | Require motion specs to explain what changed, what to look at next, or how elements relate; require safe alternatives. |
+| Content-driven breakpoints and zoom behavior | `responsive-patterns` | `ulw-execute` worker plus `frontend` | Require responsive proof at narrow, mid, desktop, and 200 percent zoom scenarios when the surface is visual. |
+| User preference adaptation | `adaptive-interfaces` | `ulw-execute` worker plus `frontend` | Require support for relevant preferences such as color scheme, contrast, reduced motion, text sizing, and density. |
+| Mental load, wayfinding, focus management, memory demands, and recovery paths | `cognitive-accessibility` | `ulw-execute` worker plus `frontend` | Add COGA-style checks directly to worker acceptance criteria for flows, forms, navigation, and dense tools. |
+| Plain-language labels, headings, alt text, link text, errors, and instructions | `accessible-content` and `voice-and-tone` | `ulw-execute` worker plus `frontend` | Require final copy, no placeholders, useful errors, readable labels, and consistent tone. |
 | Tokens and design-system consistency | `token-architecture` and `design-system-alignment` | `frontend` | Require real design tokens and existing component patterns before new one-off styling. |
 
 Materialized agent references for this lane: `design-lead`, `motion-designer`, and `content-writer`. They are prompt-role references for spawned OpenAgent work, not alternate executors.
 
 ## Prompt Injection
 
-Add this block to each `start-work` implementation worker that touches UI:
+Add this block to each `ulw-execute` implementation worker that touches UI:
 
 ```text
 Load `frontend` for UI implementation. Also apply Lane B Design Execution Guidance.
@@ -43,7 +43,7 @@ Do not invent visual direction that conflicts with the plan. If the plan lacks a
 Lane B worker DoneClaims must include:
 
 - Exact changed files and the `frontend` references loaded.
-- The real-surface QA invocation required by `start-work` for the UI surface, with captured artifact path.
+- The real-surface QA invocation required by `ulw-execute` for the UI surface, with captured artifact path.
 - Screenshot, browser, HTTP, or xterm.js web-terminal artifacts appropriate to the visible surface.
 - Accessibility evidence from the existing OpenAgent frontend path, such as Lighthouse, react-doctor, keyboard checks, or other plan-required checks.
 - A short design trace: which persona, design principle, token, or state requirement each major UI decision satisfies.
@@ -52,7 +52,7 @@ Lane B worker DoneClaims must include:
 ## Guardrails
 
 - UI implementation always goes through `frontend`; Lane B only enriches the worker prompt.
-- `start-work` owns decomposition, worker dispatch, evidence ledger entries, adversarial checks, and completion state.
+- `ulw-execute` owns decomposition, worker dispatch, evidence ledger entries, adversarial checks, and completion state.
 - The materialized `design-builder` concept is not used as an available executor. OpenAgent workers build.
 - No placeholders, generic copy, unverified contrast claims, decorative-only motion, or one-off hardcoded design systems pass this lane.
 - Accessibility and cognitive-accessibility are implementation constraints, not review-only cleanup.

@@ -379,7 +379,7 @@ describe("memory rpc bridge", () => {
       await writeFile(join(dir, "system/persona.md"), "second entry body\n", "utf8")
       await gitRepo.commitWrite(["system/persona.md"], "memory: second entry", {
         agentId: "omo-memory-rpc",
-        authorName: "Omo Agent",
+        authorName: "OmO Agent",
       })
       const log = await gitRepo.log({ limit: 2 })
       const host = rpcHost()

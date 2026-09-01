@@ -3,7 +3,7 @@ import type { ContextCollector } from "../../../features/context-injector"
 import { clearClaudeHooksConfigCache, loadClaudeHooksConfig } from "../config"
 import { clearPluginExtendedConfigCache, loadPluginExtendedConfig } from "../config-loader"
 import { executeStopHooks, type StopContext } from "../stop"
-import { clearTranscriptCache, getTranscriptPath } from "../transcript"
+import { clearTranscriptCache, getTranscriptPath, stopTranscriptCacheCleanup } from "../transcript"
 import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
 import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
@@ -12,6 +12,7 @@ import { isAmbiguousPostDispatchPromptFailure } from "../../../shared/prompt-fai
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../../shared/prompt-async-gate"
 import {
 	clearAllSessionHookState,
+	clearSessionEndHookState,
 	clearSessionHookState,
 	sessionErrorState,
 	sessionInterruptState,
@@ -47,7 +48,7 @@ export function createSessionEventHandler(
 				clearTranscriptCache(sessionID)
 				clearToolInputCache(sessionID)
 				contextCollector?.clear(sessionID)
-				clearSessionHookState(sessionID)
+				clearSessionEndHookState(sessionID)
 			}
 			return
 		}
@@ -152,7 +153,7 @@ export function createSessionEventHandler(
 }
 
 export function disposeSessionEventHandler(contextCollector?: ContextCollector): void {
-	clearTranscriptCache()
+	stopTranscriptCacheCleanup()
 	clearClaudeHooksConfigCache()
 	clearPluginExtendedConfigCache()
 	stopToolInputCacheCleanup()

@@ -186,8 +186,8 @@ describe("tool.execute.before goal command", () => {
     const handler = createHandler(directory, createGoalHook(calls))
 
     await handler(
-      { tool: "skill", sessionID: "ses-main", callID: "call-start-work" },
-      { args: { name: "/start-work", user_message: "Ship feature" } },
+      { tool: "skill", sessionID: "ses-main", callID: "call-ulw-execute" },
+      { args: { name: "/ulw-execute", user_message: "Ship feature" } },
     )
 
     expect(calls).toHaveLength(0)

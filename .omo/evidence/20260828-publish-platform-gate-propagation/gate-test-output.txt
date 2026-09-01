@@ -1,0 +1,18 @@
+A: all visible immediately                     exit=0 expect=0  PASS
+    OK lines: 24
+    All 24 platform package(s) are visible at 5.0.0-beta.24
+B: 3 lag, heal after round 2                   exit=0 expect=0  PASS
+    OK lines: 24
+    Waiting for platform package registry propagation (attempt 1/20; 3 pending)
+    Waiting for platform package registry propagation (attempt 2/20; 3 pending)
+C: 1 never appears -> hard fail                exit=1 expect=1  PASS
+    OK lines: 23
+    Waiting for platform package registry propagation (attempt 1/3; 1 pending)
+    Waiting for platform package registry propagation (attempt 2/3; 1 pending)
+    ::error::Missing platform package(s); refusing to publish wrappers. Still absent after 3 attempts:
+    ::error::  oh-my-openagent-windows-arm64@5.0.0-beta.24
+D: curl transient failure                      exit=1 expect=1  PASS
+    OK lines: 23
+    Waiting for platform package registry propagation (attempt 1/2; 1 pending)
+    ::error::Missing platform package(s); refusing to publish wrappers. Still absent after 2 attempts:
+    ::error::  oh-my-opencode-linux-x64@5.0.0-beta.24

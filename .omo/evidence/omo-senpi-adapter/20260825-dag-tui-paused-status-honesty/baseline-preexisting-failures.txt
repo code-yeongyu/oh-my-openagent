@@ -1,0 +1,39 @@
+# Pre-existing failures, unrelated to this branch
+
+## Full root suite on this branch
+
+ 16434 pass
+ 7 skip
+ 23 fail
+ 46155 expect() calls
+Ran 16464 tests across 2126 files. [848.23s]
+
+## The failing areas, run on CLEAN origin/dev (b9c04adbd, none of this branch's code):
+packages/omo-senpi/src/components/init-deep-advisor + packages/omo-native + packages/omo-senpi/src/install
+  265 pass / 21 fail  <- identical on clean dev and on this branch
+
+## Failing test names (all init-deep-advisor / omo doctor / omo setup / cli-local / OmO Native identity;
+## none touches the DAG, the status widget, or the snapshot projection):
+(fail) cli-local > #given isolated agent dir #when install then uninstall are invoked #then stdout is one-line JSON and settings round-trip 
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is tracked #when Run now is chosen #then suggestedMode is committed 
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is untracked #when Run now is chosen #then suggestedMode is local 
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never anywhere #then the correct response state is applied 
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never in this project #then the correct response state is applied 
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Run now #then the correct response state is applied 
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Skip this time #then the correct response state is applied 
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the advisor opens #then last proposed HEAD is written first 
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the dialog times out #then the correct response state is applied 
+(fail) createInitDeepAdvisorComponent > #given fake timers #when session_start fires #then ui.select waits for setTimeout zero 
+(fail) createInitDeepAdvisorComponent > #given session_start #when the handler returns #then ui.select has not run synchronously 
+(fail) omo doctor > #given SENPI_CODING_AGENT_DIR points to an alternate agent directory > #then doctor reads settings from that directory first 
+(fail) omo doctor > #given settings contain the legacy package entry > #then the object shape warns without changing settings 
+(fail) omo doctor > #given settings contain the legacy package entry > #then the string shape warns without changing settings 
+(fail) omo doctor > #given settings JSON is malformed > #then diagnostics warn and continue without changing settings 
+(fail) OmO Native product identity > #given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi 
+(fail) omo setup credential inheritance > #given a pre-existing auth file #when import writes #then mode backup and idempotency are exact 
+(fail) omo setup credential inheritance > #given an existing senpi provider #when other keys import #then its entry stays structurally byte-identical 
+(fail) omo setup credential inheritance > #given declined consent #when setup runs #then auth remains absent 
+(fail) omo setup credential inheritance > #given malformed senpi auth #when accepted #then it warns and skips all writes 
+(fail) omo setup credential inheritance > #given opencode api oauth mapped and gateway entries #when accepted #then only safe api ids import 
+(fail) omo setup credential inheritance > #given pinned omp and gjc databases #when accepted #then allow-listed rows import and unknown schema is noticed 
+(fail) session_start component ordering > #given real onboarding state and an active ulw loop #when startup then agent_end fire #then onboarding is preserved and the first-session advisor stays detached and suppressed 

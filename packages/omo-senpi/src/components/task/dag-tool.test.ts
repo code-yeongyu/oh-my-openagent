@@ -7,8 +7,9 @@ import { join } from "node:path"
 
 import { createDagFileStore, createDagManager, DagManagerError, type DagManager, type DagNodeId, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/scheduler"
+import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 
-import { DAG_TOOL_NAME, createDagTool, runDagTool, type DagToolDefinitionInput } from "./dag-tool"
+import { WORKFLOW_TOOL_NAME, createDagTool, runDagTool, type DagToolDefinitionInput } from "./dag-tool"
 
 const parentSessionId = "ses_parent"
 const rootSessionId = "ses_root"
@@ -28,6 +29,7 @@ function tempProject(): string {
 
 function fixture(): {
   readonly manager: DagManager
+  readonly store: ReturnType<typeof createDagFileStore>
   readonly runFileCount: () => number
 } {
   const store = createDagFileStore({ project_dir: tempProject() })
@@ -43,6 +45,7 @@ function fixture(): {
   })
   return {
     manager,
+    store,
     runFileCount: () => fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length,
   }
 }
@@ -64,7 +67,7 @@ function deps(manager: DagManager) {
 }
 
 describe("dag tool registration", () => {
-  test("#given the dag tool factory #when a tool is created #then it registers exactly one tool named dag", () => {
+  test("#given the workflow tool factory #when a tool is created #then it registers exactly one tool named workflow", () => {
     // given
     const { manager } = fixture()
 
@@ -72,8 +75,8 @@ describe("dag tool registration", () => {
     const tool = createDagTool(deps(manager))
 
     // then
-    expect(tool.name).toBe("dag")
-    expect(DAG_TOOL_NAME).toBe("dag")
+    expect(tool.name).toBe("workflow")
+    expect(WORKFLOW_TOOL_NAME).toBe("workflow")
   })
 })
 
@@ -281,7 +284,36 @@ describe("dag tool attach and snapshot actions", () => {
 })
 
 describe("dag tool wait action", () => {
-  test("#given a started run #when wait runs #then it resolves through the injected wait surface", async () => {
+  test("#given a started run #when wait runs with detach disabled #then it blocks and resolves through the injected wait surface", async () => {
+    // given
+    const { manager } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const waited: string[] = []
+    const withWait = {
+      ...deps(manager),
+      wait: async (runId: DagRunId, sessionId: string) => {
+        waited.push(`${runId}:${sessionId}`)
+        return {
+          runId,
+          status: "completed" as const,
+          snapshot: manager.snapshot(runId, sessionId),
+          nodes: {},
+        }
+      },
+    }
+
+    // when
+    const result = await runDagTool(withWait, { action: "wait", run_id: started.details.run_id, detach: false })
+
+    // then
+    expect(result.details.kind).toBe("waited")
+    if (result.details.kind !== "waited") throw new Error("Expected wait to succeed")
+    expect(result.details.result.status).toBe("completed")
+    expect(waited).toEqual([`${started.details.run_id}:${parentSessionId}`])
+  })
+
+  test("#given a started run #when wait runs with the default detach #then it returns a detached envelope without touching the wait surface", async () => {
     // given
     const { manager } = fixture()
     const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
@@ -303,11 +335,43 @@ describe("dag tool wait action", () => {
     // when
     const result = await runDagTool(withWait, { action: "wait", run_id: started.details.run_id })
 
-    // then
+    // then the model-facing default detaches: the session wakes on node completions and on settle
+    expect(result.details.kind).toBe("detached")
+    if (result.details.kind !== "detached") throw new Error("Expected wait to detach by default")
+    expect(result.details.run_id).toBe(started.details.run_id)
+    expect(result.details.snapshot.status).toBe("pending")
+    expect(waited).toEqual([])
+    const text = result.content[0]
+    if (text?.type !== "text") throw new Error("Expected text content")
+    expect(text.text).toContain("woken as each node completes")
+  })
+
+  test("#given a run that already settled #when wait runs with the default detach #then it still returns the final result through the wait surface", async () => {
+    // given
+    const { manager, store } = fixture()
+    const started = await runDagTool(deps(manager), { action: "start", definition: definition() })
+    if (started.details.kind !== "started") throw new Error("Expected the fixture start to succeed")
+    const runId = started.details.run_id as DagRunId
+    const record = store.readCheckpoint<DagRunRecordV1>(runId)
+    if (record === null) throw new Error("expected a checkpoint for the started run")
+    store.writeCheckpoint(runId, { ...record, status: "completed" })
+    const withWait = {
+      ...deps(manager),
+      wait: async (waitRunId: DagRunId, sessionId: string) => ({
+        runId: waitRunId,
+        status: "completed" as const,
+        snapshot: manager.snapshot(waitRunId, sessionId),
+        nodes: {},
+      }),
+    }
+
+    // when
+    const result = await runDagTool(withWait, { action: "wait", run_id: started.details.run_id })
+
+    // then a terminal run never detaches: the result already exists, so it comes straight back
     expect(result.details.kind).toBe("waited")
-    if (result.details.kind !== "waited") throw new Error("Expected wait to succeed")
+    if (result.details.kind !== "waited") throw new Error("Expected a terminal wait to return the result")
     expect(result.details.result.status).toBe("completed")
-    expect(waited).toEqual([`${started.details.run_id}:${parentSessionId}`])
   })
 
   test("#given no wait surface is wired #when wait runs #then ownership is still enforced before dispatch", async () => {

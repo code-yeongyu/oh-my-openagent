@@ -51,7 +51,7 @@ describe("createAstGrepComponent", () => {
   it.each([
     { context: "parent", env: {} },
     { context: "child", env: { SENPI_CODING_AGENT_SESSION_DIR: "/tmp/senpi-child" } },
-  ])("#given a staged runtime in a $context session #when registered #then declares the Anthropic-safe _ast_grep MCP server", async ({ env }) => {
+  ])("#given a staged runtime in a $context session #when registered #then declares the lazy Anthropic-safe _ast_grep MCP server", async ({ env }) => {
     const entry = await makeStagedEntry()
     const pi = new FakeExtensionAPI()
     const component = createAstGrepComponent({
@@ -70,9 +70,9 @@ describe("createAstGrepComponent", () => {
           type: "stdio",
           command: "/usr/local/bin/node",
           args: [entry, "mcp"],
-          env: { OMO_AST_GREP_PROJECT_CWD: "/workspace/project" },
+          env: { OMO_AST_GREP_PROJECT_CWD: "/workspace/project", BUN_BE_BUN: "1" },
           enabled: true,
-          lifecycle: "eager",
+          lifecycle: "lazy",
         },
       },
     ])
@@ -89,7 +89,7 @@ describe("createAstGrepComponent", () => {
 
     await component.register(pi, fakeContext())
 
-    expect(pi.mcpServers[0]?.config.env).toEqual({ OMO_AST_GREP_PROJECT_CWD: "/explicit/project" })
+    expect(pi.mcpServers[0]?.config.env).toEqual({ OMO_AST_GREP_PROJECT_CWD: "/explicit/project", BUN_BE_BUN: "1" })
   })
 
   it("#given the staged entry is absent #when registered #then skips cleanly and warns", async () => {
