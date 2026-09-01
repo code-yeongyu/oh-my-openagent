@@ -1,0 +1,19 @@
+Final lifecycle review GREEN
+
+Implemented:
+- Clear the footer at every session start before disabled/conflict exits.
+- Clear the footer during session shutdown.
+- Remove the late post-reconciliation clear that could erase a newly published footer.
+- Ignore failed memory tool results.
+- Reserve the one-shot gate during refresh, then retain it only when a footer was actually shown; restore retry eligibility after unavailable status or refresh failure.
+
+Verification:
+- Focused index/status/wiring: 23 pass, 0 fail, 70 assertions.
+- Full memory component: 251 pass, 0 fail, 835 assertions.
+- Omo-senpi typecheck: exit 0 after refreshing merged workspace links with exact Bun 1.3.12.
+- No-excuse audit: no violations in five changed TypeScript files.
+- Senpi plugin build and bundle freshness check: exit 0.
+- Real xterm before: footer count 0.
+- Real xterm after successful `memory create`: footer count 1 with `just now`.
+- `@uncommitted`: count 0.
+- PTYs 24561 and 24562 killed; QA runtime removed; no matching process remained.

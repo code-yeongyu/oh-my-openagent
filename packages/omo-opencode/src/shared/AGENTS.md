@@ -1,17 +1,17 @@
-# src/shared/ — 297 Utility Files (179 non-test)
+# src/shared/ — Shared Adapter Utilities
 
 **Generated:** 2026-05-20
 
 ## OVERVIEW
 
-Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes `oh-my-opencode.log` to the OS temp dir (Node's `os.tmpdir()` — `/tmp` on Linux, `%TEMP%` on Windows, etc.); rotated at 50 MB; up to 2 backups at `.1` / `.2`. Includes runtime shims for `Bun.file`, `Bun.write`, `Bun.hash`, `Bun.which`, `Bun.spawn` to support non-Bun runtimes (Electron-hosted OpenCode).
+Cross-cutting adapter utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes `oh-my-opencode.log` to the OS temp dir (Node's `os.tmpdir()` — `/tmp` on Linux, `%TEMP%` on Windows, etc.); rotated at 50 MB; up to 2 backups at `.1` / `.2`. Includes runtime shims for `Bun.file`, `Bun.write`, `Bun.hash`, `Bun.which`, `Bun.spawn` to support non-Bun runtimes (Electron-hosted OpenCode). Many former utility implementations are now extracted to Core packages such as `utils`, `model-core`, `tmux-core`, `telemetry-core`, and `skills-loader-core`; keep local files as stable OpenCode import shims when existing wiring depends on their paths.
 
 ## CATEGORY MAP
 
 | Category | Files | Key Exports |
 |----------|-------|-------------|
 | **Model Resolution** | ~22 | `resolveModel()`, `checkModelAvailability()`, `AGENT_MODEL_REQUIREMENTS` |
-| **Tmux Integration** | 11 | `createTmuxSession()`, `spawnPane()`, `closePane()`, server health |
+| **Tmux Integration** | 8 + `tmux/tmux-utils/` | `createTmuxSession()`, `spawnPane()`, `closePane()`, server health; pane/session/layout/sweep primitives live in [`tmux/tmux-utils/`](tmux/tmux-utils/AGENTS.md) (33 files, runner/injectable-spawn pattern) |
 | **Configuration & Paths** | 10 | `resolveOpenCodeConfigDir()`, `getDataPath()`, `parseJSONC()` |
 | **Session Management** | 8 | `SessionCursor`, `trackInjectedPath()`, `SessionToolsStore` |
 | **Git Worktree** | 7 | `parseGitStatusPorcelain()`, `collectGitDiffStats()`, `formatFileChanges()` |

@@ -68,7 +68,10 @@ describe("createSpawnCommand", () => {
 		const command = ["typescript-language-server", "--stdio"];
 
 		// when
-		const prepared = createSpawnCommand(command, "win32", "cmd.exe");
+		const prepared = createSpawnCommand(command, "win32", "cmd.exe", {
+			PATH: "",
+			PATHEXT: ".COM;.EXE;.BAT;.CMD",
+		});
 
 		// then
 		expect(prepared).toEqual({
@@ -83,7 +86,10 @@ describe("createSpawnCommand", () => {
 		const command = ["typescript-language-server.cmd", "--stdio"];
 
 		// when
-		const prepared = createSpawnCommand(command, "win32", "cmd.exe");
+		const prepared = createSpawnCommand(command, "win32", "cmd.exe", {
+			PATH: "",
+			PATHEXT: ".COM;.EXE;.BAT;.CMD",
+		});
 
 		// then
 		expect(prepared).toEqual({

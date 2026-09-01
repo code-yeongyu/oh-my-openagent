@@ -1,0 +1,44 @@
+WHAT WAS TESTED
+
+Four parallel final focused-domain commands ran against the complete edited
+worktree:
+
+1. `bun test packages/omo-opencode/src`
+2. Codex root plugin tests plus rules, teammode, ultrawork, ulw-loop,
+   start-work-continuation, and lazycodex-executor-verify component suites.
+3. `bun test packages/omo-senpi packages/senpi-task
+   packages/shared-skills/materialize-frontend-refs.test.ts`
+4. The 16 changed core/script/repository tests plus
+   `python3 .omo/evidence/20260817-remove-prompt-contract-tests/test_audit_prompt_contracts.py`.
+
+WHAT WAS OBSERVED
+
+- OpenCode: exit 0; 8,213 passed, 0 failed, 1 existing live-tmux test
+  skipped, 18,151 assertions, 979 files.
+- Codex: exit 0 and `CODEX_FINAL_FOCUSED_OK`.
+  - Root plugin: 329 passed.
+  - Rules: 165 passed.
+  - Teammode: 6 passed.
+  - Ultrawork: 24 passed.
+  - ulw-loop: 420 passed.
+  - start-work-continuation: 42 passed.
+  - lazycodex-executor-verify: 25 passed.
+- Senpi/shared: exit 0 and `SENPI_FINAL_FOCUSED_OK`; 3,477 passed,
+  0 failed, 2 existing Windows-only tests skipped, 10,629 assertions,
+  505 files.
+- Core/scripts: exit 0 and `CORE_FINAL_FOCUSED_OK`; 114 Bun tests and
+  9 scanner unit tests passed, 0 failed.
+
+WHY IT IS ENOUGH
+
+These commands exercise every changed adapter/domain after all forbidden
+candidate cleanups, regression-restoration tests, dead-code removal, and policy
+updates. They include full OpenCode and Senpi package surfaces, every affected
+Codex component, all changed core/script files, and the all-tracked scanner
+test suite.
+
+WHAT WAS OMITTED
+
+The multi-megabyte passing test streams are summarized with exact commands,
+exit codes, pass/fail/skip totals, assertion/file counts where available, and
+completion sentinels. No secrets or private runtime logs were captured.

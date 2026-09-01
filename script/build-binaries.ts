@@ -28,6 +28,7 @@ export const PLATFORMS: PlatformTarget[] = [
   { platform: "linux-arm64-musl", packageName: "oh-my-opencode-linux-arm64-musl", packageDir: "oh-my-opencode-linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "oh-my-opencode.js", description: "Linux ARM64 (musl)" },
   { platform: "windows-x64", packageName: "oh-my-opencode-windows-x64", packageDir: "oh-my-opencode-windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.js", description: "Windows x64" },
   { platform: "windows-x64-baseline", packageName: "oh-my-opencode-windows-x64-baseline", packageDir: "oh-my-opencode-windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "oh-my-opencode.js", description: "Windows x64 (no AVX2)" },
+  { platform: "windows-arm64", packageName: "oh-my-opencode-windows-arm64", packageDir: "oh-my-opencode-windows-arm64", target: "bun-windows-x64", binary: "oh-my-opencode.js", description: "Windows ARM64 (x64 emulation / node fallback)" },
 ];
 
 const CLI_DIST_ENTRY = "dist/cli/index.js";
@@ -122,10 +123,27 @@ if (shouldRunLazyCodexInstaller()) {
 }
 
 const cliPath = join(wrapperPackageRoot, "dist", "cli", "index.js");
+const nodeCliPath = join(wrapperPackageRoot, "dist", "cli-node", "index.js");
 
 if (!existsSync(cliPath)) {
   console.error(\`oh-my-opencode: packaged CLI not found at \${cliPath}\`);
   process.exit(2);
+}
+
+function runNodeCli(reason) {
+  if (!existsSync(nodeCliPath)) return;
+  if (reason) {
+    console.error(\`oh-my-opencode: \${reason}; falling back to the node CLI at \${nodeCliPath}\`);
+  }
+  const result = spawnSync(process.execPath, [nodeCliPath, ...process.argv.slice(2)], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  exitFromResult(result, "failed to execute the node CLI");
+}
+
+if (process.env.OMO_RUNTIME === "node") {
+  runNodeCli();
 }
 
 const bunBinary = process.env.BUN_BINARY || "bun";
@@ -133,6 +151,14 @@ const result = spawnSync(bunBinary, [cliPath, ...process.argv.slice(2)], {
   stdio: "inherit",
   env: process.env,
 });
+
+if (result.error) {
+  runNodeCli(\`bun is not available (\${result.error.message})\`);
+}
+
+if (result.signal === "SIGILL") {
+  runNodeCli("bun crashed with SIGILL - this CPU lacks the instruction set bun requires (x86-64-v2/SSE4.2 or newer)");
+}
 
 exitFromResult(result, "failed to execute Bun");
 `;

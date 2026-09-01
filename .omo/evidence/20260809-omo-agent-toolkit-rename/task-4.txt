@@ -1,0 +1,450 @@
+# Task 4 - omo-agent-toolkit command-string migration evidence
+
+## Audit RED (pre-migration, full output / full 107-hit list)
+```text
+bun test v1.4.0-canary.1 (b58cd4685)
+
+script/agent-command-string-audit.test.ts:
+49 |     const allowlist = readAllowlist()
+50 |     expect(Object.keys(allowlist).sort()).toEqual([...ALLOWLIST_CATEGORIES].sort())
+51 | 
+52 |     const categorized = ALLOWLIST_CATEGORIES.flatMap((category) => allowlist[category])
+53 |     expect(new Set(categorized).size, "allowlist entries must be unique").toBe(categorized.length)
+54 |     expect(collectHits()).toEqual(categorized.sort())
+                               ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   ".agents/skills/codex-qa/SKILL.md:72: omo get-local-version",
++   "packages/omo-codex/README.md:52: omo get-local-version",
++   "packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-code-reviewer.toml:20: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-gate-reviewer.toml:18: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-qa-executor.toml:21: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-worker-high.toml:22: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-worker-low.toml:22: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-worker-medium.toml:22: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ultrawork/agents/plan.toml:103: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ultrawork/agents/plan.toml:49: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ultrawork/skills/ulw-plan/scripts/scaffold-plan.mjs:257: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/AGENTS.md:42: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:13: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:14: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:15: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:16: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:17: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:18: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:19: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:20: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:21: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:22: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/README.md:5: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/SKILL.md:23: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/SKILL.md:24: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/SKILL.md:25: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:116: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:117: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:118: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:122: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:141: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:148: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:157: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:169: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:170: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:171: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:180: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:192: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:195: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:201: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:222: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:225: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:69: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:70: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:89: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-reconciliation.ts:90: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:10: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:11: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:12: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:13: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:5: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:6: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:7: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:8: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:9: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-steering.ts:19: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts:8: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts:8: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts:111: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts:119: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts:120: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts:74: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/codex-hook.ts:98: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/plan-crud.ts:112: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/plan-io.ts:77: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/steering.ts:179: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/stop-resume-hook.ts:102: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/stop-resume-hook.ts:104: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/cli-commands.test.ts:194: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/cli-commands.test.ts:66: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/cli-entrypoint.test.ts:99: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts:201: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts:202: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/cli-steering-kind-guidance.test.ts:14: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts:155: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts:159: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/quality-gate-builder.ts:50: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts:217: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts:217: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/plan-io.test.ts:120: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts:24: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/steering.test.ts:425: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/test/stop-resume-hook.test.ts:87: omo ulw-loop",
++   "packages/omo-codex/scripts/install-config.test.mjs:115: omo install",
++   "packages/omo-codex/scripts/install-delegated-command.test.mjs:86: omo doctor",
++   "packages/omo-codex/scripts/install-local-entrypoint.test.mjs:123: omo doctor",
++   "packages/omo-codex/src/install/codex-config-toml.test.ts:233: omo install",
++   "packages/omo-codex/src/install/lazycodex-routing.test.ts:77: omo install",
++   "packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts:228: omo doctor",
++   "packages/omo-opencode/src/cli/doctor/checks/codex-components.ts:97: omo doctor",
++   "packages/omo-opencode/src/cli/doctor/checks/tools.ts:40: omo doctor",
++   "packages/omo-opencode/src/cli/install-platform-resolution.test.ts:231: omo cleanup",
++   "packages/omo-opencode/src/cli/install-platform-resolution.test.ts:7: omo install",
++   "packages/omo-senpi/AGENTS.md:27: omo ulw-loop",
++   "packages/omo-senpi/plugin/README.md:46: omo install",
++   "packages/omo-senpi/scripts/qa/probe-continuation.mjs:131: omo ulw-loop",
++   "packages/omo-senpi/scripts/qa/probe-continuation.mjs:135: omo ulw-loop",
++   "packages/omo-senpi/scripts/qa/probe-continuation.mjs:79: omo ulw-loop",
++   "script/install-codex-dev.ts:45: omo get-local-version",
++   "script/lazycodex-published-smoke-workflow.test.ts:37: omo install",
++   "script/lazycodex-published-smoke-workflow.test.ts:43: omo install",
++   "script/lazycodex-published-smoke-workflow.test.ts:46: omo doctor",
++   "script/lazycodex-published-smoke-workflow.test.ts:47: omo doctor",
++   "script/lazycodex-published-smoke-workflow.test.ts:64: omo install",
++   "script/publish-lazycodex-workflow.test.ts:330: omo install",
++ ]
+
+- Expected  - 1
++ Received  + 107
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/script/agent-command-string-audit.test.ts:54:27)
+(fail) agent command string audit > #given tracked source files #when legacy agent and human commands are scanned #then every hit is categorized [902.82ms]
+
+ 0 pass
+ 1 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [989.00ms]
+
+AUDIT_RED_EXIT=1
+```
+
+## Audit GREEN (final)
+```text
+bun test v1.4.0-canary.1 (b58cd4685)
+
+script/agent-command-string-audit.test.ts:
+(pass) agent command string audit > #given tracked source files #when legacy agent and human commands are scanned #then every hit is categorized [893.66ms]
+
+ 1 pass
+ 0 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [996.00ms]
+
+AUDIT_FINAL_GREEN_EXIT=0
+```
+
+## Mutation probe RED
+Mutation: packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:5 temporarily restored `omo ulw-loop create-goals`.
+```text
+bun test v1.4.0-canary.1 (b58cd4685)
+
+script/agent-command-string-audit.test.ts:
+49 |     const allowlist = readAllowlist()
+50 |     expect(Object.keys(allowlist).sort()).toEqual([...ALLOWLIST_CATEGORIES].sort())
+51 | 
+52 |     const categorized = ALLOWLIST_CATEGORIES.flatMap((category) => allowlist[category])
+53 |     expect(new Set(categorized).size, "allowlist entries must be unique").toBe(categorized.length)
+54 |     expect(collectHits()).toEqual(categorized.sort())
+                               ^
+error: expect(received).toEqual(expected)
+
+@@ -8,11 +8,11 @@
+    "packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-worker-low.toml:22: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-worker-medium.toml:22: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ultrawork/agents/plan.toml:103: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ultrawork/agents/plan.toml:49: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md:222: omo ulw-loop",
++   "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts:5: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/src/codex-hook.ts:98: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/src/steering.ts:179: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts:155: omo ulw-loop",
+    "packages/omo-codex/plugin/components/ulw-loop/test/steering.test.ts:425: omo ulw-loop",
+    "packages/omo-codex/scripts/install-config.test.mjs:115: omo install",
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/script/agent-command-string-audit.test.ts:54:27)
+(fail) agent command string audit > #given tracked source files #when legacy agent and human commands are scanned #then every hit is categorized [618.83ms]
+
+ 0 pass
+ 1 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [706.00ms]
+
+MUTATION_RED_EXIT=1
+```
+
+## Mutation probe GREEN after restoration
+```text
+bun test v1.4.0-canary.1 (b58cd4685)
+
+script/agent-command-string-audit.test.ts:
+(pass) agent command string audit > #given tracked source files #when legacy agent and human commands are scanned #then every hit is categorized [968.01ms]
+
+ 1 pass
+ 0 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [1086.00ms]
+
+MUTATION_GREEN_EXIT=0
+```
+
+## Component test
+```text
+ [32m✓[39m test/cli-json-errors.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m test/ultrawork-directive.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+ [32m✓[39m test/types.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m test/cli-steering-batch.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m test/checkpoint-status.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m test/checkpoint-continuation.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m test/quality-gate-doc.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m test/cli-validation-batch.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m test/cli-steering-kind-guidance.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m test/package-smoke.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 408[2mms[22m[39m
+     [33m[2m✓[22m[39m #given PATH omo-agent-toolkit lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI [33m 395[2mms[22m[39m
+ [32m✓[39m test/cli-entrypoint.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 830[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m40 passed[39m[22m[90m (40)[39m
+[2m      Tests [22m [1m[32m422 passed[39m[22m[90m (422)[39m
+[2m   Start at [22m 18:07:32
+[2m   Duration [22m 1.20s[2m (transform 1.24s, setup 0ms, import 2.16s, tests 2.42s, environment 2ms)[22m
+
+
+ULW_LOOP_TEST_EXIT=0
+```
+
+## Senpi suite
+```text
+(pass) omo-senpi todo-fanout-reminder component > #given a reminded session #when the session shuts down #then the gate is cleared [0.07ms]
+(pass) omo-senpi todo-fanout-reminder component > #given a host exposing no session id #when todo results arrive #then the reminder fires once on the anonymous slot [0.06ms]
+(pass) omo-senpi todo-fanout-reminder component > #given the component disabled flag #when an armed session adds todos #then no reminder is appended [0.07ms]
+
+ 614 pass
+ 0 fail
+ 1706 expect() calls
+Ran 614 tests across 93 files. [5.14s]
+
+SENPI_TEST_EXIT=0
+```
+
+## Codex gate
+```text
+✔ #given absent project directory from the script surface #when script cleanup runs #then it skips project-local cleanup without throwing (0.297792ms)
+✔ #given project cleanup hits a filesystem edge #when Node installer runs #then install succeeds and reports skipped cleanup (64.862667ms)
+ℹ tests 519
+ℹ suites 0
+ℹ pass 519
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5285.966667
+
+TEST_CODEX_EXIT=0
+```
+
+## Sync/build idempotency
+First regeneration wave ran: codex sync, senpi sync, senpi extension build.
+A later repeated wave was compared byte-for-byte against the settled tracked diff.
+```text
+synced omo-senpi skills to /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-senpi/plugin/skills
+Bundled 661 modules in 32ms
+
+  omo.js  0.71 MB  (entry point)
+
+Bundled 277 modules in 9ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Built omo-senpi extensions: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-senpi/plugin/extensions/omo.js, /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-agent-toolkit-rename/packages/omo-senpi/plugin/extensions/omo-member.js
+status delta after repeated wave: empty
+tracked patch cmp exit: 0
+packages/omo-senpi/plugin/extensions/omo.js cmp exit: 0
+```
+
+## Hook-wiring scope check
+```text
+(no output)
+```
+
+## Changed files and exact changed line hunks
+New files: script/agent-command-string-audit.test.ts:1-59; script/agent-command-string-audit.allowlist.json:1-41.
+```text
+diff --git a/packages/omo-codex/plugin/components/ultrawork/skills/ulw-plan/scripts/scaffold-plan.mjs b/packages/omo-codex/plugin/components/ultrawork/skills/ulw-plan/scripts/scaffold-plan.mjs
+@@ -257 +257 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/AGENTS.md b/packages/omo-codex/plugin/components/ulw-loop/AGENTS.md
+@@ -42 +42 @@ Conventions for human contributors and AI agents working on this repository.
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/README.md b/packages/omo-codex/plugin/components/ulw-loop/README.md
+@@ -5 +5 @@
+@@ -13,10 +13,10 @@ Every subcommand below is implemented. Pass `--json` where supported for machine
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/SKILL.md b/packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/SKILL.md
+@@ -23,3 +23,3 @@ This skill is intentionally compact. The full workflow lives in `references/full
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md b/packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md
+@@ -69,2 +69,2 @@ Codex subagent reliability:
+@@ -89,2 +89,2 @@ ULW_LOOP_CLI=
+@@ -92 +92 @@ elif [ -n "$ULW_LOOP_NODE" ]; then
+@@ -100,3 +99,0 @@ elif [ -n "$ULW_LOOP_NODE" ]; then
+@@ -108 +105 @@ if [ -z "${ULW_LOOP_CLI:-}" ]; then
+@@ -116,3 +113,3 @@ Run one form:
+@@ -122 +119 @@ completed default state for unrelated new work. Start a fresh run with
+@@ -141 +138 @@ Revise any criterion that lacks observable `expectedEvidence` or a named channel
+@@ -148 +145 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
+@@ -157 +154 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
+@@ -169,3 +166,3 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
+@@ -180 +177 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
+@@ -192 +189 @@ Trigger only for the final aggregate goal after every criterion in every goal is
+@@ -195 +192 @@ Trigger only for the final aggregate goal after every criterion in every goal is
+@@ -201 +198 @@ omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e eviden
+@@ -222 +219 @@ Use steering only for structured evidence-backed mutation. Reject natural-langua
+@@ -225 +222 @@ Validation batches are optional aggregate-mode review boundaries declared at cre
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-reconciliation.ts b/packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-reconciliation.ts
+@@ -90 +90 @@ function buildCompletedLegacyGoalRemediation(goal: UlwLoopItem): string {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts b/packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts
+@@ -5,9 +5,9 @@ export const ULW_LOOP_HELP = `Usage:
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/cli-steering.ts b/packages/omo-codex/plugin/components/ulw-loop/src/cli-steering.ts
+@@ -19 +19 @@ const STEERING_KIND_HELP = [
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/cli.ts b/packages/omo-codex/plugin/components/ulw-loop/src/cli.ts
+@@ -8 +8 @@ const TOP_LEVEL_HELP =
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts b/packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts
+@@ -74 +74 @@ function modeConstraintLines(mode: UlwLoopCodexGoalMode, isFinal: boolean): read
+@@ -111 +111 @@ function evidenceLayoutLines(plan: UlwLoopPlan): string[] {
+@@ -119,2 +119,2 @@ function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, ag
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/codex-hook.ts b/packages/omo-codex/plugin/components/ulw-loop/src/codex-hook.ts
+@@ -98 +98 @@ function hasSteeringDirectiveMarker(prompt: string): boolean {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/plan-crud.ts b/packages/omo-codex/plugin/components/ulw-loop/src/plan-crud.ts
+@@ -112 +112 @@ function completedPlanExistsError(scope?: UlwLoopScope): UlwLoopError {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/plan-io.ts b/packages/omo-codex/plugin/components/ulw-loop/src/plan-io.ts
+@@ -77 +77 @@ export async function readUlwLoopPlan(repoRoot: string, scope?: UlwLoopScope): P
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/steering.ts b/packages/omo-codex/plugin/components/ulw-loop/src/steering.ts
+@@ -179 +179 @@ export function parseUlwLoopSteeringDirective(text: string): UlwLoopSteeringProp
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/src/stop-resume-hook.ts b/packages/omo-codex/plugin/components/ulw-loop/src/stop-resume-hook.ts
+@@ -102 +102 @@ function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId:
+@@ -104 +104 @@ function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId:
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/cli-commands.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/cli-commands.test.ts
+@@ -66 +66 @@ describe("ulwLoopCommand help", () => {
+@@ -194 +194 @@ describe("ulwLoopCommand unknown", () => {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/cli-entrypoint.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/cli-entrypoint.test.ts
+@@ -99 +99 @@ describe("dist/cli.js entrypoint dispatch", () => {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts
+@@ -201,2 +201,2 @@ describe("ULW_LOOP_HELP", () => {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/cli-steering-kind-guidance.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/cli-steering-kind-guidance.test.ts
+@@ -14 +14 @@ describe("#given a steering command without --kind", () => {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts
+@@ -155 +155 @@ describe("applyUserPromptUlwLoopSteering - OMO directive patterns", () => {
+@@ -159 +159 @@ describe("applyUserPromptUlwLoopSteering - OMO directive patterns", () => {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/fixtures/quality-gate-builder.ts b/packages/omo-codex/plugin/components/ulw-loop/test/fixtures/quality-gate-builder.ts
+@@ -50 +50 @@ export async function qualityGateJson(
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts
+@@ -145 +145 @@ describe("skills/ulw-loop/SKILL.md", () => {
+@@ -157,2 +157,2 @@ describe("skills/ulw-loop/SKILL.md", () => {
+@@ -175 +175 @@ describe("skills/ulw-loop/SKILL.md", () => {
+@@ -217 +217 @@ describe("README implementation contract", () => {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/plan-io.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/plan-io.test.ts
+@@ -120 +120 @@ describe("readUlwLoopPlan", () => {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts
+@@ -24 +24 @@ const BASE_GATE = {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/steering.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/steering.test.ts
+@@ -425 +425 @@ describe("parseUlwLoopSteeringDirective", () => {
+diff --git a/packages/omo-codex/plugin/components/ulw-loop/test/stop-resume-hook.test.ts b/packages/omo-codex/plugin/components/ulw-loop/test/stop-resume-hook.test.ts
+@@ -87 +87 @@ describe("runStopResumeHook", () => {
+diff --git a/packages/omo-senpi/AGENTS.md b/packages/omo-senpi/AGENTS.md
+@@ -27 +27 @@ The v1 install surface is local-path only. Install the built Pi package from `pa
+diff --git a/packages/omo-senpi/plugin/extensions/omo.js b/packages/omo-senpi/plugin/extensions/omo.js
+@@ -1 +1 @@
+@@ -4 +4 @@ var jC=Object.defineProperty;var UC=(e)=>e;function BC(e,t){this[e]=UC.bind(null
+@@ -65 +65 @@ var jC=Object.defineProperty;var UC=(e)=>e;function BC(e,t){this[e]=UC.bind(null
+@@ -67 +67 @@ var jC=Object.defineProperty;var UC=(e)=>e;function BC(e,t){this[e]=UC.bind(null
+@@ -114,3 +114,3 @@ ${a}`}))],widgetLines:void 0}}function CT(e,t){if(!t)return;e(kN,t.widgetLines,{
+@@ -119 +119 @@ ${Date.now()}
+@@ -121 +121 @@ ${Date.now()}
+@@ -861 +861 @@ ANTI-AI-SLOP RULES (NON-NEGOTIABLE):
+@@ -900 +900 @@ Minimal status updates. Focus on results, not play-by-play. Report completion wi
+@@ -949 +949 @@ If your prompt lacks this structure, REWRITE IT before delegating.
+@@ -1009 +1009 @@ Minimal status updates. Focus on results, not play-by-play. Report completion wi
+@@ -1011,5 +1011,5 @@ Minimal status updates. Focus on results, not play-by-play. Report completion wi
+@@ -1017 +1017 @@ ${n}`:n}function L1(e){let t=e.fallbackEntry,n=t?.providers[0];return t&&n?`${n}
+@@ -1025 +1025 @@ To get another review round after editing the plan, spawn a NEW momus task. Do n
+@@ -1027,3 +1027,3 @@ To get another review round after editing the plan, spawn a NEW momus task. Do n
+@@ -1041 +1041 @@ Each spawn MUST provide EITHER category OR subagent_type after inheritance. DO N
+@@ -1051 +1051 @@ task_send continues an existing child; task always spawns.
+@@ -1055,3 +1055,3 @@ ${Hf(e,t)}`}function Zd(e,t){return{content:[{type:"text",text:e}],details:t}}fu
+@@ -1063 +1063 @@ ${r.content}
+@@ -1065,3 +1065,3 @@ ${t}`}function dq(e,t,n){return[qf(e,".senpi","skills"),qf(t,".senpi","agent","s
+@@ -1069,14 +1069,14 @@ ${t}`}function dq(e,t,n){return[qf(e,".senpi","skills"),qf(t,".senpi","agent","s
+@@ -1085 +1085 @@ All top-level checkboxes are complete. Run the Final Verification Wave and mark
+@@ -1622,4 +1622,4 @@ commits this session — then stage + draft the message instead.
+@@ -1627,2 +1627,2 @@ ${i}`};return e.sendMessage({customType:PK,content:i,display:!1}),{action:"conti
+@@ -1630,2 +1630,2 @@ ${t4}`,...Array.isArray(a.images)?{images:a.images}:{}}}),t.on("agent_end",async
+diff --git a/packages/omo-senpi/scripts/qa/probe-continuation.mjs b/packages/omo-senpi/scripts/qa/probe-continuation.mjs
+@@ -79 +79 @@ function main() {
+@@ -131 +131 @@ function main() {
+@@ -135 +135 @@ function main() {
+```
+
+## Emit vs accept decisions
+- `src/steering.ts` and `src/codex-hook.ts`: input parsers. Kept `omo ulw-loop steer:` and added `omo-agent-toolkit ulw-loop steer:`; tests exercise both forms.
+- `skills/ulw-loop/references/full-workflow.md` structured-directive line: accepted-input documentation. Kept both old and new steering forms.
+- `stop-resume-hook.ts`: emitted recovery directive, not persisted-input parsing. Migrated status/checkpoint commands.
+- `checkpoint-reconciliation.ts`, `plan-io.ts`, and `plan-crud.ts`: emitted remediation/errors. Migrated because agents execute those instructions.
+- `codex-goal-instruction.ts`, `cli-output.ts`, `cli-steering.ts`, and `cli.ts`: emitted prompt/help command surfaces. Migrated all commands, including hook/help top-level examples not covered by the two audit regexes.
+- quality-gate fixture invocations: generated current-command examples, not parsed legacy ledgers. Migrated expectations.
+- skill bootstrap: canonical PATH/bin probes are used; the cached plugin directory named `omo` remains because it is a plugin identity/path, not a removed command. Cached CLI fallback is exercised directly through Node.
+- Senpi continuation probe: expectation-only QA probe for already-migrated emitted continuation text. Migrated to the canonical phrase.
+
+## Allowlist policy
+Final allowlist has empty `emit-migrate` and `test-expectation` arrays. Legacy steering/input-regression literals are `input-compat-preserve`; remaining prose-only references are `docs`. CHANGELOG files and generated/excluded directories are not scanned.
+
+## Final status
+```text
+ M packages/omo-codex/plugin/components/ultrawork/skills/ulw-plan/scripts/scaffold-plan.mjs
+ M packages/omo-codex/plugin/components/ulw-loop/AGENTS.md
+ M packages/omo-codex/plugin/components/ulw-loop/README.md
+ M packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/SKILL.md
+ M packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md
+ M packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-reconciliation.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/cli-steering.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/cli.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/codex-hook.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/plan-crud.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/plan-io.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/steering.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/stop-resume-hook.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/cli-commands.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/cli-entrypoint.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/cli-steering-kind-guidance.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/codex-hook.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/fixtures/quality-gate-builder.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/plan-io.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/steering.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/stop-resume-hook.test.ts
+ M packages/omo-senpi/AGENTS.md
+ M packages/omo-senpi/plugin/extensions/omo.js
+ M packages/omo-senpi/scripts/qa/probe-continuation.mjs
+?? script/agent-command-string-audit.allowlist.json
+?? script/agent-command-string-audit.test.ts
+```

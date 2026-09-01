@@ -1,0 +1,32 @@
+  reflection-completion (failed)
+  memory reflection failed
+  run:reflection-run-2 category:quick
+  detail:worktree merge refused because memory had uncommit...
+
+  reflection-summary
+  (no renderer registered on dev: entry never rendered in transcript)
+
+  senpi-memory.health
+  (no renderer registered on dev: entry never rendered in transcript)
+
++----------------------------------------------------------------------------------------------------+
+| TERMINAL WIDTH 100                                                                                 |
++----------------------------------------------------------------------------------------------------+
+
+  reflection-launched
+  memory reflection started run:reflection-run-2 trigger:step-count (+25 steps)
+
+  reflection-completion (merged)
+  memory reflection merged
+  run:reflection-run-2 category:quick
+
+  reflection-completion (failed)
+  memory reflection failed
+  run:reflection-run-2 category:quick
+  detail:worktree merge refused because memory had uncommitted changes on the target branch
+
+  reflection-summary
+  (no renderer registered on dev: entry never rendered in transcript)
+
+  senpi-memory.health
+  (no renderer registered on dev: entry never rendered in transcript)

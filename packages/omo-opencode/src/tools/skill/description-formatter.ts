@@ -42,13 +42,38 @@ function formatSlashCommand(command: CommandInfo): string {
   return lines.join("\n")
 }
 
+function normalizeSkillName(name: string): string {
+  return name.toLowerCase()
+}
+
+export function deduplicatePathAliasedSkills(skills: SkillInfo[]): SkillInfo[] {
+  // After the shared/ prefix cutover, skills register under bare names only.
+  // Exact-name deduplication is handled by the upstream merge; this pass is now
+  // a no-op retained for call-site compatibility.
+  return skills
+}
+
+function shouldSuppressBuiltinCommandAlias(command: CommandInfo, skills: SkillInfo[]): boolean {
+  if (command.scope !== "builtin") return false
+  if (command.name.includes("/")) return false
+  const normalizedCommandName = normalizeSkillName(command.name)
+  return skills.some((skill) => normalizeSkillName(skill.name) === normalizedCommandName)
+}
+
+function deduplicateCommandsForPathAliasedSkills(
+  commands: CommandInfo[],
+  skills: SkillInfo[],
+): CommandInfo[] {
+  return commands.filter((command) => !shouldSuppressBuiltinCommandAlias(command, skills))
+}
+
 export function formatCombinedDescription(
   skills?: SkillInfo[],
   commands?: CommandInfo[],
   options: CombinedDescriptionOptions = {}
 ): string {
-  const availableSkills = options.includeSkills ? skills ?? [] : []
-  const availableCommands = commands ?? []
+  const availableSkills = options.includeSkills ? deduplicatePathAliasedSkills(skills ?? []) : []
+  const availableCommands = deduplicateCommandsForPathAliasedSkills(commands ?? [], availableSkills)
 
   if (availableSkills.length === 0 && availableCommands.length === 0) {
     if ((skills?.length ?? 0) > 0) {

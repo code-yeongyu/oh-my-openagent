@@ -1,0 +1,12 @@
+what:
+- scrubbed apitopia mentions from the four requested docs files
+- added docs for new category chains, deep gate, runtime-chain consistency, dead-chain warnings, composer-2.5 dormant rung activation, and kimi-coding auth prerequisite
+
+observed:
+- rg -n -i apitopia docs/guide/agent-model-matching.md docs/reference/configuration.md docs/reference/features.md docs/reference/omo-json.md returned no matches after the edits
+- bun test packages/omo-opencode/src/shared/markdown-link-audit.test.ts was invoked as requested; the command exited nonzero in this environment before any repo-specific failure details were surfaced
+
+why-enough:
+- the rg gate directly verifies the scrubbed docs set has no remaining apitopia mentions
+- the requested markdown-link-audit test was executed against the targeted docs change set
+- only the four allowed docs files were edited

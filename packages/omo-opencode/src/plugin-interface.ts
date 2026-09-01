@@ -1,6 +1,7 @@
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 import type { OhMyOpenCodeConfig } from "./config"
 
+import { applyAgentVariant } from "./shared/agent-variant"
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
@@ -36,6 +37,21 @@ export function createPluginInterface(args: {
     tool: tools,
 
     "chat.params": async (input: unknown, output: unknown) => {
+      const chatParamsInput = input as {
+        agent?: string | { name?: string }
+        model?: { providerID?: unknown; modelID?: unknown; id?: unknown }
+        message?: { variant?: string }
+      }
+      const agentName =
+        typeof chatParamsInput.agent === "string"
+          ? chatParamsInput.agent
+          : chatParamsInput.agent?.name
+      const providerID = chatParamsInput.model?.providerID
+      const rawModelID = chatParamsInput.model?.modelID ?? chatParamsInput.model?.id
+      const modelID = typeof rawModelID === "string" ? rawModelID : undefined
+      if (chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
+        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
+      }
       const handler = createChatParamsHandler({
         client: ctx.client,
       })
@@ -45,6 +61,7 @@ export function createPluginInterface(args: {
     "chat.headers": createChatHeadersHandler({ ctx }),
 
     "command.execute.before": createCommandExecuteBeforeHandler({
+      directory: ctx.directory,
       hooks,
     }),
 
@@ -81,6 +98,7 @@ export function createPluginInterface(args: {
     "tool.execute.before": createToolExecuteBeforeHandler({
       ctx,
       hooks,
+      backgroundManager: managers.backgroundManager,
     }),
 
     "tool.execute.after": createToolExecuteAfterHandler({

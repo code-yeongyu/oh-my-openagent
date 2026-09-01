@@ -1,0 +1,32 @@
+Scenario: eval plus nested tool accounting.
+
+Command:
+  bun test packages/senpi-task/src/run-stats-eval.test.ts
+
+Observed:
+  7 pass
+  0 fail
+  7 expect() calls
+  Exit code 0
+
+Covered behavior:
+- one eval plus two nested tool calls reports 3;
+- an eval without nested calls reports 1;
+- eval `peek` does not recount prior nested calls;
+- input-only eval `peek` does not recount prior nested calls;
+- malformed nested summaries count only entries matching the eval call-summary contract;
+- a non-eval tool remains 1;
+- a duplicated eval end does not recount nested calls.
+
+Focused adjacent command:
+  bun test packages/senpi-task/src/run-stats-eval.test.ts packages/senpi-task/src/run-stats.test.ts packages/senpi-task/src/progress.test.ts packages/senpi-task/src/manager/run-stats-wiring.test.ts
+
+Observed:
+- All focused accounting, progress, and manager-wiring tests passed.
+- Exit code 0.
+
+## Cubic review GREEN
+
+- input-only eval control: PASS, remains one outer call;
+- malformed summaries: PASS, outer plus two valid summaries equals three;
+- full focused file: 7 pass, 0 fail.

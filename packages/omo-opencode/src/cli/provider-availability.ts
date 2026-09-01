@@ -1,5 +1,6 @@
 import type { InstallConfig } from "./types"
 import type { ProviderAvailability } from "./model-fallback-types"
+import { ULTIMATE_FALLBACK } from "./model-fallback"
 
 export function toProviderAvailability(config: InstallConfig): ProviderAvailability {
 	return {
@@ -37,4 +38,26 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
 		vercel: availability.vercelAiGateway,
 	}
 	return mapping[provider] ?? false
+}
+
+export function hasAnyConfiguredProvider(config: InstallConfig): boolean {
+	const availability = toProviderAvailability(config)
+	return (
+		availability.native.claude ||
+		availability.native.openai ||
+		availability.native.gemini ||
+		availability.copilot ||
+		availability.opencodeZen ||
+		availability.zai ||
+		availability.kimiForCoding ||
+		availability.opencodeGo ||
+		availability.bailianCodingPlan ||
+		availability.minimaxCnCodingPlan ||
+		availability.minimaxCodingPlan ||
+		availability.vercelAiGateway
+	)
+}
+
+export function getNoModelProvidersWarning(): string {
+	return `No model providers configured. Using ${ULTIMATE_FALLBACK} as fallback.`
 }

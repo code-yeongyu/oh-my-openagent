@@ -1,6 +1,10 @@
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const MAX_DEPTH = 50;
 
+export function isUnsafeObjectKey(key: string): boolean {
+  return DANGEROUS_KEYS.has(key);
+}
+
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
     typeof value === "object" &&
@@ -35,7 +39,7 @@ export function deepMerge<T extends Record<string, unknown>>(
   const result = { ...base } as Record<string, unknown>;
 
   for (const key of Object.keys(override)) {
-    if (DANGEROUS_KEYS.has(key)) continue;
+    if (isUnsafeObjectKey(key)) continue;
 
     const baseValue = base[key];
     const overrideValue = override[key];

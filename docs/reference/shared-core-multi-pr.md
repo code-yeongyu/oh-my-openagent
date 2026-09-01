@@ -4,6 +4,15 @@ This plan pins the shared core extraction work for OpenCode and Codex adapters.
 Each PR is intentionally small, lands through `dev`, and preserves observable
 behavior before moving logic into harness-neutral packages.
 
+The current extraction surface includes `utils`, `rules-engine`,
+`agents-md-core`, `model-core`, `prompts-core`, `comment-checker-core`,
+`hashline-core`, `boulder-state`, `telemetry-core`,
+`lsp-core`, `mcp-stdio-core`, `mcp-client-core`, `tmux-core`, `team-core`,
+`openclaw-core`, `claude-code-compat-core`, `skills-loader-core`, and
+`delegate-core`. Release and packaging PRs must keep the root npm tarball,
+`lazycodex-ai` tarball, and `code-yeongyu/lazycodex` marketplace payload in
+sync with those package boundaries.
+
 ## PR Matrix
 
 | PR | Scope | Required proof |
@@ -38,6 +47,13 @@ generated config.
 Every PR must run opencode-qa HTTP/SSE checks with the isolated server smoke and
 SSE hook probe scripts. Adapter behavior PRs must also record an attached
 server probe for the changed hook surface.
+
+Publish pipeline PRs must additionally run `bun test script/`, `bun pm pack
+--dry-run --ignore-scripts`, a full local LazyCodex marketplace sync, and a
+`--previous-payload` tarball-layout sync simulation. The evidence must include
+the packed `install-dist` and `plugin/skills` entries, the copied
+`plugins/omo/components/*/dist/cli.js` files, and cleanup receipts for every
+temporary pack directory, extracted package root, and marketplace repository.
 
 Before merge, every PR must pass local verification, GitHub CI, review-work, and
 Cubic with no blocking issues. Merge into `dev` with a merge commit only.

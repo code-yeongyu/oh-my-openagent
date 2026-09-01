@@ -1,0 +1,29 @@
+GREEN: focused dream selector suite
+$ bun test packages/omo-senpi/src/components/memory/dream-selector.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/dream-selector.test.ts:
+(pass) dream conversation scoring > #given a fixed scoring vector #when scored #then every normalized operand and the exact total match [0.51ms]
+(pass) dream conversation scoring > #given three equal scores #when ranked #then unreflected steps recency and conversation id break ties in order [0.13ms]
+(pass) dream conversation packing > #given an oversized middle candidate #when packed #then it is skipped and a later fitting candidate is selected [0.08ms]
+(pass) dream journal selection > #given UTF-8 journals with one fully reflected conversation #when volume and selection run twice #then bytes snapshots ranking and output stay deterministic [4.62ms]
+
+ 4 pass
+ 0 fail
+ 8 expect() calls
+Ran 4 tests across 1 file. [102.00ms]
+
+GREEN: omo-senpi TypeScript typecheck
+$ bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+typecheck exit: 0
+
+GREEN: LSP diagnostics for every touched TypeScript file
+/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/dream-selector.ts: []
+/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/dream-selector.test.ts: []
+
+GREEN: memory component package suite
+$ bun test packages/omo-senpi/src/components/memory
+ 305 pass
+ 0 fail
+ 964 expect() calls
+Ran 305 tests across 44 files. [46.75s]

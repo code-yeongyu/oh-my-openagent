@@ -1,0 +1,73 @@
+bun test v1.3.14 (0d9b296a)
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at C:\Users\pss\AppData\Local\Temp\lsp-apply-edit-euiLfM exited with code 0
+killed 1 dangling process
+
+packages\lsp-core\src\lsp\workspace-apply-edit-lease.integration.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+190 | 					? await this.connection.sendRequest<T>(method, undefined, { signal: combinedSignal.signal })
+191 | 					: await this.connection.sendRequest<T>(method, args[0], { signal: combinedSignal.signal });
+192 | 			return result;
+193 | 		} catch (error) {
+194 | 			if (this.processExited || (this.proc && this.proc.exitCode !== null)) {
+195 | 				throw new LspProcessExitedError(
+                ^
+LspProcessExitedError: LSP server workspace-edit-fixture at C:\Users\pss\AppData\Local\Temp\lsp-apply-edit-UyNOou exited with code null
+   serverId: "workspace-edit-fixture",
+       root: "C:\\Users\\pss\\AppData\\Local\\Temp\\lsp-apply-edit-UyNOou",
+   exitCode: null,
+ stderrTail: undefined,
+
+      at sendRequest (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\transport.ts:195:11)
+      at async rename (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\client.ts:298:19)
+      at async <anonymous> (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\workspace-apply-edit-lease.integration.test.ts:77:39)
+-------------------------------
+
+(fail) LspClient workspace mutation lease > #given two concurrent server applies #when one enters commit #then the other is rejected without a second write [10027.84ms]
+  ^ a beforeEach/afterEach hook timed out for this test.
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at C:\Users\pss\AppData\Local\Temp\lsp-apply-edit-UyNOou exited with code null
+
+# Unhandled error between tests
+-------------------------------
+35 | 	const clients: LspClientTransport[] = [];
+36 | 
+37 | 	return {
+38 | 		async cleanup(): Promise<void> {
+39 | 			for (const client of clients.splice(0)) await client.stop();
+40 | 			for (const directory of tempDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+                                                           ^
+EBUSY: resource busy or locked, rm 'C:\Users\pss\AppData\Local\Temp\lsp-apply-edit-1MKC8E'
+    path: "C:\\Users\\pss\\AppData\\Local\\Temp\\lsp-apply-edit-1MKC8E",
+ syscall: "rm",
+   errno: -16,
+    code: "EBUSY"
+
+      at cleanup (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\workspace-apply-edit-test-support.ts:40:55)
+      at async <anonymous> (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\workspace-apply-edit-lease.integration.test.ts:15:16)
+-------------------------------
+
+121 | 		if (existingOpen) {
+122 | 			await existingOpen;
+123 | 			return this.openFile(path);
+124 | 		}
+125 | 
+126 | 		const text = readFileSync(path, "utf-8");
+                     ^
+ENOENT: no such file or directory, open 'C:\Users\pss\AppData\Local\Temp\lsp-apply-edit-1MKC8E\source.ts'
+    path: "C:\\Users\\pss\\AppData\\Local\\Temp\\lsp-apply-edit-1MKC8E\\source.ts",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at openFile (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\workspace-document-state.ts:126:16)
+      at openFile (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\client.ts:67:24)
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\workspace-apply-edit-lease.integration.test.ts:102:24)
+(fail) LspClient workspace mutation lease > #given a rename lease is held #when another rename starts #then it is rejected without a second request [1143.67ms]
+
+ 88 pass
+ 2 fail
+ 2 errors
+ 259 expect() calls
+Ran 90 tests across 21 files. [42.07s]
+exit=1

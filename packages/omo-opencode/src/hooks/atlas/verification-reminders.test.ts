@@ -1,94 +1,66 @@
-import { describe, expect, it } from "bun:test"
-import { buildOrchestratorReminder, buildCompletionGate } from "./verification-reminders"
+import { describe, expect, test } from "bun:test"
+import {
+  buildAdvanceDirective,
+  buildCompletionGate,
+  buildFinalWaveApprovalReminder,
+  buildMissingVerdictEscalation,
+  buildOrchestratorReminder,
+  buildRejectedVerdictEscalation,
+  buildStandaloneVerificationReminder,
+} from "./verification-reminders"
 
-// Test helpers for given/when/then pattern
-const given = describe
-const when = describe
-const then = it
+// Fixed sentinels: unique per slot, deterministic across runs, and absent
+// from every builder template, so containment proves interpolation.
+const PLAN_NAME = "plan-sentinel-9f2c"
+const SESSION_ID = "ses_sentinel_5e17"
+const TASK_LABEL = "task-sentinel-3b81"
 
-describe("buildCompletionGate", () => {
-  given("a plan name and session id", () => {
-    const planName = "test-plan"
-    const sessionId = "test-session-123"
+describe("verification reminder builders", () => {
+  test("completion gate propagates the plan and continuation session", () => {
+    const result = buildCompletionGate(PLAN_NAME, SESSION_ID)
 
-    when("buildCompletionGate is called", () => {
-      const gate = buildCompletionGate(planName, sessionId)
-
-      then("completion gate text is present", () => {
-        expect(gate).toContain("COMPLETION GATE")
-      })
-
-      then("gate appears before verification phase text", () => {
-        const gateIndex = gate.indexOf("COMPLETION GATE")
-        const verificationIndex = gate.indexOf("VERIFICATION_REMINDER")
-        expect(gateIndex).toBeLessThan(verificationIndex)
-      })
-
-      then("gate interpolates the plan name path", () => {
-        expect(gate).toContain(planName)
-        expect(gate).toContain(`.omo/plans/${planName}.md`)
-      })
-
-      then("gate includes Edit instructions", () => {
-        expect(gate.toLowerCase()).toContain("edit")
-      })
-
-      then("gate includes Read instructions", () => {
-        expect(gate.toLowerCase()).toContain("read")
-      })
-
-      then("old STEP 7 MARK COMPLETION text is absent", () => {
-        expect(gate).not.toContain("STEP 7")
-        expect(gate).not.toContain("MARK COMPLETION IN PLAN FILE")
-      })
-
-      then("step numbering remains consecutive after removal", () => {
-        const stepMatches = gate.match(/STEP \d+:/g) ?? []
-        if (stepMatches.length > 1) {
-          const numbers = stepMatches.map((s: string) => parseInt(s.match(/\d+/)?.[0] ?? "0"))
-          for (let i = 1; i < numbers.length; i++) {
-            expect(numbers[i]).toBe(numbers[i - 1] + 1)
-          }
-        }
-      })
-    })
+    expect(result).toContain(PLAN_NAME)
+    expect(result).toContain(SESSION_ID)
   })
-})
 
-describe("buildOrchestratorReminder", () => {
-  given("progress with completed tasks", () => {
-    const planName = "my-test-plan"
-    const sessionId = "session-abc"
-    const progress = { total: 10, completed: 3 }
+  test("orchestrator reminder propagates plan, session, and progress values", () => {
+    const progress = { total: 11, completed: 4 }
 
-    when("buildOrchestratorReminder is called with autoCommit true", () => {
-      const reminder = buildOrchestratorReminder(planName, progress, sessionId, true)
+    const result = buildOrchestratorReminder(PLAN_NAME, progress, SESSION_ID, false)
 
-      then("old STEP 7 MARK COMPLETION IN PLAN FILE text is absent", () => {
-        expect(reminder).not.toContain("STEP 7: MARK COMPLETION IN PLAN FILE")
-      })
+    expect(result).toContain(PLAN_NAME)
+    expect(result).toContain(SESSION_ID)
+    expect(result).toContain(`${progress.completed}/${progress.total}`)
+    expect(result).toContain(String(progress.total - progress.completed))
+  })
 
-      then("completion gate appears before verification reminder", () => {
-        const gateIndex = reminder.indexOf("COMPLETION GATE")
-        const verificationIndex = reminder.indexOf("VERIFICATION_REMINDER")
-        expect(gateIndex).toBeGreaterThanOrEqual(0)
-        expect(gateIndex).toBeLessThan(verificationIndex)
-      })
-    })
+  test("final-wave reminder propagates plan, session, and progress values", () => {
+    const progress = { total: 9, completed: 5 }
 
-    when("buildOrchestratorReminder is called with autoCommit false", () => {
-      const reminder = buildOrchestratorReminder(planName, progress, sessionId, false)
+    const result = buildFinalWaveApprovalReminder(PLAN_NAME, progress, SESSION_ID)
 
-      then("old STEP 7 MARK COMPLETION IN PLAN FILE text is absent", () => {
-        expect(reminder).not.toContain("STEP 7: MARK COMPLETION IN PLAN FILE")
-      })
+    expect(result).toContain(PLAN_NAME)
+    expect(result).toContain(SESSION_ID)
+    expect(result).toContain(`${progress.completed}/${progress.total}`)
+    expect(result).toContain(String(progress.total - progress.completed))
+  })
 
-      then("completion gate appears before verification reminder", () => {
-        const gateIndex = reminder.indexOf("COMPLETION GATE")
-        const verificationIndex = reminder.indexOf("VERIFICATION_REMINDER")
-        expect(gateIndex).toBeGreaterThanOrEqual(0)
-        expect(gateIndex).toBeLessThan(verificationIndex)
-      })
-    })
+  test("standalone reminder propagates the continuation session", () => {
+    expect(buildStandaloneVerificationReminder(SESSION_ID)).toContain(SESSION_ID)
+  })
+
+  test("missing and rejected verdict reminders propagate plan, task, and session values", () => {
+    for (const result of [
+      buildMissingVerdictEscalation(PLAN_NAME, TASK_LABEL, SESSION_ID),
+      buildRejectedVerdictEscalation(PLAN_NAME, TASK_LABEL, SESSION_ID),
+    ]) {
+      expect(result).toContain(PLAN_NAME)
+      expect(result).toContain(TASK_LABEL)
+      expect(result).toContain(SESSION_ID)
+    }
+  })
+
+  test("advance directive propagates the active plan", () => {
+    expect(buildAdvanceDirective(PLAN_NAME)).toContain(PLAN_NAME)
   })
 })

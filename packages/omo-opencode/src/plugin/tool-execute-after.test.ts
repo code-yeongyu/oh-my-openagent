@@ -172,4 +172,88 @@ describe("createToolExecuteAfterHandler", () => {
     // then
     expect(seenArgs).toBe(args)
   })
+
+  it("#given CodeGraph MCP reports an uninitialized project #when tool.execute.after runs #then output includes OMO global-store init guidance", async () => {
+    // given
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {} as never,
+    })
+    const output = {
+      title: "Error",
+      output: [
+        "Tool execution failed: CodeGraph not initialized in /Users/me/project.",
+        "Run 'codegraph init' in that project first.",
+      ].join(" "),
+      metadata: {},
+    }
+
+    // when
+    await handler(
+      { tool: "codegraph.codegraph_status", sessionID: "ses_parent", callID: "call_codegraph" },
+      output,
+    )
+
+    // then
+    const normalizedOutput = normalizeDisplayPaths(output.output)
+    expect(normalizedOutput).toContain('CodeGraph is not initialized for "/Users/me/project"')
+    expect(normalizedOutput).toContain(".omo/codegraph/projects/project-")
+    expect(normalizedOutput).toContain('run `codegraph init` from "/Users/me/project"')
+  })
+
+  it("#given non-CodeGraph tool output contains a CodeGraph phrase #when tool.execute.after runs #then guidance is not appended", async () => {
+    // given
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {} as never,
+    })
+    const output = {
+      title: "Result",
+      output: [
+        "Tool execution failed: CodeGraph not initialized in /tmp/fake.",
+        "Run 'codegraph init' in that project first.",
+      ].join(" "),
+      metadata: {},
+    }
+
+    // when
+    await handler(
+      { tool: "bash", sessionID: "ses_parent", callID: "call_bash" },
+      output,
+    )
+
+    // then
+    expect(output.output).not.toContain("OMO CodeGraph initialization guidance")
+  })
+
+  it("#given real CodeGraph status output #when tool.execute.after runs #then output includes OMO global-store init guidance", async () => {
+    // given
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/Users/me/project" } as never,
+      hooks: {} as never,
+    })
+    const output = {
+      title: "Status",
+      output: [
+        "Not initialized",
+        'Run "codegraph init" to initialize',
+      ].join("\n"),
+      metadata: {},
+    }
+
+    // when
+    await handler(
+      { tool: "mcp__codegraph__codegraph_status", sessionID: "ses_parent", callID: "call_codegraph" },
+      output,
+    )
+
+    // then
+    const normalizedOutput = normalizeDisplayPaths(output.output)
+    expect(normalizedOutput).toContain('CodeGraph is not initialized for "/Users/me/project"')
+    expect(normalizedOutput).toContain(".omo/codegraph/projects/project-")
+  })
 })
+
+function normalizeDisplayPaths(value: string): string {
+  return value.replaceAll("\\\\", "/").replaceAll("\\", "/")
+}

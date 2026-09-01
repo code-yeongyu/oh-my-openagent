@@ -117,7 +117,7 @@ function removeSpecifierRootDirs(cacheDir: string, packageNames: readonly string
 }
 
 export function invalidatePackage(
-  packageName: string = PACKAGE_NAME,
+  packageName?: string,
   options: InvalidatePackageOptions = {}
 ): boolean {
   try {
@@ -125,7 +125,8 @@ export function invalidatePackage(
     const cacheDir = options.cacheDir ?? CACHE_DIR
     const defaultPackageName = options.defaultPackageName ?? PACKAGE_NAME
     const userConfigDir = options.userConfigDir ?? getUserConfigDir()
-    const packageNames = getInvalidationPackageNames(packageName, defaultPackageName, acceptedPackageNames)
+    const targetPackageName = packageName ?? defaultPackageName
+    const packageNames = getInvalidationPackageNames(targetPackageName, defaultPackageName, acceptedPackageNames)
     const pkgDirs = packageNames.flatMap(name => [
       path.join(userConfigDir, "node_modules", name),
       path.join(cacheDir, "node_modules", name),
@@ -147,7 +148,7 @@ export function invalidatePackage(
     lockRemoved = removeFromBunLock(cacheDir, packageNames)
 
     if (!packageRemoved && !specifierRemoved && !lockRemoved) {
-      log(`[auto-update-checker] Package not found, nothing to invalidate: ${packageName}`)
+      log(`[auto-update-checker] Package not found, nothing to invalidate: ${targetPackageName}`)
       return false
     }
 

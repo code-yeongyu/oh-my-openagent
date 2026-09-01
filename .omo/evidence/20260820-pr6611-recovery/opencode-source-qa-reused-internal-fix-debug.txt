@@ -1,0 +1,1331 @@
++ set -euo pipefail
++++ dirname .omo/evidence/20260820-pr6611-recovery/opencode-source-qa.sh
+++ cd .omo/evidence/20260820-pr6611-recovery
+++ pwd
++ script_dir=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.omo/evidence/20260820-pr6611-recovery
+++ cd /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.omo/evidence/20260820-pr6611-recovery/../../..
+++ pwd
++ repo=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611
++ common=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.agents/skills/opencode-qa/scripts/lib/common.sh
++ fake_server=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.agents/skills/opencode-qa/scripts/lib/fake-openai-server.mjs
++ bundle=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/dist/index.js
+++ command -v opencode
++ opencode_bin=/Users/sungsoopark/.opencode/bin/opencode
++ original_home=/Users/sungsoopark
++ fake_pid=
++ . /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.agents/skills/opencode-qa/scripts/lib/common.sh
+++ set -uo pipefail
+++ OQA_TMPDIRS=()
+++ OQA_TMUX_SESSIONS=()
+++ OQA_CURL_PIDS=()
+++ OQA_SERVER_PID=
+++ trap oqa_cleanup EXIT
+++ '[' '' = --self-check ']'
++ trap cleanup_all EXIT
+++ /Users/sungsoopark/.opencode/bin/opencode db path
+++ head -1
++ host_db=/Users/sungsoopark/.local/share/opencode/opencode.db
+++ sqlite3 /Users/sungsoopark/.local/share/opencode/opencode.db 'SELECT count(*) FROM session;'
++ host_before=7586
+++ shasum -a 256 /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/dist/index.js
+++ awk '{print $1}'
++ bundle_sha256=717f15c9bb50c10b01bf33be9badd3774c33babbc3e82cf097a737b5f570bc2b
+++ /Users/sungsoopark/.opencode/bin/opencode --version
++ opencode_version=1.18.18
+++ oqa_free_port
+++ command -v python3
+++ python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
++ fake_port=50929
++ rm -f /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.omo/evidence/20260820-pr6611-recovery/fake-llm.log /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.omo/evidence/20260820-pr6611-recovery/fake-llm.stdout.log
++ fake_pid=92004
++ oqa_wait_http http://127.0.0.1:50929/health '' 15
++ local url=http://127.0.0.1:50929/health auth= timeout=15 deadline
++ FAKE_OPENAI_PORT=50929
++ FAKE_LLM_LOG=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.omo/evidence/20260820-pr6611-recovery/fake-llm.log
++ node /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.agents/skills/opencode-qa/scripts/lib/fake-openai-server.mjs
+++ date +%s
++ deadline=1787211704
+++ date +%s
++ '[' 1787211689 -lt 1787211704 ']'
++ '[' -n '' ']'
++ curl -s -o /dev/null http://127.0.0.1:50929/health
++ return 0
++ fake_pid_snapshot=92004
++ oqa_mk_isolated_xdg
++ local root real_home
+++ mktemp -d -t oqa-xdg.XXXXXX
++ root=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe
++ real_home=/Users/sungsoopark
++ OQA_TMPDIRS+=("$root")
++ mkdir -p /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/data /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/config /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/cache /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/state /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/proj
++ oqa_preserve_home_opencode_bin /Users/sungsoopark /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home
++ local real_home=/Users/sungsoopark sandbox_home=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home
++ '[' -d /Users/sungsoopark/.opencode/bin ']'
++ mkdir -p /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home/.opencode
++ ln -s /Users/sungsoopark/.opencode/bin /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home/.opencode/bin
++ export OQA_XDG_ROOT=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe
++ OQA_XDG_ROOT=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe
++ export HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home
++ HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home
++ export OPENCODE_TEST_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home
++ OPENCODE_TEST_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/home
++ export XDG_DATA_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/data
++ XDG_DATA_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/data
++ export XDG_CONFIG_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/config
++ XDG_CONFIG_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/config
++ export XDG_CACHE_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/cache
++ XDG_CACHE_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/cache
++ export XDG_STATE_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/state
++ XDG_STATE_HOME=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/state
++ export OQA_PROJ=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/proj
++ OQA_PROJ=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/proj
++ export OPENCODE_DISABLE_AUTOUPDATE=1
++ OPENCODE_DISABLE_AUTOUPDATE=1
++ export OPENCODE_DISABLE_MODELS_FETCH=1
++ OPENCODE_DISABLE_MODELS_FETCH=1
++ sandbox_root=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe
++ mkdir -p /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/config/opencode
++ jq -n --arg plugin file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/dist/index.js --arg base_url http://127.0.0.1:50929/v1 '{
+    plugin: [$plugin],
+    model: "openai/gpt-fake",
+    provider: {
+      openai: {
+        options: {apiKey: "fake-key", baseURL: $base_url, timeout: 30000},
+        models: {
+          "gpt-fake": {
+            tool_call: true,
+            limit: {context: 200000, output: 8192}
+          }
+        }
+      }
+    }
+  }'
++ cat
+++ oqa_free_port
+++ command -v python3
+++ python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
++ server_port=50935
++ server_pass=oqa-206157953
++ OQA_SERVER_PID=92018
++ server_pid_snapshot=92018
++ OQA_SERVER_URL=http://127.0.0.1:50935
++ OQA_SERVER_PASS=oqa-206157953
++ oqa_wait_http http://127.0.0.1:50935/global/health opencode:oqa-206157953 30
++ local url=http://127.0.0.1:50935/global/health auth=opencode:oqa-206157953 timeout=30 deadline
++ OPENCODE_SERVER_PASSWORD=oqa-206157953
++ /Users/sungsoopark/.opencode/bin/opencode serve --port 50935 --hostname 127.0.0.1
+++ date +%s
++ deadline=1787211720
+++ date +%s
++ '[' 1787211690 -lt 1787211720 ']'
++ '[' -n opencode:oqa-206157953 ']'
++ curl -s -o /dev/null -u opencode:oqa-206157953 http://127.0.0.1:50935/global/health
++ sleep 0.2
+++ date +%s
++ '[' 1787211690 -lt 1787211720 ']'
++ '[' -n opencode:oqa-206157953 ']'
++ curl -s -o /dev/null -u opencode:oqa-206157953 http://127.0.0.1:50935/global/health
++ sleep 0.2
+++ date +%s
++ '[' 1787211690 -lt 1787211720 ']'
++ '[' -n opencode:oqa-206157953 ']'
++ curl -s -o /dev/null -u opencode:oqa-206157953 http://127.0.0.1:50935/global/health
++ sleep 0.2
+++ date +%s
++ '[' 1787211695 -lt 1787211720 ']'
++ '[' -n opencode:oqa-206157953 ']'
++ curl -s -o /dev/null -u opencode:oqa-206157953 http://127.0.0.1:50935/global/health
++ return 0
+++ curl -fsS -u opencode:oqa-206157953 http://127.0.0.1:50935/global/health
++ health='{"healthy":true,"version":"1.18.18"}'
+++ curl -fsS -u opencode:oqa-206157953 'http://127.0.0.1:50935/config?directory=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611'
+++ jq -c '{plugin: (.plugin // []), model: .model}'
++ config_summary='{"plugin":["file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/dist/index.js"],"model":"openai/gpt-fake"}'
++ expected_plugin=file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/dist/index.js
++ jq -e --arg expected file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/dist/index.js '.plugin | index($expected) != null'
+++ curl -fsS -u opencode:oqa-206157953 -H 'Content-Type: application/json' -X POST -d '{}' 'http://127.0.0.1:50935/session?directory=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611'
+++ jq -er .id
++ session_id=ses_fe1e1923bffeY5qRmzhZ5luEuX
++ sse_fifo=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/state/events.fifo
++ mkfifo /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/state/events.fifo
++ sse_pid=92150
++ OQA_CURL_PIDS+=("$sse_pid")
++ exec
++ curl -fsSN -u opencode:oqa-206157953 'http://127.0.0.1:50935/event?directory=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611'
++ connected=0
++ deadline=32
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6e14001m46EACI2gikT9G","type":"server.connected","properties":{}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6e14001m46EACI2gikT9G","type":"server.connected","properties":{}} == *\"\s\e\r\v\e\r\.\c\o\n\n\e\c\t\e\d\"* ]]
++ connected=1
++ break
++ [[ 1 -eq 1 ]]
+++ curl -sS -o /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/state/prompt-response.txt -w '%{http_code}' -u opencode:oqa-206157953 -H 'Content-Type: application/json' -X POST -d '{"parts":[{"type":"text","text":"reply exactly PR6611_QA_OK"}]}' 'http://127.0.0.1:50935/session/ses_fe1e1923bffeY5qRmzhZ5luEuX/prompt_async?directory=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611'
++ prompt_status=204
++ [[ 204 == \2\0\4 ]]
++ status_seen=0
++ message_seen=0
++ part_seen=0
++ part_event=
++ deadline=77
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6ee6001ZpF9RuV18oJgQn","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"New session - 2026-08-20T07:41:45.796Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706085}}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6ee6001ZpF9RuV18oJgQn","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"New session - 2026-08-20T07:41:45.796Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706085}}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e6ee6001ZpF9RuV18oJgQn","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"New session - 2026-08-20T07:41:45.796Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706085}}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e6ee6001ZpF9RuV18oJgQn","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"New session - 2026-08-20T07:41:45.796Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706085}}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6ef6001Md7thSzsOJs6ao","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"msg_01e1e6ee5001gaVd1kKxs8iZQT","role":"user","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","time":{"created":1787211706085},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-5.6-sol","variant":"xhigh"}}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6ef6001Md7thSzsOJs6ao","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"msg_01e1e6ee5001gaVd1kKxs8iZQT","role":"user","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","time":{"created":1787211706085},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-5.6-sol","variant":"xhigh"}}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e6ef6001Md7thSzsOJs6ao","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"msg_01e1e6ee5001gaVd1kKxs8iZQT","role":"user","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","time":{"created":1787211706085},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-5.6-sol","variant":"xhigh"}}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ message_seen=1
++ [[ data: {"id":"evt_01e1e6ef6001Md7thSzsOJs6ao","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"msg_01e1e6ee5001gaVd1kKxs8iZQT","role":"user","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","time":{"created":1787211706085},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-5.6-sol","variant":"xhigh"}}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6ef7001vdqpVSnnt54637","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"type":"text","text":"reply exactly PR6611_QA_OK","messageID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","id":"prt_01e1e6eea001W4lmW5FY0I7x3U"},"time":1787211706103}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6ef7001vdqpVSnnt54637","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"type":"text","text":"reply exactly PR6611_QA_OK","messageID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","id":"prt_01e1e6eea001W4lmW5FY0I7x3U"},"time":1787211706103}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e6ef7001vdqpVSnnt54637","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"type":"text","text":"reply exactly PR6611_QA_OK","messageID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","id":"prt_01e1e6eea001W4lmW5FY0I7x3U"},"time":1787211706103}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e6ef7001vdqpVSnnt54637","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"type":"text","text":"reply exactly PR6611_QA_OK","messageID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","id":"prt_01e1e6eea001W4lmW5FY0I7x3U"},"time":1787211706103}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e6ef7001vdqpVSnnt54637","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"type":"text","text":"reply exactly PR6611_QA_OK","messageID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","id":"prt_01e1e6eea001W4lmW5FY0I7x3U"},"time":1787211706103}} == *\f\a\k\e\ \r\e\s\p\o\n\s\e* ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6ef9001ACtiZy693mE3Wo","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"New session - 2026-08-20T07:41:45.796Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706105}}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6ef9001ACtiZy693mE3Wo","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"New session - 2026-08-20T07:41:45.796Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706105}}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e6ef9001ACtiZy693mE3Wo","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"New session - 2026-08-20T07:41:45.796Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706105}}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e6ef9001ACtiZy693mE3Wo","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"New session - 2026-08-20T07:41:45.796Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706105}}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6efd0013u3qWFkWImq2ww","type":"session.status","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","status":{"type":"busy"}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6efd0013u3qWFkWImq2ww","type":"session.status","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","status":{"type":"busy"}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ status_seen=1
++ [[ data: {"id":"evt_01e1e6efd0013u3qWFkWImq2ww","type":"session.status","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","status":{"type":"busy"}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e6efd0013u3qWFkWImq2ww","type":"session.status","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","status":{"type":"busy"}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6eff0018WehDy2xR0FeJy","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"msg_01e1e6eff001Q3ul2u7wzrGXZH","parentID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","variant":"xhigh","path":{"cwd":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","root":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-5.6-sol","providerID":"openai","time":{"created":1787211706111},"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX"}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6eff0018WehDy2xR0FeJy","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"msg_01e1e6eff001Q3ul2u7wzrGXZH","parentID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","variant":"xhigh","path":{"cwd":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","root":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-5.6-sol","providerID":"openai","time":{"created":1787211706111},"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX"}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e6eff0018WehDy2xR0FeJy","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"msg_01e1e6eff001Q3ul2u7wzrGXZH","parentID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","variant":"xhigh","path":{"cwd":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","root":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-5.6-sol","providerID":"openai","time":{"created":1787211706111},"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX"}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ message_seen=1
++ [[ data: {"id":"evt_01e1e6eff0018WehDy2xR0FeJy","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"msg_01e1e6eff001Q3ul2u7wzrGXZH","parentID":"msg_01e1e6ee5001gaVd1kKxs8iZQT","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","variant":"xhigh","path":{"cwd":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","root":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-5.6-sol","providerID":"openai","time":{"created":1787211706111},"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX"}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6f010012bmQ79Wwsg4sUB","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6f010012bmQ79Wwsg4sUB","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e6f010012bmQ79Wwsg4sUB","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e6f010012bmQ79Wwsg4sUB","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e6f28001qA6zj4V54ceT7Y","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"wake split probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706105}}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e6f28001qA6zj4V54ceT7Y","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"wake split probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706105}}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e6f28001qA6zj4V54ceT7Y","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"wake split probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706105}}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e6f28001qA6zj4V54ceT7Y","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"wake split probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211706105}}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8134001HBM1quu2KATElm","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"wake split probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211710771}}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8134001HBM1quu2KATElm","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"wake split probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211710771}}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8134001HBM1quu2KATElm","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"wake split probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211710771}}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8134001HBM1quu2KATElm","type":"session.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"id":"ses_fe1e1923bffeY5qRmzhZ5luEuX","slug":"eager-forest","projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678","directory":"/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611","path":"","title":"wake split probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-5.6-sol","providerID":"openai","variant":"xhigh"},"version":"1.18.18","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787211705796,"updated":1787211710771}}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8136001v7WXHQFheuG1M3","type":"session.diff","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","diff":[]}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8136001v7WXHQFheuG1M3","type":"session.diff","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","diff":[]}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8136001v7WXHQFheuG1M3","type":"session.diff","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","diff":[]}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8136001v7WXHQFheuG1M3","type":"session.diff","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","diff":[]}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8137001YmBAbDVnjEW8RY","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"role":"user","time":{"created":1787211706085},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-5.6-sol","variant":"xhigh"},"id":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","summary":{"diffs":[]}}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8137001YmBAbDVnjEW8RY","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"role":"user","time":{"created":1787211706085},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-5.6-sol","variant":"xhigh"},"id":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","summary":{"diffs":[]}}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8137001YmBAbDVnjEW8RY","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"role":"user","time":{"created":1787211706085},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-5.6-sol","variant":"xhigh"},"id":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","summary":{"diffs":[]}}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ message_seen=1
++ [[ data: {"id":"evt_01e1e8137001YmBAbDVnjEW8RY","type":"message.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","info":{"role":"user","time":{"created":1787211706085},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-5.6-sol","variant":"xhigh"},"id":"msg_01e1e6ee5001gaVd1kKxs8iZQT","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","summary":{"diffs":[]}}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e846e001hLHmc2WgFOMiIe","type":"plugin.added","properties":{"id":"core/config-reference"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e846e001hLHmc2WgFOMiIe","type":"plugin.added","properties":{"id":"core/config-reference"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e846e001hLHmc2WgFOMiIe","type":"plugin.added","properties":{"id":"core/config-reference"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e846e001hLHmc2WgFOMiIe","type":"plugin.added","properties":{"id":"core/config-reference"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e846f001pgsHp8T51kfFyv","type":"plugin.added","properties":{"id":"agent"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e846f001pgsHp8T51kfFyv","type":"plugin.added","properties":{"id":"agent"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e846f001pgsHp8T51kfFyv","type":"plugin.added","properties":{"id":"agent"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e846f001pgsHp8T51kfFyv","type":"plugin.added","properties":{"id":"agent"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e846f002rM7qQvaV7qmp3B","type":"plugin.added","properties":{"id":"command"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e846f002rM7qQvaV7qmp3B","type":"plugin.added","properties":{"id":"command"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e846f002rM7qQvaV7qmp3B","type":"plugin.added","properties":{"id":"command"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e846f002rM7qQvaV7qmp3B","type":"plugin.added","properties":{"id":"command"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e846f003xMC6ZhsrtoXpqQ","type":"plugin.added","properties":{"id":"skill"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e846f003xMC6ZhsrtoXpqQ","type":"plugin.added","properties":{"id":"skill"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e846f003xMC6ZhsrtoXpqQ","type":"plugin.added","properties":{"id":"skill"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e846f003xMC6ZhsrtoXpqQ","type":"plugin.added","properties":{"id":"skill"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8470001o1NZLMkHhkloPD","type":"plugin.added","properties":{"id":"models-dev"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8470001o1NZLMkHhkloPD","type":"plugin.added","properties":{"id":"models-dev"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8470001o1NZLMkHhkloPD","type":"plugin.added","properties":{"id":"models-dev"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8470001o1NZLMkHhkloPD","type":"plugin.added","properties":{"id":"models-dev"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8470002PIlXcdElnDWO5O","type":"plugin.added","properties":{"id":"config-agent"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8470002PIlXcdElnDWO5O","type":"plugin.added","properties":{"id":"config-agent"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8470002PIlXcdElnDWO5O","type":"plugin.added","properties":{"id":"config-agent"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8470002PIlXcdElnDWO5O","type":"plugin.added","properties":{"id":"config-agent"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e84700035t5l7hMB458qmZ","type":"plugin.added","properties":{"id":"config-command"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e84700035t5l7hMB458qmZ","type":"plugin.added","properties":{"id":"config-command"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e84700035t5l7hMB458qmZ","type":"plugin.added","properties":{"id":"config-command"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e84700035t5l7hMB458qmZ","type":"plugin.added","properties":{"id":"config-command"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e84700046HuXBJdkpu6j6q","type":"plugin.added","properties":{"id":"config-skill"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e84700046HuXBJdkpu6j6q","type":"plugin.added","properties":{"id":"config-skill"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e84700046HuXBJdkpu6j6q","type":"plugin.added","properties":{"id":"config-skill"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e84700046HuXBJdkpu6j6q","type":"plugin.added","properties":{"id":"config-skill"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8471001DEgeDHoG7SlXd7","type":"plugin.added","properties":{"id":"alibaba"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8471001DEgeDHoG7SlXd7","type":"plugin.added","properties":{"id":"alibaba"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8471001DEgeDHoG7SlXd7","type":"plugin.added","properties":{"id":"alibaba"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8471001DEgeDHoG7SlXd7","type":"plugin.added","properties":{"id":"alibaba"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8471002WtptSDqAIy975L","type":"plugin.added","properties":{"id":"amazon-bedrock"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8471002WtptSDqAIy975L","type":"plugin.added","properties":{"id":"amazon-bedrock"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8471002WtptSDqAIy975L","type":"plugin.added","properties":{"id":"amazon-bedrock"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8471002WtptSDqAIy975L","type":"plugin.added","properties":{"id":"amazon-bedrock"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8471003MHXQkEFnq13tGp","type":"plugin.added","properties":{"id":"anthropic"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8471003MHXQkEFnq13tGp","type":"plugin.added","properties":{"id":"anthropic"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8471003MHXQkEFnq13tGp","type":"plugin.added","properties":{"id":"anthropic"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8471003MHXQkEFnq13tGp","type":"plugin.added","properties":{"id":"anthropic"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8472001v7v5rEYvp4MyWy","type":"plugin.added","properties":{"id":"azure-cognitive-services"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8472001v7v5rEYvp4MyWy","type":"plugin.added","properties":{"id":"azure-cognitive-services"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8472001v7v5rEYvp4MyWy","type":"plugin.added","properties":{"id":"azure-cognitive-services"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8472001v7v5rEYvp4MyWy","type":"plugin.added","properties":{"id":"azure-cognitive-services"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d1001QwBvLuphyfI0dC","type":"plugin.added","properties":{"id":"azure"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d1001QwBvLuphyfI0dC","type":"plugin.added","properties":{"id":"azure"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d1001QwBvLuphyfI0dC","type":"plugin.added","properties":{"id":"azure"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d1001QwBvLuphyfI0dC","type":"plugin.added","properties":{"id":"azure"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d1002T9ICdcUbr0Id8w","type":"plugin.added","properties":{"id":"cerebras"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d1002T9ICdcUbr0Id8w","type":"plugin.added","properties":{"id":"cerebras"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d1002T9ICdcUbr0Id8w","type":"plugin.added","properties":{"id":"cerebras"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d1002T9ICdcUbr0Id8w","type":"plugin.added","properties":{"id":"cerebras"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d10032MtkGSDP1tYD5D","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d10032MtkGSDP1tYD5D","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d10032MtkGSDP1tYD5D","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d10032MtkGSDP1tYD5D","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d2001dt5c7WbNLXm2gt","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d2001dt5c7WbNLXm2gt","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d2001dt5c7WbNLXm2gt","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d2001dt5c7WbNLXm2gt","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d2002k2nRZSbTkCYpb3","type":"plugin.added","properties":{"id":"cohere"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d2002k2nRZSbTkCYpb3","type":"plugin.added","properties":{"id":"cohere"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d2002k2nRZSbTkCYpb3","type":"plugin.added","properties":{"id":"cohere"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d2002k2nRZSbTkCYpb3","type":"plugin.added","properties":{"id":"cohere"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d2003lhMRx1u4dW1jyE","type":"plugin.added","properties":{"id":"deepinfra"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d2003lhMRx1u4dW1jyE","type":"plugin.added","properties":{"id":"deepinfra"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d2003lhMRx1u4dW1jyE","type":"plugin.added","properties":{"id":"deepinfra"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d2003lhMRx1u4dW1jyE","type":"plugin.added","properties":{"id":"deepinfra"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d2004de6EMuphW9mRxb","type":"plugin.added","properties":{"id":"gateway"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d2004de6EMuphW9mRxb","type":"plugin.added","properties":{"id":"gateway"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d2004de6EMuphW9mRxb","type":"plugin.added","properties":{"id":"gateway"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d2004de6EMuphW9mRxb","type":"plugin.added","properties":{"id":"gateway"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d2005fFYwwPnhbs20hh","type":"plugin.added","properties":{"id":"github-copilot"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d2005fFYwwPnhbs20hh","type":"plugin.added","properties":{"id":"github-copilot"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d2005fFYwwPnhbs20hh","type":"plugin.added","properties":{"id":"github-copilot"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d2005fFYwwPnhbs20hh","type":"plugin.added","properties":{"id":"github-copilot"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d2006Jxeg644MYNDvkz","type":"plugin.added","properties":{"id":"gitlab"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d2006Jxeg644MYNDvkz","type":"plugin.added","properties":{"id":"gitlab"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d2006Jxeg644MYNDvkz","type":"plugin.added","properties":{"id":"gitlab"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d2006Jxeg644MYNDvkz","type":"plugin.added","properties":{"id":"gitlab"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d30017S1pberDITfruj","type":"plugin.added","properties":{"id":"google"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d30017S1pberDITfruj","type":"plugin.added","properties":{"id":"google"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d30017S1pberDITfruj","type":"plugin.added","properties":{"id":"google"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d30017S1pberDITfruj","type":"plugin.added","properties":{"id":"google"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d3002hPPZW41XOb2ZtX","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d3002hPPZW41XOb2ZtX","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d3002hPPZW41XOb2ZtX","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d3002hPPZW41XOb2ZtX","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85d30038WMBBXVSyQlTBk","type":"plugin.added","properties":{"id":"google-vertex"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85d30038WMBBXVSyQlTBk","type":"plugin.added","properties":{"id":"google-vertex"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85d30038WMBBXVSyQlTBk","type":"plugin.added","properties":{"id":"google-vertex"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85d30038WMBBXVSyQlTBk","type":"plugin.added","properties":{"id":"google-vertex"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85dc001bHIQ7klveM1rEA","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.12 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85dc001bHIQ7klveM1rEA","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.12 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85dc001bHIQ7klveM1rEA","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.12 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85dc001bHIQ7klveM1rEA","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.12 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e2001uWf4UFhmIK5GcN","type":"plugin.added","properties":{"id":"groq"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e2001uWf4UFhmIK5GcN","type":"plugin.added","properties":{"id":"groq"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e2001uWf4UFhmIK5GcN","type":"plugin.added","properties":{"id":"groq"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e2001uWf4UFhmIK5GcN","type":"plugin.added","properties":{"id":"groq"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e2002OIidhTcQhlbDAs","type":"plugin.added","properties":{"id":"kilo"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e2002OIidhTcQhlbDAs","type":"plugin.added","properties":{"id":"kilo"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e2002OIidhTcQhlbDAs","type":"plugin.added","properties":{"id":"kilo"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e2002OIidhTcQhlbDAs","type":"plugin.added","properties":{"id":"kilo"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e3001kJ1M1A6jMUsr69","type":"plugin.added","properties":{"id":"llmgateway"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e3001kJ1M1A6jMUsr69","type":"plugin.added","properties":{"id":"llmgateway"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e3001kJ1M1A6jMUsr69","type":"plugin.added","properties":{"id":"llmgateway"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e3001kJ1M1A6jMUsr69","type":"plugin.added","properties":{"id":"llmgateway"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e3002QciOUoJ3xI5AUV","type":"plugin.added","properties":{"id":"mistral"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e3002QciOUoJ3xI5AUV","type":"plugin.added","properties":{"id":"mistral"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e3002QciOUoJ3xI5AUV","type":"plugin.added","properties":{"id":"mistral"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e3002QciOUoJ3xI5AUV","type":"plugin.added","properties":{"id":"mistral"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e3003BasmJyRnu4xidM","type":"plugin.added","properties":{"id":"nvidia"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e3003BasmJyRnu4xidM","type":"plugin.added","properties":{"id":"nvidia"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e3003BasmJyRnu4xidM","type":"plugin.added","properties":{"id":"nvidia"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e3003BasmJyRnu4xidM","type":"plugin.added","properties":{"id":"nvidia"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e40017IE8s6FM4BxWUY","type":"plugin.added","properties":{"id":"opencode"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e40017IE8s6FM4BxWUY","type":"plugin.added","properties":{"id":"opencode"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e40017IE8s6FM4BxWUY","type":"plugin.added","properties":{"id":"opencode"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e40017IE8s6FM4BxWUY","type":"plugin.added","properties":{"id":"opencode"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e40020qDKdbGrVYGuih","type":"plugin.added","properties":{"id":"snowflake-cortex"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e40020qDKdbGrVYGuih","type":"plugin.added","properties":{"id":"snowflake-cortex"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e40020qDKdbGrVYGuih","type":"plugin.added","properties":{"id":"snowflake-cortex"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e40020qDKdbGrVYGuih","type":"plugin.added","properties":{"id":"snowflake-cortex"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e4003Wq2tXyUSugqaML","type":"plugin.added","properties":{"id":"openai-compatible"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e4003Wq2tXyUSugqaML","type":"plugin.added","properties":{"id":"openai-compatible"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e4003Wq2tXyUSugqaML","type":"plugin.added","properties":{"id":"openai-compatible"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e4003Wq2tXyUSugqaML","type":"plugin.added","properties":{"id":"openai-compatible"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e4004C0pPoIRNJLAQTN","type":"plugin.added","properties":{"id":"openai"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e4004C0pPoIRNJLAQTN","type":"plugin.added","properties":{"id":"openai"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e4004C0pPoIRNJLAQTN","type":"plugin.added","properties":{"id":"openai"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e4004C0pPoIRNJLAQTN","type":"plugin.added","properties":{"id":"openai"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e5001rZNITLtEuocTq5","type":"plugin.added","properties":{"id":"openrouter"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e5001rZNITLtEuocTq5","type":"plugin.added","properties":{"id":"openrouter"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e5001rZNITLtEuocTq5","type":"plugin.added","properties":{"id":"openrouter"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e5001rZNITLtEuocTq5","type":"plugin.added","properties":{"id":"openrouter"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e5002ULEaTY32VVbmBk","type":"plugin.added","properties":{"id":"perplexity"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e5002ULEaTY32VVbmBk","type":"plugin.added","properties":{"id":"perplexity"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e5002ULEaTY32VVbmBk","type":"plugin.added","properties":{"id":"perplexity"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e5002ULEaTY32VVbmBk","type":"plugin.added","properties":{"id":"perplexity"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e85e5003jVXFRFiloQPcei","type":"plugin.added","properties":{"id":"sap-ai-core"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e85e5003jVXFRFiloQPcei","type":"plugin.added","properties":{"id":"sap-ai-core"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e85e5003jVXFRFiloQPcei","type":"plugin.added","properties":{"id":"sap-ai-core"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e85e5003jVXFRFiloQPcei","type":"plugin.added","properties":{"id":"sap-ai-core"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8610001oxmhIi05FgWyKQ","type":"catalog.updated","properties":{}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8610001oxmhIi05FgWyKQ","type":"catalog.updated","properties":{}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8610001oxmhIi05FgWyKQ","type":"catalog.updated","properties":{}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8610001oxmhIi05FgWyKQ","type":"catalog.updated","properties":{}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8610002DnPfBPf3YvBeji","type":"plugin.added","properties":{"id":"togetherai"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8610002DnPfBPf3YvBeji","type":"plugin.added","properties":{"id":"togetherai"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8610002DnPfBPf3YvBeji","type":"plugin.added","properties":{"id":"togetherai"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8610002DnPfBPf3YvBeji","type":"plugin.added","properties":{"id":"togetherai"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8610003apEUS3JaWh4Fs8","type":"plugin.added","properties":{"id":"vercel"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8610003apEUS3JaWh4Fs8","type":"plugin.added","properties":{"id":"vercel"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8610003apEUS3JaWh4Fs8","type":"plugin.added","properties":{"id":"vercel"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8610003apEUS3JaWh4Fs8","type":"plugin.added","properties":{"id":"vercel"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8610004RKqt8p9RoiRnpS","type":"plugin.added","properties":{"id":"venice"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8610004RKqt8p9RoiRnpS","type":"plugin.added","properties":{"id":"venice"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8610004RKqt8p9RoiRnpS","type":"plugin.added","properties":{"id":"venice"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8610004RKqt8p9RoiRnpS","type":"plugin.added","properties":{"id":"venice"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8611001NyEGrB8jT0eUuj","type":"plugin.added","properties":{"id":"xai"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8611001NyEGrB8jT0eUuj","type":"plugin.added","properties":{"id":"xai"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8611001NyEGrB8jT0eUuj","type":"plugin.added","properties":{"id":"xai"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8611001NyEGrB8jT0eUuj","type":"plugin.added","properties":{"id":"xai"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8611002CZXsiVSCvg2Y3g","type":"plugin.added","properties":{"id":"zenmux"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8611002CZXsiVSCvg2Y3g","type":"plugin.added","properties":{"id":"zenmux"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8611002CZXsiVSCvg2Y3g","type":"plugin.added","properties":{"id":"zenmux"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8611002CZXsiVSCvg2Y3g","type":"plugin.added","properties":{"id":"zenmux"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8611003lB0YdtS5p7m2CS","type":"plugin.added","properties":{"id":"dynamic-provider"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8611003lB0YdtS5p7m2CS","type":"plugin.added","properties":{"id":"dynamic-provider"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8611003lB0YdtS5p7m2CS","type":"plugin.added","properties":{"id":"dynamic-provider"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8611003lB0YdtS5p7m2CS","type":"plugin.added","properties":{"id":"dynamic-provider"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8612001aH3uX3iBiSJFr5","type":"plugin.added","properties":{"id":"config-plugin"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8612001aH3uX3iBiSJFr5","type":"plugin.added","properties":{"id":"config-plugin"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8612001aH3uX3iBiSJFr5","type":"plugin.added","properties":{"id":"config-plugin"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8612001aH3uX3iBiSJFr5","type":"plugin.added","properties":{"id":"config-plugin"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8612002Lgl5ezlQ1pphqc","type":"plugin.added","properties":{"id":"config-provider"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8612002Lgl5ezlQ1pphqc","type":"plugin.added","properties":{"id":"config-provider"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8612002Lgl5ezlQ1pphqc","type":"plugin.added","properties":{"id":"config-provider"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8612002Lgl5ezlQ1pphqc","type":"plugin.added","properties":{"id":"config-provider"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e86120039VIHWCi9Ch2f3t","type":"plugin.added","properties":{"id":"variant"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e86120039VIHWCi9Ch2f3t","type":"plugin.added","properties":{"id":"variant"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e86120039VIHWCi9Ch2f3t","type":"plugin.added","properties":{"id":"variant"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e86120039VIHWCi9Ch2f3t","type":"plugin.added","properties":{"id":"variant"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8612004jAH6180e0sal8r","type":"reference.updated","properties":{}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8612004jAH6180e0sal8r","type":"reference.updated","properties":{}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8612004jAH6180e0sal8r","type":"reference.updated","properties":{}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8612004jAH6180e0sal8r","type":"reference.updated","properties":{}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8624001N7AU5KJKV4rm2r","type":"integration.updated","properties":{}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8624001N7AU5KJKV4rm2r","type":"integration.updated","properties":{}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8624001N7AU5KJKV4rm2r","type":"integration.updated","properties":{}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8624001N7AU5KJKV4rm2r","type":"integration.updated","properties":{}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8653001VuERSHA91ma01Z","type":"catalog.updated","properties":{}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8653001VuERSHA91ma01Z","type":"catalog.updated","properties":{}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8653001VuERSHA91ma01Z","type":"catalog.updated","properties":{}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8653001VuERSHA91ma01Z","type":"catalog.updated","properties":{}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e8656001uU7s5G84AoB0PV","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.12 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}} == data:* ]]
++ [[ data: {"id":"evt_01e1e8656001uU7s5G84AoB0PV","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.12 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e8656001uU7s5G84AoB0PV","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.12 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e8656001uU7s5G84AoB0PV","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.12 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e86750016YMUUxPhAlR6KB","type":"project.directories.updated","properties":{"projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e86750016YMUUxPhAlR6KB","type":"project.directories.updated","properties":{"projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e86750016YMUUxPhAlR6KB","type":"project.directories.updated","properties":{"projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e86750016YMUUxPhAlR6KB","type":"project.directories.updated","properties":{"projectID":"cc6c088c28ecc03bed8b0121d9b40f9c8b9c0678"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e868d001PKrJNuXC3T912H","type":"session.status","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","status":{"type":"busy"}}} == data:* ]]
++ [[ data: {"id":"evt_01e1e868d001PKrJNuXC3T912H","type":"session.status","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","status":{"type":"busy"}}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ status_seen=1
++ [[ data: {"id":"evt_01e1e868d001PKrJNuXC3T912H","type":"session.status","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","status":{"type":"busy"}}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e868d001PKrJNuXC3T912H","type":"session.status","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","status":{"type":"busy"}}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e869c001E0wH3R0BBLV3EE","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869c001Rsu5NcCZvwM8A5","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","snapshot":"7678002800534195f13d883104c35824e69c747e","type":"step-start"},"time":1787211712156}} == data:* ]]
++ [[ data: {"id":"evt_01e1e869c001E0wH3R0BBLV3EE","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869c001Rsu5NcCZvwM8A5","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","snapshot":"7678002800534195f13d883104c35824e69c747e","type":"step-start"},"time":1787211712156}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e869c001E0wH3R0BBLV3EE","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869c001Rsu5NcCZvwM8A5","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","snapshot":"7678002800534195f13d883104c35824e69c747e","type":"step-start"},"time":1787211712156}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e869c001E0wH3R0BBLV3EE","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869c001Rsu5NcCZvwM8A5","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","snapshot":"7678002800534195f13d883104c35824e69c747e","type":"step-start"},"time":1787211712156}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e869c001E0wH3R0BBLV3EE","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869c001Rsu5NcCZvwM8A5","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","snapshot":"7678002800534195f13d883104c35824e69c747e","type":"step-start"},"time":1787211712156}} == *\f\a\k\e\ \r\e\s\p\o\n\s\e* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e869e001dYx4d77sQ32ar4","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"","time":{"start":1787211712158},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712158}} == data:* ]]
++ [[ data: {"id":"evt_01e1e869e001dYx4d77sQ32ar4","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"","time":{"start":1787211712158},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712158}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e869e001dYx4d77sQ32ar4","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"","time":{"start":1787211712158},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712158}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e869e001dYx4d77sQ32ar4","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"","time":{"start":1787211712158},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712158}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e869e001dYx4d77sQ32ar4","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"","time":{"start":1787211712158},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712158}} == *\f\a\k\e\ \r\e\s\p\o\n\s\e* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e869f001UErWo7bYtXYgzo","type":"message.part.delta","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","partID":"prt_01e1e869e001ZDoN1rSNlgjPnR","field":"text","delta":"fake response 2"}} == data:* ]]
++ [[ data: {"id":"evt_01e1e869f001UErWo7bYtXYgzo","type":"message.part.delta","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","partID":"prt_01e1e869e001ZDoN1rSNlgjPnR","field":"text","delta":"fake response 2"}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e869f001UErWo7bYtXYgzo","type":"message.part.delta","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","partID":"prt_01e1e869e001ZDoN1rSNlgjPnR","field":"text","delta":"fake response 2"}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e869f001UErWo7bYtXYgzo","type":"message.part.delta","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","partID":"prt_01e1e869e001ZDoN1rSNlgjPnR","field":"text","delta":"fake response 2"}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 0 -eq 1 ]]
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ '' == data:* ]]
++ continue
++ ((  SECONDS < deadline  ))
++ IFS=
++ read -r -t 1 line
++ [[ data: {"id":"evt_01e1e86a0001u7RrFiDPeqXdkO","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"fake response 2","time":{"start":1787211712158,"end":1787211712159},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712160}} == data:* ]]
++ [[ data: {"id":"evt_01e1e86a0001u7RrFiDPeqXdkO","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"fake response 2","time":{"start":1787211712158,"end":1787211712159},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712160}} == *\"\s\e\s\s\i\o\n\.\s\t\a\t\u\s\"* ]]
++ [[ data: {"id":"evt_01e1e86a0001u7RrFiDPeqXdkO","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"fake response 2","time":{"start":1787211712158,"end":1787211712159},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712160}} == *\"\m\e\s\s\a\g\e\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e86a0001u7RrFiDPeqXdkO","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"fake response 2","time":{"start":1787211712158,"end":1787211712159},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712160}} == *\"\m\e\s\s\a\g\e\.\p\a\r\t\.\u\p\d\a\t\e\d\"* ]]
++ [[ data: {"id":"evt_01e1e86a0001u7RrFiDPeqXdkO","type":"message.part.updated","properties":{"sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","part":{"id":"prt_01e1e869e001ZDoN1rSNlgjPnR","messageID":"msg_01e1e6eff001Q3ul2u7wzrGXZH","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","type":"text","text":"fake response 2","time":{"start":1787211712158,"end":1787211712159},"metadata":{"openai":{"itemId":"msg_2"}}},"time":1787211712160}} == *\f\a\k\e\ \r\e\s\p\o\n\s\e* ]]
++ part_seen=1
+++ sed 's/^data: //'
+++ jq -c '{type, sessionID: (.properties.part.sessionID // .properties.sessionID // null), text: (.properties.part.text // null)}'
++ part_event='{"type":"message.part.updated","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","text":"fake response 2"}'
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ break
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
++ [[ 1 -eq 1 ]]
+++ /Users/sungsoopark/.opencode/bin/opencode db path
+++ head -1
++ sandbox_db=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/data/opencode/opencode.db
++ [[ /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/data/opencode/opencode.db == \/\v\a\r\/\f\o\l\d\e\r\s\/\1\3\/\y\y\r\k\y\f\t\s\6\q\s\g\3\0\3\m\c\w\p\w\z\q\2\0\0\0\0\0\g\n\/\T\/\o\q\a\-\x\d\g\.\X\X\X\X\X\X\.\W\M\o\0\n\Q\y\4\Q\e/* ]]
+++ sqlite3 /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/data/opencode/opencode.db 'SELECT count(*) FROM session;'
++ sandbox_sessions=1
++ [[ 1 -ge 1 ]]
+++ grep -c branch=default /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.omo/evidence/20260820-pr6611-recovery/fake-llm.log
++ fake_default_calls=1
++ [[ 1 -ge 1 ]]
++ cp /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/state/serve.log /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/.omo/evidence/20260820-pr6611-recovery/opencode-serve.log
++ exec
++ kill 92150
++ wait 92150
++ true
++ OQA_CURL_PIDS=()
++ oqa_cleanup
++ '[' -n 92018 ']'
++ kill 92018
++ sleep 0.3
++ kill -0 92018
++ true
++ OQA_SERVER_PID=
++ local s p d
++ for s in '"${OQA_TMUX_SESSIONS[@]:-}"'
++ '[' -n '' ']'
++ true
++ for p in '"${OQA_CURL_PIDS[@]:-}"'
++ '[' -n '' ']'
++ true
++ '[' -n '' ']'
++ '[' -n '' ']'
++ true
++ for d in '"${OQA_TMPDIRS[@]:-}"'
++ '[' -n /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe ']'
++ rm -rf /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe
++ OQA_TMPDIRS=()
++ OQA_TMUX_SESSIONS=()
++ OQA_CURL_PIDS=()
++ server_stopped=true
++ kill -0 92018
++ sandbox_removed=false
++ [[ ! -e /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe ]]
++ sandbox_removed=true
++ kill 92004
++ wait 92004
++ fake_pid=
++ fake_server_stopped=true
++ kill -0 92004
+++ sqlite3 /Users/sungsoopark/.local/share/opencode/opencode.db 'SELECT count(*) FROM session;'
++ host_after=7586
++ printf 'opencode_version=%s\n' 1.18.18
+opencode_version=1.18.18
++ printf 'bundle_sha256=%s\n' 717f15c9bb50c10b01bf33be9badd3774c33babbc3e82cf097a737b5f570bc2b
+bundle_sha256=717f15c9bb50c10b01bf33be9badd3774c33babbc3e82cf097a737b5f570bc2b
++ printf 'health=%s\n' '{"healthy":true,"version":"1.18.18"}'
+health={"healthy":true,"version":"1.18.18"}
++ printf 'config_summary=%s\n' '{"plugin":["file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/dist/index.js"],"model":"openai/gpt-fake"}'
+config_summary={"plugin":["file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/dist/index.js"],"model":"openai/gpt-fake"}
++ printf 'session_id=%s\n' ses_fe1e1923bffeY5qRmzhZ5luEuX
+session_id=ses_fe1e1923bffeY5qRmzhZ5luEuX
++ printf 'prompt_http_status=%s\n' 204
+prompt_http_status=204
++ printf 'sse_server_connected=%s\n' 1
+sse_server_connected=1
++ printf 'sse_session_status_seen=%s\n' 1
+sse_session_status_seen=1
++ printf 'sse_message_updated_seen=%s\n' 1
+sse_message_updated_seen=1
++ printf 'sse_part_event=%s\n' '{"type":"message.part.updated","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","text":"fake response 2"}'
+sse_part_event={"type":"message.part.updated","sessionID":"ses_fe1e1923bffeY5qRmzhZ5luEuX","text":"fake response 2"}
++ printf 'fake_default_calls=%s\n' 1
+fake_default_calls=1
++ printf 'sandbox_db=%s\n' /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/data/opencode/opencode.db
+sandbox_db=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe/data/opencode/opencode.db
++ printf 'sandbox_sessions=%s\n' 1
+sandbox_sessions=1
++ printf 'host_db=%s\n' /Users/sungsoopark/.local/share/opencode/opencode.db
+host_db=/Users/sungsoopark/.local/share/opencode/opencode.db
++ printf 'host_db_sessions_before=%s\n' 7586
+host_db_sessions_before=7586
++ printf 'host_db_sessions_after=%s\n' 7586
+host_db_sessions_after=7586
++ printf 'sandbox_root=%s\n' /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe
+sandbox_root=/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.WMo0nQy4Qe
++ printf 'sandbox_removed=%s\n' true
+sandbox_removed=true
++ printf 'opencode_server_stopped=%s\n' true
+opencode_server_stopped=true
++ printf 'fake_server_stopped=%s\n' true
+fake_server_stopped=true
++ [[ 7586 == \7\5\8\6 ]]
++ [[ true == \t\r\u\e ]]
++ [[ true == \t\r\u\e ]]
++ [[ true == \t\r\u\e ]]
++ cleanup_all
++ oqa_cleanup
++ '[' -n '' ']'
++ local s p d
++ for s in '"${OQA_TMUX_SESSIONS[@]:-}"'
++ '[' -n '' ']'
++ true
++ for p in '"${OQA_CURL_PIDS[@]:-}"'
++ '[' -n '' ']'
++ true
++ '[' -n '' ']'
++ '[' -n '' ']'
++ true
++ for d in '"${OQA_TMPDIRS[@]:-}"'
++ '[' -n '' ']'
++ true
++ OQA_TMPDIRS=()
++ OQA_TMUX_SESSIONS=()
++ OQA_CURL_PIDS=()
++ [[ -n '' ]]

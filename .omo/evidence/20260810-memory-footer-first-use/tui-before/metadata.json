@@ -1,0 +1,27 @@
+{
+  "title": "omo-senpi memory footer before first use",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "isolated real Senpi text-only memory session"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 120,
+    "rows": 32
+  },
+  "cleanup": "pty pid 21391 killed",
+  "files": {
+    "png": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/senpi-memory-footer-first-use/.omo/evidence/20260810-memory-footer-first-use/tui-before/terminal.png",
+    "text": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/senpi-memory-footer-first-use/.omo/evidence/20260810-memory-footer-first-use/tui-before/terminal.txt",
+    "ansi": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/senpi-memory-footer-first-use/.omo/evidence/20260810-memory-footer-first-use/tui-before/terminal-ansi.txt",
+    "metadata": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/senpi-memory-footer-first-use/.omo/evidence/20260810-memory-footer-first-use/tui-before/metadata.json"
+  }
+}

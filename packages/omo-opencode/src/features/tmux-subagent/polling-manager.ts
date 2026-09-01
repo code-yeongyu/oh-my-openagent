@@ -1,5 +1,6 @@
 import type { OpencodeClient } from "../../tools/delegate-task/types"
 import {
+  AUTO_ACTIVATE_GRACE_MS,
   POLL_INTERVAL_BACKGROUND_MS,
   SESSION_MISSING_GRACE_MS,
   SESSION_READY_TIMEOUT_MS,
@@ -81,11 +82,23 @@ export class TmuxPollingManager {
         const status = allStatuses[sessionId]
         const elapsedMs = now - tracked.createdAt.getTime()
         if (!tracked.attachActivated && !status) {
-          log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
+          if (elapsedMs <= SESSION_TIMEOUT_MS) {
+            log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
+              sessionId,
+              paneId: tracked.paneId,
+              elapsedMs,
+            })
+            continue
+          }
+          log("[tmux-session-manager] never-activated pane exceeded hard timeout; closing", {
             sessionId,
             paneId: tracked.paneId,
             elapsedMs,
           })
+          if (!tracked.closePending) {
+            tracked.closePending = true
+            sessionsToClose.push(sessionId)
+          }
           continue
         }
 
@@ -231,11 +244,22 @@ export class TmuxPollingManager {
 
     const panes = [state.mainPane, ...state.agentPanes].filter((pane): pane is NonNullable<typeof pane> => Boolean(pane))
     const activePaneIds = new Set(panes.filter((pane) => pane.isActive).map((pane) => pane.paneId))
-    if (activePaneIds.size === 0) return
+    const now = Date.now()
 
     for (const tracked of this.sessions.values()) {
       if (tracked.attachActivated) continue
-      if (!activePaneIds.has(tracked.paneId)) continue
+
+      const isFocused = activePaneIds.has(tracked.paneId)
+      if (!isFocused) {
+        const ageMs = now - tracked.createdAt.getTime()
+        if (ageMs > AUTO_ACTIVATE_GRACE_MS) continue
+        log("[tmux-session-manager] auto-activating pane within grace window", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+          ageMs,
+          graceMs: AUTO_ACTIVATE_GRACE_MS,
+        })
+      }
 
       const activated = await this.activateSessionPane(tracked)
       if (activated) {
@@ -244,9 +268,10 @@ export class TmuxPollingManager {
         tracked.lastSeenAt = new Date()
         tracked.stableIdlePolls = 0
         tracked.observedIdleActivityVersion = tracked.activityVersion
-        log("[tmux-session-manager] activated focused pane", {
+        log("[tmux-session-manager] activated pane", {
           sessionId: tracked.sessionId,
           paneId: tracked.paneId,
+          autoActivated: !isFocused,
         })
       }
     }

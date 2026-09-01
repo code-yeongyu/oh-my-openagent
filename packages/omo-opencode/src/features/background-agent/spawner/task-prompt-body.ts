@@ -29,10 +29,11 @@ export type TaskPromptBody = {
   readonly variant?: string
   readonly system?: string | undefined
   readonly tools: Record<string, boolean>
-  readonly parts: readonly [{
+  readonly parts: Array<{
     readonly type: "text"
     readonly text: string
-  }]
+    readonly synthetic?: boolean
+  }>
 }
 
 export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptBody {

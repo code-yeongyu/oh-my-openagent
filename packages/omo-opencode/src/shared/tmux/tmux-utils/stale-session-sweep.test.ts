@@ -1,5 +1,11 @@
+/// <reference types="bun-types" />
+
 import { beforeEach, describe, expect, it, mock } from "bun:test"
-import { sweepStaleOmoAgentSessionsWith, sweepTmuxSessionsWith, type SweepDeps } from "./stale-session-sweep"
+import {
+	sweepStaleOmoAgentSessionsWith,
+	sweepTmuxSessionsWith,
+	type SweepDeps,
+} from "./stale-session-sweep"
 
 type SweepFixture = {
 	deps: SweepDeps

@@ -1,15 +1,15 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-
+import type { PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runLspPostCompactHook, runLspPostToolUseHook } from "../src/codex-hook.js";
 
-const MARKSMAN_INITIALIZE_TIMEOUT = [
-	"LSP request timeout (method: initialize)",
-	'recent stderr: [01:16:41 INF] <LSP Entry> Starting Marksman LSP server: {"arch":"Arm64"}',
-	'[01:16:41 INF] <Folder> Loading folder documents: {"uri":"file:///repo"}',
+const DAEMON_UNREACHABLE = [
+	"LSP daemon unreachable: daemon did not become reachable.",
+	"The MCP server is a thin proxy and never runs language servers in-process.",
+	"Logs: /tmp/daemon.log",
 ].join("\n");
 
 const tempDirs: string[] = [];
@@ -31,7 +31,7 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 			// when
 			const firstOutput = await runLspPostToolUseHook(input, async () => {
 				calls += 1;
-				return MARKSMAN_INITIALIZE_TIMEOUT;
+				return markdownNotConfigured();
 			});
 			const secondOutput = await runLspPostToolUseHook(input, async () => {
 				calls += 1;
@@ -54,7 +54,7 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 		await withPluginData(pluginData, async () => {
 			await runLspPostToolUseHook(input, async () => {
 				calls += 1;
-				return MARKSMAN_INITIALIZE_TIMEOUT;
+				return markdownNotConfigured();
 			});
 			await runLspPostToolUseHook(input, async () => {
 				calls += 1;
@@ -74,7 +74,7 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 			const compactOutput = await runLspPostCompactHook(compactInput);
 			const afterCompactOutput = await runLspPostToolUseHook(input, async () => {
 				calls += 1;
-				return MARKSMAN_INITIALIZE_TIMEOUT;
+				return markdownNotConfigured();
 			});
 			await runLspPostToolUseHook(input, async () => {
 				calls += 1;
@@ -97,7 +97,7 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 		await withPluginData(pluginData, async () => {
 			await runLspPostToolUseHook(input, async () => {
 				calls += 1;
-				return MARKSMAN_INITIALIZE_TIMEOUT;
+				return markdownNotConfigured();
 			});
 			await runLspPostCompactHook({ session_id: "session-compact-clean" });
 
@@ -118,32 +118,65 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 		});
 	});
 
-	it("#given the LSP daemon is unreachable #when PostToolUse runs #then it suppresses feedback and caches the extension", async () => {
+	it("#given the LSP daemon is unreachable #when PostToolUse repeats #then it suppresses feedback once and retries on the next edit", async () => {
 		// given
 		const pluginData = tempPluginData();
 		const input = postToolUseInput("session-daemon-down", "src/app.ts");
-		const daemonDown = [
-			"LSP daemon unreachable: daemon did not become reachable.",
-			"The MCP server is a thin proxy and never runs language servers in-process.",
-			"Logs: /tmp/daemon.log",
-		].join("\n");
 		let calls = 0;
 
 		await withPluginData(pluginData, async () => {
 			// when
 			const firstOutput = await runLspPostToolUseHook(input, async () => {
 				calls += 1;
-				return daemonDown;
+				return DAEMON_UNREACHABLE;
 			});
 			const secondOutput = await runLspPostToolUseHook(input, async () => {
 				calls += 1;
-				return "error[typescript] (2304) at 1:1: skipped after daemon-down cache.";
+				return "error[typescript] (2304) at 1:1: Cannot find name 'missing'.";
 			});
 
 			// then
 			expect(firstOutput).toBe("");
-			expect(secondOutput).toBe("");
-			expect(calls).toBe(1);
+			expect(secondOutput).toContain("Cannot find name 'missing'");
+			expect(calls).toBe(2);
+		});
+	});
+
+	it("#given a cached unavailable extension #when the post-compact probe hits a daemon outage #then the cache survives and the probe stays pending", async () => {
+		// given
+		const pluginData = tempPluginData();
+		const input = postToolUseInput("session-daemon-down-probe", ".omo/ulw-loop/evidence/note.md");
+		let calls = 0;
+
+		await withPluginData(pluginData, async () => {
+			await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return markdownNotConfigured();
+			});
+			await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return "error[markdown] (1000) at 1:1: cached call should have been skipped.";
+			});
+			await runLspPostCompactHook({ session_id: "session-daemon-down-probe" });
+
+			// when
+			const outageProbeOutput = await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return DAEMON_UNREACHABLE;
+			});
+			const retriedProbeOutput = await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return markdownNotConfigured();
+			});
+			await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return "error[markdown] (1000) at 1:1: re-cached call should have been skipped.";
+			});
+
+			// then
+			expect(outageProbeOutput).toBe("");
+			expect(retriedProbeOutput).toBe("");
+			expect(calls).toBe(3);
 		});
 	});
 
@@ -154,7 +187,7 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 		const typescriptInput = postToolUseInput("session-real-diagnostics", "src/broken.ts");
 
 		await withPluginData(pluginData, async () => {
-			await runLspPostToolUseHook(markdownInput, async () => MARKSMAN_INITIALIZE_TIMEOUT);
+			await runLspPostToolUseHook(markdownInput, async () => markdownNotConfigured());
 
 			// when
 			const output = await runLspPostToolUseHook(
@@ -207,6 +240,10 @@ function tempPluginData(): string {
 	const dir = mkdtempSync(path.join(tmpdir(), "codex-lsp-unavailable-"));
 	tempDirs.push(dir);
 	return dir;
+}
+
+function markdownNotConfigured(): PostEditDiagnosticsOutcome {
+	return { kind: "not_configured", extension: ".md" };
 }
 
 interface PostToolUseHookOutput {

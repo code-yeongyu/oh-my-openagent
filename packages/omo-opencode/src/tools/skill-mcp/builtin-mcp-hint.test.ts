@@ -15,6 +15,26 @@ const mockContext = {
 }
 
 describe("skill_mcp builtin MCP hint", () => {
+  it("returns builtin hint for codegraph", async () => {
+    const tool = createSkillMcpTool({
+      manager: new SkillMcpManager(),
+      getLoadedSkills: () => [],
+      getSessionID: () => "session",
+    })
+
+    await expect(
+      tool.execute({ mcp_name: "codegraph", tool_name: "codegraph_status" }, mockContext),
+    ).rejects.toThrow(/builtin MCP/)
+
+    await expect(
+      tool.execute({ mcp_name: "codegraph", tool_name: "codegraph_status" }, mockContext),
+    ).rejects.toThrow(/codegraph_status/)
+
+    await expect(
+      tool.execute({ mcp_name: "codegraph", tool_name: "codegraph_status" }, mockContext),
+    ).rejects.toThrow(/do not retry this builtin through skill_mcp/)
+  })
+
   it("returns builtin hint for context7", async () => {
     const tool = createSkillMcpTool({
       manager: new SkillMcpManager(),

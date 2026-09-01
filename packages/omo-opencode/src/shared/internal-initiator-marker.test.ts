@@ -1,14 +1,20 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import {
   createInternalAgentContinuationTextPart,
   createInternalAgentTextPart,
   hasInternalInitiatorMarker,
+  hasInternalNoReplyMarker,
   isRealUserMessage,
   isRealUserTextPart,
   isSyntheticOrInternalOnlyTextParts,
   isSyntheticOrInternalUserMessage,
+  isTerminalNoReplyUserMessage,
   OMO_INTERNAL_INITIATOR_MARKER,
+  OMO_INTERNAL_NOREPLY_MARKER,
   stripInternalInitiatorMarkers,
+  withInternalNoReplyMarker,
 } from "./internal-initiator-marker"
 
 describe("internal-initiator-marker", () => {
@@ -209,6 +215,87 @@ describe("internal-initiator-marker", () => {
       // then
       expect(result).toBe(false)
       expect(isSyntheticOrInternalUserMessage(message)).toBe(true)
+    })
+  })
+
+  describe("noReply marker", () => {
+    test("#given a text part wrapped with the noReply marker #when inspecting it #then it carries both markers and is still synthetic", () => {
+      // given
+      const part = withInternalNoReplyMarker(createInternalAgentTextPart("task done"))
+
+      // then
+      expect(hasInternalInitiatorMarker(part.text)).toBe(true)
+      expect(hasInternalNoReplyMarker(part.text)).toBe(true)
+      expect(part.text).toContain(OMO_INTERNAL_NOREPLY_MARKER)
+    })
+
+    test("#given a continuation part wrapped with the noReply marker #when inspecting it #then synthetic and metadata are preserved", () => {
+      // given
+      const part = withInternalNoReplyMarker(createInternalAgentContinuationTextPart("recover"))
+
+      // then
+      expect(part.synthetic).toBe(true)
+      expect(part.metadata).toEqual({ compaction_continue: true })
+      expect(hasInternalNoReplyMarker(part.text)).toBe(true)
+    })
+
+    test("#given a part already carrying the noReply marker #when wrapping again #then it is not duplicated", () => {
+      // given
+      const once = withInternalNoReplyMarker(createInternalAgentTextPart("task done"))
+
+      // when
+      const twice = withInternalNoReplyMarker(once)
+
+      // then
+      expect(twice.text).toBe(once.text)
+      expect(twice.text.match(/OMO_INTERNAL_NOREPLY/g)).toHaveLength(1)
+    })
+
+    test("#given a noReply-tagged user message #when classifying #then it is a terminal noReply message", () => {
+      // given
+      const message = {
+        info: { role: "user" },
+        parts: [withInternalNoReplyMarker(createInternalAgentTextPart("task done"))],
+      }
+
+      // then
+      expect(isTerminalNoReplyUserMessage(message)).toBe(true)
+      expect(isSyntheticOrInternalUserMessage(message)).toBe(true)
+    })
+
+    test("#given an ordinary internal user message without the noReply marker #when classifying #then it is not terminal", () => {
+      // given
+      const message = {
+        info: { role: "user" },
+        parts: [createInternalAgentTextPart("continue")],
+      }
+
+      // then
+      expect(isTerminalNoReplyUserMessage(message)).toBe(false)
+    })
+
+    test("#given an assistant message carrying the noReply marker #when classifying #then it is not a terminal noReply user message", () => {
+      // given
+      const message = {
+        info: { role: "assistant" },
+        parts: [withInternalNoReplyMarker(createInternalAgentTextPart("noise"))],
+      }
+
+      // then
+      expect(isTerminalNoReplyUserMessage(message)).toBe(false)
+    })
+
+    test("#given noReply-marked text #when stripping internal markers #then both markers are removed", () => {
+      // given
+      const part = withInternalNoReplyMarker(createInternalAgentTextPart("hello world"))
+
+      // when
+      const stripped = stripInternalInitiatorMarkers(part.text)
+
+      // then
+      expect(stripped).toBe("hello world")
+      expect(hasInternalInitiatorMarker(stripped)).toBe(false)
+      expect(hasInternalNoReplyMarker(stripped)).toBe(false)
     })
   })
 })

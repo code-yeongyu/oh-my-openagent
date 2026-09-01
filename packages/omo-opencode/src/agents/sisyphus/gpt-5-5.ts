@@ -1,5 +1,5 @@
 /**
- * GPT-5.5 Sisyphus prompt - orchestrator that delegates work, supervises
+ * Shared GPT-5.5/GPT-5.6 Sisyphus prompt - orchestrator that delegates work, supervises
  * execution, and ships verified outcomes through the right specialists.
  */
 
@@ -17,32 +17,10 @@ import {
   buildNonClaudePlannerSection,
 } from "../dynamic-agent-prompt-builder"
 import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard"
+import { getGptPromptIdentity } from "../gpt-prompt-identity"
+import { buildTaskSystemGuide } from "./gpt-task-system-guide"
 
-function buildTaskSystemGuide(useTaskSystem: boolean): string {
-  if (useTaskSystem) {
-    return `Create tasks before any non-trivial work (2+ steps, uncertain scope, multiple items).
-
-Workflow:
-1. On receiving a request for implementation the user explicitly asked for, call \`task_create\` with atomic steps.
-2. Before each step, call \`task_update(status="in_progress")\`. One step in progress at a time.
-3. After each step, call \`task_update(status="completed")\` immediately. Never batch completions.
-4. If scope changes, update the task list before proceeding.
-
-Your task creations are tracked by the harness; the system will nudge you if you go idle with open tasks.`
-  }
-
-  return `Create todos before any non-trivial work (2+ steps, uncertain scope, multiple items).
-
-Workflow:
-1. On receiving a request for implementation the user explicitly asked for, call \`todowrite\` with atomic steps.
-2. Before each step, mark the item \`in_progress\`. One step in progress at a time.
-3. After each step, mark it \`completed\` immediately. Never batch completions.
-4. If scope changes, update the todo list before proceeding.
-
-Your todo creations are tracked by the harness; the system will nudge you if you go idle with open items.`
-}
-
-const SISYPHUS_GPT_5_5_TEMPLATE = `You are Sisyphus, an orchestration agent based on GPT-5.5. You and the user share the same workspace and collaborate to achieve the user's goals through specialized sub-agents and tools provided by the OhMyOpenCode harness.
+const SISYPHUS_GPT_5_5_TEMPLATE = `You are Sisyphus, an orchestration agent based on {{ modelIdentity }}. You and the user share the same workspace and collaborate to achieve the user's goals through specialized sub-agents and tools provided by the OhMyOpenCode harness.
 
 {{ personality }}
 
@@ -55,7 +33,6 @@ You are Sisyphus. The name is a reference to the mythological figure who rolls a
 - For text and file search, use \`rg\` directly. It is the fastest option available.
 - Default to ASCII when editing or creating files. Only introduce Unicode when there is clear justification or the existing file uses it.
 - Add succinct code comments only when code is not self-explanatory. Never comment what the code literally does; brief comments ahead of a complex block can help, but usage should be rare.
-- ${GPT_APPLY_PATCH_GUIDANCE}
 - You may be in a dirty git worktree. NEVER revert existing changes you did not make unless explicitly requested, since those changes were made by the user or another tool.
 - Do not amend a commit or force-push unless explicitly requested.
 - NEVER use destructive commands like \`git reset --hard\` or \`git checkout --\` unless specifically requested or approved by the user.
@@ -445,6 +422,7 @@ export function buildGpt55SisyphusPrompt(
   const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
 
   const body = SISYPHUS_GPT_5_5_TEMPLATE
+    .replace("{{ modelIdentity }}", getGptPromptIdentity(model))
     .replace("{{ personality }}", personality)
     .replace("{{ taskSystemGuide }}", taskSystemGuide)
     .replace("{{ categorySkillsGuide }}", categorySkillsGuide)

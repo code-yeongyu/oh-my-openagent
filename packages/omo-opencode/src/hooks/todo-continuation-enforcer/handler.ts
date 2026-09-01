@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import { handedBackSyncSessions } from "../../features/claude-code-session-state"
 import {
   clearContinuationMarker,
 } from "../../features/run-continuation-state"
@@ -13,6 +14,7 @@ import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
 import { handleNonIdleEvent } from "./non-idle-events"
 import { isTokenLimitError } from "./token-limit-detection"
+import { isUnrecoverableRequestError } from "./unrecoverable-request-error"
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null ? value as Record<string, unknown> : undefined
@@ -84,6 +86,9 @@ export function createTodoContinuationHandler(args: {
         state.lastIncompleteCount = undefined
         state.lastInjectedAt = undefined
         state.awaitingPostInjectionProgressCheck = false
+        state.continuationResponseObserved = false
+        state.continuationBlockReason = undefined
+        state.pendingUserMessageID = undefined
         state.stagnationCount = 0
         state.consecutiveFailures = 0
         shouldCancelCountdown = true
@@ -93,6 +98,15 @@ export function createTodoContinuationHandler(args: {
         state.tokenLimitDetected = true
         shouldCancelCountdown = true
         log(`[${HOOK_NAME}] Token limit error detected via session.error`, { sessionID, errorName: error?.name, errorMessage: error?.message })
+      } else if (isUnrecoverableRequestError(props?.error)) {
+        const state = sessionStateStore.getState(sessionID)
+        state.unrecoverableErrorDetected = true
+        shouldCancelCountdown = true
+        log(`[${HOOK_NAME}] Non-retryable request error detected via session.error`, {
+          sessionID,
+          errorName: error?.name,
+          errorMessage: error?.message,
+        })
       }
 
       if (shouldCancelCountdown) {
@@ -132,6 +146,7 @@ export function createTodoContinuationHandler(args: {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
         clearContinuationMarker(ctx.directory, sessionID)
+        handedBackSyncSessions.delete(sessionID)
       }
     }
 
