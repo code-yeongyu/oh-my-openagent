@@ -1,0 +1,28 @@
+WHAT WAS CLEANED
+- Removed isolated CLI QA HOME:
+  `/var/folders/.../coding-agent-sessions-omo-qa.XXXXXX.a6N8xVY7iH`
+- Removed the failed disposable Senpi toggle clone:
+  `/var/folders/.../omo-senpi-toggle.9ZOYrJ`
+- Disposable Docker QA containers used `--rm`.
+- Codex QA mock-model teardown completed during the passing script.
+
+WHAT WAS VERIFIED
+  MATCHING-TEMP-DIRS: empty
+  LIVE-QA-PROCESSES: empty
+  LIVE-QA-CONTAINERS: empty
+
+The isolated CLI HOME no longer exists.
+
+DISK RECOVERY
+The failed debug clone consumed 5.8 GB on the system volume. Removing it
+increased available space from 147 MB to 4.4 GB.
+
+REMAINING NON-QA WORKTREE STATE
+Tracked generated bundle differences from the initial Bun 1.4 bootstrap remain
+as an explicit later cleanup task. They are not live QA resources and will be
+regenerated with the CI toolchain before commit.
+
+WHY IT IS ENOUGH
+Every runtime resource created by the OpenCode, Codex, Senpi, and isolated CLI
+scenarios is terminated or removed, and direct process/container/temp searches
+show no leftovers.

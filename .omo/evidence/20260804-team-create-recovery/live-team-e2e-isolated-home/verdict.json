@@ -1,0 +1,26 @@
+{
+  "result": "PASS",
+  "checks": {
+    "createTwoMembersActive": true,
+    "createListsActiveMembers": true,
+    "leadToMemberEnqueued": true,
+    "memberEnvelopeEchoed": true,
+    "memberToLeadInjected": true,
+    "leadInboxDrained": true,
+    "noBlockingTeamWaitCalls": true,
+    "crashHoldReached": true,
+    "crashKilledMemberAtHold": true,
+    "crashReservationUncommittedAtKill": true,
+    "crashReservationRestoredUnread": true,
+    "crashReservationNoResidue": true,
+    "crashReservedMessageDeliveredExactlyOnce": true,
+    "crashRestartExitClean": true,
+    "crashLivenessInjectedToLead": true,
+    "crashLivenessAcknowledged": true
+  },
+  "failed": [],
+  "credentialIsolationClean": true,
+  "wholeDirUnchanged": true,
+  "leakedPids": 0,
+  "outDir": "/Users/yeongyu/local-workspaces/omo-wt/fix/team-create-inline-precedence/.omo/evidence/20260804-team-create-recovery/live-team-e2e-isolated-home"
+}

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-24 files. Implements the `hashline_edit` tool — hash-anchored file editing where every line reference includes a content hash (`LINE#ID`). Validates hashes before applying edits, rejecting stale references.
+24 files. Implements hash-anchored file editing where every line reference includes a content hash (`LINE#ID`). Validates hashes before applying edits, rejecting stale references. Registered as the `edit` tool (only when `hashline_edit: true`), replacing OpenCode's line-number edit.
 
 ## THREE-OP MODEL
 

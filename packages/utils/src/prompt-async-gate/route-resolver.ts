@@ -6,7 +6,7 @@ export const LIVE_ROUTE_UNAVAILABLE_LOG = "[live-server-route] route unavailable
 export type PromptDispatchRouteResult = {
   readonly client: unknown
   readonly route: "live" | "in-process"
-  readonly reason: "identity" | "flag" | "child" | "unavailable" | "live"
+  readonly reason: "identity" | "flag" | "child" | "unavailable" | "live" | "affinity"
 }
 
 export type PromptDispatchRouteResolver = {
@@ -45,5 +45,3 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
 export function markLiveRouteUnavailable(reason: string): void {
   routeResolver.markLiveRouteUnavailable?.(reason)
 }
-
-export type _PromptAsyncInputKeepAlive = PromptAsyncInput

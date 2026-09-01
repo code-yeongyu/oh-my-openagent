@@ -16,7 +16,7 @@ export type {
   ExperimentalConfig,
   DynamicContextPruningConfig,
   DefaultModeConfig,
-  RalphLoopConfig,
+  GoalConfig,
   TmuxConfig,
   TmuxLayout,
   SisyphusConfig,

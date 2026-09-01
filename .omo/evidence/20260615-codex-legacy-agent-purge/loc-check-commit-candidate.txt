@@ -1,4 +1,0 @@
-COMMAND: commit candidate LOC check
-
-packages/omo-codex/src/install/link-cached-plugin-agents.ts pure LOC: 240
-packages/omo-codex/src/install/retired-managed-agent-purge.ts pure LOC: 49

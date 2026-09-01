@@ -2,6 +2,7 @@ export {
   extractRuntimeFallbackAutoRetrySignal,
   type RuntimeFallbackAutoRetrySignal,
 } from "./runtime-fallback-auto-retry-signal"
+export { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "./runtime-fallback-retryable-patterns"
 export {
   getRuntimeFallbackErrorMessage,
   getRuntimeFallbackErrorName,
@@ -15,41 +16,15 @@ import {
   getRuntimeFallbackRetryableSignal,
   getRuntimeFallbackStatusCode,
 } from "./runtime-fallback-error-shape"
+import { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "./runtime-fallback-retryable-patterns"
 
 export type RuntimeFallbackErrorType =
   | "missing_api_key"
   | "invalid_api_key"
   | "model_not_found"
   | "quota_exceeded"
+  | "context_overflow"
   | "abort"
-
-export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
-  /rate.?limit/i,
-  /too.?many.?requests/i,
-  /quota\s+will\s+reset\s+after/i,
-  /quota.?exceeded/i,
-  /exceeded.*quota/i,
-  /usage\s*quota/i,
-  /exhausted\s+your\s+capacity/i,
-  /limit\s+exhausted/i,
-  /all\s+credentials\s+for\s+model/i,
-  /cool(?:ing)?\s+down/i,
-  /model.{0,20}?not.{0,10}?supported/i,
-  /model_not_supported/i,
-  /service.?unavailable/i,
-  /overloaded/i,
-  /temporarily.?unavailable/i,
-  /try.?again/i,
-  /(?:^|\s)429(?:\s|$)/,
-  /(?:^|\s)503(?:\s|$)/,
-  /(?:^|\s)529(?:\s|$)/,
-  /使用上限/,
-  /频率限制/,
-  /请求过于频繁/,
-  /暂时不可用/,
-  /服务不可用/,
-  /请稍后重试/,
-] as const
 
 export interface RuntimeFallbackRetryOptions {
   onUnsafeRetryableSignalRejected?: (details: {
@@ -75,6 +50,10 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
 
   if (errorName?.includes("messageabortederror") || errorName?.includes("aborterror")) {
     return "abort"
+  }
+
+  if (errorName === "contextoverflowerror") {
+    return "context_overflow"
   }
 
   if (
@@ -137,7 +116,8 @@ export function isRuntimeFallbackRetryableError(
   const message = getRuntimeFallbackErrorMessage(error)
   const errorType = classifyRuntimeFallbackError(error)
 
-  if (errorType === "abort") return false
+  // OpenCode starts native compaction for this error; fallback would abort that compaction on its timeout.
+  if (errorType === "abort" || errorType === "context_overflow") return false
 
   if (
     errorType === "missing_api_key" ||

@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync, chmodSync } from "fs"
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, chmodSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import type { LoadedSkill } from "./types"
 
-const TEST_DIR = join(tmpdir(), "async-loader-test-" + Date.now())
-const SKILLS_DIR = join(TEST_DIR, ".opencode", "skills")
+// mkdtempSync, never a clock-derived name: consecutive Date.now() calls in one process
+// return the same millisecond, so sibling suites sharing this prefix collided on one
+// directory and each teardown removed the other's live fixture. On Windows, removing an
+// in-use tree blocks until the hook budget expires ("a beforeEach/afterEach hook timed out").
+let TEST_DIR = ""
+let SKILLS_DIR = ""
 
 function createTestSkill(name: string, content: string, mcpJson?: object): string {
   const skillDir = join(SKILLS_DIR, name)
@@ -27,7 +31,8 @@ function createDirectSkill(name: string, content: string): string {
 
 describe("async-loader", () => {
   beforeEach(() => {
-    mkdirSync(TEST_DIR, { recursive: true })
+    TEST_DIR = mkdtempSync(join(tmpdir(), "async-loader-test-"))
+    SKILLS_DIR = join(TEST_DIR, ".opencode", "skills")
   })
 
   afterEach(() => {

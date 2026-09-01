@@ -36,6 +36,7 @@ export { createTeamModeStatusInjector } from "./team-mode-status-injector";
 export { createToolPairValidatorHook } from "./tool-pair-validator";
 export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
+export { createGoalHook, type GoalHook } from "./goal";
 export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
 export { createNoHephaestusNonGptHook } from "./no-hephaestus-non-gpt";
 export { createHephaestusAgentsMdInjectorHook } from "./hephaestus-agents-md-injector";
@@ -45,7 +46,7 @@ export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 export { createPrometheusMdOnlyHook } from "./prometheus-md-only";
 export { createSisyphusJuniorNotepadHook } from "./sisyphus-junior-notepad";
 export { createTaskResumeInfoHook } from "./task-resume-info";
-export { createStartWorkHook } from "./start-work";
+export { createUlwExecuteHook } from "./ulw-execute";
 export { createAtlasHook } from "./atlas";
 export { createTeamToolGating } from "./team-tool-gating"
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";

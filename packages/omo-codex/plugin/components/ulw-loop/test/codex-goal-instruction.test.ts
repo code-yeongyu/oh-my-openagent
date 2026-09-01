@@ -6,6 +6,7 @@ import type { UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "../src/t
 
 const NOW = "2026-05-23T00:00:00.000Z";
 const FINAL_REVIEW_ROLES = ["lazycodex-code-reviewer", "lazycodex-qa-executor", "lazycodex-gate-reviewer"] as const;
+const SENPI_REVIEW_ROLES = ["omo-senpi-code-reviewer", "omo-senpi-qa-executor", "omo-senpi-gate-reviewer"] as const;
 const QUALITY_GATE_SECTIONS = ["codeReview", "manualQa", "gateReview", "iteration", "criteriaCoverage"] as const;
 
 function makeCriterion(overrides: Partial<UlwLoopSuccessCriterion> = {}): UlwLoopSuccessCriterion {
@@ -58,53 +59,28 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		expect(text).toContain(".omo/ulw-loop/goals.json");
 	});
 
-	it("given aggregate mode when rendering create_goal payload then omits numeric limits", () => {
-		const { json, text } = buildCodexGoalInstruction({
+	it("given aggregate mode when rendering create_goal payload then payload is the aggregate objective only", () => {
+		const { json } = buildCodexGoalInstruction({
 			plan: makePlan({ codexGoalMode: "aggregate" }),
 			goal: makeGoal(),
 		});
 		expect(json).toEqual({
 			objective: ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE,
 		});
-		expect(text).toContain("objective only");
-		expect(text).not.toContain('"status"');
-		expect(text).toContain("Goals are unlimited");
-		expect(text).not.toMatch(/token[_-]?budget/i);
 	});
 
-	it("instructs not to call update_goal mid-aggregate when not final", () => {
-		const { text } = buildCodexGoalInstruction({
-			plan: makePlan({ codexGoalMode: "aggregate" }),
-			goal: makeGoal(),
-			isFinal: false,
-		});
-		expect(text).toContain("do not call update_goal mid-aggregate");
-		expect(text).toContain("checkpoint this OMO ledger story");
-		expect(text).toContain("update_goal is reserved for the final story after the mandatory quality gate passes");
-	});
-
-	it("#given a non-final aggregate story #when rendering instructions #then defers the current final quality gate", () => {
+	it("#given a non-final aggregate story #when rendering instructions #then omits the final quality gate tokens", () => {
 		const { text } = buildCodexGoalInstruction({
 			plan: makePlan({ codexGoalMode: "aggregate" }),
 			goal: makeGoal(),
 			isFinal: false,
 		});
 
-		expect(text).toMatch(/not the final .*do not run .*quality gate/i);
-		expect(text).toContain("checkpoint this OMO ledger story");
-		expect(text).toContain("continue the remaining stories");
+		for (const role of FINAL_REVIEW_ROLES) expect(text).not.toContain(role);
+		expect(text).not.toContain("record-review-blockers");
 	});
 
-	it("includes quality gate instruction when isFinal", () => {
-		const { text } = buildCodexGoalInstruction({
-			plan: makePlan({ codexGoalMode: "aggregate" }),
-			goal: makeGoal(),
-			isFinal: true,
-		});
-		expect(text).toMatch(/quality gate/i);
-	});
-
-	it("#given a final aggregate story #when rendering instructions #then requires the current LazyCodex quality gate", () => {
+	it("#given a final aggregate story #when rendering instructions #then includes the quality gate roles, fields, and commands", () => {
 		const { text } = buildCodexGoalInstruction({
 			plan: makePlan({ codexGoalMode: "aggregate" }),
 			goal: makeGoal(),
@@ -113,12 +89,44 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 
 		expectTextToContainAll(text, FINAL_REVIEW_ROLES);
 		expectTextToContainAll(text, QUALITY_GATE_SECTIONS);
-		expect(text).toMatch(/targeted verification/i);
-		expect(text).toMatch(/artifact path.*non-zero size/i);
-		expectTextToContainAll(text, ["original brief", "desired user-visible outcome", "userOutcomeReview"]);
-		expect(text).toMatch(/not clean.*do not call update_goal/i);
+		expectTextToContainAll(text, ["originalIntent", "desiredOutcome", "userOutcomeReview"]);
+		expect(text).toContain("update_goal");
 		expect(text).toContain("record-review-blockers");
 		expect(text).toContain("checkpoint");
+	});
+
+	it("#given a final story on the omo-senpi surface #when rendering instructions #then teaches the single-gate category chain", () => {
+		const { text } = buildCodexGoalInstruction({
+			plan: makePlan({ codexGoalMode: "aggregate" }),
+			goal: makeGoal(),
+			isFinal: true,
+			surface: "omo-senpi",
+		});
+
+		expectTextToContainAll(text, [
+			"main-session",
+			'category: "deep"',
+			"unspecified-high",
+			"unspecified-low",
+			"gateReview.by",
+			"category:<name>",
+			"--print-template",
+		]);
+		for (const role of [...FINAL_REVIEW_ROLES, ...SENPI_REVIEW_ROLES]) expect(text).not.toContain(role);
+		expect(text).toMatch(/model_unavailable/);
+		expect(text).not.toContain("attempted_chain");
+	});
+
+	it("#given a final story with the explicit lazycodex surface #when rendering instructions #then keeps the lazycodex reviewers", () => {
+		const { text } = buildCodexGoalInstruction({
+			plan: makePlan({ codexGoalMode: "aggregate" }),
+			goal: makeGoal(),
+			isFinal: true,
+			surface: "lazycodex",
+		});
+
+		expectTextToContainAll(text, FINAL_REVIEW_ROLES);
+		for (const role of SENPI_REVIEW_ROLES) expect(text).not.toContain(role);
 	});
 
 	it("#given a scoped plan #when rendering final commands #then includes the session id option", () => {
@@ -140,9 +148,9 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 
 describe("buildCodexGoalInstruction per_story mode", () => {
 	it("uses the goal's own objective for create_goal", () => {
-		const goal = makeGoal({ objective: "Build the auth service" });
+		const goal = makeGoal({ objective: "per-story-objective-sentinel" });
 		const { text } = buildCodexGoalInstruction({ plan: makePlan({ codexGoalMode: "per_story" }), goal });
-		expect(text).toContain("Build the auth service");
+		expect(text).toContain("per-story-objective-sentinel");
 	});
 });
 

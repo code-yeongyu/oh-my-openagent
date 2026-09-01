@@ -1,0 +1,68 @@
+{
+  "sessionId": "019fcc9f-88f2-7489-8e5f-4de8a4bee87a",
+  "runId": "532bd709-566f-4be5-b759-75e7ed138ff9",
+  "quickTask": "st_019fcc9f",
+  "afterQuit": {
+    "task_id": "st_019fcc9f",
+    "status": "completed",
+    "residency_state": "rpc_detached",
+    "parent_session_id": "019fcc9f-88f2-7489-8e5f-4de8a4bee87a",
+    "root_session_id": "019fcc9f-88f2-7489-8e5f-4de8a4bee87a",
+    "depth": 1,
+    "execution_mode": "process",
+    "model": "omo-mock/mock-1",
+    "notify_on_terminal": true,
+    "created_at": "2026-08-04T11:53:55.921Z",
+    "updated_at": "2026-08-04T11:53:57.357Z",
+    "notification": {
+      "run_epoch": 0,
+      "notified_epoch": 0
+    },
+    "name": "team:532bd709-566f-4be5-b759-75e7ed138ff9:quick",
+    "category": "quick",
+    "requested_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "omo-mock/mock-1",
+      "source": "category"
+    },
+    "resolved_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "Mock 1",
+      "source": "category"
+    },
+    "spawn_spec": {
+      "version": 1,
+      "cwd": "/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-fqZpIn/project",
+      "prompt": "You are 'quick', a member of team 'resumeteam' running under the senpi-task team runtime.\n\nWork arrives as injected messages from the lead and other members; coordinate with task_send.\n\nAfter completing any immediate instructions below, report with task_send, then end your turn. Injected messages revive this resident session with more work.\n\nWhen you finish assigned work, task_send the lead a summary, then end your turn and wait for an injected message.\n\nYou are team member 'quick'. MOCKROLE=quick. End your turn.\n\n<Category_Context>\nYou are working on SMALL / QUICK tasks.\n\nEfficient execution mindset:\n- Fast, focused, minimal overhead\n- Get to the point immediately\n- No over-engineering\n- Simple solutions for simple problems\n\nApproach:\n- Minimal viable implementation\n- Skip unnecessary abstractions\n- Direct and concise\n</Category_Context>\n\n<Caller_Warning>\nTHIS CATEGORY USES A SMALLER/FASTER MODEL (gpt-5.6-luna-fast).\n\nThe model executing this task is optimized for speed over depth. Your prompt MUST be:\n\n**EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:\n1. MUST DO: List every required action as atomic, numbered steps\n2. MUST NOT DO: Explicitly forbid likely mistakes and deviations\n3. EXPECTED OUTPUT: Describe exact success criteria with concrete examples\n\n**WHY THIS MATTERS:**\n- Smaller models benefit from explicit guardrails\n- Vague instructions may lead to unpredictable results\n- Implicit expectations may be missed\n**PROMPT STRUCTURE (MANDATORY):**\n```\nTASK: [One-sentence goal]\n\nMUST DO:\n1. [Specific action with exact details]\n2. [Another specific action]\n...\n\nMUST NOT DO:\n- [Forbidden action + why]\n- [Another forbidden action]\n...\n\nEXPECTED OUTPUT:\n- [Exact deliverable description]\n- [Success criteria / verification method]\n```\n\nIf your prompt lacks this structure, REWRITE IT before delegating.\n</Caller_Warning>"
+    },
+    "pid": 17522,
+    "final_response": "quick ready and idle",
+    "run_stats": {
+      "runtime_ms": 1334,
+      "turns": 1,
+      "tool_calls": 0,
+      "cost_usd": 0
+    }
+  },
+  "delivered": {
+    "unread": 0,
+    "reserved": 1,
+    "processed": 0
+  },
+  "leadInbox": {
+    "unread": 0,
+    "reserved": 1,
+    "processed": 0
+  },
+  "memberLog": "{\"type\":\"transition_applied\",\"payload\":{\"type\":\"transition_applied\",\"status\":\"running\",\"residency_state\":\"resident\"}}\n{\"type\":\"assistant_message\",\"payload\":{\"text\":\"quick ready and idle\"}}\n{\"type\":\"transition_applied\",\"payload\":{\"type\":\"transition_applied\",\"status\":\"completed\",\"residency_state\":\"resident\"}}\n{\"type\":\"transition_applied\",\"payload\":{\"type\":\"transition_applied\",\"status\":\"completed\",\"residency_state\":\"rpc_detached\"}}\n{\"type\":\"suspended\",\"payload\":{\"reason\":\"quit\"}}\n{\"type\":\"reconcile_reattached\",\"payload\":{\"session_path\":\"/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-fqZpIn/project/.omo/senpi-task/children/st_019fcc9f/sessions/st_019fcc9f/2026-08-04T11-53-56-606Z_019fcc9f-8e7e-71f2-93a3-57e708504f58.jsonl\"}}\n{\"type\":\"team_message_sent\",\"payload\":{\"message_id\":\"9094f3ac-81a7-4537-806d-6e6886f8cf5d\",\"from\":\"lead\",\"to\":\"quick\",\"kind\":\"message\"}}\n{\"type\":\"team_message_delivered\",\"payload\":{\"message_id\":\"9094f3ac-81a7-4537-806d-6e6886f8cf5d\",\"from\":\"lead\",\"to\":\"quick\",\"kind\":\"message\"}}\n{\"type\":\"team_message_sent\",\"payload\":{\"message_id\":\"0815ec34-09ac-4854-8ffe-c8ecefca9446\",\"from\":\"quick\",\"to\":\"lead\",\"kind\":\"message\"}}\n{\"type\":\"tool_execution\",\"payload\":{\"tool\":\"task_send\",\"is_error\":false}}\n{\"type\":\"assistant_message\",\"payload\":{\"text\":\"quick post-resume turn done\"}}\n{\"type\":\"transition_applied\",\"payload\":{\"type\":\"transition_applied\",\"status\":\"completed\",\"residency_state\":\"rpc_detached\"}}\n{\"type\":\"suspended\",\"payload\":{\"reason\":\"quit\"}}\n",
+  "findings": [
+    {
+      "id": "resumed-session-steer-gap",
+      "severity": "follow-up",
+      "leadSteerLanded": true,
+      "detail": "lead poller reserves the member's post-resume message but its steer into the RESUMED print session does not abort the lead hang (works on a fresh session); possible resumed-session parentState/idle wiring gap reaching the injection coordinator. Recorded in the plan ledger as a follow-up finding, not a failure."
+    }
+  ]
+}

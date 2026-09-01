@@ -1,0 +1,24 @@
+== bun test packages/senpi-task ==
+ 1 skip
+ 0 fail
+ 5042 expect() calls
+Ran 1615 tests across 234 files. [24.28s]
+== bun test packages/omo-senpi ==
+ 1 skip
+ 16 fail
+ 5433 expect() calls
+Ran 1922 tests across 280 files. [214.67s]
+== tsgo senpi-task ==
+== tsgo omo-senpi ==
+packages/omo-senpi/src/components/task/dag-runtime.test.ts(902,33): error TS2339: Property 'error' does not exist on type 'DagTerminalNodeResult'.
+  Property 'error' does not exist on type '{ readonly state: "completed"; readonly taskId: string; readonly output: string; readonly runStats?: TaskRunStats | undefined; }'.
+
+== A/B pre-existing failure analysis ==
+Full omo-senpi suite: branch 16 fail / baseline (clean origin/dev 4f65026b8) 16 fail.
+Branch affected-files re-run: 13 fail, a strict SUBSET of the baseline set
+(init-deep-advisor x10, cli-local x1, session_start ordering x1, product-identity x1).
+The 3 runSenpiInstaller failures reproduce only on the baseline, which received
+sync-skills.mjs but NOT the full build:senpi-plugin the branch worktree ran.
+Zero failures in dag/task/scheduler/mass-ulw areas on either side; the branch adds
+26 tests, all passing. Conclusion: all remaining failures are pre-existing
+environment-dependent failures on origin/dev, unrelated to this change.

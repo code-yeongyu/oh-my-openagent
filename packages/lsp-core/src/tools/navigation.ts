@@ -15,12 +15,13 @@ export async function executeLspGotoDefinition(
 	const character = requireNumber(params, "character");
 
 	try {
-		const result = await withLspClient(
-			filePath,
-			async (client) => client.definition(filePath, line, character),
-			"definition",
-			clientOptions(signal),
-		);
+			const result = await withLspClient(
+				filePath,
+				async (client, _workspaceRoot, resolvedFilePath) =>
+					client.definition(resolvedFilePath, line, character, signal),
+				"definition",
+				clientOptions(signal),
+			);
 		const locations = !result ? [] : Array.isArray(result) ? result : [result];
 		const details: LspGotoDefinitionDetails = { filePath, line, character, locations };
 		if (locations.length === 0) return text("No definition found", details);
@@ -47,12 +48,13 @@ export async function executeLspFindReferences(
 	const includeDeclaration = optionalBoolean(params, "includeDeclaration") ?? true;
 
 	try {
-		const result = await withLspClient(
-			filePath,
-			async (client) => client.references(filePath, line, character, includeDeclaration),
-			"references",
-			clientOptions(signal),
-		);
+			const result = await withLspClient(
+				filePath,
+				async (client, _workspaceRoot, resolvedFilePath) =>
+					client.references(resolvedFilePath, line, character, includeDeclaration, signal),
+				"references",
+				clientOptions(signal),
+			);
 		const references = Array.isArray(result) ? result : [];
 		const total = references.length;
 		const truncated = total > DEFAULT_MAX_REFERENCES;

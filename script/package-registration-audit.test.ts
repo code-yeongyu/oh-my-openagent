@@ -1,3 +1,4 @@
+// allow: SIZE_OK - single-purpose package registration audit keeps workspace graph fixtures and invariant checks together.
 import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
@@ -6,6 +7,7 @@ import { describe, expect, test } from "bun:test"
 const corePackagePaths: readonly string[] = [
   "packages/utils",
   "packages/model-core",
+  "packages/omo-config-core",
   "packages/delegate-core",
   "packages/prompts-core",
   "packages/rules-engine",
@@ -19,17 +21,27 @@ const corePackagePaths: readonly string[] = [
   "packages/team-core",
   "packages/openclaw-core",
   "packages/boulder-state",
+  "packages/memory-core",
   "packages/telemetry-core",
   "packages/claude-code-compat-core",
   "packages/skills-loader-core",
 ] as const
 
 const mcpPackagePaths: readonly string[] = [
+  "packages/ast-grep-mcp",
   "packages/git-bash-mcp",
   "packages/lsp-daemon",
   "packages/lsp-tools-mcp",
 ] as const
-const adapterPackagePaths: readonly string[] = ["packages/omo-codex", "packages/omo-opencode"] as const
+const adapterPackagePaths: readonly string[] = [
+  "packages/omo-codex",
+  "packages/omo-senpi",
+  "packages/senpi-task",
+  "packages/omo-opencode",
+  "packages/pi-goal",
+  "packages/pi-webfetch",
+  "packages/omo-native",
+] as const
 const skillPackagePaths: readonly string[] = ["packages/shared-skills"] as const
 const shimSourceRoots: readonly string[] = ["packages/omo-opencode/src", "packages/omo-codex/src"] as const
 const reExportShimFirstLinePattern = /^export (\*|\{).*from ["'](@oh-my-opencode\/[^/"']+)/
@@ -167,6 +179,10 @@ function isManagedWorkspacePackage(path: string): boolean {
   )
 }
 
+function unclassifiedRootPackageWorkspaces(workspaces: readonly string[]): readonly string[] {
+  return workspaces.filter((path) => path.startsWith("packages/") && !isManagedWorkspacePackage(path)).toSorted()
+}
+
 function isNestedCodexPluginPackage(path: string): boolean {
   return path.startsWith("packages/omo-codex/plugin/")
 }
@@ -212,12 +228,15 @@ describe("package registration audit", () => {
     const expectedDevDependencyNames = (
       await Promise.all(
         managedWorkspacePaths
-          .filter((path) => path !== "packages/omo-opencode")
+          // omo-opencode stays linked because the Senpi build imports its config-migration export.
+          // omo-native publishes under its own npm name and is not an internal workspace devDependency.
+          .filter((path) => path !== "packages/omo-native")
           .map((path) => readManifest(join(path, "package.json")).then((manifest) => manifest.name)),
       )
     ).toSorted()
 
     // when
+    const unknownWorkspacePaths = unclassifiedRootPackageWorkspaces(root.workspaces)
     const actualWorkspacePaths = root.workspaces.filter(isManagedWorkspacePackage).toSorted()
     const actualTypecheckPaths = extractTypecheckPackagePaths(root.scripts["typecheck:packages"] ?? "").filter(
       isRootManagedTypecheckPackage,
@@ -228,9 +247,21 @@ describe("package registration audit", () => {
       .toSorted()
 
     // then
+    expect(unknownWorkspacePaths).toEqual([])
     expect(actualWorkspacePaths).toEqual(managedWorkspacePaths.toSorted())
     expect(actualTypecheckPaths).toEqual(expectedTypecheckPaths.toSorted())
     expect(actualDevDependencyNames).toEqual(expectedDevDependencyNames)
+  })
+
+  test("#given an unknown packages workspace #when audited #then classification rejects it by path", () => {
+    // given
+    const workspaces = ["packages/zz-qa-unregistered-probe"]
+
+    // when
+    const unknownWorkspacePaths = unclassifiedRootPackageWorkspaces(workspaces)
+
+    // then
+    expect(unknownWorkspacePaths).toEqual(["packages/zz-qa-unregistered-probe"])
   })
 
   test("#given shared extraction guard #when audited #then every core package is covered", async () => {

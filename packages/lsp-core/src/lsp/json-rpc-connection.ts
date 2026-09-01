@@ -3,10 +3,15 @@ type JsonRpcId = number | string | null;
 interface PendingRequest {
 	resolve(result: unknown): void;
 	reject(error: Error): void;
+	cleanup(): void;
 }
 
 type NotificationHandler = (params: unknown) => void;
 type RequestHandler = (params: unknown) => Promise<unknown> | unknown;
+
+export interface JsonRpcRequestOptions {
+	readonly signal?: AbortSignal;
+}
 
 const HEADER_SEPARATOR = "\r\n\r\n";
 const PARSE_ERROR = -32700;
@@ -56,30 +61,79 @@ export class JsonRpcConnection {
 		this.errorHandlers.push(handler);
 	}
 
-	async sendRequest<T>(method: string, params?: unknown): Promise<T> {
+	async sendRequest<T>(method: string, params?: unknown, options: JsonRpcRequestOptions = {}): Promise<T> {
 		if (this.disposed) throw new Error("JSON-RPC connection is disposed");
 
 		const id = this.nextRequestId;
 		this.nextRequestId += 1;
+		const key = String(id);
 		const message = params === undefined ? { jsonrpc: "2.0", id, method } : { jsonrpc: "2.0", id, method, params };
+		let requestWritten = false;
+		let cancelAfterWrite = false;
+		let settled = false;
+		const writeCancel = (): Promise<void> => this.writeMessage({ jsonrpc: "2.0", method: "$/cancelRequest", params: { id } });
 
 		const responsePromise = new Promise<T>((resolve, reject) => {
-			this.pendingRequests.set(String(id), {
+			const cleanup = (): void => {
+				options.signal?.removeEventListener("abort", onAbort);
+			};
+			const settleCancel = (): void => {
+				if (settled) return;
+				settled = true;
+				this.pendingRequests.delete(key);
+				cleanup();
+				const rejectCancelled = (): void => reject(abortError(options.signal));
+				if (!requestWritten) {
+					cancelAfterWrite = true;
+					rejectCancelled();
+					return;
+				}
+				void writeCancel().then(rejectCancelled, (error) => {
+					this.emitError(toError(error));
+					rejectCancelled();
+				});
+			};
+			const onAbort = (): void => settleCancel();
+			this.pendingRequests.set(key, {
 				resolve(result) {
+					settled = true;
+					cleanup();
 					resolve(result as T);
 				},
-				reject,
+				reject(error) {
+					settled = true;
+					cleanup();
+					reject(error);
+				},
+				cleanup,
 			});
+			if (options.signal?.aborted) {
+				settleCancel();
+				return;
+			}
+			options.signal?.addEventListener("abort", onAbort, { once: true });
 		});
 
+		if (settled) return responsePromise;
 		try {
 			await this.writeMessage(message);
+			requestWritten = true;
+			if (cancelAfterWrite) await writeCancel();
 		} catch (error) {
-			this.pendingRequests.delete(String(id));
+			if (settled) return responsePromise;
+			const pending = this.pendingRequests.get(key);
+			if (pending) {
+				pending.cleanup();
+				this.pendingRequests.delete(key);
+			}
 			throw error;
 		}
 
 		return responsePromise;
+	}
+
+	pendingRequestCount(): number {
+		return this.pendingRequests.size;
 	}
 
 	async sendNotification(method: string, params?: unknown): Promise<void> {
@@ -97,6 +151,7 @@ export class JsonRpcConnection {
 		this.reader.off("error", this.handleStreamError);
 		this.writer.off("error", this.handleStreamError);
 		for (const pending of this.pendingRequests.values()) {
+			pending.cleanup();
 			pending.reject(new Error("JSON-RPC connection disposed"));
 		}
 		this.pendingRequests.clear();
@@ -188,6 +243,7 @@ export class JsonRpcConnection {
 		const pending = this.pendingRequests.get(String(id));
 		if (!pending) return;
 		this.pendingRequests.delete(String(id));
+		pending.cleanup();
 
 		if ("error" in message) {
 			pending.reject(jsonRpcErrorToError(message["error"]));
@@ -203,7 +259,11 @@ export class JsonRpcConnection {
 		try {
 			handler(params);
 		} catch (error) {
-			this.emitError(toError(error));
+			if (error instanceof Error) {
+				this.emitError(error);
+				return;
+			}
+			this.emitError(new Error(String(error)));
 		}
 	}
 
@@ -257,6 +317,14 @@ export class JsonRpcConnection {
 			handler(error);
 		}
 	}
+}
+
+function abortError(signal: AbortSignal | undefined): Error {
+	const reason = signal?.reason;
+	if (reason instanceof Error) return reason;
+	const error = new Error(typeof reason === "string" ? reason : "LSP request cancelled");
+	error.name = "AbortError";
+	return error;
 }
 
 function parseContentLength(headers: string): number | null {

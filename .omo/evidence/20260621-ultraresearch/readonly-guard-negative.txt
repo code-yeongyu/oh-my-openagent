@@ -1,2 +1,0 @@
-violation_exit=1
-fixture matched worker-writes-ledger wording -> detected (real SKILL.md untouched)

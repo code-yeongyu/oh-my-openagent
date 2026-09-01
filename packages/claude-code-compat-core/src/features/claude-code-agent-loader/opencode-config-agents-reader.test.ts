@@ -7,13 +7,24 @@ import { readOpencodeConfigAgents } from "./opencode-config-agents-reader"
 
 describe("readOpencodeConfigAgents", () => {
   let mockGlobalConfigDir = ""
+  let mockXdgHomeDir = ""
+  let origXdgConfigHome: string | undefined
 
   beforeEach(() => {
     mockGlobalConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-mock-global-"))
+    mockXdgHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-mock-xdg-"))
+    origXdgConfigHome = process.env.XDG_CONFIG_HOME
     process.env.OPENCODE_CONFIG_DIR = mockGlobalConfigDir
+    process.env.XDG_CONFIG_HOME = mockXdgHomeDir
   })
 
   afterEach(() => {
+    if (origXdgConfigHome !== undefined) {
+      process.env.XDG_CONFIG_HOME = origXdgConfigHome
+    } else {
+      delete process.env.XDG_CONFIG_HOME
+    }
+    fs.rmSync(mockXdgHomeDir, { recursive: true, force: true })
     fs.rmSync(mockGlobalConfigDir, { recursive: true, force: true })
   })
 
@@ -357,5 +368,71 @@ describe("readOpencodeConfigAgents", () => {
     }
 
     fs.rmSync(tempDir, { recursive: true })
+  })
+
+  it("merges agents from custom OPENCODE_CONFIG_DIR and default XDG_CONFIG_HOME dirs", () => {
+    // given
+    const tempProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-test-project-"))
+    const customConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-custom-"))
+    const xdgHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-xdg-"))
+    const xdgConfigDir = path.join(xdgHomeDir, "opencode")
+    fs.mkdirSync(xdgConfigDir, { recursive: true })
+
+    fs.writeFileSync(
+      path.join(customConfigDir, "opencode.json"),
+      JSON.stringify({
+        agents: {
+          "custom-user-agent": {
+            description: "Custom user agent",
+            prompt: "Custom prompt",
+          },
+        },
+      })
+    )
+
+    fs.writeFileSync(
+      path.join(xdgConfigDir, "opencode.json"),
+      JSON.stringify({
+        agents: {
+          "default-user-agent": {
+            description: "Default user agent",
+            prompt: "Default prompt",
+          },
+        },
+      })
+    )
+
+    const origOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+    const origXdgConfigHome = process.env.XDG_CONFIG_HOME
+
+    try {
+      process.env.OPENCODE_CONFIG_DIR = customConfigDir
+      process.env.XDG_CONFIG_HOME = xdgHomeDir
+
+      // when
+      const result = readOpencodeConfigAgents(tempProjectDir)
+
+      // then
+      expect(result).toHaveProperty("custom-user-agent")
+      expect(result["custom-user-agent"].description).toBe("(opencode-config) Custom user agent")
+      expect(result["custom-user-agent"].prompt).toBe("Custom prompt")
+      expect(result).toHaveProperty("default-user-agent")
+      expect(result["default-user-agent"].description).toBe("(opencode-config) Default user agent")
+      expect(result["default-user-agent"].prompt).toBe("Default prompt")
+    } finally {
+      if (origOpencodeConfigDir !== undefined) {
+        process.env.OPENCODE_CONFIG_DIR = origOpencodeConfigDir
+      } else {
+        delete process.env.OPENCODE_CONFIG_DIR
+      }
+      if (origXdgConfigHome !== undefined) {
+        process.env.XDG_CONFIG_HOME = origXdgConfigHome
+      } else {
+        delete process.env.XDG_CONFIG_HOME
+      }
+      fs.rmSync(tempProjectDir, { recursive: true, force: true })
+      fs.rmSync(customConfigDir, { recursive: true, force: true })
+      fs.rmSync(xdgHomeDir, { recursive: true, force: true })
+    }
   })
 })

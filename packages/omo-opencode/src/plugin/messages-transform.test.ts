@@ -1,7 +1,9 @@
-import { describe, it, expect } from "bun:test"
+import { afterEach, describe, it, expect } from "bun:test"
 
 import { createMessagesTransformHandler } from "./messages-transform"
+import { createCategorySkillReminderHook } from "../hooks/category-skill-reminder"
 import { createToolPairValidatorHook } from "../hooks/tool-pair-validator/hook"
+import { _resetForTesting, updateSessionAgent } from "../features/claude-code-session-state"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import type { CreatedHooks } from "../create-hooks"
 
@@ -11,6 +13,8 @@ type TestPart = {
   sessionID?: string
   messageID?: string
   callID?: string
+  tool?: string
+  state?: { status?: string; input?: Record<string, unknown>; time?: { start: number; end?: number } }
   tool_use_id?: string
   content?: string
   text?: string
@@ -45,18 +49,22 @@ function makeHook(handler: TransformHook): NonNullable<CreatedHooks["toolPairVal
 }
 
 function makeHooks(overrides: {
+  btw?: TransformHook
   contextInjector?: TransformHook
   teamModeStatus?: TransformHook
   teamMailbox?: TransformHook
   thinkingBlock?: TransformHook
   toolPair?: TransformHook
+  categorySkill?: TransformHook
 }): CreatedHooks {
   return {
+    btwSideContextInjector: overrides.btw ? makeHook(overrides.btw) : undefined,
     contextInjectorMessagesTransform: overrides.contextInjector ? makeHook(overrides.contextInjector) : undefined,
     teamModeStatusInjector: overrides.teamModeStatus ? makeHook(overrides.teamModeStatus) : undefined,
     teamMailboxInjector: overrides.teamMailbox ? makeHook(overrides.teamMailbox) : undefined,
     thinkingBlockValidator: overrides.thinkingBlock ? makeHook(overrides.thinkingBlock) : undefined,
     toolPairValidator: overrides.toolPair ? makeHook(overrides.toolPair) : undefined,
+    categorySkillReminder: overrides.categorySkill ? makeHook(overrides.categorySkill) : undefined,
   } as CreatedHooks
 }
 
@@ -67,6 +75,10 @@ async function runHandler(
   const handler = createMessagesTransformHandler({ hooks })
   await handler({} as never, { messages: messages as never })
 }
+
+afterEach(() => {
+  _resetForTesting()
+})
 
 describe("createMessagesTransformHandler", () => {
   it("runs all hooks in order when none throw", async () => {
@@ -88,6 +100,9 @@ describe("createMessagesTransformHandler", () => {
       toolPair: async () => {
         callOrder.push("tool-pair-validator")
       },
+      categorySkill: async () => {
+        callOrder.push("category-skill-reminder")
+      },
     })
 
     //#when
@@ -99,6 +114,26 @@ describe("createMessagesTransformHandler", () => {
       "team-mode-status-injector",
       "team-mailbox-injector",
       "tool-pair-validator",
+      "category-skill-reminder",
+    ])
+  })
+
+  it("#given category-skill-reminder is disabled #when messages transform runs #then the user message is unchanged", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      { info: { role: "user" }, parts: [{ type: "text", text: "unchanged" }] },
+    ]
+    const hooks = {
+      ...makeHooks({}),
+      categorySkillReminder: null,
+    } as CreatedHooks
+
+    //#when
+    await runHandler(hooks, messages)
+
+    //#then
+    expect(messages).toEqual([
+      { info: { role: "user" }, parts: [{ type: "text", text: "unchanged" }] },
     ])
   })
 
@@ -142,6 +177,23 @@ describe("createMessagesTransformHandler", () => {
     expect(toolPairRan).toBe(true)
   })
 
+  it("propagates BTW classification failures before the request can continue", async () => {
+    //#given
+    const hooks = makeHooks({
+      btw: async () => {
+        throw new Error("Unable to classify session for BTW isolation.")
+      },
+    })
+
+    //#when
+    const transform = runHandler(hooks, [])
+
+    //#then
+    await expect(transform).rejects.toThrow(
+      "Unable to classify session for BTW isolation.",
+    )
+  })
+
   it("runs tool-pair-validator even when thinking-block-validator throws", async () => {
     //#given
     let toolPairRan = false
@@ -161,12 +213,18 @@ describe("createMessagesTransformHandler", () => {
     expect(toolPairRan).toBe(true)
   })
 
-  it("repairs orphaned tool_use after upstream hook throws (regression for ses_22bd806)", async () => {
+  it("repairs orphaned tool calls after upstream hook throws (regression for ses_22bd806)", async () => {
     //#given
     const messages: TestMessage[] = [
       { info: { role: "user" }, parts: [{ type: "text", text: "summary stand-in" }] },
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_01SRMQs3DUtVKWoSxC8bxxVA" }] },
-      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_01Lu5cHvRtEvzoifP1UVBVRb" }] },
+      {
+        info: { role: "assistant" },
+        parts: [createRunningToolPart("toolu_01SRMQs3DUtVKWoSxC8bxxVA")],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [createRunningToolPart("toolu_01Lu5cHvRtEvzoifP1UVBVRb")],
+      },
       { info: { role: "user" }, parts: [{ type: "text", text: "next" }] },
     ]
     const hooks = makeHooks({
@@ -180,29 +238,53 @@ describe("createMessagesTransformHandler", () => {
     await runHandler(hooks, messages)
 
     //#then
-    expect(messages).toHaveLength(5)
-    expect(messages[2]).toEqual({
-      info: { role: "user" },
-      parts: [{
-        type: "tool_result",
-        toolUseId: "toolu_01SRMQs3DUtVKWoSxC8bxxVA",
-        tool_use_id: "toolu_01SRMQs3DUtVKWoSxC8bxxVA",
-        isError: true,
-        content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
-      }, {
-        type: "text",
-        text: "Recovered missing tool results. Continue from the repaired tool output.",
-        synthetic: true,
-      }],
+    expect(messages).toHaveLength(4)
+    expect(readToolStatus(messages[1])).toEqual("error")
+    expect(readToolStatus(messages[2])).toEqual("error")
+    expect(messages[3]?.parts).toEqual([{ type: "text", text: "next" }])
+  })
+
+  it("keeps a tool-pair repair separate from reminder request identity", async () => {
+    //#given
+    const sessionID = "ses_tool_pair_reminder"
+    const categorySkillReminder = createCategorySkillReminderHook({} as never)
+    updateSessionAgent(sessionID, "Sisyphus")
+    for (const [index, tool] of ["read", "grep", "glob"].entries()) {
+      await categorySkillReminder["tool.execute.after"](
+        { tool, sessionID, callID: `call_${index}` },
+        { title: tool, output: "unchanged", metadata: {} },
+      )
+    }
+    const hooks = {
+      ...makeHooks({}),
+      toolPairValidator: createToolPairValidatorHook(),
+      categorySkillReminder,
+    } as CreatedHooks
+    const messages: TestMessage[] = [
+      {
+        info: { id: "msg_real_request", role: "user", sessionID },
+        parts: [{ type: "text", text: "continue the real request" }],
+      },
+      {
+        info: { id: "msg_orphaned_tool", role: "assistant", sessionID },
+        parts: [createRunningToolPart("toolu_missing_result")],
+      },
+    ]
+
+    //#when
+    await runHandler(hooks, messages)
+
+    //#then
+    expect(messages).toHaveLength(2)
+    expect(readToolStatus(messages[1])).toEqual("error")
+    expect(messages[0]?.parts[0]).toMatchObject({
+      id: "prt_category_skill_reminder_msg_real_request",
+      messageID: "msg_real_request",
+      sessionID,
+      synthetic: true,
+      type: "text",
     })
-    expect(messages[4]?.parts[0]).toEqual({
-      type: "tool_result",
-      toolUseId: "toolu_01Lu5cHvRtEvzoifP1UVBVRb",
-      tool_use_id: "toolu_01Lu5cHvRtEvzoifP1UVBVRb",
-      isError: true,
-      content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
-    })
-    expect(messages[4]?.parts[1]).toEqual({ type: "text", text: "next" })
+    expect(messages[0]?.parts[1]).toEqual({ type: "text", text: "continue the real request" })
   })
 
   it("does not throw when tool-pair-validator itself fails", async () => {
@@ -730,4 +812,19 @@ function createRealToolPairValidator(): TransformHook {
   const handler = validator["experimental.chat.messages.transform"]
   if (!handler) throw new Error("validator missing transform")
   return handler as never
+}
+
+function createRunningToolPart(callID: string): TestPart {
+  return {
+    id: `prt_${callID}`,
+    type: "tool",
+    callID,
+    tool: "bash",
+    state: { status: "running", input: {}, time: { start: 1_700_000_000_000 } },
+  }
+}
+
+function readToolStatus(message: TestMessage | undefined): string | undefined {
+  const state = message?.parts.find((part) => part.type === "tool")?.state
+  return typeof state?.status === "string" ? state.status : undefined
 }
