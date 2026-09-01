@@ -127,6 +127,7 @@ function finalSection(
 	if (!isFinal)
 		return "- This is not the final ulw-loop story; do not run the final reviewer/manual-QA/gate-review quality gate yet.";
 	const option = sessionOption(plan);
+	if (surface === "omo-senpi") return senpiFinalSection(plan, goal, aggregate);
 	const blockerCommand = `omo-agent-toolkit ulw-loop record-review-blockers${option} --goal-id ${goal.id} --title "Resolve final code-review blockers" --objective "<blocker-resolution objective>" --evidence "<review findings>" --codex-goal-json "<active get_goal JSON or path>"`;
 	const checkpointCommand = `omo-agent-toolkit ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<targeted verification/manualQa/gateReview evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "<quality gate JSON or path>"`;
 	return joinLines([
@@ -144,6 +145,23 @@ function finalSection(
 			? '- If the quality gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint the aggregate story:'
 			: '- If the quality gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint:',
 		`  ${checkpointCommand}`,
+	]);
+}
+
+function senpiFinalSection(plan: UlwLoopPlan, goal: UlwLoopItem, aggregate: boolean): string {
+	const option = sessionOption(plan);
+	const checkpointCommand = `omo-agent-toolkit ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<manualQa/gateReview evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "$(omo-agent-toolkit ulw-loop checkpoint${option} --print-template)"`;
+	return joinLines([
+		"Final story — run the single-reviewer quality gate before update_goal:",
+		"- Run manual QA yourself and write the non-empty artifact under currentAttemptDir; set manualQa.by to \"main-session\".",
+		'- Spawn exactly one gate reviewer with task(category: "deep").',
+		"- If that task fails with any model_unavailable failure, retry with category:unspecified-high, then category:unspecified-low.",
+		'- Set gateReview.by to the exact category:<name> literal used for the successful task.',
+		'- Build the gate JSON with omo-agent-toolkit ulw-loop checkpoint --print-template, then fill manualQa, gateReview, iteration, and criteriaCoverage.',
+		'- Require passed manualQa, approved gateReview, passed iteration, and complete criteriaCoverage before update_goal({status: "complete"}).',
+		aggregate
+			? `- If the gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint the aggregate story: ${checkpointCommand}`
+			: `- If the gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint: ${checkpointCommand}`,
 	]);
 }
 

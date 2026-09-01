@@ -46,7 +46,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Require successful CI for prepared release source
         shell: bash
@@ -259,7 +259,7 @@ jobs:
       already_published: ${{ steps.omo-ai.outputs.already_published }}
       previous_lazycodex_version: ${{ steps.version.outputs.previous_lazycodex_version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Assert omo bin ownership
         run: |
@@ -373,7 +373,7 @@ jobs:
       # generation below must never be able to read the release credential from
       # git config. The token is exported explicitly only when the generated
       # release state is ready to be pushed.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
@@ -611,7 +611,7 @@ jobs:
       actions: write
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
@@ -680,7 +680,7 @@ jobs:
       needs.prepare-release-state.result == 'success' &&
       (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           # Publish the prepared release commit, not the workflow-dispatch SHA.
@@ -692,7 +692,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -1010,7 +1010,7 @@ jobs:
       needs.publish-main.result == 'success' &&
       (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
@@ -1037,7 +1037,7 @@ jobs:
 
       - name: Checkout LazyCodex marketplace
         if: needs.release-metadata.outputs.dist_tag == ''
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: code-yeongyu/lazycodex
           path: lazycodex-marketplace
@@ -1139,7 +1139,7 @@ jobs:
 
       - name: Download release-binary artifacts
         if: inputs.skip_platform != true
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: release-binary-*
           path: .omo/release-binaries
@@ -1236,12 +1236,12 @@ jobs:
       needs.publish-main.result == 'success' &&
       needs.release.result == 'success'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"

@@ -95,7 +95,7 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		expect(text).toContain("checkpoint");
 	});
 
-	it("#given a final story on the omo-senpi surface #when rendering instructions #then names the omo-senpi reviewers only", () => {
+	it("#given a final story on the omo-senpi surface #when rendering instructions #then teaches the single-gate category chain", () => {
 		const { text } = buildCodexGoalInstruction({
 			plan: makePlan({ codexGoalMode: "aggregate" }),
 			goal: makeGoal(),
@@ -103,8 +103,18 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 			surface: "omo-senpi",
 		});
 
-		expectTextToContainAll(text, SENPI_REVIEW_ROLES);
-		for (const role of FINAL_REVIEW_ROLES) expect(text).not.toContain(role);
+		expectTextToContainAll(text, [
+			"main-session",
+			'category: "deep"',
+			"unspecified-high",
+			"unspecified-low",
+			"gateReview.by",
+			"category:<name>",
+			"--print-template",
+		]);
+		for (const role of [...FINAL_REVIEW_ROLES, ...SENPI_REVIEW_ROLES]) expect(text).not.toContain(role);
+		expect(text).toMatch(/model_unavailable/);
+		expect(text).not.toContain("attempted_chain");
 	});
 
 	it("#given a final story with the explicit lazycodex surface #when rendering instructions #then keeps the lazycodex reviewers", () => {

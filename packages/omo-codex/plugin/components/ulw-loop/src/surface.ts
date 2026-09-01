@@ -32,6 +32,28 @@ export const GATE_REVIEWER_AGENT_NAMES: ReadonlySet<string> = new Set(
 	Object.values(REVIEWER_ROLES_BY_SURFACE).map((roles) => roles.gateReview),
 );
 
+export type UlwLoopGateSection = "codeReview" | "manualQa" | "gateReview" | "iteration" | "criteriaCoverage";
+
+export const REQUIRED_GATE_SECTIONS_BY_SURFACE: Readonly<Record<UlwLoopToolkitSurface, readonly UlwLoopGateSection[]>> =
+	{
+		lazycodex: ["codeReview", "manualQa", "gateReview", "iteration", "criteriaCoverage"],
+		"omo-senpi": ["manualQa", "gateReview", "iteration", "criteriaCoverage"],
+	};
+
+export const GATE_SECTION_BY_ACCEPTOR: Readonly<
+	Record<UlwLoopToolkitSurface, Readonly<Partial<Record<UlwLoopGateSection, readonly string[]>>>>
+> = {
+	lazycodex: {
+		codeReview: [REVIEWER_ROLES_BY_SURFACE.lazycodex.codeReview],
+		manualQa: [REVIEWER_ROLES_BY_SURFACE.lazycodex.manualQa],
+		gateReview: [REVIEWER_ROLES_BY_SURFACE.lazycodex.gateReview],
+	},
+	"omo-senpi": {
+		manualQa: ["main-session"],
+		gateReview: ["category:deep", "category:unspecified-high", "category:unspecified-low"],
+	},
+};
+
 export function reviewerRolesFor(surface: UlwLoopToolkitSurface): UlwLoopReviewerRoles {
 	return REVIEWER_ROLES_BY_SURFACE[surface];
 }
