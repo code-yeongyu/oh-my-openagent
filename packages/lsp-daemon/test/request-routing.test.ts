@@ -1,9 +1,8 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handleLspMcpRequest, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { authEnvelope } from "../src/ipc-protocol.js";
 import { extractRequestContext, handleDaemonMessage } from "../src/request-routing.js";
@@ -43,12 +42,12 @@ function validContext(root: string) {
 	};
 }
 
-function authenticatedToolCall(id: number, token: string, args: Record<string, unknown>) {
+function authenticatedToolCall(id: number, token: string, args: Record<string, unknown>, name = "status") {
 	return {
 		jsonrpc: "2.0",
 		id,
 		method: "tools/call",
-		params: { _omo: authEnvelope(token), name: "status", arguments: args },
+		params: { _omo: authEnvelope(token), name, arguments: args },
 	};
 }
 
@@ -62,7 +61,10 @@ function responseCode(response: unknown): string | undefined {
 	return typeof code === "string" ? code : undefined;
 }
 
-function deferredResponse(): { readonly promise: Promise<JsonRpcResponse | undefined>; readonly resolve: (value: JsonRpcResponse) => void } {
+function deferredResponse(): {
+	readonly promise: Promise<JsonRpcResponse | undefined>;
+	readonly resolve: (value: JsonRpcResponse) => void;
+} {
 	let resolvePromise: (value: JsonRpcResponse) => void = () => {};
 	const promise = new Promise<JsonRpcResponse | undefined>((resolve) => {
 		resolvePromise = resolve;
@@ -130,25 +132,34 @@ describe("extractRequestContext", () => {
 		{ name: "scalar", context: "not-an-object" },
 		{ name: "array", context: [] },
 		{ name: "null", context: null },
-	])(
-		"#given authenticated tools/call with $name _context #when routed #then invalid request returns before Core dispatch",
-		async ({ context }) => {
-			const token = "secret-token";
-			const response = await handleDaemonMessage(authenticatedToolCall(20, token, { _context: context }), {
-				token,
-				owner: { pid: process.pid, nonce: "test-owner", startedAt: "now", endpoint: { kind: "missing", path: "memory" } },
-			});
+	])("#given authenticated tools/call with $name _context #when routed #then invalid request returns before Core dispatch", async ({
+		context,
+	}) => {
+		const token = "secret-token";
+		const response = await handleDaemonMessage(authenticatedToolCall(20, token, { _context: context }), {
+			token,
+			owner: {
+				pid: process.pid,
+				nonce: "test-owner",
+				startedAt: "now",
+				endpoint: { kind: "missing", path: "memory" },
+			},
+		});
 
-			expect(responseCode(response)).toBe("invalid_daemon_request");
-			expect(dispatchMock).not.toHaveBeenCalled();
-		},
-	);
+		expect(responseCode(response)).toBe("invalid_daemon_request");
+		expect(dispatchMock).not.toHaveBeenCalled();
+	});
 
 	it("#given authenticated tools/call with omitted _context #when routed #then invalid request returns before Core dispatch", async () => {
 		const token = "secret-token";
 		const response = await handleDaemonMessage(authenticatedToolCall(21, token, {}), {
 			token,
-			owner: { pid: process.pid, nonce: "test-owner", startedAt: "now", endpoint: { kind: "missing", path: "memory" } },
+			owner: {
+				pid: process.pid,
+				nonce: "test-owner",
+				startedAt: "now",
+				endpoint: { kind: "missing", path: "memory" },
+			},
 		});
 
 		expect(responseCode(response)).toBe("invalid_daemon_request");
@@ -168,7 +179,12 @@ describe("extractRequestContext", () => {
 		const root = tempProject();
 		const running = handleDaemonMessage(authenticatedToolCall(30, token, { _context: validContext(root) }), {
 			token,
-			owner: { pid: process.pid, nonce: "test-owner", startedAt: "now", endpoint: { kind: "missing", path: "memory" } },
+			owner: {
+				pid: process.pid,
+				nonce: "test-owner",
+				startedAt: "now",
+				endpoint: { kind: "missing", path: "memory" },
+			},
 			activeRequests,
 		});
 		expect(activeRequests.size).toBe(1);
@@ -180,7 +196,12 @@ describe("extractRequestContext", () => {
 			},
 			{
 				token,
-				owner: { pid: process.pid, nonce: "test-owner", startedAt: "now", endpoint: { kind: "missing", path: "memory" } },
+				owner: {
+					pid: process.pid,
+					nonce: "test-owner",
+					startedAt: "now",
+					endpoint: { kind: "missing", path: "memory" },
+				},
 				activeRequests,
 			},
 		);
@@ -205,13 +226,61 @@ describe("extractRequestContext", () => {
 			},
 			{
 				token,
-				owner: { pid: process.pid, nonce: "test-owner", startedAt: "now", endpoint: { kind: "missing", path: "memory" } },
+				owner: {
+					pid: process.pid,
+					nonce: "test-owner",
+					startedAt: "now",
+					endpoint: { kind: "missing", path: "memory" },
+				},
 				activeRequests,
 			},
 		);
 
 		expect(controller.signal.aborted).toBe(false);
 		expect(activeRequests.size).toBe(1);
+	});
+
+	it("#given an authenticated format tools/call #when routed #then the request reaches Core with its context and filePath", async () => {
+		const token = "secret-token";
+		const root = tempProject();
+		const filePath = join(root, "drifted.ts");
+		writeFileSync(filePath, "const a=1\n");
+
+		await handleDaemonMessage(
+			authenticatedToolCall(40, token, { filePath, _context: validContext(root) }, "format"),
+			{
+				token,
+				owner: {
+					pid: process.pid,
+					nonce: "test-owner",
+					startedAt: "now",
+					endpoint: { kind: "missing", path: "memory" },
+				},
+			},
+		);
+
+		expect(dispatchMock).toHaveBeenCalledTimes(1);
+		const dispatched = dispatchMock.mock.calls[0]?.[0] as {
+			params: { name: string; arguments: Record<string, unknown> };
+		};
+		expect(dispatched.params.name).toBe("format");
+		expect(dispatched.params.arguments).toEqual({ filePath });
+	});
+
+	it("#given a format tools/call without _context #when routed #then it is rejected before Core dispatch", async () => {
+		const token = "secret-token";
+		const response = await handleDaemonMessage(authenticatedToolCall(41, token, { filePath: "/a.ts" }, "format"), {
+			token,
+			owner: {
+				pid: process.pid,
+				nonce: "test-owner",
+				startedAt: "now",
+				endpoint: { kind: "missing", path: "memory" },
+			},
+		});
+
+		expect(responseCode(response)).toBe("invalid_daemon_request");
+		expect(dispatchMock).not.toHaveBeenCalled();
 	});
 
 	it("#given actual symlink project config escaping cwd #when extract #then rejects before Core dispatch", () => {
@@ -224,7 +293,9 @@ describe("extractRequestContext", () => {
 
 		expect(() =>
 			extractRequestContext(
-				authenticatedToolCall(22, "secret-token", { _context: { ...validContext(root), projectConfigPaths: [linkedConfig] } }),
+				authenticatedToolCall(22, "secret-token", {
+					_context: { ...validContext(root), projectConfigPaths: [linkedConfig] },
+				}),
 			),
 		).toThrow(/Project LSP config path must be inside cwd/);
 	});

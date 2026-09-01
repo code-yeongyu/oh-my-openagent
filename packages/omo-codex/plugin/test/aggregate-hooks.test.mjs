@@ -32,7 +32,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 		"components/lsp/dist/cli.js",
 		"components/codegraph/dist/cli.js",
 		"components/rules/dist/cli.js",
-		"components/start-work-continuation/dist/cli.js",
+		"components/ulw-execute-continuation/dist/cli.js",
 		"components/telemetry/dist/cli.js",
 		"components/teammode/dist/cli.js",
 		"components/ulw-loop/dist/cli.js",
@@ -48,7 +48,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	assert.equal(await exists("scripts/migrate-codex-config.mjs"), true);
 });
 
-test("#given aggregate Stop hooks #when inspected #then start-work continuation and ulw-loop resume are separate groups", async () => {
+test("#given aggregate Stop hooks #when inspected #then ulw-execute continuation and ulw-loop resume are separate groups", async () => {
 	// given
 	const manifests = await readAggregateHookManifests();
 
@@ -60,11 +60,11 @@ test("#given aggregate Stop hooks #when inspected #then start-work continuation 
 
 	// then
 	assert.equal(stopCommands.length, 2);
-	assert.ok(stopCommands.some((command) => command.includes("start-work-continuation/dist/cli.js")));
+	assert.ok(stopCommands.some((command) => command.includes("ulw-execute-continuation/dist/cli.js")));
 	assert.ok(stopCommands.some((command) => command.includes("ulw-loop/dist/cli.js\" hook stop")));
 });
 
-test("#given aggregate SubagentStop hooks #when inspected #then start-work and LazyCodex executor verifier are separate groups", async () => {
+test("#given aggregate SubagentStop hooks #when inspected #then ulw-execute and LazyCodex executor verifier are separate groups", async () => {
 	// given
 	const manifests = await readAggregateHookManifests();
 

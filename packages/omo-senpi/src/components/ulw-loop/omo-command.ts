@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
 import { accessSync, constants, existsSync } from "node:fs"
 import { delimiter, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const OMO_COMMAND_TIMEOUT_MS = 30_000
 
@@ -27,17 +28,34 @@ export function toSpawnTarget(
   return { command: "cmd.exe", args: ["/d", "/s", "/c", bin, ...args] }
 }
 
-export function resolveOmoBin(): string | null {
-  const toolkitEnvBin = process.env.OMO_AGENT_TOOLKIT_BIN?.trim()
+export function resolveOmoBin(
+  env: Record<string, string | undefined> = process.env,
+  importerUrl: string = import.meta.url,
+): string | null {
+  const toolkitEnvBin = env.OMO_AGENT_TOOLKIT_BIN?.trim()
   if (toolkitEnvBin) return toolkitEnvBin
-  const toolkitOnPath = findExecutableOnPath("omo-agent-toolkit")
+  const bundledCli = resolveBundledToolkitCli(importerUrl)
+  if (bundledCli !== null) return bundledCli
+  const toolkitOnPath = findExecutableOnPath("omo-agent-toolkit", env.PATH)
   if (toolkitOnPath) return toolkitOnPath
-  const envBin = process.env.OMO_BIN?.trim()
+  const envBin = env.OMO_BIN?.trim()
   if (envBin) return envBin
   // Deliberately NO PATH lookup of the bare name "omo": after the hard cutover
   // an `omo` on PATH is either a stale install of ours or the unrelated
   // third-party package, and resolving it would silently execute the wrong binary.
   return null
+}
+
+// The packaged extension lives at plugin/extensions/omo.js and the staged CLI at
+// plugin/runtime/agent-toolkit/cli.js. Resolving from the importer URL keeps this
+// working after bundling while naturally falling through in source/test layouts.
+export function resolveBundledToolkitCli(importerUrl: string = import.meta.url): string | null {
+  try {
+    const candidate = fileURLToPath(new URL("../runtime/agent-toolkit/cli.js", importerUrl))
+    return existsSync(candidate) ? candidate : null
+  } catch {
+    return null
+  }
 }
 
 export async function runOmoCommand(
@@ -82,8 +100,7 @@ export async function runOmoCommand(
   return promise
 }
 
-function findExecutableOnPath(command: string): string | null {
-  const pathValue = process.env.PATH
+function findExecutableOnPath(command: string, pathValue = process.env.PATH): string | null {
   if (!pathValue) return null
   for (const directory of pathValue.split(delimiter)) {
     if (!directory) continue

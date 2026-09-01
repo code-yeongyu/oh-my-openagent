@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { mkdir, readFile, rm } from "node:fs/promises"
+import { existsSync } from "../fs/resilient"
+import { mkdir, readFile, rm } from "../fs/resilient"
 import { basename, isAbsolute, join, resolve } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
 import { validateCompletion } from "./completion-validation"

@@ -11,12 +11,14 @@ let workDir: string;
 let originalLimit: string | undefined;
 
 beforeEach(async () => {
+	delete process.env["OMO_AGENT_TOOLKIT_SURFACE"];
 	workDir = await mkdtemp(join(tmpdir(), "ulw-spawn-guard-"));
 	originalLimit = process.env["OMO_SPAWN_FANOUT_LIMIT"];
 	delete process.env["OMO_SPAWN_FANOUT_LIMIT"];
 });
 
 afterEach(async () => {
+	delete process.env["OMO_AGENT_TOOLKIT_SURFACE"];
 	if (originalLimit === undefined) delete process.env["OMO_SPAWN_FANOUT_LIMIT"];
 	else process.env["OMO_SPAWN_FANOUT_LIMIT"] = originalLimit;
 	await rm(workDir, { recursive: true, force: true });
@@ -144,6 +146,53 @@ describe("applySpawnGuards gate-artifact guard", () => {
 		expect(parsed.permissionDecision).toBe("deny");
 		expect(parsed.permissionDecisionReason).toContain("missing");
 		expect(parsed.permissionDecisionReason).toContain("g1-code-review.md");
+	});
+
+	it("#given senpi main-session QA is present but code review is absent #when the gate reviewer spawns #then the self-check allows it", () => {
+		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
+		writeGoals();
+		mkdirSync(join(workDir, ".omo", "evidence"), { recursive: true });
+		writeFileSync(join(workDir, ".omo", "evidence", "g1-manual-qa.md"), "matrix\n");
+
+		const output = applySpawnGuards(
+			payload("collaborationspawn_agent", { agent_type: "omo-senpi-gate-reviewer", message: "audit the artifacts" }),
+		);
+
+		expect(output).toBe("");
+	});
+
+	it("#given senpi QA is absent #when the gate reviewer spawns #then the self-check blocks naming manual QA", () => {
+		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
+		writeGoals();
+
+		const output = applySpawnGuards(
+			payload("collaborationspawn_agent", { agent_type: "omo-senpi-gate-reviewer", message: "audit the artifacts" }),
+		);
+
+		const parsed = deny(output);
+		expect(parsed.permissionDecision).toBe("deny");
+		expect(parsed.permissionDecisionReason).toContain("g1-manual-qa.md");
+	});
+
+	it("#given an omo-senpi gate spawn with a code-review artifact only #when guarded #then blocks the missing manual QA", () => {
+		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
+		writeGoals();
+		mkdirSync(join(workDir, ".omo", "evidence"), { recursive: true });
+		writeFileSync(join(workDir, ".omo", "evidence", "g1-code-review.md"), "report\n");
+
+		const output = applySpawnGuards(
+			payload("collaborationspawn_agent", { agent_type: "omo-senpi-gate-reviewer", message: "audit the artifacts" }),
+		);
+
+		expect(deny(output).permissionDecisionReason).toContain("g1-manual-qa.md");
+	});
+
+	it("#given an omo-senpi gate reviewer named in the message #when guarded #then still denies", () => {
+		writeGoals();
+
+		const output = applySpawnGuards(payload("spawn_agent", { message: "spawn omo-senpi-gate-reviewer now" }));
+
+		expect(deny(output).permissionDecision).toBe("deny");
 	});
 
 	it("#given a gate spawn identified by message only #when guarded #then still denies", () => {
