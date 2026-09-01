@@ -8,6 +8,7 @@ import {
   readJsonSafe,
   writeJsonAtomic,
   acquireLock,
+  acquireLockWithRetry,
   generateTaskId,
   listTaskFiles,
   resolveTaskListId,
@@ -539,5 +540,84 @@ describe("acquireLock", () => {
 
     //#then
     expect(existsSync(join(dirPath, ".lock"))).toBe(false)
+  })
+})
+
+describe("acquireLockWithRetry", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR_ABS)) {
+      rmSync(TEST_DIR_ABS, { recursive: true, force: true })
+    }
+    mkdirSync(TEST_DIR_ABS, { recursive: true })
+  })
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR_ABS)) {
+      rmSync(TEST_DIR_ABS, { recursive: true, force: true })
+    }
+  })
+
+  test("#given no lock #when acquiring with retry #then it acquires immediately", async () => {
+    //#when
+    const start = Date.now()
+    const lock = await acquireLockWithRetry(TEST_DIR_ABS)
+
+    //#then
+    expect(lock.acquired).toBe(true)
+    expect(Date.now() - start).toBeLessThan(50)
+
+    //#cleanup
+    lock.release()
+  })
+
+  test("#given a held lock released within the budget #when acquiring with retry #then it waits then acquires", async () => {
+    //#given a fresh lock held by another writer, released after 30ms
+    const firstLock = acquireLock(TEST_DIR_ABS)
+    expect(firstLock.acquired).toBe(true)
+    setTimeout(() => firstLock.release(), 30)
+
+    //#when
+    const lock = await acquireLockWithRetry(TEST_DIR_ABS, { attempts: 30, baseDelayMs: 10, maxDelayMs: 40 })
+
+    //#then
+    expect(lock.acquired).toBe(true)
+
+    //#cleanup
+    lock.release()
+  })
+
+  test("#given a lock held past the budget #when acquiring with retry #then it gives up as acquired=false in bounded time", async () => {
+    //#given a fresh lock that is never released
+    const firstLock = acquireLock(TEST_DIR_ABS)
+    expect(firstLock.acquired).toBe(true)
+
+    //#when a small budget is exhausted
+    const start = Date.now()
+    const lock = await acquireLockWithRetry(TEST_DIR_ABS, { attempts: 3, baseDelayMs: 5, maxDelayMs: 10 })
+    const elapsed = Date.now() - start
+
+    //#then it fails without waiting unbounded
+    expect(lock.acquired).toBe(false)
+    expect(elapsed).toBeLessThan(300)
+
+    //#cleanup
+    firstLock.release()
+  })
+
+  test("#given attempts:1 under contention #when acquiring with retry #then it does not wait and fails like a single acquireLock", async () => {
+    //#given
+    const firstLock = acquireLock(TEST_DIR_ABS)
+    expect(firstLock.acquired).toBe(true)
+
+    //#when
+    const start = Date.now()
+    const lock = await acquireLockWithRetry(TEST_DIR_ABS, { attempts: 1 })
+
+    //#then
+    expect(lock.acquired).toBe(false)
+    expect(Date.now() - start).toBeLessThan(50)
+
+    //#cleanup
+    firstLock.release()
   })
 })

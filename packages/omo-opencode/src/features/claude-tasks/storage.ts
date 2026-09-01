@@ -177,3 +177,46 @@ export function acquireLock(dirPath: string): { acquired: boolean; release: () =
     },
   }
 }
+
+export type AcquireLockRetryOptions = {
+  /** Max total attempts, including the first. Must be >= 1. */
+  attempts?: number
+  /** Initial backoff before the first retry. */
+  baseDelayMs?: number
+  /** Per-wait cap for the exponential backoff. */
+  maxDelayMs?: number
+}
+
+const DEFAULT_LOCK_RETRY_ATTEMPTS = 10
+const DEFAULT_LOCK_RETRY_BASE_DELAY_MS = 15
+const DEFAULT_LOCK_RETRY_MAX_DELAY_MS = 250
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Acquire the directory lock, retrying with bounded exponential backoff and full
+ * jitter while another writer holds a fresh lock. Normal short contention
+ * resolves within the budget instead of surfacing a transient
+ * `task_lock_unavailable`; a genuinely stuck lock still returns
+ * `{ acquired: false }` once the budget is exhausted, so callers keep a safe,
+ * bounded escape hatch. The underlying `acquireLock` semantics (exclusive
+ * create, 30s stale reclaim) are unchanged, and `attempts: 1` is equivalent to a
+ * single `acquireLock`.
+ */
+export async function acquireLockWithRetry(
+  dirPath: string,
+  options: AcquireLockRetryOptions = {},
+): Promise<{ acquired: boolean; release: () => void }> {
+  const attempts = Math.max(1, Math.floor(options.attempts ?? DEFAULT_LOCK_RETRY_ATTEMPTS))
+  const baseDelayMs = Math.max(1, options.baseDelayMs ?? DEFAULT_LOCK_RETRY_BASE_DELAY_MS)
+  const maxDelayMs = Math.max(baseDelayMs, options.maxDelayMs ?? DEFAULT_LOCK_RETRY_MAX_DELAY_MS)
+
+  let lock = acquireLock(dirPath)
+  for (let attempt = 1; !lock.acquired && attempt < attempts; attempt += 1) {
+    const cap = Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1))
+    const wait = Math.floor(Math.random() * cap) + 1
+    await delay(wait)
+    lock = acquireLock(dirPath)
+  }
+  return lock
+}

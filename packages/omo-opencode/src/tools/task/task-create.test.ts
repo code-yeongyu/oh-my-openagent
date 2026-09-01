@@ -298,4 +298,28 @@ describe("task_create tool", () => {
       expect(taskContent.description).toBe("Test description")
     })
   })
+
+  describe("concurrent creates (#6157)", () => {
+    test("#given many concurrent task_create calls #when they contend for the lock #then all succeed without task_lock_unavailable", async () => {
+      //#given several creates fired at once against the same task list
+      const count = 6
+      const inputs = Array.from({ length: count }, (_, i) => ({ subject: `concurrent task ${i}` }))
+
+      //#when they all run concurrently
+      const results = await Promise.all(
+        inputs.map((args) => tool.execute(args, TEST_CONTEXT).then((raw) => JSON.parse(raw))),
+      )
+
+      //#then none is rejected on lock contention and each task is persisted with a distinct id
+      const lockFailures = results.filter((r) => r.error === "task_lock_unavailable")
+      expect(lockFailures).toEqual([])
+
+      const ids = results.map((r) => r.task?.id).filter((id): id is string => Boolean(id))
+      expect(ids).toHaveLength(count)
+      expect(new Set(ids).size).toBe(count)
+      for (const id of ids) {
+        expect(existsSync(join(TEST_DIR, `${id}.json`))).toBe(true)
+      }
+    })
+  })
 })

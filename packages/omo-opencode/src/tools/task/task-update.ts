@@ -7,7 +7,7 @@ import {
   getTaskDir,
   readJsonSafe,
   writeJsonAtomic,
-  acquireLock,
+  acquireLockWithRetry,
 } from "../../features/claude-tasks/storage";
 import { syncTaskTodoUpdate } from "./todo-sync";
 
@@ -82,7 +82,7 @@ async function handleUpdate(
     }
 
     const taskDir = getTaskDir(config);
-    const lock = acquireLock(taskDir);
+    const lock = await acquireLockWithRetry(taskDir);
 
     if (!lock.acquired) {
       return JSON.stringify({ error: "task_lock_unavailable" });
