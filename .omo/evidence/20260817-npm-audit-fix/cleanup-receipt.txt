@@ -1,0 +1,26 @@
+Cleanup command:
+cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-npm-audit-remediation
+rm -rf \
+  node_modules \
+  packages/lsp-tools-mcp/node_modules \
+  packages/lsp-daemon/node_modules \
+  packages/omo-codex/plugin/node_modules
+
+Verification:
+Each of the four paths was tested with `test ! -e`.
+
+Result:
+PASS. Root and all three package dependency trees created for QA are absent.
+
+Other QA resources:
+- codex-qa helpers self-cleaned isolated CODEX_HOME directories
+- codex-qa helpers stopped their local mock model processes
+- GitHub run watcher was explicitly killed after the linked job result was
+  captured
+- all three explore children reached terminal completion
+- background `test:codex` session exited 0
+
+Remaining generated tracked churn:
+Root build materialization changed unrelated generated bundles in the
+task-owned worktree. They are deliberately not staged and will be discarded
+when the merged task worktree is removed.

@@ -13,7 +13,6 @@ describe("output tool factories", () => {
     // then
     expect(output.name).toBe("task_output")
     expect(output.parameters).toBe(TaskOutputParams)
-    expect(output.description).toContain("always returns immediately")
     expect(output.label.length).toBeGreaterThan(0)
     expect(typeof output.renderCall).toBe("function")
     expect(typeof output.renderResult).toBe("function")

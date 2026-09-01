@@ -24,6 +24,24 @@ describe("parseCodexGoalSnapshot", () => {
 		expect(snapshot.status).toBe("active");
 	});
 
+	it("reads the objective from a title-bearing ulw-loop status goal", () => {
+		// given
+		const payload = {
+			id: "G002-goal-2-senpi-repo-audit-determine-wh",
+			title: "Audit the Senpi repository",
+			status: "in_progress",
+			successCriteria: [],
+		};
+
+		// when
+		const snapshot = parseCodexGoalSnapshot(payload);
+
+		// then
+		expect(snapshot.available).toBe(true);
+		expect(snapshot.objective).toBe("Audit the Senpi repository");
+		expect(snapshot.status).toBe("active");
+	});
+
 	it("ignores remaining token budget fields from goal snapshots", () => {
 		// given
 		const payload = { goal: { objective: "X", status: "active" }, remainingTokens: 123 };

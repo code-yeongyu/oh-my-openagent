@@ -84,7 +84,7 @@ describe("runStopResumeHook", () => {
 
 		const parsed = JSON.parse(output);
 		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("omo ulw-loop status");
+		expect(parsed.reason).toContain("omo-agent-toolkit ulw-loop status");
 	});
 
 	it("#given stop_hook_active #when the hook runs #then no-ops", () => {
@@ -99,7 +99,7 @@ describe("runStopResumeHook", () => {
 		expect(runStopResumeHook({ hook_event_name: "Stop" })).toBe("");
 	});
 
-	it("#given an active boulder work with remaining plan tasks #when the hook runs #then defers to start-work-continuation", () => {
+	it("#given an active boulder work with remaining plan tasks #when the hook runs #then defers to ulw-execute-continuation", () => {
 		writeGoals([pendingGoal()]);
 		const plan = writeBoulderPlan(true);
 		writeFileSync(

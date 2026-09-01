@@ -1,4 +1,4 @@
-import { closeSync, openSync, rmSync, statSync, writeSync } from "node:fs"
+import { closeSync, openSync, rmSync, statSync, utimesSync, writeSync } from "node:fs"
 
 const LOCK_RETRY_MS = 10
 const LOCK_WAIT_TIMEOUT_MS = 1_000
@@ -15,6 +15,19 @@ export function withTaskRecordLock<T>(recordPath: string, operation: () => T): T
   try {
     return operation()
   } finally {
+    rmSync(lockPath, { force: true })
+  }
+}
+
+export async function withTaskRecordLockAsync<T>(recordPath: string, operation: () => Promise<T>): Promise<T> {
+  const lockPath = `${recordPath}.lock`
+  await acquireLockAsync(lockPath)
+  const heartbeat = setInterval(() => refreshLock(lockPath), LOCK_STALE_MS / 2)
+  heartbeat.unref()
+  try {
+    return await operation()
+  } finally {
+    clearInterval(heartbeat)
     rmSync(lockPath, { force: true })
   }
 }
@@ -41,6 +54,40 @@ function acquireLock(lockPath: string): void {
       }
       Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
     }
+  }
+}
+
+async function acquireLockAsync(lockPath: string): Promise<void> {
+  const startedAt = Date.now()
+  for (;;) {
+    try {
+      const fd = openSync(lockPath, "wx")
+      try {
+        writeSync(fd, `${process.pid}\n${Date.now()}\n`)
+      } finally {
+        closeSync(fd)
+      }
+      return
+    } catch (error) {
+      if (!hasCode(error, "EEXIST")) throw error
+      if (isStaleLock(lockPath)) {
+        rmSync(lockPath, { force: true })
+        continue
+      }
+      if (Date.now() - startedAt >= LOCK_WAIT_TIMEOUT_MS) {
+        throw new Error(`Timed out acquiring task record lock: ${lockPath}`)
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, LOCK_RETRY_MS))
+    }
+  }
+}
+
+function refreshLock(lockPath: string): void {
+  const now = new Date()
+  try {
+    utimesSync(lockPath, now, now)
+  } catch (error) {
+    if (!hasCode(error, "ENOENT")) console.error("Task record lock heartbeat failed", error)
   }
 }
 

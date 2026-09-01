@@ -1,0 +1,24 @@
+2026-08-17T12:28:20.3942914Z 156 |   return new RunnerError({
+2026-08-17T12:28:20.3943357Z                ^
+2026-08-17T12:28:20.3944570Z RunnerError: process model admission failed for omo-mock/mock-1: model is not visible in the child profile; forward its provider extension or child-visible settings
+2026-08-17T12:28:20.3945558Z  failure: {
+2026-08-17T12:28:20.3945930Z   kind: "model_unavailable",
+2026-08-17T12:28:20.3946967Z   message: "process model admission failed for omo-mock/mock-1: model is not visible in the child profile; forward its provider extension or child-visible settings",
+2026-08-17T12:28:20.3948163Z },
+2026-08-17T12:28:20.3948411Z
+      at <anonymous> (/home/runner/work/oh-my-openagent/oh-my-openagent/packages/senpi-task/src/runners/rpc/model-admission.ts:190:15)
+      at async <anonymous> (/home/runner/work/oh-my-openagent/oh-my-openagent/packages/omo-senpi/src/components/task/task-rpc-launch-parity.test.ts:61:27)
+2026-08-17T12:28:20.3992185Z (fail) task RPC launch profile parity > #given an explicit provider extension #when process model admission runs #then its model is visible without credentials [2187.99ms]
+2026-08-17T12:28:22.2835987Z (pass) task RPC launch profile parity > #given a model known only through parent resources #when its provider extension is not forwarded #then admission rejects before launch [1888.99ms]
+2026-08-17T12:28:22.2837099Z
+2026-08-17T12:30:02.2315801Z
+2026-08-17T12:30:02.2315894Z
+2026-08-17T12:30:02.2316098Z 1 tests failed:
+2026-08-17T12:30:02.2317131Z (fail) task RPC launch profile parity > #given an explicit provider extension #when process model admission runs #then its model is visible without credentials [2187.99ms]
+2026-08-17T12:30:02.2317863Z
+2026-08-17T12:30:02.2318027Z  15708 pass
+2026-08-17T12:30:02.2318579Z  1 fail
+2026-08-17T12:30:02.2318901Z  1 snapshots, 58500 expect() calls
+2026-08-17T12:30:02.2319328Z Ran 15752 tests across 2044 files. [318.87s]
+2026-08-17T12:30:02.3316747Z ##[error]Process completed with exit code 1.
+2026-08-17T12:30:02.3364687Z ##[group]Run GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

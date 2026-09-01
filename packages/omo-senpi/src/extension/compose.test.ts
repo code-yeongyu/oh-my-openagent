@@ -137,6 +137,7 @@ describe("composeOmoSenpiExtension", () => {
       userMessages: [],
       messageRenderers: [],
       mcpServers: [],
+      rpcEvents: [],
       on(event, handler) {
         this.handlers.push({ event, handler })
       },
@@ -172,7 +173,7 @@ describe("composeOmoSenpiExtension", () => {
     const logger = createRecordingLogger()
     const components: OmoSenpiComponent[] = [
       {
-        name: "codegraph-like",
+        name: "mcp-like",
         register(api, ctx) {
           if (typeof api.registerMcpServer !== "function") {
             ctx.logger.info("skipped: missing registerMcpServer")

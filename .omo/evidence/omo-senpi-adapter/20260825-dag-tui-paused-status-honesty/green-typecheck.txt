@@ -1,0 +1,4 @@
+### tsgo -p packages/omo-senpi
+omo-senpi exit=0
+### tsgo -p packages/senpi-task
+senpi-task exit=0

@@ -242,7 +242,7 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   // marketplace payload, a `dist/` rule in it overrides the lazycodex repository's root negation
   // (`!plugins/omo/components/*/dist/**`), so `git add plugins/omo` silently drops the component's
   // built CLI from the repo even though the file was copied and validated on disk. That is how
-  // start-work-continuation/dist/cli.js and ulw-loop/dist/cli.js went missing while rules and
+  // ulw-execute-continuation/dist/cli.js and ulw-loop/dist/cli.js went missing while rules and
   // ultrawork (whose nested .gitignore has no `dist/` rule) survived (lazycodex#108).
   return name !== ".gitignore"
 }

@@ -2,6 +2,7 @@ import type { NotifyResult, ParentState } from "../completion"
 import type { TaskRecord } from "../state"
 import { CHAOS_MODEL, CHAOS_SESSION } from "./chaos-harness"
 import type { ChaosHarness } from "./chaos-harness"
+import { crashMidSuspend, massReviveAtCap, resumeSession, siblingReconcileRace, suspendSession } from "./chaos-lifecycle-actions"
 import { isTerminalStatus } from "./observing-store"
 import type { RandomSource } from "./prng"
 
@@ -35,7 +36,20 @@ function load(state: ChaosState, taskId: string): TaskRecord | null {
 }
 
 function runningWithHandle(state: ChaosState): string[] {
-  return state.taskIds.filter((id) => load(state, id)?.status === "running" && state.harness.runner.handles.has(id))
+  return state.taskIds.filter((id) => load(state, id)?.status === "running" &&
+    state.harness.engines.some((engine) => engine.manager.getResidentHandle(id) !== undefined))
+}
+
+function ownerFor(state: ChaosState, taskId: string) {
+  return state.harness.engines.find((engine) => engine.manager.getResidentHandle(taskId) !== undefined)
+}
+
+function fakeHandleFor(state: ChaosState, taskId: string) {
+  for (const engine of state.harness.engines) {
+    const handle = engine.inProcessRunner.handles.get(taskId) ?? engine.processRunner.handles.get(taskId)
+    if (handle !== undefined) return handle
+  }
+  return undefined
 }
 
 function byStatus(state: ChaosState, predicate: (record: TaskRecord) => boolean): string[] {
@@ -74,7 +88,7 @@ async function actStart(state: ChaosState): Promise<void> {
 async function settleWith(state: ChaosState, outcome: "clean" | "signal"): Promise<void> {
   const id = pick(state, runningWithHandle(state))
   if (id === undefined) return
-  const handle = state.harness.runner.handles.get(id)
+  const handle = fakeHandleFor(state, id)
   if (handle === undefined) return
   if (outcome === "clean") handle.settle({ status: "completed", finalResponse: "clean exit" })
   else handle.settle({ status: "error", failure: { kind: "child-prompt-failed", message: "terminated by signal SIGKILL" } })
@@ -84,19 +98,19 @@ async function settleWith(state: ChaosState, outcome: "clean" | "signal"): Promi
 async function actSteer(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => record.status === "running" && record.residency_state === "resident"))
   if (id === undefined) return
-  await state.harness.manager.continueTask(id, "keep going", "steer")
+  await ownerFor(state, id)?.manager.continueTask(id, "keep going", "steer")
 }
 
 async function actInterrupt(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => record.status === "running"))
   if (id === undefined) return
-  await state.harness.manager.interruptTask(id)
+  await ownerFor(state, id)?.manager.interruptTask(id)
 }
 
 async function actCancel(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => record.status === "running"))
   if (id === undefined) return
-  await state.harness.manager.cancelTask(id, state.rng.bool() ? "user aborted" : undefined)
+  await ownerFor(state, id)?.manager.cancelTask(id, state.rng.bool() ? "user aborted" : undefined)
 }
 
 async function actCancelPending(state: ChaosState): Promise<void> {
@@ -114,7 +128,7 @@ async function actAbortParentWait(state: ChaosState): Promise<void> {
 async function actRevive(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => REVIVABLE.has(record.status) && record.residency_state === "resident"))
   if (id === undefined) return
-  await state.harness.manager.continueTask(id, "revive please")
+  await ownerFor(state, id)?.manager.continueTask(id, "revive please")
 }
 
 function expectedDelta(result: NotifyResult): number {
@@ -189,12 +203,8 @@ async function actEvict(state: ChaosState): Promise<void> {
 }
 
 async function actReconcile(state: ChaosState): Promise<void> {
-  await state.harness.lifecycle.reconcileOnSessionStart()
+  await resumeSession(state, CHAOS_SESSION)
   state.harness.notifier.reconcileFailedNotifications({ sessionId: CHAOS_SESSION, parentState: { kind: "idle" } })
-}
-
-async function actShutdown(state: ChaosState): Promise<void> {
-  await state.harness.lifecycle.teardownOnSessionShutdown()
 }
 
 async function actNotifierFailThenRetry(state: ChaosState): Promise<void> {
@@ -212,31 +222,35 @@ async function actNotifierFailThenRetry(state: ChaosState): Promise<void> {
   notifyEdge(state, id, { kind: "idle" })
 }
 
-type Action = { readonly run: (state: ChaosState) => Promise<void>; readonly weight: number }
+type Action = { readonly name: string; readonly run: (state: ChaosState) => Promise<void>; readonly weight: number }
 
 const ACTIONS: readonly Action[] = [
-  { run: actStart, weight: 8 },
-  { run: (s) => settleWith(s, "clean"), weight: 7 },
-  { run: (s) => settleWith(s, "signal"), weight: 4 },
-  { run: actSteer, weight: 3 },
-  { run: actInterrupt, weight: 3 },
-  { run: actCancel, weight: 3 },
-  { run: actCancelPending, weight: 4 },
-  { run: actAbortParentWait, weight: 4 },
-  { run: actRevive, weight: 3 },
-  { run: actNotify, weight: 6 },
-  { run: actReplayNotify, weight: 3 },
-  { run: actFlush, weight: 4 },
-  { run: actEvict, weight: 3 },
-  { run: actReconcile, weight: 2 },
-  { run: actShutdown, weight: 1 },
-  { run: actNotifierFailThenRetry, weight: 4 },
+  { name: "start", run: actStart, weight: 8 },
+  { name: "settle_clean", run: (s) => settleWith(s, "clean"), weight: 7 },
+  { name: "settle_signal", run: (s) => settleWith(s, "signal"), weight: 4 },
+  { name: "steer", run: actSteer, weight: 3 },
+  { name: "interrupt", run: actInterrupt, weight: 3 },
+  { name: "cancel", run: actCancel, weight: 3 },
+  { name: "cancel_pending", run: actCancelPending, weight: 4 },
+  { name: "abort_wait", run: actAbortParentWait, weight: 4 },
+  { name: "revive", run: actRevive, weight: 3 },
+  { name: "notify", run: actNotify, weight: 6 },
+  { name: "replay_notify", run: actReplayNotify, weight: 3 },
+  { name: "flush", run: actFlush, weight: 4 },
+  { name: "evict", run: actEvict, weight: 3 },
+  { name: "reconcile", run: actReconcile, weight: 2 },
+  { name: "suspend_session", run: suspendSession, weight: 2 },
+  { name: "crash_mid_suspend", run: crashMidSuspend, weight: 1 },
+  { name: "sibling_reconcile_race", run: siblingReconcileRace, weight: 1 },
+  { name: "mass_revive_at_cap", run: massReviveAtCap, weight: 1 },
+  { name: "notify_retry", run: actNotifierFailThenRetry, weight: 4 },
 ]
 
 export async function applyRandomAction(state: ChaosState): Promise<void> {
   state.harness.waiters.advance()
-  const action = state.rng.weighted(ACTIONS.map((entry) => ({ value: entry.run, weight: entry.weight })))
-  await action(state)
+  const action = state.rng.weighted(ACTIONS.map((entry) => ({ value: entry, weight: entry.weight })))
+  state.harness.lifecycleObservations.actionTrace.push(action.name)
+  await action.run(state)
   if (state.rng.bool(0.5)) await flushMicrotasks()
 }
 

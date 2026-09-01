@@ -1,0 +1,36 @@
+# Failing-first: the two new handler cases run against origin/dev's continuation sources.
+# unrecoverable-request-error.test.ts is excluded: its module does not exist on origin/dev.
+
+$ git checkout origin/dev -- packages/omo-opencode/src/hooks/todo-continuation-enforcer/{handler,idle-event,types,non-idle-events}.ts
+$ bun test packages/omo-opencode/src/hooks/todo-continuation-enforcer/handler.test.ts
+
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:1 char:940
++ ... ii -Append; bun test packages/omo-opencode/src/hooks/todo-continuatio ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-opencode\src\hooks\todo-continuation-enforcer\handler.test.ts:
+115 |         },
+116 |       },
+117 |     })
+118 | 
+119 |     // then
+120 |     expect(state.unrecoverableErrorDetected).toBe(true)
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: undefined
+
+      at <anonymous> (C:\Users\pss\OneDrive\Documents\github\oh-my-openagent-wt\fix-continuation-stop\packages\omo-open
+code\src\hooks\todo-continuation-enforcer\handler.test.ts:120:46)
+(fail) createTodoContinuationHandler > #given a compaction request rejected as non-retryable #when the session error 
+arrives #then it marks the session unrecoverable and cancels the countdown [5.79ms]
+
+ 3 pass
+ 1 fail
+ 11 expect() calls
+Ran 4 tests across 1 file. [3.82s]

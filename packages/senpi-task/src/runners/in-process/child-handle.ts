@@ -19,7 +19,16 @@ export type ChildSession = {
 }
 
 export type RunnerFailure = {
-  readonly kind: "child-prompt-failed" | "child-turn-failed" | "session-create-failed" | "depth-exceeded"
+  // The snake_case kinds map 1:1 onto the manager's respawn disposition codes (todo 12): a resume
+  // rebuild failure is TYPED and retryable, never a silently weakened tool set or transcript.
+  readonly kind:
+    | "child-prompt-failed"
+    | "child-turn-failed"
+    | "session-create-failed"
+    | "depth-exceeded"
+    | "model_unavailable"
+    | "tools_unavailable"
+    | "session_unavailable"
   readonly message: string
   readonly cause?: unknown
 }
@@ -45,6 +54,11 @@ export type CreateChildHandleInput = {
   readonly taskId: string
   readonly session: ChildSession
   readonly promptText: string
+}
+
+export type CreateRestoredChildHandleInput = {
+  readonly taskId: string
+  readonly session: ChildSession
 }
 
 // Per-turn facts observed from the session's event stream. senpi surfaces provider/stream failures
@@ -141,12 +155,29 @@ async function runTurn(
   return turnOutcome(session, observation)
 }
 
-export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
-  const { session } = input
+// The outcome a restored handle owes waitForIdle() before any follow-up starts a turn: the
+// transcript's last assistant text is the honest drain for a child whose completion never reached
+// its record (crash between turn end and transition). No text means nothing durable was produced.
+function settledSessionOutcome(session: ChildSession): RunnerOutcome {
+  const final = session.getLastAssistantText()
+  if (final !== undefined && final.length > 0) return { status: "completed", finalResponse: final }
+  return {
+    status: "error",
+    failure: { kind: "child-turn-failed", message: "restored session has no assistant output" },
+  }
+}
+
+type TrackedChildHandle = {
+  readonly handle: ChildHandle
+  beginTurn(text: string): void
+}
+
+function createTrackedChildHandle(taskId: string, session: ChildSession): TrackedChildHandle {
   let aborted = false
   let disposed = false
   let turnActive = false
-  let running: Promise<RunnerOutcome>
+  // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
+  let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session))
   const observation: TurnObservation = { text: undefined, stopReason: undefined, errorMessage: undefined, baseline: undefined }
   const unsubscribeObserver = session.subscribe((event) => observeTurnEvent(observation, event))
 
@@ -170,10 +201,8 @@ export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
     )
   }
 
-  beginTurn(input.promptText)
-
-  return {
-    task_id: input.taskId,
+  const handle: ChildHandle = {
+    task_id: taskId,
     sessionId: session.sessionId,
     steer: (text) => session.steer(text),
     followUp: async (text) => {
@@ -199,4 +228,18 @@ export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
       session.dispose()
     },
   }
+  return { handle, beginTurn }
+}
+
+export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
+  const tracked = createTrackedChildHandle(input.taskId, input.session)
+  tracked.beginTurn(input.promptText)
+  return tracked.handle
+}
+
+// A restored child is rebuilt from its persisted transcript: the original prompt is NEVER
+// replayed. The handle restores IDLE - its first followUp() starts a fresh tracked turn exactly
+// like a resident revival (any continuation nudge is manager-owned, todo 12, never the runner's).
+export function createRestoredChildHandle(input: CreateRestoredChildHandleInput): ChildHandle {
+  return createTrackedChildHandle(input.taskId, input.session).handle
 }

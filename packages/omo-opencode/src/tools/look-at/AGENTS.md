@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-14 files. The `look_at` tool delegates image, PDF, and diagram analysis to the `multimodal-looker` subagent. Conditional gate: tool is only registered when `multimodal-looker` is not in `disabled_agents`. Default subagent route: GPT-5.6 Sol at low effort through OpenAI, OpenCode, or Vercel. This is a summary extractor, not a precise reader.
+26 files. The `look_at` tool delegates image, PDF, and diagram analysis to the `multimodal-looker` subagent. Conditional gate: tool is only registered when `multimodal-looker` is not in `disabled_agents`. Default subagent route: GPT-5.6 Sol at low effort through OpenAI, OpenCode, or Vercel. This is a summary extractor, not a precise reader.
 
 ## EXECUTION FLOW
 

@@ -118,7 +118,7 @@ At start, run `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)` and echo 
 
 ## GOAL REGISTRATION
 
-When a `create_goal` tool exists, register the run's goal with it before implementation: the objective, the scenario contract, and the WHEN TO STOP line. No tool → record the same contract in the notepad and treat it as binding.
+When a `create_goal` tool exists, check `get_goal` first (continue a matching active goal; never duplicate), then register the run's goal before implementation with exactly `objective`, outcome-first: the concrete outcome that will be true (never an activity), named deliverable surfaces, the scenario contract as criteria that can fail, scope bounds, and the WHEN TO STOP line. No invented budgets or deadlines. No tool → record the same contract in the notepad and treat it as binding.
 
 ## TODO DISCIPLINE
 
@@ -166,7 +166,7 @@ lsp_diagnostics catches type errors only. Logic bugs, missing behavior, broken f
 | Adds/modifies a CLI command | Run it with Bash. Show output. |
 | Changes build output | Run build. Verify output files. |
 | Modifies API behavior | Call the endpoint. Show response. |
-| Renders/changes a page | Use Chrome to drive the page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Screenshot + action log. |
+| Renders/changes a page | Use Chrome to drive the page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Screenshot + action log. NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state. If you need that profile's login state, clone it first (`rsync -a <profile>/ <tmp-clone>/`) and launch Chrome / agent-browser against the clone as the user-data-dir; run any clearing there only. |
 | Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or the xterm.js web terminal render (TUI; NEVER `tmux capture-pane` - it degrades color and CJK width), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Drives a desktop GUI | Computer use: OS-level GUI automation against the running app. Action log + screenshot. |
 | Adds tool/hook/feature | Test end-to-end in a real scenario. |

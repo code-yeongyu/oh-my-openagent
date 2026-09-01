@@ -214,4 +214,60 @@ describe("handleNonIdleEvent", () => {
     // then
     expect(state.continuationBlockReason).toBe("user-interruption")
   })
+
+  test("#given an unrecoverable error and a partless user message #when the split part proves it internal #then the stop flag survives", () => {
+    // given
+    const sessionID = "ses_unrecoverable_split_internal"
+    const state = sessionStateStore.getState(sessionID)
+    state.unrecoverableErrorDetected = true
+
+    // when
+    handleNonIdleEvent({
+      eventType: "message.updated",
+      properties: { sessionID, info: { role: "user", id: "msg_split_internal" } },
+      sessionStateStore,
+    })
+    handleNonIdleEvent({
+      eventType: "message.part.updated",
+      properties: {
+        sessionID,
+        part: {
+          type: "text",
+          messageID: "msg_split_internal",
+          text: `${OMO_INTERNAL_INITIATOR_MARKER}\ncontinuation echo`,
+        },
+      },
+      sessionStateStore,
+    })
+
+    // then
+    expect(state.pendingUserMessageID).toBeUndefined()
+    expect(state.unrecoverableErrorDetected).toBe(true)
+  })
+
+  test("#given an unrecoverable error and a partless user message #when the split part proves it genuine #then the stop flag is cleared", () => {
+    // given
+    const sessionID = "ses_unrecoverable_split_genuine"
+    const state = sessionStateStore.getState(sessionID)
+    state.unrecoverableErrorDetected = true
+
+    // when
+    handleNonIdleEvent({
+      eventType: "message.updated",
+      properties: { sessionID, info: { role: "user", id: "msg_split_genuine" } },
+      sessionStateStore,
+    })
+    handleNonIdleEvent({
+      eventType: "message.part.updated",
+      properties: {
+        sessionID,
+        part: { type: "text", messageID: "msg_split_genuine", text: "please carry on" },
+      },
+      sessionStateStore,
+    })
+
+    // then
+    expect(state.pendingUserMessageID).toBeUndefined()
+    expect(state.unrecoverableErrorDetected).toBe(false)
+  })
 })

@@ -15,6 +15,7 @@ function record(overrides: Partial<TaskRecord> & { task_id: string; status: Task
     created_at: "2026-07-07T00:00:00.000Z",
     updated_at: "2026-07-07T00:00:01.000Z",
     notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: false,
     ...overrides,
   }
 }
@@ -37,15 +38,18 @@ function longActiveRecord(): TaskRecord {
 }
 
 describe("buildWidgetRows", () => {
-  it("#given more than five active tasks #when building rows #then it caps at five and adds a +N more row", () => {
-    const records = Array.from({ length: 7 }, (_value, index) => record({ task_id: `st_${index}`, status: "running" }))
-    const rows = buildWidgetRows(records)
-    expect(rows).toHaveLength(6)
-    expect(rows[5]).toBe("+2 more")
-  })
-
-  it("#given only terminal tasks #when building rows #then no rows render", () => {
-    expect(buildWidgetRows([record({ task_id: "st_done", status: "completed" })])).toHaveLength(0)
+  it("#given active and completed records #when selecting rows #then only resident team members follow active rows before the cap", () => {
+    const alpha = record({ task_id: "st_alpha", name: "team:12345678-1234-1234-1234-123456789abc:alpha", task_summary: "settled alpha", status: "completed" })
+    const beta = record({ task_id: "st_beta", name: "team:12345678-1234-1234-1234-123456789abc:beta", task_summary: "settled beta", status: "completed" })
+    const ordinary = record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })
+    const stale = record({ task_id: "st_stale", name: "team:12345678-1234-1234-1234-123456789abc:stale", task_summary: "stale member", status: "completed" })
+    const active = Array.from({ length: 4 }, (_value, index) => record({ task_id: `st_${index}`, status: "running" }))
+    const rows = buildWidgetRows([alpha, ordinary, stale, ...active, beta], new Set([alpha.task_id, beta.task_id, ordinary.task_id]))
+    expect(rows.slice(0, 4).every((row) => row.includes("running"))).toBe(true)
+    expect(rows[4]).toContain("settled alpha")
+    expect(rows[4]).toContain("completed")
+    expect(rows[5]).toBe("+1 more")
+    expect(rows.join("\n")).not.toMatch(/ordinary task|stale member/u)
   })
 
   it("#given an active task #when building a row #then useful identity and execution context remain", () => {
@@ -143,6 +147,44 @@ describe("backgroundWidgetRows", () => {
     expect(row).toContain("category:unspec")
     expect(row).toContain("running")
     expect(row).toEndWith("1m 0s")
+  })
+})
+
+describe("suspended residency labeling", () => {
+  it("#given a persisted_only record #when formatting a full row #then the status shows suspended", () => {
+    const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" }))
+    expect(row).toContain("suspended")
+    expect(row).not.toContain("status:running")
+  })
+
+  it("#given an rpc_detached record #when formatting a full row #then the status shows suspended", () => {
+    const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" }))
+    expect(row).toContain("suspended")
+    expect(row).not.toContain("status:running")
+  })
+
+  it("#given a resident record #when formatting a full row #then the status label is unchanged (regression pin)", () => {
+    const row = formatTaskRow(record({ task_id: "st_live", status: "running", residency_state: "resident" }))
+    expect(row).toContain("status:running")
+    expect(row).not.toContain("suspended")
+  })
+
+  it("#given a persisted_only record #when building a widget row #then it contains suspended", () => {
+    const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })])
+    expect(row.length).toBeGreaterThan(0)
+    expect(row[0]).toContain("suspended")
+  })
+
+  it("#given an rpc_detached record #when building a widget row #then it contains suspended", () => {
+    const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" })])
+    expect(row.length).toBeGreaterThan(0)
+    expect(row[0]).toContain("suspended")
+  })
+
+  it("#given a persisted_only record #when building a background widget row #then it contains suspended", () => {
+    const now = Date.parse("2026-07-07T00:01:00.000Z")
+    const row = backgroundWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })], new Map([]), now, () => undefined, 220)[0] ?? ""
+    expect(row).toContain("suspended")
   })
 })
 

@@ -1,0 +1,8 @@
+notepad=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/ulw-20260817-234345.XXXXXX.md.w9Y51aoKJJ
+worktree=/Volumes/mengmotaStorage/local-workspaces/omo-wt/test-process-stability-20260817
+branch=fix/test-process-stability-20260817-ulw
+base=ed723a3901fd6c14ea55b21aa8afcac28a87b6d7
+bundle_refresh=merged-pr-6925:d550875c9
+ci_partition_owner=https://github.com/code-yeongyu/oh-my-openagent/pull/6925
+live_failure_run=https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32040272549
+live_failure_job=https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32040272549/job/95418268548

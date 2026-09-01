@@ -34,6 +34,7 @@ function memberRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
     error_message: "RPC child killed by signal SIGKILL",
     killed: true,
     notification: { run_epoch: 0, notified_epoch: -1 },
+    notify_on_terminal: false,
     ...overrides,
   }
 }
@@ -60,10 +61,11 @@ describe("team member liveness notifier", () => {
         details: [{
           customType: TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
           details: {
-            memberName: "alpha",
-            lastKnownState: "error",
-            reason: "RPC child killed by signal SIGKILL",
-            deliveryKey: "team-member-liveness:st_00000001:0",
+              memberName: "alpha",
+              lastKnownState: "error",
+              reason: "RPC child killed by signal SIGKILL",
+              killed: true,
+              deliveryKey: "team-member-liveness:st_00000001:0",
           },
         }],
       },
@@ -181,6 +183,44 @@ describe("team member liveness notifier", () => {
 
     notifier.notifyTerminal(memberRecord({ status: "completed", error_message: undefined, killed: undefined }))
 
+    expect(sent).toEqual([])
+  })
+
+  test("#given a completed resident process was later marked killed #when observed #then liveness preserves the completed turn as its last known state", () => {
+    const sent: Record<string, unknown>[] = []
+    const notifier = createTeamMemberLivenessNotifier({
+      pi: { sendMessage: (message) => { sent.push(message) } },
+      isStreaming: () => false,
+    })
+
+    notifier.notifyTerminal(memberRecord({
+      status: "completed",
+      residency_state: "disposed",
+      killed: true,
+      error_message: "reattach disabled for crashed resident",
+    }))
+
+    expect(sent[0]?.details).toMatchObject({
+      memberName: "alpha",
+      lastKnownState: "completed",
+      reason: "reattach disabled for crashed resident",
+      killed: true,
+    })
+  })
+
+  test("#given an errored member record suspended between shutdown and revival #when observed #then no liveness death event is injected", () => {
+    // given a member whose errored record was suspended at session shutdown and still awaits revival
+    const sent: Record<string, unknown>[] = []
+    const notifier = createTeamMemberLivenessNotifier({
+      pi: { sendMessage: (message) => { sent.push(message) } },
+      isStreaming: () => false,
+    })
+
+    // when the suspended record is re-observed in either suspended residency
+    notifier.notifyTerminal(memberRecord({ residency_state: "persisted_only", killed: undefined }))
+    notifier.notifyTerminal(memberRecord({ residency_state: "rpc_detached", killed: undefined }))
+
+    // then the member is treated as suspended, not dead
     expect(sent).toEqual([])
   })
 })

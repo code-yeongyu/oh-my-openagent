@@ -1,0 +1,118 @@
+Task 9 evidence - omo-ai beta publish workflow
+Date: 2026-08-09
+Worktree: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release
+
+1. Failing-first workflow shape test against committed publish.yml baseline
+
+Command:
+  bun test script/omo-ai-publish-shape.test.ts
+
+Result:
+  0 pass
+  7 fail
+  5 expect() calls
+  Ran 7 tests across 1 file.
+  exit status: 1
+
+Representative failures:
+  - missing step: release-metadata/Calculate omo-ai metadata
+  - release-metadata checkout index: expected 0, received -1
+  - prepare-release-state OMO_AI_VERSION env: expected output binding, received undefined
+  - Build omo-ai payload index: expected after containment, received -1
+  - Publish omo-ai index: expected after original strip, received -1
+  - missing step: publish-main/Wait for omo-ai registry readiness
+  - preflight ALL_PACKAGES lacked omo-ai
+
+2. Final workflow shape test
+
+Command:
+  bun test script/omo-ai-publish-shape.test.ts
+
+Result:
+  (pass) maps every root release to a unique ordered prerelease
+  (pass) checks out before asserting root bin ownership
+  (pass) stamps omo-native in both release paths and stages its manifest
+  (pass) builds and verifies the payload before stripping token auth
+  (pass) publishes omo-ai through beta-only OIDC after every wrapper publish
+  (pass) always runs readiness, dist-tag guard, and live verification
+  (pass) keeps trusted publishing unconditional and DIST_TAG derivation byte-pinned
+
+  7 pass
+  0 fail
+  53 expect() calls
+  Ran 7 tests across 1 file.
+
+3. actionlint
+
+Command:
+  bunx actionlint .github/workflows/publish.yml
+
+Result:
+  clean (no diagnostics)
+  exit status: 0
+
+4. Pre-existing run-block characterization
+
+Baseline capture:
+  Parsed the committed publish.yml before editing and recorded every pre-existing step run value.
+  Baseline workflow SHA-256: fc697916b213fc96c20d71dafcbf1689be00c97606f526f8c1e60a8c55008714
+  Captured run blocks: 54
+
+Comparison result:
+  allowed additions only: preflight-trust/Verify trusted publisher for release packages
+  allowed additions only: prepare-release-state/Prepare and merge release state before publishing
+  allowed additions only: publish-main/Update version
+  pre-existing run blocks: 54
+  byte-identical: 51
+  normalized allowed additions: 3
+  unexpected changes: 0
+
+Normalization permitted only:
+  - preflight loop: omo-ai package entry and runbook failure line
+  - prepare-release-state stamp block: omo-native jq stamp and git-add path
+  - publish-main Update version stamp block: omo-native jq stamp
+
+The DIST_TAG derivation block is additionally byte-pinned by fixture equality in the green shape test.
+
+5. Mutation probe
+
+Mutation:
+  Changed the omo-ai publish command from:
+    npm publish --ignore-scripts --access public --provenance --tag beta
+  to:
+    npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG"
+
+Command:
+  bun test script/omo-ai-publish-shape.test.ts
+
+Mutation result:
+  Expected to contain: npm publish --ignore-scripts --access public --provenance --tag beta
+  Received: npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG"
+  (fail) publishes omo-ai through beta-only OIDC after every wrapper publish
+
+  6 pass
+  1 fail
+  51 expect() calls
+  exit status: 1
+
+Restore proof:
+  Restored the hardcoded --tag beta command and reran the test.
+  7 pass
+  0 fail
+  53 expect() calls
+
+6. Final integrity
+
+Commands:
+  git diff --check
+  bunx actionlint .github/workflows/publish.yml
+  bun test script/omo-ai-publish-shape.test.ts
+
+Results:
+  git diff --check: clean
+  actionlint: clean, exit 0
+  shape test: 7 pass, 0 fail
+
+Final file SHA-256 values before commit:
+  .github/workflows/publish.yml: 015c9befce7d7dac14e2fa71e13e228b93342732e8707e03902888a62e4a4bfb
+  script/omo-ai-publish-shape.test.ts: 443172af6c0dee6422af821e1a7e527fe7d0b7d316ca35c1e0886a82c08234d4

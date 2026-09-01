@@ -19,6 +19,7 @@ const corePackages = [
   "packages/team-core",
   "packages/openclaw-core",
   "packages/boulder-state",
+  "packages/memory-core",
   "packages/telemetry-core",
   "packages/claude-code-compat-core",
   "packages/skills-loader-core",
