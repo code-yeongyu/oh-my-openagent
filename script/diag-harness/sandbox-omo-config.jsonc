@@ -1,0 +1,19 @@
+{
+  // Strict opencode-go provider pinning for the Sisyphus-on-DeepSeek diagnostic.
+  // No opencode-provider models anywhere; fallbacks also stay on opencode-go.
+  "agents": {
+    "sisyphus-junior": {
+      "model": "opencode-go/deepseek-v4-flash",
+      "variant": "max",
+      "fallback_models": ["opencode-go/qwen3.7-plus", "opencode-go/minimax-m3"]
+    }
+  },
+  "categories": {
+    "quick": { "model": "opencode-go/deepseek-v4-flash", "variant": "max", "fallback_models": ["opencode-go/qwen3.7-plus"] },
+    "unspecified-low": { "model": "opencode-go/deepseek-v4-flash", "variant": "max", "fallback_models": ["opencode-go/qwen3.7-plus"] },
+    "unspecified-high": { "model": "opencode-go/deepseek-v4-flash", "variant": "max", "fallback_models": ["opencode-go/qwen3.7-plus"] },
+    "deep": { "model": "opencode-go/deepseek-v4-flash", "variant": "max", "fallback_models": ["opencode-go/qwen3.7-plus"] },
+    "ultrabrain": { "model": "opencode-go/deepseek-v4-flash", "variant": "max", "fallback_models": ["opencode-go/qwen3.7-plus"] },
+    "artistry": { "model": "opencode-go/deepseek-v4-flash", "variant": "max", "fallback_models": ["opencode-go/qwen3.7-plus"] }
+  }
+}

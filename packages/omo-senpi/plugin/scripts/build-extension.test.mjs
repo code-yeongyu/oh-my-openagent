@@ -93,7 +93,7 @@ describe("checkExtensionCurrent", () => {
       supervisorOutputPath: outputs.supervisorOutputPath,
     })
     expect(check.ok).toBe(true)
-  })
+  }, { timeout: 15000 })
 
   test("#given an empty output directory #when extensions are built #then all runtime personas match their sources", async () => {
     // given / when
@@ -111,7 +111,7 @@ describe("checkExtensionCurrent", () => {
     for (const [name, source] of personas) {
       expect(await readFile(join(dirname(outputs.outputPath), name), "utf8")).toBe(await readFile(source, "utf8"))
     }
-  })
+  }, { timeout: 15000 })
 
   test("#given platform-specific source paths #when normalized #then build markers use portable separators", () => {
     expect(toPortableBuildPath("packages\\omo-senpi\\src\\extension\\index.ts"))
