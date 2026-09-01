@@ -215,8 +215,11 @@ async function runSupervisedChild(input: {
   supervisor.unref()
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
+  const publishingPath = join(input.runDir, "publishing.json")
   const hasCompleteOutcome = () => {
-    if (!existsSync(outcomePath) || existsSync(launchPath)) return false
+    // Publication writes the outcome before launch cleanup; publishing.json proves that the
+    // surviving launch marker is an in-flight publication, not an incomplete outcome.
+    if (!existsSync(outcomePath) || (existsSync(launchPath) && !existsSync(publishingPath))) return false
     try {
       return runOutcomeMatchesLedger(ledger, JSON.parse(readFileSync(outcomePath, "utf8")) as RunOutcome)
     } catch {

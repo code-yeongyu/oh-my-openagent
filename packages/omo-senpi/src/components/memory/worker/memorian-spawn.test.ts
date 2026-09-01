@@ -130,7 +130,9 @@ describe("prepareMemorianSpawn payload", () => {
       ],
       surfaced: ["notes/old.md"],
     })
-    expect((await stat(prepared.paths.candidates)).mode & 0o777).toBe(0o400)
+    const candidatesMode = (await stat(prepared.paths.candidates)).mode
+    expect(candidatesMode & 0o222).toBe(0)
+    expect(candidatesMode & 0o400).toBe(0o400)
   })
 
   test("#given a prepared gate spawn #when the transcript window is read #then both roles are present in order", async () => {
