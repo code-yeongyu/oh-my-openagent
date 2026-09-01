@@ -24,7 +24,7 @@ jobs:
       run_heavy: ${{ steps.classify.outputs.run_heavy }}
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -151,15 +151,21 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            shard: "1/2"
+          - os: ubuntu-latest
+            shard: "2/2"
           - os: macos-latest
+            shard: "1/2"
+          - os: macos-latest
+            shard: "2/2"
           - os: windows-latest
             shard: "1/2"
           - os: windows-latest
             shard: "2/2"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           node-version: "24"
@@ -172,7 +178,7 @@ jobs:
           bun-version: "1.4.0"
 
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: runner.os != 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
@@ -194,21 +200,29 @@ jobs:
         run: npm test
         working-directory: packages/lsp-daemon
 
-      # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
-      # tests observe sh instead of the native PowerShell/cmd execution path.
-      - name: Run tests
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: bun --config=bunfig.root.toml test
-
+      # Every OS splits the root suite into two parallel jobs (the Windows
+      # shape): shard 1 runs omo-opencode + memory-core in one serial process,
+      # shard 2 runs the shared serial quarantine first and then the remainder.
+      # `bun test --parallel` is not used on POSIX: --isolate re-runs the heavy
+      # preload per file and OOM-kills the 7 GB runners, and --no-isolate leaks
+      # module state between files. Job-level sharding is the parallelism.
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun test packages/omo-opencode packages/memory-core
 
       - name: Run tests
-        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        run: |
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
+          bun --config=bunfig.win2.parallel.toml test
+
+      # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
+      # tests observe sh instead of the native PowerShell/cmd execution path.
+      - name: Run tests
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         run: |
-          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/omo-native/test/payload.test.ts packages/omo-codex/src/install/install-codex.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun --config=bunfig.win2.parallel.toml test --parallel
 
@@ -221,8 +235,8 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages before tests.
             - Runs `npm test` for `packages/lsp-daemon`.
-            - Runs all non-Senpi root tests on Linux and macOS via bunfig.root.toml.
-            - Splits Windows by measured package groups so global zauc mock bootstraps stay with their consumers.
+            - Runs all non-Senpi root tests sharded two ways per OS: shard 1 covers omo-opencode + memory-core, shard 2 runs the shared serial quarantine first and then the remainder (serial on POSIX, `--parallel` on Windows).
+            - Splits every OS by the same package groups so global zauc mock bootstraps stay with their consumers.
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
@@ -230,9 +244,9 @@ jobs:
     needs: [ci-mode]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
@@ -242,7 +256,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
@@ -282,9 +296,9 @@ jobs:
           - os: windows-latest
             suite: platform
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           node-version: "24"
@@ -294,7 +308,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
@@ -308,6 +322,21 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'full' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run test:codex
 
+
+      - name: Run omo-codex component checks
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'full' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        shell: bash
+        run: |
+          set -uo pipefail
+          status=0
+          for component in packages/omo-codex/plugin/components/*/; do
+            if jq -e '.scripts.check' "${component}package.json" > /dev/null 2>&1; then
+              echo "::group::Component check: ${component}"
+              npm --prefix "$component" run check || status=1
+              echo "::endgroup::"
+            fi
+          done
+          exit $status
       - name: Build Codex platform smoke prerequisites
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: |
@@ -341,7 +370,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds the MCP runtimes needed by the Codex adapter.
-            - Runs the full hermetic Codex gate on Linux and platform-specific installer/path/shell smoke tests on macOS and Windows.
+            - Runs the full hermetic Codex gate plus every omo-codex component check script on Linux, and platform-specific installer/path/shell smoke tests on macOS and Windows.
             - Preserves Linux, macOS, and Windows platform compatibility coverage without duplicating platform-neutral tests.
           JOB_SUMMARY_NEXT: Inspect the failing component build or the first Codex compatibility test failure for this OS.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
@@ -354,9 +383,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           node-version: "24"
@@ -366,7 +395,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
@@ -423,7 +452,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
@@ -491,7 +520,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -500,7 +529,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
@@ -541,9 +570,9 @@ jobs:
     needs: [ci-mode]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
@@ -553,7 +582,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
@@ -596,7 +625,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -604,7 +633,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.4.0-${{ hashFiles('bun.lock') }}
@@ -649,7 +678,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

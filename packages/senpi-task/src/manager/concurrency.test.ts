@@ -79,6 +79,43 @@ describe("TaskConcurrency", () => {
     expect(concurrency.getLimit("anthropic/sonnet")).toBe(3)
   })
 
+  test("#given a zero limit at each precedence level #when resolving the limit #then zero means unbounded", () => {
+    // given
+    const byDefault = new TaskConcurrency({ default_concurrency: 0 })
+    const byProvider = new TaskConcurrency({ default_concurrency: 1, provider_concurrency: { anthropic: 0 } })
+    const byModel = new TaskConcurrency({
+      default_concurrency: 1,
+      provider_concurrency: { anthropic: 1 },
+      model_concurrency: { "anthropic/opus": 0 },
+    })
+
+    // when
+    const limits = [
+      byDefault.getLimit("anthropic/claude"),
+      byProvider.getLimit("anthropic/claude"),
+      byModel.getLimit("anthropic/opus"),
+    ]
+
+    // then
+    expect(limits).toEqual([
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+    ])
+  })
+
+  test("#given a zero default limit #when many tasks acquire #then slots never fill and nothing queues", () => {
+    // given
+    const concurrency = new TaskConcurrency({ default_concurrency: 0 })
+
+    // when
+    for (let index = 0; index < 32; index += 1) concurrency.acquire("anthropic/claude", `st_0000000${index}`)
+
+    // then
+    expect(concurrency.hasFreeSlot("anthropic/claude")).toBe(true)
+    expect(concurrency.getCount("anthropic/claude")).toBe(0)
+  })
+
   test("#given different models #when both acquire under a shared default limit #then each keeps its own count", () => {
     // given
     const concurrency = new TaskConcurrency({ default_concurrency: 1 })
@@ -192,5 +229,118 @@ describe("TaskConcurrency", () => {
       // then
       expect(granted).toEqual(["second", "fourth"])
     })
+  })
+
+  test("#given a global cap of two #when two free lanes acquire #then a third lane is blocked", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 2 })
+    concurrency.acquire("anthropic/claude", "st_00000001")
+    concurrency.acquire("openai/gpt", "st_00000002")
+    expect(concurrency.hasFreeSlot("google/gemini")).toBe(false)
+  })
+
+  test("#given global zero #when lanes acquire #then only lane limits apply", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 0 })
+    expect(concurrency.tryAcquire("anthropic/claude", "st_00000001", 0)).toBe(true)
+    expect(concurrency.tryAcquire("anthropic/claude", "st_00000002", 0)).toBe(false)
+    expect(concurrency.tryAcquire("openai/gpt", "st_00000003", 0)).toBe(true)
+  })
+
+  test("#given an infinite lane and one global slot #when it acquires #then it consumes the slot", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 0, global_concurrency: 1 })
+    expect(concurrency.tryAcquire("anthropic/claude", "st_00000001", 0)).toBe(true)
+    expect(concurrency.tryAcquire("openai/gpt", "st_00000002", 0)).toBe(false)
+  })
+
+  test("#given a lane B waiter #when lane A releases the global slot #then B is granted", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 1 })
+    concurrency.tryAcquire("anthropic/claude", "st_00000001", 0)
+    let granted = false
+    concurrency.enqueue("openai/gpt", "st_00000002", 0, () => { granted = true })
+    concurrency.releaseLease("st_00000001", 0)
+    expect(granted).toBe(true)
+  })
+
+  test("#given queued lanes #when a slot frees #then the oldest eligible head wins", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 1 })
+    concurrency.tryAcquire("google/gemini", "st_00000001", 0)
+    const order: string[] = []
+    concurrency.enqueue("anthropic/claude", "st_dummy", 0, () => {})
+    concurrency.enqueue("openai/gpt", "st_00000002", 0, () => order.push("openai"))
+    concurrency.enqueue("anthropic/claude", "st_00000003", 0, () => order.push("anthropic"))
+    concurrency.remove("anthropic/claude", "st_dummy")
+    concurrency.releaseLease("st_00000001", 0)
+    expect(order).toEqual(["openai"])
+  })
+
+  test("#given a blocked head on A and an eligible head on B #when a slot frees #then B is granted", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 2 })
+    concurrency.tryAcquire("anthropic/claude", "st_00000001", 0)
+    concurrency.tryAcquire("google/gemini", "st_00000002", 0)
+    let granted = false
+    concurrency.enqueue("anthropic/claude", "st_00000003", 0, () => {})
+    concurrency.enqueue("openai/gpt", "st_00000004", 0, () => { granted = true })
+    concurrency.releaseLease("st_00000002", 0)
+    expect(granted).toBe(true)
+  })
+
+  test("#given a queued waiter #when removed #then lane and global counts stay unchanged", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 1 })
+    concurrency.tryAcquire("anthropic/claude", "st_00000001", 0)
+    concurrency.enqueue("openai/gpt", "st_00000002", 0, () => {})
+    expect(concurrency.remove("openai/gpt", "st_00000002")).toBe(true)
+    expect(concurrency.getCount("anthropic/claude")).toBe(1)
+    expect(concurrency.getCount("openai/gpt")).toBe(0)
+    expect(concurrency.tryAcquire("google/gemini", "st_00000003", 0)).toBe(false)
+  })
+
+  test("#given a blocked acquisition #when tryAcquire fails #then counts remain unchanged", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 1 })
+    concurrency.tryAcquire("anthropic/claude", "st_00000001", 0)
+    expect(concurrency.tryAcquire("anthropic/claude", "st_00000002", 0)).toBe(false)
+    expect(concurrency.getCount("anthropic/claude")).toBe(1)
+    concurrency.releaseLease("st_00000001", 0)
+    expect(concurrency.tryAcquire("openai/gpt", "st_00000003", 0)).toBe(true)
+  })
+
+  test("#given a queued lane #when tryAcquire runs #then it refuses to bypass the queue", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 2 })
+    concurrency.tryAcquire("anthropic/claude", "st_00000001", 0)
+    concurrency.enqueue("anthropic/claude", "st_00000002", 0, () => {})
+    expect(concurrency.tryAcquire("anthropic/claude", "st_00000003", 0)).toBe(false)
+    expect(concurrency.getCount("anthropic/claude")).toBe(1)
+  })
+
+  test("#given a newer lease #when an older epoch releases #then the newer lease remains", () => {
+    const concurrency = new TaskConcurrency({ default_concurrency: 2 })
+    concurrency.tryAcquire("anthropic/claude", "st_00000001", 1)
+    concurrency.releaseLease("st_00000001", 1)
+    concurrency.tryAcquire("anthropic/claude", "st_00000001", 2)
+    concurrency.releaseLease("st_00000001", 1)
+    expect(concurrency.getCount("anthropic/claude")).toBe(1)
+    concurrency.releaseLease("st_00000001", 2)
+    expect(concurrency.getCount("anthropic/claude")).toBe(0)
+  })
+
+  test("#given 64 waiters across 16 lanes #when each lane drains #then every grant is deterministic and empty", () => {
+    const config = { default_concurrency: 1, global_concurrency: 16 }
+    const concurrency = new TaskConcurrency(config)
+    const granted: string[] = []
+    for (let lane = 0; lane < 16; lane += 1) {
+      const model = `provider-${lane}/model`
+      concurrency.tryAcquire(model, `holder-${lane}`, 0)
+      for (let waiter = 0; waiter < 4; waiter += 1) {
+        const taskId = `task-${lane}-${waiter}`
+        concurrency.enqueue(model, taskId, 0, () => granted.push(taskId))
+      }
+    }
+    for (let lane = 0; lane < 16; lane += 1) {
+      const model = `provider-${lane}/model`
+      for (let release = 0; release < 5; release += 1) concurrency.release(model)
+      expect(concurrency.getCount(model)).toBe(0)
+      expect(concurrency.queuePosition(model, `task-${lane}-0`)).toBeUndefined()
+    }
+    expect(granted).toHaveLength(64)
+    expect(granted).toEqual([...Array(16)].flatMap((_, lane) => [...Array(4)].map((__, waiter) => `task-${lane}-${waiter}`)))
+    expect(concurrency.getRetainedKeyCounts()).toEqual({ lanes: 0, queues: 0, leases: 0 })
   })
 })

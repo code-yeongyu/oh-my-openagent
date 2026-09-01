@@ -117,8 +117,17 @@ export async function reviveClaimed(
     return { task_id: fresh.task_id, kind: "lost", reason: "reattach ports unavailable" }
   }
 
-  const respawned = await ports.respawn(fresh, sessionPath)
+  const reservation = ports.reserve(fresh)
+  if (!reservation.ok) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "capacity")
+  let respawned: Awaited<ReturnType<typeof ports.respawn>>
+  try {
+    respawned = await ports.respawn(fresh, sessionPath)
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
   if (!respawned.ok) {
+    reservation.release()
     if (respawned.disposition === "retryable") {
       return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, deferredCode(respawned.code))
     }
@@ -130,8 +139,15 @@ export async function reviveClaimed(
     return { task_id: fresh.task_id, kind: "lost", reason: respawned.reason }
   }
 
-  const reattached = await ports.reattach(fresh, respawned.handle)
+  let reattached: Awaited<ReturnType<typeof ports.reattach>>
+  try {
+    reattached = await ports.reattach(fresh, respawned.handle)
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
   if (!reattached.ok) {
+    reservation.release()
     if (reattached.kind === "already_attached") {
       return { task_id: fresh.task_id, kind: "resumed", reason: reattached.reason }
     }

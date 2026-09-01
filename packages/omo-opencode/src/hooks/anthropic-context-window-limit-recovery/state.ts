@@ -1,4 +1,5 @@
 import type { AutoCompactState, RetryState, TruncateState } from "./types"
+import { clearAllSessionTimeouts } from "./session-timeout-map"
 
 export function getOrCreateRetryState(
   autoCompactState: AutoCompactState,
@@ -39,6 +40,16 @@ export function clearSessionState(
   autoCompactState.truncateStateBySession.delete(sessionID)
   autoCompactState.emptyContentAttemptBySession.delete(sessionID)
   autoCompactState.compactionInProgress.delete(sessionID)
+}
+
+export function clearAllSessionState(autoCompactState: AutoCompactState): void {
+  clearAllSessionTimeouts(autoCompactState.retryTimerBySession)
+  autoCompactState.pendingCompact.clear()
+  autoCompactState.errorDataBySession.clear()
+  autoCompactState.retryStateBySession.clear()
+  autoCompactState.truncateStateBySession.clear()
+  autoCompactState.emptyContentAttemptBySession.clear()
+  autoCompactState.compactionInProgress.clear()
 }
 
 export function setRetryTimer(

@@ -5,7 +5,8 @@ import { runDoctor } from "./doctor.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
-import { detectHarnesses, needsSetupSuggestion } from "./setup-detect.js"
+import { detectHarnesses } from "./setup-detect.js"
+import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
 import { printSetupReport } from "./setup-report.js"
 
 const earlyCommands = new Set(["install", "remove", "list", "config", "auth", "app-server"])
@@ -29,7 +30,8 @@ function isSelfUpdate(args) {
 function brandProfile() {
   const update = updateTarget()
   return {
-    name: "omo",
+    name: "OmO",
+    command: "omo",
     displayVersion: packageManifest().version,
     configDir: ".omo",
     // Engine state lives at the canonical `~/.omo/agent`, never directly under the config
@@ -68,6 +70,9 @@ function senpiEnvironment(senpiRoot) {
   // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load
   // the plugin via --extension and therefore never match the settings-packages detection gates.
   env.OMO_NATIVE = "1"
+  // This launcher already decided which runtime the product runs on, possibly by re-execing itself
+  // under bun. Handing that answer down stops the engine from making its own, conflicting choice.
+  env.SENPI_RUNTIME = process.versions.bun ? "bun" : "node"
   env.SENPI_BRAND = JSON.stringify(brandProfile())
 
   const binDir = nearestNodeBin(senpiRoot)
@@ -84,12 +89,12 @@ function senpiEnvironment(senpiRoot) {
   return env
 }
 
-function spawnSenpi(args, withExtension) {
+async function spawnSenpi(args, withExtension) {
   const senpi = resolveSenpi()
   const finalArgs = withExtension
     ? ["--extension", join(packageRoot, "plugin"), ...args]
     : args
-  spawnNode(senpi.cliPath, finalArgs, { env: senpiEnvironment(senpi.packageRoot) })
+  await spawnNode(senpi.cliPath, finalArgs, { env: senpiEnvironment(senpi.packageRoot) })
 }
 
 function isInteractiveDefault(args) {
@@ -113,16 +118,28 @@ function reportLegacyFlatAdoption() {
   console.error(`omo: carried forward settings from the legacy ~/.omo layout (${moved})`)
 }
 
+/**
+ * The interactive banner's sibling-credential hint is advisory, so it must never gate the engine
+ * spawn. It is answered synchronously from the suggestion cache; a stale or missing cache kicks
+ * off a detached refresh (the launcher itself never writes the cache) and still answers this
+ * launch from the cached or empty value. Any cache failure behaves as no-siblings: fail-open.
+ */
+function setupSuggestionForLaunch() {
+  const cached = readSetupSuggestionCache()
+  if (!cached.fresh) spawnSetupSuggestionRefresh()
+  return cached.suggestion === true
+}
+
 export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
   reportLegacyFlatAdoption()
   const command = args[0]
   if (command === "ulw-loop") {
-    spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))
+    await spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))
     return
   }
   if (command === "doctor") {
-    runDoctor(await detectHarnesses())
+    runDoctor(await detectHarnesses(), args.slice(1))
     return
   }
   if (command === "setup") {
@@ -144,14 +161,14 @@ export async function runLauncher(args = process.argv.slice(2)) {
     return
   }
   if (earlyCommands.has(command) || command === "update") {
-    spawnSenpi(args, false)
+    await spawnSenpi(args, false)
     return
   }
   if (isInteractiveDefault(args)) {
     console.error(`omo (omo-ai beta ${packageManifest().version})`)
-    if (process.stdout.isTTY === true && needsSetupSuggestion(await detectHarnesses())) {
+    if (process.stdout.isTTY === true && setupSuggestionForLaunch()) {
       console.error("omo: sibling credentials detected; run `omo setup` to review them")
     }
   }
-  spawnSenpi(args, true)
+  await spawnSenpi(args, true)
 }

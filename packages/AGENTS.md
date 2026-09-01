@@ -1,6 +1,6 @@
 # packages/ - Monorepo Packages
 
-**Generated:** 2026-08-17 / 94e954721
+**Generated:** 2026-08-24 / f3642fcda
 
 ## OVERVIEW
 
@@ -20,9 +20,7 @@
 ## PLATFORM LAUNCHER PACKAGES (12)
 `oh-my-opencode-darwin-arm64`, `oh-my-opencode-darwin-x64`, `oh-my-opencode-darwin-x64-baseline`, `oh-my-opencode-linux-arm64`, `oh-my-opencode-linux-arm64-musl`, `oh-my-opencode-linux-x64`, `oh-my-opencode-linux-x64-baseline`, `oh-my-opencode-linux-x64-musl`, `oh-my-opencode-linux-x64-musl-baseline`, `oh-my-opencode-windows-x64`, `oh-my-opencode-windows-x64-baseline`, `oh-my-opencode-windows-arm64`.
 
-Each contains only a `bin/oh-my-opencode.js` launcher and a `package.json`. [`script/build-binaries.ts`](../script/build-binaries.ts) writes the same generated Node-compatible launcher payload from `createPlatformLauncherSource()` to all 12 packages; these are not distinct native binaries, and the build does not perform native compilation. Published by the `publish-platform.yml` workflow.
-
-`-baseline` and `-musl` suffixes remain package-selection and compatibility metadata. Current generated launcher payloads are identical Node scripts; the suffixes preserve x64 CPU and musl libc compatibility routing, respectively. The `windows-arm64` entry targets Windows-on-ARM through x64 emulation, with the launcher’s Node fallback available when Bun cannot run. Runtime selection happens in `bin/` and `postinstall.mjs`.
+Each contains only a `bin/oh-my-opencode.js` launcher and a `package.json`. [`script/build-binaries.ts`](../script/build-binaries.ts) writes the same generated Node-compatible launcher payload from `createPlatformLauncherSource()` to all 12 packages; these are not distinct native binaries, and the build does not perform native compilation. Published by the `publish-platform.yml` workflow. `-baseline` and `-musl` suffixes remain package-selection and compatibility metadata. Current generated launcher payloads are identical Node scripts; the suffixes preserve x64 CPU and musl libc compatibility routing, respectively. The `windows-arm64` entry targets Windows-on-ARM through x64 emulation, with the launcher’s Node fallback available when Bun cannot run. Runtime selection happens in `bin/` and `postinstall.mjs`.
 
 ## MCP PACKAGES
 
@@ -62,9 +60,8 @@ Each contains only a `bin/oh-my-opencode.js` launcher and a `package.json`. [`sc
 
 - **`omo-opencode`** is the OpenCode Ultimate edition - the former root `src/`, moved here by the package layering refactor (100% git rename). It is the build entry for the main npm dist (`packages/omo-opencode/src/index.ts` → root `dist/`) and holds all 11 agents, ~55 hooks, native tools, features, and built-in MCPs. Full breakdown in [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md).
 - **`omo-codex`** is the Codex CLI Light edition (vendored Codex plugin namespace `omo` + TS installer + telemetry); its live npm alias is `lazycodex-ai`, while `lazycodex` is the repository/bin identity and `code-yeongyu/lazycodex` is the marketplace repo; full layout in [`packages/omo-codex/AGENTS.md`](omo-codex/AGENTS.md) and the publish/deploy pipeline in the root [`AGENTS.md`](../AGENTS.md).
-- **`omo-senpi`** is the native Senpi TypeScript extension adapter. It builds one local-path Pi package at `packages/omo-senpi/plugin` with 18 components, the majors being `ultrawork`, `start-work-continuation`, `ulw-loop`, `comment-checker`, `telemetry`, `lsp`, `task` (the `task` component drives the `@oh-my-opencode/senpi-task` engine and reads `omo.json` via `@oh-my-opencode/omo-config-core`), `memory`, and `init-deep-advisor`. Rules are intentionally excluded because Senpi has builtin rules. V1 is local-path install only; do not describe npm, git, or marketplace distribution unless the implementation changes. Full breakdown in [`packages/omo-senpi/AGENTS.md`](omo-senpi/AGENTS.md).
-- **`pi-goal`** is the standalone Pi goal adapter: persistent `create_goal` / `get_goal` / `update_goal` tools, `/goal`, TUI status, and continuation prompts. It is not wired into OpenCode, Codex, or Senpi. See [`packages/pi-goal/AGENTS.md`](pi-goal/AGENTS.md).
-- **`pi-webfetch`** is the standalone Pi webfetch adapter: bounded URL retrieval with markdown/text/HTML conversion and a real Pi RPC QA driver. It is not wired into OpenCode, Codex, or Senpi. See [`packages/pi-webfetch/AGENTS.md`](pi-webfetch/AGENTS.md).
+- **`omo-senpi`** is the native Senpi TypeScript extension adapter. It builds one local-path Pi package at `packages/omo-senpi/plugin` with 18 components, the majors being `ultrawork`, `ulw-execute-continuation`, `ulw-loop`, `comment-checker`, `telemetry`, `lsp`, `task` (the `task` component drives the `@oh-my-opencode/senpi-task` engine and reads `omo.json` via `@oh-my-opencode/omo-config-core`), `memory`, and `init-deep-advisor`. Rules are intentionally excluded because Senpi has builtin rules. V1 is local-path install only; do not describe npm, git, or marketplace distribution unless the implementation changes. Full breakdown in [`packages/omo-senpi/AGENTS.md`](omo-senpi/AGENTS.md).
+- **`pi-goal` + `pi-webfetch`** are standalone Pi adapters, not wired into OpenCode, Codex, or Senpi. See [`packages/pi-goal/AGENTS.md`](pi-goal/AGENTS.md) and [`packages/pi-webfetch/AGENTS.md`](pi-webfetch/AGENTS.md).
 - **`senpi-task`** is the Senpi-coupled task engine consumed only by `omo-senpi`: the task state machine, record store, in-process + RPC runners, residency/TTL/reconcile lifecycle, completion notifier, steering engine, named-team runtime, and the 7 task + 12 team `ToolDefinition`s. Full breakdown in [`packages/senpi-task/AGENTS.md`](senpi-task/AGENTS.md).
 - **`omo-native`** is the npm `omo-ai` distribution package (BETA channel only): `bin/` launcher that spawns the exact-pinned `@code-yeongyu/senpi` CLI with the staged omo-senpi plugin payload, owns `canonicalAgentDir()` (`~/.omo/agent`), and answers `--version`/self-update under the omo brand. Full breakdown in [`packages/omo-native/AGENTS.md`](omo-native/AGENTS.md).
 
@@ -73,8 +70,7 @@ Each contains only a `bin/oh-my-opencode.js` launcher and a `package.json`. [`sc
 - **No new package without explicit need.** Adding a sibling package complicates publish + CI. Justify the boundary first.
 - **Platform launcher packages** are generated. Do NOT edit their launcher payloads by hand. Modify [`script/build-binaries.ts`](../script/build-binaries.ts).
 - **`lsp-tools-mcp` + `lsp-daemon` are vendored Node-targeted source.** Build them with `bun run build:lsp-tools-mcp` / `bun run build:lsp-daemon` (each runs `npm ci` + `npm run build`) before workflows or package tasks that need their `dist/`.
-- **`packages/web/` is excluded from root `bun test`** via `bunfig.toml`. It has its own [`web-ci.yml`](../.github/workflows/web-ci.yml) workflow.
-- **CI builds** for non-platform packages run as part of the root `ci.yml`. Platform launcher packages build only via `publish-platform.yml` when triggered by `publish.yml`.
+- **`packages/web/` is excluded from root `bun test`** (own [`web-ci.yml`](../.github/workflows/web-ci.yml)); non-platform packages build in root `ci.yml`, platform launchers only via `publish-platform.yml` (triggered by `publish.yml`).
 
 ## ANTI-PATTERNS
 

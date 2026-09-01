@@ -13,6 +13,8 @@ import {
   type MemoryIdentityRuntimeDeps,
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
+import { MemorianGateRunner } from "./memorian-runner"
+import type { MemorianGatePort } from "./memorian-wiring"
 import { resolveMemoryModelRegistry } from "./model-registry-resolver"
 import { resolveMemorySessionModel } from "./session-model-resolver"
 import {
@@ -24,13 +26,14 @@ import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from ".
 import { isRecord, sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { ReflectionLiveSession, ReflectionSessionModel } from "./worker"
-import { buildFactsSandboxTransform, type SandboxPolicy } from "./sandbox"
+import { buildFactsSandboxTransform, buildMemorianSandboxTransform, type SandboxPolicy } from "./sandbox"
 
 export interface MemoryRuntimeWiring {
   resolveContext(sessionId: string): MemoryIdentityContext | undefined
   resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]>
   journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring
   factsWiringFor(identity: MemoryIdentityContext): MemoryFactsWiring
+  memorianRunnerFor(identity: MemoryIdentityContext): MemorianGatePort
   runtimeFor(identity: MemoryIdentityContext): MemoryIdentityRuntime
   triggerSessionFor(eventCtx: unknown): ReflectionTriggerSession | undefined
   dreamSessionById(sessionId: string): DreamTriggerSession | undefined
@@ -53,6 +56,7 @@ export function createMemoryRuntimeWiring(
   const runtimes = new Map<string, MemoryIdentityRuntime>()
   const journals = new Map<string, MemoryJournalWiring>()
   const factsWirings = new Map<string, MemoryFactsWiring>()
+  const memorianRunners = new Map<string, MemorianGatePort>()
 
   const resolveContext = (sessionId: string): MemoryIdentityContext | undefined =>
     options.sessions.get(sessionId)?.context
@@ -136,6 +140,35 @@ export function createMemoryRuntimeWiring(
     return wiring
   }
 
+  /**
+   * One gate runner per identity: the runner owns the single-launch latch, so a shared instance is
+   * what keeps repeated settles down to one child.
+   */
+  function memorianRunnerFor(identity: MemoryIdentityContext): MemorianGatePort {
+    const cached = memorianRunners.get(identity.identity)
+    if (cached !== undefined) return cached
+    const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+    // The gate adds no sandbox knob of its own: it rides the reflection policy the facts child uses.
+    const sandboxPolicy = settings.agents[identity.identity]?.reflection?.sandbox ?? settings.reflection.sandbox
+    // No resolveModelRegistry here on purpose: the gate runner consumes ONLY the registry snapshot
+    // its settle handler captured, because this runner's launches outlive the senpi ctx.
+    const runner = options.createMemorianRunner?.(identity) ?? new MemorianGateRunner({
+      identityPaths: identity.identityPaths,
+      loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
+      env: options.env,
+      sandbox: buildMemorianSandboxTransform({
+        policy: sandboxPolicy as SandboxPolicy,
+        onWarning: (warning) => options.logger?.warn("memory memorian sandbox degraded", {
+          identity: identity.identity,
+          warning,
+        }),
+      }),
+      ...(options.logger === undefined ? {} : { logger: options.logger }),
+    })
+    memorianRunners.set(identity.identity, runner)
+    return runner
+  }
+
   function runtimeFor(identity: MemoryIdentityContext): MemoryIdentityRuntime {
     const cached = runtimes.get(identity.identity)
     if (cached !== undefined) return cached
@@ -216,6 +249,7 @@ export function createMemoryRuntimeWiring(
     resolveModelRegistry,
     journalWiringFor,
     factsWiringFor,
+    memorianRunnerFor,
     runtimeFor,
     triggerSessionFor,
     dreamSessionById,

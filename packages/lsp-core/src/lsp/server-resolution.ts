@@ -1,16 +1,28 @@
+import { contextCwd } from "../request-context.js";
 import { getDisabledServerIds, getMergedServers } from "./config-loader.js";
 import { BUILTIN_SERVERS, LSP_INSTALL_HINTS } from "./server-definitions.js";
-import { isServerInstalled } from "./server-installation.js";
+import { isServerInstalled, resolveServerBinary } from "./server-installation.js";
 import type { ServerLookupResult } from "./types.js";
+
+/**
+ * Replaces the command name with the absolute binary path so the client spawns the exact
+ * binary that was resolved -- in particular a repo-local one that is absent from PATH.
+ */
+function withResolvedCommand(command: string[], binaryPath: string): string[] {
+	return [binaryPath, ...command.slice(1)];
+}
 
 export function findServerForExtension(ext: string): ServerLookupResult {
 	const servers = getMergedServers();
+	const workingDirectory = contextCwd();
 
 	for (const server of servers) {
-		if (server.extensions.includes(ext) && isServerInstalled(server.command)) {
+		if (!server.extensions.includes(ext)) continue;
+		const binaryPath = resolveServerBinary(server.command, workingDirectory);
+		if (binaryPath !== null) {
 			const resolvedServer = {
 				id: server.id,
-				command: server.command,
+				command: withResolvedCommand(server.command, binaryPath),
 				extensions: server.extensions,
 				priority: server.priority,
 			};
@@ -70,6 +82,7 @@ export interface ServerStatus {
 export function getAllServers(): ServerStatus[] {
 	const servers = getMergedServers();
 	const disabled = getDisabledServerIds();
+	const workingDirectory = contextCwd();
 
 	const result: ServerStatus[] = [];
 	const seen = new Set<string>();
@@ -78,7 +91,7 @@ export function getAllServers(): ServerStatus[] {
 		if (seen.has(server.id)) continue;
 		result.push({
 			id: server.id,
-			installed: isServerInstalled(server.command),
+			installed: isServerInstalled(server.command, workingDirectory),
 			extensions: server.extensions,
 			disabled: false,
 			source: server.source,
@@ -92,7 +105,7 @@ export function getAllServers(): ServerStatus[] {
 		const builtin = BUILTIN_SERVERS[id];
 		result.push({
 			id,
-			installed: builtin ? isServerInstalled(builtin.command) : false,
+			installed: builtin ? isServerInstalled(builtin.command, workingDirectory) : false,
 			extensions: builtin?.extensions ?? [],
 			disabled: true,
 			source: "disabled",

@@ -60,16 +60,21 @@ export function createToolExecuteBeforeHandler(input: {
   pendingFilePaths: Map<string, string>
   pendingTaskRefs: Map<string, PendingTaskRef>
   pendingPlanSnapshots?: Map<string, string>
+  trackFileCall?: (callID: string, sessionID: string | undefined, filePath: string) => void
+  trackTaskCall?: (callID: string, sessionID: string | undefined, task: PendingTaskRef) => void
+  trackPlanSnapshot?: (callID: string, snapshot: string) => void
   isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
-  const { ctx, pendingFilePaths, pendingTaskRefs, pendingPlanSnapshots } = input
+  const { ctx, pendingFilePaths, pendingTaskRefs, pendingPlanSnapshots, trackFileCall, trackTaskCall, trackPlanSnapshot } = input
   const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
 
-  function trackTask(callID: string, task: TrackedTopLevelTaskRef): void {
-    pendingTaskRefs.set(callID, { kind: "track", task })
+  function trackTask(callID: string, sessionID: string | undefined, task: TrackedTopLevelTaskRef): void {
+    const pending = { kind: "track", task } as const
+    pendingTaskRefs.set(callID, pending)
+    trackTaskCall?.(callID, sessionID, pending)
   }
 
   return async (toolInput, toolOutput): Promise<void> => {
@@ -87,6 +92,7 @@ export function createToolExecuteBeforeHandler(input: {
 
       // Store filePath for use in tool.execute.after
       pendingFilePaths.set(toolInput.callID, filePath)
+      trackFileCall?.(toolInput.callID, toolInput.sessionID, filePath)
 
       const sessionID = toolInput.sessionID
       const sessionWork = sessionID
@@ -103,6 +109,7 @@ export function createToolExecuteBeforeHandler(input: {
         try {
           if (existsSync(planPath)) {
             pendingPlanSnapshots.set(toolInput.callID, readFileSync(planPath, "utf-8"))
+            trackPlanSnapshot?.(toolInput.callID, readFileSync(planPath, "utf-8"))
           }
         } catch (error) {
           if (!(error instanceof Error)) {
@@ -129,10 +136,12 @@ export function createToolExecuteBeforeHandler(input: {
       if (toolInput.callID) {
         const requestedSessionId = toolOutput.args.session_id as string | undefined
         if (requestedSessionId) {
-          pendingTaskRefs.set(toolInput.callID, {
+          const pending = {
             kind: "skip",
             reason: "explicit_resume",
-          })
+          } as const
+          pendingTaskRefs.set(toolInput.callID, pending)
+          trackTaskCall?.(toolInput.callID, toolInput.sessionID, pending)
         } else {
           const prompt = typeof toolOutput.args.prompt === "string" ? toolOutput.args.prompt : ""
           const taskFromPrompt = parseTrackedTaskFromPrompt(prompt)
@@ -164,18 +173,20 @@ export function createToolExecuteBeforeHandler(input: {
             ))
 
             if (hasExistingClaim) {
-              pendingTaskRefs.set(toolInput.callID, {
+              const pending = {
                 kind: "skip",
                 reason: "ambiguous_task_key",
                 task: trackedTask,
-              })
+              } as const
+              pendingTaskRefs.set(toolInput.callID, pending)
+              trackTaskCall?.(toolInput.callID, toolInput.sessionID, pending)
               log(`[${HOOK_NAME}] Skipping task session persistence for ambiguous task key`, {
                 sessionID: toolInput.sessionID,
                 callID: toolInput.callID,
                 taskKey: trackedTask.key,
               })
             } else {
-              trackTask(toolInput.callID, trackedTask)
+              trackTask(toolInput.callID, toolInput.sessionID, trackedTask)
             }
           }
         }

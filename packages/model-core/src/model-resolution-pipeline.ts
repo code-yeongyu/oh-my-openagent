@@ -71,6 +71,11 @@ const DEFAULT_MODEL_RESOLUTION_DEPS: ModelResolutionDeps = {
   transformModelForProvider,
 }
 
+function modelIDForProvider(provider: string, model: string): string {
+  const prefix = `${provider}/`
+  return model.startsWith(prefix) ? model.slice(prefix.length) : model
+}
+
 function findFallbackVariantForModel(
   model: string,
   fallbackChain: FallbackEntry[] | undefined,
@@ -85,7 +90,7 @@ function findFallbackVariantForModel(
   return fallbackChain?.find(
     (entry) =>
       entry.providers.includes(provider) &&
-      transformModelForProvider(provider, entry.model) === modelID &&
+      transformModelForProvider(provider, modelIDForProvider(provider, entry.model)) === modelID &&
       entry.variant,
   )?.variant
 }
@@ -214,7 +219,8 @@ export function resolveModelPipeline(
         for (const entry of fallbackChain) {
           for (const provider of entry.providers) {
             if (connectedSet.has(provider)) {
-              const transformedModelId = deps.transformModelForProvider(provider, entry.model)
+              const entryModelID = modelIDForProvider(provider, entry.model)
+              const transformedModelId = deps.transformModelForProvider(provider, entryModelID)
               const model = `${provider}/${transformedModelId}`
               log("Model resolved via fallback chain (connected provider)", {
                 provider,
@@ -235,10 +241,11 @@ export function resolveModelPipeline(
     } else {
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
-          const transformedModelId = deps.transformModelForProvider(provider, entry.model)
-          const candidateModelIds = transformedModelId === entry.model
-            ? [entry.model]
-            : [entry.model, transformedModelId]
+          const entryModelID = modelIDForProvider(provider, entry.model)
+          const transformedModelId = deps.transformModelForProvider(provider, entryModelID)
+          const candidateModelIds = transformedModelId === entryModelID
+            ? [entryModelID]
+            : [entryModelID, transformedModelId]
           for (const modelID of candidateModelIds) {
             const fullModel = `${provider}/${modelID}`
             const match = deps.fuzzyMatchModel(fullModel, availableModels, [provider])

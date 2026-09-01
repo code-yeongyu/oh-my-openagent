@@ -1,0 +1,53 @@
+{
+  "sessionFiles": [
+    "2026-09-01T06-36-45-301Z_01a05b6d-0000-7000-8000-00000000000c.jsonl"
+  ],
+  "userTurnCount": 2,
+  "recall": [],
+  "stubInvocations": [
+    {
+      "at": "2026-09-01T06:36:47.362Z",
+      "argv": [
+        "-p",
+        "--system-prompt",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/runs/980dcf74-7623-47c4-9245-20313cb88734/memorian-persona.md",
+        "--tools",
+        "nudge,read",
+        "-e",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/runs/980dcf74-7623-47c4-9245-20313cb88734/nudge-extension.ts",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--session-dir",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/runs/980dcf74-7623-47c4-9245-20313cb88734",
+        "--model",
+        "omo-mock/mock-1",
+        "Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/runs/980dcf74-7623-47c4-9245-20313cb88734/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/runs/980dcf74-7623-47c4-9245-20313cb88734/transcript-window.txt, then follow the system prompt."
+      ],
+      "nudgePath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/runs/980dcf74-7623-47c4-9245-20313cb88734/nudges.ndjson",
+      "candidatesPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/runs/980dcf74-7623-47c4-9245-20313cb88734/candidates.json",
+      "transcriptPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/runs/980dcf74-7623-47c4-9245-20313cb88734/transcript-window.txt",
+      "memorianSentinel": "1",
+      "candidates": {
+        "version": 1,
+        "maxItems": 2,
+        "candidates": [
+          {
+            "path": "skills/memory-discipline/SKILL.md",
+            "description": "This skill should be used when deciding whether and where to save memory. It routes knowledge between memory notes, skills, and people records, specifies the card and observation formats, and explains when to reach for /reflect, /dream, /search, and /people.",
+            "excerpt": "or reference/, or a system/ block when it must always be in context | | A repeatable procedure: steps you would follow again in a similar situation | A skill: skills/<name>/SKILL.md, with a descripti",
+            "score": 603
+          }
+        ],
+        "surfaced": []
+      },
+      "transcript": "user: convert 42 fahrenheit to celsius and nothing else\n\nassistant: ok\n\nuser: now walk me through the restack steps one by one\n\nassistant: ok\n",
+      "persona": "# Memorian — memory nudge agent\n\nYou watch a conversation that already happened and decide whether a stored memory would materially change what the primary agent does next. You are not the primary agent and you never address the user. Your only output channel is the `nudge` tool; any text you write outside tool calls is discarded.\n\n## Inputs\n\nRead both files before deciding.\n\n- `$MEMORIAN_TRANSCRI"
+    }
+  ],
+  "pending": {
+    "dir": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-f5P2BL/memory/agents/project-99268bba/runtime/recall/pending",
+    "files": []
+  }
+}

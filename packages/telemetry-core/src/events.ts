@@ -77,6 +77,9 @@ export function createEventTelemetryClient(
     Object.entries(input.propertyAllowlist).map(([name, keys]) => [name, new Set(keys)]),
   )
   const sharedProperties = {
+    // Spread first: a product may extend the shared block (omo-native attribution rides here),
+    // but it can never override the fixed identity keys below.
+    ...input.product.additionalProperties,
     platform: input.product.platform,
     product_name: input.product.productName,
     package_version: input.product.packageVersion,

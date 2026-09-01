@@ -165,7 +165,7 @@ TASK ANALYSIS:
 
 ## Step 2: Notepad (auto-scaffolded)
 
-`/start-work` creates `.omo/notepads/{plan-name}/` with these files automatically:
+`/ulw-execute` creates `.omo/notepads/{plan-name}/` with these files automatically:
 - `learnings.md` - Conventions, patterns
 - `decisions.md` - Architectural choices
 - `issues.md` - Problems, gotchas

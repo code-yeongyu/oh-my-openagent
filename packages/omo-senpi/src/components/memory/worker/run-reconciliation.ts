@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { readdir, rm } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { readdir, rm } from "@oh-my-opencode/memory-core/fs"
 import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
@@ -8,6 +8,7 @@ import {
   getProcessStartIdentity,
   discardReflectionWorktree,
   GitMemoryRepo,
+  LockContentionError,
   type MemoryIdentity,
   type ProcessLiveness,
   type ReservedRun,
@@ -44,6 +45,8 @@ export interface ReflectionRunReconciliationOptions {
   readonly waitUntil?: (deadlineAt: number) => Promise<void>
   readonly signalProcessGroup?: (pid: number, signal: NodeJS.Signals) => void
   readonly withWriterLock?: <T>(operation: () => Promise<T>) => Promise<T>
+  /** Bind-time maintenance defers when another session is scheduling this identity. */
+  readonly deferOnSchedulerContention?: boolean
 }
 
 type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">>
@@ -57,23 +60,30 @@ export async function reconcileReflectionRuns(
     now: options.now ?? Date.now,
     hostname: options.hostname ?? readHostname,
   }
-  const results: ReflectionRunReconcileResult[] = []
-  const prelaunch = await reconcilePrelaunch(context)
-  if (prelaunch !== undefined) results.push(prelaunch)
-  const runsDir = join(options.identity.paths.reflection, "runs")
-  for (const name of await directoryNames(runsDir)) {
-    const runDir = join(runsDir, name)
-    if (existsSync(join(runDir, "final.json")) || existsSync(join(runDir, "abandoned.json"))) continue
-    if (!existsSync(join(runDir, "ledger.json"))) continue
-    const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
-    const result = await reconcileRun(context, runDir, ledger)
-    if (result !== undefined) results.push({ runId: result.runId, outcome: result.outcome })
+  try {
+    const results: ReflectionRunReconcileResult[] = []
+    const prelaunch = await reconcilePrelaunch(context)
+    if (prelaunch !== undefined) results.push(prelaunch)
+    const runsDir = join(options.identity.paths.reflection, "runs")
+    for (const name of await directoryNames(runsDir)) {
+      const runDir = join(runsDir, name)
+      if (existsSync(join(runDir, "final.json")) || existsSync(join(runDir, "abandoned.json"))) continue
+      if (!existsSync(join(runDir, "ledger.json"))) continue
+      const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
+      const result = await reconcileRun(context, runDir, ledger)
+      if (result !== undefined) results.push({ runId: result.runId, outcome: result.outcome })
+    }
+    return results
+  } catch (error) {
+    if (context.deferOnSchedulerContention && error instanceof LockContentionError) return []
+    throw error
   }
-  return results
 }
 
 async function reconcilePrelaunch(context: ReconcileContext): Promise<ReflectionRunReconcileResult | undefined> {
-  const active = (await context.reservation.readState()).active
+  const active = (await context.reservation.readState(
+    context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
+  )).active
   if (active?.reservedAt === undefined || active.launcherPid === undefined || active.launcherHostname === undefined) return undefined
   const runDir = join(context.identity.paths.reflection, "runs", active.runId)
   if (existsSync(join(runDir, "ledger.json"))) return undefined
@@ -99,7 +109,11 @@ async function reconcilePrelaunch(context: ReconcileContext): Promise<Reflection
     if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) return undefined
     await rm(runDir, { recursive: true, force: true })
   }
-  const transition = await context.reservation.complete(active.runId, "failed")
+  const transition = await context.reservation.complete(
+    active.runId,
+    "failed",
+    context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
+  )
   if (transition.launch !== undefined) context.launch?.(transition.launch)
   return { runId: active.runId, outcome: "failed" }
 }

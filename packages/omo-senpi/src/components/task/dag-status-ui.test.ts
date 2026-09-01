@@ -176,9 +176,9 @@ describe("createDagStatusUi.syncNow", () => {
     expect(pendingRows[0]).toContain("ship-it")
     expect(pendingRows[0]).toContain("pending")
     expect(pendingRows[0]).toContain("wave 1/2")
-    expect(pendingRows.slice(1)).toEqual(["  ○ plan category:quick", "  ○ build agent:coder"])
-    expect(runningRows.slice(1)).toEqual(["  ▶ plan category:quick", "  ○ build agent:coder"])
-    expect(settledRows.slice(1)).toEqual(["  ✓ plan category:quick", "  ✗ build agent:coder"])
+    expect(pendingRows.slice(1)).toEqual(["  ◌ plan · category:quick", "  ◌ build · agent:coder"])
+    expect(runningRows.slice(1)).toEqual(["  ▶ plan · category:quick", "  ⊟ build · agent:coder"])
+    expect(settledRows.slice(1)).toEqual(["  ✗ build · agent:coder", "  ✓ plan · category:quick"])
     expect(settledRows[0]).toContain("wave 2/2")
   })
 
@@ -206,9 +206,9 @@ describe("createDagStatusUi.syncNow", () => {
 
     // then
     expect(rowsOf(ui).slice(1)).toEqual([
-      "  ✓ plan category:quick",
-      "  ▶ build category:quick x3",
-      "  ○ ship category:quick",
+      "  ▶ build · category:quick · x3",
+      "  ◌ ship · category:quick",
+      "  ✓ plan · category:quick",
     ])
   })
 
@@ -230,9 +230,11 @@ describe("createDagStatusUi.syncNow", () => {
     // when
     dagUi.syncNow()
 
-    // then
-    expect(rowsOf(ui)[0]).toContain("⏸")
-    expect(rowsOf(ui).slice(1)).toEqual(["  ⊘ a category:quick", "  ⊘ b category:quick"])
+    // then the run header takes the neutral pause-family icon and still reads paused with no
+    // live lease and no running node, while node icons keep their own per-state glyphs
+    expect(rowsOf(ui)[0]).toContain("paused")
+    expect(rowsOf(ui)[0]).not.toContain("⏸")
+    expect(rowsOf(ui).slice(1)).toEqual(["  ⊘ a · category:quick", "  ⊘ b · category:quick"])
   })
 
   it("#given a run header #when syncing #then the header carries the node counts", () => {
@@ -309,7 +311,7 @@ describe("createDagStatusUi.syncNow", () => {
     // given
     const ui = fakeUi()
     const dagUi = createDagStatusUi({
-      manager: fakeManager([snapshot({ runId: "dag_1", nodes: [node({ id: "a", state: "running" })] })]),
+      manager: fakeManager([snapshot({ runId: "dag_1", nodes: [node({ id: "a", state: "running", startedAt: new Date(0).toISOString() })] })]),
       runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
       timers: fakeTimers(),
     })
@@ -321,6 +323,50 @@ describe("createDagStatusUi.syncNow", () => {
     expect(ui.widgetCalls.at(-1)?.key).toBe("omo-dag")
     expect(DAG_STATUS_UI_KEY).not.toBe("omo-task")
     expect(ui.widgetCalls.at(-1)?.placement).toBe("belowEditor")
+  })
+
+  it("#given a terminal width seam #when rendering the same run at two widths #then the row adapts and the elapsed ticks against now", () => {
+    // given one running node whose live activity is long enough to need the width budget
+    const manager = fakeManager([
+      snapshot({
+        runId: "dag_1",
+        nodes: [node({ id: "wide-node", state: "running", startedAt: new Date(0).toISOString() })],
+      }),
+    ])
+    const ui = fakeUi()
+    const dagUi = createDagStatusUi({
+      manager,
+      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
+      timers: fakeTimers(),
+      terminalWidth: () => 120,
+      now: () => 95_000,
+    })
+    dagUi.onActivity(activity({ runId: "dag_1", nodeId: "wide-node", activity: "running bash grep -rn scheduler-claim packages and reporting the wave manifest drift" }))
+    dagUi.syncNow()
+    const wide = rowsOf(ui)[1] ?? ""
+
+    // when the same session narrows to 50 columns
+    const narrow = (() => {
+      const narrowUi = fakeUi()
+      const narrowDagUi = createDagStatusUi({
+        manager,
+        runtime: { ui: () => narrowUi, sessionId: () => "session-a", mode: () => "tui" },
+        timers: fakeTimers(),
+        terminalWidth: () => 50,
+        now: () => 95_000,
+      })
+      narrowDagUi.onActivity(activity({ runId: "dag_1", nodeId: "wide-node", activity: "running bash grep -rn scheduler-claim packages and reporting the wave manifest drift" }))
+      narrowDagUi.syncNow()
+      return rowsOf(narrowUi)[1] ?? ""
+    })()
+
+    // then the wide row carries the activity and the elapsed, the narrow row drops only the activity
+    expect(wide).toContain("category:")
+    expect(wide).toContain("scheduler-claim")
+    expect(wide).toContain("1m 35s")
+    expect(narrow).toContain("category:quick")
+    expect(narrow).toContain("1m 35s")
+    expect(narrow).not.toContain("scheduler-claim")
   })
 })
 
@@ -435,7 +481,8 @@ describe("createDagStatusUi.onActivity", () => {
     dagUi.syncNow()
 
     // then
-    expect(rowsOf(ui)[1]).toBe("  ✓ a category:quick")
+    expect(rowsOf(ui)[1]).toBe("  ▶ b · category:quick")
+    expect(rowsOf(ui)[2]).toBe("  ✓ a · category:quick")
     dagUi.dispose()
   })
 
@@ -506,5 +553,33 @@ describe("createDagStatusUi.onActivity", () => {
     // then
     expect(manager.snapshotCalls).toHaveLength(0)
     expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
+  })
+})
+
+
+// #7316: a live run whose snapshot projection fails (or whose session filter yields nothing) used
+// to clear the widget outright, which reads to the user as "the DAG died".
+describe("createDagStatusUi live-run visibility", () => {
+  it("#given a live run whose snapshot throws #when syncing #then the widget is not cleared to undefined", () => {
+    // given a manager that lists one running run but cannot project it
+    const manager: DagStatusUiManager = {
+      list: () => [{ runId: "dag_x", status: "running" }],
+      snapshot: () => {
+        throw new Error("checkpoint unreadable")
+      },
+    }
+    const ui = fakeUi()
+    const statusUi = createDagStatusUi({
+      manager,
+      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
+    })
+
+    // when
+    statusUi.syncNow()
+
+    // then the widget was never blanked while the run is still live
+    const cleared = ui.widgetCalls.filter((call) => call.key === DAG_STATUS_UI_KEY && call.content === undefined)
+    expect(cleared).toEqual([])
+    statusUi.dispose()
   })
 })

@@ -74,12 +74,18 @@ identity instead of impersonating the product.
 
 | field | value | effect |
 | --- | --- | --- |
-| `name` | `omo` | welcome header, terminal titles, help, tips, first-run, system-prompt identity |
+| `name` | `OmO` | welcome header, terminal titles, help, tips, first-run, system-prompt identity |
 | `displayVersion` | the omo-ai version | `omo --version` and the TUI header; the engine version stays internal for update comparisons |
 | `configDir` + `flatLayout` | `.omo`, nested | agent state lives at `~/.omo/agent` - the one directory every omo entry point resolves through `bin/lib/agent-dir.js`; the launcher pins it for the engine with `OMO_CODING_AGENT_DIR` plus the legacy `SENPI_CODING_AGENT_DIR` |
 | `envPrefix` | `OMO` | `OMO_*` variables are read first, then the legacy `SENPI_*` and `PI_*` names |
 | `userAgent` / `originator` | `omo` | outgoing request identity |
 | `update` | `omo-ai`, `beta`, `npm i -g omo-ai@beta` | the update banner checks the beta dist-tag of omo-ai and prints the product's own command |
+
+The display name also becomes Senpi's `APP_NAME`, so process titles, exported
+session filenames, debug-log filenames, and opt-in provider attribution headers
+use `OmO`. Machine contracts remain explicitly pinned by the other fields:
+`.omo`, `OMO_*`, the `omo` User-Agent/originator, and the lowercase `omo`
+command/package names do not derive from the display spelling.
 
 The update channel matters: omo-ai's `latest` tag is pinned to the deprecated bootstrap
 placeholder forever, so a `latest` lookup would never see a release. The engine therefore reads
@@ -99,3 +105,26 @@ Order matters:
 2. Then `npm i -g omo-ai@beta`.
 
 Machines already on a renamed release have no global `omo` and install cleanly in one step.
+
+## Bun-global launcher shim (POSIX)
+
+A `bun add -g` install reaches `bin/omo.js` through a symlink in the bun bin dir, so node boots
+first and the launcher re-execs bun on every launch - a measured 70-85ms node tax per invocation.
+On darwin/linux the launcher therefore keeps that user-facing bin as a tiny `#!/bin/sh` shim
+(`bin/lib/bun-bin-shim.js`) that execs bun on the real `bin/omo.js` directly:
+
+- the check runs on node boots only (a bun process already arrived through the shim), costs one
+  lstat per boot plus a few-hundred-byte read when the bin is already a shim, and is fail-open:
+  any error leaves the launch untouched and only `OMO_DEBUG` narrates it;
+- only bun's own link to this install is replaced - a foreign file, a foreign symlink, or a
+  missing bin is never touched, and nothing is created from nothing;
+- `bun add -g` rewrites the bin link back to a symlink on every update, and the next launch
+  regenerates the shim (verified against bun 1.4.0: updates replace the file, `bun remove -g`
+  removes it); deleting the shim by hand has the same self-healing effect;
+- `OMO_RUNTIME=node` is honored inside the shim: it execs the entrypoint, whose
+  `#!/usr/bin/env node` line is exactly what the stock symlink did, so launcher and engine both
+  stay on node end to end; a bun that moved or vanished falls back the same way;
+- npm installs and Windows never enter the repair: the package's `bin/omo.js` shebang and bin
+  mapping - the only inputs npm's Windows `.cmd`/`.ps1` shims read - are unchanged, and the
+  generated shim's `#!/bin/sh` line exists only inside the user's bun bin dir, which Windows
+  never resolves.

@@ -125,7 +125,7 @@ The output should be consistent. Not random, not surprising, not "creative" in w
 ### Continuous
 
 Work should survive interruptions:
-- Session crash on a Prometheus plan? Resume with `/start-work` (Atlas + boulder). Otherwise use `/handoff` for a new session or `/goal resume` for a paused goal
+- Session crash on a Prometheus plan? Resume with `/ulw-execute` (Atlas + boulder). Otherwise use `/handoff` for a new session or `/goal resume` for a paused goal
 - Need to step away? Progress is tracked
 - Multi-day project? Context is preserved
 
