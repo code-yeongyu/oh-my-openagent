@@ -1,0 +1,8 @@
+{
+  "workflow": 31932110216,
+  "job": 95128456220,
+  "head": "b652ab93bcdd930e367338d37b5864537eaa1018",
+  "result": "ERROR",
+  "error": "console host exited 1 before ready: AllocConsole failed: 5",
+  "interpretation": "Win32 error 5 means the PowerShell host already owns a console. The host precondition was satisfied, but the probe treated it as fatal."
+}

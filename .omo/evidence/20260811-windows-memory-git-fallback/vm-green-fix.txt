@@ -1,0 +1,22 @@
+oh-my-openagent #6701 Windows VM GREEN evidence
+Date: 2026-08-11
+Control path: Bunshin machine SDK -> mengmotaMac -> SSH -> Windows 11
+VM: Windows 11 {dcde557f-dcad-4131-81b5-11f3b5948310}
+Branch: fix/omo-memory-windows-git-fallback
+
+=== GREEN REVISION b5caee836 ===
+> New-Item -ItemType Directory -Force -Path C:\Users\yeongyu\AppData\Local\Temp\omo6701-qa\b5caee836
+> Invoke-WebRequest https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/b5caee836/packages/memory-core/src/git/exec.ts -OutFile C:\Users\yeongyu\AppData\Local\Temp\omo6701-qa\b5caee836\exec.ts
+exec.ts bytes=5052 sha256=873135B040E18A1BEE6C2A173F2A23FE34F3279A4DDABB65065219255694AA2A
+> Invoke-WebRequest https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/b5caee836/packages/memory-core/src/git/errors.ts -OutFile C:\Users\yeongyu\AppData\Local\Temp\omo6701-qa\b5caee836\errors.ts
+errors.ts bytes=1559 sha256=A8C808FC0DB58D88960AB005DC1E17D6804FFF70DFB56AEBC2359C495B0DDE23
+> bun -e "import { createNodeGitExec } from './exec.ts'; const env = { SystemRoot: process.env.SystemRoot, ProgramFiles: process.env.ProgramFiles, 'ProgramFiles(x86)': process.env['ProgramFiles(x86)'], LOCALAPPDATA: process.env.LOCALAPPDATA, Path: 'C:\only-path' }; try { console.log(JSON.stringify(await createNodeGitExec().run(['--version'], { cwd: process.env.USERPROFILE, timeoutMs: 10000, env }))); } catch (error) { console.error(error.name + ': ' + error.message); process.exitCode = 1; }"
+--- STDOUT ---
+{"code":0,"stdout":"git version 2.54.0.windows.1\n","stderr":""}
+
+--- STDERR ---
+EXIT_CODE=0
+
+REMOTE_COMMAND_EXIT=0
+
+GREEN RESULT: PASS - isolated Path returned JSON code 0 with stdout "git version 2.54.0.windows.1" and process exit code 0.

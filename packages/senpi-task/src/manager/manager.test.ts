@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
 
+import "./residency-unlimited.test"
 import { createTaskLifecycle } from "../lifecycle"
 import type { ResidentHandle, ResidencyRegistry } from "../lifecycle"
 import type { ResolvedModelRecord } from "../state"

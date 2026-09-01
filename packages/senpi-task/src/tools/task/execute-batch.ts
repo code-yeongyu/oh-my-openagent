@@ -5,15 +5,16 @@ import type { TaskRecord } from "../../state"
 import type { ForegroundWaitOptions, ForegroundWaitResult } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
 import { MAX_TASK_BATCH_ITEMS } from "./params"
+import { appendMissingSkills } from "./skill-result"
 import { backgroundConversionText } from "./start-presentation"
-import type { ResolvedSpawnItem, TaskToolContext, TaskToolDetails, TaskToolItemDetail } from "./types"
+import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDetails, TaskToolItemDetail } from "./types"
 
 type StartedResult = Extract<StartResult, { kind: "started" }>
 type FailedStartResult = Exclude<StartResult, StartedResult>
 
 type BatchStart =
-  | { readonly kind: "started"; readonly item: ResolvedSpawnItem; readonly result: StartedResult }
-  | { readonly kind: "failed"; readonly item: ResolvedSpawnItem; readonly detail: TaskToolItemDetail }
+  | { readonly kind: "started"; readonly item: ResolvedSpawnItem; readonly result: StartedResult; readonly skills?: TaskSkillSummary }
+  | { readonly kind: "failed"; readonly item: ResolvedSpawnItem; readonly detail: TaskToolItemDetail; readonly skills?: TaskSkillSummary }
 
 type BatchItemOutput = {
   readonly detail: TaskToolItemDetail
@@ -28,6 +29,7 @@ export type ExecuteBatchInput = ForegroundWaitOptions & {
   readonly ctx: TaskToolContext
   readonly runInBackground: boolean
   readonly startItem: (item: ResolvedSpawnItem) => Promise<StartResult>
+  readonly skillSummaryFor?: (item: ResolvedSpawnItem) => TaskSkillSummary | undefined
 }
 
 function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToolDetails> {
@@ -38,30 +40,42 @@ function continuationFooter(taskId: string): string {
   return `\n\n[task_id: ${taskId} - continue with task_send(to="${taskId}", message="...")]`
 }
 
-function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult): TaskToolItemDetail {
+function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult, skills?: TaskSkillSummary): TaskToolItemDetail {
   switch (start.kind) {
     case "plan_unresolved": {
-      return itemError(item, "", start.error.message + categoryListSuffix(start.error))
+      return itemError(item, "", start.error.message + categoryListSuffix(start.error), skills)
     }
     case "depth_denied":
-      return itemError(item, "", start.reason)
+      return itemError(item, "", start.reason, skills)
     case "start_failed":
-      return { task_id: start.task_id, name: start.name, status: "error", error_message: start.error_message }
+      return {
+        task_id: start.task_id,
+        name: start.name,
+        status: "error",
+        error_message: start.error_message,
+        ...(skills === undefined ? {} : { skills }),
+      }
     case "residency_denied":
-      return itemError(item, "", start.reason)
+      return itemError(item, "", start.reason, skills)
   }
 }
 
-function itemError(item: ResolvedSpawnItem, taskId: string, message: string): TaskToolItemDetail {
+function itemError(
+  item: ResolvedSpawnItem,
+  taskId: string,
+  message: string,
+  skills?: TaskSkillSummary,
+): TaskToolItemDetail {
   return {
     task_id: taskId,
     ...(item.name !== undefined && { name: item.name }),
     status: "error",
     error_message: message,
+    ...(skills === undefined ? {} : { skills }),
   }
 }
 
-function startedDetail(item: ResolvedSpawnItem, start: StartedResult): TaskToolItemDetail {
+function startedDetail(item: ResolvedSpawnItem, start: StartedResult, skills?: TaskSkillSummary): TaskToolItemDetail {
   return {
     task_id: start.task_id,
     name: start.name,
@@ -71,6 +85,7 @@ function startedDetail(item: ResolvedSpawnItem, start: StartedResult): TaskToolI
     ...(start.resolved_model === undefined ? {} : { resolved_model: start.resolved_model }),
     status: start.status,
     ...(start.queue_position !== undefined && { queue_position: start.queue_position }),
+    ...(skills === undefined ? {} : { skills }),
   }
 }
 
@@ -79,10 +94,11 @@ async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]
   for (const item of input.items) {
     try {
       const start = await input.startItem(item)
+      const skills = input.skillSummaryFor?.(item)
       starts.push(
         start.kind === "started"
-          ? { kind: "started", item, result: start }
-          : { kind: "failed", item, detail: failedStartDetail(item, start) },
+          ? { kind: "started", item, result: start, ...(skills === undefined ? {} : { skills }) }
+          : { kind: "failed", item, detail: failedStartDetail(item, start, skills), ...(skills === undefined ? {} : { skills }) },
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -124,8 +140,8 @@ function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskTo
   const live = starts.filter((start): start is Extract<BatchStart, { kind: "started" }> => start.kind === "started")
   const status = live.length > 0 ? "running" : "error"
   const taskId = live[0]?.result.task_id ?? ""
-  const items = starts.map((start) => start.kind === "started" ? startedDetail(start.item, start.result) : start.detail)
-  return result(backgroundText(starts, status), {
+  const items = starts.map((start) => start.kind === "started" ? startedDetail(start.item, start.result, start.skills) : start.detail)
+  return result(appendMissingSkills(backgroundText(starts, status), starts.map((start) => start.skills)), {
     task_id: taskId,
     status,
     mode: "spawn",
@@ -134,13 +150,14 @@ function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskTo
   })
 }
 
-function recordOutput(record: TaskRecord, start: StartedResult): BatchItemOutput {
+function recordOutput(record: TaskRecord, start: StartedResult, skills?: TaskSkillSummary): BatchItemOutput {
   return {
     detail: {
       task_id: record.task_id,
       name: record.name ?? start.name,
       status: record.status,
       ...(record.error_message !== undefined && { error_message: record.error_message }),
+      ...(skills === undefined ? {} : { skills }),
     },
     body: record.final_response ?? record.error_message ?? `Task ${record.status}`,
     continuation: true,
@@ -150,7 +167,7 @@ function recordOutput(record: TaskRecord, start: StartedResult): BatchItemOutput
 function promotedOutput(start: Extract<BatchStart, { kind: "started" }>, budgetSeconds: number): BatchItemOutput {
   return {
     detail: {
-      ...startedDetail(start.item, start.result),
+      ...startedDetail(start.item, start.result, start.skills),
       run_in_background: true,
     },
     body: backgroundConversionText(start.result, { taskSummary: start.item.task_summary, description: start.item.description }, budgetSeconds),
@@ -162,10 +179,16 @@ function rejectionMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
 }
 
-function rejectedOutput(start: StartedResult, aborted: boolean, reason: unknown): BatchItemOutput {
+function rejectedOutput(start: Extract<BatchStart, { kind: "started" }>, aborted: boolean, reason: unknown): BatchItemOutput {
   const message = aborted ? "parent turn aborted" : rejectionMessage(reason)
   return {
-    detail: { task_id: start.task_id, name: start.name, status: aborted ? "cancelled" : "error", error_message: message },
+    detail: {
+      task_id: start.result.task_id,
+      name: start.result.name,
+      status: aborted ? "cancelled" : "error",
+      error_message: message,
+      ...(start.skills === undefined ? {} : { skills: start.skills }),
+    },
     body: message,
     continuation: true,
   }
@@ -215,21 +238,21 @@ async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[
     }
     const entry = settled[liveIndex]
     liveIndex += 1
-    if (entry === undefined) return rejectedOutput(start.result, false, "missing wait result")
+    if (entry === undefined) return rejectedOutput(start, false, "missing wait result")
     if (entry.status === "fulfilled") {
       const waited: ForegroundWaitResult = entry.value
       return waited.kind === "completed"
-        ? recordOutput(waited.record, start.result)
+        ? recordOutput(waited.record, start.result, start.skills)
         : promotedOutput(start, waited.budgetSeconds)
     }
     const aborted = input.signal?.aborted === true && entry.reason === input.signal.reason
-    return rejectedOutput(start.result, aborted, entry.reason)
+    return rejectedOutput(start, aborted, entry.reason)
   })
   const items = outputs.map((output) => output.detail)
   const status = aggregateStatus(items, batchAborted)
   const taskId = live[0]?.result.task_id ?? ""
   const runInBackground = items.some((item) => item.run_in_background === true)
-  return result(syncText(status, outputs), {
+  return result(appendMissingSkills(syncText(status, outputs), starts.map((start) => start.skills)), {
     task_id: taskId,
     status,
     mode: "spawn",

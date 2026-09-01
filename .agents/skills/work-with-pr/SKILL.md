@@ -196,12 +196,20 @@ while true:
 
 ### Gate A: CI Checks
 
-CI is the fastest feedback loop. Wait for it to complete, then parse results.
+CI is the fastest feedback loop. Subscribe to its completion via `monitor` — never block a model round-trip on `gh pr checks --watch`.
 
-```bash
-# Wait for checks to start (GitHub needs a moment after push)
-# Then watch for completion
-gh pr checks "$PR_NUMBER" --watch --fail-fast
+```
+# Subscribe to CI completion — the monitor event wakes the session when checks finish.
+# Do NOT use `gh pr checks --watch` as a blocking tool call; it burns a full model
+# round-trip (~29s) on every poll. Instead, register a monitor and end the turn:
+monitor({
+  description: "CI completion for PR $PR_NUMBER",
+  command: "gh pr checks $PR_NUMBER --watch --fail-fast",
+  filter: "completed|fail|cancel"
+})
+# → end turn; the monitor's matching line arrives as an injected event.
+# For a single midpoint status peek (at most once), use:
+#   gh pr checks "$PR_NUMBER"  # one-shot, no --watch
 ```
 
 **On failure**: Get the failed run logs to understand what broke:
@@ -243,20 +251,21 @@ fi
 
 **On issues**: Cubic's review body contains structured issue descriptions. Parse them, determine which are valid (some may be false positives), and fix the valid ones per the iteration discipline below.
 
-Cubic reviews are triggered automatically on PR updates. After pushing a fix, wait for the new review to appear before checking again. Use `gh api` polling with a conditional loop:
+Cubic reviews are triggered automatically on PR updates. After pushing a fix, subscribe to the new review arriving — never spin a `for _ in $(seq 1 30)` polling loop that burns model round-trips.
 
-```bash
-# Wait for a NEW Cubic review after push. If none arrives within the bound,
-# Cubic is out of quota (or not running) → skip Gate B rather than spin forever.
+```
+# Subscribe to a NEW Cubic review after push. The monitor exits when a review
+# newer than PUSH_TIME appears, or times out (quota exhausted → Gate B SKIPPED).
 PUSH_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-for _ in $(seq 1 30); do
-  LATEST_REVIEW_TIME=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
-    --jq '[.[] | select(.user.login == "cubic-dev-ai[bot]")] | last | .submitted_at')
-  [[ "$LATEST_REVIEW_TIME" > "$PUSH_TIME" ]] && break
-  timeout 20 gh pr checks "$PR_NUMBER" --watch >/dev/null 2>&1 || true  # spend the interval usefully
-done
-# Loop exhausted without a newer review → treat Gate B as SKIPPED (quota exhausted)
-[[ "$LATEST_REVIEW_TIME" > "$PUSH_TIME" ]] || echo "Cubic: SKIPPED (no review within bound — quota exhausted)"
+monitor({
+  description: "Cubic review for PR $PR_NUMBER",
+  command: "LATEST=$(gh api repos/${REPO}/pulls/${PR_NUMBER}/reviews --jq '[.[] | select(.user.login == "cubic-dev-ai[bot]")] | last | .submitted_at // empty'); [ -n \"$LATEST\" ] && [ \"$LATEST\" > \"$PUSH_TIME\" ] && echo NEW_REVIEW || echo WAITING",
+  filter: "NEW_REVIEW",
+  timeout_ms: 600000   # 10 min bound — if no review arrives, Gate B is SKIPPED (quota exhausted)
+})
+# → end turn; if the monitor times out without NEW_REVIEW, treat Gate B as SKIPPED.
+# For a single midpoint peek (at most once), use:
+#   gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --jq '[.[] | select(.user.login == "cubic-dev-ai[bot]")] | last | .submitted_at'
 ```
 
 ### Iteration discipline
@@ -292,13 +301,18 @@ gh pr merge "$PR_NUMBER" --merge --auto --delete-branch
 # are green, fall back to a direct merge: gh pr merge "$PR_NUMBER" --merge --delete-branch
 ```
 
-Then WAIT until the merge has actually completed before you report done or clean up - never walk away while the PR is still merging:
+Then subscribe to the merge completing — never block a model round-trip on an `until [ ... MERGED ]` polling loop:
 
-```bash
-# Block until the PR is actually MERGED (auto-merge lands once all required checks pass)
-until [ "$(gh pr view "$PR_NUMBER" --json state -q .state)" = "MERGED" ]; do
-  gh pr checks "$PR_NUMBER" --watch --fail-fast >/dev/null 2>&1 || true   # spend the interval on the checks
-done
+```
+# Subscribe to merge completion. The monitor exits when gh pr view returns MERGED.
+monitor({
+  description: "Merge completion for PR $PR_NUMBER",
+  command: "[ \"$(gh pr view $PR_NUMBER --json state -q .state)\" = \"MERGED\" ] && echo MERGED || echo WAITING",
+  filter: "MERGED",
+  timeout_ms: 1800000   # 30 min bound for auto-merge to land after all gates pass
+})
+# → end turn; the MERGED event wakes the session for the cleanup step.
+# If the monitor times out, check merge state once: gh pr view "$PR_NUMBER" --json state -q .state
 ```
 
 If the user opted out of merging, skip the merge but STILL run the cleanup below: the worktree is removed either way.

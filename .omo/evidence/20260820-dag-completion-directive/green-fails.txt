@@ -1,0 +1,27 @@
+(fail) cli-local > #given isolated agent dir #when install then uninstall are invoked #then stdout is one-line JSON and settings round-trip
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is tracked #when Run now is chosen #then suggestedMode is committed
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is untracked #when Run now is chosen #then suggestedMode is local
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never anywhere #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never in this project #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Run now #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Skip this time #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the advisor opens #then last proposed HEAD is written first
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the dialog times out #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given fake timers #when session_start fires #then ui.select waits for setTimeout zero
+(fail) createInitDeepAdvisorComponent > #given session_start #when the handler returns #then ui.select has not run synchronously
+(fail) OmO Native product identity > #given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi
+(fail) omo-senpi lsp architecture boundary > #given the daemon-backed adapter #when source shape is audited #then no vendored LSP engine remains
+(fail) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered
+(fail) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts
+(fail) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract
+(fail) omo-senpi ultrawork component > #given generated directive #when embed script runs check #then passes without drift
+(fail) omo-senpi ultrawork component > #given generated directive drift #when embed script runs check #then fails
+(fail) session_start component ordering > #given real onboarding state and an active ulw loop #when startup then agent_end fire #then onboarding is preserved and the first-session advisor stays detached and suppressed
+(fail) task 13 senpi QA scripts > #given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox
+(fail) task 13 senpi QA scripts > #given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory
+(fail) task 13 senpi QA scripts > #given drive.mjs self-test #when executed #then sandbox helpers validate successfully
+(fail) task 13 senpi QA scripts > #given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape
+(fail) task 13 senpi QA scripts > #given mock provider self-test #when executed #then text and tool-call script steps validate
+(fail) task 13 senpi QA scripts > #given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi
+(fail) task 13 senpi QA scripts > #given probe-continuation self-test #when executed #then continuation helpers validate successfully
+(fail) task 13 senpi QA scripts > #given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup

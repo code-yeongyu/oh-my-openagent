@@ -1,0 +1,22 @@
+Bundled 803 modules in 37ms
+
+  omo.js  0.97 MB  (entry point)
+
+Bundled 278 modules in 11ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 75 modules in 6ms
+
+  omo-memory-mcp.js  57.83 KB  (entry point)
+
+Bundled 3 modules in 3ms
+
+  memory-run-supervisor.mjs  6.94 KB  (entry point)
+
+Built omo-senpi extensions: /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/plugin/extensions/omo.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/plugin/extensions/omo-member.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+
+--- GENERATED STATUS ---
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+ M packages/omo-senpi/plugin/extensions/omo.js

@@ -1,0 +1,28 @@
+diff.js, files.js, goal, gpt-apply-patch, help, history-search, hooks, import-repro, look-at, loop-guard, mcp,          
+mock-provider, model-fallback, nested-agents-md, omo.js, openai-web-search, permission-system, prompt-preset,           
+prompt-url-widget.js, recommended-models, redraws, rules, service-tier, src, terminal, todo, tool-pair-guard, tps.js,   
+ttsr, video-in, webfetch, websearch                                                                                     
+
+[Skill conflicts]                                                                                                       
+  "hyperplan" collision:                                                                                                
+    ✓ auto (project)                                                                                                    
+/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/senpi-memory-footer-first-use/.agents/skills/hyperplan/SKILL.md    
+    ✗                                                                                                                   
+/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/senpi-memory-footer-first-use/packages/omo-senpi/plugin/skills/hype
+rplan/SKILL.md (skipped)                                                                                                
+                                                                                                                        
+/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/senpi-memory-footer-first-use/.omo/evidence/20260810-memory-footer-
+first-use/qa-runtime/before/memory/agents/project-fffa1c2d/repo/skills                                                  
+    skill path does not exist                                                                                           
+
+                                                                                                                        
+ hello before memory use                                                                                                
+                                                                                                                        
+
+ no memory tool used                                                                                                    
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                       
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+…ter-first-use/qa-runtime/before/project • fix/senpi-memory-footer-first-use • 157/200K (0.1%) (auto)  (omo-mock) mock-1
+(😺 OmO Native)

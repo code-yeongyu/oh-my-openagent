@@ -62,9 +62,11 @@ interface TranscriptCacheEntry {
   createdAt: number
 }
 
-const TRANSCRIPT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+export const TRANSCRIPT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const TRANSCRIPT_CACHE_PRUNE_INTERVAL_MS = TRANSCRIPT_CACHE_TTL_MS
 
 const transcriptCache = new Map<string, TranscriptCacheEntry>()
+let cleanupInterval: ReturnType<typeof setInterval> | null = null
 
 function logTranscriptError(message: string, error: unknown): void {
   log(message, { error })
@@ -109,6 +111,31 @@ export function clearTranscriptCache(sessionId?: string): void {
 
 export function hasTranscriptCacheEntry(sessionId: string): boolean {
   return transcriptCache.has(sessionId)
+}
+
+function pruneExpiredTranscriptCache(): void {
+  const now = Date.now()
+  for (const sessionId of [...transcriptCache.keys()]) {
+    const entry = transcriptCache.get(sessionId)
+    if (!entry || now - entry.createdAt >= TRANSCRIPT_CACHE_TTL_MS) {
+      clearTranscriptCache(sessionId)
+    }
+  }
+}
+
+function ensureTranscriptCacheCleanup(): void {
+  if (cleanupInterval) return
+  cleanupInterval = setInterval(pruneExpiredTranscriptCache, TRANSCRIPT_CACHE_PRUNE_INTERVAL_MS)
+  if (typeof cleanupInterval === "object" && "unref" in cleanupInterval) {
+    cleanupInterval.unref()
+  }
+}
+
+export function stopTranscriptCacheCleanup(): void {
+  clearTranscriptCache()
+  if (!cleanupInterval) return
+  clearInterval(cleanupInterval)
+  cleanupInterval = null
 }
 
 function isCacheValid(entry: TranscriptCacheEntry): boolean {
@@ -212,6 +239,7 @@ export async function buildTranscriptFromSession(
         tempPath: null,
         createdAt: Date.now(),
       })
+      ensureTranscriptCacheCleanup()
     }
 
     const allEntries = [...baseEntries, buildCurrentEntry(currentToolName, currentToolInput)]

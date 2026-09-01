@@ -1,0 +1,846 @@
+# Scenario 01 - build and package staged omo-ai payload
+started=2026-08-09T15:38:59Z
++ bun run build:omo-native
+$ bun run script/build-omo-native.ts
+$ bun run build:lsp-daemon && bun run build:ast-grep-mcp && bun run build:senpi-plugin:stage
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 52 packages, and audited 55 packages in 762ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && bun build src/cli.ts src/index.ts src/client.ts --outdir dist --target node --format esm && node scripts/stamp-dist-version.mjs
+
+node:internal/modules/cjs/loader:1573
+  throw err;
+  ^
+
+Error: Cannot find module '/Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/lsp-daemon/node_modules/.bin/tsc'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+    at Module._load (node:internal/modules/cjs/loader:1346:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v26.6.0
+error: script "build:lsp-daemon" exited with code 1
+error: script "build:senpi-plugin" exited with code 1
+build:senpi-plugin failed with exit code 1
+error: script "build:omo-native" exited with code 1
+build_exit=1
+
+# Build retry after concurrent test:codex npm-ci race removed the tsc target during the first invocation
+retry_started=2026-08-09T15:39:31Z
++ bun run build:omo-native
+$ bun run script/build-omo-native.ts
+$ bun run build:lsp-daemon && bun run build:ast-grep-mcp && bun run build:senpi-plugin:stage
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 52 packages, and audited 55 packages in 536ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && bun build src/cli.ts src/index.ts src/client.ts --outdir dist --target node --format esm && node scripts/stamp-dist-version.mjs
+
+Bundled 78 modules in 6ms
+
+  cli.js     232.1 KB   (entry point)
+  index.js   212.91 KB  (entry point)
+  client.js  210.46 KB  (entry point)
+
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 251 modules in 11ms
+
+  cli.js  84.78 KB  (entry point)
+
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] wrote 148 frontend reference files from submodules
+Staged Senpi LSP runtime: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+
+added 74 packages, and audited 94 packages in 2s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+npm warn allow-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 9ms
+
+  cli.js  19.23 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 13ms
+
+  cli.js  155.41 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 5ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/start-work-continuation
+
+> @code-yeongyu/codex-start-work-continuation@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 6ms
+
+  cli.js  14.55 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 17ms
+
+  cli.js  19.40 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 78 modules in 17ms
+
+  cli.js  204.84 KB  (entry point)
+
+Bundled 76 modules in 24ms
+
+  posthog.js  202.42 KB  (entry point)
+
+Building components/codegraph
+
+> @sisyphuslabs/codex-codegraph@4.19.4 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 159 modules in 17ms
+
+  serve.js  0.33 MB  (entry point)
+
+Bundled 182 modules in 31ms
+
+  cli.js  0.42 MB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 6ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 15ms
+
+  cli.js  155.62 KB  (entry point)
+
+Bundling components/start-work-continuation/dist/cli.js
+Bundled 5 modules in 5ms
+
+  cli.js  14.79 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 78 modules in 10ms
+
+  cli.js  204.57 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@4.19.4 build
+> node scripts/build.mjs
+
+
+  dist/cli.js  148.7kb
+
+⚡ Done in 6ms
+Bundling components/codegraph/dist/cli.js
+Bundled 182 modules in 12ms
+
+  cli.js  0.42 MB  (entry point)
+
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 5ms
+
+  cli.js  153.14 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@4.19.4 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@4.19.4 build
+> node scripts/build-runtime.mjs
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@4.19.4 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 4 modules in 4ms
+
+  cli.js  7.30 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 4 modules in 3ms
+
+  cli.js  7.44 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 3ms
+
+  cli.js  5.75 KB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 3ms
+
+  cli.js  8.33 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@4.19.4 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 38 modules in 4ms
+
+  cli.js  153.70 KB  (entry point)
+
+Usage:
+  omo-agent-toolkit ulw-loop <subcommand> [args]
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+
+Run `omo-agent-toolkit ulw-loop help` for ulw-loop subcommands.
+Staged Senpi agent-toolkit runtime: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/runtime/agent-toolkit
+Bundled 662 modules in 29ms
+
+  omo.js  0.71 MB  (entry point)
+
+Bundled 277 modules in 13ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Built omo-senpi extensions: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/extensions/omo.js, /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/extensions/omo-member.js
+synced omo-senpi skills to /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/skills
+generated directive is current: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 3 modules in 5ms
+
+  install.mjs  14.80 KB  (entry point)
+
+Built omo-senpi installer: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-senpi/plugin/scripts/install.mjs
+omo-native payload complete at /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/omo-ai-beta-release/packages/omo-native/plugin (32 required artifacts present)
+retry_build_exit=0
+pack_root=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-pack.XXXXXX.fJ6X95lKp6
++ npm pack --pack-destination /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-pack.XXXXXX.fJ6X95lKp6 (cwd packages/omo-native)
+npm notice
+npm notice 📦  omo-ai@0.0.0-dev
+npm notice Tarball Contents
+npm notice 456B bin/lib/child-process.js
+npm notice 2.7kB bin/lib/doctor.js
+npm notice 2.4kB bin/lib/launcher.js
+npm notice 1.2kB bin/lib/package-paths.js
+npm notice 1.2kB bin/lib/provider-map.json
+npm notice 6.1kB bin/lib/setup-detect.js
+npm notice 8.4kB bin/lib/setup-import.js
+npm notice 948B bin/lib/setup-models.js
+npm notice 937B bin/lib/setup-report.js
+npm notice 443B bin/omo-agent-toolkit.js
+npm notice 308B bin/omo.js
+npm notice 480B package.json
+npm notice 117.7kB plugin/extensions/omo-member.js
+npm notice 707.3kB plugin/extensions/omo.js
+npm notice 1.2kB plugin/LICENSE
+npm notice 500B plugin/NOTICE
+npm notice 520B plugin/package.json
+npm notice 2.9kB plugin/README.md
+npm notice 633B plugin/runtime/agent-toolkit/cli.js
+npm notice 26.6kB plugin/runtime/agent-toolkit/directive.md
+npm notice 50B plugin/runtime/agent-toolkit/omo-agent-toolkit
+npm notice 34B plugin/runtime/agent-toolkit/omo-agent-toolkit.cmd
+npm notice 153.7kB plugin/runtime/agent-toolkit/ulw-loop/cli.js
+npm notice 84.8kB plugin/runtime/ast-grep-mcp/cli.js
+npm notice 143B plugin/runtime/ast-grep-mcp/manifest.json
+npm notice 4.9kB plugin/runtime/lsp-daemon/dist/.omo-runtime-manifest.json
+npm notice 31B plugin/runtime/lsp-daemon/dist/cli.d.ts
+npm notice 232.1kB plugin/runtime/lsp-daemon/dist/cli.js
+npm notice 4.1kB plugin/runtime/lsp-daemon/dist/client.d.ts
+npm notice 210.5kB plugin/runtime/lsp-daemon/dist/client.js
+npm notice 840B plugin/runtime/lsp-daemon/dist/daemon-client.d.ts
+npm notice 7.8kB plugin/runtime/lsp-daemon/dist/daemon-client.js
+npm notice 224B plugin/runtime/lsp-daemon/dist/daemon-failure-result.d.ts
+npm notice 1.7kB plugin/runtime/lsp-daemon/dist/daemon-failure-result.js
+npm notice 554B plugin/runtime/lsp-daemon/dist/daemon-request-error.d.ts
+npm notice 930B plugin/runtime/lsp-daemon/dist/daemon-request-error.js
+npm notice 532B plugin/runtime/lsp-daemon/dist/daemon-server.d.ts
+npm notice 5.2kB plugin/runtime/lsp-daemon/dist/daemon-server.js
+npm notice 1.5kB plugin/runtime/lsp-daemon/dist/ensure-daemon.d.ts
+npm notice 7.8kB plugin/runtime/lsp-daemon/dist/ensure-daemon.js
+npm notice 607B plugin/runtime/lsp-daemon/dist/index.d.ts
+npm notice 212.9kB plugin/runtime/lsp-daemon/dist/index.js
+npm notice 2.2kB plugin/runtime/lsp-daemon/dist/ipc-protocol.d.ts
+npm notice 6.3kB plugin/runtime/lsp-daemon/dist/ipc-protocol.js
+npm notice 340B plugin/runtime/lsp-daemon/dist/lock.d.ts
+npm notice 2.0kB plugin/runtime/lsp-daemon/dist/lock.js
+npm notice 1.9kB plugin/runtime/lsp-daemon/dist/ownership.d.ts
+npm notice 6.2kB plugin/runtime/lsp-daemon/dist/ownership.js
+npm notice 98B plugin/runtime/lsp-daemon/dist/package.json
+npm notice 1.6kB plugin/runtime/lsp-daemon/dist/paths.d.ts
+npm notice 4.0kB plugin/runtime/lsp-daemon/dist/paths.js
+npm notice 702B plugin/runtime/lsp-daemon/dist/proxy.d.ts
+npm notice 6.0kB plugin/runtime/lsp-daemon/dist/proxy.js
+npm notice 609B plugin/runtime/lsp-daemon/dist/request-routing.d.ts
+npm notice 3.8kB plugin/runtime/lsp-daemon/dist/request-routing.js
+npm notice 52B plugin/runtime/lsp-daemon/dist/run-daemon.d.ts
+npm notice 727B plugin/runtime/lsp-daemon/dist/run-daemon.js
+npm notice 1.1kB plugin/runtime/lsp-daemon/dist/runtime-contract.d.ts
+npm notice 2.6kB plugin/runtime/lsp-daemon/dist/runtime-contract.js
+npm notice 286B plugin/runtime/lsp-daemon/dist/socket-jsonrpc.d.ts
+npm notice 1.0kB plugin/runtime/lsp-daemon/dist/socket-jsonrpc.js
+npm notice 1.4kB plugin/runtime/lsp-daemon/dist/version-reap.d.ts
+npm notice 7.5kB plugin/runtime/lsp-daemon/dist/version-reap.js
+npm notice 14.8kB plugin/scripts/install.mjs
+npm notice 7.2kB plugin/skills/ast-grep/install.ps1
+npm notice 7.6kB plugin/skills/ast-grep/install.sh
+npm notice 1.1kB plugin/skills/ast-grep/LICENSE
+npm notice 7.7kB plugin/skills/ast-grep/README.md
+npm notice 7.3kB plugin/skills/ast-grep/references/cli.md
+npm notice 5.6kB plugin/skills/ast-grep/references/install.md
+npm notice 5.5kB plugin/skills/ast-grep/references/patterns.md
+npm notice 8.9kB plugin/skills/ast-grep/references/pitfalls.md
+npm notice 7.9kB plugin/skills/ast-grep/references/recipes.md
+npm notice 6.4kB plugin/skills/ast-grep/references/sgconfig.md
+npm notice 11.4kB plugin/skills/ast-grep/references/yaml-rules.md
+npm notice 27.0kB plugin/skills/ast-grep/scripts/ast_grep_helper.py
+npm notice 12.5kB plugin/skills/ast-grep/SKILL.md
+npm notice 125B plugin/skills/ast-grep/SOURCE
+npm notice 5.7kB plugin/skills/ast-grep/tests/smoke.ps1
+npm notice 7.8kB plugin/skills/ast-grep/tests/smoke.sh
+npm notice 6.0kB plugin/skills/coding-agent-sessions/references/all-platforms.md
+npm notice 2.4kB plugin/skills/coding-agent-sessions/references/claude.md
+npm notice 1.9kB plugin/skills/coding-agent-sessions/references/codex.md
+npm notice 2.6kB plugin/skills/coding-agent-sessions/references/opencode.md
+npm notice 1.7kB plugin/skills/coding-agent-sessions/references/senpi.md
+npm notice 35B plugin/skills/coding-agent-sessions/scripts/agent_sessions/__init__.py
+npm notice 4.9kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/aside_scanner.py
+npm notice 2.5kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/claude.py
+npm notice 10.9kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/cli.py
+npm notice 3.9kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/codex.py
+npm notice 12.2kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/file_scanners.py
+npm notice 1.4kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/jsonio.py
+npm notice 3.2kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/kiro_scanner.py
+npm notice 10.0kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/opencode.py
+npm notice 1.8kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/pi_family.py
+npm notice 3.3kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/scanners.py
+npm notice 7.7kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/sqlite_optional_scanners.py
+npm notice 6.0kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/sqlite_scanners.py
+npm notice 2.0kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/timeparse.py
+npm notice 5.6kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/transcript.py
+npm notice 1.5kB plugin/skills/coding-agent-sessions/scripts/agent_sessions/types.py
+npm notice 514B plugin/skills/coding-agent-sessions/scripts/find-agent-sessions.py
+npm notice 11.4kB plugin/skills/coding-agent-sessions/SKILL.md
+npm notice 3.7kB plugin/skills/data-scientist/references/common-scenarios.md
+npm notice 4.6kB plugin/skills/data-scientist/references/execution-templates.md
+npm notice 3.5kB plugin/skills/data-scientist/references/integration-patterns.md
+npm notice 2.6kB plugin/skills/data-scientist/references/performance-benchmarks.md
+npm notice 2.7kB plugin/skills/data-scientist/references/uv-setup.md
+npm notice 3.3kB plugin/skills/data-scientist/scripts/quick-query.py
+npm notice 2.3kB plugin/skills/data-scientist/scripts/setup-uv.ps1
+npm notice 1.8kB plugin/skills/data-scientist/scripts/setup-uv.sh
+npm notice 10.6kB plugin/skills/data-scientist/SKILL.md
+npm notice 5.4kB plugin/skills/debugging/references/methodology/00-setup.md
+npm notice 9.0kB plugin/skills/debugging/references/methodology/02-investigate.md
+npm notice 4.5kB plugin/skills/debugging/references/methodology/03-flaky-triage.md
+npm notice 8.1kB plugin/skills/debugging/references/methodology/04-oracle-triple.md
+npm notice 3.2kB plugin/skills/debugging/references/methodology/05-escalate.md
+npm notice 6.5kB plugin/skills/debugging/references/methodology/06-fix.md
+npm notice 6.3kB plugin/skills/debugging/references/methodology/08-qa.md
+npm notice 6.2kB plugin/skills/debugging/references/methodology/09-cleanup.md
+npm notice 12.1kB plugin/skills/debugging/references/methodology/partial-runtime-evidence.md
+npm notice 19.4kB plugin/skills/debugging/references/runtimes/bundled-js-binary.md
+npm notice 8.2kB plugin/skills/debugging/references/runtimes/go.md
+npm notice 21.4kB plugin/skills/debugging/references/runtimes/native-binary.md
+npm notice 9.7kB plugin/skills/debugging/references/runtimes/node.md
+npm notice 8.2kB plugin/skills/debugging/references/runtimes/python.md
+npm notice 7.0kB plugin/skills/debugging/references/runtimes/rust.md
+npm notice 7.4kB plugin/skills/debugging/references/tools/ghidra.md
+npm notice 7.3kB plugin/skills/debugging/references/tools/playwright-cli.md
+npm notice 7.9kB plugin/skills/debugging/references/tools/pwndbg.md
+npm notice 7.3kB plugin/skills/debugging/references/tools/pwntools.md
+npm notice 12.4kB plugin/skills/debugging/SKILL.md
+npm notice 12.6kB plugin/skills/frontend/ATTRIBUTION.md
+npm notice 11.3kB plugin/skills/frontend/LICENSE-Apache-2.0.txt
+npm notice 16.3kB plugin/skills/frontend/references/design/_INDEX.md
+npm notice 29.5kB plugin/skills/frontend/references/design/airbnb.md
+npm notice 3.7kB plugin/skills/frontend/references/design/airtable.md
+npm notice 17.8kB plugin/skills/frontend/references/design/apple.md
+npm notice 12.8kB plugin/skills/frontend/references/design/aside.md
+npm notice 18.9kB plugin/skills/frontend/references/design/binance.md
+npm notice 9.9kB plugin/skills/frontend/references/design/bmw.md
+npm notice 8.5kB plugin/skills/frontend/references/design/brutalist-skill.md
+npm notice 26.8kB plugin/skills/frontend/references/design/bugatti.md
+npm notice 17.9kB plugin/skills/frontend/references/design/cal.md
+npm notice 20.4kB plugin/skills/frontend/references/design/claude.md
+npm notice 17.4kB plugin/skills/frontend/references/design/clay.md
+npm notice 15.5kB plugin/skills/frontend/references/design/clickhouse.md
+npm notice 5.2kB plugin/skills/frontend/references/design/clone-from-url.md
+npm notice 14.9kB plugin/skills/frontend/references/design/cohere.md
+npm notice 5.1kB plugin/skills/frontend/references/design/coinbase.md
+npm notice 21.0kB plugin/skills/frontend/references/design/composio.md
+npm notice 19.2kB plugin/skills/frontend/references/design/cursor.md
+npm notice 12.7kB plugin/skills/frontend/references/design/design-system-architecture.md
+npm notice 15.3kB plugin/skills/frontend/references/design/elevenlabs.md
+npm notice 18.8kB plugin/skills/frontend/references/design/expo.md
+npm notice 25.6kB plugin/skills/frontend/references/design/ferrari.md
+npm notice 11.7kB plugin/skills/frontend/references/design/figma.md
+npm notice 17.7kB plugin/skills/frontend/references/design/framer.md
+npm notice 7.9kB plugin/skills/frontend/references/design/gpt-tasteskill.md
+npm notice 15.7kB plugin/skills/frontend/references/design/hashicorp.md
+npm notice 19.7kB plugin/skills/frontend/references/design/ibm.md
+npm notice 36.4kB plugin/skills/frontend/references/design/image-to-code-skill.md
+npm notice 16.0kB plugin/skills/frontend/references/design/imagegen-brandkit.md
+npm notice 40.3kB plugin/skills/frontend/references/design/imagegen-frontend-mobile.md
+npm notice 36.9kB plugin/skills/frontend/references/design/imagegen-frontend-web.md
+npm notice 13.7kB plugin/skills/frontend/references/design/interaction-skill.md
+npm notice 6.5kB plugin/skills/frontend/references/design/intercom.md
+npm notice 4.4kB plugin/skills/frontend/references/design/kraken.md
+npm notice 21.2kB plugin/skills/frontend/references/design/lamborghini.md
+npm notice 8.5kB plugin/skills/frontend/references/design/layout-skill.md
+npm notice 3.9kB plugin/skills/frontend/references/design/lazyweb.md
+npm notice 22.5kB plugin/skills/frontend/references/design/linear.app.md
+npm notice 17.5kB plugin/skills/frontend/references/design/lovable.md
+npm notice 27.1kB plugin/skills/frontend/references/design/mastercard.md
+npm notice 20.6kB plugin/skills/frontend/references/design/meta.md
+npm notice 7.9kB plugin/skills/frontend/references/design/minimalist-skill.md
+npm notice 14.4kB plugin/skills/frontend/references/design/minimax.md
+npm notice 17.5kB plugin/skills/frontend/references/design/mintlify.md
+npm notice 4.9kB plugin/skills/frontend/references/design/miro.md
+npm notice 15.7kB plugin/skills/frontend/references/design/mistral.ai.md
+npm notice 15.1kB plugin/skills/frontend/references/design/mongodb.md
+npm notice 20.1kB plugin/skills/frontend/references/design/nike.md
+npm notice 18.5kB plugin/skills/frontend/references/design/notion.md
+npm notice 17.2kB plugin/skills/frontend/references/design/nvidia.md
+npm notice 15.6kB plugin/skills/frontend/references/design/ollama.md
+npm notice 15.6kB plugin/skills/frontend/references/design/opencode.ai.md
+npm notice 2.6kB plugin/skills/frontend/references/design/output-skill.md
+npm notice 12.0kB plugin/skills/frontend/references/design/pinterest.md
+npm notice 28.3kB plugin/skills/frontend/references/design/playstation.md
+npm notice 18.7kB plugin/skills/frontend/references/design/posthog.md
+npm notice 18.6kB plugin/skills/frontend/references/design/raycast.md
+npm notice 8.6kB plugin/skills/frontend/references/design/react-dev-tooling-skill.md
+npm notice 25.8kB plugin/skills/frontend/references/design/README.md
+npm notice 15.1kB plugin/skills/frontend/references/design/redesign-skill.md
+npm notice 24.4kB plugin/skills/frontend/references/design/renault.md
+npm notice 14.2kB plugin/skills/frontend/references/design/replicate.md
+npm notice 18.5kB plugin/skills/frontend/references/design/resend.md
+npm notice 8.7kB plugin/skills/frontend/references/design/revolut.md
+npm notice 14.4kB plugin/skills/frontend/references/design/runwayml.md
+npm notice 21.3kB plugin/skills/frontend/references/design/sanity.md
+npm notice 14.8kB plugin/skills/frontend/references/design/sentry.md
+npm notice 20.1kB plugin/skills/frontend/references/design/shopify.md
+npm notice 10.6kB plugin/skills/frontend/references/design/soft-skill.md
+npm notice 11.4kB plugin/skills/frontend/references/design/spacex.md
+npm notice 13.1kB plugin/skills/frontend/references/design/spotify.md
+npm notice 37.5kB plugin/skills/frontend/references/design/starbucks.md
+npm notice 12.1kB plugin/skills/frontend/references/design/stitch-design-example.md
+npm notice 11.9kB plugin/skills/frontend/references/design/stitch-skill.md
+npm notice 20.6kB plugin/skills/frontend/references/design/stripe.md
+npm notice 14.9kB plugin/skills/frontend/references/design/supabase.md
+npm notice 19.0kB plugin/skills/frontend/references/design/superhuman.md
+npm notice 87.3kB plugin/skills/frontend/references/design/taste-skill.md
+npm notice 22.3kB plugin/skills/frontend/references/design/tesla.md
+npm notice 28.5kB plugin/skills/frontend/references/design/theverge.md
+npm notice 14.4kB plugin/skills/frontend/references/design/together.ai.md
+npm notice 18.8kB plugin/skills/frontend/references/design/uber.md
+npm notice 19.5kB plugin/skills/frontend/references/design/vercel.md
+npm notice 30.2kB plugin/skills/frontend/references/design/vodafone.md
+npm notice 26.4kB plugin/skills/frontend/references/design/voltagent.md
+npm notice 16.8kB plugin/skills/frontend/references/design/warp.md
+npm notice 4.2kB plugin/skills/frontend/references/design/webflow.md
+npm notice 22.6kB plugin/skills/frontend/references/design/wired.md
+npm notice 8.6kB plugin/skills/frontend/references/design/wise.md
+npm notice 16.4kB plugin/skills/frontend/references/design/x.ai.md
+npm notice 18.8kB plugin/skills/frontend/references/design/zapier.md
+npm notice 3.8kB plugin/skills/frontend/references/designpowers/EVIDENCE.md
+npm notice 5.4kB plugin/skills/frontend/references/designpowers/lane-a-direction.md
+npm notice 5.7kB plugin/skills/frontend/references/designpowers/lane-b-execution.md
+npm notice 5.5kB plugin/skills/frontend/references/designpowers/lane-c-review.md
+npm notice 5.1kB plugin/skills/frontend/references/designpowers/lane-d-memory.md
+npm notice 5.5kB plugin/skills/frontend/references/designpowers/orchestration.md
+npm notice 3.8kB plugin/skills/frontend/references/designpowers/README.md
+npm notice 5.4kB plugin/skills/frontend/references/designpowers/routing.md
+npm notice 2.2kB plugin/skills/frontend/references/designpowers/UPSTREAM.md
+npm notice 5.9kB plugin/skills/frontend/references/designpowers/vendor/agents/accessibility-reviewer.md
+npm notice 8.7kB plugin/skills/frontend/references/designpowers/vendor/agents/content-writer.md
+npm notice 9.0kB plugin/skills/frontend/references/designpowers/vendor/agents/design-builder.md
+npm notice 6.8kB plugin/skills/frontend/references/designpowers/vendor/agents/design-critic.md
+npm notice 8.2kB plugin/skills/frontend/references/designpowers/vendor/agents/design-lead.md
+npm notice 4.7kB plugin/skills/frontend/references/designpowers/vendor/agents/design-scout.md
+npm notice 8.3kB plugin/skills/frontend/references/designpowers/vendor/agents/design-strategist.md
+npm notice 14.3kB plugin/skills/frontend/references/designpowers/vendor/agents/heuristic-evaluator.md
+npm notice 7.3kB plugin/skills/frontend/references/designpowers/vendor/agents/inspiration-scout.md
+npm notice 8.4kB plugin/skills/frontend/references/designpowers/vendor/agents/motion-designer.md
+npm notice 1.1kB plugin/skills/frontend/references/designpowers/vendor/LICENSE
+npm notice 4.5kB plugin/skills/frontend/references/designpowers/vendor/skills/accessible-content/reference.md
+npm notice 4.6kB plugin/skills/frontend/references/designpowers/vendor/skills/adaptive-interfaces/reference.md
+npm notice 5.3kB plugin/skills/frontend/references/designpowers/vendor/skills/cognitive-accessibility/reference.md
+npm notice 8.7kB plugin/skills/frontend/references/designpowers/vendor/skills/design-debate/reference.md
+npm notice 9.0kB plugin/skills/frontend/references/designpowers/vendor/skills/design-debt-tracker/reference.md
+npm notice 4.6kB plugin/skills/frontend/references/designpowers/vendor/skills/design-handoff/reference.md
+npm notice 9.6kB plugin/skills/frontend/references/designpowers/vendor/skills/design-md/reference.md
+npm notice 9.7kB plugin/skills/frontend/references/designpowers/vendor/skills/design-retrospective/reference.md
+npm notice 7.2kB plugin/skills/frontend/references/designpowers/vendor/skills/design-review/reference.md
+npm notice 4.4kB plugin/skills/frontend/references/designpowers/vendor/skills/design-system-alignment/reference.md
+npm notice 6.4kB plugin/skills/frontend/references/designpowers/vendor/skills/designpowers-critique/reference.md
+npm notice 5.3kB plugin/skills/frontend/references/designpowers/vendor/skills/heuristic-evaluation/reference.md
+npm notice 4.2kB plugin/skills/frontend/references/designpowers/vendor/skills/inclusive-personas/reference.md
+npm notice 9.0kB plugin/skills/frontend/references/designpowers/vendor/skills/inspiration-scouting/reference.md
+npm notice 5.3kB plugin/skills/frontend/references/designpowers/vendor/skills/interaction-design/reference.md
+npm notice 2.5kB plugin/skills/frontend/references/designpowers/vendor/skills/motion-choreography/reference.md
+npm notice 3.7kB plugin/skills/frontend/references/designpowers/vendor/skills/research-planning/reference.md
+npm notice 2.2kB plugin/skills/frontend/references/designpowers/vendor/skills/responsive-patterns/reference.md
+npm notice 9.3kB plugin/skills/frontend/references/designpowers/vendor/skills/synthetic-user-testing/reference.md
+npm notice 8.8kB plugin/skills/frontend/references/designpowers/vendor/skills/taste-feedback/reference.md
+npm notice 5.6kB plugin/skills/frontend/references/designpowers/vendor/skills/taste-report/reference.md
+npm notice 2.2kB plugin/skills/frontend/references/designpowers/vendor/skills/token-architecture/reference.md
+npm notice 4.7kB plugin/skills/frontend/references/designpowers/vendor/skills/ui-composition/reference.md
+npm notice 2.9kB plugin/skills/frontend/references/designpowers/vendor/skills/usability-testing/reference.md
+npm notice 4.3kB plugin/skills/frontend/references/designpowers/vendor/skills/verification-before-shipping/reference.md
+npm notice 2.7kB plugin/skills/frontend/references/designpowers/vendor/skills/voice-and-tone/reference.md
+npm notice 4.1kB plugin/skills/frontend/references/designpowers/vendor/skills/writing-design-plans/reference.md
+npm notice 7.9kB plugin/skills/frontend/references/perfection/react-perf-tooling.md
+npm notice 11.5kB plugin/skills/frontend/references/perfection/README.md
+npm notice 19.4kB plugin/skills/frontend/references/ui-ux-db/data/charts.csv
+npm notice 32.4kB plugin/skills/frontend/references/ui-ux-db/data/colors.csv
+npm notice 20.6kB plugin/skills/frontend/references/ui-ux-db/data/icons.csv
+npm notice 16.7kB plugin/skills/frontend/references/ui-ux-db/data/landing.csv
+npm notice 58.0kB plugin/skills/frontend/references/ui-ux-db/data/products.csv
+npm notice 14.8kB plugin/skills/frontend/references/ui-ux-db/data/react-performance.csv
+npm notice 11.9kB plugin/skills/frontend/references/ui-ux-db/data/stacks/astro.csv
+npm notice 10.4kB plugin/skills/frontend/references/ui-ux-db/data/stacks/flutter.csv
+npm notice 11.3kB plugin/skills/frontend/references/ui-ux-db/data/stacks/html-tailwind.csv
+npm notice 8.2kB plugin/skills/frontend/references/ui-ux-db/data/stacks/jetpack-compose.csv
+npm notice 12.5kB plugin/skills/frontend/references/ui-ux-db/data/stacks/nextjs.csv
+npm notice 14.0kB plugin/skills/frontend/references/ui-ux-db/data/stacks/nuxt-ui.csv
+npm notice 16.5kB plugin/skills/frontend/references/ui-ux-db/data/stacks/nuxtjs.csv
+npm notice 10.0kB plugin/skills/frontend/references/ui-ux-db/data/stacks/react-native.csv
+npm notice 13.0kB plugin/skills/frontend/references/ui-ux-db/data/stacks/react.csv
+npm notice 15.9kB plugin/skills/frontend/references/ui-ux-db/data/stacks/shadcn.csv
+npm notice 11.0kB plugin/skills/frontend/references/ui-ux-db/data/stacks/svelte.csv
+npm notice 10.8kB plugin/skills/frontend/references/ui-ux-db/data/stacks/swiftui.csv
+npm notice 11.0kB plugin/skills/frontend/references/ui-ux-db/data/stacks/vue.csv
+npm notice 142.7kB plugin/skills/frontend/references/ui-ux-db/data/styles.csv
+npm notice 49.7kB plugin/skills/frontend/references/ui-ux-db/data/typography.csv
+npm notice 53.1kB plugin/skills/frontend/references/ui-ux-db/data/ui-reasoning.csv
+npm notice 18.8kB plugin/skills/frontend/references/ui-ux-db/data/ux-guidelines.csv
+npm notice 9.7kB plugin/skills/frontend/references/ui-ux-db/data/web-interface.csv
+npm notice 44.8kB plugin/skills/frontend/references/ui-ux-db/README.md
+npm notice 12.4kB plugin/skills/frontend/references/ui-ux-db/scripts/core.py
+npm notice 47.1kB plugin/skills/frontend/references/ui-ux-db/scripts/design_system.py
+npm notice 5.6kB plugin/skills/frontend/references/ui-ux-db/scripts/search.py
+npm notice 6.6kB plugin/skills/frontend/scripts/perfection/lighthouse-audit.py
+npm notice 19.1kB plugin/skills/frontend/SKILL.md
+npm notice 5.6kB plugin/skills/git-master/SKILL.md
+npm notice 6.5kB plugin/skills/give-me-tips/SKILL.md
+npm notice 27.5kB plugin/skills/hyperplan/SKILL.md
+npm notice 11.8kB plugin/skills/init-deep/SKILL.md
+npm notice 2.1kB plugin/skills/lsp-setup/references/bash/README.md
+npm notice 2.5kB plugin/skills/lsp-setup/references/c-cpp/README.md
+npm notice 2.5kB plugin/skills/lsp-setup/references/csharp/README.md
+npm notice 1.9kB plugin/skills/lsp-setup/references/dart/README.md
+npm notice 2.1kB plugin/skills/lsp-setup/references/elixir/README.md
+npm notice 2.0kB plugin/skills/lsp-setup/references/go/README.md
+npm notice 2.3kB plugin/skills/lsp-setup/references/haskell/README.md
+npm notice 2.6kB plugin/skills/lsp-setup/references/java/README.md
+npm notice 2.3kB plugin/skills/lsp-setup/references/julia/README.md
+npm notice 2.5kB plugin/skills/lsp-setup/references/kotlin/README.md
+npm notice 2.1kB plugin/skills/lsp-setup/references/lua/README.md
+npm notice 1.9kB plugin/skills/lsp-setup/references/php/README.md
+npm notice 3.0kB plugin/skills/lsp-setup/references/python/README.md
+npm notice 2.4kB plugin/skills/lsp-setup/references/ruby/README.md
+npm notice 2.0kB plugin/skills/lsp-setup/references/rust/README.md
+npm notice 2.3kB plugin/skills/lsp-setup/references/swift/README.md
+npm notice 2.2kB plugin/skills/lsp-setup/references/terraform/README.md
+npm notice 3.3kB plugin/skills/lsp-setup/references/typescript/README.md
+npm notice 2.4kB plugin/skills/lsp-setup/references/yaml/README.md
+npm notice 1.7kB plugin/skills/lsp-setup/references/zig/README.md
+npm notice 6.6kB plugin/skills/lsp-setup/scripts/detect-lsp.ts
+npm notice 5.2kB plugin/skills/lsp-setup/scripts/lsp-server-table.ts
+npm notice 397B plugin/skills/lsp-setup/scripts/tsconfig.json
+npm notice 5.2kB plugin/skills/lsp-setup/scripts/verify-lsp.ts
+npm notice 6.3kB plugin/skills/lsp-setup/SKILL.md
+npm notice 14.1kB plugin/skills/programming/references/code-smells.md
+npm notice 17.0kB plugin/skills/programming/references/go/backend-stack.md
+npm notice 9.1kB plugin/skills/programming/references/go/bootstrap.md
+npm notice 11.6kB plugin/skills/programming/references/go/bubbletea-v2.md
+npm notice 11.8kB plugin/skills/programming/references/go/cobra-stack.md
+npm notice 11.1kB plugin/skills/programming/references/go/concurrency.md
+npm notice 12.3kB plugin/skills/programming/references/go/data-modeling.md
+npm notice 10.4kB plugin/skills/programming/references/go/error-handling.md
+npm notice 10.3kB plugin/skills/programming/references/go/golangci-strict.md
+npm notice 10.5kB plugin/skills/programming/references/go/grpc-connect.md
+npm notice 14.1kB plugin/skills/programming/references/go/libraries.md
+npm notice 5.7kB plugin/skills/programming/references/go/one-liners.md
+npm notice 7.6kB plugin/skills/programming/references/go/README.md
+npm notice 13.0kB plugin/skills/programming/references/go/sqlc-pgx.md
+npm notice 14.6kB plugin/skills/programming/references/go/testing.md
+npm notice 9.8kB plugin/skills/programming/references/go/type-patterns.md
+npm notice 10.7kB plugin/skills/programming/references/logging.md
+npm notice 14.5kB plugin/skills/programming/references/python/async-anyio.md
+npm notice 6.8kB plugin/skills/programming/references/python/data-modeling.md
+npm notice 4.3kB plugin/skills/programming/references/python/data-processing.md
+npm notice 6.1kB plugin/skills/programming/references/python/error-handling.md
+npm notice 9.4kB plugin/skills/programming/references/python/fastapi-stack.md
+npm notice 12.3kB plugin/skills/programming/references/python/httpx2-optimization.md
+npm notice 10.8kB plugin/skills/programming/references/python/libraries.md
+npm notice 8.0kB plugin/skills/programming/references/python/one-liners.md
+npm notice 13.6kB plugin/skills/programming/references/python/orjson-stack.md
+npm notice 8.4kB plugin/skills/programming/references/python/pydantic-ai.md
+npm notice 9.3kB plugin/skills/programming/references/python/pyproject-strict.md
+npm notice 15.8kB plugin/skills/programming/references/python/README.md
+npm notice 5.3kB plugin/skills/programming/references/python/textual-tui.md
+npm notice 4.2kB plugin/skills/programming/references/python/type-patterns.md
+npm notice 11.7kB plugin/skills/programming/references/rust-ub/miri-sanitizers-loom.md
+npm notice 11.4kB plugin/skills/programming/references/rust-ub/README.md
+npm notice 13.2kB plugin/skills/programming/references/rust-ub/ub-taxonomy.md
+npm notice 9.9kB plugin/skills/programming/references/rust/async-tokio.md
+npm notice 14.9kB plugin/skills/programming/references/rust/axum-stack.md
+npm notice 7.6kB plugin/skills/programming/references/rust/cargo-strict.md
+npm notice 12.2kB plugin/skills/programming/references/rust/clap-stack.md
+npm notice 12.8kB plugin/skills/programming/references/rust/concurrency.md
+npm notice 14.5kB plugin/skills/programming/references/rust/libraries.md
+npm notice 7.6kB plugin/skills/programming/references/rust/one-liners.md
+npm notice 13.1kB plugin/skills/programming/references/rust/proptest-insta.md
+npm notice 14.3kB plugin/skills/programming/references/rust/README.md
+npm notice 11.6kB plugin/skills/programming/references/rust/type-state.md
+npm notice 11.3kB plugin/skills/programming/references/rust/unsafe-discipline.md
+npm notice 15.3kB plugin/skills/programming/references/rust/zero-cost-safety.md
+npm notice 21.7kB plugin/skills/programming/references/typescript/backend-hono.md
+npm notice 6.7kB plugin/skills/programming/references/typescript/bootstrap.md
+npm notice 5.1kB plugin/skills/programming/references/typescript/data-modeling.md
+npm notice 4.8kB plugin/skills/programming/references/typescript/error-handling.md
+npm notice 9.4kB plugin/skills/programming/references/typescript/README.md
+npm notice 4.9kB plugin/skills/programming/references/typescript/tsconfig-strict.md
+npm notice 5.3kB plugin/skills/programming/references/typescript/type-patterns.md
+npm notice 7.2kB plugin/skills/programming/scripts/go/check-no-excuse-rules.sh
+npm notice 4.5kB plugin/skills/programming/scripts/go/new-project.py
+npm notice 206B plugin/skills/programming/scripts/go/templates/.editorconfig
+npm notice 1.6kB plugin/skills/programming/scripts/go/templates/.golangci.yml
+npm notice 845B plugin/skills/programming/scripts/go/templates/AGENTS.md.tmpl
+npm notice 863B plugin/skills/programming/scripts/go/templates/ci.yml
+npm notice 643B plugin/skills/programming/scripts/go/templates/config.go
+npm notice 99B plugin/skills/programming/scripts/go/templates/gitignore
+npm notice 329B plugin/skills/programming/scripts/go/templates/main.go.tmpl
+npm notice 207B plugin/skills/programming/scripts/go/templates/README.md.tmpl
+npm notice 350B plugin/skills/programming/scripts/go/templates/run.go
+npm notice 706B plugin/skills/programming/scripts/go/templates/Taskfile.yml
+npm notice 25.5kB plugin/skills/programming/scripts/python/check-no-excuse-rules.py
+npm notice 4.7kB plugin/skills/programming/scripts/python/new-project.py
+npm notice 3.2kB plugin/skills/programming/scripts/python/new-script.py
+npm notice 10.6kB plugin/skills/programming/scripts/rust/check-no-excuse-rules.py
+npm notice 6.6kB plugin/skills/programming/scripts/rust/check-no-excuse-rules.sh
+npm notice 5.7kB plugin/skills/programming/scripts/rust/new-project.py
+npm notice 12.8kB plugin/skills/programming/scripts/typescript/check-no-excuse-rules.ts
+npm notice 4.5kB plugin/skills/programming/scripts/typescript/new-project.ts
+npm notice 38.9kB plugin/skills/programming/SKILL.md
+npm notice 26.5kB plugin/skills/refactor/SKILL.md
+npm notice 23.5kB plugin/skills/remove-ai-slops/SKILL.md
+npm notice 24.4kB plugin/skills/review-work/SKILL.md
+npm notice 21.2kB plugin/skills/start-work/SKILL.md
+npm notice 5.0kB plugin/skills/ultimate-browsing/ATTRIBUTION.md
+npm notice 668B plugin/skills/ultimate-browsing/engine/__init__.py
+npm notice 4.9kB plugin/skills/ultimate-browsing/engine/__main__.py
+npm notice 7.3kB plugin/skills/ultimate-browsing/engine/bias_check.py
+npm notice 2.4kB plugin/skills/ultimate-browsing/engine/curl_probe.py
+npm notice 6.4kB plugin/skills/ultimate-browsing/engine/executor.py
+npm notice 13.4kB plugin/skills/ultimate-browsing/engine/fetch_chain.py
+npm notice 327B plugin/skills/ultimate-browsing/engine/referers.py
+npm notice 1.6kB plugin/skills/ultimate-browsing/engine/result_schema.py
+npm notice 1.2kB plugin/skills/ultimate-browsing/engine/summary.py
+npm notice 8.1kB plugin/skills/ultimate-browsing/engine/surrogate.py
+npm notice 2.4kB plugin/skills/ultimate-browsing/engine/surrogates.yaml
+npm notice 331B plugin/skills/ultimate-browsing/engine/templates/package.json
+npm notice 3.5kB plugin/skills/ultimate-browsing/engine/templates/playwright_mobile_chrome.js
+npm notice 5.5kB plugin/skills/ultimate-browsing/engine/templates/playwright_real_chrome.js
+npm notice 323B plugin/skills/ultimate-browsing/engine/tests/fixtures/amp_redirect_stub.html
+npm notice 92.5kB plugin/skills/ultimate-browsing/engine/tests/fixtures/search_interstitial.html
+npm notice 246B plugin/skills/ultimate-browsing/engine/tests/fixtures/wayback_available.json
+npm notice 185.8kB plugin/skills/ultimate-browsing/engine/tests/fixtures/wayback_snapshot.html
+npm notice 2.8kB plugin/skills/ultimate-browsing/engine/tests/test_fetch_chain.py
+npm notice 11.1kB plugin/skills/ultimate-browsing/engine/tests/test_playwright_templates.py
+npm notice 3.6kB plugin/skills/ultimate-browsing/engine/tests/test_surrogate_validators.py
+npm notice 11.6kB plugin/skills/ultimate-browsing/engine/tests/test_surrogate.py
+npm notice 3.3kB plugin/skills/ultimate-browsing/engine/url_transforms.py
+npm notice 9.3kB plugin/skills/ultimate-browsing/engine/validators.py
+npm notice 7.1kB plugin/skills/ultimate-browsing/engine/waf_detector.py
+npm notice 6.4kB plugin/skills/ultimate-browsing/engine/waf_profiles.yaml
+npm notice 712B plugin/skills/ultimate-browsing/references/agent-reach/career.md
+npm notice 1.4kB plugin/skills/ultimate-browsing/references/agent-reach/dev.md
+npm notice 2.3kB plugin/skills/ultimate-browsing/references/agent-reach/README.md
+npm notice 821B plugin/skills/ultimate-browsing/references/agent-reach/search.md
+npm notice 5.7kB plugin/skills/ultimate-browsing/references/agent-reach/social.md
+npm notice 2.7kB plugin/skills/ultimate-browsing/references/agent-reach/video.md
+npm notice 1.9kB plugin/skills/ultimate-browsing/references/agent-reach/web.md
+npm notice 6.9kB plugin/skills/ultimate-browsing/references/chrome-stealth.md
+npm notice 4.2kB plugin/skills/ultimate-browsing/references/insane-search/cache-archive.md
+npm notice 6.2kB plugin/skills/ultimate-browsing/references/insane-search/fallback.md
+npm notice 3.9kB plugin/skills/ultimate-browsing/references/insane-search/jina.md
+npm notice 3.6kB plugin/skills/ultimate-browsing/references/insane-search/json-api.md
+npm notice 3.5kB plugin/skills/ultimate-browsing/references/insane-search/media.md
+npm notice 3.0kB plugin/skills/ultimate-browsing/references/insane-search/metadata.md
+npm notice 3.4kB plugin/skills/ultimate-browsing/references/insane-search/naver.md
+npm notice 6.2kB plugin/skills/ultimate-browsing/references/insane-search/playwright.md
+npm notice 3.5kB plugin/skills/ultimate-browsing/references/insane-search/public-api.md
+npm notice 19.0kB plugin/skills/ultimate-browsing/references/insane-search/README.md
+npm notice 3.0kB plugin/skills/ultimate-browsing/references/insane-search/rss.md
+npm notice 6.4kB plugin/skills/ultimate-browsing/references/insane-search/tls-impersonate.md
+npm notice 3.6kB plugin/skills/ultimate-browsing/references/insane-search/twitter.md
+npm notice 3.0kB plugin/skills/ultimate-browsing/scripts/cookie_crypto.py
+npm notice 1.2kB plugin/skills/ultimate-browsing/scripts/cookie_domains.py
+npm notice 3.8kB plugin/skills/ultimate-browsing/scripts/cookie_paths.py
+npm notice 9.4kB plugin/skills/ultimate-browsing/scripts/extract_cookies.py
+npm notice 10.8kB plugin/skills/ultimate-browsing/SKILL.md
+npm notice 30.9kB plugin/skills/ultrawork/SKILL.md
+npm notice 30.4kB plugin/skills/ulw-loop/references/full-workflow.md
+npm notice 7.0kB plugin/skills/ulw-loop/SKILL.md
+npm notice 27.8kB plugin/skills/ulw-plan/references/full-workflow.md
+npm notice 4.6kB plugin/skills/ulw-plan/references/intent-clear.md
+npm notice 5.9kB plugin/skills/ulw-plan/references/intent-unclear.md
+npm notice 13.2kB plugin/skills/ulw-plan/scripts/scaffold-plan.mjs
+npm notice 17.5kB plugin/skills/ulw-plan/SKILL.md
+npm notice 3.1kB plugin/skills/ulw-research/ATTRIBUTION.md
+npm notice 11.9kB plugin/skills/ulw-research/references/latex-report.md
+npm notice 48.5kB plugin/skills/ulw-research/SKILL.md
+npm notice 1.8kB plugin/skills/visual-qa/references/agent-browser-setup.md
+npm notice 499B plugin/skills/visual-qa/scripts/ansi.ts
+npm notice 2.5kB plugin/skills/visual-qa/scripts/cli.ts
+npm notice 3.1kB plugin/skills/visual-qa/scripts/east-asian-width.ts
+npm notice 3.8kB plugin/skills/visual-qa/scripts/image-diff.ts
+npm notice 682B plugin/skills/visual-qa/scripts/png-crc.ts
+npm notice 5.3kB plugin/skills/visual-qa/scripts/png-decode.ts
+npm notice 1.7kB plugin/skills/visual-qa/scripts/png-synth.ts
+npm notice 2.7kB plugin/skills/visual-qa/scripts/tui-grid.ts
+npm notice 1.3kB plugin/skills/visual-qa/scripts/types.ts
+npm notice 16.5kB plugin/skills/visual-qa/scripts/visual-qa.mjs
+npm notice 27.3kB plugin/skills/visual-qa/SKILL.md
+npm notice Tarball Details
+npm notice name: omo-ai
+npm notice version: 0.0.0-dev
+npm notice filename: omo-ai-0.0.0-dev.tgz
+npm notice package size: 2.1 MB
+npm notice unpacked size: 6.7 MB
+npm notice shasum: 681321e8459b88a0042c0c12cb0c77e85fdb09d3
+npm notice integrity: sha512-wvw5bEUx/fZRN[...]BQlORQZ+jcEsg==
+npm notice total files: 487
+npm notice
+omo-ai-0.0.0-dev.tgz
+pack_exit=0
+tarball=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-ai-task11-pack.XXXXXX.fJ6X95lKp6/omo-ai-0.0.0-dev.tgz
+tarball_size_bytes=2125372
++ tar -tf "$TARBALL" | head -40
+package/plugin/skills/programming/scripts/go/templates/.editorconfig
+package/plugin/skills/programming/scripts/go/templates/gitignore
+package/plugin/LICENSE
+package/plugin/skills/ast-grep/LICENSE
+package/plugin/skills/frontend/references/designpowers/vendor/LICENSE
+package/plugin/NOTICE
+package/plugin/runtime/agent-toolkit/omo-agent-toolkit
+package/plugin/skills/ast-grep/SOURCE
+package/plugin/runtime/agent-toolkit/omo-agent-toolkit.cmd
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/astro.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/charts.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/colors.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/flutter.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/html-tailwind.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/icons.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/jetpack-compose.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/landing.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/nextjs.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/nuxt-ui.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/nuxtjs.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/products.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/react-native.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/react-performance.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/react.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/shadcn.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/styles.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/svelte.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/swiftui.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/typography.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/ui-reasoning.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/ux-guidelines.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/stacks/vue.csv
+package/plugin/skills/frontend/references/ui-ux-db/data/web-interface.csv
+package/plugin/skills/programming/scripts/go/templates/config.go
+package/plugin/skills/programming/scripts/go/templates/run.go
+package/plugin/skills/ultimate-browsing/engine/tests/fixtures/amp_redirect_stub.html
+package/plugin/skills/ultimate-browsing/engine/tests/fixtures/search_interstitial.html
+package/plugin/skills/ultimate-browsing/engine/tests/fixtures/wayback_snapshot.html
+package/bin/lib/child-process.js
+package/plugin/runtime/agent-toolkit/cli.js
++ payload directory assertions
+bin_payload=PASS
+plugin_payload=PASS
+scenario_01=PASS
+finished=2026-08-09T15:39:38Z

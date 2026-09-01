@@ -1,0 +1,12 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/dag/scheduler-frontier.test.ts:
+(pass) DAG scheduler dependency-frontier admission > #given a dependent whose dependsOn completed #when an unrelated sibling keeps running #then the dependent is admitted at once (dag_530ad299) [54.12ms]
+(pass) DAG scheduler dependency-frontier admission > #given a dependency still running #when the scheduler is active #then its dependent is not admitted before terminal [75.36ms]
+(pass) DAG scheduler dependency-frontier admission > #given frontier admission under the residency cap #when a slot frees #then the oldest denial is retried before newer ready nodes [62.16ms]
+(pass) DAG scheduler dependency-frontier admission > #given frontier admission #when the run settles #then every wave index reports exactly one completed grouping with full membership [83.53ms]
+
+ 4 pass
+ 0 fail
+ 22 expect() calls
+Ran 4 tests across 1 file. [846.00ms]

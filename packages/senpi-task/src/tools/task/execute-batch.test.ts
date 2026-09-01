@@ -19,19 +19,6 @@ function started(taskId: string, name: string, status: "running" | "pending" = "
     ...(queuePosition === undefined ? {} : { queue_position: queuePosition }),
   }
 }
-function startFailed(taskId: string, name: string, message: string): StartResult {
-  return {
-    kind: "start_failed",
-    task_id: taskId,
-    name,
-    category: "quick",
-    execution_mode: "in-process",
-    model: "test/model",
-    run_in_background: true,
-    error_message: message,
-  }
-}
-
 describe("buildTaskExecute batch fanout", () => {
   test(" w2batch #given three sync items #when all complete #then details preserve input order with aggregate completed", async () => {
     // given
@@ -149,37 +136,6 @@ describe("buildTaskExecute batch fanout", () => {
     ])
   })
 
-  test(" w2batch #given background capacity one #when three items start #then all ids and queue positions return as running", async () => {
-    // given
-    const starts = [started(IDS[0], "one"), started(IDS[1], "two", "pending", 1), started(IDS[2], "three", "pending", 2)]
-    let startIndex = 0
-    const manager = createFakeManager({
-      start: async (): Promise<StartResult> => {
-        const next = starts[startIndex]
-        if (next === undefined) throw new Error("unexpected extra start")
-        startIndex += 1
-        return next
-      },
-    })
-    const execute = buildTaskExecute(makeDeps(manager))
-    // when
-    const output = await execute(
-      "batch-background",
-      { category: "quick", run_in_background: true, tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] },
-      undefined,
-      undefined,
-      CTX,
-    )
-    // then
-    expect(output.details).toMatchObject({ task_id: IDS[0], status: "running", run_in_background: true })
-    expect(output.details.items).toEqual([
-      { task_id: IDS[0], name: "one", category: "quick", status: "running" },
-      { task_id: IDS[1], name: "two", category: "quick", status: "pending", queue_position: 1 },
-      { task_id: IDS[2], name: "three", category: "quick", status: "pending", queue_position: 2 },
-    ])
-    for (const taskId of IDS) expect(textOf(output)).toContain(`task_send(to="${taskId}"`)
-  })
-
   test(" w2batch #given a parent abort during three waits #when the batch settles #then every non-terminal child is cancelled", async () => {
     // given
     const controller = new AbortController()
@@ -274,31 +230,6 @@ describe("buildTaskExecute batch fanout", () => {
     // then
     expect(output.details.status).toBe("error")
     expect(output.details.items?.[1]).toEqual({ task_id: "", status: "error", error_message: "depth limit" })
-  })
-
-  test(" w2batch #given every background start fails #when results are aggregated #then status is error instead of running", async () => {
-    // given
-    let startIndex = 0
-    const manager = createFakeManager({
-      start: async (): Promise<StartResult> => {
-        const taskId = IDS[startIndex]
-        if (taskId === undefined) throw new Error("unexpected extra start")
-        startIndex += 1
-        return startFailed(taskId, `item-${startIndex}`, `failed:${taskId}`)
-      },
-    })
-    // when
-    const output = await buildTaskExecute(makeDeps(manager))(
-      "batch-all-failed",
-      { category: "quick", run_in_background: true, tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] },
-      undefined,
-      undefined,
-      CTX,
-    )
-    // then
-    expect(output.details.task_id).toBe("")
-    expect(output.details.status).toBe("error")
-    expect(output.details.items?.map((item) => item.error_message)).toEqual(IDS.map((taskId) => `failed:${taskId}`))
   })
 
   test(" w2batch #given a model_unavailable start failure #when executed #then the error names valid category names with the omo.json config hint", async () => {

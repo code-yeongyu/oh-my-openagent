@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition } from "../../agents"
+import { CATEGORY_PROMPT_APPENDS } from "../../category"
 import { listTaskAgents, listTaskCategories } from "./categories"
 
 describe("listTaskCategories", () => {
@@ -46,6 +47,18 @@ describe("listTaskCategories", () => {
 
     // then
     expect(names).not.toContain("quick")
+  })
+
+  test("#given caller-directed builtin guidance #when worker appends are inspected #then only worker context remains", () => {
+    // given
+    const callerDirectedCategories = ["quick", "unspecified-low", "unspecified-high"]
+
+    // when / then
+    for (const category of callerDirectedCategories) {
+      expect(CATEGORY_PROMPT_APPENDS[category]).toContain("<Category_Context>")
+      expect(CATEGORY_PROMPT_APPENDS[category]).not.toContain("<Selection_Gate>")
+      expect(CATEGORY_PROMPT_APPENDS[category]).not.toContain("<Caller_Warning>")
+    }
   })
 })
 

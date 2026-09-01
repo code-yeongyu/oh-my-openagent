@@ -1,0 +1,33 @@
+# Mutation proof (corrected capture, 2026-08-27)
+# MUTATION: reverted #settleWaiters guard to pre-#7413 form:
+#   if (record === null || record === undefined || !isTerminalRecord(record)) return  ->  if (record === null || record === undefined) return
+# Command: bun test packages/senpi-task/src/manager/manager-outcome.test.ts -t "waiter remains armed until terminal settlement"
+# Result: test FAILS under the mutation (below), PASSES with the guard restored (green.txt).
+# Note: the F2b abort-transition block removal alone does NOT fail this test; F2b remains covered
+# only in combination (waiter would hang without it once F2a holds) - recorded as a known gap.
+
+<<ERR Command failed: cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-owner-completion-loss && bun test packages/senpi-task/src/manager/manager-outcome.test.ts -t "waiter remains armed until terminal settlement" 2>&1>>
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/senpi-task/src/manager/manager-outcome.test.ts:
+25 |     store.replace({ ...current, status: "pending" })
+26 | 
+27 |     // when - the outcome reaches #settleWaiters while the record is still nonterminal
+28 |     inProcess.handles.get(started.task_id)?.settle({ status: "completed", finalResponse: "late" })
+29 |     await Promise.resolve()
+30 |     expect(manager.waiterKeyCount()).toBe(1)
+                                          ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-dag-owner-completion-loss/packages/senpi-task/src/manager/manager-outcome.test.ts:30:38)
+(fail) TaskManager outcome guards > #given a nonterminal record #when an outcome tries to settle waiters and the record then becomes terminal #then the waiter remains armed until terminal settlement [6.05ms]
+
+ 0 pass
+ 9 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [2.00s]
+

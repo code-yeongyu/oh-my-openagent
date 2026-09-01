@@ -1,0 +1,26 @@
+{
+  "workflow": 31932110216,
+  "job": 95128456257,
+  "head": "b652ab93bcdd930e367338d37b5864537eaa1018",
+  "result": "FAIL",
+  "checks": {
+    "process_mode_routes_to_rpc_runner": {
+      "verdict": "PASS",
+      "pid": 1084,
+      "status": "error"
+    },
+    "spawn_process_pid_and_session_jsonl": {
+      "verdict": "FAIL",
+      "pid": 1084,
+      "sessionJsonl": false,
+      "residency_state": "rpc_detached"
+    },
+    "no_leaked_rpc_child_pids": {
+      "verdict": "PASS",
+      "leakedPids": []
+    }
+  },
+  "child_error": "Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\\win\\fs-event.c, line 72",
+  "sandbox_root": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\omo-senpi-qa-*",
+  "interpretation": "Production routing was proven, but Bun's Windows watcher compared an 8.3 sandbox path with a canonical path. The sandbox root is now normalized once with realpathSync.native."
+}

@@ -1,0 +1,25 @@
+# Validation baseline
+Worktree: /Volumes/mengmotaStorage/local-workspaces/omo/.local-ignore/worktrees/init-deep-20260812
+
+## `bun test script/agents-md-dev-env.test.ts`
+The command did not reach the test assertions. The test preload attempted to
+build the vendored LSP daemon, and `npm ci` failed with:
+
+```
+npm error code EEXIST
+npm error syscall symlink
+npm error path ../../../mcp-stdio-core
+npm error dest packages/lsp-daemon/node_modules/@oh-my-opencode/mcp-stdio-core
+npm error errno -17
+```
+
+This is a worktree dependency-setup defect, not hierarchy evidence. The command
+must be rerun after safe worktree setup.
+
+## `bun test packages/omo-opencode/src/shared/markdown-link-audit.test.ts`
+PASS: 20 tests passed, 0 failed.
+
+## Interpretation
+The existing markdown audit is green before the change. RED for this prose
+target therefore comes from the faithful hierarchy coverage scenario in
+`hierarchy-red.txt`, not from pinning wording or inventing a prose-string test.
