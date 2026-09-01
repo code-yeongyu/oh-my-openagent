@@ -17,7 +17,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.6-sol",
         variant: "medium",
       },
-      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan"], model: "glm-5.2" },
+      { providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode", "bailian-coding-plan"], model: "glm-5.2" },
       { providers: ["opencode"], model: "big-pickle" }
     ],
     requiresAnyModel: true,
@@ -84,7 +84,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "low" },
       { providers: ["opencode-go"], model: "kimi-k3" },
-      { providers: ["zai-coding-plan"], model: "glm-4.6v" },
+      { providers: ["zai-coding-plan", "zhipuai-coding-plan"], model: "glm-4.6v" },
       { providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"], model: "gpt-5-nano" }
     ],
   },

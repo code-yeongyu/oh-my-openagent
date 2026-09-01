@@ -10,6 +10,7 @@ export type InstallCommandOptions = {
   readonly platform?: InstallArgs["platform"]
   readonly opencodeZen?: InstallArgs["opencodeZen"]
   readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"]
+  readonly zhipuaiCodingPlan?: InstallArgs["zhipuaiCodingPlan"]
   readonly kimiForCoding?: InstallArgs["kimiForCoding"]
   readonly opencodeGo?: InstallArgs["opencodeGo"]
   readonly bailianCodingPlan?: InstallArgs["bailianCodingPlan"]
@@ -42,6 +43,7 @@ export function resolveInstallArgs(
     platform,
     opencodeZen: options.opencodeZen,
     zaiCodingPlan: options.zaiCodingPlan,
+    zhipuaiCodingPlan: options.zhipuaiCodingPlan,
     kimiForCoding: options.kimiForCoding,
     opencodeGo: options.opencodeGo,
     bailianCodingPlan: options.bailianCodingPlan,

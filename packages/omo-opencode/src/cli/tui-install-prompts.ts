@@ -79,6 +79,7 @@ export async function promptInstallConfig(
       hasNativeDev,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasZhipuaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
       hasBailianCodingPlan: false,
@@ -151,6 +152,16 @@ export async function promptInstallConfig(
     initialValue: initial.zaiCodingPlan,
   })
   if (!zaiCodingPlan) return null
+
+  const zhipuaiCodingPlan = await selectOrCancel({
+    message: "Do you have a Zhipu GLM Coding Plan (bigmodel.cn) subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "GLM fallbacks via the bigmodel.cn coding plan" },
+    ],
+    initialValue: initial.zhipuaiCodingPlan,
+  })
+  if (!zhipuaiCodingPlan) return null
 
   const kimiForCoding = await selectOrCancel({
     message: "Do you have a Kimi For Coding subscription?",
@@ -225,6 +236,7 @@ export async function promptInstallConfig(
     hasNativeDev,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
+    hasZhipuaiCodingPlan: zhipuaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
     hasBailianCodingPlan: bailianCodingPlan === "yes",
