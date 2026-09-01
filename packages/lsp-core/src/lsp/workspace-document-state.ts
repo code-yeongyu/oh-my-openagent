@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { effectiveExtension } from "./effective-extension.js";
 import { getLanguageId } from "./language-mappings.js";
 import type { Diagnostic } from "./types.js";
+import type { TimerProvider } from "./timer-provider.js";
 import type { PlannedWorkspaceOperation, WorkspaceMutation, WorkspaceMutationDelta } from "./workspace-edit-types.js";
 
 const WATCHED_FILE_BATCH_SIZE = 128;
@@ -76,6 +77,7 @@ export type PushDiagnosticsResolution =
 
 export interface WorkspaceDocumentStateOptions {
 	readonly now?: () => number;
+	readonly timerProvider?: TimerProvider;
 	readonly versionlessPublishQuiescenceMs?: number;
 }
 
@@ -114,6 +116,7 @@ export class WorkspaceDocumentState {
 	private readonly openByUri = new Map<string, OpenDocumentState>();
 	private readonly openPromises = new Map<string, Promise<void>>();
 	private readonly now: () => number;
+	private readonly timerProvider: TimerProvider;
 	private readonly versionlessPublishQuiescenceMs: number;
 
 	constructor(
@@ -121,7 +124,12 @@ export class WorkspaceDocumentState {
 		private readonly clearDiagnostics: (uri: string) => void,
 		options: WorkspaceDocumentStateOptions = {},
 	) {
-		this.now = options.now ?? (() => Date.now());
+		this.timerProvider = options.timerProvider ?? {
+			now: options.now ?? (() => Date.now()),
+			setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
+			clearTimeout: (handle) => clearTimeout(handle),
+		};
+		this.now = () => this.timerProvider.now();
 		this.versionlessPublishQuiescenceMs =
 			options.versionlessPublishQuiescenceMs ?? DEFAULT_VERSIONLESS_PUBLISH_QUIESCENCE_MS;
 	}
@@ -232,11 +240,11 @@ export class WorkspaceDocumentState {
 			const finish = () => {
 				if (settled) return;
 				settled = true;
-				clearTimeout(timer);
+				this.timerProvider.clearTimeout(timer);
 				state.waiters.delete(finish);
 				resolveActivity();
 			};
-			const timer = setTimeout(finish, timeoutMs);
+			const timer = this.timerProvider.setTimeout(finish, timeoutMs);
 			if (typeof timer.unref === "function") timer.unref();
 			state.waiters.add(finish);
 		});

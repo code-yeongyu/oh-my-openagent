@@ -27,13 +27,13 @@ import { listUnreadMessages } from "@oh-my-opencode/team-core/team-mailbox/inbox
 import { pollAndBuildInjection } from "@oh-my-opencode/team-core/team-mailbox/poll"
 import { BroadcastNotPermittedError } from "@oh-my-opencode/team-core/team-mailbox/send"
 import { getInboxDir, resolveBaseDir } from "@oh-my-opencode/team-core/team-registry/paths"
-import { createRuntimeState, saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
+import { createRuntimeState, loadRuntimeState, saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
 import { clearTeamSessionRegistry, registerTeamSession } from "../team-session-registry"
 import type { Message } from "@oh-my-opencode/team-core/types"
 import { MessageSchema } from "@oh-my-opencode/team-core/types"
 import { createTeamIdleWakeHint } from "../../../hooks/team-session-events/team-idle-wake-hint"
-import { createTeamSendMessageTool } from "./messaging"
-import { resolveTeamRuntimeDetails } from "./messaging-runtime"
+import { createTeamSendMessageTool as createProductionTeamSendMessageTool } from "./messaging"
+import { defaultTeamSendMessageToolDeps, resolveTeamRuntimeDetails } from "./messaging-runtime"
 
 type PromptAsyncCall = {
   sessionId: string
@@ -110,6 +110,18 @@ const temporaryDirectories: string[] = []
 const TEST_EVENT_TIMEOUT_MS = 3_000
 const realSetTimeout = globalThis.setTimeout
 const realClearTimeout = globalThis.clearTimeout
+
+function createTeamSendMessageTool(
+  config: Parameters<typeof createProductionTeamSendMessageTool>[0],
+  client: Parameters<typeof createProductionTeamSendMessageTool>[1],
+  deps: Parameters<typeof createProductionTeamSendMessageTool>[2] = defaultTeamSendMessageToolDeps,
+): ReturnType<typeof createProductionTeamSendMessageTool> {
+  return createProductionTeamSendMessageTool(config, client, {
+    ...defaultTeamSendMessageToolDeps,
+    ...deps,
+    liveDeliverySettleMs: 0,
+  })
+}
 
 function createDeferred<T>(): Deferred<T> {
   let resolvePromise: Deferred<T>["resolve"] | undefined
@@ -1008,12 +1020,12 @@ describe("createTeamSendMessageTool", () => {
     expect(calls[0].variant).toBe("high")
   })
 
-  test("live delivery uses the registered agent alias when the runtime stores a config-key agent name", async () => {
+  test("live delivery uses the ambient idle-settle default when no settle value is injected", async () => {
     const settleTimerScheduled = createDeferred<void>()
     const acceleratedSetTimeout = new Proxy(realSetTimeout, {
       apply(target, thisArg, args) {
         if (args[1] === DEFAULT_SESSION_IDLE_SETTLE_MS) {
-          settleTimerScheduled.resolve()
+          settleTimerScheduled.resolve(undefined)
           args[1] = 0
         }
         return Reflect.apply(target, thisArg, args)
@@ -1023,33 +1035,55 @@ describe("createTeamSendMessageTool", () => {
 
     try {
       // given
-      registerAgentName("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
       const fixture = await createTeamFixture()
-      const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
-      const state = await loadState(fixture.teamRunId, fixture.config)
-      const memberTwo = state.members.find((member) => member.name === "m2")
-      if (!memberTwo) throw new Error("m2 runtime member missing")
-      memberTwo.subagent_type = "atlas"
-      await saveState(state, fixture.config)
-
       const { client, calls } = createRecordingClient()
-      const liveTool = createTeamSendMessageTool(fixture.config, client)
+      const liveTool = createProductionTeamSendMessageTool(
+        fixture.config,
+        client,
+        defaultTeamSendMessageToolDeps,
+      )
 
       // when
       const delivery = liveTool.execute({
         teamRunId: fixture.teamRunId,
         to: "m2",
-        body: "ping",
+        body: "ambient default ping",
       }, fixture.toolContext(fixture.memberOneSessionId))
       await waitForEvent(settleTimerScheduled.promise, "live delivery idle-settle timer")
       await delivery
 
       // then
       expect(calls).toHaveLength(1)
-      expect(calls[0]?.agent).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+      expect(calls[0]?.parts[0]?.text).toContain("ambient default ping")
     } finally {
       setTimeoutSpy.mockRestore()
     }
+  })
+
+  test("live delivery uses the registered agent alias when the runtime stores a config-key agent name", async () => {
+    // given
+    registerAgentName("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+    const fixture = await createTeamFixture()
+    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
+    const state = await loadState(fixture.teamRunId, fixture.config)
+    const memberTwo = state.members.find((member) => member.name === "m2")
+    if (!memberTwo) throw new Error("m2 runtime member missing")
+    memberTwo.subagent_type = "atlas"
+    await saveState(state, fixture.config)
+
+    const { client, calls } = createRecordingClient()
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "ping",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.agent).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
   })
 
   test("live delivery reapplies category routing and advanced model params for category members", async () => {
@@ -1316,7 +1350,10 @@ describe("createTeamSendMessageTool", () => {
         },
       },
     } satisfies LiveDeliveryClient
-    const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
+    const liveTool = createTeamSendMessageTool(fixture.config, failingClient, {
+      loadRuntimeState,
+      liveDeliverySettleMs: 0,
+    })
 
     // when
     await liveTool.execute({
