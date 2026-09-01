@@ -8,6 +8,7 @@ export type TeamRuntimeDetails = {
   isLead: boolean
   senderName: string
   activeMembers: string[]
+  leadRecipient?: string
 }
 
 export type TeamSendMessageToolDeps = {
@@ -20,6 +21,16 @@ export const defaultTeamSendMessageToolDeps: TeamSendMessageToolDeps = {
 }
 
 type RuntimeMember = RuntimeState["members"][number]
+
+export function resolveLeadRecipient(runtimeState: RuntimeState): string | undefined {
+  const leadSessionId = runtimeState.leadSessionId
+  if (leadSessionId !== undefined) {
+    const bySession = runtimeState.members.find((member) => member.sessionId === leadSessionId)
+    if (bySession !== undefined) return bySession.name
+  }
+
+  return runtimeState.members.find((member) => member.agentType === "leader")?.name
+}
 
 export function shouldReserveRecipientMailbox(member: RuntimeMember, message: Message, senderName: string): boolean {
   if (message.to === "*") {
@@ -46,6 +57,7 @@ export async function resolveTeamRuntimeDetails(
       activeMembers: runtimeState.members
         .map((entry) => entry.name)
         .filter((name) => name !== registryEntry.memberName),
+      leadRecipient: resolveLeadRecipient(runtimeState),
     }
   }
 
@@ -65,6 +77,7 @@ export async function resolveTeamRuntimeDetails(
       activeMembers: runtimeState.members
         .map((entry) => entry.name)
         .filter((name) => name !== senderName),
+      leadRecipient: resolveLeadRecipient(runtimeState),
     }
   } catch (error) {
     error instanceof Error

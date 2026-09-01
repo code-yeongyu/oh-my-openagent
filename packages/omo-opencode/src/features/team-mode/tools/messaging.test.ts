@@ -297,6 +297,27 @@ describe("createTeamSendMessageTool", () => {
     expect(message.from).toBe("m1")
   })
 
+  test("resolves the 'lead' sentinel to the actual lead member and delivers there", async () => {
+    // given
+    const fixture = await createTeamFixture()
+
+    // when
+    const result = await fixture.tool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "lead",
+      body: "hello lead",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    const parsedResult = parseToolResult(result)
+
+    // then
+    expect(parsedResult.deliveredTo).toEqual(["team-lead"])
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "team-lead")
+    const [messageFile] = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
+    const message = MessageSchema.parse(JSON.parse(await readFile(path.join(inboxDir, messageFile), "utf8")))
+    expect(message.to).toBe("team-lead")
+    expect(message.from).toBe("m1")
+  })
+
   test("#given recipient tries path traversal #when team_send_message runs #then it rejects without creating an escaped inbox", async () => {
     // given
     const fixture = await createTeamFixture()

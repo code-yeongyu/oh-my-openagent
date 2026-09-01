@@ -66,11 +66,14 @@ export function createTeamSendMessageTool(
       const targetDirectory = typeof runtimeContext.directory === "string" ? runtimeContext.directory : process.cwd()
 
       const teamRuntime = await resolveTeamRuntimeDetails(args.teamRunId, sessionID, config, deps)
+      const resolvedTo = args.to === "lead" && teamRuntime.leadRecipient !== undefined
+        ? teamRuntime.leadRecipient
+        : args.to
       const message = MessageSchema.parse({
         version: 1,
         messageId: randomUUID(),
         from: teamRuntime.senderName,
-        to: args.to,
+        to: resolvedTo,
         body: args.body,
         kind: args.kind ?? "message",
         timestamp: Date.now(),
@@ -98,6 +101,7 @@ export function createTeamSendMessageTool(
         isLead: teamRuntime.isLead,
         activeMembers: teamRuntime.activeMembers,
         reservedRecipients,
+        ...(teamRuntime.leadRecipient !== undefined ? { leadRecipient: teamRuntime.leadRecipient } : {}),
       })
 
       try {
