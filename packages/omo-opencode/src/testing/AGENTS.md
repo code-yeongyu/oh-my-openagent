@@ -21,7 +21,7 @@ Naming gotcha: despite the directory name, this is PRODUCTION init code. `create
 - `experimental.session.compacting` + `experimental.compaction.autocontinue` — the 2 hook handlers beyond the 12 in `src/plugin-interface.ts`, built via `createSessionCompactingHandler(hooks)` / `createCompactionAutocontinueHandler(hooks)` from `src/plugin/session-compacting`.
 - `dispose` — stops the runtime skill-source server, then `createPluginDispose()` (backgroundManager shutdown + skillMcpManager disconnect + disposeHooks).
 - `recordPluginTelemetry({ configEnabled })` — try/catch-wrapped PostHog call right after `loadPluginConfig()`.
-- `ensureTuiPluginEntry()` — tui.json self-heal unless `tui.sidebar.enabled === false`.
+- `ensureTuiPluginEntry()` — unconditional tui.json self-heal; BTW remains available when the sidebar is disabled.
 - `initLiveServerRoute` / `setLiveParentWakeRoutingDisabled` / `warmLiveServerProbe` — live-listener wake routing (`src/shared/live-server-route`); disable via `experimental.disable_live_parent_wake_routing`.
 - Duplicate-plugin guard: `detectDuplicateOmoPlugin()` detected → warn + return `{}` (plugin no-ops).
 - Team-mode init via dynamic imports (`checkTeamModeDependencies` + `ensureBaseDirs`), warn-only on failure.

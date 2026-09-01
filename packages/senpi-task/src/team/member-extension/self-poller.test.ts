@@ -63,7 +63,7 @@ function poller(harness: Harness) {
     memberName: "alice",
     config: harness.config,
     sessionDir: harness.sessionDir,
-    sendUserMessage: (content) => harness.injected.push(content),
+    inject: (content) => harness.injected.push(content),
     appendEvent: (event) => harness.events.push(event),
   })
 }
@@ -98,7 +98,7 @@ describe("member self-poller", () => {
       memberName: "alice",
       config: harness.config,
       sessionDir: harness.sessionDir,
-      sendUserMessage: (content) => harness.injected.push(content),
+      inject: (content) => harness.injected.push(content),
       appendEvent: (event) => harness.events.push(event),
       afterInject: async () => {
         reportEntered()

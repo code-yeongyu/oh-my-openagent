@@ -53,8 +53,7 @@ describe("unified omo config schema", () => {
     if (!result.success) throw new Error(result.error.message)
     expect(result.data.models?.sol).toEqual({
       model: "openai/gpt-5.6-sol",
-      variant: "high",
-      reasoningEffort: "xhigh",
+      reasoning: "xhigh",
     })
     expect(result.data["[opencode]"]).toEqual({ background_task: { enabled: true } })
     expect(result.data["[senpi]"]?.agents?.oracle?.model).toBe("sol")
@@ -95,9 +94,9 @@ describe("unified omo config schema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data["[senpi]"]?.models?.sol).toEqual({ reasoningEffort: "high" })
-    expect(result.data.profiles.focused?.models?.sol).toEqual({ variant: "low" })
-    expect(result.data.profiles.focused?.["[codex]"]?.models?.sol).toEqual({ reasoningEffort: "minimal" })
+    expect(result.data["[senpi]"]?.models?.sol).toEqual({ reasoning: "high" })
+    expect(result.data.profiles.focused?.models?.sol).toEqual({ reasoning: "low" })
+    expect(result.data.profiles.focused?.["[codex]"]?.models?.sol).toEqual({ reasoning: "minimal" })
   })
 
   test("#given unknown root and profile overlay keys #when parsed #then the strict schema rejects both", () => {

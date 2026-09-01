@@ -36,6 +36,7 @@ export function getNextReachableFallback(
   providerID: string
   modelID: string
   variant?: string
+  reasoning?: string
   reasoningEffort?: string
   temperature?: number
   top_p?: number
@@ -72,6 +73,7 @@ export function getNextReachableFallback(
       providerID,
       modelID,
       variant: fallback.variant,
+      reasoning: fallback.reasoning,
       reasoningEffort: fallback.reasoningEffort,
       temperature: fallback.temperature,
       top_p: fallback.top_p,

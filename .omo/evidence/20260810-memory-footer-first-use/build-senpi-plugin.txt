@@ -1,0 +1,39 @@
+First invocation:
+bun run build:senpi-plugin
+
+Observed:
+FAIL during `build:materialize-frontend`.
+The strict submodule initializer could not resolve the existing `packages/shared-skills/upstreams/open-design` revision in this fresh worktree. This was an environment/submodule setup failure before the Senpi extension build.
+
+Repository-supported retry:
+OMO_SKIP_MATERIALIZE=1 bun run build:senpi-plugin
+
+Observed:
+- lsp-daemon build completed
+- ast-grep MCP build completed
+- committed shared frontend materialization was reused
+- Senpi LSP runtime staged
+- Senpi ast-grep runtime staged
+- Senpi agent-toolkit runtime staged
+- `omo.js`, `omo-member.js`, and `omo-memory-mcp.js` bundled
+- Senpi skills synchronized
+- generated ultrawork directive current
+- installer bundled
+
+Exit code: 0
+
+Cleanup:
+The failed materialization attempt left three shared-skill submodules dirty. They were restored to the exact gitlink revisions recorded by this worktree. Final parent status contains only the requested source/tests and generated Senpi artifacts.
+
+Post-rebase proof:
+- Rebasing onto current `origin/dev` introduced the upstream Senpi 2026.8.11 pin and a generated-bundle conflict.
+- The conflict was resolved by installing the rebased lockfile with `bun install --ignore-scripts` and regenerating extension bundles from the merged TypeScript sources.
+- `OMO_SKIP_MATERIALIZE=1 bun run build:senpi-plugin` then completed again on the rebased tree.
+- The final generated `omo.js` delta was committed separately and the worktree became clean.
+
+Final merged-dev proof:
+- Merging repaired `origin/dev` conflicted only in generated `omo.js` and `omo-memory-mcp.js`.
+- Focused memory tests and the full memory suite passed before resolution, proving the merged TypeScript behavior.
+- `OMO_SKIP_MATERIALIZE=1 bun run build:senpi-plugin` regenerated both files plus the adjacent Senpi artifacts from the merged source tree.
+- Marker scan and `git diff --check` found no remaining conflict markers.
+- Build exit code: 0.

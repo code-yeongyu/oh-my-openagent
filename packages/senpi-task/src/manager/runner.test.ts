@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
+import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 import type { ChildHandle as InProcessChildHandle, RunnerOutcome } from "../runners/in-process/child-handle"
 import type { ChildSpec } from "../runners/in-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
+import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import { createInProcessManagedRunner, createRpcManagedRunner, type InProcessRunnerLike, type RpcRunnerLike } from "./runner"
 import type { ManagedStartSpec } from "./types"
 
@@ -56,13 +58,19 @@ describe("createInProcessManagedRunner", () => {
   test("#given a managed spec #when started #then it maps to a ChildSpec and injects session context", async () => {
     // given
     let captured: ChildSpec | undefined
+    const modelRuntime = { kind: "native-provider-runtime" } as unknown as NonNullable<
+      CreateAgentSessionOptions["modelRuntime"]
+    >
     const runner: InProcessRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
       },
     }
-    const managed = createInProcessManagedRunner(runner, () => ({ agentDir: "/home/user/.senpi/agent" }))
+    const managed = createInProcessManagedRunner(runner, () => ({
+      agentDir: "/home/user/.senpi/agent",
+      modelRuntime,
+    }))
 
     // when
     const handle = await managed.start(managedSpec())
@@ -71,8 +79,84 @@ describe("createInProcessManagedRunner", () => {
     // then
     expect(captured?.taskId).toBe("st_00000001")
     expect(captured?.agentDir).toBe("/home/user/.senpi/agent")
+    expect(captured?.modelRuntime).toBe(modelRuntime)
     expect(captured?.parentSessionId).toBe("parent-1")
+    expect(captured?.sessionDir).toBe(resolveChildSessionDir(managedSpec().stateDir, "st_00000001"))
     expect(outcome).toEqual({ status: "completed", finalResponse: "ok" })
+  })
+
+  test("#given a managed spec with a runtime fallback chain #when started #then the ordered chain reaches the child runner", async () => {
+    // given
+    let captured: ChildSpec | undefined
+    const requestedModel = {
+      source: "category",
+      provider: "kimi-coding",
+      model_id: "kimi-for-coding-highspeed-unlocked",
+      display: "kimi-coding/kimi-for-coding-highspeed-unlocked",
+      reasoning_effort: "minimal",
+    } as const
+    const fallbackModels = [
+      {
+        source: "category",
+        provider: "openai-codex",
+        model_id: "gpt-5.6-luna-fast",
+        display: "openai-codex/gpt-5.6-luna-fast",
+        reasoning_effort: "minimal",
+      },
+    ] as const
+    const runner: InProcessRunnerLike = {
+      start: async (spec) => {
+        captured = spec
+        return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
+      },
+    }
+    const managed = createInProcessManagedRunner(runner)
+    const spec = {
+      ...managedSpec(),
+      requestedModel,
+      fallbackModels,
+    }
+
+    // when
+    await managed.start(spec)
+
+    // then
+    expect(captured).toMatchObject({ requestedModel, fallbackModels })
+  })
+
+  test("#given a managed resume spec #when resumed #then it maps every persisted tool and model fact to ChildSpec", async () => {
+    // given
+    let captured: ChildSpec | undefined
+    let capturedPath: string | undefined
+    const runner: InProcessRunnerLike = {
+      start: () => Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" })),
+      resume: (spec, sessionPath) => {
+        captured = spec
+        capturedPath = sessionPath
+        return Promise.resolve(fakeInProcessHandle({ status: "completed", finalResponse: "ok" }))
+      },
+    }
+    const managed = createInProcessManagedRunner(runner)
+    const resolvedModel = {
+      source: "agent",
+      provider: "anthropic",
+      model_id: "claude",
+      display: "Claude",
+    } as const
+
+    // when
+    await managed.resume?.({
+      ...managedSpec(),
+      resolvedModel,
+      toolDenylist: ["write"],
+      memberScopedToolNames: ["team_ping"],
+    }, "/tmp/session.jsonl")
+
+    // then
+    expect(capturedPath).toBe("/tmp/session.jsonl")
+    expect(captured?.resolvedModel).toEqual(resolvedModel)
+    expect(captured?.toolDenylist).toEqual(["write"])
+    expect(captured?.memberScopedToolNames).toEqual(["team_ping"])
   })
 })
 
@@ -81,7 +165,7 @@ describe("createRpcManagedRunner", () => {
     // given
     let captured: RpcRunnerSpec | undefined
     const runner: RpcRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return fakeRpcHandle()
       },
@@ -101,7 +185,7 @@ describe("createRpcManagedRunner", () => {
     // given
     let captured: RpcRunnerSpec | undefined
     const runner: RpcRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return fakeRpcHandle()
       },
@@ -121,7 +205,7 @@ describe("variant threading", () => {
     // given
     let captured: RpcRunnerSpec | undefined
     const runner: RpcRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return fakeRpcHandle()
       },
@@ -139,7 +223,7 @@ describe("variant threading", () => {
     // given
     let captured: RpcRunnerSpec | undefined
     const runner: RpcRunnerLike = {
-      start: (spec) => {
+      start: async (spec) => {
         captured = spec
         return fakeRpcHandle()
       },

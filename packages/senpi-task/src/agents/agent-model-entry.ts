@@ -1,6 +1,7 @@
 export type AgentModelCandidate = {
   readonly model: string
   readonly variant?: string
+  readonly reasoning?: string
   readonly reasoningEffort?: string
 }
 
@@ -29,7 +30,8 @@ function normalizeEntry(entry: AgentModelEntry): AgentModelCandidate {
 
 function withDefaults(candidate: AgentModelCandidate, defaults: AgentTuningDefaults): AgentModelCandidate {
   const variant = candidate.variant ?? defaults.variant
-  const reasoningEffort = candidate.reasoningEffort ?? defaults.reasoningEffort
+  // Canonical reasoning wins over the legacy reasoningEffort spelling on the same entry.
+  const reasoningEffort = candidate.reasoning ?? candidate.reasoningEffort ?? defaults.reasoningEffort
   return {
     model: candidate.model,
     ...(variant === undefined ? {} : { variant }),

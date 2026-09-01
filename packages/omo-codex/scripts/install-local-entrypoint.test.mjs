@@ -153,7 +153,7 @@ test("#given dry-run cleanup path needs quoting #when running the Node installer
 	).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project '/tmp/lazy codex'\\''s qa'");
+	assert.equal(output, "npx --yes --package oh-my-openagent omo-agent-toolkit cleanup --platform=codex --project '/tmp/lazy codex'\\''s qa'");
 });
 
 test("#given dry-run cleanup #when running the Node installer entrypoint #then prints delegated codex cleanup command", () => {
@@ -168,7 +168,7 @@ test("#given dry-run cleanup #when running the Node installer entrypoint #then p
 	).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project /tmp/lazycodex-qa");
+	assert.equal(output, "npx --yes --package oh-my-openagent omo-agent-toolkit cleanup --platform=codex --project /tmp/lazycodex-qa");
 });
 
 test("#given dry-run uninstall #when running the Node installer entrypoint #then prints delegated codex cleanup command", () => {
@@ -183,7 +183,7 @@ test("#given dry-run uninstall #when running the Node installer entrypoint #then
 	).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project /tmp/lazycodex-qa");
+	assert.equal(output, "npx --yes --package oh-my-openagent omo-agent-toolkit cleanup --platform=codex --project /tmp/lazycodex-qa");
 });
 
 test("#given stale lazycodex version #when running update dry-run #then prints the latest installer command", () => {
@@ -340,7 +340,7 @@ test("#given dry-run ulw-loop #when running the Node installer entrypoint #then 
 	}).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo ulw-loop help");
+	assert.equal(output, "npx --yes --package oh-my-openagent omo-agent-toolkit ulw-loop help");
 });
 
 test("#given the invoking argv path disappears #when importing the Node installer module #then the entrypoint guard does not throw", () => {

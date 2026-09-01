@@ -5,6 +5,10 @@ import type { MigrationClock, MigrationEnvironment, MigrationFileSystem, Migrati
 
 const DEFAULT_LEASE_DURATION_MS = 30_000
 const GUARD_LEASE_DURATION_MS = 1_000
+// A live owner must miss two extra renewal windows before takeover; dead owners remain reclaimable at expiry.
+const LIVE_OWNER_STALE_LEASE_MULTIPLIER = 2
+const MUTATION_GUARD_RETRY_DELAYS_MS = [2, 4, 8, 16, 32] as const
+const MUTATION_GUARD_SLEEP_VIEW = new Int32Array(new SharedArrayBuffer(4))
 
 type LockRecord = {
   readonly leaseExpiresAt: number
@@ -51,8 +55,20 @@ function leaseContent(process: MigrationProcess, clock: MigrationClock, duration
   return `${JSON.stringify({ leaseExpiresAt: clock.now() + duration, pid: process.pid })}\n`
 }
 
-function isExpiredDead(record: LockRecord, clock: MigrationClock, process: MigrationProcess): boolean {
-  return record.leaseExpiresAt <= clock.now() && !process.isAlive(record.pid)
+function isReclaimable(
+  record: LockRecord,
+  clock: MigrationClock,
+  process: MigrationProcess,
+  leaseDurationMs: number,
+): boolean {
+  const now = clock.now()
+  if (record.leaseExpiresAt > now) return false
+  if (!process.isAlive(record.pid)) return true
+  return record.leaseExpiresAt + leaseDurationMs * LIVE_OWNER_STALE_LEASE_MULTIPLIER <= now
+}
+
+function sleepSync(milliseconds: number): void {
+  Atomics.wait(MUTATION_GUARD_SLEEP_VIEW, 0, 0, milliseconds)
 }
 
 function acquireMutationGuard(input: {
@@ -62,7 +78,7 @@ function acquireMutationGuard(input: {
   readonly process: MigrationProcess
 }): string | null {
   const path = mutationGuardPath(input.env)
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt <= MUTATION_GUARD_RETRY_DELAYS_MS.length; attempt += 1) {
     const content = leaseContent(input.process, input.clock, GUARD_LEASE_DURATION_MS)
     try {
       input.fileSystem.writeFileExclusiveSync(path, content)
@@ -70,10 +86,19 @@ function acquireMutationGuard(input: {
     } catch (error) {
       if (!isFileExistsError(error)) throw error
     }
-    const observedContent = input.fileSystem.readFileSync(path, "utf-8")
-    const observed = parseLockRecord(observedContent)
-    if (observed === null || !isExpiredDead(observed, input.clock, input.process)) return null
-    input.fileSystem.removeIfContentsMatchSync(path, observedContent)
+
+    try {
+      const observedContent = input.fileSystem.readFileSync(path, "utf-8")
+      const observed = parseLockRecord(observedContent)
+      if (observed === null || isReclaimable(observed, input.clock, input.process, GUARD_LEASE_DURATION_MS)) {
+        input.fileSystem.removeIfContentsMatchSync(path, observedContent)
+      }
+    } catch (error) {
+      if (!isFileMissingError(error)) throw error
+    }
+
+    const retryDelayMs = MUTATION_GUARD_RETRY_DELAYS_MS[attempt]
+    if (retryDelayMs !== undefined) sleepSync(retryDelayMs)
   }
   return null
 }
@@ -116,7 +141,10 @@ export function acquireMigrationLock(input: {
       return {
         release: (): void => {
           const guardContent = acquireMutationGuard(input)
-          if (guardContent === null) return
+          if (guardContent === null) {
+            input.fileSystem.removeIfContentsMatchSync(path, ownedContent)
+            return
+          }
           try {
             input.fileSystem.removeIfContentsMatchSync(path, ownedContent)
           } finally {
@@ -142,7 +170,7 @@ export function acquireMigrationLock(input: {
         throw error
       }
       const observed = parseLockRecord(observedContent)
-      if (observed === null || !isExpiredDead(observed, input.clock, input.process)) return null
+      if (observed !== null && !isReclaimable(observed, input.clock, input.process, leaseDurationMs)) return null
       input.fileSystem.removeIfContentsMatchSync(path, observedContent)
     } finally {
       releaseMutationGuard({ env: input.env, fileSystem: input.fileSystem, content: guardContent })

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
 import { accessSync, constants, existsSync } from "node:fs"
 import { delimiter, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const OMO_COMMAND_TIMEOUT_MS = 30_000
 
@@ -11,23 +12,50 @@ export interface SpawnTarget {
 
 // Windows .cmd/.bat shims must be invoked through cmd.exe; Node's BatBadBut hardening
 // (CVE-2024-27980, Node >= 18.20.2) throws EINVAL synchronously when spawning them
-// without a shell. Mirrors the codegraph component's wrap (`/d /s /c` preserves arg
-// quoting). `args` here are the fixed STATUS_ARGS constant, so cmd metacharacter
-// injection is not a concern for this call site.
+// without a shell. The `/d /s /c` prefix preserves arg quoting. `args` here are
+// the fixed STATUS_ARGS constant, so cmd metacharacter injection is not a concern
+// for this call site.
 export function toSpawnTarget(
   bin: string,
   args: readonly string[],
   platform: NodeJS.Platform = process.platform,
 ): SpawnTarget {
+  // .js entries spawn through the current runtime on every platform, so an
+  // override (e.g. OMO_AGENT_TOOLKIT_BIN) may point at a JS entry directly.
+  if (/\.js$/i.test(bin)) return { command: process.execPath, args: [bin, ...args] }
   const isWindowsScript = platform === "win32" && /\.(cmd|bat)$/i.test(bin)
   if (!isWindowsScript) return { command: bin, args }
   return { command: "cmd.exe", args: ["/d", "/s", "/c", bin, ...args] }
 }
 
-export function resolveOmoBin(): string | null {
-  const envBin = process.env.OMO_BIN?.trim()
+export function resolveOmoBin(
+  env: Record<string, string | undefined> = process.env,
+  importerUrl: string = import.meta.url,
+): string | null {
+  const toolkitEnvBin = env.OMO_AGENT_TOOLKIT_BIN?.trim()
+  if (toolkitEnvBin) return toolkitEnvBin
+  const bundledCli = resolveBundledToolkitCli(importerUrl)
+  if (bundledCli !== null) return bundledCli
+  const toolkitOnPath = findExecutableOnPath("omo-agent-toolkit", env.PATH)
+  if (toolkitOnPath) return toolkitOnPath
+  const envBin = env.OMO_BIN?.trim()
   if (envBin) return envBin
-  return findExecutableOnPath("omo")
+  // Deliberately NO PATH lookup of the bare name "omo": after the hard cutover
+  // an `omo` on PATH is either a stale install of ours or the unrelated
+  // third-party package, and resolving it would silently execute the wrong binary.
+  return null
+}
+
+// The packaged extension lives at plugin/extensions/omo.js and the staged CLI at
+// plugin/runtime/agent-toolkit/cli.js. Resolving from the importer URL keeps this
+// working after bundling while naturally falling through in source/test layouts.
+export function resolveBundledToolkitCli(importerUrl: string = import.meta.url): string | null {
+  try {
+    const candidate = fileURLToPath(new URL("../runtime/agent-toolkit/cli.js", importerUrl))
+    return existsSync(candidate) ? candidate : null
+  } catch {
+    return null
+  }
 }
 
 export async function runOmoCommand(
@@ -37,12 +65,13 @@ export async function runOmoCommand(
 ): Promise<{ code: number; stdout: string }> {
   const { promise, resolve } = Promise.withResolvers<{ code: number; stdout: string }>()
   // stderr is never consumed: piping it would wedge the child forever once the
-  // 64KiB pipe buffer fills (observed as thousands of live `omo ulw-loop status`
+  // 64KiB pipe buffer fills (observed as thousands of live `omo-agent-toolkit ulw-loop status`
   // processes). Inherit-discard it and hard-kill the child on timeout instead.
   const target = toSpawnTarget(bin, args)
   const child = spawn(target.command, [...target.args], {
     cwd: options.cwd,
     stdio: ["ignore", "pipe", "ignore"],
+    windowsHide: true,
   })
 
   const stdoutChunks: Buffer[] = []
@@ -71,8 +100,7 @@ export async function runOmoCommand(
   return promise
 }
 
-function findExecutableOnPath(command: string): string | null {
-  const pathValue = process.env.PATH
+function findExecutableOnPath(command: string, pathValue = process.env.PATH): string | null {
   if (!pathValue) return null
   for (const directory of pathValue.split(delimiter)) {
     if (!directory) continue

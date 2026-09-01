@@ -1,0 +1,31 @@
+
+  omo-task.js  0.89 MB  (entry point)
+
+Bundled 280 modules in 13ms
+
+  omo-member.js  173.24 KB  (entry point)
+
+Bundled 94 modules in 6ms
+
+  omo-memory-mcp.js  97.19 KB  (entry point)
+
+Bundled 125 modules in 7ms
+
+  memory-run-supervisor.mjs  29.19 KB  (entry point)
+
+Bundled 112 modules in 8ms
+
+  omo-init-deep-advisor.js  64.27 KB  (entry point)
+
+Built omo-senpi extensions: [REDACTED]/packages/omo-senpi/plugin/extensions/omo.js, [REDACTED]/packages/omo-senpi/plugin
+/extensions/omo-task.js, [REDACTED]/packages/omo-senpi/plugin/extensions/omo-member.js, [REDACTED]/packages/omo-senpi/pl
+ugin/extensions/omo-memory-mcp.js, [REDACTED]/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, [REDACTED]
+/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to [REDACTED]/packages/omo-senpi/plugin/skills
+generated directive is current: [REDACTED]/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 6 modules in 3ms
+
+  install.mjs  19.87 KB  (entry point)
+
+Built omo-senpi installer: [REDACTED]/packages/omo-senpi/plugin/scripts/install.mjs
+build: all steps completed

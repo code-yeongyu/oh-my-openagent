@@ -8,4 +8,5 @@ export type {
   StateDirConfig,
   TaskRecordDiagnostic,
   TaskRecordStore,
+  TombstoneResult,
 } from "./types"

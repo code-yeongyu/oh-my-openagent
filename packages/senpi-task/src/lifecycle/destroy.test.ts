@@ -36,6 +36,24 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     expect(readEvents(store, "st_0000000a")).toContain("destroyed")
   })
 
+  test("#given an in-process DAG resident #when cancel-destroyed without abort #then it disposes without creating an abort promise", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000007", status: "cancelled", residency_state: "resident" })
+    const registry = new FakeRegistry()
+    const order: CallLog = []
+    registry.add(fakeHandle("st_00000007", "in-process", order, { abortRejects: true }))
+    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+
+    // when
+    await lifecycle.destroyResidentTask("st_00000007", "cancel_without_abort")
+
+    // then
+    expect(order).toEqual(["dispose:st_00000007"])
+    expect(store.load("st_00000007")?.residency_state).toBe("disposed")
+    expect(registry.forgotten).toContain("st_00000007")
+  })
+
   test("#given an in-process resident whose abort rejects #when cancel-destroyed #then dispose still runs and it ends disposed", async () => {
     // given
     const store = tempStore()
@@ -54,6 +72,30 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     expect(handle.disposed()).toBe(true)
     expect(store.load("st_0000000e")?.residency_state).toBe("disposed")
     expect(registry.forgotten).toContain("st_0000000e")
+  })
+
+  test("#given a fallback handoff #when the old resident is torn down #then manager ownership metadata stays registered", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, {
+      task_id: "st_0000000f",
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "process",
+    })
+    const registry = new FakeRegistry()
+    const order: CallLog = []
+    registry.add(fakeHandle("st_0000000f", "rpc", order, { pid: 4242 }))
+    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+
+    // when
+    await lifecycle.destroyResidentTask("st_0000000f", "fallback_handoff")
+
+    // then
+    expect(order).toEqual(["terminate:st_0000000f", "dispose:st_0000000f"])
+    expect(store.load("st_0000000f")?.residency_state).toBe("resident")
+    expect(registry.forgotten).not.toContain("st_0000000f")
+    expect(readEvents(store, "st_0000000f")).not.toContain("destroyed")
   })
 
   test("#given an rpc resident #when destroyed #then it terminates (TERM->KILL) then detaches, never dispose-only", async () => {

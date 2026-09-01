@@ -265,7 +265,7 @@ describe("loadOmoConfig", () => {
   })
 })
 
-test("#given cwd outside home #when loading #then only cwd project config is read and ancestors are not walked", () => {
+test("#given cwd outside home #when loading #then ancestor project configs are read", () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "omo-config-outside-home-"))
   const homeDir = join(root, "home")
@@ -285,5 +285,5 @@ test("#given cwd outside home #when loading #then only cwd project config is rea
 
   // then
   expect(result.config.task?.default_concurrency).toBe(7)
-  expect(result.sources.some((source) => source.path.endsWith(join("elsewhere", ".omo", "omo.jsonc")))).toBe(false)
+  expect(result.sources.some((source) => source.path.endsWith(join("elsewhere", ".omo", "omo.jsonc")))).toBe(true)
 })

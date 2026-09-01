@@ -4,7 +4,7 @@ import type { OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
 
 import { applyDisabledProviders } from "../shared/disabled-providers"
 import { log } from "../shared/logger"
-import { loadOmoOpenCodeConfigChain } from "../plugin-config/omo-config-chain"
+import { loadOmoOpenCodeConfigChain, type OmoOpenCodeConfigView } from "../plugin-config/omo-config-chain"
 import { mergeConfigs } from "../plugin-config/config-merger"
 import { findUnknownKeyPaths } from "../plugin-config/unknown-key-diagnostics"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./schema"
@@ -95,6 +95,69 @@ function protectUserFields(
   }
 }
 
+function materializeAgentModelChains(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
+  if (config.agents === undefined) return config
+
+  let changed = false
+  const agents = Object.fromEntries(Object.entries(config.agents).map(([name, agent]) => {
+    if (agent?.models === undefined) return [name, agent]
+
+    const [primary, ...fallbacks] = agent.models
+    const {
+      models: _models,
+      model: _model,
+      fallback_models: _fallbackModels,
+      reasoning: _reasoning,
+      variant: _variant,
+      reasoningEffort: _reasoningEffort,
+      temperature: _temperature,
+      top_p: _topP,
+      maxTokens: _maxTokens,
+      thinking: _thinking,
+      ...rest
+    } = agent
+    const primarySettings = primary === undefined
+      ? {}
+      : typeof primary === "string"
+        ? { model: primary }
+        : primary
+    changed = true
+    return [name, {
+      ...rest,
+      ...primarySettings,
+      fallback_models: fallbacks,
+    }]
+  })) as typeof config.agents
+
+  return changed ? { ...config, agents } : config
+}
+
+const START_WORK_DEPRECATION_MESSAGE = 'config key "start_work" is deprecated, rename to "ulw_execute" - will be removed next release'
+
+let deprecationWarningSink: (message: string) => void = log
+
+export function _setDeprecationWarningSinkForTesting(sink: (message: string) => void): void {
+  deprecationWarningSink = sink
+}
+
+export function _resetDeprecationWarningSinkForTesting(): void {
+  deprecationWarningSink = log
+}
+
+function warnLegacyUlwExecuteKey(views: readonly OmoOpenCodeConfigView[]): void {
+  for (const view of views) {
+    if (!Object.hasOwn(view.config, "start_work")) continue
+    deprecationWarningSink(`[config] ${shortPath(view.path)}: ${START_WORK_DEPRECATION_MESSAGE}`)
+  }
+}
+
+function migrateLegacyUlwExecuteKey(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
+  const legacy = config.start_work
+  if (legacy === undefined || config.ulw_execute !== undefined) return config
+
+  return { ...config, ulw_execute: legacy }
+}
+
 function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
   const legacy = config.ralph_loop
   if (legacy === undefined) return config
@@ -126,12 +189,15 @@ export function validatePluginConfig(
   const firstFailingView = views.find((view) => view.messages.length > 0)
   const firstView = views[0]
   const userConfig = parseConfig(chain.protectedUserView)
-  const config = applyDisabledProviders(protectUserFields(mergeViews(views), userConfig))
+  const config = applyDisabledProviders(materializeAgentModelChains(
+    protectUserFields(mergeViews(views), userConfig),
+  ))
+  warnLegacyUlwExecuteKey(chain.views)
 
   return {
     valid: messages.length === 0,
     messages,
     path: chainMessages.length > 0 ? chain.diagnostics[0]?.path ?? null : firstFailingView?.path ?? firstView?.path ?? null,
-    config: migrateRalphLoopConfig(config),
+    config: migrateRalphLoopConfig(migrateLegacyUlwExecuteKey(config)),
   }
 }

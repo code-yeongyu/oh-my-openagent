@@ -84,8 +84,20 @@ export function taskEventText(cwd, taskId) {
   return readText(join(taskStateDir(cwd), "logs", `${taskId}.jsonl`)) ?? ""
 }
 
+export function unreadMessagePath(cwd, teamRunId, recipient, messageId) {
+  return join(memberInboxDir(cwd, teamRunId, recipient), `${messageId}.json`)
+}
+
+export function reservedMessagePath(cwd, teamRunId, recipient, messageId) {
+  return join(memberInboxDir(cwd, teamRunId, recipient), `${RESERVED_PREFIX}${messageId}.json`)
+}
+
 export function processedMessagePath(cwd, teamRunId, recipient, messageId) {
   return join(memberInboxDir(cwd, teamRunId, recipient), "processed", `${messageId}.json`)
+}
+
+export function memberSessionDir(cwd, taskId) {
+  return join(taskStateDir(cwd), "children", taskId, "sessions", taskId)
 }
 
 export function sessionEnvelopeCount(cwd, taskId, messageId) {
@@ -169,7 +181,7 @@ export function readJsonIfPresent(path) {
 }
 
 function sessionStringValues(cwd, taskId) {
-  const sessionDir = join(taskStateDir(cwd), "children", taskId, "sessions", taskId)
+  const sessionDir = memberSessionDir(cwd, taskId)
   if (!existsSync(sessionDir)) return []
   const values = []
   for (const entry of readdirSync(sessionDir)) {

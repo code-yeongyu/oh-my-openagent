@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { applyUserPromptUlwLoopSteering, type UserPromptSubmitPayload } from "../src/codex-hook.js";
+import { buildUltraworkSkillPointer } from "../src/ultrawork-skill-pointer.js";
 
 const DEFAULT_SESSION_ID = "s1";
 
@@ -55,11 +56,17 @@ describe("standalone ultrawork directive injection", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
 	});
 
-	it("#given ulw-loop bundles the ultrawork directive #when compared to ultrawork #then the copy stays byte-identical", async () => {
+	it("#given ulw-loop bundles the ultrawork directive #when compared to the canonical prompts-core source #then the copy stays byte-identical", async () => {
+		// ulw-loop is a standalone published package with no prompts-core dependency, so it bundles its
+		// own copy as the runtime fallback its `files` list ships. This pins that copy to the canonical
+		// source that scripts/sync-directive.mjs in the ultrawork component regenerates it from.
 		const ulwLoopDirective = await readFile(new URL("../directive.md", import.meta.url), "utf8");
-		const ultraworkDirective = await readFile(new URL("../../ultrawork/directive.md", import.meta.url), "utf8");
+		const canonicalDirective = await readFile(
+			new URL("../../../../../prompts-core/prompts/ultrawork/codex.md", import.meta.url),
+			"utf8",
+		);
 
-		expect(ulwLoopDirective).toBe(ultraworkDirective);
+		expect(ulwLoopDirective).toBe(canonicalDirective);
 	});
 
 	it("#given an existing ultrawork skill file #when standalone injection runs #then emits the compact skill pointer", async () => {
@@ -76,10 +83,7 @@ describe("standalone ultrawork directive injection", () => {
 		const parsed = JSON.parse(output);
 		const context = parsed.hookSpecificOutput.additionalContext;
 
-		expect(context).toMatch(/^<ultrawork-mode>/);
-		expect(context).toContain(skillFilePath);
-		expect(context).toContain("create_goal");
-		expect(context).not.toContain("Tier triage");
+		expect(context).toBe(buildUltraworkSkillPointer(skillFilePath).trim());
 	});
 
 	it("#given a missing ultrawork skill file #when standalone injection runs #then falls back to the full directive", async () => {
@@ -90,8 +94,9 @@ describe("standalone ultrawork directive injection", () => {
 			ultraworkSkillFilePath: missingSkillFilePath,
 		});
 		const parsed = JSON.parse(output);
+		const directive = await readFile(new URL("../directive.md", import.meta.url), "utf8");
 
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("Tier triage");
+		expect(parsed.hookSpecificOutput.additionalContext).toBe(directive.trim());
 	});
 
 	it("#given the ulw-loop pointer template #when compared to ultrawork #then the copy stays byte-identical", async () => {

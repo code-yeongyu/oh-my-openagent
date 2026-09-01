@@ -40,11 +40,11 @@ describe("runMigration transaction ownership", () => {
     expect(parseFile(fileSystem, migrationFixture.targetPath)._migrations).toEqual(["concurrent-legacy"])
   })
 
-  test("#given a live owner whose lease is expired #when another caller attempts takeover #then the lock is not stolen", () => {
+  test("#given a live owner whose lease is fresh #when another caller attempts takeover #then the lock is not stolen", () => {
     // given
     const fileSystem = new MemoryMigrationFileSystem()
     const lockPath = "/home/alice/.omo/.migration.lock"
-    const lockContent = `${JSON.stringify({ leaseExpiresAt: 0, pid: 99 })}\n`
+    const lockContent = `${JSON.stringify({ leaseExpiresAt: 2_000, pid: 99 })}\n`
     fileSystem.files.set(lockPath, lockContent)
     fileSystem.files.set(migrationFixture.sourcePath, `{}`)
 
@@ -66,6 +66,59 @@ describe("runMigration transaction ownership", () => {
     expect(fileSystem.readFileSync(lockPath, "utf-8")).toBe(lockContent)
     expect(fileSystem.existsSync(migrationFixture.sourcePath)).toBe(true)
     expect(fileSystem.existsSync(migrationFixture.targetPath)).toBe(false)
+  })
+
+  test("#given a migration lasts beyond its initial lease #when it renews at transaction boundaries #then fresh ownership is never stolen", () => {
+    // given
+    const fileSystem = new MemoryMigrationFileSystem()
+    let now = 0
+    const competingStatuses: string[] = []
+    fileSystem.files.set(migrationFixture.sourcePath, `{}`)
+    const input = {
+      clock: { now: () => now },
+      env: migrationFixture.env,
+      fileSystem,
+      id: "renewing-owner",
+      isProcessAlive: () => true,
+      leaseDurationMs: 10,
+      sources: [{ path: migrationFixture.sourcePath }],
+      targetPath: migrationFixture.targetPath,
+      transform: () => ({ task: { default_concurrency: 3 } }),
+    }
+    const race = (): void => {
+      competingStatuses.push(runMigration({ ...input, pid: 200 }).status)
+    }
+
+    // when
+    const result = runMigration({
+      ...input,
+      onBoundary: (boundary) => {
+        if (boundary === "journal-written") {
+          now = 8
+          race()
+        }
+        if (boundary === "source-moved") {
+          now = 24
+          race()
+        }
+      },
+      pid: 100,
+      writeTarget: (writeInput) => {
+        now = 16
+        race()
+        updateOmoConfig({
+          edits: writeInput.edits,
+          env: writeInput.env,
+          fileSystem: writeInput.fileSystem,
+          scope: "user",
+        })
+      },
+    })
+
+    // then
+    expect(result.status).toBe("migrated")
+    expect(competingStatuses).toEqual(["locked", "locked", "locked"])
+    expect(parseFile(fileSystem, migrationFixture.targetPath)._migrations).toEqual(["renewing-owner"])
   })
 
   test("#given a false predicate and no journal #when entering the transaction #then no target or source is written", () => {

@@ -1,0 +1,27 @@
+{
+  "title": "Senpi task TUI zero price",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "taskResultLines zero-cost fixture"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 100,
+    "rows": 12
+  },
+  "cleanup": "pty pid 24979 killed",
+  "files": {
+    "png": "/Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/senpi-task-hide-zero-cost/.omo/evidence/20260804-senpi-task-zero-price/zero/terminal.png",
+    "text": "/Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/senpi-task-hide-zero-cost/.omo/evidence/20260804-senpi-task-zero-price/zero/terminal.txt",
+    "ansi": "/Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/senpi-task-hide-zero-cost/.omo/evidence/20260804-senpi-task-zero-price/zero/terminal-ansi.txt",
+    "metadata": "/Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/senpi-task-hide-zero-cost/.omo/evidence/20260804-senpi-task-zero-price/zero/metadata.json"
+  }
+}

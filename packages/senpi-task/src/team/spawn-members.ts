@@ -4,6 +4,7 @@ import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, StartResult } from "../manager"
 import type { ResolvedModelRecord } from "../state"
+import { assembleMemberExtensions } from "./member-extensions"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
 import {
   SenpiTeamRuntimeError,
@@ -121,7 +122,7 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
   const launch = input.memberExtension
   const extensions = launch === undefined
     ? undefined
-    : [...new Set([...(launch.inheritedExtensions ?? []), launch.entryPath])]
+    : assembleMemberExtensions(launch.entryPath, launch.inheritedExtensions)
   return {
     prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,
@@ -131,6 +132,7 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
     execution_mode: "process",
     run_in_background: true,
     ...(member.kind === "category" ? { category: member.category } : { subagent_type: member.subagent_type }),
+    ...(member.task_summary !== undefined ? { task_summary: member.task_summary } : {}),
     ...(member.worktreePath !== undefined ? { cwd: member.worktreePath } : {}),
     ...(extensions !== undefined ? { extensions } : {}),
     ...(launch !== undefined ? {

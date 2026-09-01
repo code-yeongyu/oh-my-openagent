@@ -37,7 +37,8 @@ describe("member extension lifecycle", () => {
 
     const handlers = new Map<string, Array<() => unknown | Promise<unknown>>>()
     const toolNames: string[] = []
-    const injected: Array<{ content: string; deliverAs: string | undefined }> = []
+    const injected: Array<{ message: Record<string, unknown>; options: Record<string, unknown> | undefined }> = []
+    const visible: string[] = []
     let loading = true
     const api = {
       on(event: string, handler: () => unknown | Promise<unknown>) {
@@ -48,9 +49,13 @@ describe("member extension lifecycle", () => {
       registerTool(tool: { name: string }) {
         toolNames.push(tool.name)
       },
-      sendUserMessage(content: string, options?: { deliverAs?: string }) {
+      sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>) {
         if (loading) throw new Error("runtime action called during extension loading")
-        injected.push({ content, deliverAs: options?.deliverAs })
+        injected.push({ message, options })
+      },
+      sendUserMessage(content: string) {
+        if (loading) throw new Error("runtime action called during extension loading")
+        visible.push(content)
       },
     } as unknown as ExtensionAPI
     const previous = captureMemberEnv()
@@ -75,9 +80,14 @@ describe("member extension lifecycle", () => {
 
       expect(injected).toHaveLength(1)
       expect(injected[0]).toEqual({
-        content: expect.stringContaining(MESSAGE_ID),
-        deliverAs: "steer",
+        message: {
+          customType: "senpi-task:team-message",
+          content: expect.stringContaining(MESSAGE_ID),
+          display: false,
+        },
+        options: { triggerTurn: true, deliverAs: "steer" },
       })
+      expect(visible).toEqual([])
     } finally {
       await dispatch(handlers, "session_shutdown")
       restoreMemberEnv(previous)

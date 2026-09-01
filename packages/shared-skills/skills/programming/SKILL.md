@@ -238,8 +238,7 @@ Logging is part of the code you ship, and it has iron rules of its own: levels c
 ## DEPENDENCY UPGRADES — CROSS-CUTTING RULES
 
 - **`0.x` minor = major.** Semver promises nothing below 1.0: treat `0.N → 0.N+1` as a breaking upgrade — read the changelog, build, and run the full suite before trusting it. A required field appearing in a public options type is a routine `0.x` "minor".
-- **Version literals live outside the manifest.** Before committing a bump, grep the repo for the old version string: Dockerfiles pinning a global CLI, CI workflows, docs, and contract tests all carry copies. A bump that updates only the package manifest ships a split-brain deploy.
-- **Pin-parity contract tests are a pattern, not a nuisance.** A small test asserting the lockfile-resolved version equals the deploy artifact's pin (Dockerfile, image tag) turns silent drift into a red test. If the project has one, update it deliberately; if the bump reveals unguarded drift, add the test with the bump.
+- **Version literals live outside the manifest.** Before committing a bump, grep the repo for the old version string: Dockerfiles pinning a global CLI, CI workflows, and docs all carry copies. A bump that updates only the package manifest ships a split-brain deploy.
 - **Never hand-merge a lockfile.** On conflict, take either side whole and regenerate with the package manager — the resolver owns that file, not you.
 
 ---

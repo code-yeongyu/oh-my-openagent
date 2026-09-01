@@ -24,7 +24,7 @@ export function tempProject(): string {
 }
 
 export function settings(overrides: Record<string, unknown> = {}): OmoTaskSettings {
-  return OmoTaskSettingsSchema.parse(overrides)
+  return OmoTaskSettingsSchema.parse({ global_concurrency: 0, ...overrides })
 }
 
 export type FakeHandle = {
@@ -35,6 +35,8 @@ export type FakeHandle = {
   readonly followUpCalls: string[]
   subscribeCount(): number
   unsubscribeCount(): number
+  waitForSubscription(): Promise<void>
+  waitForUnsubscription(): Promise<void>
 }
 
 export function makeHandle(taskId: string, pid?: number): FakeHandle {
@@ -49,6 +51,8 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
   const listeners = new Set<ManagedChildListener>()
   let subscribeCalls = 0
   let unsubscribeCalls = 0
+  const subscriptionWaiters: Array<() => void> = []
+  const unsubscriptionWaiters: Array<() => void> = []
   const handle: ManagedChildHandle = {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
@@ -62,9 +66,11 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     abort: async () => {},
     subscribe: (listener) => {
       subscribeCalls += 1
+      for (const resolve of subscriptionWaiters.splice(0)) resolve()
       listeners.add(listener)
       return () => {
         unsubscribeCalls += 1
+        for (const resolve of unsubscriptionWaiters.splice(0)) resolve()
         listeners.delete(listener)
       }
     },
@@ -89,6 +95,12 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     followUpCalls,
     subscribeCount: () => subscribeCalls,
     unsubscribeCount: () => unsubscribeCalls,
+    waitForSubscription: () => subscribeCalls > 0
+      ? Promise.resolve()
+      : new Promise((resolve) => subscriptionWaiters.push(resolve)),
+    waitForUnsubscription: () => unsubscribeCalls > 0
+      ? Promise.resolve()
+      : new Promise((resolve) => unsubscriptionWaiters.push(resolve)),
   }
 }
 

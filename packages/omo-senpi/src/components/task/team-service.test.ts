@@ -2,8 +2,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
-import { AuthStorage, ModelRegistry } from "@code-yeongyu/senpi"
-
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import { createRuntimeState, transitionRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 import {
@@ -23,6 +21,7 @@ import {
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeTaskEngine } from "./engine"
 import { createTeamService } from "./team-service"
+import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 
 const MEMBER_TASK_ID = "st_00000001"
 const MESSAGE_ID = "77777777-7777-4777-8777-777777777777"
@@ -62,6 +61,7 @@ async function activeTeamHarness(sessionId?: string) {
   )
   const service = createTeamService({
     manager: engine.manager,
+    destruction: engine.lifecycle,
     runtime: engine.runtime,
     settings: engine.settings,
     omoConfig,
@@ -94,27 +94,14 @@ function extensionOrderHarness() {
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => runner, process: () => runner },
   })
-  const modelRegistry = ModelRegistry.inMemory(AuthStorage.inMemory())
-  modelRegistry.registerProvider("omo-mock", {
-    api: "openai-completions",
-    baseUrl: "https://example.test",
-    apiKey: "test-key",
-    models: [{
-      id: "mock-1",
-      name: "Mock model",
-      reasoning: false,
-      input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 1,
-      maxTokens: 1,
-    }],
-  })
+  const modelRegistry = createTeamServiceTestModelRegistry()
   engine.runtime.captureFrom({
     modelRegistry,
     sessionManager: { getSessionId: () => "lead-session" },
   })
   const service = createTeamService({
     manager: engine.manager,
+    destruction: engine.lifecycle,
     runtime: engine.runtime,
     settings: engine.settings,
     omoConfig,
@@ -151,6 +138,7 @@ describe("createTeamService curated agent gating", () => {
     expect(Object.keys(engine.agents)).toContain("momus")
     const service = createTeamService({
       manager: engine.manager,
+      destruction: engine.lifecycle,
       runtime: engine.runtime,
       settings: engine.settings,
       omoConfig,
@@ -254,6 +242,7 @@ describe("createTeamService named-team lookup", () => {
     engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "lead-session" } })
     const service = createTeamService({
       manager: engine.manager,
+      destruction: engine.lifecycle,
       runtime: engine.runtime,
       settings: engine.settings,
       omoConfig,

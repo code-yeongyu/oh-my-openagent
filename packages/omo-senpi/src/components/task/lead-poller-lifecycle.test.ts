@@ -10,7 +10,7 @@ import type { TaskRuntimeContext } from "./runtime-context"
 
 type FakePoller = LeadPollerPort & { readonly teamRunId: string; polls: number; shutdowns: number }
 
-function harness() {
+function harness(options: { readonly withCoordinator?: boolean } = {}) {
   let sessionId: string | undefined = "session-a"
   let state: ReturnType<TaskRuntimeContext["parentState"]> = { kind: "idle" }
   let sessionFile: string | undefined = "/tmp/lead.jsonl"
@@ -23,6 +23,7 @@ function harness() {
   let scheduled = 0
   let soon = 0
   const userMessages: string[] = []
+  const sentMessages: Array<{ message: unknown; options: unknown }> = []
   const journal = createLeadDeliveryJournal()
 
   const lifecycle = createLeadPollerLifecycle({
@@ -36,13 +37,20 @@ function harness() {
     runtimeDir: (teamRunId) => `/tmp/runtime/${teamRunId}`,
     deliveryJournal: journal,
     appendTaskEvent: () => undefined,
-    pi: { sendUserMessage: (content) => userMessages.push(String(content)) },
+    pi: {
+      sendMessage: (message: unknown, deliveryOptions: unknown) => {
+        sentMessages.push({ message, options: deliveryOptions })
+      },
+      sendUserMessage: (content: unknown) => userMessages.push(String(content)),
+    } as never,
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
-    coordinator: {
-      enqueue: (injection) => injected.push(injection),
-      scheduleFlush: () => { scheduled += 1 },
-      flushSoon: () => { soon += 1 },
-    },
+    coordinator: options.withCoordinator === false
+      ? undefined
+      : {
+          enqueue: (injection) => injected.push(injection),
+          scheduleFlush: () => { scheduled += 1 },
+          flushSoon: () => { soon += 1 },
+        },
     createPoller: (input) => {
       const poller: FakePoller = {
         teamRunId: input.teamRunId,
@@ -72,6 +80,7 @@ function harness() {
     injected,
     journal,
     userMessages,
+    sentMessages,
     get scheduled() { return scheduled },
     get soon() { return soon },
     get intervalDisposals() { return intervalDisposals },
@@ -87,6 +96,29 @@ function ownedTeam(teamRunId: string, leadSessionId = "session-a") {
 }
 
 describe("lead poller lifecycle", () => {
+  test("#given no shared coordinator #when team mail injects #then fallback is hidden custom steer", async () => {
+    const h = harness({ withCoordinator: false })
+    await h.lifecycle.tick()
+
+    h.created[0]?.input.coordinator.enqueue({
+      key: "team-message:m1",
+      source: "team-message",
+      content: '<peer_message from="worker" to="lead" messageId="m1">ready</peer_message>',
+    } as LeadInjection)
+
+    expect(h.userMessages).toEqual([])
+    expect(h.sentMessages).toEqual([
+      {
+        message: {
+          customType: "senpi-task:team-message",
+          content: '<peer_message from="worker" to="lead" messageId="m1">ready</peer_message>',
+          display: false,
+        },
+        options: { triggerTurn: true, deliverAs: "steer" },
+      },
+    ])
+  })
+
   test("#given owned and foreign teams #when ticks repeat #then only one owned poller is created and reused", async () => {
     // given
     const h = harness()
@@ -132,6 +164,27 @@ describe("lead poller lifecycle", () => {
 
     // then
     expect(h.created[0]?.poller.polls).toBe(1)
+  })
+
+  test("#given an owned team whose members are suspended #when the lead session shuts down and resumes #then the same poller keeps the team", async () => {
+    // given a live poller for the owned team, then the lead session enters shutdown (members suspend)
+    const h = harness()
+    await h.lifecycle.tick()
+    h.setState({ kind: "session_shutdown" })
+    h.setSessionFile(undefined)
+
+    // when the shutdown window passes with the team still active, then the session resumes
+    await h.lifecycle.tick()
+    expect(h.lifecycle.resolveLeadPoller("run-owned")).toBeUndefined()
+    h.setState({ kind: "idle" })
+    h.setSessionFile("/tmp/lead.jsonl")
+    await h.lifecycle.tick()
+
+    // then the original poller instance kept the team across the suspension window
+    expect(h.created).toHaveLength(1)
+    expect(h.created[0]?.poller.shutdowns).toBe(0)
+    expect(h.created[0]?.poller.polls).toBe(2)
+    expect(h.lifecycle.resolveLeadPoller("run-owned")).toBe(h.created[0]?.poller)
   })
 
   test("#given ownership disappears #when the lifecycle reconciles #then the old poller shuts down and cannot resolve", async () => {

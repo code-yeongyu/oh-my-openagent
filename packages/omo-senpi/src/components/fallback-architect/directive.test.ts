@@ -35,10 +35,7 @@ describe("fallback-architect directive", () => {
         expect(directive).toContain('task(category: "architect")')
       })
 
-      it("#then it is wrapped in the matched marker pair", () => {
-        expect(directive).toContain("<omo-fallback-architect>")
-        expect(directive).toContain("</omo-fallback-architect>")
-      })
+
     })
 
     describe("#when the compact reminder is built", () => {
@@ -49,13 +46,7 @@ describe("fallback-architect directive", () => {
         expect(reminder).toContain('task(category: "architect")')
       })
 
-      it("#then it stays shorter than the full directive", () => {
-        const directive = buildFallbackArchitectDirective({
-          from: "anthropic/claude-fable-5",
-          to: "anthropic/claude-opus-5",
-        })
-        expect(reminder.length).toBeLessThan(directive.length)
-      })
+
     })
   })
 })

@@ -1,4 +1,5 @@
-import { prepareTargetWrite, targetDocument, writePreparedTarget } from "./commit"
+import { moveMigrationBackup } from "./backup-move"
+import { prepareTargetReplacement, prepareTargetWrite, targetDocument, writePreparedTarget } from "./commit"
 import { readMigrationJournal, removeMigrationJournal, writeMigrationJournal } from "./journal"
 import { hasMigrationMarker } from "./predicate"
 import { MigrationTransactionError, type MigrationClock, type MigrationEnvironment, type MigrationFileSystem, type MigrationProcess, type MigrationTargetWriter } from "./types"
@@ -17,12 +18,19 @@ export function resumeMigrationJournal(input: {
   input.renewLock()
   const target = targetDocument(journal.targetPath, input.fileSystem)
   if (!hasMigrationMarker(target, journal.migrationId)) {
-    const prepared = prepareTargetWrite({
-      additions: journal.targetWrite.additions,
-      migrationId: journal.migrationId,
-      target,
-      targetPath: journal.targetPath,
-    })
+    const prepared = journal.targetWrite.mode === "replace-target"
+      ? prepareTargetReplacement({
+        document: journal.targetWrite.additions,
+        migrationId: journal.migrationId,
+        target,
+        targetPath: journal.targetPath,
+      })
+      : prepareTargetWrite({
+        additions: journal.targetWrite.additions,
+        migrationId: journal.migrationId,
+        target,
+        targetPath: journal.targetPath,
+      })
     writePreparedTarget({
       env: input.env,
       fileSystem: input.fileSystem,
@@ -41,7 +49,7 @@ export function resumeMigrationJournal(input: {
       if (input.fileSystem.existsSync(move.to)) {
         throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`)
       }
-      input.fileSystem.renameSync(move.from, move.to)
+      moveMigrationBackup(input.fileSystem, move.from, move.to)
     } else if (!input.fileSystem.existsSync(move.to)) {
       throw new MigrationTransactionError(`Migration source and backup are both missing: ${move.from}`)
     }

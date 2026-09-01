@@ -28,7 +28,7 @@ type MockProvider = Parameters<TaskE2EExtensionAPI["registerProvider"]>[1];
 type MockModel = MockProvider["models"][number];
 
 const EXPLORE_FALLBACK_MODEL: MockModel = {
-	id: "gpt-5.4-mini-fast",
+	id: "gpt-5.6-luna-fast",
 	name: "Mock Explore Fallback",
 	reasoning: false,
 	input: ["text"],

@@ -47,15 +47,34 @@ function advertisedAgentNames(engine: TaskEngine): string {
   return (end < 0 ? rest : rest.slice(0, end)).trim()
 }
 
+function advertisedPlanGatedAgentNames(engine: TaskEngine): string {
+  const description = buildTaskToolDescription({ omoConfig: engine.omoConfig, agents: engine.agents })
+  const marker =
+    "Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and ulw-execute was never invoked): "
+  const start = description.indexOf(marker)
+  if (start < 0) throw new Error("task tool description is missing the Plan-gated agents list")
+  const rest = description.slice(start + marker.length)
+  const end = rest.indexOf("\n")
+  return (end < 0 ? rest : rest.slice(0, end)).trim()
+}
+
 describe("task engine builtin agent overlay", () => {
-  test("#given no omo.json agents #when the engine resolves agents #then the 5 builtin curated agents are present with their personas", () => {
+  test("#given no omo.json agents #when the engine resolves agents #then the builtin curated agents are present", () => {
     // given / when
     const engine = composeIn(tempProject())
 
     // then
-    expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus"])
-    expect(engine.agents["explore"]?.prompt).toContain("codebase search specialist")
+    expect(Object.keys(engine.agents).sort()).toEqual([
+      "explore",
+      "librarian",
+      "metis",
+      "momus",
+      "omo-senpi-code-reviewer",
+      "omo-senpi-gate-reviewer",
+      "omo-senpi-qa-executor",
+    ])
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
+    expect(engine.agents["omo-senpi-code-reviewer"]?.executionMode).toBe("in-process")
   })
 
   test("#given an omo.json model override for a builtin agent #when the engine resolves agents #then the model wins and the builtin prompt and allowlist survive", () => {
@@ -82,7 +101,16 @@ describe("task engine builtin agent overlay", () => {
     const engine = composeIn(cwd)
 
     // then
-    expect(Object.keys(engine.agents).sort()).toEqual(["explore", "librarian", "metis", "momus", "scout"])
+    expect(Object.keys(engine.agents).sort()).toEqual([
+      "explore",
+      "librarian",
+      "metis",
+      "momus",
+      "omo-senpi-code-reviewer",
+      "omo-senpi-gate-reviewer",
+      "omo-senpi-qa-executor",
+      "scout",
+    ])
     expect(engine.agents["scout"]?.prompt).toBe("Scout the repo.")
   })
 
@@ -96,6 +124,20 @@ describe("task engine builtin agent overlay", () => {
 
     // then
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
+  })
+
+  test("#given a process override for a reviewer agent #when the engine resolves agents #then in-process execution remains pinned", () => {
+    // given
+    const cwd = tempProject()
+    writeOmoJson(cwd, { agents: { "omo-senpi-code-reviewer": { execution_mode: "process" } } })
+
+    // when
+    const engine = composeIn(cwd)
+
+    // then
+    expect(engine.agents["omo-senpi-code-reviewer"]?.executionMode).toBe("in-process")
+    expect(engine.agents["omo-senpi-qa-executor"]?.executionMode).toBe("in-process")
+    expect(engine.agents["omo-senpi-gate-reviewer"]?.executionMode).toBe("in-process")
   })
 
   test("#given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable", () => {
@@ -112,12 +154,15 @@ describe("task engine builtin agent overlay", () => {
     expect(engine.agents["scout"]?.executionMode).toBe("process")
   })
 
-  test("#given the default engine agents #when the task tool description renders #then all 4 builtin names are advertised sorted", () => {
+  test("#given the default engine agents #when the task tool description renders #then plain builtins are advertised and the plan-gated tier is classified separately", () => {
     // given
     const engine = composeIn(tempProject())
 
     // when / then
-    expect(advertisedAgentNames(engine)).toBe("explore, librarian, metis, momus")
+    expect(advertisedAgentNames(engine)).toBe(
+      "explore, librarian, omo-senpi-code-reviewer, omo-senpi-gate-reviewer, omo-senpi-qa-executor",
+    )
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("metis, momus")
   })
 
   test("#given agents.momus.disable in omo.json #when the description renders #then momus is hidden and the other three stay listed", () => {
@@ -130,6 +175,9 @@ describe("task engine builtin agent overlay", () => {
 
     // then
     expect(engine.agents["momus"]?.disable).toBe(true)
-    expect(advertisedAgentNames(engine)).toBe("explore, librarian, metis")
+    expect(advertisedAgentNames(engine)).toBe(
+      "explore, librarian, omo-senpi-code-reviewer, omo-senpi-gate-reviewer, omo-senpi-qa-executor",
+    )
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("metis")
   })
 })

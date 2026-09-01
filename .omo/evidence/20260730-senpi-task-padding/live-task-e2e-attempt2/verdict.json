@@ -1,0 +1,64 @@
+{
+  "result": "PASS",
+  "checks": {
+    "spawn_background": "PASS",
+    "unconditional_wake": "PASS",
+    "followup_revive": "PASS",
+    "task_output_peek": "PASS",
+    "jsonl_sequence": "PASS",
+    "extension_suppression": "PASS",
+    "batch_fanout_two_children": "PASS",
+    "sync_inline_no_notification": "PASS",
+    "negative_category_error": "PASS",
+    "real_senpi_untouched": "PASS",
+    "no_leaked_pids": "PASS"
+  },
+  "leakedPids": 0,
+  "spawnedPids": [
+    80644,
+    80827,
+    80984,
+    81131
+  ],
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "concurrentRealSenpiChangedPaths": [],
+  "allRealSenpiChangedPaths": [],
+  "realSenpiDigestUnchanged": true,
+  "providedAgentDir": "unset",
+  "sandboxAgentDirs": [
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-2ASxjQ/agent",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-QEDFiY/agent",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-xmcbaL/agent",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-DbB3A4/agent"
+  ],
+  "sandboxCwds": [
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-2ASxjQ/project",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-QEDFiY/project",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-xmcbaL/project",
+    "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-DbB3A4/project"
+  ],
+  "sandboxTokens": [
+    "omo-senpi-qa-2ASxjQ",
+    "omo-senpi-qa-QEDFiY",
+    "omo-senpi-qa-xmcbaL",
+    "omo-senpi-qa-DbB3A4"
+  ],
+  "markerChildExtensions": 1,
+  "mainTaskId": "st_019fb190",
+  "mainSignatures": [
+    "running/resident",
+    "assistant_message",
+    "completed/resident",
+    "revived",
+    "assistant_message",
+    "completed/resident",
+    "completed/disposed",
+    "destroyed"
+  ],
+  "mainExit": 0,
+  "batchTaskIds": [
+    "st_019fb190",
+    "st_019fb191"
+  ]
+}

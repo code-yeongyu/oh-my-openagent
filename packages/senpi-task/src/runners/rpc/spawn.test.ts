@@ -1,5 +1,6 @@
-import { homedir } from "node:os"
-import { isAbsolute, join, sep } from "node:path"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { homedir, tmpdir } from "node:os"
+import { dirname, isAbsolute, join, relative, sep } from "node:path"
 import { describe, expect, test } from "bun:test"
 
 import { buildChildArgs, buildRpcSpawn, detectBunBinary, resolveChildSessionDir, resolveSenpiExecutable } from "./spawn"
@@ -69,6 +70,36 @@ describe("resolveSenpiExecutable", () => {
     expect(resolved).toBeNull()
   })
 
+  test("#given a relative SENPI_BIN #when resolving #then the validated executable is returned as a canonical absolute path", () => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-relative-override-"))
+    const executable = join(root, "senpi")
+    writeFileSync(executable, "")
+    try {
+      const override = relative(process.cwd(), executable)
+      const resolved = resolveSenpiExecutable({ ...runtime, parentEnv: { SENPI_BIN: override } })
+      expect(resolved).toBe(realpathSync.native(executable))
+      if (resolved === null) throw new Error("relative SENPI_BIN did not resolve")
+      expect(isAbsolute(resolved)).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a relative PATH entry #when resolving #then the validated executable is returned as a canonical absolute path", () => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-relative-path-"))
+    const executable = join(root, "senpi")
+    writeFileSync(executable, "")
+    try {
+      const pathEntry = relative(process.cwd(), root)
+      const resolved = resolveSenpiExecutable({ ...runtime, parentEnv: { PATH: pathEntry } })
+      expect(resolved).toBe(realpathSync.native(executable))
+      if (resolved === null) throw new Error("relative PATH entry did not resolve")
+      expect(isAbsolute(resolved)).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given no SENPI_BIN and an empty PATH #when resolving a node runtime #then no executable is found", () => {
     // when
     const resolved = resolveSenpiExecutable({ ...runtime, parentEnv: { PATH: "" } })
@@ -76,11 +107,21 @@ describe("resolveSenpiExecutable", () => {
     expect(resolved).toBeNull()
   })
 
-  test("#given a bun runtime #when resolving #then the sibling binary next to the bun exec is chosen", () => {
-    // when
+  test("#given a bun runtime whose sibling Senpi binary is absent #when resolving #then it falls through instead of returning a missing path", () => {
     const resolved = resolveSenpiExecutable({ ...runtime, isBunBinary: true, execPath: "/opt/senpi/bin/bun", parentEnv: {} })
-    // then
-    expect(resolved).toBe(join("/opt/senpi/bin", "senpi"))
+    expect(resolved).toBeNull()
+  })
+
+  test("#given a bun runtime with an existing sibling Senpi binary #when resolving #then that sibling is chosen", () => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-bun-sibling-"))
+    const execPath = join(root, "bun")
+    const sibling = join(root, "senpi")
+    writeFileSync(sibling, "")
+    try {
+      expect(resolveSenpiExecutable({ ...runtime, isBunBinary: true, execPath, parentEnv: {} })).toBe(realpathSync.native(sibling))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 
@@ -106,6 +147,13 @@ describe("buildChildArgs", () => {
     expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1", "--thinking", "xhigh"])
   })
 
+  test("#given a spec with high reasoning effort #when building child args #then it maps to senpi high", () => {
+    // when
+    const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "high" })
+    // then
+    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1", "--thinking", "high"])
+  })
+
   test("#given the omo.json reasoningEffort none as variant #when building child args #then it maps to senpi off", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, variant: "none" })
@@ -122,6 +170,72 @@ describe("buildChildArgs", () => {
 })
 
 describe("buildRpcSpawn spawn strategy", () => {
+  test("#given a Windows npm senpi installation #when building an RPC child #then Node launches the npm package CLI without shell forwarding", () => {
+    // given
+    const npmDir = mkdtempSync(join(tmpdir(), "senpi-npm-rpc-"))
+    const shim = join(npmDir, "senpi.cmd")
+    const cli = join(npmDir, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
+    mkdirSync(dirname(cli), { recursive: true })
+    writeFileSync(shim, "@echo off\n")
+    writeFileSync(cli, "")
+
+    try {
+      // when
+      const descriptor = buildRpcSpawn(
+        { ...baseSpec, model: "omo-mock/mock-1" },
+        {
+          isBunBinary: false,
+          execPath: "C:\\Program Files\\nodejs\\node.exe",
+          platform: "win32",
+          parentEnv: { PATH: npmDir },
+          resolveRpcEntry: () => "/fallback/rpc-entry.js",
+        },
+      )
+
+      // then
+      expect(descriptor.command).toBe("C:\\Program Files\\nodejs\\node.exe")
+      expect(descriptor.args).toEqual([
+        realpathSync.native(cli),
+        "--mode",
+        "rpc",
+        "--no-extensions",
+        "--model",
+        "omo-mock/mock-1",
+      ])
+    } finally {
+      rmSync(npmDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a project-local node_modules/.bin Senpi shim #when building an RPC child #then Node launches its package CLI without rpc-entry fallback", () => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-local-bin-rpc-"))
+    const shimDir = join(root, "node_modules", ".bin")
+    const shim = join(shimDir, "senpi.cmd")
+    const cli = join(root, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
+    mkdirSync(dirname(cli), { recursive: true })
+    mkdirSync(shimDir, { recursive: true })
+    writeFileSync(shim, "@echo off\n")
+    writeFileSync(cli, "")
+    try {
+      const descriptor = buildRpcSpawn(
+        { ...baseSpec, model: "omo-mock/mock-1" },
+        {
+          isBunBinary: false,
+          execPath: "C:\\Program Files\\nodejs\\node.exe",
+          platform: "win32",
+          parentEnv: { PATH: shimDir },
+          resolveRpcEntry: () => "/fallback/rpc-entry.js",
+        },
+      )
+
+      expect(descriptor.command).toBe("C:\\Program Files\\nodejs\\node.exe")
+      expect(descriptor.args[0]).toBe(realpathSync.native(cli))
+      expect(descriptor.args).not.toContain("/fallback/rpc-entry.js")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given a resolvable senpi executable #when building #then it spawns the EXECUTABLE in rpc mode (not the loader-hijacked rpc-entry)", () => {
     // when
     const descriptor = buildRpcSpawn(
@@ -204,6 +318,37 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(parentEnv).not.toHaveProperty(SESSION_DIR_ENV)
   })
 
+  test("#given a generic child spawned by a member #when building #then member identity and extension do not leak", () => {
+    // given
+    const memberExtension = "/tmp/omo-member.js"
+    const providerExtension = "/tmp/provider.js"
+
+    // when
+    const descriptor = buildRpcSpawn(
+      { ...baseSpec, extensions: [memberExtension, providerExtension] },
+      {
+        isBunBinary: false,
+        execPath: "/usr/bin/node",
+        platform: "linux",
+        parentEnv: {
+          PATH: "/usr/bin",
+          SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::alice",
+          SENPI_TASK_MEMBER_TASK_ID: "st_00000001",
+          SENPI_TASK_TEAM_CONFIG: '{"members":["alice"]}',
+        },
+        resolveRpcEntry: () => "/rpc-entry.js",
+        ...noExecutable,
+      },
+    )
+
+    // then
+    expect(descriptor.env.SENPI_TASK_MEMBER).toBeUndefined()
+    expect(descriptor.env.SENPI_TASK_MEMBER_TASK_ID).toBeUndefined()
+    expect(descriptor.env.SENPI_TASK_TEAM_CONFIG).toBeUndefined()
+    expect(descriptor.args).not.toContain(memberExtension)
+    expect(descriptor.args).toContain(providerExtension)
+  })
+
   test("#given member extension env w2mem #when building #then identity config and task id reach the child without overriding isolation", () => {
     // given
     const memberEnv = {
@@ -215,7 +360,7 @@ describe("buildRpcSpawn spawn strategy", () => {
 
     // when
     const descriptor = buildRpcSpawn(
-      { ...baseSpec, memberEnv },
+      { ...baseSpec, extensions: ["/tmp/omo-member.js"], memberEnv },
       {
         isBunBinary: false,
         execPath: "/usr/bin/node",
@@ -231,5 +376,6 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.env.SENPI_TASK_MEMBER_TASK_ID).toBe(memberEnv.SENPI_TASK_MEMBER_TASK_ID)
     expect(descriptor.env.SENPI_TASK_TEAM_CONFIG).toBe(memberEnv.SENPI_TASK_TEAM_CONFIG)
     expect(descriptor.env.SENPI_CODING_AGENT_SESSION_DIR).toBe(resolveChildSessionDir(baseSpec.state_dir, baseSpec.task_id))
+    expect(descriptor.args).toContain("/tmp/omo-member.js")
   })
 })

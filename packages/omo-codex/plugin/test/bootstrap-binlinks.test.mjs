@@ -12,9 +12,9 @@ const { runBootstrapWorker, runWorkerSetup } = await import(CLI_URL.href);
 const MARKETPLACE_SOURCE_LINE = 'source = "https://github.com/code-yeongyu/lazycodex.git"';
 const COMPONENT_BIN_NAME = "omo-toolbox";
 const execFileAsync = promisify(execFile);
-const OMO_CLI_DEGRADED_ENTRY = {
-	component: "omo-cli",
-	hint: "use npx lazycodex-ai for the omo CLI",
+const OMO_AGENT_TOOLKIT_DEGRADED_ENTRY = {
+	component: "omo-agent-toolkit",
+	hint: "use npx lazycodex-ai for the omo-agent-toolkit CLI",
 	reason: "marketplace payload has no dist/cli",
 };
 
@@ -205,7 +205,7 @@ test("#given a completed v1 marker #when the worker runs against a v2 root #then
 	});
 });
 
-test("#given platform win32 #when the worker setup links bins #then component bins become .cmd shims and the omo wrapper is omo.cmd", async () => {
+test("#given platform win32 #when the worker setup links bins #then component bins become .cmd shims and the canonical wrapper is omo-agent-toolkit.cmd", async () => {
 	await withBinLinkFixture(async (fixture) => {
 		const bashPath = "C:\\Tools\\Git\\bin\\bash.exe";
 		const pluginRoot = await writeVersionedRoot(fixture.root, "1.0.0", { withRuntimeCli: true });
@@ -226,19 +226,19 @@ test("#given platform win32 #when the worker setup links bins #then component bi
 		assert.match(shim, /"%OMO_NODE_BINARY%"/);
 		assert.match(shim, new RegExp(`"${escapeRegExp(componentEntrypoint)}" %\\*`));
 		assert.doesNotMatch(shim, new RegExp(`node "${escapeRegExp(componentEntrypoint)}" %\\*`));
-		const wrapper = await readFile(join(fixture.binDir, "omo.cmd"), "utf8");
+		const wrapper = await readFile(join(fixture.binDir, "omo-agent-toolkit.cmd"), "utf8");
 		assert.ok(wrapper.includes(join(pluginRoot, "dist", "cli", "index.js")));
 		await assert.rejects(() => lstat(join(fixture.binDir, COMPONENT_BIN_NAME)), "win32 must not leave posix symlinks behind");
 	});
 });
 
-test("#given a legacy payload without root CLI dist #when the worker setup runs #then it records degraded omo-cli and leaves no broken link", async () => {
+test("#given a legacy payload without root CLI dist #when the worker setup runs #then it records degraded omo-agent-toolkit and leaves no broken link", async () => {
 	await withBinLinkFixture(async (fixture) => {
 		const pluginRoot = await writeVersionedRoot(fixture.root, "1.0.0");
 
 		const outcome = await runWorkerSetup(setupOptions(fixture, pluginRoot, { now: 7_000, platform: process.platform }));
 
-		assert.deepEqual(outcome.degraded, [OMO_CLI_DEGRADED_ENTRY]);
+		assert.deepEqual(outcome.degraded, [OMO_AGENT_TOOLKIT_DEGRADED_ENTRY]);
 		await assert.rejects(() => lstat(join(fixture.binDir, "omo")), "no omo wrapper may be written without dist/cli");
 		await assert.rejects(() => lstat(join(fixture.binDir, "omo.cmd")), "no Windows omo wrapper may be written without dist/cli");
 		await assertNoDanglingEntries(fixture.binDir);
@@ -246,15 +246,15 @@ test("#given a legacy payload without root CLI dist #when the worker setup runs 
 		const warning = JSON.parse(log)["warning"];
 		assert.equal(typeof warning, "string", `bootstrap.log warning must be a string, got: ${log}`);
 		assert.ok(
-			warning.includes("skipped the omo runtime wrapper because ") &&
+			warning.includes("skipped the omo-agent-toolkit runtime wrapper because ") &&
 				warning.includes(`${join("dist", "cli", "index.js")} is missing; `) &&
-				warning.includes("omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
+				warning.includes("omo-agent-toolkit ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
 			`bootstrap.log must carry the install-local warning text, got: ${log}`,
 		);
 	});
 });
 
-test("#given a payload shipping dist/cli #when the worker setup runs with no bin-dir override #then the omo wrapper lands in <codexHome>/bin without a degraded entry", async () => {
+test("#given a payload shipping dist/cli #when the worker setup runs with no bin-dir override #then the omo-agent-toolkit wrapper lands in <codexHome>/bin without a degraded entry", async () => {
 	await withBinLinkFixture(async (fixture) => {
 		const pluginRoot = await writeVersionedRoot(fixture.root, "1.0.0", { withRuntimeCli: true });
 
@@ -262,12 +262,12 @@ test("#given a payload shipping dist/cli #when the worker setup runs with no bin
 
 		assert.deepEqual(outcome.degraded, []);
 		const defaultBinDir = join(fixture.codexHome, "bin");
-		const wrapperName = process.platform === "win32" ? "omo.cmd" : "omo";
+		const wrapperName = process.platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit";
 		const wrapperPath = join(defaultBinDir, wrapperName);
 		const wrapper = await readFile(wrapperPath, "utf8");
 		assert.ok(wrapper.includes(join(pluginRoot, "dist", "cli", "index.js")));
 		if (process.platform !== "win32") {
-			assert.ok((await stat(wrapperPath)).mode & 0o111, "the posix omo wrapper must be executable");
+			assert.ok((await stat(wrapperPath)).mode & 0o111, "the posix omo-agent-toolkit wrapper must be executable");
 			assert.equal(
 				await readlink(join(defaultBinDir, COMPONENT_BIN_NAME)),
 				join(pluginRoot, "components", "toolbox", "dist", "cli.js"),

@@ -1,0 +1,13 @@
+== loc_test rc=0 ==
+     133
+
+== loc_wf rc=0 ==
+     258
+
+== no_excuse rc=0 ==
+No violations in 2 file(s).
+
+== yaml_parse rc=0 ==
+YAML_OK
+
+== diffcheck rc=0 ==

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Palace</title>
+<style>
+:root {
+  --accent: hsl(240, 93%, 35%);
+  --accent-soft: hsl(240, 67%, 98%);
+  --accent-soft-border: hsl(240, 62%, 94%);
+  --bg: hsl(0, 0%, 100%);
+  --panel: hsl(0, 0%, 100%);
+  --surface: hsl(0, 0%, 98%);
+  --surface-2: hsl(0, 0%, 96%);
+  --hover: hsl(0, 0%, 96%);
+  --border: hsl(210, 10%, 92%);
+  --text: hsl(0, 0%, 8%);
+  --text-muted: hsl(210, 3%, 28%);
+  --text-dim: hsl(210, 3%, 56%);
+  --warn: hsl(28, 80%, 34%);
+  --warn-soft: hsl(38, 92%, 95%);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --radius: 6px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 22px;
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --max-w: 1180px;
+}
+html.dark {
+  --accent: hsl(240, 80%, 68%);
+  --accent-soft: hsl(240, 20%, 18%);
+  --accent-soft-border: hsl(240, 15%, 25%);
+  --bg: hsl(0, 0%, 11%);
+  --panel: hsl(0, 0%, 13%);
+  --surface: hsl(0, 0%, 15%);
+  --surface-2: hsl(0, 0%, 18%);
+  --hover: hsl(0, 0%, 18%);
+  --border: hsl(210, 3%, 20%);
+  --text: hsl(210, 7%, 84%);
+  --text-muted: hsl(210, 3%, 60%);
+  --text-dim: hsl(210, 3%, 42%);
+  --warn: hsl(38, 80%, 66%);
+  --warn-soft: hsl(28, 30%, 18%);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--mono);
+  font-size: var(--text-md);
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg);
+}
+.shell {
+  max-width: var(--max-w);
+  margin: var(--space-5) auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+}
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.header h1 {
+  font-family: var(--sans);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.header .meta {
+  margin-left: auto;
+  text-align: right;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+}
+.header .meta strong { color: var(--text-muted); font-weight: 500; }
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.tab {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  user-select: none;
+  border: 0;
+  background: transparent;
+  font-family: var(--mono);
+}
+.tab:hover { color: var(--text); background: var(--hover); }
+.tab.active {
+  color: var(--accent);
+  background: var(--panel);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.main { padding: var(--space-4) var(--space-5); }
+.panel-title {
+  font-size: var(--text-xs);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: var(--space-2);
+}
+.entry {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+  background: var(--panel);
+}
+.entry-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.entry-path { color: var(--text); font-size: var(--text-md); }
+.entry-projection { color: var(--text-dim); font-size: var(--text-sm); }
+.entry-body {
+  padding: var(--space-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-muted);
+  font-size: var(--text-md);
+}
+.pill {
+  font-size: var(--text-xs);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--accent-soft-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+}
+.pill.warn {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.pill.plain {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+.tree {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  background: var(--surface);
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--text-muted);
+  font-size: var(--text-md);
+  margin-bottom: var(--space-4);
+}
+.rows { list-style: none; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.row:last-child { border-bottom: 0; }
+.row .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .dim { color: var(--text-dim); font-size: var(--text-sm); }
+.commit { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: var(--space-3); }
+.commit-head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.commit-sha { color: var(--accent); }
+.diff {
+  margin: 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: pre;
+}
+.note {
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+}
+.empty {
+  color: var(--text-dim);
+  padding: var(--space-4);
+  text-align: center;
+}
+.person {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+  background: var(--panel);
+}
+.person-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.person-name { color: var(--text); font-size: var(--text-md); }
+.person-slug { color: var(--text-dim); font-size: var(--text-sm); }
+.edges { list-style: none; padding: var(--space-2) var(--space-3); }
+.edge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  color: var(--text-muted);
+  font-size: var(--text-md);
+}
+.edge-predicate {
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+.edge-arrow { color: var(--text-dim); }
+.footer {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="header">
+    <h1>Memory Palace</h1>
+    <div class="meta">
+      <div>identity <strong id="meta-identity"></strong></div>
+      <div>HEAD <strong id="meta-head"></strong></div>
+      <div>recompiled <strong id="meta-recompiled"></strong></div>
+    </div>
+  </header>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="core" type="button">Core</button>
+    <button class="tab" data-tab="external" type="button">External</button>
+    <button class="tab" data-tab="history" type="button">History</button>
+    <button class="tab" data-tab="reflection" type="button">Reflection</button>
+    <button class="tab" data-tab="people" type="button">People</button>
+  </nav>
+  <main class="main">
+    <section id="panel-core"></section>
+    <section id="panel-external" hidden></section>
+    <section id="panel-history" hidden></section>
+    <section id="panel-reflection" hidden></section>
+    <section id="panel-people" hidden></section>
+  </main>
+  <footer class="footer" id="footer"></footer>
+</div>
+<script type="application/json" id="omo-palace-data">{"metadata":{"identity":"palace-agent","headSha":"c6770a6ed566a69a264deffa31cbd8d1785a1fb6","recompiledAt":"2026-08-10T07:19:05.216Z"},"core":{"entries":[{"path":"system/human.md","projection":"$MEMORY_DIR/system/human.md","description":"who the user is","body":"\nIDENTITY: the person you work with\nRELATIONSHIP: works-with: jane-doe\nRELATIONSHIP: mentors: sam-rivers\n","state":"committed"},{"path":"system/persona.md","projection":"$MEMORY_DIR/system/persona.md","description":"who the agent is","body":"\nfixture persona body\n","state":"committed"}]},"external":{"entries":[{"path":"people/jane-doe/card.md","binary":false,"byteSize":181,"state":"committed","body":"---\ndescription: Person - Jane Doe\nkind: person\naliases: [\"Jane\",\"JD\"]\n---\n\nIDENTITY: staff engineer\nATTRIBUTE: senior-engineer: prefers small diffs\nRELATIONSHIP: reports-to: human\n"},{"path":"people/sam-rivers/card.md","binary":false,"byteSize":117,"state":"committed","body":"---\ndescription: Person - Sam Rivers\nkind: person\n---\n\nIDENTITY: designer\nRELATIONSHIP: collaborates: unknown-person\n"},{"path":"reference/logo.png","binary":true,"byteSize":12,"state":"committed"},{"path":"reference/notes.md","binary":false,"byteSize":55,"state":"committed","body":"---\ndescription: external note\n---\n\nexternal note body\n"}],"tree":"\u003cexternal_projection>\n$MEMORY_DIR/\n├── people/\n│   ├── jane-doe/\n│   │   └── card.md\n│   └── sam-rivers/\n│       └── card.md\n└── reference/\n    ├── logo.png\n    └── notes.md\n\u003c/external_projection>"},"history":{"commits":[{"sha":"c6770a6ed566a69a264deffa31cbd8d1785a1fb6","shortSha":"c6770a6","author":"Palace Fixture","date":"2026-08-10T16:19:05+09:00","subject":"chore: add people fixtures","body":"","isReflection":false,"diffTruncated":false,"diff":"\ndiff --git a/people/jane-doe/card.md b/people/jane-doe/card.md\nnew file mode 100644\nindex 0000000..f0b161d\n--- /dev/null\n+++ b/people/jane-doe/card.md\n@@ -0,0 +1,9 @@\n+---\n+description: Person - Jane Doe\n+kind: person\n+aliases: [\"Jane\",\"JD\"]\n+---\n+\n+IDENTITY: staff engineer\n+ATTRIBUTE: senior-engineer: prefers small diffs\n+RELATIONSHIP: reports-to: human\ndiff --git a/people/sam-rivers/card.md b/people/sam-rivers/card.md\nnew file mode 100644\nindex 0000000..6fa6da3\n--- /dev/null\n+++ b/people/sam-rivers/card.md\n@@ -0,0 +1,7 @@\n+---\n+description: Person - Sam Rivers\n+kind: person\n+---\n+\n+IDENTITY: designer\n+RELATIONSHIP: collaborates: unknown-person\ndiff --git a/system/human.md b/system/human.md\nindex 441d05a..8bcc5b1 100644\n--- a/system/human.md\n+++ b/system/human.md\n@@ -1,5 +1,9 @@\n ---\n description: who the user is\n+kind: person\n+aliases: [\"Boss\"]\n ---\n \n-fixture human body\n+IDENTITY: the person you work with\n+RELATIONSHIP: works-with: jane-doe\n+RELATIONSHIP: mentors: sam-rivers\n"},{"sha":"bbaf3eaaab62e69e0a1ca700f533934b1d966edf","shortSha":"bbaf3ea","author":"Palace Fixture","date":"2026-08-10T16:19:05+09:00","subject":"chore: add binary asset","body":"","isReflection":false,"diffTruncated":false,"diff":"\ndiff --git a/reference/logo.png b/reference/logo.png\nnew file mode 100644\nindex 0000000..6735744\nBinary files /dev/null and b/reference/logo.png differ\n"},{"sha":"60f4813679eb87a2b06aa5f234eebb96b5ab2231","shortSha":"60f4813","author":"Palace Fixture","date":"2026-08-10T16:19:05+09:00","subject":"chore: initialize local memory","body":"","isReflection":false,"diffTruncated":false,"diff":"\ndiff --git a/reference/notes.md b/reference/notes.md\nnew file mode 100644\nindex 0000000..7d6cc03\n--- /dev/null\n+++ b/reference/notes.md\n@@ -0,0 +1,5 @@\n+---\n+description: external note\n+---\n+\n+external note body\ndiff --git a/system/human.md b/system/human.md\nnew file mode 100644\nindex 0000000..441d05a\n--- /dev/null\n+++ b/system/human.md\n@@ -0,0 +1,5 @@\n+---\n+description: who the user is\n+---\n+\n+fixture human body\ndiff --git a/system/persona.md b/system/persona.md\nnew file mode 100644\nindex 0000000..d6bff8e\n--- /dev/null\n+++ b/system/persona.md\n@@ -0,0 +1,5 @@\n+---\n+description: who the agent is\n+---\n+\n+fixture persona body\n"}],"caps":{"maxCommits":500,"perDiffBytes":100000,"totalDiffBytes":5000000}},"reflection":{"outcomes":[],"cursor":{"schema_version":"v3_assistant_steps","reflected_through_message_id":"msg-1","total_completed_steps":2,"reflected_completed_steps":1,"steps_since_last_successful_reflection":1,"last_reflection_succeeded_at":"2026-01-15T00:00:00.000Z"},"conversationId":"conversation-1"},"people":{"nodes":[{"slug":"human","path":"system/human.md","displayName":"human","kind":"person","aliases":["Boss"],"state":"committed"},{"slug":"jane-doe","path":"people/jane-doe/card.md","displayName":"Jane Doe","kind":"person","aliases":["Jane","JD"],"state":"committed"},{"slug":"sam-rivers","path":"people/sam-rivers/card.md","displayName":"Sam Rivers","kind":"person","aliases":[],"state":"committed"}],"edges":[{"source":"human","predicate":"works-with","target":"jane-doe","targetSlug":"jane-doe"},{"source":"human","predicate":"mentors","target":"sam-rivers","targetSlug":"sam-rivers"},{"source":"jane-doe","predicate":"reports-to","target":"human","targetSlug":"human"},{"source":"sam-rivers","predicate":"collaborates","target":"unknown-person"}],"diagnostics":[]}}</script>
+<script>
+(function () {
+  'use strict';
+  var media = window.matchMedia('(prefers-color-scheme: dark)');
+  var applyTheme = function (matches) { document.documentElement.classList.toggle('dark', matches); };
+  applyTheme(media.matches);
+  media.addEventListener('change', function (event) { applyTheme(event.matches); });
+
+  var DATA;
+  try {
+    DATA = JSON.parse(document.getElementById('omo-palace-data').textContent);
+  } catch (error) {
+    document.body.textContent = 'Failed to parse palace data.';
+    return;
+  }
+
+  var el = function (tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  };
+  var pill = function (text, variant) { return el('span', variant ? 'pill ' + variant : 'pill', text); };
+  var stateVariant = function (state) { return state === 'committed' ? 'plain' : 'warn'; };
+
+  var meta = DATA.metadata || {};
+  document.getElementById('meta-identity').textContent = meta.identity || 'unknown';
+  document.getElementById('meta-head').textContent = meta.headSha || 'no commits';
+  document.getElementById('meta-recompiled').textContent = meta.recompiledAt || '';
+  document.getElementById('footer').textContent =
+    'Generated locally from the committed memory repository. Uncommitted files are shown but are not part of the system prompt.';
+
+  var renderCore = function (root, section) {
+    var entries = (section && section.entries) || [];
+    if (entries.length === 0) { root.appendChild(el('div', 'empty', 'No core memory files')); return; }
+    entries.forEach(function (entry) {
+      var card = el('article', 'entry');
+      var head = el('div', 'entry-head');
+      head.appendChild(el('span', 'entry-path', entry.path));
+      head.appendChild(el('span', 'entry-projection', entry.projection));
+      if (entry.description) head.appendChild(pill(entry.description));
+      head.appendChild(pill(entry.state, stateVariant(entry.state)));
+      card.appendChild(head);
+      card.appendChild(el('div', 'entry-body', entry.body));
+      root.appendChild(card);
+    });
+  };
+
+  var renderExternal = function (root, section) {
+    var entries = (section && section.entries) || [];
+    if (section && section.tree) {
+      root.appendChild(el('div', 'panel-title', 'Projection'));
+      root.appendChild(el('div', 'tree', section.tree));
+    }
+    if (entries.length === 0) { root.appendChild(el('div', 'empty', 'No external memory files')); return; }
+    var list = el('ul', 'rows');
+    entries.forEach(function (entry) {
+      var row = el('li', 'row');
+      row.appendChild(el('span', 'grow', entry.path));
+      row.appendChild(el('span', 'dim', entry.byteSize + ' B'));
+      row.appendChild(pill(entry.binary ? 'binary' : 'text', entry.binary ? undefined : 'plain'));
+      row.appendChild(pill(entry.state, stateVariant(entry.state)));
+      list.appendChild(row);
+    });
+    root.appendChild(list);
+  };
+
+  var renderHistory = function (root, section) {
+    var commits = (section && section.commits) || [];
+    var caps = (section && section.caps) || {};
+    root.appendChild(el(
+      'div',
+      'note',
+      'First-parent history, capped at ' + caps.maxCommits + ' commits, ' +
+        Math.round((caps.perDiffBytes || 0) / 1024) + 'KB per diff, ' +
+        Math.round((caps.totalDiffBytes || 0) / 1048576) + 'MB total.'
+    ));
+    if (commits.length === 0) { root.appendChild(el('div', 'empty', 'No commits yet')); return; }
+    commits.forEach(function (commit) {
+      var card = el('article', 'commit');
+      var head = el('div', 'commit-head');
+      head.appendChild(el('span', 'commit-sha', commit.shortSha));
+      head.appendChild(el('span', 'grow', commit.subject));
+      if (commit.isReflection) head.appendChild(pill('reflection'));
+      head.appendChild(el('span', 'dim', commit.date));
+      card.appendChild(head);
+      if (commit.diff) card.appendChild(el('pre', 'diff', commit.diff));
+      else if (commit.diffTruncated) card.appendChild(el('div', 'note', 'Diff omitted by payload cap.'));
+      root.appendChild(card);
+    });
+  };
+
+  var renderReflection = function (root, section) {
+    var cursor = section && section.cursor;
+    root.appendChild(el('div', 'panel-title', 'Journal cursor'));
+    if (!cursor) {
+      root.appendChild(el('div', 'empty', 'No journal state recorded'));
+    } else {
+      var list = el('ul', 'rows');
+      [
+        ['conversation', section.conversationId || 'unknown'],
+        ['completed steps', cursor.total_completed_steps],
+        ['reflected steps', cursor.reflected_completed_steps],
+        ['steps since reflection', cursor.steps_since_last_successful_reflection],
+        ['last success', cursor.last_reflection_succeeded_at || 'never']
+      ].forEach(function (pair) {
+        var row = el('li', 'row');
+        row.appendChild(el('span', 'grow', pair[0]));
+        row.appendChild(el('span', 'dim', pair[1]));
+        list.appendChild(row);
+      });
+      root.appendChild(list);
+    }
+    root.appendChild(el('div', 'panel-title', 'Recent run outcomes'));
+    var outcomes = (section && section.outcomes) || [];
+    if (outcomes.length === 0) { root.appendChild(el('div', 'empty', 'No reflection runs recorded')); return; }
+    var runs = el('ul', 'rows');
+    outcomes.forEach(function (outcome) {
+      var row = el('li', 'row');
+      row.appendChild(el('span', 'grow', outcome.runId));
+      row.appendChild(pill(outcome.outcome, outcome.outcome === 'merged' ? undefined : 'warn'));
+      row.appendChild(el('span', 'dim', outcome.finishedAt));
+      runs.appendChild(row);
+    });
+    root.appendChild(runs);
+  };
+
+  var renderPeople = function (root, section) {
+    if (!root) return;
+    var nodes = (section && section.nodes) || [];
+    var edges = (section && section.edges) || [];
+    if (nodes.length === 0) { root.appendChild(el('div', 'empty', 'No people recorded')); return; }
+    root.appendChild(el('div', 'panel-title', 'People graph'));
+    nodes.forEach(function (node) {
+      var card = el('article', 'person');
+      var head = el('div', 'person-head');
+      head.appendChild(el('span', 'person-name', node.displayName));
+      head.appendChild(el('span', 'person-slug', node.path));
+      if (node.kind) head.appendChild(pill(node.kind));
+      (node.aliases || []).forEach(function (alias) { head.appendChild(pill(alias, 'plain')); });
+      head.appendChild(pill(node.state, stateVariant(node.state)));
+      card.appendChild(head);
+      var outgoing = edges.filter(function (edge) { return edge.source === node.slug; });
+      if (outgoing.length === 0) {
+        card.appendChild(el('div', 'entry-body', 'No relationships recorded'));
+      } else {
+        var list = el('ul', 'edges');
+        outgoing.forEach(function (edge) {
+          var row = el('li', 'edge');
+          row.appendChild(el('span', 'edge-predicate', edge.predicate));
+          row.appendChild(el('span', 'edge-arrow', '->'));
+          row.appendChild(el('span', 'grow', edge.target));
+          if (!edge.targetSlug) row.appendChild(pill('no card', 'warn'));
+          list.appendChild(row);
+        });
+        card.appendChild(list);
+      }
+      root.appendChild(card);
+    });
+    var diagnostics = (section && section.diagnostics) || [];
+    if (diagnostics.length === 0) return;
+    root.appendChild(el('div', 'panel-title', 'Card diagnostics'));
+    var issues = el('ul', 'rows');
+    diagnostics.forEach(function (diagnostic) {
+      var row = el('li', 'row');
+      row.appendChild(el('span', 'grow', diagnostic.path));
+      row.appendChild(el('span', 'dim', diagnostic.message));
+      issues.appendChild(row);
+    });
+    root.appendChild(issues);
+  };
+
+  renderCore(document.getElementById('panel-core'), DATA.core);
+  renderExternal(document.getElementById('panel-external'), DATA.external);
+  renderHistory(document.getElementById('panel-history'), DATA.history);
+  renderReflection(document.getElementById('panel-reflection'), DATA.reflection);
+  if (DATA.people) renderPeople(document.getElementById('panel-people'), DATA.people);
+
+  document.getElementById('tabs').addEventListener('click', function (event) {
+    var button = event.target.closest('[data-tab]');
+    if (!button) return;
+    var name = button.getAttribute('data-tab');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (tab) {
+      tab.classList.toggle('active', tab === button);
+    });
+    ['core', 'external', 'history', 'reflection', 'people'].forEach(function (panel) {
+      var node = document.getElementById('panel-' + panel);
+      if (node) node.hidden = panel !== name;
+    });
+  });
+})();
+</script>
+</body>
+</html>

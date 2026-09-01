@@ -116,10 +116,13 @@ describe("runSenpiStartupMigration", () => {
 
     // then
     expect(result.error).toBeUndefined()
-    expect(result.results.map((entry) => entry.status)).toEqual(["migrated", "migrated"])
+    expect(result.results.map((entry) => entry.status)).toEqual(["migrated", "migrated", "migrated"])
     expect(parse(fileSystem.readFileSync("/home/alice/.omo/omo.jsonc", "utf-8"))).toMatchObject({
-      _migrations: ["2026-07-opencode-config-unification", "2026-07-codex-config-jsonc"],
-      "[opencode]": { agents: { finder: { model: "provider/finder" } } },
+      _migrations: [
+        "2026-07-opencode-config-unification",
+        "2026-07-codex-config-jsonc",
+        "2026-08-reasoning-unification",
+      ],
       codegraph: { daemon: false },
     })
   })
@@ -159,10 +162,11 @@ describe("runSenpiStartupMigration", () => {
     // then
     if (opencodeResult === undefined) throw new Error("Expected OpenCode race result")
     expect(opencodeResult.status).toBe("locked")
-    const migrations = [...senpiResult.results, ...opencodeResult.results].filter((entry) => entry.status === "migrated")
-    expect(migrations).toHaveLength(1)
+    expect(opencodeResult.results.filter((entry) => entry.status === "migrated")).toHaveLength(0)
+    expect(senpiResult.results.filter((entry) => entry.status === "migrated")).toHaveLength(2)
     expect(parse(fileSystem.readFileSync("/home/alice/.omo/omo.jsonc", "utf-8"))._migrations).toEqual([
       "2026-07-opencode-config-unification",
+      "2026-08-reasoning-unification",
     ])
   })
 })
@@ -213,11 +217,11 @@ describe("createConfigStartupComponent", () => {
     expect(logs).toEqual([])
   })
 
-  test("#given a migration target with a conflicting legacy value #when session_start captures a UI #then it reports the skipped-conflict diagnostic once", async () => {
+  test("#given a migration target with a conflicting provider setting #when session_start captures a UI #then it reports the skipped-conflict diagnostic once", async () => {
     // given
     const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/legacy"}}}')
-    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"[opencode]":{"agents":{"finder":{"model":"provider/kept"}}}}')
+    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"model_fallback":true}')
+    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"[opencode]":{"model_fallback":false}}')
     const migration = runSenpiStartupMigration(migrationOptions(fileSystem))
     const pi = new FakeExtensionAPI()
     const logs: string[] = []
@@ -240,7 +244,7 @@ describe("createConfigStartupComponent", () => {
         type: "info",
       },
       {
-        message: "omo-senpi: configuration migration: skipped: [opencode].agents.finder.model legacy=\"provider/legacy\" kept=\"provider/kept\"",
+        message: "omo-senpi: configuration migration: skipped: [opencode].model_fallback legacy=true kept=false",
         type: "warning",
       },
     ])

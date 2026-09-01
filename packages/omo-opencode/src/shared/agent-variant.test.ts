@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../config"
-import { applyAgentVariant, resolveAgentVariant, resolveVariantForModel } from "./agent-variant"
+import {
+  applyAgentVariant,
+  lowerReasoningForModel,
+  resolveAgentVariant,
+  resolveVariantForModel,
+} from "./agent-variant"
 
 describe("resolveAgentVariant", () => {
   test("returns undefined when agent name missing", () => {
@@ -14,11 +19,11 @@ describe("resolveAgentVariant", () => {
     expect(variant).toBeUndefined()
   })
 
-  test("returns agent override variant", () => {
+  test("returns agent reasoning before legacy variant", () => {
     // given
     const config = {
       agents: {
-        sisyphus: { variant: "low" },
+        sisyphus: { reasoning: "high", variant: "low" },
       },
     } as OhMyOpenCodeConfig
 
@@ -26,17 +31,17 @@ describe("resolveAgentVariant", () => {
     const variant = resolveAgentVariant(config, "sisyphus")
 
     // then
-    expect(variant).toBe("low")
+    expect(variant).toBe("high")
   })
 
-  test("returns category variant when agent uses category", () => {
+  test("returns category reasoning before legacy category variant", () => {
     // given
     const config = {
       agents: {
         sisyphus: { category: "ultrabrain" },
       },
       categories: {
-        ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
+        ultrabrain: { model: "openai/gpt-5.5", reasoning: "high", variant: "xhigh" },
       },
     } as OhMyOpenCodeConfig
 
@@ -44,7 +49,57 @@ describe("resolveAgentVariant", () => {
     const variant = resolveAgentVariant(config, "sisyphus")
 
     // then
-    expect(variant).toBe("xhigh")
+    expect(variant).toBe("high")
+  })
+})
+
+describe("lowerReasoningForModel", () => {
+  test("lowers a level to variant when the model exposes a matching preset", () => {
+    // given
+    const model = {
+      providerID: "test-provider",
+      modelID: "test-model",
+      runtimeModel: { variants: { high: {} } },
+    }
+
+    // when
+    const result = lowerReasoningForModel("high", model)
+
+    // then
+    expect(result).toEqual({ variant: "high" })
+  })
+
+  test("lowers a level to native reasoning effort without a matching preset", () => {
+    // given
+    const model = { providerID: "test-provider", modelID: "test-model" }
+
+    // when
+    const result = lowerReasoningForModel("high", model)
+
+    // then
+    expect(result).toEqual({ reasoningEffort: "high" })
+  })
+
+  test("maps off to OpenCode's native none effort", () => {
+    // given
+    const model = { providerID: "test-provider", modelID: "test-model" }
+
+    // when
+    const result = lowerReasoningForModel("off", model)
+
+    // then
+    expect(result).toEqual({ reasoningEffort: "none" })
+  })
+
+  test("passes a non-level preset token through as variant", () => {
+    // given
+    const model = { providerID: "test-provider", modelID: "test-model" }
+
+    // when
+    const result = lowerReasoningForModel("thinking", model)
+
+    // then
+    expect(result).toEqual({ variant: "thinking" })
   })
 })
 
@@ -59,10 +114,53 @@ describe("applyAgentVariant", () => {
     const message: { variant?: string } = {}
 
     // when
-    applyAgentVariant(config, "sisyphus", message)
+    applyAgentVariant(config, "sisyphus", message, {
+      providerID: "test-provider",
+      modelID: "test-model",
+      runtimeModel: { variants: { low: {} } },
+    } as { providerID: string; modelID: string; runtimeModel?: { variants?: { low?: unknown } } })
 
     // then
     expect(message.variant).toBe("low")
+  })
+
+  test("lowers canonical reasoning to reasoningEffort when the selected model has no matching preset", () => {
+    // given
+    const config = {
+      agents: {
+        sisyphus: { reasoning: "high" },
+      },
+    } as OhMyOpenCodeConfig
+    const message: { variant?: string; reasoningEffort?: string } = {}
+
+    // when
+    applyAgentVariant(config, "sisyphus", message, {
+      providerID: "test-provider",
+      modelID: "test-model",
+    } as { providerID: string; modelID: string; runtimeModel?: { variants?: Record<string, unknown> } })
+
+    // then
+    expect(message).toEqual({ reasoningEffort: "high" })
+  })
+
+  test("keeps canonical reasoning as variant when the selected model exposes the preset", () => {
+    // given
+    const config = {
+      agents: {
+        sisyphus: { reasoning: "high" },
+      },
+    } as OhMyOpenCodeConfig
+    const message: { variant?: string; reasoningEffort?: string } = {}
+
+    // when
+    applyAgentVariant(config, "sisyphus", message, {
+      providerID: "test-provider",
+      modelID: "test-model",
+      runtimeModel: { variants: { high: {} } },
+    } as { providerID: string; modelID: string; runtimeModel?: { variants?: { high?: unknown } } })
+
+    // then
+    expect(message).toEqual({ variant: "high" })
   })
 
   test("does not override existing variant", () => {
@@ -75,7 +173,11 @@ describe("applyAgentVariant", () => {
     const message = { variant: "max" }
 
     // when
-    applyAgentVariant(config, "sisyphus", message)
+    applyAgentVariant(config, "sisyphus", message, {
+      providerID: "test-provider",
+      modelID: "test-model",
+      runtimeModel: { variants: { low: {} } },
+    } as { providerID: string; modelID: string; runtimeModel?: { variants?: { low?: unknown } } })
 
     // then
     expect(message.variant).toBe("max")
@@ -83,12 +185,12 @@ describe("applyAgentVariant", () => {
 })
 
 describe("resolveVariantForModel", () => {
-  test("returns agent override variant when configured", () => {
+  test("returns agent reasoning before legacy variant and fallback chain metadata", () => {
     // given - use a model in sisyphus chain (claude-opus-5 has default variant "max")
-    // to verify override takes precedence over fallback chain
+    // to verify the canonical field takes precedence over both legacy sources
     const config = {
       agents: {
-        sisyphus: { variant: "high" },
+        sisyphus: { reasoning: "high", variant: "low" },
       },
     } as OhMyOpenCodeConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-5" }
@@ -172,7 +274,26 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBeUndefined()
   })
 
-  test("falls back to category chain when agent has no requirement", () => {
+  test("returns category reasoning before category chain metadata", () => {
+    // given
+    const config = {
+      agents: {
+        "custom-agent": { category: "ultrabrain" },
+      },
+      categories: {
+        ultrabrain: { reasoning: "medium" },
+      },
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "openai", modelID: "gpt-5.6-sol" }
+
+    // when
+    const variant = resolveVariantForModel(config, "custom-agent", model)
+
+    // then
+    expect(variant).toBe("medium")
+  })
+
+  test("falls back to category chain when no configured reasoning or variant exists", () => {
     // given
     const config = {
       agents: {
@@ -185,7 +306,7 @@ describe("resolveVariantForModel", () => {
     const variant = resolveVariantForModel(config, "custom-agent", model)
 
     // then
-    expect(variant).toBe("xhigh")
+    expect(variant).toBe("max")
   })
 
   test("returns xhigh for oracle's openai GPT-5.6 Sol primary", () => {

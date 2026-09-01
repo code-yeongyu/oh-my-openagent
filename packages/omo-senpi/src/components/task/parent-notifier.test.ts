@@ -35,7 +35,7 @@ type Delivered = { content: string; deliverAs: "steer" | "followUp" }
 function coordinatorWithManualFlush(delivered: Delivered[]): { coordinator: IdleInjectionCoordinator; runFlush: () => void } {
   let pending: (() => void) | undefined
   const coordinator = new IdleInjectionCoordinator(
-    (content, options) => delivered.push({ content, deliverAs: options.deliverAs }),
+    (message, options) => delivered.push({ content: message.content, deliverAs: options.deliverAs }),
     { scheduleFlush: (flush) => { pending = flush } },
   )
   return {
@@ -52,7 +52,7 @@ const completionDetails = [
     task_id: "st_1",
     name: "worker",
     status: "completed" as const,
-    model: "quotio-openai/gpt-5.4-mini-fast",
+    model: "openai-codex/gpt-5.6-luna-fast",
     duration_ms: 10,
     final_response: "ok",
     continuation_hint: "continue",
@@ -70,6 +70,30 @@ function completionMessage(taskId: string) {
 }
 
 describe("createParentNotifier batched injection delivery", () => {
+  test("#given a completion #when enqueued through the coordinator #then hidden metadata is preserved", () => {
+    const enqueued: unknown[] = []
+    const coordinator = {
+      enqueue: (injection: unknown) => {
+        enqueued.push(injection)
+      },
+      scheduleFlush: () => undefined,
+    } as unknown as IdleInjectionCoordinator
+    const notifier = createParentNotifier(fakePi(), coordinator, () => true)
+
+    notifier.enqueue(completionMessage("st_1"))
+
+    expect(enqueued).toEqual([
+      {
+        key: "task-completion:st_1",
+        source: "task-completion",
+        customType: "senpi-task.completion",
+        content: "st_1 completed",
+        display: false,
+        details: [{ ...completionDetails[0], task_id: "st_1" }],
+      },
+    ])
+  })
+
   test("#given one completion #when enqueued #then it defers through the coordinator and flushes as ONE steer", () => {
     // given
     const delivered: Delivered[] = []
@@ -131,9 +155,9 @@ describe("createParentNotifier batched injection delivery", () => {
 
   test("#given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both", async () => {
     // given: no manual scheduler - the idle path flushes itself on the next microtask
-    const delivered: Delivered[] = []
-    const coordinator = new IdleInjectionCoordinator(
-      (content, options) => delivered.push({ content, deliverAs: options.deliverAs }),
+  const delivered: Delivered[] = []
+  const coordinator = new IdleInjectionCoordinator(
+    (message, options) => delivered.push({ content: message.content, deliverAs: options.deliverAs }),
     )
     const notifier = createParentNotifier(fakePi(), coordinator, () => false)
 

@@ -1,11 +1,9 @@
-import type { Message } from "@oh-my-opencode/team-core/types"
 import {
   createLeadPoller,
   readMemberTaskMap,
   type ActiveTeamSummary,
   type DefaultTeamRunIdResolution,
   type LeadDeliveryJournal,
-  type LeadInjection,
   type LeadInjectionSink,
   type LeadPoller,
   type LeadPollerDeps,
@@ -28,7 +26,7 @@ export type LeadPollerLifecycleDeps = {
   readonly runtimeDir: (teamRunId: string) => string
   readonly deliveryJournal?: LeadDeliveryJournal
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
-  readonly pi: Pick<SenpiExtensionAPI, "sendUserMessage">
+  readonly pi: Pick<SenpiExtensionAPI, "sendMessage">
   readonly logger: ComponentLogger
   readonly coordinator?: Pick<IdleInjectionCoordinator, "enqueue" | "scheduleFlush" | "flushSoon">
   readonly createPoller?: (input: LeadPollerFactoryInput) => LeadPollerPort
@@ -183,11 +181,22 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     return {
       enqueue(injection) {
         if (input.coordinator === undefined) {
-          input.pi.sendUserMessage(injection.content, { deliverAs: "steer" })
+          input.pi.sendMessage(
+            {
+              customType: "senpi-task:team-message",
+              content: injection.content,
+              display: false,
+            },
+            { triggerTurn: true, deliverAs: "steer" },
+          )
           injection.onFlushed?.()
           return
         }
-        input.coordinator.enqueue(injection)
+        input.coordinator.enqueue({
+          ...injection,
+          customType: "senpi-task:team-message",
+          display: false,
+        })
         const parentState = input.runtime.parentState()
         switch (parentState.kind) {
           case "streaming":

@@ -6,10 +6,11 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FALLBACK_ARCHITECT_DIRECTIVE_TYPE, FALLBACK_ARCHITECT_REMINDER_TYPE } from "./directive"
 import { createFallbackArchitectComponent } from "./index"
+import { FALLBACK_ARCHITECT_NOTICE_TYPE } from "./notice"
 
 const FABLE = { provider: "anthropic", id: "claude-fable-5" }
 const OPUS = { provider: "anthropic", id: "claude-opus-5" }
-const KIMI = { provider: "apitopia", id: "kimi-k3-unlocked" }
+const KIMI = { provider: "kimi-coding", id: "kimi-k3-unlocked" }
 const DISABLED_FLAG = "omo-senpi-fallback-architect-disabled"
 
 function createTestContext(pi: FakeExtensionAPI): ComponentContext {
@@ -72,6 +73,10 @@ function reminders(pi: FakeExtensionAPI): Record<string, unknown>[] {
   return pi.messages.map((call) => call.message).filter((m) => m["customType"] === FALLBACK_ARCHITECT_REMINDER_TYPE)
 }
 
+function notices(pi: FakeExtensionAPI): Record<string, unknown>[] {
+  return pi.messages.map((call) => call.message).filter((m) => m["customType"] === FALLBACK_ARCHITECT_NOTICE_TYPE)
+}
+
 describe("fallback-architect component", () => {
   describe("#given a classifier refusal on claude-fable-5", () => {
     describe("#when the session falls back to a weaker model", () => {
@@ -86,6 +91,26 @@ describe("fallback-architect component", () => {
         expect(String(injected[0]?.["content"])).toContain("anthropic/claude-fable-5")
         expect(String(injected[0]?.["content"])).toContain("anthropic/claude-opus-5")
         expect(String(injected[0]?.["content"])).toContain('task(category: "architect")')
+      })
+
+      it("#then it also shows exactly one visible notice with structured model details", async () => {
+        const pi = await setup()
+        await endMessage(pi, refusalMessage())
+        await selectModel(pi, { model: OPUS, previousModel: FABLE, source: "fallback" })
+
+        const shown = notices(pi)
+        expect(shown).toHaveLength(1)
+        expect(shown[0]?.["display"]).toBe(true)
+        expect(String(shown[0]?.["content"])).toContain("anthropic/claude-opus-5")
+        expect(shown[0]?.["details"]).toEqual({
+          from: "anthropic/claude-fable-5",
+          to: "anthropic/claude-opus-5",
+        })
+      })
+
+      it("#then it registers a renderer for the visible notice message", async () => {
+        const pi = await setup()
+        expect(pi.messageRenderers.map((registration) => registration.customType)).toContain(FALLBACK_ARCHITECT_NOTICE_TYPE)
       })
     })
   })
@@ -108,6 +133,7 @@ describe("fallback-architect component", () => {
         await endMessage(pi, { role: "assistant", stopReason: "error", errorMessage: "Request timed out." })
         await selectModel(pi, { model: OPUS, previousModel: FABLE, source: "fallback" })
         expect(pi.messages).toHaveLength(0)
+        expect(notices(pi)).toHaveLength(0)
       })
     })
 
@@ -140,6 +166,48 @@ describe("fallback-architect component", () => {
         await endMessage(pi, refusalMessage())
         await selectModel(pi, { model: OPUS, previousModel: FABLE, source: "fallback" })
         expect(pi.messages).toHaveLength(0)
+        expect(notices(pi)).toHaveLength(0)
+      })
+    })
+  })
+
+  describe("#given the default gate and a live model registry in the event context", () => {
+    describe("#when a refusal fallback happens", () => {
+      it("#then the gate receives the registry from the event context", async () => {
+        const pi = new FakeExtensionAPI()
+        let seenRegistry: unknown
+        const registry = { getAvailable: () => [FABLE], find: () => FABLE }
+        const component = createFallbackArchitectComponent({
+          hasArchitectCategory: (_cwd: string, gateRegistry?: unknown) => {
+            seenRegistry = gateRegistry
+            return true
+          },
+        })
+        await component.register(pi, createTestContext(pi))
+        await endMessage(pi, refusalMessage())
+        await pi.dispatch(
+          "model_select",
+          { type: "model_select", model: OPUS, previousModel: FABLE, source: "fallback" },
+          { cwd: "/tmp/project", modelRegistry: registry },
+        )
+        expect(seenRegistry).toBe(registry)
+        expect(directives(pi)).toHaveLength(1)
+      })
+
+      it("#then a context without a registry still gates on config alone", async () => {
+        const pi = new FakeExtensionAPI()
+        let seenRegistry: unknown
+        const component = createFallbackArchitectComponent({
+          hasArchitectCategory: (_cwd: string, gateRegistry?: unknown) => {
+            seenRegistry = gateRegistry
+            return true
+          },
+        })
+        await component.register(pi, createTestContext(pi))
+        await endMessage(pi, refusalMessage())
+        await selectModel(pi, { model: OPUS, previousModel: FABLE, source: "fallback" })
+        expect(seenRegistry).toBeUndefined()
+        expect(directives(pi)).toHaveLength(1)
       })
     })
   })
@@ -174,22 +242,24 @@ describe("fallback-architect component", () => {
     })
 
     describe("#when the prompt was queued while the agent was streaming", () => {
-      it("#then the reminder rides inside that same prompt instead of burning its own turn", async () => {
+      it("#then the reminder still rides as a hidden message and the typed text is never rewritten", async () => {
         const pi = await setup()
         await endMessage(pi, refusalMessage())
         await selectModel(pi, { model: OPUS, previousModel: FABLE, source: "fallback" })
 
-        const steer = (await sendQueuedInput(pi, "steer")) as { action: string; text: string }
-        const followUp = (await sendQueuedInput(pi, "followUp")) as { action: string; text: string }
+        const steer = await sendQueuedInput(pi, "steer")
+        const followUp = await sendQueuedInput(pi, "followUp")
 
-        for (const result of [steer, followUp]) {
-          expect(result.action).toBe("transform")
-          // Appended, never prepended: a leading `/skill:` command must still expand.
-          expect(result.text.startsWith("next question")).toBe(true)
-          expect(result.text).toContain('task(category: "architect")')
+        // Never transform: an appended reminder renders inside the user's own bubble in the TUI.
+        // senpi steers a mid-stream custom message into the RUNNING turn (agent.steer), so a hidden
+        // message costs no extra assistant turn on this path either.
+        expect(steer).toEqual({ action: "continue" })
+        expect(followUp).toEqual({ action: "continue" })
+        const injected = reminders(pi)
+        expect(injected).toHaveLength(2)
+        for (const message of injected) {
+          expect(message["display"]).toBe(false)
         }
-        // No separate steering message was created, so nothing consumes an extra assistant turn.
-        expect(pi.messages.filter((call) => call.message["customType"] === FALLBACK_ARCHITECT_REMINDER_TYPE)).toHaveLength(0)
       })
     })
 

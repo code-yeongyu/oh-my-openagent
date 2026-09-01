@@ -15,6 +15,7 @@ import {
   type SparedLspDaemonVersion,
   type StaleLspDaemonVersionTarget,
 } from "./lsp-daemon-family"
+import { attestLspDaemonOwner } from "./lsp-daemon-owner-attestation"
 import { selectOrphanedLspDaemonProxies, type LspDaemonProxyProcess } from "./lsp-proxy-family"
 import type { ProcessInfo } from "./process-table"
 import { discoverCodegraphOwnedRoots, type CodegraphOwnedRootsOptions } from "./roots"
@@ -73,6 +74,7 @@ export type LspDaemonVersionSweepAction = ProcessSweepAction | "skipped"
 
 export interface SweepStaleLspDaemonVersionsOptions extends ProcessFamilySweepOptions, LspDaemonBaseDirOptions {
   readonly attest?: (pid: number, platform: NodeJS.Platform) => Promise<boolean>
+  readonly attestTarget?: (target: StaleLspDaemonVersionTarget, platform: NodeJS.Platform) => Promise<boolean>
   readonly currentVersion?: string
   readonly isAlive?: (pid: number) => boolean
 }
@@ -98,17 +100,23 @@ export async function sweepStaleLspDaemonVersions(
     return { action: "skipped", candidates: [], dryRun, failed: [], killed: [], spared: [], stampFile }
   }
 
+  const platform = options.platform ?? process.platform
+  const attestTarget = options.attestTarget
+    ?? (options.attest === undefined
+      ? (target: StaleLspDaemonVersionTarget) => attestLspDaemonOwner(target)
+      : (target: StaleLspDaemonVersionTarget) => options.attest!(target.pid, platform))
   const result = await runProcessFamilySweep<StaleLspDaemonVersionTarget, SparedLspDaemonVersion>({
+    attestBeforeSignal: (target) => attestTarget(target, platform),
     familyLabel: "lsp-daemon stale-version sweep",
     stampFile,
     collect: async () => {
       const plan = await planStaleLspDaemonVersionSweep({
         baseDir,
         currentVersion,
-        ...(options.attest === undefined ? {} : { attest: options.attest }),
+        attestTarget,
         ...(options.isAlive === undefined ? {} : { isAlive: options.isAlive }),
         ...(options.log === undefined ? {} : { log: options.log }),
-        ...(options.platform === undefined ? {} : { platform: options.platform }),
+        platform,
       })
       return { candidates: [...plan.targets, ...plan.spared], killList: plan.targets, spared: plan.spared }
     },

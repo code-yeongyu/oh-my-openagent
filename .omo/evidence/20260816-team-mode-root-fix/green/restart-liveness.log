@@ -1,0 +1,22 @@
+Focused GREEN:
+  bun test packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts
+
+Result:
+  7 pass
+  0 fail
+  23 expectations
+
+Observed behavior:
+  - session_start still processes lifecycle reconciliation outcomes first;
+  - it also enumerates every record owned by the resumed parent session;
+  - duplicate records collapse by task id;
+  - already-terminal records omitted by reconciliation are re-observed by the owned-member liveness gate;
+  - the notifier continues to filter non-team, non-abnormal, suspended, foreign, and previously delivered records.
+
+Verification:
+  bun run --cwd packages/omo-senpi typecheck
+    exit 0
+
+  LSP diagnostics:
+    packages/omo-senpi/src/components/task/event-bridge.ts
+    0 diagnostics

@@ -1,16 +1,18 @@
 import type { MigrationSourceDescriptor, MigrationTransform } from "@oh-my-opencode/omo-config-core"
 
 import { discoverLegacyConfigGroups, CONFIG_JSONC_MIGRATION_ID, OPENCODE_CONFIG_MIGRATION_ID } from "./discovery"
-import { canonicalPath, hostPathOperations, pathKey } from "./discovery-paths"
+import { canonicalPath, discoveryFileSystem, hostPathOperations, pathKey, projectDirectories } from "./discovery-paths"
 import { mergeRecords } from "./record-values"
 import { transformConfigJsoncSources } from "./transform-config-jsonc"
 import { transformOpenCodeSources } from "./transform-opencode"
+import { REASONING_UNIFICATION_MIGRATION_ID, transformReasoningUnification } from "./reasoning-unification"
 import type { ConfigMigrationDiscoveryOptions, DiscoveredLegacyConfigSource } from "./types"
 import type { ConfigMigrationTransformResult, OpenCodeTransformScope } from "./transform-types"
 
 export type LegacyConfigMigrationPlan = {
   readonly id: string
   readonly inspect: (sources: Parameters<MigrationTransform>[0]) => ConfigMigrationTransformResult
+  readonly mode?: "merge" | "replace-target"
   readonly sources: readonly MigrationSourceDescriptor[]
   readonly targetPath: string
   readonly transform: MigrationTransform
@@ -105,6 +107,28 @@ function mergeOpenCodeInputs(
   return [...byTarget.values()]
 }
 
+function reasoningPlan(targetPath: string): LegacyConfigMigrationPlan {
+  const inspect = (sources: Parameters<MigrationTransform>[0]): ConfigMigrationTransformResult =>
+    transformReasoningUnification(sources[0]?.value)
+  return {
+    id: REASONING_UNIFICATION_MIGRATION_ID,
+    inspect,
+    mode: "replace-target",
+    sources: [],
+    targetPath,
+    transform: inspect,
+  }
+}
+
+function existingOmoConfigPath(directory: string, options: ConfigMigrationDiscoveryOptions): string | undefined {
+  const fileSystem = discoveryFileSystem(options)
+  for (const fileName of ["omo.jsonc", "omo.json"] as const) {
+    const path = options.pathOperations.join(directory, fileName)
+    if (fileSystem.existsSync(path)) return canonicalPath(path, options)
+  }
+  return undefined
+}
+
 export function createLegacyConfigMigrationPlans(
   options: CreateLegacyConfigMigrationPlansOptions,
 ): readonly LegacyConfigMigrationPlan[] {
@@ -136,15 +160,29 @@ export function createLegacyConfigMigrationPlans(
     ...projectInputs,
   ]
   const plans = mergeOpenCodeInputs(openCodeInputs, options).map((input) => openCodePlan(input, options, timestamp))
-  if (configJsoncGroup.id !== CONFIG_JSONC_MIGRATION_ID || configJsoncGroup.sources.length === 0) return plans
-  return [
-    ...plans,
-    {
-      id: CONFIG_JSONC_MIGRATION_ID,
-      inspect: (loaded) => transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
-      sources: descriptors(configJsoncGroup.sources, options, timestamp),
-      targetPath: userTargetPath,
-      transform: (loaded) => transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
-    },
-  ]
+  const legacyPlans = configJsoncGroup.id !== CONFIG_JSONC_MIGRATION_ID || configJsoncGroup.sources.length === 0
+    ? plans
+    : [
+      ...plans,
+      {
+        id: CONFIG_JSONC_MIGRATION_ID,
+        inspect: (loaded: Parameters<MigrationTransform>[0]) => transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
+        sources: descriptors(configJsoncGroup.sources, options, timestamp),
+        targetPath: userTargetPath,
+        transform: (loaded: Parameters<MigrationTransform>[0]) => transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
+      },
+    ]
+
+  const reasoningTargets = new Map<string, string>()
+  const addReasoningTarget = (targetPath: string | undefined): void => {
+    if (targetPath === undefined) return
+    reasoningTargets.set(pathKey(targetPath, options), targetPath)
+  }
+  addReasoningTarget(existingOmoConfigPath(options.pathOperations.join(options.homeDir, ".omo"), options))
+  for (const projectRoot of projectDirectories(options)) {
+    addReasoningTarget(existingOmoConfigPath(options.pathOperations.join(projectRoot, ".omo"), options))
+  }
+  for (const plan of legacyPlans) addReasoningTarget(plan.targetPath)
+
+  return [...legacyPlans, ...[...reasoningTargets.values()].map(reasoningPlan)]
 }

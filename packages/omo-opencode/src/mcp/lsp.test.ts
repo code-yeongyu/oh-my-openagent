@@ -43,6 +43,7 @@ describe("createLspMcpConfig", () => {
     // then
     expect(config.enabled).toBe(true)
     expect(config.command).toEqual([nodePath, cliPath, "mcp"])
+    expect(config.cwd).toBe(unrelatedCwd)
   })
 
   it("uses the bun daemon source cli when the engine dist is already built", () => {
@@ -282,6 +283,7 @@ describe("createLspMcpConfig", () => {
 
     // then
     expect(config.enabled).toBe(false)
+    expect(config.environment?.LSP_TOOLS_MCP_CWD).toBe(cwd)
     const projectConfigPaths = config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG.split(delimiter)
     expect(projectConfigPaths).toEqual([
       join(cwd, ".opencode", "lsp.json"),

@@ -80,7 +80,7 @@ async function runTaskKillCommand(manager: CommandManager, ctx: CommandContext):
 }
 
 function killOption(record: TaskRecord): string {
-  const identity = taskIdentityLabel({ taskId: record.task_id, name: record.name, description: record.description })
+  const identity = taskIdentityLabel({ taskId: record.task_id, name: record.name, description: record.description, taskSummary: record.task_summary })
   const idSuffix = identity === record.task_id ? "" : ` (${record.task_id})`
   return `${identity}${idSuffix} ${record.status}`
 }

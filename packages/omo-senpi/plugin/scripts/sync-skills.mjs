@@ -2,49 +2,37 @@
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, extname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { createNativeSkillSources } from "./native-skill-sources.mjs"
+import { insertSenpiCompatibilityGuidance } from "./senpi-compatibility-guidance.mjs"
+import { applySenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
 
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const repoRoot = dirname(dirname(pluginRoot))
-const skillsRoot = join(pluginRoot, "skills")
+const skillsRoot = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
+  ? join(pluginRoot, "skills")
+  : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "skills")
 const sharedSkillsRoot = join(repoRoot, "shared-skills", "skills")
 
 const skillSources = [
   {
     name: "ulw-loop",
-    source: join(repoRoot, "omo-codex", "plugin", "components", "ulw-loop", "skills", "ulw-loop"),
+    source: join(repoRoot, "omo-senpi", "skills", "ulw-loop"),
   },
 ]
 const componentSkillNames = new Set(skillSources.map(({ name }) => name))
 
-// Senpi-native skills authored directly against the omo-senpi tool surface (not ported from Codex or
-// the shared pool). They ship verbatim aside from blank-line normalization: no edition rewrite, no
-// section stripping, and no Senpi-compatibility banner (they already speak native Senpi tools).
-const nativeSkillsRoot = join(repoRoot, "omo-senpi", "skills")
-const nativeSkillSources = [
-  {
-    name: "hyperplan",
-    source: join(nativeSkillsRoot, "hyperplan"),
-  },
-  {
-    name: "ultrawork",
-    source: join(nativeSkillsRoot, "ultrawork"),
-  },
-  {
-    name: "ulw-research",
-    source: join(nativeSkillsRoot, "ulw-research"),
-  },
-]
-const nativeSkillNames = new Set(nativeSkillSources.map(({ name }) => name))
+const { sources: nativeSkillSources, names: nativeSkillNames } = createNativeSkillSources(repoRoot)
 
 const textExtensions = new Set([".md", ".yaml", ".yml", ".json", ".txt"])
 const sectionHeadingsToStrip = new Set([
   "Codex Harness Tool Compatibility",
   "Codex Tool Mapping",
   "Codex subagent reliability",
+  "Codex Subagent Reliability",
   "Subagent-dependent transition barrier",
   "Senpi Harness Tool Compatibility",
 ])
-const forbiddenGuidancePattern = /\b(?:multi_agent|spawn_agent)\b/i
+const forbiddenGuidancePattern = /\b(?:multi_agent|spawn_agent|update_plan)\b/i
 
 const sourceTestFilePattern = /\.test\.ts$/
 const ignoredSkillSourceDirNames = new Set([
@@ -55,28 +43,6 @@ const ignoredSkillSourceDirNames = new Set([
   "__pycache__",
 ])
 const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json", "openai.yaml"])
-
-const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/
-
-export const senpiHarnessToolCompatibility = `## Senpi Harness Tool Compatibility
-
-This skill may include examples copied from the OpenCode harness. In Senpi, do not call OpenCode-only tools such as \`call_omo_agent(...)\`, \`task(...)\`, \`background_output(...)\`, or \`team_*(...)\` literally. Translate those examples to Senpi native tools:
-
-| OpenCode example | Senpi tool to use |
-| --- | --- |
-| \`call_omo_agent(subagent_type="explore", ...)\` | \`task\` tool with category/agent matching \`.omo/omo.json\` (e.g. \`agent: "scout"\`) |
-| \`call_omo_agent(subagent_type="librarian", ...)\` | \`task\` tool with category/agent matching \`.omo/omo.json\` (e.g. \`agent: "librarian"\`) |
-| \`task(...)\` | \`task\` tool |
-| \`background_output(task_id="...")\` | \`task_output\` tool with the task id |
-| \`team_*(...)\` | Lead team tools (\`team_create\`, \`task_create\`, ...); send with \`task_send\`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
-
-If a code block below conflicts with this section, this section wins.
-
-`
-
-const senpiCompatibilityEndMarkers = [
-  "If a code block below conflicts with this section, this section wins.\n\n",
-]
 
 function isTextFile(path) {
   return textExtensions.has(extname(path))
@@ -146,17 +112,49 @@ function applyTier1Adaptation(content) {
   return normalizeBlankLines(stripForbiddenGuidanceLines(stripNamedSections(rewriteEditionNaming(content))))
 }
 
-function applyStartWorkOverlay(content) {
+function applyUlwExecuteOverlay(content) {
   return content.replace(/codex:<session_id>/g, "senpi:<session_id>").replace(/\bcodex:/g, "senpi:")
 }
 
-const ulwPlanReviewOverride = `## Senpi Review Override (authoritative)
+const ulwPlanReviewOverride = `## Senpi Review Policy (authoritative)
 
-In omo-senpi the curated \`oracle\` subagent does not exist. The high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file. Ignore every "dual" review instruction, every "independent" reviewer lane, and every \`independent_reviewer\` state field below; never spawn \`task(subagent_type="oracle")\`. A momus approval whose remaining items are notes counts as approval.
+In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file, and a momus approval whose remaining items are notes counts as approval.
+
+Only a plan file produced by this skill and recorded with \`review_required\` authorizes a \`momus\` or \`metis\` review. A bare \`ulw\` run without that file uses notepad self-review instead, however large the work feels.
 
 If a section below conflicts with this section, this section wins.
 
 `
+
+const ulwPlanMomusOnlyRewrites = [
+  [
+    'The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native \`momus\` reviewer subagent, and (2) an independent Oracle review via \`task(subagent_type="oracle", ...)\` on the strongest available reasoning model, in a fully isolated sub-session with normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing.',
+    'In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file.',
+  ],
+  ["### High-accuracy review (dual review)", "### High-accuracy review (momus-only in omo-senpi)"],
+  [
+    'One round = exactly ONE \`momus\` + ONE independent review, dispatched together',
+    'One round = exactly ONE \`momus\` review, dispatched',
+  ],
+  ['"independent_reviewer": "oracle",', '"independent_reviewer": null,'],
+  ['"lanes": ["momus", "independent"],', '"lanes": ["momus"],'],
+  [
+    '(all read-only, plus \`oracle\` for the high-accuracy review)',
+    '(all read-only; \`momus\` also runs the high-accuracy review)',
+  ],
+  [
+    'the dual high-accuracy review (native \`momus\` + the independent Oracle review) is now REQUIRED',
+    'the high-accuracy review (momus-only in omo-senpi) is now REQUIRED',
+  ],
+]
+
+function rewriteUlwPlanReviewToMomusOnly(content) {
+  let rewritten = content
+  for (const [source, replacement] of ulwPlanMomusOnlyRewrites) {
+    rewritten = rewritten.replaceAll(source, replacement)
+  }
+  return rewritten
+}
 
 const ulwPlanConsultationLanes = `## Senpi Design Consultation Lanes (authoritative)
 
@@ -174,13 +172,14 @@ This section is an EXPLICIT EXCEPTION to the later rule "Never dispatch with \`c
 `
 
 function applyUlwPlanOverlay(content) {
-  if (content.includes("# ulw-plan - full workflow")) {
-    return insertAfterFrontmatter(content, ulwPlanReviewOverride)
+  const rewritten = rewriteUlwPlanReviewToMomusOnly(content)
+  if (rewritten.includes("# ulw-plan - full workflow")) {
+    return insertAfterFrontmatter(rewritten, ulwPlanReviewOverride)
   }
-  if (/^#\s+ulw-plan\s*$/m.test(content)) {
-    return insertAfterFrontmatter(content, `${ulwPlanReviewOverride}${ulwPlanConsultationLanes}`)
+  if (/^#\s+ulw-plan\s*$/m.test(rewritten)) {
+    return insertAfterFrontmatter(rewritten, `${ulwPlanReviewOverride}${ulwPlanConsultationLanes}`)
   }
-  return content
+  return rewritten
 }
 
 function insertAfterFrontmatter(content, section) {
@@ -190,66 +189,16 @@ function insertAfterFrontmatter(content, section) {
   return `${content.slice(0, insertAt)}\n${section}${content.slice(insertAt)}`
 }
 
-function findSenpiCompatibilitySectionEnd(content, searchStart) {
-  const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g
-  structuralEndPattern.lastIndex = searchStart
-  const structuralEnd = structuralEndPattern.exec(content)
-  if (structuralEnd) return structuralEnd.index + 1
-
-  const knownEndMarker = senpiCompatibilityEndMarkers.find((marker) => content.indexOf(marker, searchStart) !== -1)
-  if (knownEndMarker === undefined) return content.length
-
-  return content.indexOf(knownEndMarker, searchStart) + knownEndMarker.length
-}
-
-function removeSenpiCompatibilityGuidance(content) {
-  const heading = "## Senpi Harness Tool Compatibility"
-  let withoutGuidance = content
-
-  while (true) {
-    const start = withoutGuidance.indexOf(heading)
-    if (start === -1) return withoutGuidance
-
-    const end = findSenpiCompatibilitySectionEnd(withoutGuidance, start + heading.length)
-    withoutGuidance = `${withoutGuidance.slice(0, start)}${withoutGuidance.slice(end)}`
-  }
-}
-
-function hasKnownGeneratedSenpiCompatibilityGuidance(content, compatibilityIndex) {
-  return senpiCompatibilityEndMarkers.some((marker) => content.indexOf(marker, compatibilityIndex) !== -1)
-}
-
-export function insertSenpiCompatibilityGuidance(content) {
-  if (!opencodeOnlyOrchestrationPattern.test(content)) return content
-  const firstExampleIndex = content.search(opencodeOnlyOrchestrationPattern)
-  const compatibilityIndex = content.indexOf("## Senpi Harness Tool Compatibility")
-  if (
-    compatibilityIndex !== -1 &&
-    compatibilityIndex < firstExampleIndex &&
-    !hasKnownGeneratedSenpiCompatibilityGuidance(content, compatibilityIndex)
-  ) {
-    return content
-  }
-
-  const contentWithoutGuidance = removeSenpiCompatibilityGuidance(content)
-
-  const frontmatterMatch = contentWithoutGuidance.match(/^---\n[\s\S]*?\n---\n+/)
-  if (!frontmatterMatch) {
-    return `${senpiHarnessToolCompatibility}${contentWithoutGuidance}`
-  }
-
-  return `${frontmatterMatch[0]}${senpiHarnessToolCompatibility}${contentWithoutGuidance.slice(frontmatterMatch[0].length)}`
-}
-
 function applySharedTierAdaptation(skillName, content) {
-  let adapted = content
-  if (skillName === "start-work") {
-    adapted = applyStartWorkOverlay(adapted)
+  let adapted = applySenpiSkillRosterOverlay(skillName, content)
+  if (skillName === "ulw-execute") {
+    adapted = applyUlwExecuteOverlay(adapted)
   }
   if (skillName === "ulw-plan") {
     adapted = applyUlwPlanOverlay(adapted)
   }
   adapted = stripNamedSections(adapted)
+  adapted = stripForbiddenGuidanceLines(adapted)
   adapted = insertSenpiCompatibilityGuidance(adapted)
   return normalizeBlankLines(adapted)
 }
@@ -309,7 +258,7 @@ export async function syncSkills() {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
     await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
-    await adaptSkillTree(destination, applyTier1Adaptation)
+    await adaptSkillTree(destination, normalizeBlankLines)
   }
 
   for (const { name, source } of nativeSkillSources) {

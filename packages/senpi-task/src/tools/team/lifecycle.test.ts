@@ -56,10 +56,10 @@ describe("team_create tool", () => {
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     const [firstLine = ""] = text.split("\n")
     expect(firstLine).toBe("Created team 'demo' (00000000-0000-4000-8000-000000000000) with 2 members.")
-    expect(text).toContain("- alpha [running] category:deep (anthropic Claude Opus 4.7 reasoning:high) task:st_a")
+    expect(text).toContain("- alpha [running] category:deep(anthropic/claude-opus-4-7:high) task:st_a")
     expect(text).not.toContain("Refactor the auth module")
-    expect(text).toContain("- beta [idle] subagent_type:sisyphus task:st_b")
-    expect(text).not.toContain("beta [idle] subagent_type:sisyphus (")
+    expect(text).toContain("- beta [idle] agent:sisyphus task:st_b")
+    expect(text).not.toContain("beta [idle] agent:sisyphus(")
     if (result.details.kind !== "created") throw new Error("expected created")
     expect(result.details.members[0]).toMatchObject({
       name: "alpha",
@@ -68,19 +68,87 @@ describe("team_create tool", () => {
       task_id: "st_a",
       prompt_excerpt: "Refactor the auth module",
     })
-    expect(result.details.members[1]).toMatchObject({ name: "beta", role: "subagent_type:sisyphus", task_id: "st_b" })
+    expect(result.details.members[1]).toMatchObject({ name: "beta", role: "agent:sisyphus", task_id: "st_b" })
   })
 
-  test("#given both team_name and inline_spec #when team_create runs #then it rejects with invalid_arguments", async () => {
+  test("#given the inline member schema #when inspected #then task_summary sits right after prompt with the length limit", () => {
     // given
-    const service = createFakeTeamService()
-
-    // when
-    const result = await runTeamCreate(service, { team_name: "x", inline_spec: { name: "y" } })
+    const memberSchema = TeamCreateParams.properties.inline_spec.anyOf[0].properties.members.anyOf[0].items
+    const keys = Object.keys(memberSchema.properties)
 
     // then
-    expect(result.details.kind).toBe("invalid_arguments")
-    expect(service.calls).toHaveLength(0)
+    expect(keys.indexOf("task_summary")).toBe(keys.indexOf("prompt") + 1)
+    expect(memberSchema.properties.task_summary).toMatchObject({ maxLength: 80 })
+  })
+
+  test("#given a member with a taskSummary #when team_create runs #then the member view carries task_summary", async () => {
+    // given
+    const service = createFakeTeamService({
+      createTeam: async () =>
+        fakeCreateResult({
+          members: [
+            fakeCreatedMember({
+              name: "alpha",
+              status: "running",
+              role: { kind: "category", category: "deep" },
+              taskSummary: "Refactor the auth module boundary",
+            }),
+          ],
+        }),
+    })
+
+    // when
+    const result = await runTeamCreate(service, { inline_spec: { name: "demo", members: [] } })
+
+    // then
+    if (result.details.kind !== "created") throw new Error("expected created")
+    expect(result.details.members[0]).toMatchObject({ name: "alpha", task_summary: "Refactor the auth module boundary" })
+  })
+
+  test("#given member model metadata variants and reasoning efforts #when team_create runs #then reasoning is labeled and reasoning effort wins over variant", async () => {
+    // given
+    const service = createFakeTeamService({
+      createTeam: async () =>
+        fakeCreateResult({
+          members: [
+            fakeCreatedMember({
+              name: "alpha",
+              status: "running",
+              role: { kind: "category", category: "deep" },
+              model: {
+                provider: "anthropic",
+                model_id: "claude-opus-4-7",
+                display: "Claude Opus 4.7",
+                reasoning_effort: "high",
+                variant: "xhigh",
+                source: "category",
+              },
+            }),
+            fakeCreatedMember({
+              name: "beta",
+              status: "running",
+              role: { kind: "category", category: "quick" },
+              model: {
+                provider: "openai",
+                model_id: "gpt-5.6-luna-fast",
+                display: "gpt-5.6-luna-fast",
+                variant: "max",
+                source: "category",
+              },
+            }),
+          ],
+        }),
+    })
+
+    // when
+    const result = await runTeamCreate(service, { inline_spec: { name: "demo", members: [] } })
+
+    // then
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("category:deep(anthropic/claude-opus-4-7:high)")
+    expect(text).toContain("category:quick(openai/gpt-5.6-luna-fast:max)")
+    expect(text).not.toContain("variant:")
+    expect(text).not.toContain("undefined")
   })
 
   test("#given neither team_name nor inline_spec #when team_create runs #then it rejects with invalid_arguments", async () => {

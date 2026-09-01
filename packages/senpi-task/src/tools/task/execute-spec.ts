@@ -2,11 +2,15 @@ import { resolveExecutionMode } from "../../manager"
 import type { ExecutionMode, ManagerStartSpec } from "../../manager"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
-import type { ResolvedSpawnItem, TaskToolDeps } from "./types"
+import { taskSkillSummary } from "./skill-result"
+import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolDeps } from "./types"
 
 type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 
-export type ResolvedManagerStartSpec = ManagerStartSpec & { readonly execution_mode: ExecutionMode }
+export type ResolvedManagerStartSpec = ManagerStartSpec & {
+  readonly execution_mode: ExecutionMode
+  readonly skills?: TaskSkillSummary
+}
 
 export function buildStartSpec(
   params: SingleSpawnParams,
@@ -18,9 +22,12 @@ export function buildStartSpec(
   const ancestry = deps.resolveAncestry?.(parentSessionId)
   const loadSkills = deps.loadSkills ?? createFsSkillLoader()
   const skills = loadSkills(params.load_skills ?? [], cwd)
+  const skillSummary = taskSkillSummary(params.load_skills ?? [], skills)
   const executionMode = resolvedTaskExecutionMode(target, deps)
   return {
     prompt: skills.prepend + params.prompt,
+    ...(skillSummary === undefined ? {} : { skills: skillSummary }),
+    ...(params.task_summary !== undefined && { task_summary: params.task_summary }),
     parent_session_id: parentSessionId,
     root_session_id: ancestry?.rootSessionId ?? parentSessionId,
     depth: (ancestry?.depth ?? 0) + 1,
@@ -66,6 +73,7 @@ export function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: bool
   return {
     prompt: item.prompt,
     ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
+    ...(item.task_summary !== undefined && { task_summary: item.task_summary }),
     ...(item.description !== undefined && { description: item.description }),
     ...(item.name !== undefined && { name: item.name }),
     ...(item.model !== undefined && { model: item.model }),

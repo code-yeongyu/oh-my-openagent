@@ -2,181 +2,252 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
-  test("ultrabrain keeps native gpt-5.6-sol xhigh before Copilot high and Gemini", () => {
+  test("ultrabrain is gpt-5.6-sol max on every rung", () => {
     // given
-    const ultrabrain = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
+    const requirement = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
 
     // when
-    const [primary, copilot, opencodeSol, geminiFallback] = ultrabrain.fallbackChain
+    const chain = requirement.fallbackChain
 
     // then
-    expect(ultrabrain.fallbackChain.length).toBeGreaterThan(1)
-    expect(primary?.variant).toBe("xhigh")
-    expect(primary?.model).toBe("gpt-5.6-sol")
-    expect(primary?.providers[0]).toBe("openai")
-    expect(copilot).toEqual({
-      providers: ["github-copilot"],
-      model: "gpt-5.6-sol",
-      variant: "high",
-    })
-    expect(opencodeSol).toEqual({
-      providers: ["openai", "opencode", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "xhigh",
-    })
-    expect(geminiFallback?.model).toBe("gemini-3.1-pro")
-    expect(geminiFallback?.variant).toBe("high")
-  })
-
-  test("deep keeps native gpt-5.6-terra xhigh before Copilot terra high and shared sol high", () => {
-    // given
-    const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
-
-    // when
-    const [primary, copilot, sharedSol, mediumSol, opusFallback] = deep.fallbackChain
-
-    // then
-    expect(deep.fallbackChain.length).toBeGreaterThan(2)
-    expect(primary?.variant).toBe("xhigh")
-    expect(primary?.model).toBe("gpt-5.6-terra")
-    expect(primary?.providers).toContain("openai")
-    expect(primary?.providers).not.toContain("venice")
-    expect(copilot).toEqual({
-      providers: ["github-copilot"],
-      model: "gpt-5.6-terra",
-      variant: "high",
-    })
-    expect(sharedSol).toEqual({
-      providers: ["openai", "github-copilot", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "high",
-    })
-    expect(mediumSol).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "medium",
-    })
-    expect(opusFallback?.model).toBe("claude-opus-5")
-    expect(opusFallback?.variant).toBe("max")
-  })
-
-  test("visual-engineering keeps the prior Gemini and GLM tail after the new prefix", () => {
-    // given
-    const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
-
-    // when
-    const legacyTail = visualEngineering.fallbackChain.slice(3)
-
-    // then
-    expect(legacyTail).toEqual([
+    expect(chain).toEqual([
       {
-        providers: ["google", "github-copilot", "opencode", "vercel"],
-        model: "gemini-3.1-pro",
-        variant: "high",
+        providers: ["openai", "openai-codex"],
+        model: "gpt-5.6-sol",
+        variant: "max",
       },
-      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5" },
-      { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+      {
+        providers: ["github-copilot"],
+        model: "gpt-5.6-sol",
+        variant: "max",
+      },
+      {
+        providers: ["openai", "openai-codex", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "max",
+      }
     ])
   })
 
-  test("quick keeps the prior lightweight tail after Haiku", () => {
+  test("deep is a single sol-family medium rung", () => {
     // given
-    const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
+    const requirement = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
     // when
-    const firstLegacyFallback = quick.fallbackChain[3]
+    const chain = requirement.fallbackChain
 
     // then
-    expect(firstLegacyFallback).toEqual({
-      providers: ["google", "github-copilot", "opencode", "vercel"],
-      model: "gemini-3-flash",
-    })
+    expect(chain).toEqual([
+      {
+        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      }
+    ])
   })
 
-  test("unspecified-low keeps native gpt-5.6-luna xhigh before Copilot high", () => {
+  test("visual-engineering follows the approved 4-rung chain", () => {
     // given
-    const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
+    const requirement = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when
-    const [primary, copilot, claudeFallback, solFallback] = unspecifiedLow.fallbackChain
+    const chain = requirement.fallbackChain
 
     // then
-    expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(1)
-    expect(primary?.model).toBe("gpt-5.6-luna")
-    expect(primary?.variant).toBe("xhigh")
-    expect(primary?.providers[0]).toBe("openai")
-    expect(copilot).toEqual({
-      providers: ["github-copilot"],
-      model: "gpt-5.6-luna",
-      variant: "high",
-    })
-    expect(claudeFallback?.model).toBe("claude-sonnet-4-6")
-    expect(claudeFallback?.providers[0]).toBe("anthropic")
-    expect(solFallback).toEqual({
-      providers: ["openai", "opencode", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "medium",
-    })
+    expect(chain).toEqual([
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
+        variant: "max",
+      },
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
+        variant: "max",
+      },
+      {
+        providers: ["zai-coding-plan", "opencode-go"],
+        model: "glm-5.2",
+        variant: "max",
+      },
+      {
+        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      }
+    ])
   })
 
-  test("unspecified-high keeps gpt-5.6-sol high after the new Kimi and Opus prefix", () => {
+  test("quick follows the approved 8-rung chain", () => {
     // given
-    const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
+    const requirement = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
     // when
-    const solFallback = unspecifiedHigh.fallbackChain[2]
+    const chain = requirement.fallbackChain
 
     // then
-    expect(solFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "high",
-    })
+    expect(chain).toEqual([
+      {
+        providers: ["kimi-for-coding"],
+        model: "kimi-for-coding-highspeed",
+      },
+      {
+        providers: ["openai-codex"],
+        model: "gpt-5.6-luna-fast",
+        variant: "low",
+      },
+      {
+        providers: ["deepseek"],
+        model: "deepseek-v4-flash",
+        variant: "off",
+      },
+      {
+        providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
+        model: "qwen3.6-flash",
+        variant: "low",
+      },
+      {
+        providers: ["opencode-go"],
+        model: "minimax-m3",
+        variant: "max",
+      },
+      {
+        providers: ["opencode-go"],
+        model: "minimax-m2.7",
+        variant: "max",
+      },
+      {
+        providers: ["xai"],
+        model: "grok-4.20-0309-non-reasoning",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot"],
+        model: "claude-haiku-4-5",
+        variant: "off",
+      }
+    ])
   })
 
-  test("artistry keeps gemini-3.1-pro high primary and gpt-5.6-sol OpenAI coverage", () => {
+  test("unspecified-low follows the approved 6-rung chain headed by grok-4.6 xhigh", () => {
     // given
-    const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
+    const requirement = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
     // when
-    const primary = artistry.fallbackChain[0]
-    const openAiFallback = artistry.fallbackChain.find((entry) => entry.providers.includes("openai"))
+    const chain = requirement.fallbackChain
 
     // then
-    expect(artistry.fallbackChain.length).toBeGreaterThan(0)
-    expect(primary?.model).toBe("gemini-3.1-pro")
-    expect(primary?.variant).toBe("high")
-    expect(primary?.providers[0]).toBe("google")
-    expect(openAiFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "high",
-    })
+    expect(chain).toEqual([
+      {
+        providers: ["xai", "github-copilot", "opencode"],
+        model: "grok-4.6",
+        variant: "xhigh",
+      },
+      {
+        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+        model: "gpt-5.6-terra",
+        variant: "high",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-sonnet-5",
+        variant: "low",
+      },
+      {
+        providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
+        model: "qwen3.8-max-preview",
+        variant: "max",
+      },
+      {
+        providers: ["deepseek", "opencode-go"],
+        model: "deepseek-v4-pro",
+        variant: "max",
+      },
+      {
+        providers: ["xiaomi", "opencode-go"],
+        model: "mimo-v2.5-pro",
+        variant: "max",
+      }
+    ])
   })
 
-  test("writing keeps gemini, kimi, sonnet, and minimax fallback order", () => {
+  test("unspecified-high follows the approved opus-first 3-rung chain", () => {
     // given
-    const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
+    const requirement = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
 
     // when
-    const [primary, second, third, fourth, fifth, sixth] = writing.fallbackChain
+    const chain = requirement.fallbackChain
 
     // then
-    expect(writing.fallbackChain).toHaveLength(6)
-    expect(primary?.model).toBe("gemini-3-flash")
-    expect(primary?.providers[0]).toBe("google")
-    expect(second?.model).toBe("kimi-k3")
-    expect(second?.providers[0]).toBe("opencode-go")
-    expect(third?.model).toBe("claude-sonnet-4-6")
-    expect(third?.providers[0]).toBe("anthropic")
-    expect(fourth?.model).toBe("minimax-m3")
-    expect(fourth?.providers[0]).toBe("opencode-go")
-    expect(fifth).toEqual({
-      providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
-      model: "MiniMax-M3",
-    })
-    expect(sixth?.model).toBe("minimax-m2.7")
-    expect(sixth?.providers[0]).toBe("opencode-go")
+    expect(chain).toEqual([
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
+        variant: "xhigh",
+      },
+      {
+        providers: ["zai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+        variant: "max",
+      },
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
+        variant: "max",
+      }
+    ])
+  })
+
+  test("artistry follows the approved 3-rung chain", () => {
+    // given
+    const requirement = CATEGORY_MODEL_REQUIREMENTS["artistry"]
+
+    // when
+    const chain = requirement.fallbackChain
+
+    // then
+    expect(chain).toEqual([
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5",
+        variant: "xhigh",
+      },
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
+        variant: "xhigh",
+      }
+    ])
+  })
+
+  test("writing follows the approved 3-rung chain", () => {
+    // given
+    const requirement = CATEGORY_MODEL_REQUIREMENTS["writing"]
+
+    // when
+    const chain = requirement.fallbackChain
+
+    // then
+    expect(chain).toEqual([
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
+        variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
+        variant: "low",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode"],
+        model: "gemini-3.6-flash",
+      }
+    ])
   })
 
   test("deep and artistry no longer hard-require primary models", () => {
@@ -188,4 +259,5 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(deep.requiresModel).toBeUndefined()
     expect(artistry.requiresModel).toBeUndefined()
   })
+
 })

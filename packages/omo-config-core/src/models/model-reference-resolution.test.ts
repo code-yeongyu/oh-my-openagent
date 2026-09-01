@@ -26,15 +26,13 @@ describe("resolveModelReferences", () => {
     expect(result.diagnostics).toEqual([])
     expect(result.view.agents?.oracle).toEqual({
       model: "openai/gpt-5.6-sol",
-      variant: "high",
-      reasoningEffort: "xhigh",
-      models: [{ model: "openai/gpt-5.6-sol", variant: "high", reasoningEffort: "xhigh" }],
+      reasoning: "xhigh",
+      models: [{ model: "openai/gpt-5.6-sol", reasoning: "xhigh" }],
     })
     expect(result.view.categories?.deep).toEqual({
       model: "openai/gpt-5.6-sol",
-      variant: "high",
-      reasoningEffort: "xhigh",
-      fallback_models: [{ model: "openai/gpt-5.6-sol", variant: "high", reasoningEffort: "xhigh" }],
+      reasoning: "xhigh",
+      fallback_models: [{ model: "openai/gpt-5.6-sol", reasoning: "xhigh" }],
     })
     expect(view).toEqual(originalView)
   })
@@ -65,13 +63,12 @@ describe("resolveModelReferences", () => {
 
     // then
     expect(result.view.agents?.oracle?.model).toBe("openai/gpt-5.6-sol")
-    expect(result.view.agents?.oracle?.variant).toBe("low")
-    expect(result.view.agents?.oracle?.reasoningEffort).toBe("minimal")
+    expect(result.view.agents?.oracle?.reasoning).toBe("minimal")
     expect(result.view.agents?.oracle?.models).toEqual([
-      { model: "openai/gpt-5.6-sol", variant: "medium", reasoningEffort: "high" },
+      { model: "openai/gpt-5.6-sol", reasoning: "high" },
     ])
     expect(result.view.categories?.deep?.fallback_models).toEqual([
-      { model: "openai/gpt-5.6-sol", variant: "medium", reasoningEffort: "high" },
+      { model: "openai/gpt-5.6-sol", reasoning: "high" },
     ])
   })
 

@@ -1,0 +1,7 @@
+RED output: initial bun test packages/model-core run failed with 10 then 2 then 8 then 1 failures while pinning the new category chains and provider transform. The failures were confined to model-core expectations around the refreshed approved chains and capability snapshot/guardrail coverage.
+GREEN output: final bun test packages/model-core run passed 314 tests across 28 files with 0 failures and 1206 expect() calls.
+Typecheck: npx tsgo --noEmit -p packages/model-core/tsconfig.json completed without output.
+rg-zero output: rg -i apitopia packages/model-core returned no matches.
+What was tested: provider-model-id-transform tests, category-routing-policy tests, category-model-requirements coverage, model-capability-guardrails, model-capabilities, and the full packages/model-core bun test target.
+What was observed: kimi-coding/kimi-for-coding transform now maps kimi-k3 -> k3 and kimi-k3-256k -> k3-256k; category chains now match the approved spec; the refreshed bundled model-capabilities snapshot includes the new chain models needed by guardrails and capability tests.
+Why enough: the changed package's full test suite and typecheck both passed, and the apitopia search over the package returned zero hits, which satisfies the todo's acceptance criteria for this scope.

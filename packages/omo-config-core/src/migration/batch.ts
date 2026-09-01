@@ -2,7 +2,8 @@ import { dirname, posix } from "node:path"
 
 import { isPlainObject } from "../internal/plain-object"
 import { parseJsoncSafe } from "../internal/jsonc-parse"
-import { prepareTargetWrite, targetDocument, writeOmoMigrationTarget, writePreparedTarget } from "./commit"
+import { moveMigrationBackup } from "./backup-move"
+import { prepareTargetReplacement, prepareTargetWrite, targetDocument, writeOmoMigrationTarget, writePreparedTarget } from "./commit"
 import { type MigrationBackupMove, migrationJournalPath, removeMigrationJournal, writeMigrationJournal } from "./journal"
 import { acquireMigrationLock, migrationLockPath } from "./lock"
 import { shouldRunMigration } from "./predicate"
@@ -114,12 +115,22 @@ function executePlan(input: {
   assertSafeSourcePaths(plan.sources, protectedPaths)
   const existingSources = plan.sources.filter((source) => fileSystem.existsSync(source.path))
   const target = targetDocument(plan.targetPath, fileSystem)
-  if (!shouldRunMigration({ legacySourcesExist: existingSources.length > 0, migrationId: plan.id, target })) {
+  const replaceTarget = plan.mode === "replace-target"
+  if (!shouldRunMigration({
+    legacySourcesExist: replaceTarget ? fileSystem.existsSync(plan.targetPath) : existingSources.length > 0,
+    migrationId: plan.id,
+    target,
+  })) {
     return { diagnostics: [], journalResumed, status: "skipped" }
   }
 
-  const transformed = transformResult(plan.transform(loadSources(existingSources, fileSystem)))
-  const prepared = prepareTargetWrite({ additions: transformed.document, migrationId: plan.id, target, targetPath: plan.targetPath })
+  const loaded = replaceTarget
+    ? [{ path: plan.targetPath, value: target }]
+    : loadSources(existingSources, fileSystem)
+  const transformed = transformResult(plan.transform(loaded))
+  const prepared = replaceTarget
+    ? prepareTargetReplacement({ document: transformed.document, migrationId: plan.id, target, targetPath: plan.targetPath })
+    : prepareTargetWrite({ additions: transformed.document, migrationId: plan.id, target, targetPath: plan.targetPath })
   const diagnostics = [...transformed.diagnostics, ...prepared.diagnostics]
   const moves = backupMoves(existingSources, plan.id, fileSystem, protectedPaths)
   const preview = { backupMoves: moves, targetPath: plan.targetPath, transform: transformed.document }
@@ -129,9 +140,13 @@ function executePlan(input: {
   const journal = {
     backupMoves: moves,
     completedMoves: [],
+    diagnostics,
     migrationId: plan.id,
     targetPath: plan.targetPath,
-    targetWrite: { additions: transformed.document },
+    targetWrite: {
+      additions: transformed.document,
+      ...(replaceTarget ? { mode: "replace-target" as const } : {}),
+    },
     targetWritten: false,
     version: 1 as const,
   }
@@ -146,7 +161,7 @@ function executePlan(input: {
   for (const move of targetRecorded.backupMoves) {
     input.renewLock()
     if (fileSystem.existsSync(move.to)) throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`)
-    fileSystem.renameSync(move.from, move.to)
+    moveMigrationBackup(fileSystem, move.from, move.to)
     input.onBoundary?.("source-moved")
     Object.assign(targetRecorded, { completedMoves: [...targetRecorded.completedMoves, move.from] })
     writeMigrationJournal(targetRecorded, fileSystem, env, input.process, input.clock)

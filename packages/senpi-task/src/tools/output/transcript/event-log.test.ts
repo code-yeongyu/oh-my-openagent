@@ -4,7 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
-import { readEventLogTranscript } from "./event-log"
+import { readEventLogTranscript, readEventLogTranscriptResult } from "./event-log"
+import { MAX_TRANSCRIPT_SOURCE_BYTES } from "./read-bounded"
 
 function writeLog(lines: readonly string[]): string {
   const stateDir = mkdtempSync(join(tmpdir(), "senpi-task-event-log-"))
@@ -30,6 +31,22 @@ describe("readEventLogTranscript", () => {
       { kind: "assistant", text: "working on it" },
       { kind: "tool", tool: "bash", is_error: false },
       { kind: "error", message: "upstream gateway timeout" },
+    ])
+  })
+
+  test("#given a large event log #when read #then head and tail events survive with source truncation", () => {
+    const stateDir = writeLog([
+      JSON.stringify({ type: "assistant_message", payload: { text: "first" } }),
+      JSON.stringify({ type: "ignored", payload: { text: "x".repeat(MAX_TRANSCRIPT_SOURCE_BYTES) } }),
+      JSON.stringify({ type: "assistant_message", payload: { text: "last" } }),
+    ])
+
+    const result = readEventLogTranscriptResult(stateDir, "st_1")
+
+    expect(result.truncated).toBe(true)
+    expect(result.entries).toEqual([
+      { kind: "assistant", text: "first" },
+      { kind: "assistant", text: "last" },
     ])
   })
 })

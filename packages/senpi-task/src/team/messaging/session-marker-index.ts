@@ -2,6 +2,7 @@ import { open, stat } from "node:fs/promises"
 
 // Reads the byte range [start, end) of a session JSONL file. Injectable so tests can count bytes.
 export type SessionSliceReader = (path: string, start: number, end: number) => Promise<string>
+export type SessionMarkerExtractor = (text: string) => readonly string[]
 
 // Incremental index over a lead's append-only session JSONL. The lead poller must check, many times
 // per tick, whether a peer-message envelope for a given messageId has been persisted. The naive check
@@ -19,6 +20,13 @@ type PathState = { offset: number; residual: string; readonly seen: Set<string> 
 const MESSAGE_ID_MARKER = /<peer_message [^>]*?messageId=\\?"([^"\\]+)\\?"/g
 
 export function createSessionMarkerIndex(readSlice: SessionSliceReader = defaultReadSlice): SessionMarkerIndex {
+  return createIncrementalSessionMarkerIndex(extractMessageIds, readSlice)
+}
+
+export function createIncrementalSessionMarkerIndex(
+  extractMarkers: SessionMarkerExtractor,
+  readSlice: SessionSliceReader = defaultReadSlice,
+): SessionMarkerIndex {
   const states = new Map<string, PathState>()
 
   async function refresh(path: string): Promise<Set<string> | null> {
@@ -44,7 +52,7 @@ export function createSessionMarkerIndex(readSlice: SessionSliceReader = default
     const lastNewline = text.lastIndexOf("\n")
     const complete = lastNewline < 0 ? "" : text.slice(0, lastNewline + 1)
     state.residual = lastNewline < 0 ? text : text.slice(lastNewline + 1)
-    for (const id of extractMessageIds(complete)) state.seen.add(id)
+    for (const marker of extractMarkers(complete)) state.seen.add(marker)
     return state.seen
   }
 

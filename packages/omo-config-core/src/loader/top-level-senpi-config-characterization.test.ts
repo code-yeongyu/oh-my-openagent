@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { availableParallelism, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
@@ -14,30 +14,30 @@ EVAL-FIRST: \`eval\` is your default execution surface. Before acting, ask "how 
 const CURRENT_USER_CONFIG = `{
   "categories": {
     "quick": {
-      "model": "apitopia/kimi-for-coding-highspeed-unlocked",
+      "model": "kimi-coding/kimi-for-coding-highspeed-unlocked",
       "reasoningEffort": "minimal",
       "fallback_models": [
-        { "model": "quotio-openai/gpt-5.4-mini-fast", "reasoningEffort": "minimal" },
-        { "model": "apitopia/z-ai/glm-5.2-ultrafast-unlocked", "reasoningEffort": "none" }
+        { "model": "openai-codex/gpt-5.6-luna-fast", "reasoningEffort": "minimal" },
+        { "model": "example-gateway/z-ai/glm-5.2-ultrafast-unlocked", "reasoningEffort": "none" }
       ],
       "prompt_append": ${JSON.stringify(QUICK_PROMPT_APPEND)}
     },
     "deep": {
-      "model": "quotio-openai/gpt-5.6-terra",
+      "model": "openai-codex/gpt-5.6-terra",
       "variant": "xhigh"
     }
   },
   "agents": {
     "explore": {
-      "model": "apitopia/kimi-for-coding-highspeed",
+      "model": "kimi-coding/kimi-for-coding-highspeed",
       "models": [
-        { "model": "quotio-openai/gpt-5.4-mini-fast", "reasoningEffort": "minimal" },
-        "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
-        { "model": "quotio-openai/gpt-5.4-mini", "reasoningEffort": "minimal" }
+        { "model": "openai-codex/gpt-5.6-luna-fast", "reasoningEffort": "minimal" },
+        "example-gateway/z-ai/glm-5.2-ultrafast-unlocked",
+        { "model": "openai-codex/gpt-5.6-luna-fast", "reasoningEffort": "minimal" }
       ]
     },
     "oracle": {
-      "model": "quotio-openai/gpt-5.6-sol",
+      "model": "openai-codex/gpt-5.6-sol",
       "reasoningEffort": "max"
     }
   }
@@ -46,31 +46,31 @@ const CURRENT_USER_CONFIG = `{
 const EXPECTED_CONFIG = {
   agents: {
     explore: {
-      model: "apitopia/kimi-for-coding-highspeed",
+      model: "kimi-coding/kimi-for-coding-highspeed",
       models: [
-        { model: "quotio-openai/gpt-5.4-mini-fast", reasoningEffort: "minimal" },
-        "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
-        { model: "quotio-openai/gpt-5.4-mini", reasoningEffort: "minimal" },
+        { model: "openai-codex/gpt-5.6-luna-fast", reasoning: "minimal" },
+        "example-gateway/z-ai/glm-5.2-ultrafast-unlocked",
+        { model: "openai-codex/gpt-5.6-luna-fast", reasoning: "minimal" },
       ],
     },
     oracle: {
-      model: "quotio-openai/gpt-5.6-sol",
-      reasoningEffort: "max",
+      model: "openai-codex/gpt-5.6-sol",
+      reasoning: "max",
     },
   },
   categories: {
     quick: {
       fallback_models: [
-        { model: "quotio-openai/gpt-5.4-mini-fast", reasoningEffort: "minimal" },
-        { model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked", reasoningEffort: "none" },
+        { model: "openai-codex/gpt-5.6-luna-fast", reasoning: "minimal" },
+        { model: "example-gateway/z-ai/glm-5.2-ultrafast-unlocked", reasoning: "off" },
       ],
-      model: "apitopia/kimi-for-coding-highspeed-unlocked",
+      model: "kimi-coding/kimi-for-coding-highspeed-unlocked",
       prompt_append: QUICK_PROMPT_APPEND,
-      reasoningEffort: "minimal",
+      reasoning: "minimal",
     },
     deep: {
-      model: "quotio-openai/gpt-5.6-terra",
-      variant: "xhigh",
+      model: "openai-codex/gpt-5.6-terra",
+      reasoning: "xhigh",
     },
   },
   codegraph: {
@@ -81,9 +81,11 @@ const EXPECTED_CONFIG = {
   },
   task: {
     default_concurrency: 5,
+    global_concurrency: Math.max(8, availableParallelism() * 2),
     default_execution_mode: "in-process",
     max_depth: 1,
-    residency_max_children: 8,
+    residency_max_children: Math.min(16, Math.max(8, availableParallelism() * 2)),
+    resume_children: true,
     team: {
       max_members: 8,
       max_parallel_members: 4,
@@ -94,6 +96,9 @@ const EXPECTED_CONFIG = {
       default_ms: 60_000,
       max_ms: 600_000,
       min_ms: 5_000,
+    },
+    warnings: {
+      unavailable_categories: true,
     },
   },
   teams: {},

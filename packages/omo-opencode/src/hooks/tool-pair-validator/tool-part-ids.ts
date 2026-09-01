@@ -1,94 +1,65 @@
 import { isRecord } from "@oh-my-opencode/utils"
-import type { TransformPart } from "./types"
+import type { TransformPart, UnpairedToolPart } from "./types"
 
 export { isRecord }
 
-const TERMINAL_OPENCODE_TOOL_STATUSES = new Set(["completed", "error"])
+const TERMINAL_TOOL_STATUSES = new Set(["completed", "error"])
 
-function isTerminalOpenCodeToolPart(part: TransformPart): boolean {
-  if (!isRecord(part)) {
-    return false
-  }
+export const UNKNOWN_TOOL_STATUS = "unknown"
 
-  const candidate = part
-  if (candidate.type !== "tool" || typeof candidate.callID !== "string" || candidate.callID.length === 0) {
-    return false
-  }
-
-  if (!isRecord(candidate.state)) {
-    return false
-  }
-
-  const status = candidate.state["status"]
-  return typeof status === "string" && TERMINAL_OPENCODE_TOOL_STATUSES.has(status)
+export function toRecord(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null
 }
 
-export function getToolUseID(part: TransformPart): string | null {
-  if (!isRecord(part)) {
+export function getToolCallID(part: TransformPart): string | null {
+  const record = toRecord(part)
+  if (!record || record["type"] !== "tool") {
     return null
   }
 
-  const candidate = part
-
-  if (candidate.type === "tool_use" && typeof candidate.id === "string" && candidate.id.length > 0) {
-    return candidate.id
-  }
-
-  if (candidate.type === "tool" && typeof candidate.callID === "string" && candidate.callID.length > 0) {
-    return isTerminalOpenCodeToolPart(part) ? null : candidate.callID
-  }
-
-  return null
+  const callID = record["callID"]
+  return typeof callID === "string" && callID.length > 0 ? callID : null
 }
 
-export function getToolResultID(part: TransformPart): string | null {
-  if (!isRecord(part)) {
-    return null
+export function getToolStatus(part: TransformPart): string {
+  const state = toRecord(toRecord(part)?.["state"])
+  if (!state) {
+    return UNKNOWN_TOOL_STATUS
   }
 
-  const candidate = part
-
-  if (candidate.type !== "tool_result") {
-    return null
-  }
-
-  if (typeof candidate.toolUseId === "string" && candidate.toolUseId.length > 0) {
-    return candidate.toolUseId
-  }
-
-  if (typeof candidate.tool_use_id === "string" && candidate.tool_use_id.length > 0) {
-    return candidate.tool_use_id
-  }
-
-  return null
+  const status = state["status"]
+  return typeof status === "string" && status.length > 0 ? status : UNKNOWN_TOOL_STATUS
 }
 
-export function extractUniqueToolUseIDs(parts: TransformPart[]): string[] {
+export function isTerminalToolStatus(status: string): boolean {
+  return TERMINAL_TOOL_STATUSES.has(status)
+}
+
+/**
+ * OpenCode has no standalone `tool_use` or `tool_result` part. A single assistant
+ * `tool` part is converted into BOTH the `tool_use` block and its `tool_result`
+ * block, but only once the part carries a terminal (`completed` / `error`) state.
+ * A part still in `pending` / `running` is therefore the only shape that can reach
+ * the provider as a `tool_use` without a paired `tool_result`.
+ */
+export function findUnpairedToolParts(parts: TransformPart[]): UnpairedToolPart[] {
   const seen = new Set<string>()
-  const toolUseIDs: string[] = []
+  const unpaired: UnpairedToolPart[] = []
 
   for (const part of parts) {
-    const toolUseID = getToolUseID(part)
-    if (!toolUseID || seen.has(toolUseID)) {
+    const callID = getToolCallID(part)
+    if (!callID || seen.has(callID)) {
       continue
     }
 
-    seen.add(toolUseID)
-    toolUseIDs.push(toolUseID)
-  }
-
-  return toolUseIDs
-}
-
-export function extractToolResultIDs(parts: TransformPart[]): Set<string> {
-  const toolResultIDs = new Set<string>()
-
-  for (const part of parts) {
-    const toolResultID = getToolResultID(part)
-    if (toolResultID) {
-      toolResultIDs.add(toolResultID)
+    const status = getToolStatus(part)
+    if (isTerminalToolStatus(status)) {
+      continue
     }
+
+    seen.add(callID)
+    unpaired.push({ callID, status })
   }
 
-  return toolResultIDs
+  return unpaired
 }

@@ -1,38 +1,52 @@
-import { findContinuableBoulderWork } from "../start-work-continuation/boulder-eligibility"
-import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { resolveOmoBin, runOmoCommand } from "./omo-command"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 
-const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
+import { findContinuableBoulderWork } from "../ulw-execute-continuation/boulder-eligibility"
+import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { createUlwLoopFooterStatus, type UlwLoopFooterStatusOptions } from "./footer-status"
+import { resolveOmoBin, runOmoCommand } from "./omo-command"
+import { extractSessionId, resolveUlwLoopSessionScope, ulwLoopStatusArgs } from "./session-scope"
+
+// Every ulw-loop plan lives under `<cwd>/.omo/ulw-loop`, unscoped as `goals.json` and session-scoped as
+// `<sessionId>/goals.json` (omo-codex ulw-loop `paths.ts`), and the toolkit resolves its repo root from the
+// cwd it is spawned in (`cli-commands.ts`). A missing directory therefore rules out a plan for every scope.
+const ULW_LOOP_PLAN_DIR = join(".omo", "ulw-loop")
 const CONTINUATION_LIMIT = 8
 const STEERING_REMINDER = [
   "<omo-senpi-ulw-loop>",
-  "An active omo ulw-loop run is present in this working directory.",
-  "Before continuing, inspect `omo ulw-loop status --json` and use the existing .omo/ulw-loop ledger as the source of truth.",
+  "An active omo-agent-toolkit ulw-loop run is present in this working directory.",
+  "Before continuing, inspect `omo-agent-toolkit ulw-loop status --json` and use the existing .omo/ulw-loop ledger as the source of truth.",
   "Continue the current ulw-loop story with evidence-bound execution; do not start unrelated work until the active run is complete or checkpointed.",
   "</omo-senpi-ulw-loop>",
 ].join("\n")
 const CONTINUATION_PROMPT = [
-  "Continue the active omo ulw-loop run.",
-  "Run `omo ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.",
+  "Continue the active omo-agent-toolkit ulw-loop run.",
+  "Run `omo-agent-toolkit ulw-loop status --json` in this session cwd, inspect the active incomplete goals, and keep working until the run is complete or safely checkpointed.",
 ].join("\n")
 
 export interface UlwLoopComponentOptions {
   resolveOmoBin?: () => string | null
   runCommand?: (bin: string, args: readonly string[], options: { cwd: string }) => Promise<{ code: number; stdout: string }>
+  planDirExists?: (cwd: string) => boolean
+  footerStatus?: UlwLoopFooterStatusOptions
 }
 
 interface InputEventLike {
   text: string
   source?: unknown
   images?: unknown
+  streamingBehavior?: unknown
 }
 
 interface ActiveStatus {
   raw: string
   active: boolean
+  // false marks a probe that never ran because this host could not prove which run it owns.
+  sessionScoped?: boolean
 }
 
 type RunCommand = NonNullable<UlwLoopComponentOptions["runCommand"]>
+type PlanDirLookup = NonNullable<UlwLoopComponentOptions["planDirExists"]>
 
 export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): OmoSenpiComponent {
   return {
@@ -47,10 +61,17 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
       }
 
       const runCommand = options.runCommand ?? runOmoCommand
+      const planDirExists = options.planDirExists ?? ulwLoopPlanDirExists
+      const footerStatus = createUlwLoopFooterStatus(options.footerStatus)
       const state = {
         consecutiveContinuations: 0,
         previousStatusRaw: undefined as string | undefined,
       }
+
+      pi.on("session_start", async (_payload, eventCtx) => {
+        const status = await readActiveStatus(omoBin, runCommand, planDirExists, eventCtx, ctx)
+        footerStatus.sync(eventCtx, status?.active ?? false)
+      })
 
       pi.on("input", async (payload, eventCtx) => {
         if (!isInputEvent(payload)) return { action: "continue" }
@@ -58,7 +79,9 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 
         state.consecutiveContinuations = 0
         state.previousStatusRaw = undefined
-        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        if (payload.streamingBehavior === undefined) return { action: "continue" }
+        const status = await readActiveStatus(omoBin, runCommand, planDirExists, eventCtx, ctx)
+        footerStatus.sync(eventCtx, status?.active ?? false)
         if (status === null || !status.active) return { action: "continue" }
         return {
           action: "transform",
@@ -83,8 +106,13 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
           return
         }
 
-        const status = await readActiveStatus(omoBin, runCommand, cwd, ctx)
+        const status = await readActiveStatus(omoBin, runCommand, planDirExists, eventCtx, ctx)
+        footerStatus.sync(eventCtx, status?.active ?? false)
         if (status === null) {
+          return
+        }
+        if (status.sessionScoped === false) {
+          ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "session-id-unavailable" })
           return
         }
         if (!status.active) {
@@ -101,6 +129,15 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         state.consecutiveContinuations += 1
         deliverContinuation(pi, ctx)
       })
+
+      pi.on("tool_result", async (payload, eventCtx) => {
+        if (!shouldRefreshFooterAfterToolResult(payload)) return
+        const status = await readActiveStatus(omoBin, runCommand, planDirExists, eventCtx, ctx)
+        footerStatus.sync(eventCtx, status?.active ?? false)
+      })
+
+      pi.on("session_before_switch", () => footerStatus.dispose())
+      pi.on("session_shutdown", () => footerStatus.dispose())
     },
   }
 }
@@ -117,23 +154,49 @@ function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext): void
     ctx.idleCoordinator.enqueue({
       key: ULW_CONTINUATION_INJECTION_KEY,
       source: "ulw-continuation",
+      customType: "omo-senpi:ulw-continuation",
       content: CONTINUATION_PROMPT,
+      display: false,
     })
     ctx.idleCoordinator.scheduleFlush()
     return
   }
-  pi.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" })
+  pi.sendMessage(
+    {
+      customType: "omo-senpi:ulw-continuation",
+      content: CONTINUATION_PROMPT,
+      display: false,
+    },
+    { triggerTurn: true, deliverAs: "followUp" },
+  )
+}
+
+function ulwLoopPlanDirExists(cwd: string): boolean {
+  return existsSync(join(cwd, ULW_LOOP_PLAN_DIR))
 }
 
 async function readActiveStatus(
   omoBin: string,
   runCommand: RunCommand,
-  cwd: string,
+  planDirExists: PlanDirLookup,
+  eventCtx: unknown,
   ctx: ComponentContext,
 ): Promise<ActiveStatus | null> {
+  const cwd = cwdFromContext(eventCtx)
+  // Spawning the toolkit costs two node startups (`bin/omo-agent-toolkit.js` re-spawns `cli.js`), and the
+  // input hook is awaited inside `emitInput` before the submitted message is committed. Without a ledger
+  // directory the toolkit can only answer ULW_LOOP_PLAN_MISSING, so answer inactive without paying for it.
+  if (!planDirExists(cwd)) return { raw: "", active: false }
+
+  // Fail closed: without a session identity the toolkit would answer from the unscoped repo-global
+  // `.omo/ulw-loop/goals.json`, which every session sharing this cwd can see. Never auto-continue a run
+  // this host cannot prove it owns.
+  const sessionId = resolveUlwLoopSessionScope(eventCtx)
+  if (sessionId === null) return { raw: "", active: false, sessionScoped: false }
+
   let result: { code: number; stdout: string }
   try {
-    result = await runCommand(omoBin, STATUS_ARGS, { cwd })
+    result = await runCommand(omoBin, ulwLoopStatusArgs(sessionId), { cwd })
   } catch (error) {
     ctx.logger.warn("omo-senpi ulw-loop status ignored", {
       reason: "run-command-failed",
@@ -183,13 +246,13 @@ function isUserSourcedInput(value: InputEventLike): boolean {
   return value.source !== "extension"
 }
 
-function extractSessionId(eventCtx: unknown): string | undefined {
-  if (!isRecord(eventCtx)) return undefined
-  const value = eventCtx["sessionManager"]
-  if (!isRecord(value) || typeof value["getSessionId"] !== "function") return undefined
-  const manager = value as unknown as { getSessionId(): unknown }
-  const id = manager.getSessionId()
-  return typeof id === "string" ? id : undefined
+function shouldRefreshFooterAfterToolResult(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  const toolName = value["toolName"]
+  return toolName === "create_goal"
+    || toolName === "update_goal"
+    || toolName === "bash"
+    || toolName === "interactive_bash"
 }
 
 function cwdFromContext(value: unknown): string {

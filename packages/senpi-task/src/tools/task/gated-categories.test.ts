@@ -23,12 +23,20 @@ describe("gated category listing", () => {
       // then
       expect(entry?.description).toContain("(requires gpt-5.6-sol)")
     })
+
+    test("#when the categories are listed #then deep carries its required model annotation", () => {
+      // given / when
+      const entry = entryFor("deep", {})
+
+      // then
+      expect(entry?.description).toContain("(requires gpt-5.6-sol)")
+    })
   })
 
   describe("#given a gated category configured in omo.json", () => {
     test("#when the categories are listed #then the annotation is dropped because the gate is bypassed", () => {
       // given / when
-      const entry = entryFor("architect", { categories: { architect: { model: "apitopia/kimi-k3" } } })
+      const entry = entryFor("architect", { categories: { architect: { model: "kimi-coding/k3" } } })
 
       // then
       expect(entry?.description).not.toContain("requires")
@@ -46,7 +54,7 @@ describe("gated category listing", () => {
   describe("#given an ungated builtin category", () => {
     test("#when the categories are listed #then no annotation is added", () => {
       // given / when
-      const entry = entryFor("deep", {})
+      const entry = entryFor("quick", {})
 
       // then
       expect(entry?.description).toBeDefined()

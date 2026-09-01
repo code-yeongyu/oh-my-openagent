@@ -21,7 +21,7 @@
   Force one method: scoop | winget | choco | npm | cargo | pip | github
 
 .PARAMETER Version
-  Pin a specific version when downloading from GitHub. Default: 0.43.0
+  Pin a specific version when downloading from GitHub. Default: 0.45.0
 
 .PARAMETER NoFallback
   Don't fall back to GitHub zip; fail if all package managers miss
@@ -37,7 +37,7 @@
 
 param(
     [string]$Method = "",
-    [string]$Version = "0.43.0",
+    [string]$Version = "0.45.0",
     [switch]$NoFallback,
     [switch]$Quiet
 )

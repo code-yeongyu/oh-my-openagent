@@ -45,6 +45,34 @@ function expectResolved(result: ReturnType<typeof resolveAgent>): Extract<typeof
 }
 
 describe("resolveAgent", () => {
+  test("#given an agent with disallowedTools #when resolved #then the denylist rides the persona as toolDenylist", () => {
+    // given
+    const agents = roster({
+      name: "explore",
+      prompt: "Inspect the codebase",
+      disallowedTools: ["bash", "write"],
+    })
+    const models = registry([model("openai", "gpt-5.6-luna-fast")])
+
+    // when
+    const result = expectResolved(resolveAgent("explore", agents, models))
+
+    // then
+    expect(result.toolDenylist).toEqual(["bash", "write"])
+  })
+
+  test("#given an agent without disallowedTools #when resolved #then no denylist is forced onto the persona", () => {
+    // given
+    const agents = roster({ name: "explore", prompt: "Inspect the codebase" })
+    const models = registry([model("openai", "gpt-5.6-luna-fast")])
+
+    // when
+    const result = expectResolved(resolveAgent("explore", agents, models))
+
+    // then
+    expect(result.toolDenylist).toBeUndefined()
+  })
+
   test("#given an agent fallback chain and matching live model #when resolved #then it returns agent metadata and persona", () => {
     // given
     const agents = roster({
@@ -52,18 +80,20 @@ describe("resolveAgent", () => {
       prompt: "Inspect the codebase",
       executionMode: "in-process",
     })
-    const models = registry([model("openai", "gpt-5.4-mini-fast")])
+    const models = registry([model("openai", "gpt-5.6-luna-fast")])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
 
     // then
-    expect(result.model).toBe("openai/gpt-5.4-mini-fast")
+    expect(result.model).toBe("openai/gpt-5.6-luna-fast")
     expect(result.resolved_model).toEqual({
       source: "agent",
       provider: "openai",
-      model_id: "gpt-5.4-mini-fast",
-      display: "openai/gpt-5.4-mini-fast",
+      model_id: "gpt-5.6-luna-fast",
+      display: "openai/gpt-5.6-luna-fast",
+      variant: "low",
+      reasoning: "low",
     })
     expect(result.agentType).toBe("explore")
     expect(result.instructions).toBe("Inspect the codebase")
@@ -84,6 +114,41 @@ describe("resolveAgent", () => {
 
     // then
     expect(result.model).toBe("local/primary")
+  })
+
+  test("#given configured runtime fallback preserves requested and resolved models #when an agent resolves #then the ordered runtime chain is retained", () => {
+    // given
+    const agents = roster({
+      name: "custom",
+      model: "local/primary",
+      models: ["openai/secondary", "google/tertiary"],
+    })
+    const models = registry([
+      model("openai", "secondary"),
+      model("google", "tertiary"),
+    ])
+
+    // when
+    const result = expectResolved(resolveAgent("custom", agents, models))
+
+    // then
+    expect(result.model).toBe("openai/secondary")
+    expect(result).toMatchObject({
+      requested_model: {
+        source: "agent",
+        provider: "local",
+        model_id: "primary",
+        display: "local/primary",
+      },
+      fallback_models: [
+        {
+          source: "agent",
+          provider: "google",
+          model_id: "tertiary",
+          display: "google/tertiary",
+        },
+      ],
+    })
   })
 
   test("#given an unavailable primary and ordered def.models #when resolved #then the first available model wins", () => {
@@ -125,15 +190,15 @@ describe("resolveAgent", () => {
     // given
     const agents = roster({ name: "explore", models: ["anthropic/claude-haiku-4-5"] })
     const models = catalogRegistry(
-      [model("openai", "gpt-5.4-mini-fast")],
-      [model("anthropic", "claude-haiku-4-5"), model("openai", "gpt-5.4-mini-fast")],
+      [model("openai", "gpt-5.6-luna-fast")],
+      [model("anthropic", "claude-haiku-4-5"), model("openai", "gpt-5.6-luna-fast")],
     )
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
 
     // then
-    expect(result.model).toBe("openai/gpt-5.4-mini-fast")
+    expect(result.model).toBe("openai/gpt-5.6-luna-fast")
   })
 
   test("#given a disabled agent #when resolved #then it is hidden as not_found", () => {

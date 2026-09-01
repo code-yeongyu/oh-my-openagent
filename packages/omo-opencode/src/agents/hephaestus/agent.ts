@@ -20,6 +20,7 @@ const GPT_5_3_CODEX_RE = /^gpt-5[.-]3-codex(?:$|[.-])/i;
 const GPT_5_4_RE = /^gpt-5[.-]4(?:$|[.-])/i;
 const GPT_5_5_RE = /^gpt-5[.-]5(?:$|[.-])/i;
 const GPT_5_6_RE = /^gpt-5[.-]6(?:$|[.-])/i;
+const HOSTED_VENDOR_PREFIX_RE = /^(?:[^./]+\.)+(gpt-5[.-].*)$/i;
 
 export type HephaestusPromptSource = "gpt-5-6" | "gpt-5-5" | "gpt-5-4" | "gpt";
 
@@ -36,7 +37,8 @@ export class UnsupportedHephaestusModelError extends Error {
 }
 
 function extractModelName(model: string): string {
-  return model.includes("/") ? (model.split("/").pop() ?? model) : model;
+  const afterProvider = model.includes("/") ? (model.split("/").pop() ?? model) : model;
+  return HOSTED_VENDOR_PREFIX_RE.exec(afterProvider)?.[1] ?? afterProvider;
 }
 
 export function isHephaestusSupportedModel(model: string | undefined): boolean {
