@@ -98,24 +98,47 @@ export function resolveModelForDelegateTask(
     ) {
       const providerHint = parsed?.providerHint
       const primaryMatch = fuzzyMatchModel(userResult.model, new Set(input.availableModels), providerHint)
-      if (!primaryMatch) {
-        for (const fallbackModel of userFallbackModels) {
-          const parsedFallback = parseUserFallbackModel(fallbackModel)
-          if (!parsedFallback) continue
-          const fbMatch = fuzzyMatchModel(
-            parsedFallback.baseModel,
-            new Set(input.availableModels),
-            parsedFallback.providerHint,
-          )
-          if (fbMatch) {
-            deps.log?.("[resolveModelForDelegateTask] user primary model unreachable; promoting user fallback_models entry", {
-              userPrimary: userResult.model,
-              selectedFallback: fbMatch,
-            })
-            return {
-              model: fbMatch,
-              variant: parsedFallback.variant,
-              matchedFallback: true,
+      if (primaryMatch === null) {
+        // An explicit user-configured primary must always win. fuzzyMatchModel
+        // returning null is "inconclusive" (format/alias/normalization edges),
+        // not "unavailable" — demoting the configured primary on inconclusive
+        // matching silently overrides explicit user intent. Fallbacks engage
+        // only when the primary is verifiably absent: neither an exact member
+        // of the available set, nor present under any provider prefix
+        // (an alias/format edge like opencode-go vs opencode would otherwise
+        // be misread as unavailability).
+        const primaryExact = Array.from(input.availableModels).some(
+          (available) => available === userResult.model,
+        )
+        // Positive-absence check: is the primary's MODEL ID (ignoring the
+        // provider prefix, which is an alias/format edge) present in the
+        // available set in any provider form? fuzzyMatchModel on the full
+        // string can miss this (opencode-go/kimi-k3 vs opencode/kimi-k3),
+        // which is exactly the inconclusive edge that must not demote an
+        // explicit primary.
+        const primaryModelID = userResult.model.split("/").slice(1).join("/")
+        const primaryModelIDPresent = Array.from(input.availableModels).some(
+          (available) => available.split("/").slice(1).join("/") === primaryModelID,
+        )
+        if (!primaryExact && !primaryModelIDPresent) {
+          for (const fallbackModel of userFallbackModels) {
+            const parsedFallback = parseUserFallbackModel(fallbackModel)
+            if (!parsedFallback) continue
+            const fbMatch = fuzzyMatchModel(
+              parsedFallback.baseModel,
+              new Set(input.availableModels),
+              parsedFallback.providerHint,
+            )
+            if (fbMatch) {
+              deps.log?.("[resolveModelForDelegateTask] user primary model unreachable; promoting user fallback_models entry", {
+                userPrimary: userResult.model,
+                selectedFallback: fbMatch,
+              })
+              return {
+                model: fbMatch,
+                variant: parsedFallback.variant,
+                matchedFallback: true,
+              }
             }
           }
         }
