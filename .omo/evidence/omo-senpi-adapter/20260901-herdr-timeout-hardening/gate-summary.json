@@ -1,0 +1,46 @@
+{
+  "focusedComponentSuite": {
+    "passed": 12,
+    "failed": 0,
+    "assertions": 30
+  },
+  "typecheck": "PASS",
+  "bundleRegenerated": true,
+  "fullSenpiGate": {
+    "passed": 2478,
+    "failed": 0,
+    "files": 328
+  },
+  "driveBaseline": {
+    "result": "PASS",
+    "ultraworkInjected": true,
+    "commentChecker": "PASS",
+    "realSenpiUntouched": true
+  },
+  "runtime": {
+    "node": "24.18.0",
+    "senpi": "2026.8.31",
+    "bun": "1.4.0"
+  },
+  "adversarialCrossReview": {
+    "model": "independent GPT-model agent",
+    "findings": 3,
+    "allFixed": true,
+    "items": [
+      "error.name unbounded -> sanitized safeErrorName",
+      "SIGKILL misclassified as timeout -> ETIMEDOUT-only + signal reason",
+      "async timeout left pipe/descendant -> destroy+unref"
+    ]
+  },
+  "hermeticRecorderLifecycle": {
+    "result": "PASS",
+    "recordedCalls": 5,
+    "reportStates": [
+      "idle",
+      "working",
+      "idle",
+      "idle"
+    ],
+    "releaseCount": 1
+  }
+}

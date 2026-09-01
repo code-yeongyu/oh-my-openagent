@@ -1,3 +1,22 @@
+## 2026-09-01 - Bound every Herdr lifecycle call and log only safe metadata
+
+The `herdr-agent-state` reporter and its `process.exit` cleanup called Herdr with
+no timeout, so a stuck Herdr binary could hold a live session or the process exit
+open. Both the async reporter (`runCommand`) and the two synchronous exit-path calls
+(`runCommandSync`) now run under a bounded timeout and kill the child on expiry, so
+every path returns within a fixed budget. The async timeout also destroys the stderr
+stream, drops listeners, and unrefs the child so a wedged binary or descendant pipe
+cannot keep the process open. Failure logging no longer emits raw `stderr` or
+exception text; it records bounded, non-sensitive metadata only: `reason`, exit
+`code`, `stderrBytes`, and an error-name token sanitized to letters and capped so an
+attacker-set name cannot inject or leak. Signal-terminated runs are reported as a
+`signal` failure, and timeouts are detected only from `ETIMEDOUT` so a stderr
+overflow is not mislabeled as a timeout. The `session_shutdown` handler still
+unregisters the process-exit fallback so exit cannot release twice. Deterministic
+coverage was added for the async timeout, synchronous timeout, synchronous nonzero
+exit, signal termination, thrown-error, bounded error-name logging, exit-handler
+unregistration, and safe-logging paths.
+
 ## 2026-08-29 — Teach "mass ulw research" the mass path
 
 A combined mass + research invocation collected at team scale instead of mass
