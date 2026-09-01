@@ -8,6 +8,7 @@ import {
   createAgentSession,
   createExtensionRuntime,
   DefaultResourceLoader,
+  defineTool,
   type AgentSessionEvent,
   type CreateAgentSessionOptions,
   type ResourceLoader,
@@ -16,13 +17,32 @@ import {
   type ToolDefinition,
 } from "@code-yeongyu/senpi"
 
+import * as senpiTask from "./index"
 import { createMinimalSenpiResourceLoader } from "./index"
+import type { AgentResolutionResult, ResolveAgentOptions } from "./index"
 
 function acceptRpcTypes(command: RpcCommand, response: RpcResponse, event: AgentSessionEvent): readonly string[] {
   return [typeof command, typeof response, event.type]
 }
 
 describe("pinned Senpi API surface", () => {
+  test("#given the senpi-task root import #when curated agent exports are used #then values and result types resolve", () => {
+    // given
+    const options: ResolveAgentOptions = { modelOverride: "openai/explicit" }
+
+    // when
+    const result: AgentResolutionResult = senpiTask.resolveAgent(
+      "explore",
+      senpiTask.BUILTIN_AGENTS,
+      undefined,
+      options,
+    )
+
+    // then
+    expect(senpiTask.BUILTIN_AGENT_DEFAULTS).toHaveLength(7)
+    expect(result.kind).toBe("resolved")
+  })
+
   test("#given senpi root exports #when type checked #then task adapter can pass session construction seams", () => {
     // given
     const customTools: ToolDefinition[] = []
@@ -45,6 +65,20 @@ describe("pinned Senpi API surface", () => {
     expect(options.resourceLoader).toBe(resourceLoader)
     expect(options.customTools).toEqual([])
     expect(options.tools).toEqual(["read", "bash"])
+  })
+
+  test("#given the pinned senpi barrel #when defineTool is applied #then it is the identity helper", () => {
+    // given / when / then - the task tool factories return their definitions unwrapped on the
+    // strength of defineTool being identity; pin that so a senpi bump that changes this trips the
+    // tripwire instead of silently changing tool construction.
+    const sample: ToolDefinition = {
+      name: "sample",
+      label: "Sample",
+      description: "sample",
+      parameters: undefined as never,
+      execute: () => Promise.resolve(undefined as never),
+    }
+    expect(defineTool(sample)).toBe(sample)
   })
 
   test("#given agent dir marker extension #when session boots with minimal loader #then marker factory is not invoked", async () => {

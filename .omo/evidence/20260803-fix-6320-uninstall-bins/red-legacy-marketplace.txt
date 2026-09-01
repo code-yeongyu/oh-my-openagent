@@ -1,0 +1,7 @@
+uname=Linux bun=1.3.12
+
+== RED: legacy-marketplace bins on POSIX ==
+(fail) codex cleanup > #given a legacy install under another marketplace #when cleanup runs #then its legacy bins are still removed [7.61ms]
+ 18 pass
+ 1 fail
+

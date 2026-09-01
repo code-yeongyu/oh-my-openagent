@@ -1,0 +1,3 @@
+expected=2026.8.19
+package-json=undefined
+lock=RED_expected_old_pin

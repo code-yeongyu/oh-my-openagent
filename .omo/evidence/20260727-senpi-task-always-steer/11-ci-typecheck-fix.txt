@@ -1,0 +1,22 @@
+CI failure:
+
+`CI/typecheck (ubuntu-latest)` failed with two annotations:
+
+```text
+Object literal may only specify known properties, and 'interruptTask' does not exist in type 'SendManager'.
+```
+
+Affected upstream-added test fixtures:
+
+- `packages/senpi-task/src/tools/team/allowlist.test.ts`
+- `packages/senpi-task/src/tools/control/factory.test.ts`
+
+Fix:
+
+Removed the obsolete `interruptTask` property from both `SendManager` fixture objects.
+
+Verification:
+
+- `bun run --cwd packages/senpi-task typecheck`: exit 0.
+- focused `factory.test.ts` and `allowlist.test.ts`: pass.
+- No production behavior changed.

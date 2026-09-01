@@ -2,20 +2,20 @@ import { chmodSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 
 import { disposeDefaultLspManager, getLspManager } from "@oh-my-opencode/lsp-core/lsp/manager";
-
-import { setPrivateFileMode } from "./ipc-protocol.js";
 import { pingDaemon } from "./ensure-daemon.js";
+import { setPrivateFileMode } from "./ipc-protocol.js";
 import {
 	acquireStartupLease,
+	type DaemonOwner,
 	DaemonStartupDeferredError,
 	endpointIdentity,
 	removeDaemonMetadataForOwner,
 	writeDaemonOwner,
-	type DaemonOwner,
 } from "./ownership.js";
 import type { DaemonPaths } from "./paths.js";
 import { handleDaemonMessage } from "./request-routing.js";
 import { createLineDecoder, encodeJsonLine } from "./socket-jsonrpc.js";
+import { reapStaleDaemonVersions } from "./version-reap.js";
 
 export { DaemonAlreadyRunningError, DaemonStartupDeferredError } from "./ownership.js";
 
@@ -81,6 +81,10 @@ export async function startDaemonServer(
 		throw error;
 	}
 	lease.lock.release();
+
+	// Best-effort cross-version reap: the daemon now owns its version, so older
+	// sibling versions may be reaped. Never block or crash startup on failure.
+	void reapStaleDaemonVersions(paths).catch((error: unknown) => logServerError(error));
 
 	let closed = false;
 	const close = async (): Promise<void> => {

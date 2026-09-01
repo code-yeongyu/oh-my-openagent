@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact path tests predate this change.
 import { join, posix, win32 } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -6,6 +7,7 @@ import {
 	isWithinAttemptDir,
 	normalizeUlwLoopSessionId,
 	repoRelative,
+	resolveUlwLoopSessionIdFromEnv,
 	ulwLoopBriefPath,
 	ulwLoopDir,
 	ulwLoopGoalsPath,
@@ -21,6 +23,14 @@ describe("ulwLoopDir(repo)", () => {
 	it("#given a session id #when resolving the loop dir #then scopes artifacts under that session", () => {
 		// when/then
 		expect(ulwLoopDir("/repo", { sessionId: "sess_abc" })).toBe(join("/repo", ".omo", "ulw-loop", "sess_abc"));
+	});
+});
+
+describe("resolveUlwLoopSessionIdFromEnv", () => {
+	it("#given a Senpi session env #when resolving scope #then uses the current Pi session id", () => {
+		expect(resolveUlwLoopSessionIdFromEnv({ PI_SESSION_ID: "01a00baf-feed-7f4d-a4a9-b8345c67cf72" })).toBe(
+			"01a00baf-feed-7f4d-a4a9-b8345c67cf72",
+		);
 	});
 });
 

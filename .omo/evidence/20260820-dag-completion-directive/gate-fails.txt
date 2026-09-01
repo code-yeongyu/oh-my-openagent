@@ -1,0 +1,13 @@
+(fail) cli-local > #given isolated agent dir #when install then uninstall are invoked #then stdout is one-line JSON and settings round-trip
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is tracked #when Run now is chosen #then suggestedMode is committed
+(fail) createInitDeepAdvisorComponent > #given AGENTS.md is untracked #when Run now is chosen #then suggestedMode is local
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never anywhere #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Never in this project #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Run now #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when Skip this time #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the advisor opens #then last proposed HEAD is written first
+(fail) createInitDeepAdvisorComponent > #given an eligible repo #when the dialog times out #then the correct response state is applied
+(fail) createInitDeepAdvisorComponent > #given fake timers #when session_start fires #then ui.select waits for setTimeout zero
+(fail) createInitDeepAdvisorComponent > #given session_start #when the handler returns #then ui.select has not run synchronously
+(fail) OmO Native product identity > #given an explicit agent directory #when the native state path is resolved #then it is nested under omo-senpi
+(fail) session_start component ordering > #given real onboarding state and an active ulw loop #when startup then agent_end fire #then onboarding is preserved and the first-session advisor stays detached and suppressed

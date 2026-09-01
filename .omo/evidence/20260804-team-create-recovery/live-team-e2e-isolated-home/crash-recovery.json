@@ -1,0 +1,138 @@
+{
+  "target": {
+    "ready": true,
+    "markerPath": "/Users/yeongyu/local-workspaces/omo-wt/fix/team-create-inline-precedence/.omo/evidence/20260804-team-create-recovery/live-team-e2e-isolated-home/crash-after-inject.json",
+    "messageId": "9c8308dc-17d3-4589-847c-42e41076daae",
+    "runId": "71244fe1-895f-4ebe-9dd9-00f4b24af12d",
+    "taskId": "st_019fcb5c",
+    "pid": 91842,
+    "leadSessionId": "019fcb5c-7813-78c1-b09c-36c53d82efcd"
+  },
+  "before": {
+    "reservedExists": true,
+    "processedExists": false,
+    "eventCount": 0
+  },
+  "parentAliveAtHold": true,
+  "memberAliveAtHold": true,
+  "memberKilled": true,
+  "memberTerminal": {
+    "kind": "record",
+    "status": "error"
+  },
+  "parentAliveBeforeTermination": true,
+  "parentTermination": {
+    "kind": "terminated",
+    "pid": 91822,
+    "platform": "darwin"
+  },
+  "reservationAged": true,
+  "afterKillRecord": {
+    "task_id": "st_019fcb5c",
+    "status": "error",
+    "residency_state": "resident",
+    "parent_session_id": "019fcb5c-7813-78c1-b09c-36c53d82efcd",
+    "root_session_id": "019fcb5c-7813-78c1-b09c-36c53d82efcd",
+    "depth": 1,
+    "execution_mode": "process",
+    "model": "omo-mock/mock-1",
+    "created_at": "2026-08-04T06:01:03.585Z",
+    "updated_at": "2026-08-04T06:01:05.139Z",
+    "notification": {
+      "run_epoch": 0,
+      "notified_epoch": 0
+    },
+    "name": "team:71244fe1-895f-4ebe-9dd9-00f4b24af12d:crash",
+    "category": "quick",
+    "requested_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "omo-mock/mock-1",
+      "source": "category"
+    },
+    "resolved_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "Mock 1",
+      "source": "category"
+    },
+    "spawn_spec": {
+      "cwd": "/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-oPcL35/project"
+    },
+    "pid": 91842,
+    "host_pid": 91823,
+    "error_message": "RPC child killed by signal SIGKILL (pid=91842)",
+    "killed": true,
+    "run_stats": {
+      "runtime_ms": 1551,
+      "turns": 0,
+      "tool_calls": 0
+    }
+  },
+  "afterRestartRecord": {
+    "task_id": "st_019fcb5c",
+    "status": "error",
+    "residency_state": "resident",
+    "parent_session_id": "019fcb5c-7813-78c1-b09c-36c53d82efcd",
+    "root_session_id": "019fcb5c-7813-78c1-b09c-36c53d82efcd",
+    "depth": 1,
+    "execution_mode": "process",
+    "model": "omo-mock/mock-1",
+    "created_at": "2026-08-04T06:01:03.585Z",
+    "updated_at": "2026-08-04T06:01:05.139Z",
+    "notification": {
+      "run_epoch": 0,
+      "notified_epoch": 0,
+      "liveness_notified_epoch": 0
+    },
+    "name": "team:71244fe1-895f-4ebe-9dd9-00f4b24af12d:crash",
+    "category": "quick",
+    "requested_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "omo-mock/mock-1",
+      "source": "category"
+    },
+    "resolved_model": {
+      "provider": "omo-mock",
+      "model_id": "mock-1",
+      "display": "Mock 1",
+      "source": "category"
+    },
+    "spawn_spec": {
+      "cwd": "/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-oPcL35/project"
+    },
+    "pid": 91842,
+    "host_pid": 91823,
+    "error_message": "RPC child killed by signal SIGKILL (pid=91842)",
+    "killed": true,
+    "run_stats": {
+      "runtime_ms": 1551,
+      "turns": 0,
+      "tool_calls": 0
+    }
+  },
+  "afterReclaim": {
+    "unread": 1,
+    "reserved": 0,
+    "processed": 0,
+    "reservedExists": false,
+    "unreadExists": true,
+    "processedExists": false,
+    "eventCount": 0,
+    "envelopeCount": 0
+  },
+  "afterReplacement": {
+    "unread": 0,
+    "reserved": 0,
+    "processed": 1,
+    "reservedExists": false,
+    "unreadExists": false,
+    "processedExists": true,
+    "eventCount": 1,
+    "envelopeCount": 1
+  },
+  "initialStatus": null,
+  "restartStatus": 0,
+  "livenessInjected": true
+}

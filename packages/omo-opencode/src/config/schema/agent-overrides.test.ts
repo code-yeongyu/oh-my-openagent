@@ -23,6 +23,28 @@ describe("AgentOverridesSchema", () => {
     }
   })
 
+  test("accepts canonical reasoning on agents and per-message overrides", () => {
+    // given
+    const input = {
+      sisyphus: {
+        reasoning: "xhigh",
+        ultrawork: { reasoning: "max" },
+        compaction: { reasoning: "off" },
+      },
+    }
+
+    // when
+    const result = AgentOverridesSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.sisyphus?.reasoning).toBe("xhigh")
+      expect(result.data.sisyphus?.ultrawork?.reasoning).toBe("max")
+      expect(result.data.sisyphus?.compaction?.reasoning).toBe("off")
+    }
+  })
+
   test("validates custom agent keys against AgentOverrideConfigSchema", () => {
     const input = {
       "custom-agent": {

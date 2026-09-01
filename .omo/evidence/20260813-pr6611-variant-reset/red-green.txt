@@ -1,0 +1,401 @@
+RED
+command:
+  bun test C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+
+observed:
+  2 pass
+  1 fail
+  6 expect() calls
+  Expected: "openai/gpt-5.4(high)"
+  Received: "openai/gpt-5.4"
+  exit_code=1
+
+The regression seeded the low-variant retry key, selected only the high
+variant, and failed because the handler collapsed both variants to the same
+base model identity.
+
+GREEN
+command:
+  bun test C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6579/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+
+observed after aligning the final regression to the review's high-to-low case:
+  3 pass
+  0 fail
+  6 expect() calls
+  exit_code=0
+
+The handler now resets fallback state and the retained retry-key set when only
+the top-level OpenCode variant changes.
+
+ADAPTER CONTRACT RED
+command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+
+scenario:
+  input has no variant
+  output.message.variant changes from the retained high state to low
+
+observed:
+  2 pass
+  1 fail
+  Expected: "openai/gpt-5.4(low)"
+  Received: "openai/gpt-5.4"
+  exit_code=1
+
+ADAPTER CONTRACT GREEN
+command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+
+observed:
+  14 pass
+  0 fail
+  30 expect() calls
+  exit_code=0
+
+The handler now reads `output.message.variant` first, matching the production
+plugin adapter contract, and retains `input.variant` only as a compatibility
+fallback.
+
+VARIANT FALLBACK OUTPUT RED
+command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+
+scenario:
+  accepted fallback is openai/gpt-5.4(high)
+  output.message already carries variant high
+
+observed:
+  3 pass
+  1 fail
+  Expected modelID: "gpt-5.4"
+  Received modelID: "gpt-5.4(high)"
+  exit_code=1
+
+VARIANT FALLBACK OUTPUT GREEN
+focused command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+
+observed:
+  15 pass
+  0 fail
+  31 expect() calls
+  exit_code=0
+
+The handler now parses runtime fallback strings through the canonical
+`parseModelString` helper and writes separate model and variant fields.
+
+INHERITED VARIANT PENDING FALLBACK RED
+command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
+
+scenario:
+  configured fallback is openai/gpt-5.4
+  resolved agent inherits variant high
+
+observed:
+  5 pass
+  1 fail
+  Expected currentModel: "openai/gpt-5.4(high)"
+  Received currentModel: "openai/gpt-5.4"
+  exit_code=1
+
+INHERITED VARIANT PENDING FALLBACK GREEN
+focused command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+
+observed:
+  21 pass
+  0 fail
+  46 expect() calls
+  exit_code=0
+
+The dispatcher now stores the effective, variant-qualified identity in both
+current and pending fallback state before sending the internal prompt, and
+restores prior state if dispatch is not accepted.
+
+THREE ADJACENT VARIANT P2 RED
+commands:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/normalize-model.test.ts packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+
+observed:
+  error/session model object with variant medium normalized to the base model
+  instead of openai/gpt-5.5-codex(medium)
+  manual high-to-low reset retained sessionAwaitingFallbackResult and its timer
+  inherited high primary restoration did not reapply the primary model
+
+THREE ADJACENT VARIANT P2 GREEN
+focused command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/normalize-model.test.ts packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+
+observed:
+  23 pass
+  0 fail
+  50 expect() calls
+  exit_code=0
+
+The event boundary now retains object-model variants, manual generation reset
+clears its awaiting flag and timer, and primary restoration preserves a
+variant already supplied by the adapter.
+
+MODEL-LESS GENERATION DEDUPE RED
+command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+
+scenario:
+  original request and dispatched fallback both emit identical retry statuses
+  without model metadata
+
+observed:
+  8 pass
+  1 fail
+  expected the second fallback call to google/gemini-2.5-pro
+  received only the first fallback call to openai/gpt-5.4
+  exit_code=1
+
+MODEL-LESS GENERATION DEDUPE GREEN
+command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+
+observed:
+  9 pass
+  0 fail
+  22 expect() calls
+  exit_code=0
+
+Model-less `unknown:` keys remain stable while a fallback is pending, then are
+cleared when the next fallback generation begins.
+
+PRODUCTION-SHAPED GENERATION AND SESSION INDEX RED
+commands:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts
+
+observed:
+  the real chat-message acknowledgment could not clear the model-less key
+  because pending identity equaled current identity
+  inherited-variant session creation stored the active fallback as primary and
+  left fallbackIndex at -1
+
+PRODUCTION-SHAPED GENERATION AND SESSION INDEX GREEN
+focused commands:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+
+observed:
+  26 pass
+  0 fail
+  72 expect() calls
+  exit_code=0
+
+Pending fallback acknowledgment now precedes manual-change detection and clears
+only model-less keys at the true generation boundary. Session creation locates
+variant-inherited fallbacks using effective runtime-model equivalence.
+
+CORRECTED REGRESSION WIRING
+focused command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.test.ts
+
+observed:
+  26 pass
+  0 fail
+  72 expect() calls
+  exit_code=0
+
+The chat-message acknowledgment helper belongs only in the consecutive-
+generation test. The duplicate-within-generation test retains the plain
+dispatcher, so identical statuses remain deduped while a fallback is pending.
+
+FINAL THREE REGRESSION GREEN
+commands:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry.test.ts
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+
+observed:
+  blocked dispatch preserves the previous pending fallback
+  category-inherited high variant stores openai/gpt-5.4(high)
+  object and canonical-string variant retry events dedupe to one key
+  22 pass
+  0 fail
+
+Full runtime-fallback:
+  263 pass
+  0 fail
+  475 expect() calls
+
+REPLACEMENT-STATE ROLLBACK RED
+command:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
+
+observed before fix:
+  Expected: "google/gemini-2.5-pro"
+  Received: "anthropic/claude-opus-4-7"
+  7 pass
+  1 fail
+
+REPLACEMENT-STATE ROLLBACK GREEN
+focused:
+  auto-retry-dispatch.test.ts: 8 pass, 0 fail
+  final focused set: 23 pass, 0 fail
+
+full runtime-fallback:
+  264 pass
+  0 fail
+  476 expect() calls
+
+The deferred-message regression replaces the session's fallback state while
+the old dispatch is awaiting message lookup, then drives the old generation
+through blocked rollback. Object-identity guards keep captured values off the
+new manual-model generation.
+
+FINAL CAPABILITY AND CATEGORY P2 RED
+command:
+  bun test retry-model-payload.test.ts auto-retry-dispatch.test.ts event-handler.test.ts
+
+observed before fix:
+  unsupported canonical reasoning was absent or stored as a variant-qualified
+  identity instead of native reasoningEffort
+  category-inherited session.created fallback retained fallbackIndex -1
+  24 pass
+  3 fail
+
+FINAL CAPABILITY AND CATEGORY P2 GREEN
+focused:
+  27 pass
+  0 fail
+  69 expect() calls
+
+full runtime-fallback:
+  266 pass
+  0 fail
+  480 expect() calls
+
+Package typecheck first exposed that the replacement-state identity comparison
+could also compare two undefined values. Requiring `state` before object
+identity fixed the branch-caused TS18048 failures. The final package typecheck
+and six-file strict audit are clean.
+
+EXPLICIT VARIANT PRECEDENCE RED
+command:
+  bun test retry-model-payload.test.ts
+
+observed before fix:
+  explicit variant "medium" was emitted together with inherited
+  reasoningEffort "high"
+  9 pass
+  1 fail
+
+EXPLICIT VARIANT PRECEDENCE GREEN
+full runtime-fallback:
+  267 pass
+  0 fail
+  481 expect() calls
+
+Explicit model variants now suppress both inherited reasoning lowering and
+agent-level reasoningEffort for that retry payload. Package typecheck and the
+two-file strict audit are clean.
+
+ACCEPTED QUEUED STATE RED
+command:
+  bun test auto-retry-dispatch.test.ts
+
+observed before fix:
+  Expected: "openai/gpt-5.4(high)"
+  Received: "google/gemini-2.5-pro"
+  8 pass
+  1 fail
+
+ACCEPTED QUEUED STATE GREEN
+focused:
+  20 pass
+  0 fail
+  56 expect() calls
+
+full runtime-fallback:
+  268 pass
+  0 fail
+  486 expect() calls
+
+An accepted queued prompt now retains the effective next fallback identity,
+including inherited variants. A prompt-gate rejection still leaves
+`retryDispatched` false and uses the existing guarded rollback path. Package
+typecheck and the three-file strict audit are clean.
+
+CREATED REASONING INDEX RED
+command:
+  bun test event-handler.test.ts
+
+observed before fix:
+  expected original primary anthropic/claude-opus-4-7
+  received active base fallback test-provider/test-model
+  10 pass
+  1 fail
+
+CREATED REASONING INDEX GREEN
+focused:
+  21 pass
+  0 fail
+  53 expect() calls
+
+full runtime-fallback:
+  269 pass
+  0 fail
+  489 expect() calls
+
+`session.created` now compares each configured fallback through the same
+capability-aware retry payload builder as dispatch. Reasoning lowered to
+native effort therefore matches the event's base model and retains the correct
+fallback index. Package typecheck and the two-file strict audit are clean.
+
+SYNTHETIC ADAPTER ACKNOWLEDGMENT RED
+command:
+  bun test packages/omo-opencode/src/plugin/chat-message.test.ts
+
+observed before fix:
+  expected runtimeFallback hook call
+  received no hook calls
+  30 pass
+  1 fail
+
+SYNTHETIC ADAPTER ACKNOWLEDGMENT GREEN
+focused:
+  54 pass
+  0 fail
+  133 expect() calls
+
+full runtime-fallback:
+  269 pass
+  0 fail
+  489 expect() calls
+
+Synthetic retry parts now reach only runtime-fallback acknowledgment before
+the adapter's synthetic/internal early return. Keyword, slash-command, session
+agent, and first-message state remain skipped. Package typecheck and the
+two-file strict audit are clean.
+
+STALE TIMEOUT GENERATION RED
+command:
+  bun test auto-retry-timeout.test.ts
+
+observed before fix:
+  expected stale-generation retry calls: 0
+  received: 1
+  2 pass
+  1 fail
+
+STALE TIMEOUT GENERATION GREEN
+focused:
+  17 pass
+  0 fail
+  44 expect() calls
+
+full runtime-fallback:
+  270 pass
+  0 fail
+  491 expect() calls
+
+A timeout callback now revalidates the captured state object after its awaited
+abort. A manual model or variant replacement therefore invalidates the old
+generation before any fallback mutation or prompt dispatch. Package typecheck
+and the two-file strict audit are clean.

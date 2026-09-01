@@ -1,0 +1,11 @@
+senpi plugin/skills/ulw-loop/references:
+define-goal.md
+full-workflow.md
+
+codex plugin/skills/ulw-loop/references:
+define-goal.md
+full-workflow.md
+
+generated SKILL.md carries pointer (senpi/codex):
+packages/omo-senpi/plugin/skills/ulw-loop/SKILL.md:2
+packages/omo-codex/plugin/skills/ulw-loop/SKILL.md:2

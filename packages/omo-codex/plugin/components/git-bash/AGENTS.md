@@ -27,5 +27,5 @@ Component wrapper (`@sisyphuslabs/codex-git-bash-hook`, private, bin `omo-git-ba
 - **Windows detection is env-tolerant** (`isWindowsHost`): `platform === "win32"` OR any of `OS=Windows_NT` / `ComSpec` / `SystemRoot` present, so bash-hosted shells on Windows still count.
 - **Marker path:** `${PLUGIN_DATA:-~/.codex/omo-git-bash}/git-bash-reminder/<session_id>.seen`; session id sanitized to `[A-Za-z0-9._-]`. `PostCompact` removes it with `rmSync(force)`.
 - **Hook must never block the user's Bash call:** the CLI swallows parse/fs errors and exits 0 on both hook paths; malformed or empty stdin yields empty output.
-- **Runtime dep-free Node >=20 ESM.** `@oh-my-opencode/utils` is a devDependency only (`file:` link). Build `tsc -p tsconfig.build.json`; tests run via `bun test test/*.test.ts` (unlike the vitest-based `lsp` component).
+- **Runtime dep-free Node >=20 ESM.** Build `tsc -p tsconfig.build.json`; tests run via `bun test test/*.test.ts` (unlike the vitest-based `lsp` component).
 - **Windows absolute MCP targets are valid:** `isPluginRuntimePathArg` in `packages/omo-opencode/src/cli/doctor/checks/codex-components.ts` and `script/lazycodex-marketplace-validation.ts` gained `isAbsolute(arg)` so a rewritten `C:\...` git_bash/lsp entrypoint passes validation (commit 3b1681ae8).

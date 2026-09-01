@@ -148,6 +148,14 @@ For each scenario, capture:
 
 If a verification command is unavailable or not applicable, state the exact reason and run the nearest truthful substitute.
 
+## GOAL REGISTRATION
+
+When a `create_goal` tool exists, check `get_goal` first (continue a matching active goal; never duplicate), then register the run's goal before implementation with exactly `objective`, written outcome-first: the concrete outcome that will be true (never an activity), the named deliverable surfaces, the scenario contract as success criteria that can fail, scope bounds, and one WHEN TO STOP line naming the observable end state. Never invent a budget or deadline the user did not state. Without the tool, record the same contract in your working notes and treat it as binding.
+
+## TODO DISCIPLINE
+
+Track every multi-step task in a live todo list: one atomic item per action with its verification, exactly one item in progress, status updated the instant it changes, newly discovered work added immediately. Never batch completions.
+
 ## SCENARIO CONTRACT
 
 Before production changes, define scenarios covering:
@@ -162,7 +170,7 @@ Each scenario needs a binary pass condition. "Looks good" is not a pass conditio
 
 ## TDD WORKFLOW
 
-TDD is mandatory on production behavior changes.
+TDD is mandatory on production code changes with a test seam; prose, docs, and visual-only changes take review + real-surface QA instead (a test pinning their text is pretend-coverage).
 
 1. RED: write or identify a failing test that proves the needed behavior.
 2. GREEN: make the smallest change that flips the test to passing.
@@ -171,6 +179,10 @@ TDD is mandatory on production behavior changes.
 5. REGRESSION: rerun the scenario list.
 
 Exemptions: pure prompt text, formatting, comment-only edits, version bumps with no behavior delta, and rename-only moves. Justify every exemption in the final report.
+
+## COMMIT DISCIPLINE
+
+Commit one atomic commit per verified increment; never one end-of-run omnibus. Before composing each message, read `git log --oneline -20` and `git log -5 -- <touched paths>`, then match the observed subject shape, scope names, message language, body style, and commit size. Skip only when the user forbade commits this session.
 
 ## MANUAL QA MANDATE
 

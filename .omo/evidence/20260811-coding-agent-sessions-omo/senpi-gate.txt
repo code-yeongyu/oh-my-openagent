@@ -1,0 +1,41 @@
+WHAT WAS TESTED
+Initial gate:
+  npx -y bun@1.3.12 run test:senpi
+
+Clean exact-version gate:
+  canonical deep cleanup
+  Docker Node 24.18.0 / Bun 1.3.12
+  bun install --frozen-lockfile --ignore-scripts
+  bun run script/remove-stale-self-package-tests.ts
+  OMO_SKIP_MATERIALIZE=1 bun run test:senpi
+
+Bundle-only causal toggle:
+  keep the clean Bun 1.3.12 install
+  regenerate only Senpi extension bytes with host Bun 1.4.0
+  run Bun 1.3.12 `bun test packages/omo-senpi`
+
+WHAT WAS OBSERVED
+Initial mixed-state gate:
+  969 pass, 18 fail
+  Failures clustered in unrelated memory trigger/journal wiring tests.
+
+Exact-version branch gate:
+  986 pass, 1 expected Darwin sandbox skip, 0 fail
+  2973 expect() calls
+  987 tests across 152 files
+
+Bundle-only toggle:
+  986 pass, 1 expected Darwin sandbox skip, 0 fail
+  Previously failing trigger and journal wiring tests passed.
+
+WHY IT IS ENOUGH
+The same branch toggled from red to green when Bun 1.4-created dependency state
+was replaced with a clean Bun 1.3.12 install. Reintroducing Bun 1.4-generated
+bundle bytes did not reintroduce the failure. This confirms local dependency
+state contamination and refutes both the requested session-skill patch and
+generated bundle bytes as causes. No unrelated Senpi source fix is justified.
+
+WHAT WAS OMITTED
+Full 987-test logs and dependency manifests were summarized. A disposable
+clean-clone attempt that hit ENOSPC before tests was removed; it contributed no
+product verdict. No credentials or private data were captured.

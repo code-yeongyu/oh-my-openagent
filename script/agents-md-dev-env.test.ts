@@ -40,13 +40,11 @@ describe("AGENTS.md dev-environment documentation", () => {
     expect(lower).toContain("in sync") // update docs when the scripts change
   })
 
-  test("#given the maintenance directive #when scanned #then it requires updating the matching QA skill and shares the infra with the Claude side", () => {
+  test("#given the maintenance directive #when scanned #then it shares the infra with the Claude side", () => {
     // given
     const content = readAgents()
-    const lower = content.toLowerCase()
 
     // then
-    expect(lower).toContain("and the matching skill")
     expect(content).toContain("CLAUDE.md")
   })
 })

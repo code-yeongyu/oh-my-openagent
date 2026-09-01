@@ -1,0 +1,72 @@
+{
+  "ok": true,
+  "plan": {
+    "version": 1,
+    "evidenceLayoutVersion": 2,
+    "createdAt": "2026-08-09T15:43:57.604Z",
+    "updatedAt": "2026-08-09T15:43:57.604Z",
+    "briefPath": ".omo/ulw-loop/task11-isolated/brief.md",
+    "goalsPath": ".omo/ulw-loop/task11-isolated/goals.json",
+    "ledgerPath": ".omo/ulw-loop/task11-isolated/ledger.jsonl",
+    "codexGoalMode": "aggregate",
+    "goals": [
+      {
+        "id": "G001-task-11-packaged-runtime-smoke",
+        "title": "Task 11 packaged runtime smoke",
+        "objective": "Task 11 packaged runtime smoke",
+        "status": "pending",
+        "successCriteria": [
+          {
+            "id": "C001",
+            "scenario": "happy path for: Task 11 packaged runtime smoke",
+            "userModel": "happy",
+            "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 1.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C002",
+            "scenario": "edge case (boundary/empty/malformed)",
+            "userModel": "edge",
+            "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Task 11 packaged runtime smoke.",
+            "essential": true,
+            "capturedEvidence": null,
+            "status": "pending"
+          },
+          {
+            "id": "C003",
+            "scenario": "regression: adjacent surface still works",
+            "userModel": "regression",
+            "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Task 11 packaged runtime smoke.",
+            "essential": false,
+            "capturedEvidence": null,
+            "status": "pending"
+          }
+        ],
+        "attempt": 0,
+        "createdAt": "2026-08-09T15:43:57.604Z",
+        "updatedAt": "2026-08-09T15:43:57.604Z"
+      }
+    ],
+    "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/task11-isolated/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/task11-isolated/ledger.jsonl as the audit trail."
+  },
+  "summary": {
+    "total": 1,
+    "pending": 1,
+    "in_progress": 0,
+    "complete": 0,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "needs_user_decision": 0,
+    "superseded": 0,
+    "criteria": {
+      "total": 3,
+      "pass": 0,
+      "pending": 3,
+      "fail": 0,
+      "blocked": 0
+    }
+  }
+}

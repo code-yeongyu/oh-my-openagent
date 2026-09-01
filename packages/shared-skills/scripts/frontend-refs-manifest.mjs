@@ -13,9 +13,12 @@ export const designOriginals = [
 	"aside.md",
 	"clone-from-url.md",
 	"design-system-architecture.md",
+	"interaction-skill.md",
 	"layout-skill.md",
 	"lazyweb.md",
+	"print-paged-media.md",
 	"react-dev-tooling-skill.md",
+	"stylegallery.md",
 ];
 
 export const brandStems = [

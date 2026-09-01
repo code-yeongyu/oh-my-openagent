@@ -1,5 +1,5 @@
 [test]
-preload = ["./test-setup.ts"]
+preload = ["./test-env.ts", "./test-setup.ts"]
 pathIgnorePatterns = ["dist/**", "packages/web/**", "packages/lsp-tools-mcp/**", "packages/lsp-daemon/**", "packages/omo-codex/plugin/**", "packages/omo-codex/scripts/**", "packages/shared-skills/upstreams/**"]
 
 [loader]

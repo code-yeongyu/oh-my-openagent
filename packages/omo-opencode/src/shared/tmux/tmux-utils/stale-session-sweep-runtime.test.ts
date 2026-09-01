@@ -27,7 +27,11 @@ async function loadSweepStaleOmoAgentSessions(): Promise<typeof import("./stale-
 }
 
 function registerModuleMocks(): void {
-	mock.module(environmentSpecifier, () => ({ isInsideTmux: isInsideTmuxMock }))
+	mock.module(environmentSpecifier, () => ({
+		isInsideTmux: isInsideTmuxMock,
+		isNativeTmux: isInsideTmuxMock,
+		isTmuxPaneCompatible: isInsideTmuxMock,
+	}))
 	mock.module(loggerSpecifier, () => ({ log: logMock }))
 	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
 	mock.module(sessionKillSpecifier, () => ({ killTmuxSessionIfExists: killTmuxSessionIfExistsMock }))

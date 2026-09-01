@@ -2,7 +2,7 @@ import {
   discoverInstalledPlugins,
   loadPluginCommands,
   loadPluginSkillsAsCommands,
-} from "../features/claude-code-plugin-loader"
+} from "@oh-my-opencode/claude-code-compat-core/claude-code-plugin-loader"
 import type { CommandDefinition } from "../features/claude-code-command-loader/types"
 
 export interface PluginCommandDiscoveryOptions {

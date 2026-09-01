@@ -1,0 +1,773 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/memory-core/src/harness-neutrality.test.ts:
+(pass) memory-core harness neutrality > #given the package manifest #when dependencies are inspected #then no senpi or pi packages appear [3.93ms]
+(pass) memory-core harness neutrality > #given every source file #when import specifiers are scanned #then no harness-coupled module is imported [6.71ms]
+
+packages/memory-core/src/journal/store.test.ts:
+(pass) transcript journal store > #given three completed assistant messages #when reconciled twice #then rows are idempotent and steps stay derived [18.24ms]
+(pass) transcript journal store > #given a stale derived counter on disk #when state is written #then the counter is recomputed [14.62ms]
+(pass) cancellable journal flush > #given a journal with rows #when flush runs #then it settles and leaves no lock behind [6.83ms]
+(pass) cancellable journal flush > #given the state.lock held by a live foreign holder #when flush runs #then it completes without waiting for the lock [6.17ms]
+(pass) cancellable journal flush > #given a signal aborted before acquisition #when flush runs #then it throws AbortError and creates no lock file [5.04ms]
+(pass) cancellable journal flush > #given an abort during the acquisition retry loop #when the lock is contended #then it throws without acquiring [1.10ms]
+(pass) cancellable journal flush > #given an abort raised while the task holds the lock #when the task settles #then the lock file is released anyway [3.80ms]
+(pass) cancellable journal flush > stale journal lock recovery > #given a lock file left by a dead process #when the lock is acquired #then the stale lock is reclaimed and the task runs [24.39ms]
+(pass) cancellable journal flush > stale journal lock recovery > #given a payload-free lock file abandoned mid-acquisition #when the lock is acquired #then the artifact is reclaimed by age [15.83ms]
+(pass) cancellable journal flush > stale journal lock recovery > #given a lock file owned by a live process #when the wait deadline passes #then it throws and the live lock is never stolen [5008.81ms]
+(pass) cancellable journal flush > #given an injected journal lock #when flush runs #then the lock is never invoked [6.05ms]
+
+packages/memory-core/src/journal/lock.test.ts:
+(pass) withLocalJournalLock > #given overlapping same-process acquisitions #when the holder outlasts the acquisition wait #then every contender still runs, serialized [5215.59ms]
+(pass) withLocalJournalLock > #given a stale lock whose live pid now belongs to a different process #when acquiring #then the reused-pid lock is reclaimed [20.36ms]
+(pass) withLocalJournalLock > #given a live foreign owner that keeps the lock #when the acquisition wait expires #then a typed JournalLockTimeoutError is thrown [5002.54ms]
+
+packages/memory-core/src/journal/cursor.test.ts:
+(pass) reflection cursor > #given an aborted signal #when snapshot capture starts #then reflection state is not mutated [8.95ms]
+(pass) reflection cursor > #given rows appended during reflection #when the captured snapshot succeeds #then only snapshot rows become reflected [17.25ms]
+(pass) reflection cursor > #given a captured snapshot #when reflection fails #then the cursor remains retryable [16.70ms]
+
+packages/memory-core/src/journal/entries.test.ts:
+(pass) transcript entry projection > #given an assistant trajectory #when projected #then canonical and contextual rows use stable ids [0.14ms]
+(pass) transcript entry projection > #given a tool-only assistant message #when projected #then it has no canonical assistant row [0.09ms]
+
+packages/memory-core/src/locks/domains.test.ts:
+(pass) lock domain paths > #given the runtime lock directory #when domain paths are resolved #then every protocol has a stable confined name [0.32ms]
+(pass) lock domain paths > #given hostile and distinct run ids #when finalization paths are resolved #then names remain confined and distinct [0.14ms]
+
+packages/memory-core/src/locks/subprocess-contention.test.ts:
+(pass) real subprocess lock contention > #given two Bun subprocess writers #when they contend on one counter #then critical-section log entries never interleave [67.95ms]
+(pass) real subprocess lock contention > #given a SIGKILLed Bun lock holder #when another process acquires #then proven-dead ownership is recovered [31.22ms]
+(pass) real subprocess lock contention > #given a live Bun lock holder #when a contender tries immediately #then the live owner is never stolen [29.38ms]
+
+packages/memory-core/src/locks/lock-record.test.ts:
+(pass) cross-process lock protocol > #given an absent lock #when it is acquired and released #then the complete record is published and removed [4.55ms]
+(pass) cross-process lock protocol > #given an owned lock #when another owner acquires it #then a typed retriable contention error is raised [9.64ms]
+(pass) cross-process lock protocol > #given a lock whose nonce changed #when the former owner releases #then the replacement remains held [5.40ms]
+(pass) cross-process lock protocol > #given a live PID with a different process start #when acquisition is attempted #then PID reuse is recovered [12.56ms]
+(pass) cross-process lock protocol > #given a very old lock whose owner is live #when acquisition is attempted #then age alone never permits recovery [9.08ms]
+(pass) cross-process lock protocol > #given a dead owner on another host #when acquisition is attempted #then recovery fails closed [6.14ms]
+(pass) cross-process lock protocol > #given a callback under a lock #when the callback fails #then withLock releases only its own lock [4.04ms]
+
+packages/memory-core/src/tools/patch-parser.test.ts:
+(pass) memory patch parser > #given leading content #when parsed #then a prefixed typed envelope error is thrown [0.30ms]
+(pass) memory patch parser > #given indented begin #when parsed #then a prefixed typed envelope error is thrown [0.09ms]
+(pass) memory patch parser > #given missing end #when parsed #then a prefixed typed envelope error is thrown [0.09ms]
+(pass) memory patch parser > #given trailing garbage #when parsed #then a prefixed typed envelope error is thrown [0.06ms]
+(pass) memory patch parser > #given empty operations #when parsed #then a prefixed typed envelope error is thrown [0.06ms]
+(pass) memory patch parser > #given CRLF and a terminal newline #when parsed #then the envelope is normalized [0.09ms]
+(pass) memory patch parser > #given add update move and delete directives #when parsed #then paths and hunks preserve patch text [0.10ms]
+(pass) memory patch parser > #given an update without an @@ marker #when parsed #then it forms one implicit hunk [0.08ms]
+(pass) memory patch parser > #given malformed directive bodies #when parsed #then line-oriented failures stay actionable [0.10ms]
+
+packages/memory-core/src/tools/soul-edit.test.ts:
+(pass) runMemoryTool soul-edit result > #given a create committed under system/persona.md #when the tool runs #then the result carries the commit metadata and the soul-edit directive [351.04ms]
+(pass) runMemoryTool soul-edit result > #given a str_replace on system/identity.md #when the tool runs #then the soul-edit directive appears [450.26ms]
+(pass) runMemoryTool soul-edit result > #given a rename that moves system/persona.md #when the tool runs #then the soul-edit directive appears [423.82ms]
+(pass) runMemoryTool soul-edit result > #given a commit that touches only non-soul files #when the tool runs #then no soul-edit directive appears but commit metadata is present [324.47ms]
+(pass) runMemoryApplyPatch soul-edit result > #given a patch updating system/persona.md #when applied #then the result carries the soul-edit directive and commit metadata [476.60ms]
+(pass) runMemoryApplyPatch soul-edit result > #given a patch adding a non-soul file #when applied #then no soul-edit directive appears [380.13ms]
+
+packages/memory-core/src/tools/memory.test.ts:
+(pass) runMemoryTool > #given create params #when run #then it renders frontmatter, commits under the writer lock, and reports local [382.94ms]
+(pass) runMemoryTool > #given accepted-turn provenance #when memory commits #then the in-band writer session and turn trailers are durable [377.99ms]
+(pass) runMemoryTool > #given create omits optional file_text #when run #then an empty body is valid [430.17ms]
+(pass) runMemoryTool > #given a configured remote #when create commits #then the result delegates synchronization to the harness [370.87ms]
+(pass) runMemoryTool > #given two matching body occurrences #when str_replace runs #then only the first occurrence changes [448.65ms]
+(pass) runMemoryTool > #given insert positions below and above the body #when insert runs #then positions clamp to first and lines+1 [614.33ms]
+(pass) runMemoryTool > #given a nested directory #when delete runs #then it recursively removes every tracked file [585.25ms]
+(pass) runMemoryTool > #given an editable file #when rename runs #then it creates parents and tracks old and new paths [700.47ms]
+
+packages/memory-core/src/tools/memory-apply-patch-validation.test.ts:
+(pass) memoryApplyPatch validation failures > #given read_only source or resulting target #when updated #then both are rejected before disk writes [2569.25ms]
+(pass) memoryApplyPatch validation failures > #given near-matching context #when updated #then no fuzzy match is attempted [1372.70ms]
+(pass) memoryApplyPatch validation failures > #given backticks in mismatched previews #when diagnosed #then the exact hardened format sizes fences safely [519.24ms]
+(pass) memoryApplyPatch validation failures > #given oversized failed and current chunks #when diagnosed #then previews truncate at 2000 and 4000 characters [494.26ms]
+(pass) memoryApplyPatch validation failures > #given UTF-16LE source #when read #then it is rejected with conversion guidance and remains byte-identical [582.98ms]
+(pass) memoryApplyPatch validation failures > #given duplicate add, existing add, and empty patch #when applied #then each fails with the tool prefix [846.21ms]
+
+packages/memory-core/src/tools/memory-apply-patch-provenance.test.ts:
+(pass) memoryApplyPatch provenance and locks > #given accepted-turn provenance #when a patch commits #then the in-band writer session and turn trailers are durable [402.17ms]
+(pass) memoryApplyPatch provenance and locks > #given a delete and configured remote #when applied #then writer lock, deletion, and remote result shape are pinned [558.37ms]
+
+packages/memory-core/src/tools/memory-apply-patch.test.ts:
+(pass) memoryApplyPatch success operations > #given an add without frontmatter #when applied #then description is synthesized and reason and author commit [444.46ms]
+(pass) memoryApplyPatch success operations > #given add then update in one patch #when applied #then the update sees the pending add [458.88ms]
+(pass) memoryApplyPatch success operations > #given a move followed by an edit #when applied #then target writes are visible and source is deleted [640.34ms]
+(pass) memoryApplyPatch success operations > #given a final line without newline #when a newline-anchored hunk applies #then the sole fallback preserves no newline [539.47ms]
+
+packages/memory-core/src/tools/memory-validation.test.ts:
+(pass) runMemoryTool > #given read_only frontmatter #when update_description runs #then it rejects without changing HEAD [513.38ms]
+(pass) runMemoryTool > #given editable frontmatter with read_only false #when update_description runs #then body and flag are preserved [536.22ms]
+(pass) runMemoryTool > #given read_only descendants #when recursive delete runs #then tool-level enforcement rejects the directory [387.45ms]
+(pass) runMemoryTool > #given each editable mutation command targets read_only content #when run #then every command rejects [468.78ms]
+(pass) runMemoryTool > #given invalid and missing command inputs #when run #then caller-neutral typed tool errors retain the memory prefix [326.43ms]
+(pass) runMemoryTool > #given existing or missing targets #when commands require the opposite #then they fail without commits [454.48ms]
+(pass) runMemoryTool > #given byte-identical replacements or descriptions #when commit detects no diff #then it reports no effective changes [1036.54ms]
+(pass) runMemoryTool > #given an untracked empty directory #when delete yields no affected tracked paths #then it reports made no changes [286.43ms]
+(pass) runMemoryTool > #given a UTF-16 BOM memory file #when a mutating command reads it #then a typed error asks for UTF-8 conversion [467.08ms]
+(pass) runMemoryTool > #given unrelated dirty files #when a command starts #then cleanCheck fails first with porcelain listing [279.95ms]
+
+packages/memory-core/src/identity/sanitize.test.ts:
+(pass) shortHash > #given a string #when hashed #then it is the first 8 hex chars of its sha256 [0.22ms]
+(pass) sanitizeToSlug > #given already-safe input #when sanitized #then it is unchanged [0.16ms]
+(pass) sanitizeToSlug > #given unicode input #when sanitized #then it folds to ascii or dashes [0.14ms]
+(pass) sanitizeToSlug > #given separator-heavy input #when sanitized #then dashes collapse and trim [0.08ms]
+(pass) sanitizeToSlug > #given overlong input #when sanitized #then it caps without a trailing dash [0.15ms]
+
+packages/memory-core/src/identity/resolve.test.ts:
+(pass) resolveMemoryIdentity auto mode > #given the same cwd #when resolved repeatedly #then the id is deterministic [0.35ms]
+(pass) resolveMemoryIdentity auto mode > #given two projects with the same basename #when resolved #then slugs match but ids differ [0.10ms]
+(pass) resolveMemoryIdentity auto mode > #given cwd spelling variants #when resolved #then normalization yields the same id [0.12ms]
+(pass) resolveMemoryIdentity auto mode > #given a project path #when resolved #then the id is basename slug plus sha256-8 of the full path [0.10ms]
+(pass) resolveMemoryIdentity auto mode > #given no root override #when resolved #then paths live under ~/.omo/memory/agents/<id> [0.09ms]
+(pass) resolveMemoryIdentity explicit mode > #given explicit id 'backend-lead' #when resolved #then the dir is agents/backend-lead-<hash> [0.09ms]
+(pass) resolveMemoryIdentity explicit mode > #given an explicit id with surrounding whitespace #when resolved #then it matches the trimmed form [0.08ms]
+(pass) resolveMemoryIdentity explicit mode > #given the exact keyword 'auto' #when compared with 'Auto' #then only lowercase triggers auto mode [0.11ms]
+(pass) resolveMemoryIdentity root override > #given OMO_MEMORY_HOME #when resolved #then paths honor it and sanitization still applies [0.10ms]
+(pass) resolveMemoryIdentity root override > #given a relative OMO_MEMORY_HOME #when resolved #then it resolves against the cwd argument [0.09ms]
+(pass) resolveMemoryIdentity root override > #given no env argument #when OMO_MEMORY_HOME is set in the process env #then the default env read honors it [0.11ms]
+(pass) resolveMemoryIdentity input guards > #given an empty cwd #when resolved #then it throws a TypeError [0.09ms]
+
+packages/memory-core/src/identity/layout.test.ts:
+(pass) memory identity layout constants > #given the layout module #when constants are inspected #then they pin the decided directory names [0.14ms]
+(pass) defaultMemoryRoot > #given no override #when the default root is computed #then it is ~/.omo/memory [0.08ms]
+(pass) resolveMemoryRoot > #given an absolute OMO_MEMORY_HOME #when the root is resolved #then the override is used verbatim [0.08ms]
+(pass) resolveMemoryRoot > #given a relative OMO_MEMORY_HOME #when the root is resolved #then it resolves against the given cwd [0.07ms]
+(pass) resolveMemoryRoot > #given an empty or whitespace OMO_MEMORY_HOME #when the root is resolved #then the default root is used [0.08ms]
+(pass) buildIdentityPaths > #given a memory root and id #when paths are built #then the decided layout shape is produced [0.11ms]
+(pass) buildIdentityPaths > #given the recall runtime tree #when paths are built #then no receipts log is declared [0.11ms]
+(pass) buildIdentityPaths > #given built paths #when runtime subdirs are enumerated #then every declared subdir is present under runtime [0.10ms]
+
+packages/memory-core/src/identity/confinement.test.ts:
+(pass) resolveMemoryIdentity sanitization confinement > #given hostile explicit ids #when resolved #then every id is a safe slug and every path stays confined [0.80ms]
+(pass) resolveMemoryIdentity sanitization confinement > #given '../evil' #when resolved #then it becomes a benign slug and never escapes the root [0.13ms]
+(pass) resolveMemoryIdentity sanitization confinement > #given inputs that sanitize to the same slug #when resolved #then hash suffixes keep them distinct [0.10ms]
+
+packages/memory-core/src/memfs/frontmatter-kind-aliases.test.ts:
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then parseMemoryFile extracts kind and aliases [0.15ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then renderMemoryFile emits kind then aliases after description [0.12ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind and aliases > #then round-trip parse -> render -> parse is stable [0.08ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind but no aliases > #then parseMemoryFile extracts kind and leaves aliases undefined [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with kind but no aliases > #then renderMemoryFile omits aliases when undefined [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with aliases but no kind > #then parseMemoryFile extracts aliases and leaves kind undefined [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with aliases but no kind > #then renderMemoryFile omits kind when undefined [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with read_only, kind, and aliases together > #then parseMemoryFile preserves all fields [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a file with read_only, kind, and aliases together > #then renderMemoryFile emits all fields in order [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases that is not a JSON array > #then parseMemoryFile throws FrontmatterError [0.12ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON array with empty strings > #then parseMemoryFile throws FrontmatterError [0.10ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON array of non-strings > #then parseMemoryFile throws FrontmatterError [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases that is a JSON object (not array) > #then parseMemoryFile throws FrontmatterError [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a card edit via str_replace keeps kind+aliases (IC-13 round-trip through memory tool) > #then parse -> render -> parse preserves kind+aliases through body edit [0.08ms]
+(pass) frontmatter kind + aliases (IC-13) > #given a card edit via apply_patch keeps kind+aliases (IC-13 round-trip) > #then the full file round-trips through parse+render preserving frontmatter [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given an empty aliases array > #then parseMemoryFile accepts it as an empty array [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given an empty aliases array > #then renderMemoryFile round-trips empty aliases [0.07ms]
+(pass) frontmatter kind + aliases (IC-13) > #given kind as a multi-word value > #then parseMemoryFile preserves kind verbatim [0.06ms]
+(pass) frontmatter kind + aliases (IC-13) > #given aliases with special characters in names > #then parseMemoryFile preserves them through round-trip [0.07ms]
+
+packages/memory-core/src/memfs/frontmatter.test.ts:
+(pass) frontmatter > #given a well-formed memory file > #then parseMemoryFile extracts description and body [0.10ms]
+(pass) frontmatter > #given a well-formed memory file > #then renderMemoryFile roundtrips stably [0.09ms]
+(pass) frontmatter > #given a memory file with read_only: true > #then parseMemoryFile preserves read_only [0.07ms]
+(pass) frontmatter > #given a memory file with read_only: true > #then renderMemoryFile preserves read_only through edits [0.08ms]
+(pass) frontmatter > #given frontmatter with a limit key (legacy) > #then parseMemoryFile tolerates and ignores limit [0.07ms]
+(pass) frontmatter > #given CRLF line endings > #then parseMemoryFile normalizes CRLF on read [0.07ms]
+(pass) frontmatter > #given CRLF line endings > #then renderMemoryFile outputs LF only [0.07ms]
+(pass) frontmatter > #given a description with embedded newlines > #then renderMemoryFile collapses newlines in description to spaces [0.08ms]
+(pass) frontmatter > #given an empty body > #then parseMemoryFile yields empty body [0.06ms]
+(pass) frontmatter > #given an empty body > #then renderMemoryFile with empty body produces header with trailing newline [0.07ms]
+(pass) frontmatter > #given frontmatter without closing delimiter > #then parseMemoryFile throws FrontmatterError [0.07ms]
+(pass) frontmatter > #given a file with no frontmatter at all > #then parseMemoryFile throws FrontmatterError [0.07ms]
+(pass) frontmatter > #given frontmatter with missing description > #then parseMemoryFile throws FrontmatterError [0.06ms]
+(pass) frontmatter > #given frontmatter with empty description value > #then parseMemoryFile throws FrontmatterError [0.06ms]
+(pass) frontmatter > #given renderMemoryFile with empty description > #then throws FrontmatterError [0.06ms]
+(pass) frontmatter > #given renderMemoryFile with whitespace-only description > #then throws FrontmatterError [0.07ms]
+(pass) frontmatter > roundtrip stability > #then parse -> render -> parse is stable across varied inputs [0.09ms]
+(pass) frontmatter > #given description with surrounding whitespace > #then renderMemoryFile trims description [0.07ms]
+(pass) frontmatter > #given frontmatter with extra whitespace around keys > #then parseMemoryFile trims keys and values [0.06ms]
+
+packages/memory-core/src/memfs/hooks.test.ts:
+(pass) installHooks > #given a repository #when hooks are installed twice #then both hooks stay executable and identical [88.70ms]
+(pass) installHooks > #given the hook scripts #when checked for portability #then they parse as POSIX sh without bash-only constructs [12.32ms]
+(pass) installHooks > #given a linked worktree #when hooks are installed #then they land in the shared hooks directory [638.03ms]
+(pass) pre-commit hook > #given valid memory markdown #when it is committed #then the hook accepts every supported shape [708.47ms]
+(pass) pre-commit hook > #given a read_only file from the server #when an unrelated file changes #then the commit still succeeds [657.43ms]
+(pass) pre-commit hook > #given missing frontmatter #when the commit runs #then the hook rejects it [401.08ms]
+(pass) pre-commit hook > #given unclosed frontmatter #when the commit runs #then the hook rejects it [345.05ms]
+(pass) pre-commit hook > #given empty description #when the commit runs #then the hook rejects it [406.75ms]
+(pass) pre-commit hook > #given multi-line description #when the commit runs #then the hook rejects it [404.96ms]
+(pass) pre-commit hook > #given missing description #when the commit runs #then the hook rejects it [441.65ms]
+(pass) pre-commit hook > #given unknown key #when the commit runs #then the hook rejects it [370.37ms]
+(pass) pre-commit hook > #given read_only added by the agent #when the commit runs #then the hook rejects it [357.92ms]
+(pass) pre-commit hook > #given flat skill file #when the commit runs #then the hook rejects it [309.56ms]
+(pass) pre-commit hook > #given legacy flat skill file #when the commit runs #then the hook rejects it [316.72ms]
+(pass) pre-commit hook > #given a committed read_only file #when the body of a read_only file is edited #then the hook rejects the commit [586.21ms]
+(pass) pre-commit hook > #given a committed read_only file #when only the description of a read_only file is edited #then the hook rejects the commit [600.61ms]
+(pass) pre-commit hook > #given a committed read_only file #when an unlocked read_only key is removed #then the hook rejects the commit [617.21ms]
+(pass) pre-commit hook > #given a file whose HEAD read_only is false #when the agent flips it to true #then the change is rejected [601.62ms]
+(pass) post-commit mirror push > #given a configured mirror #when a commit lands on main #then it is pushed and logged [660.91ms]
+(pass) post-commit mirror push > #given no configured mirror #when a commit lands #then the hook no-ops without a log [504.11ms]
+(pass) post-commit mirror push > #given a reflection branch and a detached HEAD #when commits land #then nothing is pushed [949.27ms]
+(pass) post-commit mirror push > #given an unreachable mirror #when a commit lands #then the commit succeeds and the failure is logged [627.44ms]
+(pass) post-commit mirror push > #given the default background push #when a commit lands #then the mirror receives it without blocking the commit [646.26ms]
+
+packages/memory-core/src/memfs/paths.test.ts:
+(pass) validateMemoryPath > #given valid tool labels #when normalized #then they resolve to confined markdown files > #given "system/notes" #when validated #then returns system/notes.md [0.69ms]
+(pass) validateMemoryPath > #given valid tool labels #when normalized #then they resolve to confined markdown files > #given "system/notes.md" #when validated #then returns system/notes.md [0.82ms]
+(pass) validateMemoryPath > #given valid tool labels #when normalized #then they resolve to confined markdown files > #given "memory/system/notes" #when validated #then returns system/notes.md [0.51ms]
+(pass) validateMemoryPath > #given valid tool labels #when normalized #then they resolve to confined markdown files > #given "memory/reference/nested/topic.md" #when validated #then returns reference/nested/topic.md [0.48ms]
+(pass) validateMemoryPath > #given valid tool labels #when normalized #then they resolve to confined markdown files > #given "system//nested///notes" #when validated #then returns system/nested/notes.md [0.53ms]
+(pass) validateMemoryPath > #given valid tool labels #when normalized #then they resolve to confined markdown files > #given "system\\nested\\notes.md" #when validated #then returns system/nested/notes.md [0.74ms]
+(pass) validateMemoryPath > #given valid tool labels #when normalized #then they resolve to confined markdown files > #given "  system/notes.md  " #when validated #then returns system/notes.md [0.52ms]
+(pass) validateMemoryPath > #given valid tool labels #when normalized #then they resolve to confined markdown files > #given an absolute path inside root #when validated #then it is accepted [0.57ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "" #when validated #then rejects with non-empty [0.54ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "   " #when validated #then rejects with non-empty [0.40ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "memory/" #when validated #then rejects with empty [0.45ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "../etc" #when validated #then rejects with traversal [0.57ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "a/../../etc" #when validated #then rejects with traversal [0.46ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "a/./notes" #when validated #then rejects with traversal [0.45ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "system/../notes" #when validated #then rejects with traversal [0.70ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "system/nu\u0000ll" #when validated #then rejects with null [0.49ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "~/x" #when validated #then rejects with home-relative [0.49ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "$HOME/x" #when validated #then rejects with home-relative [0.47ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "notes.txt" #when validated #then rejects with markdown [0.68ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "notes.MD" #when validated #then rejects with markdown [0.52ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "notes.Md" #when validated #then rejects with markdown [0.45ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given ".git/config" #when validated #then rejects with .git [0.39ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given ".GIT/config.md" #when validated #then rejects with .git [0.45ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "system/.Git/config.md" #when validated #then rejects with .git [0.45ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given "memory/.gIt/config" #when validated #then rejects with .git [0.36ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given an absolute path outside root #when validated #then it is rejected [0.59ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given the root itself as an absolute path #when validated #then it is rejected [0.40ms]
+(pass) validateMemoryPath > #given hostile labels #when validated #then they are rejected > #given a Windows absolute path outside root #when validated #then it is rejected [0.52ms]
+(pass) validateMemoryPath > #given filesystem indirection #when validated #then real ancestors remain confined > #given a symlink directory escaping root #when a child is validated #then it is rejected [0.84ms]
+(pass) validateMemoryPath > #given filesystem indirection #when validated #then real ancestors remain confined > #given an existing symlink file escaping root #when validated #then it is rejected [0.61ms]
+(pass) validateMemoryPath > #given filesystem indirection #when validated #then real ancestors remain confined > #given a real existing parent inside root #when a missing child is validated #then it is accepted [0.61ms]
+(pass) validateMemoryPath > #given filesystem indirection #when validated #then real ancestors remain confined > #given a symlink directory staying inside root #when a child is validated #then it is accepted [0.75ms]
+(pass) validateMemoryPath > #given a non-tool repository caller #when validated #then non-markdown paths are allowed but confined > #given a directory label #when validated through repository API #then no extension is added [0.50ms]
+(pass) validateMemoryPath > #given a non-tool repository caller #when validated #then non-markdown paths are allowed but confined > #given a non-markdown file #when validated through repository API #then it is accepted [0.53ms]
+(pass) validateMemoryPath > #given a non-tool repository caller #when validated #then non-markdown paths are allowed but confined > #given .git with repository API #when validated #then it remains rejected [0.56ms]
+(pass) validateMemoryPath > #given a non-tool repository caller #when validated #then non-markdown paths are allowed but confined > #given traversal with repository API #when validated #then it remains rejected [0.83ms]
+
+packages/memory-core/src/recall/select.test.ts:
+(pass) selectRecallCandidates > #given no queries #when candidates are selected #then nothing is returned [0.15ms]
+(pass) selectRecallCandidates > #given matching documents #when candidates are selected #then scores are ascending [0.28ms]
+(pass) selectRecallCandidates > #given multiple queries #when candidates are selected #then each path keeps its best score [0.10ms]
+(pass) selectRecallCandidates > #given surfaced paths #when candidates are selected #then already surfaced paths drop [0.08ms]
+(pass) selectRecallCandidates > #given more matches than maxItems #when candidates are selected #then only the best capped set returns [0.29ms]
+(pass) selectRecallCandidates > #given equal scores #when candidates are selected #then the path breaks the tie [0.08ms]
+(pass) selectRecallCandidates > #given a term match inside the body #when the excerpt is built #then it is a centered whitespace-normalized window [0.11ms]
+(pass) selectRecallCandidates > #given a body longer than the internal excerpt length #when the excerpt is built #then it is capped at 200 characters [0.09ms]
+(pass) selectRecallCandidates > #given a match only in the description #when the excerpt is built #then the body head is used [0.07ms]
+(pass) selectRecallCandidates > #given a multi-line body #when the excerpt is built #then newlines collapse to single spaces [0.08ms]
+(pass) selectRecallCandidates > #given a non-positive maxItems #when candidates are selected #then nothing is returned [0.07ms]
+
+packages/memory-core/src/recall/provider.test.ts:
+(pass) loadRecallCorpus > #given a committed HEAD tree #when the corpus is loaded #then only non-system parseable markdown survives [374.62ms]
+(pass) loadRecallCorpus > #given committed files #when documents are parsed #then description and body come from frontmatter parsing [383.96ms]
+(pass) loadRecallCorpus > #given a committed file whose path merely contains a system segment #when the corpus is loaded #then only the reserved root system tree is excluded [325.25ms]
+(pass) loadRecallCorpus > #given uncommitted working-tree edits #when the corpus is loaded #then only committed HEAD content is visible [357.09ms]
+(pass) loadRecallCorpus > #given a directory that is not a git repository #when the corpus is loaded #then the revision is null and no documents load [15.31ms]
+(pass) loadRecallCorpus > #given HEAD advances with a new recallable file #when the corpus reloads #then the new revision and document appear [607.38ms]
+(pass) RecallCorpusCache > #given an unchanged HEAD #when the corpus loads twice #then the cached corpus object is reused [378.53ms]
+(pass) RecallCorpusCache > #given HEAD changes #when the corpus reloads #then the cache invalidates and the new corpus is loaded [695.52ms]
+(pass) RecallCorpusCache > #given a cleared cache #when the corpus reloads #then the corpus is reloaded even at the same HEAD [591.64ms]
+
+packages/memory-core/src/recall/index.test.ts:
+(pass) recall package surface > #given the package barrel #when the recall surface is imported #then every recall unit is exported [0.15ms]
+(pass) recall package surface > #given the package barrel #when the recall surface is imported #then the receipts audit trail is gone [0.07ms]
+
+packages/memory-core/src/recall/planner.test.ts:
+(pass) planRecallQueries > #given no texts #when queries are planned #then no query is emitted [0.19ms]
+(pass) planRecallQueries > #given only stopword chatter #when queries are planned #then no query is emitted [0.16ms]
+(pass) planRecallQueries > #given a distinctive newest text #when queries are planned #then lowercase terms and verbatim bigram phrases come out [0.12ms]
+(pass) planRecallQueries > #given a term repeated across every text #when queries are planned #then rarer terms outrank the repeated one [0.11ms]
+(pass) planRecallQueries > #given a newest text without kept terms #when queries are planned #then the next text tops up [0.18ms]
+(pass) planRecallQueries > #given a text rich in distinctive terms #when queries are planned #then at most four queries are emitted [0.14ms]
+(pass) planRecallQueries > #given the same input twice #when queries are planned #then the output is deterministic [0.10ms]
+(pass) planRecallQueries > #given short or stopword tokens #when queries are planned #then terms under three characters and stopwords drop [0.10ms]
+
+packages/memory-core/src/recall/gate.test.ts:
+(pass) parseNudgeLines > #given well-formed NDJSON #when parsed #then every nudge is returned in order [0.26ms]
+(pass) parseNudgeLines > #given malformed and non-conforming lines #when parsed #then only valid lines survive [0.13ms]
+(pass) parseNudgeLines > #given empty output #when parsed #then the result is empty [0.08ms]
+(pass) validateNudges > #given a path outside the candidate set #when validated #then it is rejected [0.15ms]
+(pass) validateNudges > #given an already surfaced path #when validated #then it is rejected [0.08ms]
+(pass) validateNudges > #given an oversized or multiline hint #when validated #then it is rejected [0.08ms]
+(pass) validateNudges > #given more nudges than maxItems #when validated #then the cap is enforced in order [0.07ms]
+(pass) validateNudges > #given a repeated path in one batch #when validated #then only the first occurrence survives [0.07ms]
+(pass) PendingNudges > #given written nudges #when taken #then they return once and the file is gone [1.98ms]
+(pass) PendingNudges > #given a written file #when inspected #then the self-describing payload and mode are pinned [1.34ms]
+(pass) PendingNudges > #given a payload written for another session #when taken #then nothing returns and the file survives [0.92ms]
+(pass) PendingNudges > #given a payload written 25 hours ago #when taken #then nothing returns and the file is deleted [1.20ms]
+(pass) PendingNudges > #given a malformed or unknown-version file #when taken #then nothing returns and nothing throws [1.60ms]
+(pass) PendingNudges > #given stale siblings and tmp orphans #when a new payload is written #then only fresh files remain [2.40ms]
+(pass) PendingNudges > #given an unsafe session id #when written and taken #then the file stays inside the pending dir [1.55ms]
+(pass) PendingNudges > #given no nudges #when written #then nothing is stored [0.77ms]
+
+packages/memory-core/src/recall/ledger.test.ts:
+(pass) sanitizeSessionFilename > #given a plain session id #when sanitized #then it survives unchanged [0.12ms]
+(pass) sanitizeSessionFilename > #given an unsafe session id #when sanitized #then colons, separators and globs collapse to dashes [0.08ms]
+(pass) sanitizeSessionFilename > #given path traversal or empty input #when sanitized #then a safe fallback name results [0.08ms]
+(pass) RecallLedger > #given an unknown session #when surfaced paths are read #then the set is empty [0.98ms]
+(pass) RecallLedger > #given a malformed ledger file #when surfaced paths are read #then the set is empty and nothing throws [0.97ms]
+(pass) RecallLedger > #given marked entries #when surfaced paths are read #then exactly those paths return [1.32ms]
+(pass) RecallLedger > #given marked entries #when the ledger file is inspected #then the versioned shape and mode are pinned [1.01ms]
+(pass) RecallLedger > #given a second mark on the same session #when the ledger is read #then earlier entries persist and repeats update [1.74ms]
+(pass) RecallLedger > #given two sessions #when both mark entries #then separate files hold separate sets [1.68ms]
+(pass) RecallLedger > #given an unsafe session id #when entries are marked #then the file lands sanitized inside the ledger dir [1.08ms]
+(pass) RecallLedger > #given no entries #when marking #then nothing is written [0.41ms]
+(pass) RecallLedger > #given a ledger dir that does not exist yet #when entries are marked #then the directory is created [1.24ms]
+
+packages/memory-core/src/recall/render.test.ts:
+(pass) renderRecallMessage > #given no candidates #when the message is rendered #then the result is empty [0.09ms]
+(pass) renderRecallMessage > #given one candidate #when the message is rendered #then the exact block shape is produced [0.10ms]
+(pass) renderRecallMessage > #given several candidates #when the message is rendered #then one sourced block per candidate keeps order [0.07ms]
+(pass) renderRecallMessage > #given a rendered message #when the shape is inspected #then no trailing newline is appended [0.07ms]
+(pass) renderNudgeBlock > #given a judged nudge #when the block is rendered #then the hint replaces the description and excerpt inside the sourced framing [0.08ms]
+(pass) renderNudgeMessage > #given no nudges #when the message is rendered #then the result is empty so callers inject nothing [0.07ms]
+(pass) renderNudgeMessage > #given several nudges #when the message is rendered #then one sourced block per nudge keeps the judge's order [0.08ms]
+
+packages/memory-core/src/search/query.test.ts:
+(pass) normalizeText > #given mixed case and padded whitespace #when normalized #then it lowercases, collapses runs and trims [0.10ms]
+(pass) parseQuery > #given bare terms and a double-quoted phrase #when parsed #then terms and phrases are separated [0.09ms]
+(pass) parseQuery > #given repeated whitespace between terms #when parsed #then empty fragments are dropped [0.08ms]
+(pass) parseQuery > #given an unclosed quote #when parsed #then it falls back to raw whitespace terms keeping the quote character [0.09ms]
+(pass) parseQuery > #given empty quotes and blank input #when parsed #then nothing is produced [0.07ms]
+(pass) parseQuery > #given mixed-case input #when parsed #then case is preserved for match-time normalization [0.08ms]
+(pass) matchScore golden formula > #given one term #when scored #then score is first index plus the short-term bonus [0.07ms]
+(pass) matchScore golden formula > #given two terms #when scored #then per-term contributions sum [0.07ms]
+(pass) matchScore golden formula > #given a term of 50 characters or more #when scored #then the length bonus floors at zero [0.08ms]
+(pass) matchScore golden formula > #given a quoted phrase #when scored #then the phrase contributes a tenth of its first index [0.07ms]
+(pass) matchScore golden formula > #given a phrase and a term #when scored #then phrase and term contributions combine [0.07ms]
+(pass) matchScore golden formula > #given a term that is absent #when scored #then the match is rejected because all terms must match [0.07ms]
+(pass) matchScore golden formula > #given a phrase whose words appear out of order #when scored #then the phrase does not match [0.06ms]
+(pass) matchScore golden formula > #given mixed case and padded text #when scored #then matching is case-insensitive over normalized text [0.06ms]
+(pass) matchScore golden formula > #given an unclosed-quote query #when scored #then the retained quote character must appear literally [0.07ms]
+(pass) matchScore golden formula > #given empty text #when scored #then nothing matches [0.06ms]
+(pass) searchableText > #given every searchable field #when composed #then type, content, reasoning, summary, tool names, args and return are joined [0.19ms]
+(pass) searchableText > #given a string content and no optional fields #when composed #then empty parts are dropped [0.07ms]
+(pass) dateInRange > #given inclusive bounds #when a message sits on a boundary #then it stays eligible [0.09ms]
+(pass) dateInRange > #given a missing or unparseable message date #when filtered #then the message stays eligible [0.06ms]
+(pass) dateInRange > #given unparseable bounds #when filtered #then the filter is ignored [0.07ms]
+
+packages/memory-core/src/search/senpi-session-provider.test.ts:
+(pass) SenpiSessionProvider > #given a session file #when conversations are listed #then the file is one conversation keyed by the header id [1.31ms]
+(pass) SenpiSessionProvider > #given user, assistant and tool-result entries #when mapped #then text, reasoning, tool names, arguments and returns are searchable [1.25ms]
+(pass) SenpiSessionProvider > #given branches that repeat a shared ancestor entry #when mapped #then each entry id appears once [0.77ms]
+(pass) SenpiSessionProvider > #given a malformed line and a missing header #when read #then bad lines are skipped and the rest of the file survives [1.04ms]
+(pass) SenpiSessionProvider > #given an archived sidecar, an excluded directory and a hidden-marker hook #when listed #then those conversations are hidden but still readable with includeHidden [2.12ms]
+(pass) SenpiSessionProvider > #given a hidden marker file inside a session directory #when listed #then every session in that directory is hidden [1.29ms]
+(pass) SenpiSessionProvider > #given extension-injected custom messages #when mapped #then only memory-owned channels are hidden and other custom content stays searchable [1.05ms]
+(pass) SenpiSessionProvider > #given a missing sessions directory or non-jsonl files #when listed #then reading is empty and never throws [0.47ms]
+
+packages/memory-core/src/search/engine.test.ts:
+(pass) searchTranscripts > #given documents with different first-match indices #when searched #then results sort by ascending score [0.20ms]
+(pass) searchTranscripts > #given equal scores #when searched #then ties break on descending date [0.10ms]
+(pass) searchTranscripts > #given more matches than the limit #when searched #then the default limit is 100 and explicit limits truncate [0.53ms]
+(pass) searchTranscripts > #given an empty or term-free query #when searched #then no results are returned [0.08ms]
+(pass) searchTranscripts > #given date bounds #when searched #then bounds are inclusive and undated messages stay eligible [0.11ms]
+(pass) searchTranscripts > #given hidden conversations #when searched #then they are excluded unless includeHidden is set [0.11ms]
+(pass) searchTranscripts > #given a conversation filter #when searched #then only that conversation contributes results [0.08ms]
+(pass) searchTranscripts > #given a phrase plus term query #when searched #then only documents matching every term and phrase are returned [0.08ms]
+(pass) searchTranscripts > #given a matched document #when results are built #then identity fields are carried through [0.08ms]
+
+packages/memory-core/src/concurrency/two-process.test.ts:
+(pass) one memory identity across real Bun processes > #given two synchronized tool writers #when each makes ten writes #then twenty linear commits land with observed lock contention [2951.24ms]
+(pass) one memory identity across real Bun processes > #given two synchronized reflection reservers #when they race one identity #then one is active, one is pending, and completion promotes pending [114.00ms]
+(pass) one memory identity across real Bun processes > #given a writer SIGKILLed while holding the shared lock #when its peer continues #then liveness takeover completes twenty clean commits [3012.07ms]
+
+packages/memory-core/src/compile/cache.test.ts:
+(pass) MemoryBlockCache > #given the same template identity and HEAD #when compiled twice #then the stable projection is reused [330.54ms]
+(pass) MemoryBlockCache > #given either template content or HEAD changes #when compiled #then each stable key retains only its latest revision [456.32ms]
+(pass) MemoryBlockCache > #given repeated calls for one stable projection #when compile runs many times #then the cache stays bounded to one entry [341.40ms]
+(pass) MemoryBlockCache > #given two identities at the same HEAD #when compiled through one cache #then identity-stable projections remain isolated [398.82ms]
+(pass) MemoryBlockCache > #given template content #when hashed #then the structure version participates in sha256 [0.20ms]
+
+packages/memory-core/src/compile/compile.test.ts:
+(pass) compileMemoryBlock > #given nested committed memory #when compiled #then block sections, projection order, and metadata values form the structural contract [353.76ms]
+(pass) compileMemoryBlock > #given a committed persona and identity #when compiled #then both projection paths share the self section and metadata remains structured [322.85ms]
+(pass) compileMemoryBlock > #given only a committed identity #when compiled #then it renders under self without a persona projection [295.31ms]
+(pass) compileMemoryBlock > #given an empty committed repository #when compiled #then only structured metadata is emitted [265.45ms]
+(pass) compileMemoryBlock > #given only a committed persona #when compiled #then its body is projected without its description [292.00ms]
+
+packages/memory-core/src/compile/compile-projections.test.ts:
+(pass) compileMemoryBlock > #given a dirty persona edit #when compiled #then only the committed HEAD body sentinel appears [294.97ms]
+(pass) compileMemoryBlock > #given a committed binary projection #when compiled #then its path is listed without reading its blob [279.71ms]
+(pass) compileMemoryBlock > #given an unreadable committed system file #when compiled #then its structural tag is skipped best-effort [341.16ms]
+
+packages/memory-core/src/compile/render.test.ts:
+(pass) memory block sentinels > #given an identity and block #when marked #then the exact sentinel wrapper is returned [0.11ms]
+(pass) memory block sentinels > #given repeated legacy blocks #when replaced #then every matching region is transformed [0.23ms]
+(pass) memory block sentinels > #given no matching block #when replaced #then the sentinel block is appended [0.08ms]
+(pass) memory block sentinels > #given marked regions #when stripped #then only surrounding prompt content remains [0.10ms]
+
+packages/memory-core/src/compile/compile-metadata.test.ts:
+(pass) compileMemoryBlock > #given a stable identity and HEAD #when compiled repeatedly #then metadata is identity-only and byte-identical [370.69ms]
+
+packages/memory-core/src/seeds/seeds.test.ts:
+(pass) default memory seeds > #given the default block label constants > #then they are persona and human in order [15.92ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then it produces three files with expected paths and frontmatter [0.24ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the memory-discipline skill seed path is skills/memory-discipline/SKILL.md [0.13ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then every seed file parses as a memory file [0.26ms]
+(pass) default memory seeds > #given buildDefaultSeedFiles > #then the human seed frontmatter has kind: person and aliases [0.14ms]
+
+packages/memory-core/src/people/format.test.ts:
+(pass) people card format (IC-16) > #given a well-formed card with all four prefix types > #then parsePeopleCard extracts all entries with their prefixes [0.33ms]
+(pass) people card format (IC-16) > #given a well-formed card with all four prefix types > #then serializePeopleCard round-trips stably [0.14ms]
+(pass) people card format (IC-16) > #given a card with blank lines between entries > #then parsePeopleCard skips blank lines [0.07ms]
+(pass) people card format (IC-16) > #given a card with a comment-only line > #then parsePeopleCard skips comment lines without diagnostics [0.08ms]
+(pass) people card format (IC-16) > #given an invalid prefix line > #then parsePeopleCard returns a diagnostic instead of throwing [0.08ms]
+(pass) people card format (IC-16) > #given an invalid prefix line > #then parsePeopleCard still parses valid entries [0.07ms]
+(pass) people card format (IC-16) > #given an entry exceeding maxEntryChars > #then parsePeopleCard flags the entry as a diagnostic [0.07ms]
+(pass) people card format (IC-16) > #given entries exceeding maxEntries > #then parsePeopleCard flags the overflow as a diagnostic [0.09ms]
+(pass) people card format (IC-16) > #given an entry at exactly maxEntryChars > #then parsePeopleCard does not flag it [0.07ms]
+(pass) people card format (IC-16) > #given an empty card > #then parsePeopleCard yields no entries and no diagnostics [0.06ms]
+(pass) people card format (IC-16) > #given a card with trailing whitespace on lines > #then parsePeopleCard trims trailing whitespace [0.07ms]
+(pass) people card format (IC-16) > #given serializePeopleCard with entries > #then produces one line per entry [0.07ms]
+(pass) people card format (IC-16) > #given serializePeopleCard with an empty card > #then produces an empty string [0.06ms]
+(pass) people card format (IC-16) > #given a RELATIONSHIP entry > #then parsePeopleCard preserves the full content including predicate [0.07ms]
+(pass) people card format (IC-16) > #given a line with prefix but no content > #then parsePeopleCard flags it as a diagnostic [0.06ms]
+(pass) people card format (IC-16) > #given a line with prefix and only whitespace content > #then parsePeopleCard flags it as a diagnostic [0.06ms]
+
+packages/memory-core/src/people/person-slug.test.ts:
+(pass) person slug (IC-14) > #given a display name for slug derivation > #then sanitizePersonSlug reuses sanitizeToSlug rules [0.17ms]
+(pass) person slug (IC-14) > #given the reserved slug 'human' > #then isReservedSlug returns true for 'human' [0.10ms]
+(pass) person slug (IC-14) > #given a slug collision needing a numeric suffix > #then resolveSlugCollision appends -2, -3, etc. [0.12ms]
+
+packages/memory-core/src/people/format-observations.test.ts:
+(pass) observation entry format (IC-16) > #given an explicit observation with full comment fields > #then parsePeopleCard extracts the section and entry [0.25ms]
+(pass) observation entry format (IC-16) > #given an observation with minimal fields (just src) > #then parsePeopleCard extracts with optional fields undefined [0.10ms]
+(pass) observation entry format (IC-16) > #given an observation with no comment at all > #then parsePeopleCard extracts with all comment fields undefined [0.08ms]
+(pass) observation entry format (IC-16) > #given observations in multiple sections > #then parsePeopleCard separates them by section [0.09ms]
+(pass) observation entry format (IC-16) > #given an observation entry with n= but no src > #then parsePeopleCard extracts n without src [0.07ms]
+(pass) observation entry format (IC-16) > #given an observation entry with multiple src ids > #then parsePeopleCard preserves the full src string [0.07ms]
+(pass) observation entry format (IC-16) > #given serializePeopleCard with observations > #then produces a parseable card with both entries and observations [0.08ms]
+(pass) observation entry format (IC-16) > #given a mixed card with entries and observations > #then parsePeopleCard extracts both entries and observations [0.08ms]
+(pass) observation entry format (IC-16) > #given a mixed card with entries and observations > #then serializePeopleCard round-trips both [0.09ms]
+(pass) observation entry format (IC-16) > #given an unknown observation section > #then parsePeopleCard returns a diagnostic for the unknown section [0.09ms]
+(pass) observation entry format (IC-16) > #given an observation entry without a date bracket > #then parsePeopleCard flags it as a diagnostic [0.07ms]
+
+packages/memory-core/src/soul/watermark.test.ts:
+(pass) consumeSoulNoticeDelta > #given no watermark file #when consumed #then the watermark is established silently at HEAD with no notice [435.68ms]
+(pass) consumeSoulNoticeDelta > #given a watermark behind HEAD with an out-of-band persona commit #when consumed #then exactly one notice is emitted and the watermark advances [557.83ms]
+(pass) consumeSoulNoticeDelta > #given only in-band memory-tool soul commits since the watermark #when consumed #then no notice is emitted and the watermark stays put [534.39ms]
+(pass) consumeSoulNoticeDelta > #given an out-of-band commit that touches only non-soul paths #when consumed #then no notice is emitted [545.59ms]
+(pass) consumeSoulNoticeDelta > #given an out-of-band identity.md commit mixed with an in-band persona commit #when consumed #then the notice names the out-of-band commit [642.60ms]
+(pass) consumeSoulNoticeDelta > #given a corrupt watermark file #when consumed #then it re-establishes silently at HEAD [362.86ms]
+(pass) consumeSoulNoticeDelta > #given a watermark naming a sha that history no longer contains #when consumed #then it re-establishes silently at HEAD [368.51ms]
+
+packages/memory-core/src/sync/mirror.test.ts:
+(pass) MirrorSync module surface > #given the push-only mirror contract > #then no pull, fetch or import entry point is exposed [0.20ms]
+(pass) MirrorSync module surface > #given the push-only mirror contract > #then the config key and log name are the letta-parity omo names [0.07ms]
+(pass) MirrorSync module surface > #given the push-only mirror contract > #then the hook snippet never pushes from a non-main or detached HEAD [0.08ms]
+(pass) MirrorSync lifecycle > #given a bare file:// mirror > #when set then a commit lands #then the mirror receives the commit [662.48ms]
+(pass) MirrorSync lifecycle > #given a bare file:// mirror > #when set is called with trailing slashes #then the stored url is normalized [406.63ms]
+(pass) MirrorSync lifecycle > #given a bare file:// mirror > #when set is called twice #then the second url wins [847.24ms]
+(pass) MirrorSync lifecycle > #given a bare file:// mirror > #when unset #then later commits produce no new log lines [778.87ms]
+(pass) MirrorSync lifecycle > #given an unreachable mirror > #when set #then the config survives the failed initial push and the reason is reported [342.97ms]
+(pass) MirrorSync lifecycle > #given an unreachable mirror > #when a commit lands #then the commit succeeds and the failure is logged in status [689.51ms]
+(pass) MirrorSync lifecycle > #given pushNow > #when no mirror is configured #then it reports not-configured without throwing [254.64ms]
+(pass) MirrorSync lifecycle > #given pushNow > #when a mirror is configured #then a one-shot foreground push lands and clears ahead [525.95ms]
+(pass) MirrorSync lifecycle > #given a credentialed url > #when status is read #then the url is exposed redacted alongside the raw value [542.27ms]
+(pass) MirrorSync lifecycle > #given a credentialed url > #when the log contains a credentialed url #then the status tail is redacted [453.16ms]
+(pass) MirrorSync lifecycle > #given a credentialed url > #when a push to a credentialed remote fails #then the detail leaks no credential [340.39ms]
+
+packages/memory-core/src/sync/redact.test.ts:
+(pass) redactUrl > #given an https url carrying a token > #then the credential is masked and the host and path survive [0.10ms]
+(pass) redactUrl > #given an https url with user and password > #then both halves of the credential are masked [0.08ms]
+(pass) redactUrl > #given an ssh scp-style url > #then the user info is masked and host plus path survive [0.07ms]
+(pass) redactUrl > #given an ssh:// url with user info > #then the user info is masked [0.07ms]
+(pass) redactUrl > #given urls without credentials > #then https, file and bare paths pass through unchanged [0.08ms]
+(pass) redactUrl > #given free text containing a credentialed url > #then embedded credentials inside log output are masked [0.08ms]
+(pass) redactUrl > #given an empty url > #then the empty string is returned [0.06ms]
+
+packages/memory-core/src/facts/queue-reconcile.test.ts:
+(pass) facts queue reconcile > #given a leftover queue file with no completion #when reconcile runs #then it is listed as launchable [13.39ms]
+(pass) facts queue reconcile > #given a malformed queue file #when listPending runs #then it is ignored instead of throwing [10.56ms]
+(pass) facts queue reconcile > #given consumed entries #when markConsumed runs #then the files are deleted and the watermark records the endpoint [17.49ms]
+
+packages/memory-core/src/facts/recovery-setter-race.test.ts:
+(pass) facts conditional mutation primitives > preserves a foreign replacement injected after hashing an existing tracked path [1168.55ms]
+(pass) facts conditional mutation primitives > preserves a foreign write injected after deletion reservation resolves [1062.00ms]
+(pass) facts conditional mutation primitives > preserves foreign bytes injected after hashing an existing path for deletion [641.52ms]
+
+packages/memory-core/src/facts/payload-cap.test.ts:
+(pass) facts payload measurement > #given a payload #when it is measured #then the bytes equal the shared serializer's utf8 length [0.20ms]
+(pass) facts payload measurement > #given the cap constant #when it is read #then it is 131072 bytes [0.07ms]
+(pass) facts capped batch selection > #given a payload exactly at the cap #when selecting #then the entry is accepted, and one byte more is rejected [0.58ms]
+(pass) facts capped batch selection > #given a conversation whose newest entry fits but whose older one does not #when selecting #then prefix closure ships neither [0.21ms]
+(pass) facts capped batch selection > #given a middle entry that does not fit #when a tiny entry follows it #then the follower is held back too [0.10ms]
+(pass) facts capped batch selection > #given a fitting older entry #when its newer sibling does not fit #then only the closed prefix ships [0.21ms]
+(pass) facts capped batch selection > #given an entry waiting past 24 hours #when newer conversations compete for the cap #then the starved one is selected first [0.11ms]
+(pass) facts capped batch selection > #given an entry waiting just under 24 hours #when newer entries compete #then the newest wins the budget [0.09ms]
+(pass) facts capped batch selection > #given a multi-conversation batch #when everything fits #then entries ship ascending per conversation [0.11ms]
+(pass) facts capped batch selection > #given an oversized entry beside healthy ones #when selecting #then the oversized entry is reported and never truncated [0.17ms]
+(pass) facts capped batch selection > #given an envelope that already exceeds the cap #when selecting #then nothing ships [0.13ms]
+
+packages/memory-core/src/facts/extraction-person-lifecycle.test.ts:
+(pass) person routing reinforcement > #given an existing explicit observation #when a textually equal fact arrives #then n increments and the date refreshes without a duplicate line [1153.08ms]
+(pass) person routing reinforcement > #given an existing explicit observation #when a different fact arrives #then it appends a separate line [866.57ms]
+(pass) person routing new people > #given no matching card #when a confidently named person fact arrives #then a card skeleton and ledger are created [812.23ms]
+(pass) person routing new people > #given a slug already taken by a different person #when a new person sanitizes to it #then a numeric suffix avoids the collision [781.41ms]
+(pass) person routing new people > #given two facts about the same new person in one batch #when applied #then one card receives both entries [662.49ms]
+
+packages/memory-core/src/facts/extraction-routing-gate.test.ts:
+(pass) person routing gate and unresolved mentions > #given people routing is disabled #when a person fact arrives #then it falls back to the monthly notes file [569.10ms]
+(pass) person routing gate and unresolved mentions > #given an unresolved person mention #when applied #then the prefixed bullet is stored verbatim in monthly notes [518.28ms]
+
+packages/memory-core/src/facts/extraction.test.ts:
+(pass) facts extraction JSONL validation > #given valid project and person arms #when parsed #then scope remains a discriminated union [0.45ms]
+(pass) facts extraction JSONL validation > #given a project record carrying person #when parsed #then the whole extraction is rejected [0.19ms]
+(pass) facts extraction JSONL validation > #given a person record missing person #when parsed #then the whole extraction is rejected [0.11ms]
+(pass) atomic facts batch application > #given project and resolved person records #when applied without a people policy #then one notes commit preserves both texts and trailers [578.87ms]
+(pass) atomic facts batch application > #given zero applicable records #when applied #then no commit is attempted [277.06ms]
+(pass) atomic facts batch application > #given git commit fails after staging #when the batch aborts #then index and working tree are restored [577.43ms]
+
+packages/memory-core/src/facts/failures-schema.test.ts:
+(pass) facts failures file parsing > #given a well-formed file #when it is parsed #then every record round-trips [0.33ms]
+(pass) facts failures file parsing > #given corrupt JSON #when it is parsed #then a typed error is thrown instead of empty state [0.13ms]
+(pass) facts failures file parsing > #given an unsupported version #when it is parsed #then a typed error is thrown [0.08ms]
+(pass) facts failures file parsing > #given a record with an unknown reason #when it is parsed #then a typed error is thrown [0.10ms]
+(pass) facts failures file parsing > #given a parked record without parkedAt #when it is parsed #then a typed error is thrown [0.07ms]
+(pass) facts failures file parsing > #given a record with a non-ISO instant #when it is parsed #then a typed error is thrown [0.14ms]
+(pass) facts failures file parsing > #given a non-ISO file updatedAt #when it is parsed #then a typed error is thrown [0.07ms]
+(pass) facts failures file parsing > #given a parked record with a null nextEligibleAt #when it is parsed #then null stays valid [0.08ms]
+(pass) facts failures file parsing > #given unsorted records #when the file is rendered #then output is sorted and newline-terminated [0.14ms]
+
+packages/memory-core/src/facts/queue.test.ts:
+(pass) facts queue enqueue > #given a fresh journal delta #when enqueue runs #then one queue file holds the full canonical range [12.51ms]
+(pass) facts queue enqueue > #given an identical settle #when enqueue runs again #then the duplicate endpoint is skipped [11.47ms]
+(pass) facts queue enqueue > #given a retained entry ending at m2 #when a later settle arrives #then the new range starts strictly after it [18.31ms]
+(pass) facts queue enqueue > #given the consumed watermark already covers the endpoint #when enqueue runs #then nothing is published [24.05ms]
+(pass) facts queue enqueue > #given only non-canonical trailing entries #when enqueue runs #then no queue file is published [5.54ms]
+(pass) #given an aborted drain signal #when enqueue is attempted #then nothing publishes and the cursor stays untouched [9.36ms]
+(pass) #given the abort fires at the interior clock hook #when enqueue runs #then nothing publishes and the cursor stays untouched [13.29ms]
+(pass) #given the abort fires after the publish lands #when the cursor advance is attempted #then the batch stays retryable with the watermark unmoved [12.57ms]
+
+packages/memory-core/src/facts/extraction-person-aliases.test.ts:
+(pass) person routing alias resolution > #given an existing card with a known alias #when a person fact names that alias #then it lands in the card ledger and no new directory appears [662.28ms]
+(pass) person routing alias resolution > #given two cards whose aliases both match #when resolved #then the longest matching alias wins [846.66ms]
+(pass) person routing alias resolution > #given two cards with equal-length matching aliases #when resolved #then the smallest slug wins and the tie is logged [802.48ms]
+(pass) person routing alias resolution > #given the primary human card carries an alias #when a fact names it #then it routes to the human ledger without a new card [759.71ms]
+
+packages/memory-core/src/facts/failures-selection.test.ts:
+(pass) facts launch selection > #given no failures file #when selecting #then every pending entry is launchable [0.26ms]
+(pass) facts launch selection > #given a parked endpoint #when selecting #then its later same-conversation entries are blocked but other conversations flow [0.20ms]
+(pass) facts launch selection > #given a backoff endpoint #when the clock is one millisecond early #then it is dropped [0.11ms]
+(pass) facts launch selection > #given a backoff endpoint #when the clock reaches nextEligibleAt exactly #then it is launchable [0.09ms]
+(pass) facts launch selection > #given a legacy record anchored at snapshot line 0 #when its entry carries a real boundary #then the pair still gates [0.09ms]
+(pass) facts launch selection > #given an unrelated failure record #when selecting #then entries with no record of their own stay launchable [0.07ms]
+(pass) facts launch selection > #given an out-of-order pending list #when a dropped entry has a lower snapshot boundary #then gating follows the boundary, not the list order [0.09ms]
+(pass) facts launch selection > #given a launchable predecessor #when a later entry is parked #then the predecessor still launches [0.08ms]
+
+packages/memory-core/src/facts/queue-publication.test.ts:
+(pass) facts queue file naming > #given a published entry #when the filename is inspected #then it is colon-free and hashes the conversation id [7.72ms]
+(pass) facts queue file naming > #given two publications in the same millisecond #when both land #then the endpoint hash keeps them distinct [12.44ms]
+(pass) facts queue concurrency > #given two concurrent enqueue attempts for the same delta #when both run #then exactly one entry is published [36.89ms]
+
+packages/memory-core/src/facts/failures-store.test.ts:
+(pass) facts failures layout > #given an identity #when the queue layout is built #then failures.json sits beside consumed.json [0.90ms]
+(pass) facts failure store persistence > #given no failures file #when the store reads #then empty state is returned [6.07ms]
+(pass) facts failure store persistence > #given a recorded failure #when the store persists it #then the file is 0600 with a trailing newline [6.58ms]
+(pass) facts failure store persistence > #given a persisted failure #when the same failureId replays #then the streak stays at one [15.26ms]
+(pass) facts failure store persistence > #given persisted failures #when the batch succeeds #then only its records are cleared [14.68ms]
+(pass) facts failure store persistence > #given parked records #when a retry clears one conversation #then the rest stay parked [35.02ms]
+(pass) facts failure store persistence > #given a corrupt failures file #when the store reads #then it fails closed with a typed error [11.16ms]
+(pass) facts failure store persistence > #given a corrupt failures file #when a failure is recorded #then the write fails closed and the file is untouched [14.92ms]
+(pass) facts failure store persistence > #given the facts-queue lock is held #when the store records a failure #then it waits for the lock instead of writing [90.62ms]
+
+packages/memory-core/src/facts/recovery.test.ts:
+(pass) facts path-state recovery ownership > rejects a foreign edit injected immediately before initial pre-state capture [846.45ms]
+(pass) facts path-state recovery ownership > rejects tracked worktree drift without changing index or worktree bytes [872.31ms]
+(pass) facts path-state recovery ownership > rejects tracked index drift without rewriting either surface [800.25ms]
+(pass) facts path-state recovery ownership > rejects foreign creation at a planned new path without deleting it [495.69ms]
+(pass) facts path-state recovery ownership > rejects a foreign creation injected after bulk validation and before mutation [584.85ms]
+(pass) facts path-state recovery ownership > preserves every path when one member of a multi-path batch is foreign [550.68ms]
+(pass) facts path-state recovery ownership > restores owned partial pre/post residue and commits the exact recorded post state [947.86ms]
+(pass) facts path-state recovery ownership > durably inserts every pre and post identity before envelope publication [1084.85ms]
+(pass) facts path-state recovery ownership > publishes a complete blob-backed envelope before the first affected-path mutation [639.30ms]
+
+packages/memory-core/src/facts/queue-watermark.test.ts:
+(pass) facts queue watermark monotonicity > #given an older batch settling after a newer one was queued #when it is consumed #then the enqueue watermark never rolls back [30.88ms]
+(pass) facts queue watermark monotonicity > #given a late older batch consumed #when the next settle runs #then no range overlapping the retained newer entry is republished [30.40ms]
+(pass) facts queue watermark monotonicity > #given a failed batch #when it is retained #then the enqueue watermark does not roll back and the entry survives [15.83ms]
+(pass) facts queue watermark monotonicity > #given a queue file that landed without its cursor write #when the next settle runs #then the retained endpoint anchors the range [14.35ms]
+
+packages/memory-core/src/facts/failures-backoff.test.ts:
+(pass) facts failure backoff curve > #given a first failure #when applyFailure runs #then the entry is eligible one minute later [0.17ms]
+(pass) facts failure backoff curve > #given consecutive failures #when the streak grows #then eligibility follows 1m/5m/30m/2h exactly [0.16ms]
+(pass) facts failure backoff curve > #given a fifth consecutive failure #when applyFailure runs #then the entry parks with no eligibility [0.09ms]
+(pass) facts failure backoff curve > #given a parked entry #when another failure arrives #then it stays parked with a growing streak [0.09ms]
+(pass) facts failure backoff curve > #given a record already parked #when a later different-reason failure lands #then it stays parked with its original parkedAt [0.08ms]
+(pass) facts failure backoff curve > #given a changed failure reason #when the next failure lands #then the streak does not reset [0.08ms]
+(pass) facts failure backoff curve > #given an oversized single entry #when applyFailure runs once #then it parks immediately at streak 1 [0.07ms]
+(pass) facts failure backoff curve > #given one failureId already applied #when it is replayed #then the record is unchanged [0.08ms]
+(pass) facts failure backoff curve > #given a detail longer than the cap #when applyFailure runs #then it is truncated to 512 UTF-8 bytes [0.17ms]
+(pass) facts failure backoff curve > #given control characters in the detail #when applyFailure runs #then they are sanitized to spaces [0.09ms]
+(pass) facts failure clearing > #given records for two conversations #when clearOnSuccess names one #then only that record is removed [0.10ms]
+(pass) facts failure clearing > #given parked records across conversations #when clearForRetry filters one conversation #then the others remain [0.08ms]
+(pass) facts failure clearing > #given records for two conversations #when clearForRetry has no filter #then every record is cleared [0.08ms]
+
+packages/memory-core/src/facts/recovery-reservation-finalization.test.ts:
+(pass) facts deletion reservation finalization > preserves a foreign directory replacing the verified reservation [968.49ms]
+(pass) facts deletion reservation finalization > does not overwrite a newer foreign file while restoring a mismatched claim [1212.24ms]
+(pass) facts deletion reservation finalization > does not overwrite a newer foreign directory while restoring a mismatched claim [1250.23ms]
+(pass) facts deletion reservation finalization > preserves a foreign file replacing the verified reservation and returns parent_dirty [1230.99ms]
+
+packages/memory-core/src/reminders/reminders.test.ts:
+(pass) reminders > #given a clean repo snapshot > #then generateReminders returns no reminders [0.18ms]
+(pass) reminders > #given a clean repo snapshot > #then reminderKindFor is null [0.09ms]
+(pass) reminders > #given a dirty repo snapshot > #then generateReminders emits a dirty reminder with COMMIT NEEDED text and paths [0.12ms]
+(pass) reminders > #given a dirty repo snapshot > #then re-generating with same snapshot does NOT re-emit (dedupe) [0.09ms]
+(pass) reminders > #given a dirty repo snapshot > #then after clearing to clean, re-triggering emits again [0.08ms]
+(pass) reminders > #given a merge conflict snapshot > #then generateReminders emits a conflict reminder with resolution guidance [0.10ms]
+(pass) reminders > #given a merge conflict snapshot > #then dedupe prevents re-emission while conflict persists [0.07ms]
+(pass) reminders > #given a rebase conflict snapshot > #then the conflict reminder mentions rebase [0.15ms]
+(pass) reminders > #given an unmerged-files conflict snapshot > #then the conflict reminder is emitted (conflict takes priority over dirty) [0.13ms]
+(pass) reminders > #given a push-failed snapshot > #then generateReminders emits a push_failed reminder with the reason [0.14ms]
+(pass) reminders > #given a push-failed snapshot > #then dedupe prevents re-emission while push remains failed [0.24ms]
+(pass) reminders > #given a push-failed snapshot > #then a different failure reason re-emits (condition-key includes reason) [0.18ms]
+(pass) reminders > #given conflict + dirty + push_failed simultaneously > #then conflict takes priority over dirty (single highest-priority reminder) [0.09ms]
+(pass) reminders > #given aheadCount with no push failure > #then no push_failed reminder (ahead without failure is not a failure) [0.07ms]
+(pass) reminders > #given a dirty snapshot then clean then dirty with different paths > #then re-triggering with different paths re-emits after clear [0.09ms]
+(pass) reminders > #given state persistence across calls > #then the same state object tracks emitted conditions across multiple generate calls [0.10ms]
+(pass) reminders > #given reminder has stable machine key > #then Reminder.kind values are the expected union [0.08ms]
+
+packages/memory-core/src/git/exec.test.ts:
+(pass) createNodeGitExec > #given a spawn cwd that does not exist > #when git runs #then it does NOT report git as missing from PATH [1.51ms]
+(pass) createNodeGitExec > #given a spawn cwd that does not exist > #when the bare runner reports the missing-cwd result #then Windows fallbacks are not attempted [0.20ms]
+(pass) createNodeGitExec > #given a cwd that exists but no git binary on PATH > #when git runs #then GitNotFoundError fires [0.85ms]
+(pass) createNodeGitExec > #given Git resolves on PATH #when Windows roots exist #then bare Git keeps precedence [0.16ms]
+(pass) createNodeGitExec > #given a non-Windows platform and missing Git #when git runs #then Windows roots are not attempted [0.17ms]
+(pass) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EACCES #when Windows roots exist #then the error propagates without fallback [0.15ms]
+(pass) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EPERM #when Windows roots exist #then the error propagates without fallback [0.07ms]
+(pass) createNodeGitExec > #given bare Git reports GitNotFoundError caused by EIO #when Windows roots exist #then the error propagates without fallback [0.06ms]
+(pass) createNodeGitExec > #given UNC, device-prefix, and root-relative roots #when fallback runs #then only a drive-qualified local root is attempted [0.26ms]
+(pass) createNodeGitExec > #given distinct standard roots #when every executable is absent #then candidates are attempted in deterministic order [0.15ms]
+(pass) createNodeGitExec > #given duplicate standard roots #when fallback runs #then equivalent candidates are attempted once [0.13ms]
+(pass) createNodeGitExec > #given the first fallback executable disappears #when its spawn yields ENOENT #then the next candidate is attempted [0.13ms]
+(pass) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EACCES #when fallback runs #then the error propagates without trying later candidates [0.12ms]
+(pass) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EPERM #when fallback runs #then the error propagates without trying later candidates [0.12ms]
+(pass) createNodeGitExec > #given a fallback reports GitNotFoundError caused by EIO #when fallback runs #then the error propagates without trying later candidates [0.08ms]
+(pass) createNodeGitExec > #given a fallback spawn EACCES #when fallback runs #then the error propagates without trying later candidates [0.15ms]
+(pass) createNodeGitExec > #given a fallback spawn EPERM #when fallback runs #then the error propagates without trying later candidates [0.12ms]
+(pass) createNodeGitExec > #given a fallback spawn EIO #when fallback runs #then the error propagates without trying later candidates [0.08ms]
+(pass) createNodeGitExec > #given a fallback timeout #when fallback runs #then the timeout propagates without trying later candidates [0.18ms]
+(pass) createNodeGitExec > #given a fallback nonzero result #when fallback runs #then the result returns without trying later candidates [0.14ms]
+(pass) createNodeGitExec > #given stdin #when real Git runs #then bytes are piped and existing argv handling is unchanged [34.60ms]
+(pass) createNodeGitExec > #given stdin and a Windows fallback #when bare Git is absent #then stdin reaches the fallback runner [0.30ms]
+(pass) createNodeGitExec > #given bare Git fails with a non-ENOENT error #when Windows roots exist #then the error propagates without fallback [0.14ms]
+
+packages/memory-core/src/git/repo-ls-tree-sized.test.ts:
+(pass) GitMemoryRepo.lsTreeSized > #given a committed tree with blobs #when lsTreeSized runs #then each blob path and byte size is returned from one git call [305.12ms]
+(pass) GitMemoryRepo.lsTreeSized > #given an empty commit #when lsTreeSized runs #then the listing is empty [254.89ms]
+(pass) GitMemoryRepo.lsTreeSized > #given tree and gitlink records with dash sizes #when lsTreeSized parses #then only blob entries remain [0.26ms]
+
+packages/memory-core/src/git/repo-worktree-serialization.test.ts:
+(pass) GitMemoryRepo worktree administration serialization > #given two worktree additions #when they target one repository #then Git administration never overlaps [0.41ms]
+
+packages/memory-core/src/git/repo.test.ts:
+(pass) GitMemoryRepo > #given a committed HEAD with a fixed committer date #when timestamp is read #then epoch seconds are returned [297.32ms]
+(pass) GitMemoryRepo > #given a new repository #when it is initialized and a write is committed #then HEAD advances to the committed content [457.41ms]
+(pass) GitMemoryRepo > #given no effective path changes #when commitWrite runs #then it throws a typed no-change error [359.17ms]
+(pass) GitMemoryRepo > #given unrelated uncommitted files #when cleanCheck runs #then it rejects with the porcelain listing [255.44ms]
+(pass) GitMemoryRepo > #given a UTF-16 markdown file is dirty #when cleanCheck runs #then its encoding problem is readable [232.93ms]
+(pass) GitMemoryRepo > #given local identity overrides #when init reconciles config #then email is preserved and agent identity is updated [292.35ms]
+(pass) GitMemoryRepo > #given commit signing is explicitly enabled locally #when init reconciles config #then the override is preserved [251.62ms]
+(pass) GitMemoryRepo > #given conflicting local identity #when a tool write commits #then explicit author flags control attribution [486.81ms]
+(pass) GitMemoryRepo > #given commits with bodies and changed paths #when log reads history #then metadata trailers ranges filters and optional paths are parsed newest-first [604.45ms]
+(pass) GitMemoryRepo > #given a reflection worktree commit #when it is merged no-ff #then the parent exposes the content and removes the worktree [506.97ms]
+(pass) GitMemoryRepo > #given concurrent commits across worktrees #when index and ref locks contend #then every commit lands [680.80ms]
+(pass) GitMemoryRepo > #given a transient ref lock on the first attempt #when a repo is initialized #then the retry lets HEAD settle [302.57ms]
+
+packages/memory-core/src/git/path-state.test.ts:
+(pass) GitPathStateStore > captures stage-zero index and raw worktree identities independently [396.08ms]
+(pass) GitPathStateStore > captures and restores executable modes [397.49ms]
+(pass) GitPathStateStore > hashes and writes blobs both raw and through path filters [420.06ms]
+(pass) GitPathStateStore > sets and removes index entries without changing the worktree [420.39ms]
+(pass) GitPathStateStore > atomically materializes and removes worktree files idempotently [291.30ms]
+(pass) GitPathStateStore > rejects traversal, worktree symlinks, and index symlinks [252.80ms]
+(pass) GitPathStateStore > rejects unmerged entries [442.92ms]
+(pass) GitPathStateStore > rejects unsupported index modes [310.31ms]
+
+packages/memory-core/src/git/config-lock.test.ts:
+(pass) serialized git config > #given transient config.lock failures #when a mutation runs #then it retries with bounded backoff [77.16ms]
+(pass) serialized git config > #given two concurrent configSet calls #when they mutate one repo #then their git config processes do not overlap [439.18ms]
+(pass) git lock error classification > #given a real index.lock contention message #when classified #then it is a retryable lock error [0.27ms]
+(pass) git lock error classification > #given a ref lock failure #when classified #then it is a retryable lock error [0.13ms]
+(pass) git lock error classification > #given the config.lock message #when classified #then it stays a retryable lock error [0.10ms]
+(pass) git lock error classification > #given an unrelated git failure #when classified #then it is NOT retryable [0.15ms]
+(pass) git lock retry > #given transient index.lock failures #when an operation runs #then it retries and finally succeeds [77.42ms]
+(pass) git lock retry > #given a lock that never clears #when the retry budget is exhausted #then the original error surfaces [380.77ms]
+(pass) git lock retry > #given a non-lock git failure #when an operation runs #then it surfaces immediately without retrying [0.42ms]
+
+packages/memory-core/src/reflection/reservation.test.ts:
+(pass) persisted reflection reservation > #given an aborted signal #when reservation starts #then active and pending state remain empty [15.62ms]
+(pass) persisted reflection reservation > #given journal state at threshold #when the persisted machine evaluates a successful settle #then it captures and reserves the cursor snapshot [35.95ms]
+(pass) persisted reflection reservation > #given an async run-id factory #when a reservation is made #then the awaited id names the reserved run [28.91ms]
+(pass) persisted reflection reservation > #given a factory deriving ids from shared state #when reservations race #then minting is serialized so no id is issued twice [56.30ms]
+(pass) persisted reflection reservation > #given a new active reservation #when it is published #then launch-owner identity and reservation time are durable in the same record [23.78ms]
+(pass) persisted reflection reservation > #given simultaneous trigger requests #when reserved #then one becomes active and all others collapse into one atomic pending record [78.61ms]
+(pass) persisted reflection reservation > #given dream outcomes #when runs complete #then dream state advances only for merged and no_changes [74.50ms]
+(pass) persisted reflection reservation > #given a failed active run #when completed #then its cursor is unchanged and valid pending work is promoted [39.15ms]
+(pass) persisted reflection reservation > #given successful compaction-triggered work #when completed #then its snapshot advances and the compaction flag clears exactly once [46.09ms]
+(pass) persisted reflection reservation > #given a pending threshold request made stale by successful cursor advancement #when dequeued #then it is dropped [45.06ms]
+(pass) persisted reflection reservation > #given automatic pending work below its threshold #when dequeued #then it is dropped but a manual pending request remains launchable [49.34ms]
+
+packages/memory-core/src/reflection/machine.test.ts:
+(pass) reflection trigger machine > #given a successful settle at the configured step threshold #when evaluated #then it requests a step-count reservation [0.15ms]
+(pass) reflection trigger machine > #given zero or undefined thresholds #when a successful run settles #then step count never launches [0.10ms]
+(pass) reflection trigger machine > #given an aborted or failed run #when it settles #then no automatic trigger launches [0.07ms]
+(pass) reflection trigger machine > #given compaction was accepted #when several successful boundaries settle #then its reservation is emitted exactly once [0.11ms]
+(pass) reflection trigger machine > #given an active threshold run #when compaction and manual requests arrive #then one pending slot unions conversations and preserves manual priority [0.11ms]
+(pass) reflection trigger machine > #given reflection and dream requests #when they compete for one pending slot #then the specified priority order and newest tie winner are preserved [0.12ms]
+(pass) reflection trigger machine > #given two dream requests during an active reflection #when they merge #then one pending dream unions snapshots and the newest equal-priority request wins [0.11ms]
+(pass) reflection trigger machine > #given interleaved reflection and dream requests #when every bounded event sequence is applied #then at most one active and one pending run exist [0.59ms]
+(pass) reflection trigger machine > #given every completion outcome #when the active run completes #then only merged and no_changes advance its captured cursor [0.16ms]
+(pass) reflection trigger machine > #given a failed active run and a queued request #when completed #then the cursor stays unmoved and pending is promoted [0.10ms]
+(pass) reflection trigger machine > #given pending automatic work became stale #when dequeued #then it is dropped, while manual work survives [0.10ms]
+
+packages/memory-core/src/reflection/completion-validation.test.ts:
+(pass) dream token budget completion validation > #given a pressure dream whose merged system estimate remains at target #when validated #then budget_not_met is recorded [0.17ms]
+(pass) dream token budget completion validation > #given a pressure dream below target #when validated #then the estimate is clean [0.09ms]
+(pass) dream token budget completion validation > #given a non-pressure dream above target #when validated #then the estimate is reported without failing [0.07ms]
+(pass) reflection completion validation > #given an uncommitted worktree edit #when finalized #then it reports dirty_uncommitted and cleans up [437.75ms]
+(pass) reflection completion validation > #given the linked-worktree .git administration file is altered #when finalized #then validation fails and cleans up [500.97ms]
+
+packages/memory-core/src/reflection/worktree.test.ts:
+(pass) reflection worktree finalization > #given recorded identity before Git creation #when cleanup runs #then missing resources are idempotently confirmed absent [422.79ms]
+(pass) reflection worktree finalization > #given a precreate callback #when a worktree is created #then identity is published before Git resources exist [392.91ms]
+(pass) reflection worktree finalization > #given a clean committed reflection #when auto-finalized #then it no-ff merges and cleans up [807.45ms]
+(pass) reflection worktree finalization > #given a document-maintenance allowlist #when the child changes another path #then nothing is merged [867.97ms]
+(pass) reflection worktree finalization > #given a reflection with no commits #when finalized #then it reports no_changes and cleans up [496.69ms]
+(pass) reflection worktree finalization > #given conflicting child and parent commits #when auto-finalized #then merge aborts cleanly and cleanup always runs [958.73ms]
+(pass) reflection worktree finalization > #given a dirty parent #when auto-finalized #then it refuses before merge and cleans up [643.82ms]
+(pass) reflection worktree finalization > #given a non-conflicting parent advance after launch #when auto-finalized #then recorded-base drift merges successfully [825.27ms]
+(pass) reflection worktree finalization > #given an externally merged reflection branch #when explicit finalization verifies reachability #then it reports merged and cleans up [704.65ms]
+
+packages/memory-core/src/reflection/worktree-integration.test.ts:
+(pass) reflection worktree integration > #given a validated tip #when auto integration lands #then it creates a no-ff receipt without cleaning resources [618.02ms]
+(pass) reflection worktree integration > #given legacy auto receipts #when probed without a validated tip #then only the exact trailer is accepted [439.60ms]
+(pass) reflection worktree integration > #given a landed auto merge #when probed #then exact receipt and validated-tip ancestry prove integration [636.56ms]
+(pass) reflection worktree integration > #given a matching receipt that excludes the validated tip #when probed #then it is rejected [596.31ms]
+(pass) reflection worktree integration > #given a non-exact receipt on an integrated tip #when auto mode probes #then only ancestry is accepted [725.72ms]
+(pass) reflection worktree integration > #given external integration without a receipt #when either mode probes #then ancestry proves integration [648.36ms]
+(pass) reflection worktree integration > #given an owned interrupted merge #when auto integration retries #then it aborts that merge and lands one clean merge [700.64ms]
+(pass) reflection worktree integration > #given foreign merge residue #when auto integration runs #then parent index and merge state remain untouched [905.64ms]
+(pass) reflection worktree integration > #given present then absent resources #when cleanup repeats #then both receipts confirm absence [515.64ms]
+
+packages/memory-core/src/recall/assets/assets.test.ts:
+(pass) memorian persona asset > #given the source asset #when loaded through assets.ts #then it equals the real file and is non-empty [0.17ms]
+
+packages/memory-core/src/reflection/assets/assets.test.ts:
+(pass) dream persona asset > #given the source asset and the packaged plugin copy #when loaded and read #then all copies are identical [0.31ms]
+(pass) dream persona asset > #given the dream persona #when parsed as sections #then the machine budget-contract anchor is embedded [0.13ms]
+(pass) dream persona asset > #given the dream persona #when parsed as sections #then the memory-usage ledger input is documented [0.12ms]
+(pass) reflection persona asset > #given the source asset #when loaded through assets.ts #then it equals the real source [0.17ms]
+(pass) reflection persona asset > #given the reflection persona asset #when trailer keys are parsed #then the runtime keys are present [0.18ms]
+
+ 615 pass
+ 0 fail
+ 4791 expect() calls
+Ran 615 tests across 76 files. [121.97s]

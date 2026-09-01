@@ -3,8 +3,9 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { loadAgents, registerAgent, resolveToolRule } from "../index"
-import { clearRegisteredAgentsForTests } from "./registry"
+import { loadAgents } from "./loader"
+import { clearRegisteredAgentsForTests, registerAgent } from "./registry"
+import { resolveToolRule } from "./tools"
 
 const fixtureRoots: string[] = []
 
@@ -303,6 +304,25 @@ Reader
     const rules = result.agents.reader?.tools ?? []
     expect(resolveToolRule(rules, "read")).toBe(true)
     expect(resolveToolRule(rules, "shell")).toBe(false)
+  })
+
+  test("#given activated Senpi agent overlays and model catalog aliases #when loading #then the Senpi profile view and concrete model chain win", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(
+      join(fixture.project, ".omo", "omo.json"),
+      JSON.stringify({
+        agents: { finder: { model: "base" } },
+        models: { quick: { model: "provider/quick", reasoningEffort: "low" } },
+        "[senpi]": { agents: { finder: { model: "quick" } } },
+        profiles: { focused: { "[senpi]": { agents: { finder: { model: "provider/focused" } } } } },
+      }),
+    )
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project, env: { OMO_PROFILE: "focused" } })
+
+    // then
+    expect(result.agents.finder?.model).toBe("provider/focused")
   })
 
   test("#given snake case omo agent keys #when loading #then fields normalize to camelCase definitions", () => {

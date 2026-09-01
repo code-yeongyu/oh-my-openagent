@@ -37,6 +37,23 @@ describe("manager wiring seams (W1-V F3/F7)", () => {
     expect(manager.wasBackground(sync.task_id)).toBe(false)
   })
 
+  test("#given a foreground spawn #when promoted twice #then the first call flips live background state and the second is idempotent", async () => {
+    // given
+    const { manager } = makeManager()
+    const started = await manager.start(baseSpec({ run_in_background: false }))
+    if (started.kind !== "started") throw new Error("expected started")
+    expect(manager.wasBackground(started.task_id)).toBe(false)
+
+    // when
+    const first = manager.promoteToBackground(started.task_id)
+    const second = manager.promoteToBackground(started.task_id)
+
+    // then
+    expect(first).toBe(true)
+    expect(second).toBe(false)
+    expect(manager.wasBackground(started.task_id)).toBe(true)
+  })
+
   test("#given an admit gate that rejects #when starting #then start returns residency_denied and never launches", async () => {
     // given
     const admit = (): Promise<SpawnAdmission> => Promise.resolve({ kind: "rejected", message: "cap reached" })

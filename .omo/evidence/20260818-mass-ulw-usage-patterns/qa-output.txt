@@ -1,0 +1,31 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/skills-sync.test.ts:
+(pass) OMO Senpi scoped skill sync > #given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen [0.55ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 23 roots exist with valid names [0.28ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [0.85ms]
+(pass) OMO Senpi scoped skill sync > #given codex-derived and native skill roots #when scanned #then no Codex or multi-agent harness guidance survives [1.25ms]
+(pass) OMO Senpi scoped skill sync > #given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization [0.49ms]
+(pass) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.09ms]
+(pass) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom [0.11ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill tree #when inspected #then no codex-only display metadata is packaged [2.19ms]
+(pass) OMO Senpi scoped skill sync > #given ported orchestration skills #when scanned #then no foreign-harness delegation guidance survives [0.43ms]
+(pass) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.06ms]
+
+packages/omo-senpi/plugin/scripts/native-skill-sources.test.mjs:
+(pass) createNativeSkillSources > #given the registry #when ordered names are extracted #then they match the expected alphabetical sequence including onboarding [0.56ms]
+(pass) createNativeSkillSources > #given the registry #when the name set is built #then it contains exactly the same entries as the ordered list [0.11ms]
+(pass) createNativeSkillSources > #given each source entry #when the path is resolved #then it points to an existing directory under the native skills root [0.17ms]
+(pass) createNativeSkillSources > #given onboarding skill #when checked #then it is present in the registry at the correct position [0.09ms]
+
+packages/omo-senpi/src/components/task/mass-ulw-protocol-doc.test.ts:
+(pass) mass-ulw protocol doc > #given every backticked omo.dag.* name in the doc > #when checked against the shipped bridge and handler sources > #then each name exists as a string literal in the source [0.10ms]
+(pass) mass-ulw protocol doc > #given every backticked omo.dag.* name in the doc > #when checked against the shipped bridge and handler sources > #then the doc covers all four channels and all four request methods [0.07ms]
+(pass) mass-ulw protocol doc > #given every backticked dag.* journaled event type in the doc > #when compared with DAG_RUN_EVENT_TYPES > #then each doc type is a shipped type and every shipped type is documented [0.09ms]
+(pass) mass-ulw protocol doc > #given the documented overflow payload fields > #when compared with the shipped event union > #then the field names match exactly [0.13ms]
+(pass) mass-ulw protocol doc > #given the documented error codes > #when compared with DAG_RPC_ERROR_CODES > #then every shipped code appears in the doc [0.07ms]
+
+ 19 pass
+ 0 fail
+ 240 expect() calls
+Ran 19 tests across 3 files. [121.00ms]

@@ -1,6 +1,6 @@
-# src/ — Plugin Source
+# src/ - Plugin Source
 
-**Generated:** 2026-06-23
+**Generated:** 2026-08-07 / 51ab1e5b6
 
 ## STOP. THIS IS THE OPENCODE PLUGIN. QA IS MANDATORY. EVERY SINGLE TIME YOU CHANGE ANYTHING HERE.
 
@@ -29,7 +29,7 @@ Entry `index.ts` orchestrates a staged initialization across the directories bel
 |------|---------|
 | `index.ts` | Plugin entry; default-exports `pluginModule: PluginModule` with `{ id, server }` |
 | `plugin-config.ts` | JSONC parse, multi-level merge (user + walked project), Zod v4 validation, migration |
-| `plugin-state.ts` | `createModelCacheState()` — model resolution cache shared across handlers |
+| `plugin-state.ts` | `createModelCacheState()`: model resolution cache shared across handlers |
 | `plugin-interface.ts` | 12 OpenCode hook handlers wired into `Hooks` (a further 2, `experimental.session.compacting` + `experimental.compaction.autocontinue`, are wired in `src/testing/create-plugin-module.ts`, for 14 total) |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry composition |
@@ -54,15 +54,16 @@ serverPlugin(input, options)
 
 ```
 loadPluginConfig(directory, ctx)
-  1. User: ~/.config/opencode/oh-my-openagent.jsonc (legacy: oh-my-opencode.jsonc)
-  2. Walked configs: <pwd up to $HOME>/.opencode/oh-my-openagent.jsonc
+  1. User: ~/.omo/omo.jsonc
+  2. Walked configs: <pwd up to $HOME>/.omo/omo.jsonc
   3. mergeConfigs(user, walked)
      - agents/categories/claude_code: deepMerge (recursive, prototype-pollution safe)
      - disabled_*: Set union
      - mcp_env_allowlist: user-only (security)
+     - playwright_mcp_args: user-only (security)
      - others: override replaces
   4. Zod safeParse → defaults for omitted fields
-  5. migrateConfigFile() → idempotent via _migrations tracking + timestamped backups
+  5. Legacy configuration is migrated once at startup into the unified OMO chain
 ```
 
 ## HOOK COMPOSITION (5-tier)
@@ -72,11 +73,12 @@ Counts verified from each composer's return object. Numbers in brackets show cou
 ```
 createHooks()
   ├─→ createCoreHooks()
-  │   ├─ createSessionHooks()     # 22: preemptiveCompaction,
+  │   ├─ createSessionHooks()     # 24: preemptiveCompaction,
   │   │                             sessionNotification, thinkMode, modelFallback,
   │   │                             anthropicContextWindowLimitRecovery, autoUpdateChecker,
+  │   │                             codegraphBootstrap, astGrepSgProvision,
   │   │                             agentUsageReminder, nonInteractiveEnv, interactiveBashSession,
-  │   │                             ralphLoop, editErrorRecovery, delegateTaskRetry, startWork,
+  │   │                             goal, editErrorRecovery, delegateTaskRetry, ulwExecute,
   │   │                             prometheusMdOnly, sisyphusJuniorNotepad, noSisyphusGpt,
   │   │                             noHephaestusNonGpt, hephaestusAgentsMdInjector,
   │   │                             questionLabelTruncator, taskResumeInfo,
@@ -88,9 +90,10 @@ createHooks()
   │   │                             jsonErrorRecovery, readImageResizer, todoDescriptionOverride,
   │   │                             webfetchRedirectGuard, fsyncSkipWarning,
   │   │                             notepadWriteGuard, planFormatValidator [+ teamToolGating]
-  │   └─ createTransformHooks()   # 4 [+2 with team-mode]: claudeCodeHooks, keywordDetector,
-  │                                  contextInjectorMessagesTransform,
-  │                                  toolPairValidator [+ teamModeStatusInjector, teamMailboxInjector]
+  │   └─ createTransformHooks()   # 4 [+2 team-mode, +1 monitor-gated]: claudeCodeHooks,
+  │                                  keywordDetector, contextInjectorMessagesTransform,
+  │                                  toolPairValidator [+ teamModeStatusInjector,
+  │                                  teamMailboxInjector, monitorStatusInjector (monitor.enabled)]
   ├─→ createContinuationHooks()   # 7: stopContinuationGuard, compactionContextInjector,
   │                                  compactionTodoPreserver, todoContinuationEnforcer (boulder),
   │                                  unstableAgentBabysitter, backgroundNotificationHook, atlasHook
@@ -101,30 +104,32 @@ createHooks()
     team-member-error-handler, team-member-status-handler
 ```
 
-Total: 53 base, 60 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
+Total: 54 base, 61 with team-mode, 62 with monitor enabled. Authoritative per-tier breakdown: [`hooks/AGENTS.md`](hooks/AGENTS.md). Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
 
 ## SUBSYSTEM INVENTORY
 
 | Subdir | Purpose | Has AGENTS.md |
 |--------|---------|---------------|
 | `agents/` | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
-| `hooks/` | 53-60 lifecycle hooks across 60 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, todo-continuation-enforcer) |
+| `hooks/` | 54-62 lifecycle hooks across 62 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, todo-continuation-enforcer) |
 | `tools/` | 14 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
-| `features/` | 23 feature modules (some now shimming `team-core`, `tmux-core`, `skills-loader-core`, `mcp-client-core`, and `claude-code-compat-core`) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
+| `features/` | 24 feature modules (including `btw-side`, `opengateway-provider`; some now shimming `team-core`, `tmux-core`, `skills-loader-core`, `mcp-client-core`, and `claude-code-compat-core`) | yes (+ 16 sub-AGENTS.md including team-mode, background-agent, btw-side, claude-code-*) |
 | `shared/` | Cross-cutting adapter utilities plus shims over extracted Core packages, barrel-exported | yes |
 | `cli/` | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
 | `plugin/` | 12 OpenCode hook handlers + hook composition | yes |
 | `config/` | Zod v4 schema files | yes |
 | `plugin-handlers/` | 6-phase config loading pipeline | yes |
 | `openclaw/` | Bidirectional Discord/Telegram/HTTP integration | yes |
-| `__tests__/` | Plugin-level integration tests + perf fixtures | — |
+| `__tests__/` | Plugin-level integration tests + perf fixtures | yes |
 | `mcp/` | 5 built-in MCPs (3 remote + local stdio lsp + codegraph) | yes |
-| `testing/` | Test utilities + `create-plugin-module.ts` | — |
-| `help/` | CLI help schema definitions (acp, doctor, sandbox, status) | — |
-| `locales/` | i18n strings (en, zh): toasts + model-fallback labels | — |
+| `testing/` | Test utilities + `create-plugin-module.ts` | yes |
+| `config-migration/` | Legacy config discovery + transform plans (consumed by senpi config-startup + codex startup) | yes |
+| `types/` | Ambient `.d.ts` declarations (markdown modules) | no |
+| `help/` | CLI help schema definitions (acp, doctor, sandbox, status) | no |
+| `locales/` | i18n strings (en, zh): toasts + model-fallback labels | no |
 
 ## NOTES
 
 - `plugin-interface.ts` is the **only** layer that talks to OpenCode's `Plugin` API. Every other file goes through it.
-- Reach for `shared/` before adding helpers anywhere else — duplicate utilities WILL be flagged in review.
+- Reach for `shared/` before adding helpers anywhere else; duplicate utilities WILL be flagged in review.
 - Path aliases are forbidden. Use relative imports within a module, barrel imports across modules.

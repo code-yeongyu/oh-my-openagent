@@ -144,6 +144,27 @@ describe("lazycodex bin wrapper", () => {
       "/tmp/lazycodex-qa",
     ]);
   });
+
+  test("routes flag-prefixed lazycodex uninstall to the Node installer", async () => {
+    // #given
+    const fixture = await createLazyCodexFixture();
+    const nodePath = Bun.which("node") ?? "node";
+
+    // #when
+    const result = spawnSync(nodePath, [fixture.lazycodexBin, "--dry-run", "uninstall", "--project", "/tmp/lazycodex-qa"], {
+      encoding: "utf8",
+      env: createWrapperTestEnv(fixture),
+    });
+
+    // #then
+    expect(result.status).toBe(19);
+    expect((await readFile(join(fixture.captureDir, "node-installer-args"), "utf8")).trim().split("\n")).toEqual([
+      "--dry-run",
+      "uninstall",
+      "--project",
+      "/tmp/lazycodex-qa",
+    ]);
+  });
 });
 
 function createWrapperTestEnv(

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
 
+import "./residency-unlimited.test"
 import { createTaskLifecycle } from "../lifecycle"
 import type { ResidentHandle, ResidencyRegistry } from "../lifecycle"
 import type { ResolvedModelRecord } from "../state"
@@ -246,8 +247,9 @@ describe("TaskManager.start", () => {
 
     const rawRecord = readFileSync(join(store.stateDir, "tasks", `${result.task_id}.json`), "utf8")
     expect(rawRecord).toContain('"resolved_model"')
-    expect(rawRecord).not.toContain("private prompt payload")
-    expect(rawRecord).not.toContain('"prompt"')
+    // The spawn_spec v1 persisted at spawn deliberately carries the effective prompt for respawn
+    // rebuilds; message transcripts still never land on the record.
+    expect(rawRecord).toContain("private prompt payload")
     expect(rawRecord).not.toContain('"messages"')
   })
 
@@ -293,7 +295,7 @@ describe("TaskManager.start", () => {
       reason: "Task runner failed to start.",
     })
     expect(row).toBe(
-      `task category:ultrabrain (GPT-5.6 Sol reasoning:xhigh) <i>background</i> error id:${result.details.task_id} reason:Task runner failed to start.`,
+      `task category:ultrabrain(openai/gpt-5.6-sol:xhigh) <i>background</i> error id:${result.details.task_id} reason:Task runner failed to start.`,
     )
     expect(JSON.stringify({ result, row })).not.toContain(privatePrompt)
   })
@@ -398,6 +400,29 @@ describe("TaskManager.waitFor", () => {
     // then
     expect((await waiting).final_response).toBe("done")
     expect(manager.waiterKeyCount()).toBe(0)
+  })
+})
+
+describe("TaskManager child subscriptions", () => {
+  test("#given a pending task #when its concurrency slot is promoted #then the deferred child listener attaches to its managed handle", async () => {
+    const runner = new FakeRunner()
+    const { manager } = makeManager({ config: settings({ default_concurrency: 1 }), inProcess: runner, process: runner })
+    const first = await manager.start(baseSpec({ name: "running" }))
+    const queued = await manager.start(baseSpec({ name: "queued" }))
+    if (first.kind !== "started" || queued.kind !== "started") throw new Error("expected starts")
+    expect(queued.status).toBe("pending")
+
+    const unsubscribe = manager.subscribeChild(queued.task_id, () => {})
+    expect(runner.handles.get(queued.task_id)).toBeUndefined()
+
+    runner.handles.get(first.task_id)?.settle({ status: "completed", finalResponse: "done" })
+    await flush()
+
+    const promoted = runner.handles.get(queued.task_id)
+    // Owned transcript + run-stats subscriptions plus the deferred external child listener.
+    expect(promoted?.subscribeCount()).toBe(3)
+    unsubscribe()
+    expect(promoted?.unsubscribeCount()).toBe(1)
   })
 })
 

@@ -61,6 +61,7 @@ function writeSweepReport(stdout: HookStdout, result: SweepCodegraphZombiesResul
 		failed: result.failed,
 		killed: result.killed.map(formatProcess),
 		ownedRoots: result.ownedRoots,
+		spared: result.spared.map(formatProcess),
 		stampFile: result.stampFile,
 	})}\n`);
 }

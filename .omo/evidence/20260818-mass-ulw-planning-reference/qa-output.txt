@@ -1,0 +1,20 @@
+=== final qa capture ===
+(pass) mass-ulw protocol doc > #given the documented error codes > #when compared with DAG_RPC_ERROR_CODES > #then every shipped code appears in the doc [0.07ms]
+
+ 19 pass
+ 0 fail
+ 240 expect() calls
+Ran 19 tests across 3 files. [109.00ms]
+=== git status ===
+ M packages/omo-senpi/skills/mass-ulw/SKILL.md
+D  packages/omo-senpi/skills/mass-ulw/skill-contract.test.ts
+?? packages/omo-senpi/skills/mass-ulw/references/
+=== log convention ===
+3cb1d63c4 Merge pull request #6904 from code-yeongyu/feat/ulw-plan-constraint-sweep
+004fe9dd4 Merge pull request #6903 from code-yeongyu/feat/ulw-loop-assumed-constraints
+381738a96 feat(ulw-plan): sweep extrinsic constraints (budget/stack/scale/audience) across editions
+1301238f2 feat(ulw-loop): derive assumed constraints when the brief is silent
+8281cefbf test(omo-senpi): give mass-ulw python AST-parse test a 60s timeout
+028165f93 fix(omo-senpi): resolve python interpreter portably in mass-ulw skill contract test
+bb5cc9e80 docs(omo-senpi): add mass-ulw skill
+13a034b83 fix(ulw-plan): bound high-accuracy review convergence
