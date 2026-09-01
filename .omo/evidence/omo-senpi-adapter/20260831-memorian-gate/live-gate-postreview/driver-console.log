@@ -1,0 +1,99 @@
+senpi: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/node_modules/@code-yeongyu/senpi/dist/cli.js (2026.8.31)
+outDir: .omo/evidence/omo-senpi-adapter/20260831-memorian-gate/live-gate-postreview
+PASS HAPPY corpus note committed at HEAD :: HEAD=d3ea3846b11c files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md
+PASS HAPPY turn 1 is the session's FIRST turn (exactly one user message) :: userTurns=1
+PASS HAPPY turn 1 settle spawned the gate child exactly once :: invocations=1
+PASS HAPPY child argv carries the production flag set (--no-extensions + -e + --tools nudge,read) :: ["-p","--system-prompt","/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163cbfa2/memorian-persona.md","--tools","nudge,read","-e","/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163c
+PASS HAPPY child env carries the memorian sentinel and the nudge sink :: sentinel=1 nudgePath=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/runs/2280e4c1-1bae-4c03-bc42-386a163cbfa2/nudges.ndjson
+PASS HAPPY candidates payload handed to the child contains the seeded note :: {"version":1,"maxItems":2,"candidates":[{"path":"reference/project/test-note.md","description":"Project rebase ordering rule captured for memorian gate QA","excerpt":"The zebra-quokka rebase ordering rule says: rebase the oldest reviewed branch first, then replay the dependent branches in merge order so the stack never inverts.","score":6.9}],"surfaced":[]}
+PASS HAPPY turn 1 carries NO recall entry (the gate advises the NEXT turn) :: count=0
+PASS HAPPY the validated nudge persisted to the pending store after turn 1 :: {"dir":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/pending","files":[{"name":"01a05b6d-0000-7000-8000-00000000000a.json","payload":{"version":1,"sessionId":"01a05b6d-0000-7000-8000-00000000000a","writtenAt":"2026-09-01T07:27:22.033Z","nudges":[{"path":"reference/project/test-note.md","hint":"Rebase the oldest reviewed 
+PASS HAPPY turn 2 JSONL contains an omo-memorian:recall entry :: count=2 shapes=custom,custom_message
+PASS HAPPY turn 2 content carries <recalled-memory source="[[reference/project/test-note.md]]" :: 
+<recalled-memory source="[[reference/project/test-note.md]]">
+A stored memory surfaced. It is a hint, not current state — verify before relying on it; read the source path for full context.
+Rebase the oldest reviewed branch first so the dependent stack never inverts.
+</recalled-memory>
+PASS HAPPY turn 2 content carries the stub judge's hint verbatim :: 
+<recalled-memory source="[[reference/project/test-note.md]]">
+A stored memory surfaced. It is a hint, not current state — verify before relying on it; read the source path for full context.
+Rebase the oldest reviewed branch first so the dependent stack never inverts.
+</recalled-memory>
+PASS HAPPY the pending file was consumed by the injection :: {"dir":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD/memory/agents/project-af42b011/runtime/recall/pending","files":[]}
+PASS HAPPY the ledger marks the injected path as surfaced :: {"present":true,"files":[{"name":"01a05b6d-0000-7000-8000-00000000000a.json","surfaced":["reference/project/test-note.md"]}]}
+PASS DISABLED corpus note committed at HEAD :: HEAD=9263c69af1a2 files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md
+PASS DISABLED session ran 2 turn(s) :: userTurns=2
+PASS DISABLED zero omo-memorian:recall entries :: count=0 []
+PASS DISABLED nothing pending for a later turn :: {"dir":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pkryq1/memory/agents/project-86bfe8ca/runtime/recall/pending","files":[]}
+PASS DISABLED the gate child never spawned :: invocations=0 []
+PASS NO-CANDIDATES corpus note committed at HEAD :: HEAD=7680269bef7f files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md
+PASS NO-CANDIDATES session ran 2 turn(s) :: userTurns=2
+PASS NO-CANDIDATES zero omo-memorian:recall entries :: count=0 []
+PASS NO-CANDIDATES nothing pending for a later turn :: {"dir":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ARnZNp/memory/agents/project-752b2044/runtime/recall/pending","files":[]}
+PASS INVALID-NUDGE corpus note committed at HEAD :: HEAD=3971890a0ee0 files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md
+PASS INVALID-NUDGE session ran 2 turn(s) :: userTurns=2
+PASS INVALID-NUDGE zero omo-memorian:recall entries :: count=0 []
+PASS INVALID-NUDGE nothing pending for a later turn :: {"dir":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-Fu2E1w/memory/agents/project-bcfda2c1/runtime/recall/pending","files":[]}
+PASS INVALID-NUDGE the gate child DID spawn (the rejection is the parent validator's) :: invocations=2
+PASS LOOP no facts/reflection projection derives from the injected nudge :: projections=4 recallDerived=0 []
+PASS LOOP the source session really contains the injection :: count=2
+PASS REAL-CHILD production argv keeps --no-extensions alongside the explicit -e extension :: ["/Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/node_modules/@code-yeongyu/senpi/dist/cli.js","-p","--system-prompt","/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna/memorian-run/memorian-persona.md","--tools","nudge,read","-e","/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-utfDna/memorian-run/nudge-extension.ts","--no-extension
+PASS REAL-CHILD production argv restricts tools to nudge,read :: --tools nudge,read
+PASS REAL-CHILD the real child booted and exited cleanly :: status=0 stderr=
+PASS REAL-CHILD the real child's NDJSON line matches the scripted nudge EXACTLY :: lines=1 first={"path":"reference/project/test-note.md","hint":"Rebase the oldest reviewed branch first so the dependent stack never inverts."}
+PASS SINGLE-TURN corpus note committed at HEAD :: HEAD=be65402fcb8e files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md
+PASS SINGLE-TURN session ran 1 turn(s) :: userTurns=1
+PASS SINGLE-TURN zero omo-memorian:recall entries :: count=0 []
+PASS SINGLE-TURN the judged nudge is parked for a turn that never came :: {"dir":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-0ryP4y/memory/agents/project-e78fb207/runtime/recall/pending","files":[{"name":"01a05b6d-0000-7000-8000-00000000000f.json","payload":{"version":1,"sessionId":"01a05b6d-0000-7000-8000-00000000000f","writtenAt":"2026-09-01T07:27:43.667Z","nudges":[{"path":"reference/project/test-note.md","hint":"Rebase the oldest reviewed 
+PASS SINGLE-TURN the gate child DID spawn (the rejection is the parent validator's) :: invocations=1
+PASS isolation: real ~/.senpi/agent untouched (volatile paths excluded) :: 52858ff24259 vs 52858ff24259
+PASS isolation: real ~/.omo/memory has no QA-attributable pending nudge or corpus file :: before={"agents":414,"pendingFiles":[],"tokenBearingFiles":[]} after={"agents":414,"pendingFiles":[],"tokenBearingFiles":[]}
+PASS cleanup: every sandbox removed :: [{"root":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FX7rJD","exists":false},{"root":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-pkryq1","exists":false},{"root":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ARnZNp","exists":false},{"root":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-Fu2E1w","ex
+{
+  "result": "PASS",
+  "scenarioVerdicts": [
+    {
+      "scenario": "HAPPY",
+      "verdict": "PASS",
+      "assertions": 13,
+      "failed": []
+    },
+    {
+      "scenario": "DISABLED",
+      "verdict": "PASS",
+      "assertions": 5,
+      "failed": []
+    },
+    {
+      "scenario": "NO-CANDIDATES",
+      "verdict": "PASS",
+      "assertions": 4,
+      "failed": []
+    },
+    {
+      "scenario": "INVALID-NUDGE",
+      "verdict": "PASS",
+      "assertions": 5,
+      "failed": []
+    },
+    {
+      "scenario": "LOOP",
+      "verdict": "PASS",
+      "assertions": 2,
+      "failed": []
+    },
+    {
+      "scenario": "REAL-CHILD",
+      "verdict": "PASS",
+      "assertions": 4,
+      "failed": []
+    },
+    {
+      "scenario": "SINGLE-TURN",
+      "verdict": "PASS",
+      "assertions": 5,
+      "failed": []
+    }
+  ],
+  "failures": []
+}

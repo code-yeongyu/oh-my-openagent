@@ -1,0 +1,19 @@
+=== a harness-owned orphan shaped exactly like a stale interactive engine ===
+fixture pid: 60037
+60037     1 00:01 ??       node /tmp/omo-reap-fixture/senpi/dist/cli.js --extension /tmp/omo-reap-fixture/plugin
+
+=== it is reported as stale ===
+WARN stale engine pid 60037 (age 00:01, tty ??) has no launcher; it was orphaned by a signaled launcher
+INFO reap them explicitly by pid: omo doctor --reap 60037 76071 90220 90387 75183 90878
+
+=== omo doctor --reap $FIXTURE ===
+PASS reaped stale engine pid 60037 (age 00:01, tty ??)
+exit=0
+
+=== it is gone ===
+pid 60037 no longer exists
+
+=== the user's stale pids are untouched throughout ===
+90387     1    23:20:07
+75183     1 01-02:20:33
+90878     1 01-01:52:49

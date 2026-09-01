@@ -1,243 +1,103 @@
 ---
 name: data-scientist
-description: "Expert data processing specialist with intelligent DuckDB/Polars selection for maximum performance. Always includes numpy, never uses pandas, runs everything through uv. Triggers: 'analyze the data', 'analyze this file', 'what is in this CSV/parquet/json', 'summarize this', 'group by', 'filter rows', 'sort by', 'join these files', 'merge datasets', 'time series trend', 'last 30 days data', 'compare yesterday and today', 'distribution/histogram', 'correlation', 'clean duplicates', 'handle missing values', 'dataset larger than RAM', 'SQL query on files', 'DataFrame operations', 'chart/plot this data', DuckDB vs Polars selection, quick data exploration CLI. NOT for plain text/code inspection, configs, or tiny inline math."
+description: "Expert data processing with a hybrid engine strategy: resident-kernel engines first - DuckDB plus a resident Python stack (Polars/numpy/matplotlib) in persistent js/py eval kernels where the harness has them, bun/uv one-shots elsewhere - and per-action placement judgment (in-memory vs streaming vs remote-in-place). Triggers: 'analyze the data', 'what is in this CSV/parquet/json', 'summarize this', 'group by', 'filter rows', 'sort by', 'join these files', 'merge datasets', 'time series trend', 'compare yesterday and today', 'distribution/histogram', 'correlation', 'clean duplicates', 'handle missing values', 'dataset larger than RAM', 'SQL query on files', 'DataFrame operations', 'chart/plot this data', DuckDB vs Polars selection, quick data exploration CLI. NOT for plain text/code inspection, configs, or tiny inline math."
 ---
 
-# Data Scientist: High-Performance Data Processing Expert
+# Data Scientist: Hybrid-Engine Data Processing
 
-## Role & Expertise
+Answer data questions through the cheapest engine and surface that can prove the answer, and
+decide where the computation should live before touching the data.
 
-Performance-obsessed data scientist with expertise in:
-- Intelligent tool selection: DuckDB vs Polars based on operation characteristics
-- Zero-copy data interchange via Apache Arrow
-- Memory-efficient processing for datasets exceeding RAM
-- SQL and DataFrame API mastery for analytical workloads
+## Execution surfaces: resident kernel first
 
-## Environment Setup
+A persistent REPL/eval kernel (many harnesses expose one for JavaScript and Python) is the
+default surface. Reason: each one-shot process pays roughly a second of spawn-plus-import
+overhead and re-scans the input file, while a resident connection amortizes both — after a
+one-time load, repeat queries return in milliseconds. Exploration is repeat queries, so this
+difference dominates the session.
 
-Everything runs through **uv**. If `uv` is not on PATH, set it up first — pick the path that matches the system and run it, no manual guesswork:
+1. **JavaScript kernel (Bun)**: run `scripts/ensure-js-deps.sh` once; it prints the absolute
+   import path for `@duckdb/node-api`. Dynamic-import it, connect once, query across cells.
+2. **Python kernel**: the default surface for Python work. duckdb/numpy/matplotlib are
+   typically resident; Polars and pyarrow come from `scripts/ensure-py-deps.sh`, which
+   installs them once into a user cache keyed to the kernel's interpreter —
+   `sys.path.insert` the printed directory and import. The interpreter itself is never
+   mutated.
+3. **uv lane** (`uv run --with ...`): isolation for a heavy or crash-prone one-shot that
+   should not take the kernel down.
+4. **No kernel** (plain-shell harness): the same engines as one-shots — `bun -e` for
+   DuckDB-js, `uv run python -c` for the Python stack — batching several questions per
+   process.
 
-```bash
-bash scripts/setup-uv.sh        # macOS / Linux / WSL / Git Bash — auto-detects OS + arch, installs or updates uv to latest
-```
+Per-surface patterns and pitfalls: read `references/execution-surfaces.md` before first use.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/setup-uv.ps1   # native Windows — installs or updates uv to latest
-```
+## Engine selection
 
-Both scripts detect the platform, install uv when missing (official installer first, Homebrew/winget as fallback), upgrade it when present (`uv self update`), put it on PATH for the current shell, and verify with `uv --version`. The full per-platform matrix, PATH notes, and CI usage live in [references/uv-setup.md](references/uv-setup.md). Verify: `uv --version`.
+- **DuckDB** for SQL-shaped work: direct file queries, joins, aggregation, subqueries,
+  window functions. It queries CSV/Parquet/JSON in place without loading, spills to disk
+  past its memory limit, and reads remote files with the same syntax.
+- **Polars** when the pipeline is DataFrame-shaped: expression-chain transforms, reshapes,
+  streaming datasets past RAM — resident in the Python kernel via `ensure-py-deps.sh`.
+  Read `references/polars-lane.md` — the current 1.x API differs from widely-memorized
+  older spellings.
+- **numpy** when numeric work goes beyond SQL/DataFrame aggregation: statistical tests,
+  linear algebra, FFT, random sampling.
+- **matplotlib** for every chart — read `references/visualization.md` first; it carries the
+  quality bar and a mandatory visual check.
 
-## Core Principles
+Performance folklore ("X is Nx faster at filtering") varies with data shape, cardinality,
+and hardware. When the engine choice materially matters, measure on the actual data instead
+of trusting remembered multipliers.
 
-### ABSOLUTE RULES
+## Placement: decide where the computation lives
 
-1. **ALWAYS include numpy** in all data processing operations (`uv run --with numpy ...`)
-2. **NEVER use pandas** - Polars and DuckDB beat it decisively on every operation; the entire skill assumes pandas is absent
-3. **ALWAYS use Python via `uv run`** for calculations and data processing
-4. **Intelligent tool selection**: Choose DuckDB or Polars based on operation types, NOT arbitrarily
-5. **Zero-copy conversions**: hand data across DuckDB and Polars through Arrow — `duckdb.sql(...).pl()`. Never call `.df()` (returns a pandas frame; crashes without pandas). Keep `pyarrow` in the package set or `.pl()` raises `ModuleNotFoundError`
-6. **Lazy evaluation**: Prefer `scan_csv`/`scan_parquet` and `.collect()` only when needed
-7. **Direct file queries**: Let DuckDB query files directly instead of loading to memory when possible
+Probe before you compute — one cell: file size, free RAM, and (when unclear) a row count via
+a direct scan. Then place the work:
 
-### Standard Package Pattern
+- **Load into memory** when the working set stays within roughly a quarter of free RAM AND
+  the session will run repeated queries: `CREATE TABLE t AS SELECT ...` (or a collected
+  DataFrame) once, then iterate. One scan up front converts every later query from a file
+  re-scan into milliseconds.
+- **Query in place / stream** when the question is single-pass, or the data exceeds RAM:
+  DuckDB reads files directly (`FROM 'data.csv'`); past RAM, cap DuckDB's memory and let it
+  spill, or use Polars' streaming engine in the Python kernel. NEVER load a larger-than-RAM
+  dataset fully into memory — swapping stalls the whole machine, while streaming merely
+  takes longer.
+- **Query remotely, in place** when the data lives elsewhere: DuckDB reads http(s)/S3
+  Parquet and CSV with projection and predicate pushdown, so fetch the columns and rows the
+  question needs, never the whole file. When data sits on another machine you can execute
+  on, ship the query to the data and return the small result. Rule: result much smaller
+  than data — move the query; repeated local iteration planned — move a pruned copy of the
+  data once.
 
-```bash
-# Default for data tasks (numpy + pyarrow are mandatory parts of the set)
-uv run --with numpy --with duckdb --with polars --with pyarrow python -c "{code}"
+Sizing heuristics and recipes: `references/placement.md`.
 
-# With visualization (RECOMMENDED for most analysis requests)
-uv run --with numpy --with duckdb --with polars --with pyarrow --with matplotlib python -c "{code}"
+## Hard rules
 
-# Pure Polars
-uv run --with numpy --with polars python -c "{code}"
+- **NEVER use pandas.** DuckDB and Polars beat it decisively on every workload this skill
+  covers, and the environments this skill assumes do not ship it — `.df()` on a DuckDB
+  result raises unless pandas is installed; convert with `.pl()` via Arrow instead.
+- Excel files are not read directly: export to CSV or Parquet first.
 
-# Pure DuckDB (with the Arrow handoff available)
-uv run --with numpy --with duckdb --with pyarrow python -c "{code}"
-```
+## Output contract
 
-**When to include matplotlib:**
-- User requests visualization: "graph", "chart", "plot", "show me"
-- Exploratory data analysis (EDA): "analyze", "trends", "patterns"
-- Time-series analysis: "over time", "daily", "trends"
-- Distribution analysis: "distribution", "histogram", "statistics"
-- Comparison tasks: "compare", visual comparison implied
-- **Default to including matplotlib** when in doubt - overhead is minimal
+Answer the question; report row counts and timing for anything heavy; then stop — no bonus
+charts, no extra exploration passes beyond what the question needed. Chart when asked, or
+when the answer is a shape (trend, distribution, comparison) that prose cannot carry — then
+follow `references/visualization.md` including its visual QA step.
 
-## Tool Selection Logic
+## References
 
-### Decision Tree (Apply in Order)
+| Read | When |
+| --- | --- |
+| `references/execution-surfaces.md` | before the first query on any surface: kernel patterns, one-shot recipes, escalation rules |
+| `references/polars-lane.md` | DataFrame-shaped pipeline or data past RAM: current API, Arrow handoff, package sets |
+| `references/placement.md` | before heavy or remote work: sizing probe, memory limits, remote reads |
+| `references/visualization.md` | before any chart: type selection, quality bar, CJK fonts, visual QA |
+| `references/uv-setup.md` | uv missing or broken on this machine |
 
-1. **Is it a `.duckdb` file?** → **USE DUCKDB** (native format, optimal performance)
-2. **Simple one-off query without needing full data in memory?** → **USE DUCKDB** (direct file query, zero memory load)
-3. **Very heavy complex SQL query (multi-table joins, window functions)?** → **USE DUCKDB** (superior SQL optimizer)
-4. **Main operation is FILTERING?** → **USE POLARS** (typically the fastest by a wide margin — see benchmarks)
-5. **Main operation is SORTING?** → **USE POLARS** (typically the fastest)
-6. **Complex SQL JOINS needed?** → **USE DUCKDB** (stronger join engine, more join types)
-7. **Heavy GROUP BY AGGREGATIONS?** → **USE DUCKDB** (typically faster on large datasets)
-8. **Window functions with partitioning?** → **POLARS** (typically faster)
-9. **Complex TRANSFORMATIONS (pivot, melt, string ops)?** → **USE POLARS**
-10. **Dataset larger than available RAM?** → **USE POLARS** (streaming support) or **DUCKDB** (out-of-core)
-11. **Mixed operations?** → **USE HYBRID APPROACH** (leverage strengths of both)
+## CLI fallback
 
-### Quick Reference
-
-```
-Simple query → DuckDB
-Heavy complex query → DuckDB
-Filter → Polars
-Sort → Polars
-Join → DuckDB
-Aggregate → DuckDB
-Window → Polars
-Transform → Polars
-Too large for RAM → Polars streaming
-Mixed operations → Hybrid
-```
-
-The exact multipliers these heuristics distill (with sources and caveats — routing heuristics, not guarantees) live in [performance-benchmarks.md](references/performance-benchmarks.md).
-
-## Essential Patterns
-
-### DuckDB Direct File Query
-
-```python
-import duckdb
-# Query file directly - no memory load
-result = duckdb.sql("""
-    SELECT category, SUM(amount) as total
-    FROM 'data.csv'
-    GROUP BY category
-""").pl()  # .pl() -> Polars via Arrow. Requires pyarrow. Never .df() (pandas).
-```
-
-### Polars Lazy Evaluation
-
-```python
-import polars as pl
-# Lazy scan - optimizes and executes once
-result = (
-    pl.scan_csv('data.csv')
-    .filter(pl.col('value') > 100)
-    .sort('value', descending=True)
-    .collect()
-)
-```
-
-### Zero-Copy DuckDB → Polars
-
-```python
-import duckdb
-# Direct conversion via Arrow (pyarrow required in the package set)
-df_polars = duckdb.sql("SELECT * FROM 'data.csv'").pl()
-```
-
-### Hybrid Approach
-
-```python
-import duckdb
-import polars as pl
-
-# Phase 1: DuckDB for joins
-joined = duckdb.sql(
-    "SELECT * FROM 'orders.csv' o "
-    "JOIN 'customers.csv' c ON o.customer_id = c.customer_id"
-).pl()
-
-# Phase 2: Polars for filtering
-filtered = joined.filter(pl.col('amount') > 100)
-
-# Phase 3: Back to DuckDB for aggregation
-duckdb.register('filtered_data', filtered)
-final = duckdb.sql('SELECT category, SUM(amount) FROM filtered_data GROUP BY category').pl()
-```
-
-## Quick Query CLI
-
-For ad-hoc data exploration, use the built-in query runner:
-
-```bash
-# SQL query (uses DuckDB)
-uv run scripts/quick-query.py data.csv "SELECT category, COUNT(*) FROM data GROUP BY category"
-
-# Filter expression — Polars SQL syntax, e.g. "amount > 100" (NOT Python: never passes through eval)
-uv run scripts/quick-query.py data.csv --filter "amount > 100"
-
-# Auto-describe (schema + stats)
-uv run scripts/quick-query.py data.parquet --describe
-```
-
-Supports CSV, Parquet, JSON, NDJSON. Cross-platform (macOS, Linux, Windows). Excel files are not read directly — export to CSV or Parquet first.
-
-## Reference Documentation
-
-For detailed guidance, consult these reference files:
-
-- **Environment setup per platform**: See [uv-setup.md](references/uv-setup.md) — install/update uv on macOS, Linux, Windows, WSL, CI; PATH fixes; `scripts/setup-uv.sh` / `scripts/setup-uv.ps1` automate it.
-- **Performance benchmarks and operation detection**: See [performance-benchmarks.md](references/performance-benchmarks.md)
-- **Integration patterns and best practices**: See [integration-patterns.md](references/integration-patterns.md)
-- **Execution templates**: See [execution-templates.md](references/execution-templates.md)
-- **Common scenarios**: See [common-scenarios.md](references/common-scenarios.md)
-
-## Quality Assurance Process
-
-### Before Execution
-1. **Analyze request** → Detect operation types (filter, join, aggregate, etc.)
-2. **Select optimal tool** → Apply decision tree based on detected operations
-3. **Verify approach** → Confirm tool selection matches the benchmark heuristics
-4. **Check package list** → Ensure numpy AND pyarrow are included
-
-### During Execution
-1. **Use lazy evaluation** when possible (Polars `scan_*`, DuckDB direct queries)
-2. **Monitor for errors** and have fallback strategy ready
-3. **Provide progress updates** for long operations
-
-### After Execution
-1. **Report performance** → Show processing time and row counts
-2. **Validate results** → Confirm output matches expectations
-3. **Document tool choice** → Explain why specific tool was selected
-
-## Activation Context
-
-**Automatic activation triggers:**
-
-### Exploratory Questions
-- "Analyze the data" / "What's in the data" / "What's in this file"
-- "Show me the data" / "Take a look at this file" / "Check the file contents"
-
-### Temporal/Historical Analysis
-- "What happened in the past N days?" / "How's last week's data?"
-- "What's the trend for the last 30 days?" / "Compare yesterday and today"
-
-### Aggregation/Summary Requests
-- "Summarize this" / "What's the total?" / "What's the average?"
-- "Show by category" / "Show statistics" / "How many?"
-
-### Filtering/Search Patterns
-- "Show only above 100" / "Find specific conditions" / "Top 10"
-
-### Comparison/Correlation
-- "Compare A and B" / "What's the difference?" / "Is there a correlation?" / "Merge two files"
-
-### Transformation/Cleaning
-- "Clean this up" / "Remove duplicates" / "Handle missing values" / "Convert format"
-
-### Technical Patterns
-- Working with CSV, Parquet, JSON, NDJSON, or `.duckdb` files
-- File paths ending in `.csv`, `.parquet`, `.json`, `.jsonl`, `.ndjson`, `.tsv`, `.duckdb`
-- Requests involving calculations or aggregations
-- Joining, filtering, sorting, or transforming datasets
-- Processing large datasets that may exceed memory
-- Comparing or analyzing data from multiple sources
-- Performance-critical data operations
-- SQL queries or DataFrame operations mentioned
-
-### When NOT to Activate
-- Simple file reading for text/code inspection (use the harness's file-read surface)
-- Non-data files (images, videos, binaries)
-- Configuration files (YAML, TOML, JSON configs) unless specifically for data analysis
-- Small inline calculations (run them directly)
-- Excel files — convert to CSV/Parquet first
-
----
-
-**Core execution principle:** Always apply intelligent tool selection based on operation characteristics, never use pandas, and always include numpy and pyarrow in the execution environment.
+When no kernel or REPL surface exists, `uv run scripts/quick-query.py <file> [SQL]`
+(`--filter <polars-sql-expr>`, `--describe`) answers ad-hoc questions with zero code.
+Supports CSV, Parquet, JSON, NDJSON.

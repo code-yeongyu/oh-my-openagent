@@ -23,6 +23,18 @@ describe("resolveModelPipeline", () => {
 		expect(hasExplicitUserConfigField).toBe(false);
 	});
 
+	test("resolves catalog fallback entries that already include their provider exactly once", () => {
+		const result = resolveModelPipeline({
+			constraints: { availableModels: new Set(["openrouter/qwen3.5-plus"]) },
+			policy: {
+				fallbackChain: [{ providers: ["openrouter"], model: "openrouter/qwen3.5-plus" }],
+			},
+		})
+
+		expect(result?.model).toBe("openrouter/qwen3.5-plus")
+		expect(result?.provenance).toBe("provider-fallback")
+	})
+
 	test("does not resolve provider fallback entries through a different provider with the same model name", () => {
 		// given
 		const result = resolveModelPipeline({

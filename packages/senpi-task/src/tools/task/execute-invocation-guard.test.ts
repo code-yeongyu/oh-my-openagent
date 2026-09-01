@@ -106,12 +106,12 @@ describe("buildTaskExecute plan-gated agents", () => {
     expect(result.details.status).not.toBe("denied")
   })
 
-  test("#given a user-requested plan session that then invoked start-work #when spawning momus #then it denies and names start-work", async () => {
+  test("#given a user-requested plan session that then invoked ulw-execute #when spawning momus #then it denies and names ulw-execute", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(
       makeDeps(startedManager(calls), {
-        resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true, invoked: ["start-work"] }),
+        resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true, invoked: ["ulw-execute"] }),
       }),
     )
 
@@ -121,13 +121,13 @@ describe("buildTaskExecute plan-gated agents", () => {
     // then
     expect(calls.count).toBe(0)
     expect(result.details.status).toBe("denied")
-    expect(resultText(result)).toContain("start-work")
+    expect(resultText(result)).toContain("ulw-execute")
   })
 
-  test("#given a session that invoked only start-work #when spawning momus #then the forbidden denial takes precedence", async () => {
+  test("#given a session that invoked only ulw-execute #when spawning momus #then the forbidden denial takes precedence", async () => {
     // given
     const calls = { count: 0 }
-    const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({ invoked: ["start-work"] }) }))
+    const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({ invoked: ["ulw-execute"] }) }))
 
     // when
     const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
@@ -135,7 +135,7 @@ describe("buildTaskExecute plan-gated agents", () => {
     // then
     expect(calls.count).toBe(0)
     expect(result.details.status).toBe("denied")
-    expect(resultText(result)).toContain("start-work")
+    expect(resultText(result)).toContain("ulw-execute")
   })
 
   test("#given a session with no skill invocations #when spawning explore #then the gate does not apply and the manager starts", async () => {

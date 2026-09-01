@@ -14,28 +14,45 @@ import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
+  getOmoNativeAttribution,
   getOmoNativeStateDir,
   hashSessionId,
   maskProviderAndModel,
+  withOmoNativeAttribution,
 } from "./product-identity"
 import { MAX_TRACKED_CALLS } from "./wave-assembler"
 import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
 import { UNCONFIGURED_POSTHOG_API_KEY, getTelemetryApiKey, isConfiguredTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
 
-const originalAgentDir = process.env.SENPI_CODING_AGENT_DIR
+const originalAgentDirs = {
+  OMO_CODING_AGENT_DIR: process.env.OMO_CODING_AGENT_DIR,
+  SENPI_CODING_AGENT_DIR: process.env.SENPI_CODING_AGENT_DIR,
+  PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR,
+} as const
+// Attribution env is ambient too: a dev-tree OmO Desktop service exports OMO_NATIVE_SURFACE/
+// OMO_NATIVE_INSTALL_ID to every child, and without restoring them the "no env attribution" case
+// would silently read the host's desktop attribution.
+const originalAttributionEnv = {
+  OMO_NATIVE_SURFACE: process.env.OMO_NATIVE_SURFACE,
+  OMO_NATIVE_INSTALL_ID: process.env.OMO_NATIVE_INSTALL_ID,
+} as const
 const temporaryRoots: string[] = []
 
 afterEach(() => {
-  if (originalAgentDir === undefined) delete process.env.SENPI_CODING_AGENT_DIR
-  else process.env.SENPI_CODING_AGENT_DIR = originalAgentDir
+  for (const [name, value] of Object.entries({ ...originalAgentDirs, ...originalAttributionEnv })) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
   for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 function useTemporaryAgentDir(): string {
   const root = mkdtempSync(join(tmpdir(), "omo-native-identity-"))
   temporaryRoots.push(root)
+  process.env.OMO_CODING_AGENT_DIR = root
   process.env.SENPI_CODING_AGENT_DIR = root
+  process.env.PI_CODING_AGENT_DIR = root
   return root
 }
 
@@ -243,7 +260,61 @@ describe("OmO Native product identity", () => {
   })
 
   test("#given the shared schema version #when the native clients are configured #then one exported constant carries it", () => {
-    expect(OMO_NATIVE_SCHEMA_VERSION).toBe(2)
+    expect(OMO_NATIVE_SCHEMA_VERSION).toBe(3)
+  })
+
+  test("#given no env attribution #when attribution is resolved #then surface is cli and a 64-hex install id is persisted once", () => {
+    const agentDir = useTemporaryAgentDir()
+    delete process.env.OMO_NATIVE_SURFACE
+    delete process.env.OMO_NATIVE_INSTALL_ID
+
+    const first = getOmoNativeAttribution()
+
+    expect(first.surface).toBe("cli")
+    expect(first.install_id).toMatch(/^[0-9a-f]{64}$/)
+    // and: the id is stable across reads and stored 0600 next to the session-id salt
+    expect(getOmoNativeAttribution().install_id).toBe(first.install_id)
+    const stored = readFileSync(join(agentDir, "omo-senpi", "omo-native", "install-id"), "utf8").trim()
+    expect(stored).toBe(first.install_id)
+  })
+
+  test("#given a desktop host env #when attribution is resolved #then the env pin wins over the local file", () => {
+    const agentDir = useTemporaryAgentDir()
+    const envInstallId = "b".repeat(64)
+    const env = {
+      OMO_NATIVE_SURFACE: "desktop",
+      OMO_NATIVE_INSTALL_ID: envInstallId,
+      OMO_CODING_AGENT_DIR: agentDir,
+      SENPI_CODING_AGENT_DIR: agentDir,
+    }
+
+    expect(getOmoNativeAttribution({ env })).toEqual({ surface: "desktop", install_id: envInstallId })
+    // and: a malformed env id is ignored rather than trusted
+    expect(getOmoNativeAttribution({ env: { ...env, OMO_NATIVE_INSTALL_ID: "not-hex" } }).install_id)
+      .toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  test("#given a product config #when attribution is attached #then additionalProperties carry it and existing product extras survive", () => {
+    const agentDir = useTemporaryAgentDir()
+    const base = createOmoNativeProductConfig()
+
+    const attributed = withOmoNativeAttribution(
+      { ...base, additionalProperties: { custom_flag: true } },
+      {
+        env: {
+          OMO_NATIVE_SURFACE: "desktop",
+          OMO_NATIVE_INSTALL_ID: "c".repeat(64),
+          OMO_CODING_AGENT_DIR: agentDir,
+          SENPI_CODING_AGENT_DIR: agentDir,
+        },
+      },
+    )
+
+    expect(attributed.additionalProperties).toEqual({
+      custom_flag: true,
+      surface: "desktop",
+      install_id: "c".repeat(64),
+    })
   })
 
   test("#given static telemetry inventories #when inspected #then they and every property allowlist are frozen", () => {

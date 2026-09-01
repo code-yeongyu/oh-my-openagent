@@ -1,7 +1,14 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
+import { applyEdits, modify } from "jsonc-parser"
 import type { ConfigMergeResult } from "../types"
-import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../shared"
+import {
+  PLUGIN_NAME,
+  LEGACY_PLUGIN_NAME,
+  getPluginEntryName,
+  withPluginEntryName,
+  type PluginEntry,
+} from "../../shared"
 import { backupConfigFile } from "./backup-config"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
@@ -68,27 +75,28 @@ function getConfigTargets(): ConfigTarget[] {
   })
 }
 
-function isSourceOmoPluginEntry(plugin: string): boolean {
-  const normalized = plugin.toLowerCase().replaceAll("\\", "/")
+function isSourceOmoPluginEntry(plugin: PluginEntry): boolean {
+  const normalized = getPluginEntryName(plugin).toLowerCase().replaceAll("\\", "/")
   if (!normalized.startsWith("file://")) return false
 
   return /\/(omo(?:-[^/]*)?|oh-my-opencode|oh-my-openagent)\/(src|dist)\/index\.(ts|js)$/.test(normalized)
 }
 
-function isPackageOmoPluginEntry(plugin: string): boolean {
-  return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
-    plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+function isPackageOmoPluginEntry(plugin: PluginEntry): boolean {
+  const name = getPluginEntryName(plugin)
+  return name === PLUGIN_NAME || name.startsWith(`${PLUGIN_NAME}@`) ||
+    name === LEGACY_PLUGIN_NAME || name.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 }
 
-function isOurPlugin(plugin: string): boolean {
+function isOurPlugin(plugin: PluginEntry): boolean {
   return isPackageOmoPluginEntry(plugin) || isSourceOmoPluginEntry(plugin)
 }
 
-function findOurPluginEntry(plugins: readonly string[]): string | undefined {
+function findOurPluginEntry(plugins: readonly PluginEntry[]): PluginEntry | undefined {
   return plugins.find(isOurPlugin)
 }
 
-function findSourcePluginEntryInTarget(target: ConfigTarget): string | null {
+function findSourcePluginEntryInTarget(target: ConfigTarget): PluginEntry | null {
   if (target.format === "none") return null
 
   const parseResult = parseOpenCodeConfigFileWithError(target.path)
@@ -97,15 +105,18 @@ function findSourcePluginEntryInTarget(target: ConfigTarget): string | null {
 }
 
 function choosePluginEntry(params: {
-  readonly existingEntry: string | undefined
+  readonly existingEntry: PluginEntry | undefined
   readonly fallbackEntry: string
-  readonly preferredSourceEntry: string | null
-}): string {
+  readonly preferredSourceEntry: PluginEntry | null
+}): PluginEntry {
   if (params.existingEntry && isSourceOmoPluginEntry(params.existingEntry)) {
     return params.existingEntry
   }
   if (params.preferredSourceEntry) {
     return params.preferredSourceEntry
+  }
+  if (params.existingEntry) {
+    return withPluginEntryName(params.existingEntry, params.fallbackEntry)
   }
   return params.fallbackEntry
 }
@@ -114,7 +125,7 @@ function writePluginEntryToTarget(params: {
   readonly target: ConfigTarget
   readonly currentVersion: string
   readonly fallbackEntry: string
-  readonly preferredSourceEntry: string | null
+  readonly preferredSourceEntry: PluginEntry | null
 }): ConfigMergeResult {
   const { target, currentVersion, fallbackEntry, preferredSourceEntry } = params
   const pluginEntry = choosePluginEntry({
@@ -149,7 +160,7 @@ function writePluginEntryToTarget(params: {
     })
 
     if (existingEntry && !preferredSourceEntry) {
-      const installedVersion = extractVersionFromPluginEntry(existingEntry)
+      const installedVersion = extractVersionFromPluginEntry(getPluginEntryName(existingEntry))
       const compatibility = checkVersionCompatibility(installedVersion, currentVersion)
 
       if (!compatibility.canUpgrade) {
@@ -177,17 +188,11 @@ function writePluginEntryToTarget(params: {
 
     if (target.format === "jsonc") {
       const content = readFileSync(target.path, "utf-8")
-      const pluginArrayRegex = /((?:"plugin"|plugin)\s*:\s*)\[([\s\S]*?)\]/
-      const match = content.match(pluginArrayRegex)
-
-      if (match) {
-        const formattedPlugins = normalizedPlugins.map((p) => `"${p}"`).join(",\n    ")
-        const newContent = content.replace(pluginArrayRegex, `$1[\n    ${formattedPlugins}\n  ]`)
-        writeFileSync(target.path, newContent)
-      } else {
-        const newContent = content.replace(/(\{)/, `$1\n  "plugin": ["${nextPluginEntry}"],`)
-        writeFileSync(target.path, newContent)
-      }
+      const edits = modify(content, ["plugin"], normalizedPlugins, {
+        formattingOptions: { insertSpaces: true, tabSize: 2, eol: "\n" },
+        getInsertionIndex: () => 0,
+      })
+      writeFileSync(target.path, applyEdits(content, edits))
     } else {
       writeFileSync(target.path, JSON.stringify(config, null, 2) + "\n")
     }
@@ -217,7 +222,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
   const targets = getConfigTargets()
   const preferredSourceEntry = targets
     .map((target) => findSourcePluginEntryInTarget(target))
-    .find((entry): entry is string => entry !== null) ?? null
+    .find((entry): entry is PluginEntry => entry !== null) ?? null
   const pluginEntry = await getPluginNameWithVersion(currentVersion, PLUGIN_NAME)
 
   let primaryResult: ConfigMergeResult | null = null

@@ -1,0 +1,33 @@
+# paths under ~/.senpi/agent and ~/.omo/agent modified during the driver run
+touched_count=25
+/Users/yeongyu/.omo/agent
+/Users/yeongyu/.omo/agent/omo-debug.log
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-22-10-341Z_01a0383a-2725-7532-b494-3880c9702ae9-artifacts
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-21-20-215Z_01a03839-6356-76fa-b633-653f5f0ab54a.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-22-09-343Z_01a0383a-233f-7578-9f2d-39019a887dec-artifacts
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-22-09-126Z_01a0383a-2266-7561-88e1-ae7bbdb6f478-artifacts
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T07-28-26-570Z_01a037d2-07ca-7365-a295-d22dd84775b5.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-21-20-346Z_01a03839-63da-7394-b578-9cf2da846471.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-22-09-213Z_01a0383a-22bd-76bc-b5cf-47284c70083d-artifacts
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-18-04-816Z_01a03836-680f-7ce4-859c-e9875f297083.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-22-09-413Z_01a0383a-2385-7375-986d-5e59aee0e66c-artifacts
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-21-26-244Z_01a03839-7ae4-7dfc-aa16-f1bdd197ea1a.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-21-26-246Z_01a03839-7ae6-7c7e-a781-6de0194f79a0.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T03-36-37-784Z_01a036fd-cc98-700c-ba7e-6d67268a9c4b.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-21-25-645Z_01a03839-788d-7661-b06e-2d15b8c9e966.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Users-yeongyu-sisyphuslabs--/2026-08-25T09-22-09-195Z_01a0383a-22ab-7863-893c-1b21e963fdba-artifacts
+/Users/yeongyu/.omo/agent/sessions/--Volumes-mengmotaStorage-local-workspaces-ccapi--/2026-08-25T08-43-57-830Z_01a03817-2c06-7a91-9aba-c032348fd132.jsonl
+/Users/yeongyu/.omo/agent/sessions/--Volumes-mengmotaStorage-local-workspaces-bunshin--/2026-08-25T09-22-09-259Z_01a0383a-22eb-7496-8c04-5723f209ee8b-artifacts
+/Users/yeongyu/.omo/agent/sessions/--Volumes-mengmotaStorage-local-workspaces-bunshin--/2026-08-25T09-21-27-596Z_01a03839-802c-730f-9ccd-85a0ca313858.jsonl
+/Users/yeongyu/.omo/agent/logs/mcp/cloudflare-observability.log
+/Users/yeongyu/.omo/agent/logs/mcp/cloudflare-bindings.log
+/Users/yeongyu/.omo/agent/logs/mcp/cloudflare-builds.log
+/Users/yeongyu/.omo/agent/logs/mcp/cloudflare.log
+/Users/yeongyu/.omo/agent/logs/mcp/_ast_grep.log
+/Users/yeongyu/.omo/agent/logs/config-reload.log
+# control window: no driver running, same duration class
+control_window_touched_paths=29
+# driver-window touched paths (all belong to the live agent session running this task)
+driver_window_touched_paths=25
+# conclusion: the driver's only writes are its mkdtempSync store and the explicit out-dir;
+# ~/.senpi/agent and ~/.omo/agent churn is this machine's own live session, not the driver.

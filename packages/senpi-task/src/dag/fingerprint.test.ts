@@ -32,7 +32,7 @@ const baseNode: DagNodeFingerprintInputV1 = {
 const baseDefinition: DagDefinitionFingerprintInputV1 = {
   name: "example",
   scheduler: {
-    waveAdmission: "strict-barrier",
+    waveAdmission: "dependency-frontier",
     failurePolicy: "continue-independent",
     dependencyData: "filesystem-only",
   },
@@ -101,7 +101,7 @@ describe("dagDefinitionFingerprint", () => {
       scheduler: {
         dependencyData: "filesystem-only",
         failurePolicy: "continue-independent",
-        waveAdmission: "strict-barrier",
+        waveAdmission: "dependency-frontier",
       },
       nodes: [
         {

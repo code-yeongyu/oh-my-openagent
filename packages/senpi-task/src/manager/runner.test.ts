@@ -98,9 +98,9 @@ describe("createInProcessManagedRunner", () => {
     const fallbackModels = [
       {
         source: "category",
-        provider: "quotio-openai",
+        provider: "openai-codex",
         model_id: "gpt-5.6-luna-fast",
-        display: "quotio-openai/gpt-5.6-luna-fast",
+        display: "openai-codex/gpt-5.6-luna-fast",
         reasoning_effort: "minimal",
       },
     ] as const
