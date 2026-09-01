@@ -1,8 +1,9 @@
-import type { FactsApplyRecovery, FactsQueue, FactsQueueEntry, MemoryIdentity } from "@oh-my-opencode/memory-core"
+import type { FactsApplyRecovery, FactsQueue, MemoryIdentity } from "@oh-my-opencode/memory-core"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
+import type { FactsFailurePort, FactsQueuedKey } from "./facts-failure-recording"
 import type { ResolveAndPreflightMemoryLaunch } from "./worker/memory-launch-preflight"
 import type { FactsSandbox } from "./worker/spawn"
 
@@ -32,6 +33,13 @@ export interface FactsExtractorRunnerOptions {
   readonly withWriterLock?: <T>(operation: () => Promise<T>, attempt: number) => Promise<T>
   readonly retryDelay?: (attempt: number, delayMs: number) => Promise<void>
   readonly random?: () => number
+  /** Failure-streak ledger seam; defaults to the durable `FactsFailureStore`. */
+  readonly failures?: FactsFailurePort
+  /** Terminal sentinel write seam; tests use it to crash inside the ordering window. */
+  readonly writeTerminalSentinel?: (path: string, value: unknown) => Promise<void>
+  /** Post-sentinel artifact deletion seam; tests observe the ordering and inject failures. */
+  readonly removeRunArtifact?: (path: string) => Promise<void>
+  readonly createPreflightId?: () => string
 }
 
 export interface FactsRunLedger {
@@ -46,7 +54,7 @@ export interface FactsRunLedger {
   readonly terminationGraceMs: number
   readonly deadlineAt: number
   readonly batchId: string
-  readonly queued: readonly ReturnType<typeof queueKey>[]
+  readonly queued: readonly FactsQueuedKey[]
   readonly headBeforeApply?: string
   readonly applyRecovery?: FactsApplyRecovery
   readonly pid?: number
@@ -60,8 +68,4 @@ export interface FactsFinalRecord {
   readonly runId: string
   readonly outcome: "committed" | "no_facts" | "failed" | "parent_dirty"
   readonly sha?: string
-}
-
-function queueKey(entry: FactsQueueEntry) {
-  return { conversationId: entry.conversationId, end_message_id: entry.range.end_message_id }
 }

@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
+import { rmEfaultTolerant } from "../teardown.test-support"
 
 import {
   GitMemoryRepo,
@@ -27,7 +28,7 @@ const childFixture = join(import.meta.dir, "__fixtures__", "dream-child.ts")
 const supervisorFixture = join(import.meta.dir, "memory-run-supervisor.ts")
 const roots: string[] = []
 
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
 
 async function launchDream(
   people: { enabled: boolean; max_entries: number; max_entry_chars: number },

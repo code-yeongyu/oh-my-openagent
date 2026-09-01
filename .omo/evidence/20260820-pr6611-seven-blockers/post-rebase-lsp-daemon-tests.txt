@@ -1,0 +1,16 @@
+
+> @code-yeongyu/lsp-daemon@0.1.0 test
+> vitest --run
+
+
+ RUN  v4.1.8 /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/lsp-daemon
+
+[lsp-daemon] startup diagnostic failed: synthetic diagnostic failure
+
+ Test Files  21 passed (21)
+      Tests  155 passed (155)
+   Start at  12:56:11
+   Duration  949ms (transform 3.83s, setup 0ms, import 5.73s, tests 1.73s, environment 1ms)
+
+
+exit_code=0

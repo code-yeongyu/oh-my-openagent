@@ -1,0 +1,32 @@
+Mutation:
+Temporarily changed `omo-native-notice.ts` function `enabled(...)` to return `true`,
+bypassing both telemetry-core environment gating and omo.json configuration gating.
+
+Mutation command:
+cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command
+npm exec --yes --package=bun@1.3.12 -- bun test packages/omo-senpi/src/components/telemetry/omo-native-notice.test.ts
+
+Mutation RED:
+- Unconfigured project key test failed because the disclosure notice was emitted.
+- DO_NOT_TRACK=1 test failed because the disclosure notice was emitted.
+- telemetry.enabled:false test failed because the disclosure notice was emitted.
+- Summary: 6 pass, 3 fail, exit code 1.
+
+Restoration:
+Restored the original environment-and-config gate:
+`isTelemetryClientEnabled(...) && configEnabled(...)`.
+
+Restored GREEN:
+- 9 pass
+- 0 fail
+- 15 expect() calls
+- Exit code 0
+
+LSP:
+- `omo-native-notice.ts`: no diagnostics.
+- `omo-native-notice.test.ts`: no error diagnostics.
+
+Why this is enough:
+The tests fail when either class of user control is bypassed and recover only after the
+real gate is restored. The enabled-path disclosure test also remains green, so removal
+of the command did not remove the public first-run collection notice.

@@ -107,15 +107,7 @@ export interface UlwLoopManualQaAdversarialCase {
 	readonly artifactRefs: readonly string[];
 }
 
-export interface UlwLoopQualityGate {
-	readonly codeReview: {
-		readonly by: string;
-		readonly recommendation: "APPROVE";
-		readonly codeQualityStatus: "CLEAR" | "WATCH";
-		readonly reportPath: string;
-		readonly evidence: string;
-		readonly blockers: readonly [];
-	};
+interface UlwLoopQualityGateCommon {
 	readonly manualQa: {
 		readonly by: string;
 		readonly status: "passed";
@@ -146,6 +138,24 @@ export interface UlwLoopQualityGate {
 		readonly adversarialClassesCovered: readonly string[];
 	};
 }
+
+export interface UlwLoopQualityGateLazycodex extends UlwLoopQualityGateCommon {
+	readonly surface: "lazycodex";
+	readonly codeReview: {
+		readonly by: string;
+		readonly recommendation: "APPROVE";
+		readonly codeQualityStatus: "CLEAR" | "WATCH";
+		readonly reportPath: string;
+		readonly evidence: string;
+		readonly blockers: readonly [];
+	};
+}
+
+export interface UlwLoopQualityGateSenpi extends UlwLoopQualityGateCommon {
+	readonly surface: "omo-senpi";
+}
+
+export type UlwLoopQualityGate = UlwLoopQualityGateLazycodex | UlwLoopQualityGateSenpi;
 
 export interface UlwLoopLedgerEntry {
 	at: string;

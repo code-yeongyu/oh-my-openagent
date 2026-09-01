@@ -32,7 +32,8 @@ export function localLauncherCmdPath(homeDir: string = homedir()): string {
 
 export function renderLocalLauncher(options: LocalLauncherOptions): string {
   const brand = {
-    name: "omo",
+    name: "OmO",
+    command: "omo",
     displayVersion: options.version ?? "local",
     configDir: ".omo",
     // Engine state lives at the canonical `~/.omo/agent`; a flat home would disagree with the

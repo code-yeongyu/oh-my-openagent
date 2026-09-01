@@ -1,0 +1,31 @@
+
+  ┃
+  ┃  what context token is in the main conversation?
+  ┃
+
+     SIDE-CONTEXT-PROOF
+
+        Hephaestus - Deep Agent  GPT-5   361ms
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ┃
+  ┃
+  ┃
+  ┃  Hephaestus - Deep Agent   GPT-5 OpenAI                BTW from mainm main rkeady ctrl+/ switch  ctrl+c close
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/fix/btw-parent-remote-revalidation/.  tab       ctrl+p
+   omo/evidence/20260820-btw-parent-remote-revalidation/project                                 agents    commands

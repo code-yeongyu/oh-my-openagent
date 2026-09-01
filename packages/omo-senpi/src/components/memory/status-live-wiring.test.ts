@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
@@ -13,7 +14,7 @@ import { createMemoryFooterStatusLive } from "./status-live-wiring"
 
 const roots: string[] = []
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 interface FakeTimers extends MemoryFooterTimers {

@@ -1,0 +1,33 @@
+(pass) resolveReflectionModel > #given legacy fallback_models and a stale availability snapshot #when find locates the chain #then reflection preserves every fallback [0.12ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when the live registry exposes priced chat models #then the cheapest one resolves as registry fallback [0.09ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when a pricier session model is also present #then the registry candidate still wins the ladder [0.09ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when the session model is cheaper than every registry candidate #then the cost chooser inherits it [0.09ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when the registry scan finds nothing but a session model exists #then reflection inherits the session model [0.08ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when even the registry object is missing #then the session model still resolves [0.05ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when an explicitly pinned model is unresolvable but other models exist #then the fallback keeps reflection alive [0.08ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when neither registry nor session model can help #then it still fails closed [0.07ms]
+(pass) resolveReflectionModel > #given the task warning suppression convention #when evaluated #then global opt-out and per-category opt-in retain their precedence [0.15ms]
+(pass) resolveReflectionModel > #given a pinned user model whose model id contains a slash #when the availability snapshot is stale #then the whole model id is looked up rather than its first segment [0.10ms]
+
+packages/omo-senpi/src/components/memory/worker/spawn.test.ts:
+(pass) worker payload mode relaxation > #given a missing facts payload from the first launch #when mode relaxation reports ENOENT #then preparation continues [1.16ms]
+(pass) worker payload mode relaxation > #given facts payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [0.37ms]
+(pass) worker payload mode relaxation > #given reflection payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [0.64ms]
+(pass) worker senpi command resolution > #given an env whose PATH cannot resolve senpi #when a facts spawn is prepared #then the command is executable rather than the bare name [0.47ms]
+(pass) worker senpi command resolution > #given an explicit senpiCommand #when a facts spawn is prepared #then the override is preserved [0.47ms]
+
+packages/omo-senpi/src/components/memory/worker/run-finalization-claim.test.ts:
+(pass) per-run finalization claim > #given concurrent finalizers #when the first publishes final #then the waiter observes terminal without executing [9.47ms]
+
+packages/omo-senpi/src/components/memory/worker/run-finalization-race.test.ts:
+(pass) run finalization publication races > #given outcome publishes during abandonment state read #when terminalized #then matching outcome wins and abandoned is never published [324.32ms]
+(pass) run finalization publication races > #given publication is scheduled after every unknown-liveness read #when abandonment writes #then the matching publisher wins atomically [245.58ms]
+(pass) run finalization publication races > #given attempt two and a stale attempt-one outcome #when current attempt is confirmed dead #then stale outcome is ignored [324.18ms]
+
+ 1582 pass
+ 0 fail
+ 4359 expect() calls
+Ran 1582 tests across 238 files. [138.14s]
+EXIT=0
+
+Command: npm exec --yes --package=bun@1.3.12 -- bun test packages/omo-senpi (head 4e06b9c43, post-rebase rerun)

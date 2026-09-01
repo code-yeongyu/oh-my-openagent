@@ -1,5 +1,6 @@
 export { executeLspDiagnostics } from "./diagnostics.js";
 export { LSP_MCP_TOOLS } from "./definitions.js";
+export { executeLspFormat } from "./format.js";
 export { executeLspInstallDecision } from "./install-decision.js";
 export { executeLspFindReferences, executeLspGotoDefinition } from "./navigation.js";
 export { isRecord } from "./parameters.js";

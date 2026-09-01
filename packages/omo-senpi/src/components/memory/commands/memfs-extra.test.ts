@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
-import { readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
@@ -13,6 +12,7 @@ import {
   type FakeCommandContext,
   type FakeDeps,
 } from "./commands.test-support"
+import { backupTimestamp } from "./backup"
 import { registerMemfsCommand } from "./memfs"
 
 const tempDirs: string[] = []
@@ -75,16 +75,21 @@ describe("/memfs backup", () => {
 
   test("#given a backup already exists for the same clock #when backup runs again #then the existing backup is not clobbered", async () => {
     // given
-    const { identityRoot, pi, ctx } = await harness()
-    await invoke(pi, "memfs", "backup", ctx)
+    const { identityRoot, pi, ctx, deps } = await harness()
+    const stamp = backupTimestamp(deps.now?.() ?? 0)
+    const existingName = `memory-backup-${stamp}`
+    const existingPersona = join(identityRoot, existingName, "system", "persona.md")
+    await mkdir(join(identityRoot, existingName, "system"), { recursive: true })
+    await writeFile(existingPersona, "existing backup sentinel\n")
 
     // when
     await invoke(pi, "memfs", "backup", ctx)
 
     // then
-    const backups = await backupNames(identityRoot)
-    expect(backups).toHaveLength(2)
-    expect(new Set(backups).size).toBe(2)
+    expect(await backupNames(identityRoot)).toEqual([existingName, `${existingName}-2`])
+    expect(await readFile(existingPersona, "utf8")).toBe("existing backup sentinel\n")
+    expect(await readFile(join(identityRoot, `${existingName}-2`, "system", "persona.md"), "utf8"))
+      .toContain("seeded persona")
   })
 })
 

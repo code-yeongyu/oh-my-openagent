@@ -61,6 +61,7 @@ Beyond the 12-file Layer A library, the design ruleset carries project-original 
 | `interaction-skill.md` | Interaction mechanics anchored to the beui.dev catalog: find the nearest pattern, read its real source through the curl recipe, extract the mechanism (spring config, layout strategy, enter/exit order, reduced-motion path), and adapt it to `DESIGN.md` motion tokens. | Any work adding or changing interaction or motion — micro-interactions, animated components, transitions, gestures, hover/press/state feedback, loading/success/error morphs, "make it feel alive". |
 | `layout-skill.md` | Layout mechanics: scroll ownership, the two silent CSS contracts, named primitives, content-stress matrix. Zero visual direction. | App shells, dashboards, split panes, or a layout that breaks under real content. |
 | `lazyweb.md` | Curl-only real-product screen research for design direction. | Greenfield design research lanes. |
+| `stylegallery.md` | Curl-only lookup of named spatial pattern contracts: primary problem, constraints, scroll ownership, anti-patterns. | A concrete spatial problem needs a documented pattern, alongside `layout-skill.md` mechanics. |
 | `clone-from-url.md` | Runtime extraction workflow (browser + `getComputedStyle`) for cloning a named site. | A live site or URL is the visual reference. |
 
 ---

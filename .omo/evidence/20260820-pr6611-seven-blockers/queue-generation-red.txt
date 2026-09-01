@@ -1,0 +1,35 @@
+bun test v1.3.12 (700fc117)
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts:
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a stale promptAsync reservation that releases shortly after #when auto retry runs #then the fallback dispatch is retried instead of silently abandoned [7.77ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given the retried dispatch fails ambiguously after the reservation releases #when auto retry runs #then the pending fallback is preserved as possibly accepted [1.07ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given the failed assistant is still active #when auto retry runs #then the fallback dispatch is queued until the assistant unblocks [1.07ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a session WE internally aborted whose dangling assistant turn has no finish, no output and no terminal error #when auto retry runs #then the fallback dispatch fires immediately instead of looping forever on active-queue [0.29ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a session NOT internally aborted whose assistant turn is genuinely active #when auto retry runs #then the dispatch is still withheld (active-check preserved for live turns) [0.26ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given an inherited agent variant #when a base fallback is dispatched #then pending state stores the effective variant identity [2.00ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a category-inherited variant #when a base fallback is dispatched #then pending state stores the effective variant identity [0.41ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a registered session category has reasoning #when its fallback is dispatched through another agent #then category reasoning qualifies the prompt and pending identity [0.40ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given an older fallback is awaiting #when a variant-qualified next fallback is accepted as queued #then effective pending state is preserved [0.89ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given manual model change replaces state during a failed dispatch #when rollback runs #then the replacement state is preserved [1.10ms]
+504 |     await flushPromptGateMicrotasks()
+505 |     await clock.advanceBy(DEFAULT_PROMPT_QUEUE_RETRY_MS)
+506 |     await flushPromptGateMicrotasks()
+507 |
+508 |     // then
+509 |     expect(promptCalls.count).toBe(0)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/st_01a01d18-pr6611/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts:509:31)
+(fail) createAutoRetryDispatcher reserved-session retry (#5109) > #given a fallback prompt is queued behind an active assistant #when state is replaced before the queue drains #then the stale generation never reaches promptAsync [1.65ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given state is replaced while fallback message lookup is pending #when the lookup completes #then the stale generation cannot dispatch or arm a watchdog [0.40ms]
+
+ 11 pass
+ 1 fail
+ 35 expect() calls
+Ran 12 tests across 1 file. [349.00ms]
+
+expected_failure_exit_code=1

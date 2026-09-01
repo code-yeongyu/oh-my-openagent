@@ -38,15 +38,18 @@ function longActiveRecord(): TaskRecord {
 }
 
 describe("buildWidgetRows", () => {
-  it("#given more than five active tasks #when building rows #then it caps at five and adds a +N more row", () => {
-    const records = Array.from({ length: 7 }, (_value, index) => record({ task_id: `st_${index}`, status: "running" }))
-    const rows = buildWidgetRows(records)
-    expect(rows).toHaveLength(6)
-    expect(rows[5]).toBe("+2 more")
-  })
-
-  it("#given only terminal tasks #when building rows #then no rows render", () => {
-    expect(buildWidgetRows([record({ task_id: "st_done", status: "completed" })])).toHaveLength(0)
+  it("#given active and completed records #when selecting rows #then only resident team members follow active rows before the cap", () => {
+    const alpha = record({ task_id: "st_alpha", name: "team:12345678-1234-1234-1234-123456789abc:alpha", task_summary: "settled alpha", status: "completed" })
+    const beta = record({ task_id: "st_beta", name: "team:12345678-1234-1234-1234-123456789abc:beta", task_summary: "settled beta", status: "completed" })
+    const ordinary = record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })
+    const stale = record({ task_id: "st_stale", name: "team:12345678-1234-1234-1234-123456789abc:stale", task_summary: "stale member", status: "completed" })
+    const active = Array.from({ length: 4 }, (_value, index) => record({ task_id: `st_${index}`, status: "running" }))
+    const rows = buildWidgetRows([alpha, ordinary, stale, ...active, beta], new Set([alpha.task_id, beta.task_id, ordinary.task_id]))
+    expect(rows.slice(0, 4).every((row) => row.includes("running"))).toBe(true)
+    expect(rows[4]).toContain("settled alpha")
+    expect(rows[4]).toContain("completed")
+    expect(rows[5]).toBe("+1 more")
+    expect(rows.join("\n")).not.toMatch(/ordinary task|stale member/u)
   })
 
   it("#given an active task #when building a row #then useful identity and execution context remain", () => {

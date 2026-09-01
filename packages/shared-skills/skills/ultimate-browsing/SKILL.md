@@ -86,6 +86,8 @@ Routing table, per-platform auth (set `TWITTER_*` env vars, `gh auth login`, a t
 
 CloakBrowser is a stealth Chromium with source-level fingerprint patches that passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors; agent-browser is the CDP automation CLI that drives it. Both are runtime-installed tools (not vendored here). Full setup, version pins, launch flow, cookie login, and cross-platform notes are in [references/chrome-stealth.md](references/chrome-stealth.md).
 
+NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state everywhere. If the task needs that profile's login state, clone the profile directory first (`rsync -a <profile>/ <tmp-clone>/`) and launch CloakBrowser / agent-browser with the clone as the user-data-dir; run any clearing on the clone only.
+
 ```bash
 # 1. Launch CloakBrowser with CDP on :9242 (see chrome-stealth.md for install + venv).
 # 2. CloakBrowser launches tabless — open the first tab via CDP before any agent-browser command:

@@ -1,0 +1,38 @@
+WHAT WAS TESTED
+
+After extracting the existing single-process preload behavior without adding a
+lock, the helper was called twice over one temporary package directory. The
+first `npm ci` callback was held by an unresolved promise before the second
+caller entered.
+
+Command:
+
+  npm exec --yes --package=bun@1.3.12 -- \
+    bun test script/ensure-vendored-lsp-daemon.test.ts
+
+RED OBSERVED
+
+  error: expect(received).toBe(expected)
+  Expected: 1
+  Received: 2
+
+  (fail) ensureVendoredLspDaemonBuilt >
+    #given two callers over one missing dist
+    #when the first build is held and the second enters
+    #then one build runs and both observe the output
+
+  0 pass
+  1 fail
+  exit=1
+
+WHY THIS IS FAITHFUL
+
+The test does not depend on elapsed time. It holds the first exact install
+operation, starts the second caller, and observes the duplicate install entry
+caused by the unlocked check-then-build behavior. The temporary package
+directory prevents mutation of the real vendored package.
+
+CLEANUP
+
+The test `afterEach` recursively removed its unique temporary package root.
+Bun exited normally with the expected assertion failure.

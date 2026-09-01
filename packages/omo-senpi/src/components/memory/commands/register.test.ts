@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { rm } from "node:fs/promises"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
@@ -6,6 +6,9 @@ import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity } from "
 import { MEMORY_COMMAND_NAMES, registerMemoryCommands } from "./register"
 
 const tempDirs: string[] = []
+
+// Registered handlers build Git-backed fixtures, and cleanup can wait on Windows file locks.
+setDefaultTimeout(60_000)
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
@@ -36,6 +39,7 @@ describe("registerMemoryCommands", () => {
       "dream",
       "search",
       "people",
+      "facts",
     ])
   })
 

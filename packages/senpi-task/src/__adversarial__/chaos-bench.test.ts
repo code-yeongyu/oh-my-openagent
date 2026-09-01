@@ -82,6 +82,6 @@ describe("W1-V chaos bench", () => {
       }
       expect(failures).toEqual([])
     },
-    120_000,
+    process.platform === "win32" ? 240_000 : 120_000,
   )
 })

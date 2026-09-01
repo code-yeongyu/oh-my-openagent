@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process"
-import { existsSync, readFileSync } from "node:fs"
-import { mkdir } from "node:fs/promises"
+import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
+import { mkdir } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {
@@ -10,6 +10,7 @@ import {
   type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
+import type { FactsQueuedKey } from "../facts-failure-recording"
 import { requireRunMetadata } from "./spawn-metadata"
 import { waitForRunCompletion } from "./run-sentinel"
 import {
@@ -86,6 +87,8 @@ export async function runReflectionChild(
       deadlineAt: prepared.hardDeadlineAt + graceMs,
       mergePolicy: metadata.mergePolicy,
       ...(metadata.targetDoc === undefined ? {} : { targetDoc: metadata.targetDoc }),
+      ...(metadata.systemTokenBudget === undefined ? {} : { systemTokenBudget: metadata.systemTokenBudget }),
+      ...(metadata.systemTokenTarget === undefined ? {} : { systemTokenTarget: metadata.systemTokenTarget }),
       worktreeDir: metadata.worktree.dir,
       worktreeBranch: metadata.worktree.branch,
       baseSha: metadata.worktree.baseSha,
@@ -106,7 +109,7 @@ export async function runFactsChild(
     readonly supervisorPath?: string
     readonly now?: () => number
     readonly batchId: string
-    readonly queued: readonly { readonly conversationId: string; readonly end_message_id: string }[]
+    readonly queued: readonly FactsQueuedKey[]
   },
 ): Promise<ReflectionChildResult> {
   const graceMs = options.terminationGraceMs ?? DEFAULT_GRACE_MS
@@ -205,12 +208,18 @@ async function runSupervisedChild(input: {
   const supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
     detached: true,
     stdio: "ignore",
+    // win32 gives a detached child its own console, which flashes an empty terminal window on the
+    // user's desktop for every reflection run. CREATE_NO_WINDOW keeps the detachment, drops the window.
+    windowsHide: true,
   })
   supervisor.unref()
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
+  const publishingPath = join(input.runDir, "publishing.json")
   const hasCompleteOutcome = () => {
-    if (!existsSync(outcomePath) || existsSync(launchPath)) return false
+    // Publication writes the outcome before launch cleanup; publishing.json proves that the
+    // surviving launch marker is an in-flight publication, not an incomplete outcome.
+    if (!existsSync(outcomePath) || (existsSync(launchPath) && !existsSync(publishingPath))) return false
     try {
       return runOutcomeMatchesLedger(ledger, JSON.parse(readFileSync(outcomePath, "utf8")) as RunOutcome)
     } catch {

@@ -1,0 +1,38 @@
+                                                                                                                                                                
+  ┃                                                                                                                     BTW · PARENT-CONTINUED                  
+  ┃  repeat the context proof for visual QA                                                                                                                     
+  ┃                                                                                                                     Context                                 
+                                                                                                                        0 tokens                                
+     SIDE-CONTEXT-PROOF                                                                                                 0% used                                 
+                                                                                                                        $0.00 spent                             
+     ▣  Hephaestus - Deep Agent · GPT-5 · 208ms                                                                                                                 
+                                                                                                                        ▼ MCP                                   
+                                                                                                                        • codegraph Disabled                    
+                                                                                                                        • context7 Connected                    
+                                                                                                                        • grep_app Connected                    
+                                                                                                                        • lsp Connected                         
+                                                                                                                        • pencil Connected                      
+                                                                                                                        • websearch Connected                   
+                                                                                                                                                                
+                                                                                                                        LSP                                     
+                                                                                                                        LSPs are disabled                       
+                                                                                                                                                                
+                                                                                                                        ┌───────────────────────────────────┐   
+                                                                                                                        │                                   │   
+                                                                                                                        │ Config                            │   
+                                                                                                                        │ config invalid - run doctor       │   
+                                                                                                                        │ ../../../../../../../...          │   
+                                                                                                                        │                                   │   
+                                                                                                                        └───────────────────────────────────┘   
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+  ┃                                                                                                                                                             
+  ┃                                                                                                                     ~/Documents/GitHub/oh-my-openagent-wt/  
+  ┃                                                                                                                     feat/btw-codex-side-ui/.omo/evidence/   
+  ┃  Hephaestus - Deep Agent · GPT-5 OpenAI                                                                             20260819-btw-codex-side-ui/project:     
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀    feat/btw-codex-side-ui                  
+   /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/feat/btw-codex-side-ui/.omo/        tab       ctrl+p                                                  
+   evidence/20260819-btw-codex-side-ui/project                                                agents    commands        • OpenCode 1.18.18                      
+                                                                                                                                                                

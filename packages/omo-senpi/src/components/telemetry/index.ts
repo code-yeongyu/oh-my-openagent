@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
-import { homedir } from "node:os"
 import { join } from "node:path"
 import type { OmoSenpiComponent } from "../../extension/types"
 import {
@@ -18,7 +17,6 @@ import type { ComponentLogger } from "../../extension/types"
 export const SENPI_TELEMETRY_EVENT_NAME = "omo_senpi_daily_active"
 export const SENPI_MACHINE_ID_PREFIX = "omo-senpi:"
 
-const SENPI_AGENT_DIR_ENV = "SENPI_CODING_AGENT_DIR"
 const SENPI_TELEMETRY_SOURCE = "senpi-extension"
 const SESSION_START_REASON = "session_start"
 const DEFAULT_TIMEOUT_MS = 500
@@ -146,7 +144,6 @@ function logDebug(logger: ComponentLogger, message: string, details: unknown): v
   }
 }
 
-export * from "./omo-native-buffer"
 export * from "./omo-native-component"
 export * from "./omo-native-notice"
 export * from "./omo-native-prompt"

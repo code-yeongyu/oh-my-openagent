@@ -93,11 +93,11 @@ export function createCommandExecuteBeforeHandler(args: {
     }
 
     if (
-      hooks.startWork
-      && normalizedCommand === "start-work"
+      hooks.ulwExecute
+      && normalizedCommand === "ulw-execute"
       && hasPartsOutput(output)
     ) {
-      await hooks.startWork["command.execute.before"]?.(input, output)
+      await hooks.ulwExecute["command.execute.before"]?.(input, output)
       if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
         hooks.stopContinuationGuard.clear(sessionID)
         log("[stop-continuation] Stop state cleared by native command", {

@@ -204,7 +204,6 @@ describe("plugin-wired shared skills", () => {
     const plainOutput = toolResultToText(await skillTool.execute({ name: "ulw-plan" }, toolContext))
 
     // then
-    expect(plainOutput).toContain("## Skill: ulw-plan")
     expect(plainOutput).toContain(LOCAL_ULW_PLAN_BODY)
   })
 

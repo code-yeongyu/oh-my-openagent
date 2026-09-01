@@ -8,13 +8,15 @@ Monitor output is treated as untrusted process output. It is never treated as a 
 
 ## Enable Monitor
 
-Add the `monitor` block to your plugin config and set `enabled` to `true`.
+Monitor is OpenCode-only. Put the block in `~/.omo/omo.jsonc` (or project `.omo/omo.jsonc`) under `"[opencode]"` and set `enabled` to `true`:
 
 ```jsonc
 {
-  "monitor": {
-    "enabled": true,
-    "allowed_commands": ["bun", "npm", "tail"]
+  "[opencode]": {
+    "monitor": {
+      "enabled": true,
+      "allowed_commands": ["bun", "npm", "tail"]
+    }
   }
 }
 ```
@@ -25,18 +27,20 @@ If OpenCode's Bash permission gate is available to the plugin, Monitor asks that
 
 ```jsonc
 {
-  "monitor": {
-    "enabled": false,
-    "live_mode_enabled": false,
-    "allowed_commands": ["bun", "tail"],
-    "max_monitors_per_session": 3,
-    "max_runtime_ms": 1800000,
-    "batch_max_lines": 50,
-    "batch_max_bytes": 16384,
-    "flush_interval_ms": 1000,
-    "ring_max_lines": 1000,
-    "line_max_bytes": 8192,
-    "pattern_max_length": 512
+  "[opencode]": {
+    "monitor": {
+      "enabled": false,
+      "live_mode_enabled": false,
+      "allowed_commands": ["bun", "tail"],
+      "max_monitors_per_session": 3,
+      "max_runtime_ms": 1800000,
+      "batch_max_lines": 50,
+      "batch_max_bytes": 16384,
+      "flush_interval_ms": 1000,
+      "ring_max_lines": 1000,
+      "line_max_bytes": 8192,
+      "pattern_max_length": 512
+    }
   }
 }
 ```
@@ -68,7 +72,7 @@ Arguments:
 | `command` | yes | string | Shell command to run. The command is tokenized and spawned without stdin or a PTY. |
 | `label` | no | string | Safe label shown in transcripts instead of the raw command. |
 | `mode` | no | `"idle"` or `"live_safe"` | Output injection mode. Defaults to `"idle"`. |
-| `match_pattern` | no | string | JavaScript regex used to mark matching lines. Length is capped by `pattern_max_length`. |
+| `match_pattern` | no | string | Optional JavaScript regex, capped by `pattern_max_length`. When set, only matching lines are auto-injected; unmatched lines stay in the ring and are readable via `monitor_output` (`stream: "unmatched"` or `"all"`). Omit it to inject every line. |
 
 If `mode: "live_safe"` is requested while `monitor.live_mode_enabled` is false, Monitor starts the command in `idle` mode and returns a note about the downgrade.
 
@@ -120,7 +124,7 @@ Monitor supports two output injection modes.
 | `idle` | yes | Buffers output and normally flushes when the parent session is idle, at safe turn boundaries. A terminal batch from a process exit can be force-dispatched while the session is active after the 60-second active-defer ceiling. |
 | `live_safe` | no | Requires `monitor.live_mode_enabled: true`. Currently follows the same active-session deferral as `idle`, including the terminal-batch 60-second defer-ceiling exception. |
 
-Use `idle` unless the agent needs quicker feedback and you accept more frequent internal output injections.
+Do not choose `live_safe` for faster delivery. Even with `monitor.live_mode_enabled: true`, `live_safe` is a stored label only; injection follows the same idle-boundary plus 60-second terminal-batch deferral as `idle`.
 
 ## Security Model
 
