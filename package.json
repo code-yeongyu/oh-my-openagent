@@ -104,6 +104,7 @@
     },
     "./server": "./dist/index.js",
     "./tui": "./dist/tui.js",
+    "./v2": "./dist/v2/index.js",
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
@@ -126,6 +127,7 @@
     "build:omo-native": "bun run script/build-omo-native.ts",
     "omob": "bun run script/build-omob.ts",
     "build:omo-schema": "bun run script/build-omo-schema.ts",
+    "build:v2": "node script/write-v2-shim.mjs",
     "build:model-capabilities": "bun run script/build-model-capabilities.ts",
     "clean": "rm -rf dist",
     "prepack": "bun run build:materialize-frontend",
