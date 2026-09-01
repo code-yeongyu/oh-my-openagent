@@ -25,9 +25,9 @@ const expectedSkillNames = [
   "refactor",
   "remove-ai-slops",
   "review-work",
-  "start-work",
   "ultimate-browsing",
   "ultrawork",
+  "ulw-execute",
   "ulw-loop",
   "ulw-plan",
   "ulw-research",
@@ -49,7 +49,10 @@ const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   "ulw-research": true,
 }
 const namePattern = /^[a-z0-9-]{1,64}$/
-const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent)\b/i
+const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent|update_plan)\b/i
+// The ulw-loop CLI literally accepts `--codex-goal-json`; that interface name is not Codex
+// guidance, so mask it before scanning for leaked harness tokens.
+const cliInterfaceFlagPattern = /--codex-goal-json/g
 const taskTargetPattern = /\b(subagent_type|category)["']?\s*[=:]\s*["']([a-z0-9-]+)["']/g
 
 function listDirectoryNames(path: string): string[] {
@@ -145,7 +148,7 @@ describe("OMO Senpi scoped skill sync", () => {
       if (!existsSync(skillRoot)) continue
 
       for (const file of listFiles(skillRoot)) {
-        const content = readFileSync(file, "utf8")
+        const content = readFileSync(file, "utf8").replace(cliInterfaceFlagPattern, "")
         if (forbiddenTokenPattern.test(content)) {
           leaks.push(relative(repoRoot, file))
         }
@@ -167,21 +170,21 @@ describe("OMO Senpi scoped skill sync", () => {
     }
   })
 
-  test("#given start-work skill #when inspected #then session ids reference senpi, not codex", () => {
-    const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+  test("#given ulw-execute skill #when inspected #then session ids reference senpi, not codex", () => {
+    const skillFile = join(skillsRoot, "ulw-execute", "SKILL.md")
     const content = readFileSync(skillFile, "utf8")
 
-    expect(content.includes("senpi:<session_id>"), "start-work must reference senpi:<session_id>").toBe(true)
-    expect(content.includes("codex:<session_id>"), "start-work must not reference codex:<session_id>").toBe(false)
+    expect(content.includes("senpi:<session_id>"), "ulw-execute must reference senpi:<session_id>").toBe(true)
+    expect(content.includes("codex:<session_id>"), "ulw-execute must not reference codex:<session_id>").toBe(false)
   })
 
-  test("#given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom", () => {
-    const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+  test("#given ulw-execute skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom", () => {
+    const skillFile = join(skillsRoot, "ulw-execute", "SKILL.md")
     const content = readFileSync(skillFile, "utf8")
 
-    expect(/\bmonitor\b/.test(content), "start-work must name the senpi tool that arms a lane watcher").toBe(true)
-    expect(/\bkill_bash\b/.test(content), "start-work must name the senpi tool that tears a watcher down").toBe(true)
-    expect(/\bwait_agent\b/.test(content), "start-work must not carry the codex wait_agent polling idiom").toBe(false)
+    expect(/\bmonitor\b/.test(content), "ulw-execute must name the senpi tool that arms a lane watcher").toBe(true)
+    expect(/\bkill_bash\b/.test(content), "ulw-execute must name the senpi tool that tears a watcher down").toBe(true)
+    expect(/\bwait_agent\b/.test(content), "ulw-execute must not carry the codex wait_agent polling idiom").toBe(false)
   })
 
   test("#given synced skill tree #when inspected #then no codex-only display metadata is packaged", () => {
@@ -190,7 +193,7 @@ describe("OMO Senpi scoped skill sync", () => {
   })
 
   test("#given ported orchestration skills #when scanned #then no foreign-harness delegation guidance survives", () => {
-    const portedOrchestrationSkillNames = ["start-work", "ulw-plan"] as const
+    const portedOrchestrationSkillNames = ["ulw-execute", "ulw-plan"] as const
     const foreignDelegationPattern = /\b(?:multi_agent|spawn_agent|lazycodex)\b/i
     const leaks: string[] = []
 

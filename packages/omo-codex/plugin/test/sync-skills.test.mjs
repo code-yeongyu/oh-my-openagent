@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 import {
+	canonicalUltraworkDirectiveRelativePath,
 	componentSkillSources,
 	expectedSkills,
 	listSkillFiles,
@@ -174,6 +175,18 @@ test("#given component skill sources #when aggregate Codex component skills are 
 			);
 		}
 	}
+});
+
+test("#given the canonical prompts-core directive #when the aggregate ultrawork skill is inspected #then it wraps the canonical bytes in skill frontmatter", async () => {
+	// given
+	const canonical = await readFile(join(repoRoot, canonicalUltraworkDirectiveRelativePath), "utf8");
+
+	// when
+	const skill = await readFile(join(root, "skills", "ultrawork", "SKILL.md"), "utf8");
+
+	// then
+	assert.match(skill, /^---\r?\nname: ultrawork\r?\n/);
+	assert.equal(removeCodexCompatibilityGuidance(skill).endsWith(canonical), true);
 });
 
 test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop surfaces the ulw-loop alias", async () => {

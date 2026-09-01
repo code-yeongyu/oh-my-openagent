@@ -212,7 +212,7 @@ These are the only deprecated keys the strict agent schema accepts. `textVerbosi
 
 #### Builtin agents
 
-The Senpi task engine ships four builtin curated agents: `explore` and `librarian` are always spawnable through the task tool with zero configuration, for example `task(subagent_type: "explore", ...)`, while `metis` and `momus` are plan-gated: spawnable only after the user requests the `ulw-plan` workflow, a `.omo/plans/*.md` artifact was touched, and `start-work` was never invoked. They are read-only research and review specialists; implementation and orchestration agents stay category-routed. (`oracle` is an OpenCode plugin agent, not a Senpi builtin.)
+The Senpi task engine ships four builtin curated agents: `explore` and `librarian` are always spawnable through the task tool with zero configuration, for example `task(subagent_type: "explore", ...)`, while `metis` and `momus` are plan-gated: spawnable only after the user requests the `ulw-plan` workflow, a `.omo/plans/*.md` artifact was touched, and `ulw-execute` was never invoked. They are read-only research and review specialists; implementation and orchestration agents stay category-routed. (`oracle` is an OpenCode plugin agent, not a Senpi builtin.)
 
 | Name | Purpose |
 |------|---------|
@@ -278,11 +278,12 @@ Task engine settings. The whole object is optional, but `provider_concurrency`, 
 | Field | Type | Default |
 |-------|------|---------|
 | `default_execution_mode` | `in-process \| process` | `in-process` |
-| `default_concurrency` | positive int | `5` |
-| `provider_concurrency` | record<string, positive int> | unset |
-| `model_concurrency` | record<string, positive int> | unset |
+| `default_concurrency` | non-negative int (0 = unlimited) | `5` |
+| `provider_concurrency` | record<string, non-negative int (0 = unlimited)> | unset |
+| `model_concurrency` | record<string, non-negative int (0 = unlimited)> | unset |
+| `global_concurrency` | non-negative int (0 = unlimited) | effective default `max(8, availableParallelism() * 2)` |
 | `max_depth` | int >= 0 | `1` |
-| `residency_max_children` | positive int or `"unlimited"` | effective default `max(8, availableParallelism() * 3)` |
+| `residency_max_children` | non-negative int or `"unlimited"` (0 = unlimited) | effective default `max(8, availableParallelism() * 3)` |
 | `ttl_ms` | positive int | `86400000` (24h) |
 | `state_dir` | string | unset (runtime uses `<project>/.omo/senpi-task`) |
 | `reattach_on_reconcile` | boolean | unset |
@@ -297,6 +298,8 @@ Task engine settings. The whole object is optional, but `provider_concurrency`, 
 | `dag` | object | unset |
 
 `task.dag` is an optional block bounding the DAG orchestration subsystem (`schema/task.ts`): `max_nodes_per_run` (`64`), `max_runs_per_session` (`16`), `subscriber_ring` (`1000`), `heartbeat_ms` (`15000`), `history_default_limit` (`256`), `history_max_limit` (`1000`), `retention_days` (`7`), `max_prompt_bytes` (`262144`).
+
+`global_concurrency` caps how many tasks run at once per senpi process, across all model and provider lanes combined. It applies only to senpi; OpenCode `background_task` is unaffected (parity is a follow-up). The cap is per process, not cross-process or machine-wide: two senpi processes each get their own budget. A task spills to a later entry in its fallback chain whenever admission cannot seat it in the preferred model's lane — the per-model/provider/default lane limit is reached or its queue is occupied (the common case), or this global cap is full — even though the preferred model never failed. That later entry can be a DIFFERENT provider, with different pricing and different data handling. If that matters to you, remove cross-provider entries from your fallback chains or use single-model chains. No new storage or telemetry is introduced by this setting.
 
 `state_dir` defaults to `<project_dir>/.omo/senpi-task` when unset (`packages/senpi-task/src/store/state-dir.ts`). Completion delivery is not configurable: every child completion is batched with any other ready notifications and steered into the parent's running turn at the next tool-call boundary; see the completion routing table in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md).
 

@@ -107,8 +107,8 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   })
 
   // Builtin chain fixture providers for the "quick" category: rung 1 (kimi-coding/
-  // kimi-for-coding-highspeed) always dies on the child; rung 2 (quotio-openai/gpt-5.6-luna-fast)
-  // answers unless the scenario exhausts the chain. quotio-openai needs reasoning so the runtime
+  // kimi-for-coding-highspeed) always dies on the child; rung 2 (openai-codex/gpt-5.6-luna-fast)
+  // answers unless the scenario exhausts the chain. openai-codex needs reasoning so the runtime
   // accepts the rung variant (":minimal") in its fallback selector.
   pi.registerProvider("kimi-coding", {
     name: "omo runtime fallback kimi-coding fixture",
@@ -120,8 +120,8 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
       return streamMessage(childReply(model.id))
     },
   })
-  pi.registerProvider("quotio-openai", {
-    name: "omo runtime fallback quotio-openai fixture",
+  pi.registerProvider("openai-codex", {
+    name: "omo runtime fallback openai-codex fixture",
     baseUrl: "file://omo-runtime-fallback-mock",
     apiKey: "mock",
     api: "openai-completions",
@@ -142,7 +142,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
         quotio: ids.filter((id) => id.includes("quotio")),
         kimi: ids.filter((id) => id.includes("kimi")),
         mock: ids.filter((id) => id.includes("omo-fallback-mock")),
-        findQuotio: registry?.find("quotio-openai", "gpt-5.6-luna-fast") !== undefined,
+        findQuotio: registry?.find("openai-codex", "gpt-5.6-luna-fast") !== undefined,
       }, null, 2))
     }
     dump("t0")

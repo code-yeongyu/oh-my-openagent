@@ -1,5 +1,7 @@
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
-import { Box, type Component, Text } from "@earendil-works/pi-tui"
+import type { Component } from "@earendil-works/pi-tui"
+
+import { piTui } from "./lazy/pi-tui"
 
 export type NoticeTone = "accent" | "warning" | "error" | "success" | "dim"
 
@@ -28,6 +30,7 @@ export function buildNoticeBox(
   options: { readonly expanded: boolean },
   theme: NoticeTheme,
 ): Component {
+  const { Box, Text } = piTui()
   const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text))
   box.addChild(new Text(theme.fg(spec.tone ?? "accent", `${BOLD}${spec.title}${BOLD_OFF}`), 0, 0))
   box.addChild(new Text(theme.fg("dim", spec.why), 0, 0))

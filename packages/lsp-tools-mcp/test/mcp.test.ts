@@ -71,6 +71,7 @@ describe("lsp MCP server", () => {
 			"symbols",
 			"prepare_rename",
 			"rename",
+			"format",
 			"install_decision",
 		]);
 	});
