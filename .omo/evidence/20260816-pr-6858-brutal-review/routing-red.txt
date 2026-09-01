@@ -1,0 +1,7 @@
+Committed RED observable from `.omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console/qa.md`:
+
+The driver's unrelated process-routing checks reported that this configuration
+selected the in-process runner rather than the RPC runner. That pre-existing
+routing result was not counted as proof for this window fix.
+
+This means the committed evidence recorded a failed production-route proof and dismissed it.

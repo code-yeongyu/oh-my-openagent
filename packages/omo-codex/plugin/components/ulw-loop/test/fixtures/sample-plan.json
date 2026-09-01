@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "createdAt": "2026-05-23T00:00:00.000Z",
+  "codexGoalMode": "aggregate",
+  "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/goals.json...",
+  "codexObjectiveAliases": [],
+  "goals": [
+    {
+      "id": "G001",
+      "title": "Build auth service",
+      "objective": "Implement JWT auth endpoint",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "valid login returns 200",
+          "userModel": "happy",
+          "expectedEvidence": "curl /login -d '{...}' returns 200 + token",
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "invalid creds return 401",
+          "userModel": "edge",
+          "expectedEvidence": "curl /login -d '{bad}' returns 401",
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "no regression in /health",
+          "userModel": "regression",
+          "expectedEvidence": "GET /health returns 200 OK after auth merge",
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "G002",
+      "title": "Add rate limiting",
+      "objective": "Throttle login by IP",
+      "status": "in_progress",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "limit kicks at N reqs",
+          "userModel": "happy",
+          "expectedEvidence": "100 reqs from same IP -> last is 429",
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "different IPs not affected",
+          "userModel": "edge",
+          "expectedEvidence": "concurrent 2 IPs both succeed",
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "limiter does not block /health",
+          "userModel": "regression",
+          "expectedEvidence": "/health unaffected during throttle",
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "G003",
+      "title": "Integration tests",
+      "objective": "End-to-end suite",
+      "status": "complete",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "all int tests green",
+          "userModel": "happy",
+          "expectedEvidence": "npm run test:integration exit 0",
+          "capturedEvidence": "npm run test:integration exit 0, 12/12 tests",
+          "status": "pass",
+          "capturedAt": "2026-05-23T00:30:00.000Z"
+        },
+        {
+          "id": "C002",
+          "scenario": "no flaky 3x rerun",
+          "userModel": "edge",
+          "expectedEvidence": "3 reruns all green",
+          "capturedEvidence": "3 reruns all green, no flakes",
+          "status": "pass",
+          "capturedAt": "2026-05-23T00:31:00.000Z"
+        },
+        {
+          "id": "C003",
+          "scenario": "no new console errors",
+          "userModel": "regression",
+          "expectedEvidence": "0 errors in build log",
+          "capturedEvidence": "no console errors",
+          "status": "pass",
+          "capturedAt": "2026-05-23T00:32:00.000Z"
+        }
+      ]
+    }
+  ]
+}

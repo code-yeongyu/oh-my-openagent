@@ -1,0 +1,13 @@
+=== tests ===
+
+ 19 pass
+ 0 fail
+ 240 expect() calls
+Ran 19 tests across 3 files. [120.00ms]
+=== python block gone, eval default present ===
+packages/omo-senpi/skills/mass-ulw/SKILL.md:22:## Running a dag - eval is the default
+packages/omo-senpi/skills/mass-ulw/references/planning.md:30:The difficulty ladder, bottom rung first:
+packages/omo-senpi/skills/mass-ulw/references/planning.md:57:## Eval orchestration patterns
+=== git status ===
+ M packages/omo-senpi/skills/mass-ulw/SKILL.md
+ M packages/omo-senpi/skills/mass-ulw/references/planning.md

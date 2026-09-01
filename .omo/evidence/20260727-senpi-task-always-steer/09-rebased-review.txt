@@ -1,0 +1,25 @@
+Final rebased-delta review:
+
+Scope:
+
+- `.omo/evidence/20260727-senpi-task-always-steer/08-rebase.txt`
+- `packages/omo-senpi/src/components/task/usage-guidance.ts`
+- `packages/omo-senpi/src/components/ultrawork/generated-directive.ts`
+- `packages/omo-senpi/plugin/extensions/omo.js`
+
+Checks requested:
+
+- Upstream wording still preserves always-steer task_send semantics.
+- Generated artifacts match merged sources.
+- No conflict markers remain.
+- Post-rebase gates (`554/554`, `403/403`) cover the delta.
+
+Reviewer result:
+
+```text
+No blockers.
+
+VERDICT: APPROVE
+```
+
+Reviewer task: `st_019fa2f9`, run epoch 1.

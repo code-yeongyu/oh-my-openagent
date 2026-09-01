@@ -1,0 +1,25 @@
+# Fresh-identity session-start git error QA (beta.3)
+
+## What was tested
+Session start on a FRESH sandbox HOME (memory repo dir absent) through the omo launcher in print mode
+with auth + models copied so the session actually reaches before_agent_start (without them senpi aborts
+at "No API key found" before the memory injection runs - that ordering hid the bug in an earlier probe).
+
+## What was observed
+
+### A. current beta.2 install - spurious error reproduces
+    Extension error (.../omo-ai/plugin/extensions/omo.js): Git is required for memory storage but was not found on PATH.
+    (session then proceeds and answers)
+
+### B. fixed worktree build - error absent
+    (no "Git is required" line; session starts cleanly and answers "ok")
+
+## Why it is enough
+The exact user-reported line reproduces on A with git present on PATH and is absent on B through the
+identical launcher, runtime, and sandbox. The fix makes the missing-cwd spawn ENOENT resolve
+git-faithfully (exit 128 "cannot change to ...") so a fresh identity reads as no-memory-yet, and reserves
+GitNotFoundError for a cwd that exists while the git binary truly cannot spawn (pinned by
+packages/memory-core/src/git/exec.test.ts). Matches Discord user aslaii's report
+(channel 1490536332961906829, message 1536165436675067914).
+## Omitted
+Sandbox paths only; no secrets.

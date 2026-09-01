@@ -1,0 +1,16 @@
+===== RED: revert ONLY the product, keep the tests =====
+  product diff vs dev: []
+(fail) resolveCompatibleModelSettings > drops temperature for Claude Opus 4.8 without capability metadata [4.68ms]
+(fail) resolveCompatibleModelSettings > drops temperature for a custom provider hosting Claude Opus 4.8 [1.42ms]
+(fail) resolveCompatibleModelSettings > drops temperature for reasoning-suffixed o-series model openai/o3:high [1.52ms]
+(fail) resolveCompatibleModelSettings > drops temperature for reasoning-suffixed o-series model openai/o3(high) [1.35ms]
+(fail) resolveCompatibleModelSettings > drops temperature for reasoning-suffixed o-series model openai/o3 high [1.48ms]
+ 71 pass
+ 5 fail
+
+===== GREEN: restore the product =====
+ 76 pass
+ 0 fail
+
+  restored product diff vs dev: [ 2 files changed, 18 insertions(+), 3 deletions(-)]
+

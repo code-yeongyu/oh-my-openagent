@@ -2,19 +2,11 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { basename, join } from "node:path"
 
 import { PROMETHEUS_PLANS_DIR } from "../constants"
+import { parsePlanChecklist } from "../plan-checklist"
 import type { PlanProgress } from "../types"
 
-const TODO_HEADING_PATTERN = /^##\s+TODOs\b/i
-const FINAL_VERIFICATION_HEADING_PATTERN = /^##\s+Final Verification Wave\b/i
-const SECOND_LEVEL_HEADING_PATTERN = /^##\s+/
-const UNCHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[\s*\]\s*(.+)$/
-const CHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[[xX]\]\s*(.+)$/
-const TODO_TASK_PATTERN = /^\d+\.\s+/
-const FINAL_WAVE_TASK_PATTERN = /^F\d+\.\s+/i
 const LEGACY_PROMETHEUS_PLANS_DIR = ".sisyphus/plans"
 const PROMETHEUS_PLAN_DIRS = [PROMETHEUS_PLANS_DIR, LEGACY_PROMETHEUS_PLANS_DIR] as const
-
-type ProgressSection = "todo" | "final-wave" | "other"
 
 export function findPrometheusPlans(directory: string): string[] {
   try {
@@ -45,65 +37,13 @@ export function getPlanProgress(planPath: string): PlanProgress {
 
   try {
     const content = readFileSync(planPath, "utf-8")
-    const lines = content.split(/\r?\n/)
-    const hasStructuredSections = lines.some(
-      (line) => TODO_HEADING_PATTERN.test(line) || FINAL_VERIFICATION_HEADING_PATTERN.test(line),
-    )
-    if (hasStructuredSections) {
-      return getStructuredPlanProgress(lines)
+    const checklist = parsePlanChecklist(content)
+    return {
+      total: checklist.total,
+      completed: checklist.completed,
+      isComplete: checklist.total > 0 && checklist.remaining === 0,
     }
-
-    return getSimplePlanProgress(content)
   } catch {
     return { total: 0, completed: 0, isComplete: false }
   }
-}
-
-function getStructuredPlanProgress(lines: string[]): PlanProgress {
-  let section: ProgressSection = "other"
-  let total = 0
-  let completed = 0
-
-  for (const line of lines) {
-    if (SECOND_LEVEL_HEADING_PATTERN.test(line)) {
-      section = TODO_HEADING_PATTERN.test(line)
-        ? "todo"
-        : FINAL_VERIFICATION_HEADING_PATTERN.test(line)
-          ? "final-wave"
-          : "other"
-      continue
-    }
-
-    if (section !== "todo" && section !== "final-wave") {
-      continue
-    }
-
-    const checkedMatch = line.match(CHECKED_CHECKBOX_PATTERN)
-    const uncheckedMatch = checkedMatch ? null : line.match(UNCHECKED_CHECKBOX_PATTERN)
-    const match = checkedMatch ?? uncheckedMatch
-    if (!match || match[1].length > 0) {
-      continue
-    }
-
-    const taskBody = match[2].trim()
-    const labelPattern = section === "todo" ? TODO_TASK_PATTERN : FINAL_WAVE_TASK_PATTERN
-    if (!labelPattern.test(taskBody)) {
-      continue
-    }
-
-    total += 1
-    if (checkedMatch) {
-      completed += 1
-    }
-  }
-
-  return { total, completed, isComplete: total > 0 && completed === total }
-}
-
-function getSimplePlanProgress(content: string): PlanProgress {
-  const uncheckedMatches = content.match(/^[-*]\s*\[\s*\]/gm) ?? []
-  const checkedMatches = content.match(/^[-*]\s*\[[xX]\]/gm) ?? []
-  const total = uncheckedMatches.length + checkedMatches.length
-  const completed = checkedMatches.length
-  return { total, completed, isComplete: total > 0 && completed === total }
 }

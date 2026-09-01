@@ -2,6 +2,7 @@
 .omo/*
 !.omo/rules/
 !.omo/rules/**
+packages/*/.omo/*
 .sisyphus/*
 !.sisyphus/rules/
 !.sisyphus/rules/**
@@ -9,6 +10,7 @@ node_modules/
 
 # Build output
 dist/
+packages/omo-codex/plugin/skills/
 
 # Platform binaries (built, not committed)
 packages/*/bin/oh-my-opencode
@@ -31,6 +33,9 @@ npm-debug.log*
 
 # Lock files (use bun.lockb instead)
 package-lock.json
+!packages/lsp-tools-mcp/package-lock.json
+!packages/lsp-daemon/package-lock.json
+!packages/omo-codex/plugin/package-lock.json
 yarn.lock
 
 # Environment
@@ -40,7 +45,6 @@ test-injection/
 notepad.md
 oauth-success.html
 *.bun-build
-.omx/
 .dori-sync/
 .dori/
 .playwright-mcp/
@@ -49,4 +53,11 @@ oauth-success.html
 .debugging
 .debug-journal*.md
 session-ses_*.md
+pr-*.md
 plans/
+.ulw/
+.claude/*
+!.claude/skills
+!.claude/commands
+!.claude/settings.json
+.dys/

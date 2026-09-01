@@ -1,0 +1,4 @@
+$ npm --prefix packages/omo-codex/plugin/components/start-work-continuation test
+ Test Files  3 passed (3)
+      Tests  42 passed (42)
+exit=0

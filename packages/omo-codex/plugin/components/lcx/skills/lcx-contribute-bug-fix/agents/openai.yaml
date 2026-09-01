@@ -1,0 +1,12 @@
+interface:
+  display_name: "lcx-contribute-bug-fix (omo)"
+  short_description: "Contribute verified LazyCodex or Codex bug fixes"
+  search_terms:
+    - "lcx-contribute-bug-fix"
+    - "contribute a bug fix"
+    - "contribute to fix bug"
+    - "fix bug pr"
+    - "lazycodex fix"
+    - "omo-codex bug fix"
+    - "codex bug fix pr"
+  default_prompt: "Use $lcx-contribute-bug-fix to debug this LazyCodex or Codex bug, work from a fresh ${TMPDIR:-/tmp} clone and worktree, implement the smallest verified fix, apply the lazycodex-generated label, deliver it (verified-fix issue on code-yeongyu/lazycodex — never a PR there; fork PR only for openai/codex), and clean up."

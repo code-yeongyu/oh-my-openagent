@@ -98,12 +98,12 @@ export function stripRangeBoundaryEcho(
 
   let out = newLines
   const beforeIdx = startLine - 2
-  if (beforeIdx >= 0 && equalsIgnoringWhitespace(out[0], lines[beforeIdx])) {
+  if (beforeIdx >= 0 && out[0] === lines[beforeIdx]) {
     out = out.slice(1)
   }
 
   const afterIdx = endLine
-  if (afterIdx < lines.length && out.length > 0 && equalsIgnoringWhitespace(out[out.length - 1], lines[afterIdx])) {
+  if (afterIdx < lines.length && out.length > 0 && out[out.length - 1] === lines[afterIdx]) {
     out = out.slice(0, -1)
   }
 

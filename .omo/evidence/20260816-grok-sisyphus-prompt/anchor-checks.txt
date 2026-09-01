@@ -1,0 +1,16 @@
+=== AFTER (worktree dist, xai/grok-4.6) anchor counts ===
+running on Grok 4.6: 1
+<grok_calibration>: 1
+production ready: 3
+<Constraints>: 0 (fallback body gone)
+
+=== BEFORE (origin/dev dist, xai/grok-4.6) anchor counts ===
+grok anchors: 0
+<Constraints> (fallback dynamic body): 1
+
+=== model resolution (both) ===
+{"modelID":"grok-4.6","providerID":"xai"}
+{"modelID":"grok-4.6","providerID":"xai"}
+
+=== isolation proof ===
+real ~/.local/share/opencode/opencode.db absent before AND after QA (both servers ran with XDG_* under mktemp sandboxes)

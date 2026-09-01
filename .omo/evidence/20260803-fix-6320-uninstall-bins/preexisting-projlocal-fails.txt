@@ -1,0 +1,12 @@
+== the two project-local cleanup files WITH my change ==
+ 8 pass
+ 2 fail
+
+== revert ALL my product to pristine dev, keep test file ==
+== same two files on PRISTINE dev (proves the 2 fails are pre-existing) ==
+ 8 pass
+ 2 fail
+
+== restore ==
+restored: [ 2 files changed, 10 insertions(+), 1 deletion(-)]
+

@@ -1,0 +1,10 @@
+{
+	"mcpServers": {
+		"lsp": {
+			"command": "node",
+			"args": ["../../../../lsp-daemon/dist/cli.js", "mcp"],
+			"cwd": ".",
+			"startup_timeout_sec": 10
+		}
+	}
+}

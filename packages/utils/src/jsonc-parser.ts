@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { parse, ParseError, printParseErrorCode } from "jsonc-parser"
+import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
+import type { ParseError } from "jsonc-parser/lib/esm/main.js"
 
 export interface JsoncParseResult<T> {
   data: T | null
@@ -31,9 +32,6 @@ function stripBom(content: string): string {
 }
 
 export function parseJsonc<T = unknown>(content: string): T {
-  // Strip UTF-8 BOM if present (Windows UTF-8 with BOM files)
-  content = content.replace(/^\uFEFF/, "")
-
   const errors: ParseError[] = []
   const result = parse(stripBom(content), errors, {
     allowTrailingComma: true,
@@ -119,7 +117,7 @@ export function detectPluginConfigFile(
   if (canonicalResult.format !== "none") {
     detectionResult = {
       ...canonicalResult,
-      legacyPath: firstExistingLegacyResult?.path,
+      ...(firstExistingLegacyResult === undefined ? {} : { legacyPath: firstExistingLegacyResult.path }),
     }
   } else if (firstExistingLegacyResult) {
     detectionResult = firstExistingLegacyResult

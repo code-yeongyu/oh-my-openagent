@@ -1,0 +1,18 @@
+Command:
+`bun test packages/omo-senpi/src/components/task/planner-model-name-boundary.test.ts packages/senpi-task/src/tools/task/renderers.test.ts`
+
+Observed RED after reviewer mutation coverage was added:
+- Inherited model name was rendered instead of ignored.
+- Throwing `name` accessor escaped category planning.
+- Terminal-control and 121-character model names were accepted.
+- Persisted display `OpenAI GPT-5.6 SOL` rendered with a duplicated `openai` prefix.
+
+Result:
+17 pass, 4 fail. All four failures named the reviewer-identified security or compatibility regression.
+
+GREEN:
+After moving name parsing to the registry boundary and extracting shared provider qualification:
+`bun test packages/omo-senpi/src/components/task/planner-model-name-boundary.test.ts packages/omo-senpi/src/components/task/planner.test.ts packages/senpi-task/src/tools/task/renderers.test.ts packages/senpi-task/src/category/resolve-category-boundary.test.ts`
+
+Result:
+41 pass, 0 fail, 170 assertions.

@@ -1,0 +1,14 @@
+=== violating definition: model-visible text ===
+Started dag run dag_66b1a453-9751-4174-a794-227c546dca6f (2 nodes). Advisory warnings (fix the definition and re-start under a new key to clear them): node "plan": prompt is missing the TASK: marker from the mass-ulw node prompt contract (TASK/DELIVERABLE/SCOPE/VERIFY/STOP WHEN) | node "plan": prompt is missing a STOP WHEN condition from the mass-ulw node prompt contract | node "build": prompt is missing the TASK: marker from the mass-ulw node prompt contract (TASK/DELIVERABLE/SCOPE/VERIFY/STOP WHEN) | node "build": prompt is missing a STOP WHEN condition from the mass-ulw node prompt contract | run has 2 nodes but no verification node; a graph that produces work ends with a verification wave (mass-ulw planning reference)
+=== violating definition: warnings payload ===
+[
+  "node \"plan\": prompt is missing the TASK: marker from the mass-ulw node prompt contract (TASK/DELIVERABLE/SCOPE/VERIFY/STOP WHEN)",
+  "node \"plan\": prompt is missing a STOP WHEN condition from the mass-ulw node prompt contract",
+  "node \"build\": prompt is missing the TASK: marker from the mass-ulw node prompt contract (TASK/DELIVERABLE/SCOPE/VERIFY/STOP WHEN)",
+  "node \"build\": prompt is missing a STOP WHEN condition from the mass-ulw node prompt contract",
+  "run has 2 nodes but no verification node; a graph that produces work ends with a verification wave (mass-ulw planning reference)"
+]
+=== compliant definition: model-visible text ===
+Started dag run dag_87385711-1723-4ce0-9704-c72542b2a1db (2 nodes).
+=== compliant definition: warnings payload ===
+[]

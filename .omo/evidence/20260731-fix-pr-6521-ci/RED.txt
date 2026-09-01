@@ -1,0 +1,35 @@
+GitHub Actions RED
+==================
+
+Surface:
+  PR #6521, GitHub Actions run 30627980408
+  Job: test (windows-latest), database id 91147589248
+  Step: Run tests
+
+Observed:
+  error: ENOENT: no such file or directory
+  at trackedFiles (script/gpt-mini-reference-audit.test.ts:30:23)
+  (fail) GPT Mini reference audit > tracked shipped files no longer reference the retired GPT Mini model
+  12605 pass
+  22 skip
+  1 fail
+
+Cross-platform control:
+  test (macos-latest): success
+  test (ubuntu-latest): success
+  test (windows-latest): failure
+
+Focused regression RED:
+  bun --cwd <task-worktree> test script/gpt-mini-reference-audit.test.ts
+
+  Expected: "/var/folders/.../T/gpt mini audit/"
+  Received: "/var/folders/.../T/gpt%20mini%20audit/"
+  (fail) GPT Mini reference audit > repository root decodes a platform-native file URL
+  (pass) GPT Mini reference audit > tracked shipped files no longer reference the retired GPT Mini model
+  1 pass
+  1 fail
+
+The local regression exercises the same defective URL pathname conversion.
+The GitHub Windows run proves the drive-letter form makes Bun.spawn reject the
+working directory with ENOENT.
+

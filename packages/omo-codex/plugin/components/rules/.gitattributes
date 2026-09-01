@@ -1,0 +1,13 @@
+# Normalize line endings: store LF in git, check out LF on every platform.
+# Required so biome's --check passes on Windows (default core.autocrlf=true).
+* text=auto eol=lf
+
+# Explicit binary types
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.tgz binary
+*.gz binary

@@ -1,0 +1,46 @@
+$ sed -n 2p packages/omo-codex/scripts/install-dist/install-local.mjs   # committed blob carries no build marker
+var __defProp = Object.defineProperty;
+
+$ bun test script/codex-install-bundle-freshness.test.ts
+bun test v1.3.14 (0d9b296a)
+
+script\codex-install-bundle-freshness.test.ts:
+26 | 
+27 |     // when
+28 |     const bodyDigest = createHash("sha256").update(artifact?.body ?? "").digest("hex")
+29 | 
+30 |     // then
+31 |     expect(artifact).toBeDefined()
+                          ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\script\codex-install-bundle-freshness.test.ts:31:22)
+(fail) committed Codex installer bundle > #given the tracked bundle #when its build marker is read #then it is present and self-consistent [273.28ms]
+38 | 
+39 |     // when
+40 |     const currentSourceDigest = await digestCodexInstallerSources()
+41 | 
+42 |     // then
+43 |     expect({ bundle: trackedBundlePath, sourceDigest: artifact?.sourceDigest }).toEqual({
+                                                                                     ^
+error: expect(received).toEqual(expected)
+
+@@ -2,3 +2,3 @@
+    "bundle": "packages/omo-codex/scripts/install-dist/install-local.mjs",
+-   "sourceDigest": "837f31a80cb49a0be547308babfd7266571dd1c53846dc2a2225006cc2da8bfa",
++   "sourceDigest": undefined,
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\omo\script\codex-install-bundle-freshness.test.ts:43:81)
+(fail) committed Codex installer bundle > #given current installer sources #when compared with the tracked bundle marker #then the bundle is current [2802.06ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [9.29s]
+exit=1

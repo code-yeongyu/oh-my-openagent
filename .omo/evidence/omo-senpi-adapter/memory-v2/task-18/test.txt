@@ -1,0 +1,39 @@
+=== RED: todo 18 /people command + graph + dialectic-lite ===
+date: 2026-08-10T08:54:43Z
+cmd: bun test packages/omo-senpi/src/components/memory/commands/people.test.ts
+
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/omo-senpi/src/components/memory/commands/people.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './people' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat/memory-v2-active-learning/packages/omo-senpi/src/components/memory/commands/people.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [89.00ms]
+
+=== GREEN: todo 18 /people command + graph + dialectic-lite ===
+date: 2026-08-10T09:07:45Z
+cmd: bun test packages/omo-senpi/src/components/memory/commands/
+
+(pass) estimateSystemTokens > #given a file whose byte length is not divisible by four #when estimated #then the file rounds up [0.71ms]
+
+ 109 pass
+ 0 fail
+ 381 expect() calls
+Ran 109 tests across 16 files. [38.06s]
+
+cmd: bun test packages/omo-senpi/src/components/memory/palace/
+
+ 31 pass
+ 0 fail
+ 105 expect() calls
+Ran 31 tests across 4 files. [11.66s]
+
+cmd: bunx tsgo --noEmit (repo-wide, files touched by this task are clean)
+tsgo exit: 0

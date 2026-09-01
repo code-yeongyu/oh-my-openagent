@@ -1,6 +1,6 @@
 import type { BoulderSessionOrigin, BoulderState, BoulderWorkState } from "../types"
 import { getBoulderWorks, readBoulderState } from "./read-state"
-import { nowIsoString, projectWorkToMirror } from "./shared"
+import { normalizeSessionId, nowIsoString, projectWorkToMirror } from "./shared"
 import { writeBoulderState } from "./write-state"
 
 export function appendSessionId(
@@ -8,9 +8,10 @@ export function appendSessionId(
   sessionId: string,
   origin: "direct" | "appended" = "direct",
 ): BoulderState | null {
+  const normalizedSessionId = normalizeSessionId(sessionId)
   const activeWorkId = readBoulderState(directory)?.active_work_id
   if (activeWorkId) {
-    return appendSessionIdForWork(directory, activeWorkId, sessionId, origin)
+    return appendSessionIdForWork(directory, activeWorkId, normalizedSessionId, origin)
   }
 
   const state = readBoulderState(directory)
@@ -22,15 +23,15 @@ export function appendSessionId(
     state.session_origins = {}
   }
 
-  if (!state.session_ids?.includes(sessionId)) {
+  if (!state.session_ids?.includes(normalizedSessionId)) {
     if (!Array.isArray(state.session_ids)) {
       state.session_ids = []
     }
 
     const originalSessionIds = [...state.session_ids]
     const originalSessionOrigins = { ...state.session_origins }
-    state.session_ids.push(sessionId)
-    state.session_origins[sessionId] = origin
+    state.session_ids.push(normalizedSessionId)
+    state.session_origins[normalizedSessionId] = origin
     if (writeBoulderState(directory, state)) {
       return state
     }
@@ -40,8 +41,8 @@ export function appendSessionId(
     return null
   }
 
-  if (!state.session_origins[sessionId]) {
-    state.session_origins[sessionId] = origin
+  if (!state.session_origins[normalizedSessionId]) {
+    state.session_origins[normalizedSessionId] = origin
     if (!writeBoulderState(directory, state)) {
       return null
     }
@@ -56,6 +57,7 @@ export function appendSessionIdForWork(
   sessionId: string,
   origin: BoulderSessionOrigin = "direct",
 ): BoulderState | null {
+  const normalizedSessionId = normalizeSessionId(sessionId)
   const state = readBoulderState(directory)
   if (!state) {
     return null
@@ -69,10 +71,10 @@ export function appendSessionIdForWork(
 
   const updatedWork: BoulderWorkState = {
     ...targetWork,
-    session_ids: targetWork.session_ids.includes(sessionId)
+    session_ids: targetWork.session_ids.includes(normalizedSessionId)
       ? [...targetWork.session_ids]
-      : [...targetWork.session_ids, sessionId],
-    session_origins: { ...(targetWork.session_origins ?? {}), [sessionId]: origin },
+      : [...targetWork.session_ids, normalizedSessionId],
+    session_origins: { ...(targetWork.session_origins ?? {}), [normalizedSessionId]: origin },
     updated_at: nowIsoString(),
   }
 

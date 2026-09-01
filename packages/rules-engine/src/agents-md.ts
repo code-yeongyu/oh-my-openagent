@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { AGENTS_FILENAME } from "./constants";
 import type { AgentsMdCache } from "./types";
@@ -11,9 +11,12 @@ export interface FindAgentsMdUpInput {
 }
 
 export async function findAgentsMdUp(input: FindAgentsMdUpInput): Promise<string[]> {
-  const startDir = resolve(input.startDir);
-  const rootDir = resolve(input.rootDir);
+  const startDir = canonicalizePath(input.startDir);
+  const rootDir = canonicalizePath(input.rootDir);
   const skipRoot = input.skipRoot ?? true;
+  if (!isSameOrChildPath(startDir, rootDir)) {
+    return [];
+  }
   const cacheKey = [startDir, rootDir, skipRoot ? "1" : "0"].join("\0");
   const cached = input.cache?.get(cacheKey);
   if (cached) return [...cached];
@@ -22,8 +25,8 @@ export async function findAgentsMdUp(input: FindAgentsMdUpInput): Promise<string
   while (true) {
     const isRootDir = current === rootDir;
     if (!(skipRoot && isRootDir)) {
-      const agentsPath = join(current, AGENTS_FILENAME);
-      if (isFile(agentsPath)) found.push(agentsPath);
+      const agentsPath = resolveAgentsFilePath(join(current, AGENTS_FILENAME), rootDir);
+      if (agentsPath) found.push(agentsPath);
     }
     if (isRootDir) break;
     const parent = dirname(current);
@@ -35,12 +38,23 @@ export async function findAgentsMdUp(input: FindAgentsMdUpInput): Promise<string
   return result;
 }
 
-function isFile(path: string): boolean {
-  if (!existsSync(path)) return false;
+function canonicalizePath(path: string): string {
   try {
-    return statSync(path).isFile();
+    return realpathSync(path);
+  } catch (error) {
+    if (error instanceof Error) return resolve(path);
+    throw error;
+  }
+}
+
+function resolveAgentsFilePath(path: string, rootDir: string): string | null {
+  if (!existsSync(path)) return null;
+  try {
+    const canonicalPath = realpathSync(path);
+    if (!isSameOrChildPath(canonicalPath, rootDir)) return null;
+    return statSync(canonicalPath).isFile() ? canonicalPath : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

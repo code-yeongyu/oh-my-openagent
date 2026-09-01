@@ -1,6 +1,93 @@
 // bin/platform.test.ts
 import { describe, expect, test } from "bun:test";
-import { getBinaryPath, getPlatformPackage, getPlatformPackageCandidates } from "./platform.js";
+import {
+  getBinaryPath,
+  getPackageBareName,
+  getPlatformPackage,
+  getPlatformPackageCandidates,
+  resolvePlatformPackageBaseName,
+} from "./platform.js";
+
+describe("getPackageBareName", () => {
+  test("strips npm scope from package name", () => {
+    // #given
+    const packageName = "@code-yeongyu/lazycodex";
+
+    // #when
+    const bareName = getPackageBareName(packageName);
+
+    // #then
+    expect(bareName).toBe("lazycodex");
+  });
+});
+
+describe("resolvePlatformPackageBaseName", () => {
+  test("maps lazycodex wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "lazycodex";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
+  test("maps scoped lazycodex wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "@code-yeongyu/lazycodex";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
+  test("maps lazycodex-ai wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "lazycodex-ai";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
+  test("maps scoped lazycodex-ai wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "@code-yeongyu/lazycodex-ai";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
+  test("keeps oh-my-opencode wrapper mapped to oh-my-opencode platform package family", () => {
+    // #given
+    const wrapperPackageName = "oh-my-opencode";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-opencode");
+  });
+
+  test("keeps oh-my-openagent wrapper mapped to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "oh-my-openagent";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+});
 
 describe("getPlatformPackage", () => {
   // #region Darwin platforms
@@ -110,7 +197,7 @@ describe("getPlatformPackage", () => {
 });
 
 describe("getBinaryPath", () => {
-  test("returns path without .exe for Unix platforms", () => {
+  test("returns JavaScript launcher path for Unix platforms", () => {
     // #given Unix platform package
     const pkg = "oh-my-opencode-darwin-arm64";
     const platform = "darwin";
@@ -118,11 +205,11 @@ describe("getBinaryPath", () => {
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
-    // #then returns path without extension
-    expect(result).toBe("oh-my-opencode-darwin-arm64/bin/oh-my-opencode");
+    // #then returns the platform launcher script
+    expect(result).toBe("oh-my-opencode-darwin-arm64/bin/oh-my-opencode.js");
   });
 
-  test("returns path with .exe for Windows", () => {
+  test("returns JavaScript launcher path for Windows", () => {
     // #given Windows platform package
     const pkg = "oh-my-opencode-windows-x64";
     const platform = "win32";
@@ -130,11 +217,11 @@ describe("getBinaryPath", () => {
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
-    // #then returns path with .exe extension
-    expect(result).toBe("oh-my-opencode-windows-x64/bin/oh-my-opencode.exe");
+    // #then returns the platform launcher script
+    expect(result).toBe("oh-my-opencode-windows-x64/bin/oh-my-opencode.js");
   });
 
-  test("returns path without .exe for Linux", () => {
+  test("returns JavaScript launcher path for Linux", () => {
     // #given Linux platform package
     const pkg = "oh-my-opencode-linux-x64";
     const platform = "linux";
@@ -142,8 +229,8 @@ describe("getBinaryPath", () => {
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
-    // #then returns path without extension
-    expect(result).toBe("oh-my-opencode-linux-x64/bin/oh-my-opencode");
+    // #then returns the platform launcher script
+    expect(result).toBe("oh-my-opencode-linux-x64/bin/oh-my-opencode.js");
   });
 });
 
@@ -214,5 +301,61 @@ describe("getPlatformPackageCandidates", () => {
 
     // #then baseline fallback is not included
     expect(result).toEqual(["oh-my-opencode-linux-arm64"]);
+  });
+
+  test("returns arm64 and x64-baseline candidates for Windows ARM64", () => {
+    // #given Windows arm64
+    const input = { platform: "win32", arch: "arm64" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then arm64 package first then the x64 baseline fallback
+    expect(result).toEqual([
+      "oh-my-opencode-windows-arm64",
+      "oh-my-opencode-windows-x64-baseline",
+    ]);
+  });
+
+  test("supports renamed package family for Windows ARM64 via packageBaseName override", () => {
+    // #given Windows arm64 with renamed package base
+    const input = { platform: "win32", arch: "arm64", packageBaseName: "oh-my-openagent" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then returns renamed arm64 and x64 baseline candidates
+    expect(result).toEqual([
+      "oh-my-openagent-windows-arm64",
+      "oh-my-openagent-windows-x64-baseline",
+    ]);
+  });
+
+  test("returns x64 and baseline candidates for Windows x64", () => {
+    // #given Windows x64
+    const input = { platform: "win32", arch: "x64" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then modern x64 first then x64 baseline
+    expect(result).toEqual([
+      "oh-my-opencode-windows-x64",
+      "oh-my-opencode-windows-x64-baseline",
+    ]);
+  });
+
+  test("returns baseline first for Windows x64 when preferBaseline is true", () => {
+    // #given Windows x64 with baseline preference
+    const input = { platform: "win32", arch: "x64", preferBaseline: true };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then baseline package is preferred first
+    expect(result).toEqual([
+      "oh-my-opencode-windows-x64-baseline",
+      "oh-my-opencode-windows-x64",
+    ]);
   });
 });

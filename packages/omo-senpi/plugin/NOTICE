@@ -1,0 +1,5 @@
+omo-senpi LSP adapter notice
+
+The Senpi LSP descriptor, schema, renderer, path extraction, post-edit wiring, and migration-warning helpers include code adapted from pi-lsp-client / oh-my-pi by Yeongyu Kim.
+
+The former duplicated Senpi LSP client, transport, JSON-RPC, manager, server-resolution, project-trust, diagnostics, workspace-edit, and process execution engine has been removed. Runtime LSP execution is provided by the packaged @code-yeongyu/lsp-daemon runtime and @oh-my-opencode/lsp-core.

@@ -1,0 +1,95 @@
+Task 22 - live QA drivers: quit->resume revival scenarios for tasks and teams
+Date: 2026-08-04
+Worktree: /Users/yeongyu/local-workspaces/omo-wt/subagent-session-resume-revival (branch feat/subagent-session-resume-revival)
+
+SCOPE
+Finish the prior worker's uncommitted live-QA work: run both live drivers GREEN (PASS, not SKIP)
+with the shutdown_approved revival fix (ee792ec39) in place, write evidence, one atomic commit.
+
+WHAT RAN
+1. Task driver (task-e2e.mjs, imports task-resume-e2e.mjs + task-resume-failure-e2e.mjs):
+   SENPI_BIN="$(command -v senpi)" TASK_E2E_OUT_DIR=.omo/evidence/omo-senpi-adapter/subagent-session-resume-revival/task \
+     node packages/omo-senpi/scripts/qa/task-e2e.mjs
+   Observed: {"result":"PASS"} - 27/27 checks PASS, leakedPids 0, real_senpi_untouched PASS.
+   Verdict: .omo/evidence/omo-senpi-adapter/subagent-session-resume-revival/task/verdict.json
+
+2. Team driver (team-e2e.mjs, imports team-resume-e2e.mjs):
+   SENPI_BIN="$(command -v senpi)" TEAM_E2E_OUT_DIR=.omo/evidence/omo-senpi-adapter/subagent-session-resume-revival/team \
+     node packages/omo-senpi/scripts/qa/team-e2e.mjs
+   Observed: {"result":"PASS"} - 22/22 checks true, failed [], credentialIsolationClean true, leakedPids 0.
+   Verdict: .omo/evidence/omo-senpi-adapter/subagent-session-resume-revival/team/verdict.json
+
+3. bun test packages/omo-senpi -> 562 pass, 0 fail (86 files).
+4. ./node_modules/.bin/tsgo --noEmit -p packages/omo-senpi/tsconfig.json -> clean.
+5. New QA modules pure LOC (non-comment non-blank): resume-e2e-runtime 152, runtime test 152,
+   mock-provider 247, scenarios 93, task-resume-e2e 123, task-resume-failure 184, team-resume-e2e 229.
+   All under the 250 pure-LOC ceiling; drivers task-e2e.mjs/team-e2e.mjs only gained import+call lines.
+
+EXPECTED vs OBSERVED (resume scenarios, all PASS)
+Task side:
+- resume_spawn_children / resume_quit_suspends_both: run 1 spawns midchild (mid-turn, owns an
+  assistant message) + finchild (completed); natural print-mode quit suspends both to persisted_only.
+- resume_revived_resident / resume_midturn_continuation: resuming the same session revives both
+  resident; the mid-turn child receives the continuation nudge and lands MIDTURN_CONTINUED_TOKEN.
+- resume_finished_no_nudge / resume_finished_steerable: the finished child revives WITHOUT the
+  continuation marker, and a post-resume task_send with RESUME_PING_TOKEN is answered with
+  RESUME_PONG_TOKEN in the child's own persisted session (task_send result details kind:"revived").
+- resume_unrelated_no_revive: a second, unrelated session does not revive either child (event logs
+  byte-identical, residency stays persisted_only).
+- Deliberate-stop proofs, each paired with a finished witness that DID revive in the same resumed
+  process: resume_cancel_not_revived (task_cancel), resume_killed_not_revived (external kill,
+  killed:true persisted), resume_lru_evict_not_revived (cap-1 LRU eviction),
+  resume_ttl_setup/expunged/not_revived (ttl_ms:1 expiry tombstones the record; the ttl witness
+  still continues post-resume).
+Team side:
+- resume_member_suspended_on_quit: member record rpc_detached with host_pid cleared after natural quit.
+- resume_member_revived / resume_member_mailbox_identity: same task id revived after suspend;
+  the lead's post-resume envelope (LEAD2QUICK-POST-RESUME) lands in the member's resumed session.
+- resume_lead_poller_running: DURABLE signals - lead poller reserved the member's post-resume
+  report (delivered.reserved >= 1) AND member-side team_message_delivered from="lead" in the
+  member's task event log.
+- resume_shutdown_approved_setup / resume_shutdown_approved_not_revived: member retired through
+  shutdown_request -> shutdown_response(approve) while mid-turn (team state stamped
+  shutdown_approved, task cancelled); on resume it is NOT revived (status stays cancelled,
+  residency never resident, event log byte-identical). This is the live proof of ee792ec39.
+
+ISOLATION PROOF
+- Drivers isolate via SENPI_CODING_AGENT_DIR + XDG_CONFIG_HOME + HOME/USERPROFILE sandbox dirs
+  (the omo user-scope config resolves from HOME; without it the developer's real user categories
+  leak into lanes). seedSandbox pins packages:[<worktree plugin>] so lanes load the WORKTREE bundles.
+- real_senpi_untouched PASS / credentialIsolationClean true: the four credential files
+  (auth.json, models.json, settings.json minus volatile tipsHistory/lastChangelogVersion stamps,
+  trust.json) byte-identical across both runs; the only real-agent-dir changes were concurrent
+  host session JSONL (classified concurrent, not QA-attributed). No leaked pids in either driver.
+
+FIXES MADE IN THIS PASS (beyond the prior worker's state)
+1. Extension bundles regenerated with the CI-pinned bun 1.3.12 (installed to /tmp/bun-1.3.12;
+   local bun 1.4.0 minifies differently - see ff48966b7). The committed bundle (678,227 bytes,
+   last regenerated 68d72a48d) predated TWENTY source commits of this plan, including the
+   ee792ec39 shutdown_approved resolver fix; the drivers load plugin/extensions/omo.js via
+   settings.json packages, so the fix had to be compiled in. Verified the bundle now contains
+   members.find(...) -> status==="shutdown_approved" -> throw member_missing.
+2. bundle-size budget 700,000 -> 710,000 (packages/omo-senpi/src/bundle-size.test.ts): the plan's
+   suspend/revive feature code grew the minified bundle to a measured 706,927 bytes (pinned bun
+   1.3.12). Plan-scoped feature growth, no new third-party dependency inlined; documented in the test.
+3. resume_lead_poller_running gated on durable signals per the task brief (step 5) instead of the
+   full steer-into-model cycle.
+4. Crash lane "flake" root-caused and fixed (team-e2e-crash.mjs): crash-after-inject.json lives in
+   the PERSISTENT outDir, so a stale marker from a previous run satisfied readCrashTarget with a
+   foreign message id (evidence: marker id 715ccc6c... vs the run's real task_send id
+   b1ae0cea-4ba9-46ff-84ec-b0ad8d51ffe8 in crash-initial-stdout.json.log; every id-keyed check
+   failed while count-based ones passed). The lane now deletes the marker and any stale release
+   file before the initial run. Full crash lane green: crashReservationUncommittedAtKill,
+   crashReservationRestoredUnread, crashReservedMessageDeliveredExactlyOnce all true.
+
+FINDING (follow-up, not a failure; matches plan ledger entry)
+- resumed-session-steer-gap: the lead poller's steer into a RESUMED print session may not abort the
+  lead hang (fresh sessions steer fine); possible resumed-session parentState/idle wiring gap
+  reaching the injection coordinator. Recorded in
+  team/resume-member-evidence.json findings[] with this run's leadSteerLanded observation (true
+  this run - the gap is intermittent). Poller restart is proven by durable signals regardless.
+
+EVIDENCE ARTIFACTS
+- task/ + team/ verdict.json, per-lane stdout/stderr logs, resume-member-evidence.json,
+  crash-recovery.json under .omo/evidence/omo-senpi-adapter/subagent-session-resume-revival/
+- This file: .omo/evidence/task-22-subagent-session-resume-revival.txt

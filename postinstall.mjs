@@ -1,13 +1,23 @@
 // postinstall.mjs
 // Runs after npm install to verify platform binary is available
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
-import { getPlatformPackageCandidates, getBinaryPath } from "./bin/platform.js";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import {
+  getPlatformPackageCandidates,
+  getBinaryPath,
+  resolvePlatformPackageBaseName,
+} from "./bin/platform.js";
+import { detectPlatformBinaryMismatch } from "./bin/version-mismatch.js";
 
 const require = createRequire(import.meta.url);
 
 const MIN_OPENCODE_VERSION = "1.4.0";
+const OPENCODE_PLUGIN_PACKAGES = ["oh-my-opencode", "oh-my-openagent"];
+const RENAME_NOTICE =
+  "oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).";
 
 /**
  * Parse version string into numeric parts
@@ -77,12 +87,49 @@ function getLibcFamily() {
   }
 }
 
-function getPackageBaseName() {
+function readMainPackageJson() {
   try {
-    const packageJson = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
-    return packageJson.name || "oh-my-opencode";
+    return JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
   } catch {
-    return "oh-my-opencode";
+    return null;
+  }
+}
+
+function getPackageBaseName() {
+  const packageJson = readMainPackageJson();
+  return resolvePlatformPackageBaseName(packageJson?.name || "oh-my-opencode");
+}
+
+function getMainPackageVersion() {
+  const packageJson = readMainPackageJson();
+  return packageJson?.version ?? null;
+}
+
+function invalidateOpenCodePluginCache() {
+  const cacheDir = join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "opencode");
+  const parentDirs = [cacheDir, join(cacheDir, "packages")];
+  const prefixes = OPENCODE_PLUGIN_PACKAGES.map((packageName) => `${packageName}@`);
+
+  for (const parentDir of parentDirs) {
+    try {
+      for (const entry of readdirSync(parentDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && prefixes.some((prefix) => entry.name.startsWith(prefix))) {
+          rmSync(join(parentDir, entry.name), { recursive: true, force: true });
+        }
+      }
+    } catch {
+      // Cache invalidation is best-effort; postinstall should not fail package installs.
+    }
+  }
+}
+
+function readPlatformPackageVersion(pkg) {
+  try {
+    const platformPackageJsonPath = require.resolve(`${pkg}/package.json`);
+    const packageJson = JSON.parse(readFileSync(platformPackageJsonPath, "utf8"));
+    return packageJson.version ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -90,6 +137,12 @@ function main() {
   const { platform, arch } = process;
   const libcFamily = getLibcFamily();
   const packageBaseName = getPackageBaseName();
+
+  // npm >= 7 hides lifecycle output unless --foreground-scripts, so this notice is
+  // best-effort: the reliable migration surfaces are the CHANGELOG, docs, and README.
+  console.log(RENAME_NOTICE);
+
+  invalidateOpenCodePluginCache();
 
   // Check opencode version requirement
   const versionCheck = checkOpenCodeVersion();
@@ -120,6 +173,19 @@ function main() {
       throw new Error(
         `No platform binary package installed. Tried: ${packageCandidates.join(", ")}`
       );
+    }
+
+    const mismatch = detectPlatformBinaryMismatch({
+      mainVersion: getMainPackageVersion(),
+      platformVersion: readPlatformPackageVersion(resolvedPackage),
+      platformPackage: resolvedPackage,
+    });
+    if (mismatch) {
+      console.warn(`⚠ oh-my-opencode platform binary version mismatch detected`);
+      console.warn(`  ${packageBaseName}: ${mismatch.mainVersion}`);
+      console.warn(`  ${mismatch.platformPackage}: ${mismatch.platformVersion}`);
+      console.warn(`  The startup banner may show the stale version until the platform binary is updated.`);
+      console.warn(`  Fix: npm install -g ${packageBaseName}@${mismatch.mainVersion} ${mismatch.platformPackage}@${mismatch.mainVersion}`);
     }
 
     console.log(`✓ oh-my-opencode binary installed for ${platform}-${arch} (${resolvedPackage})`);

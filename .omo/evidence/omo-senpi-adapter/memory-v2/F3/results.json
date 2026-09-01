@@ -1,0 +1,126 @@
+{
+  "result": "FAIL",
+  "fatal": null,
+  "checks": [
+    {
+      "name": "fresh seed and accepted turn 1: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "fresh seed created the isolated identity repo",
+      "ok": true,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-gBNc6X/memory/agents/project-a050c3a7/repo"
+    },
+    {
+      "name": "fresh seed committed persona.md and human.md",
+      "ok": true,
+      "detail": "29706fa0689b59acb9b777d43b0a8cbff3344ab1\tchore: initialize local memory"
+    },
+    {
+      "name": "accepted turn 2 without memory save: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "nudge remains absent one turn after the initial save",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "accepted turn 3 without memory save: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "nudge appears at every_user_turns=2",
+      "ok": false,
+      "detail": "expected exact nudge count N=2"
+    },
+    {
+      "name": "accepted turn 4 with memory tool save: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "memory tool save committed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "accepted turn 5 after memory save: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "nudge self-clears on the turn after memory save",
+      "ok": true,
+      "detail": "nudge token absent"
+    },
+    {
+      "name": "facts run published final.json",
+      "ok": false,
+      "detail": "Error: facts final.json timed out after 5000ms"
+    },
+    {
+      "name": "facts queue enqueue or launch attempt is durable",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "facts extraction produced Mina Kim person card",
+      "ok": false,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-gBNc6X/memory/agents/project-a050c3a7/repo/people/mina-kim/card.md"
+    },
+    {
+      "name": "soul edit through memory tool: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "soul edit tool result carries announcement discipline",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "turn after soul edit: senpi process exited cleanly",
+      "ok": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "soul-edit notice is injected on the next turn",
+      "ok": false,
+      "detail": "Soul updated by token present"
+    },
+    {
+      "name": "manual dream command reserved a run",
+      "ok": false,
+      "detail": "                                                                                                                                          \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[38;2;255;255;0m  /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-gBNc6X/memory/agents/project-a050c3a7/repo/skills\u001b[39m                                                                                                          \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[38;2;255;255;0m    skill path does not exist\u001b[39m                                                                                                                                                                                               \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007 \u001b[38;2;255;255;0mWarning: omo-senpi: configuration migration: Migration validation failed for /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-gBNc6X/home/.omo/omo.json: memory.reflection: Invalid input, memory:   \u001b[0m\u001b]"
+    },
+    {
+      "name": "dream fs.watch observed final.json",
+      "ok": false,
+      "detail": "Error: dream final.json timed out after 5000ms"
+    },
+    {
+      "name": "/people renders the extracted Mina Kim card",
+      "ok": false,
+      "detail": "8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[38;2;102;102;102multrawork, ulw-loop, ulw-plan, ulw-research, visual-qa\u001b[39m                                                                                                                                                                      \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[38;2;240;198;116m[Extensions]\u001b[39m                                                                                                                                                                                                                \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[38;2;102;102;102m  anthropic-bash, anthropic-web-search, bash-timeout, btw, cache-keepalive, claude-sdk-oauth, compaction, config-reload, diff.js, f3-provider.ts, files.js, goal, gpt-apply-patch, help, history-search, hooks,             \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[38;2;102;102;102mimport-repro, look-at, loop-guard, mcp, model-fallback, nested-agents-md, omo.js, openai-web-search, permission-system, prompt-preset, prompt-url-widget.js, recommended-models, redraws, rules, service-tier, src,         \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[38;2;102;102;102mterminal, todo, tool-pair-guard, tps.js, ttsr, video-in, webfetch, websearch\u001b[39m                                                                                                                                                \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[38;2;255;255;0m[Skill conflicts]\u001b[39m                                         "
+    },
+    {
+      "name": "all isolated tmux command sessions exited",
+      "ok": true,
+      "detail": "remaining=0"
+    },
+    {
+      "name": "all directly spawned child processes exited",
+      "ok": true,
+      "detail": "remaining="
+    },
+    {
+      "name": "isolated HOME/SENPI/XDG/memory root removed",
+      "ok": true,
+      "detail": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-memory-f3-gBNc6X"
+    }
+  ]
+}

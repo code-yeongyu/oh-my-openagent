@@ -1,0 +1,54 @@
+{
+  "result": "FAIL",
+  "isolatedRealAgentDir": false,
+  "scenarios": [
+    {
+      "scenario": "A-classifier-refusal",
+      "expectedDirectives": 1,
+      "observedDirectives": 1,
+      "contentOk": true,
+      "observedNotices": 1,
+      "noticeOk": true,
+      "reminderLeaks": 0,
+      "exitStatus": 0,
+      "entries": 13,
+      "result": "PASS"
+    },
+    {
+      "scenario": "B-policy-rejection",
+      "expectedDirectives": 1,
+      "observedDirectives": 1,
+      "contentOk": true,
+      "observedNotices": 1,
+      "noticeOk": true,
+      "reminderLeaks": 0,
+      "exitStatus": 0,
+      "entries": 13,
+      "result": "PASS"
+    },
+    {
+      "scenario": "C-transient-fallback",
+      "expectedDirectives": 0,
+      "observedDirectives": 0,
+      "contentOk": true,
+      "observedNotices": 0,
+      "noticeOk": true,
+      "reminderLeaks": 0,
+      "exitStatus": 0,
+      "entries": 13,
+      "result": "PASS"
+    },
+    {
+      "scenario": "D-architect-absent",
+      "expectedDirectives": 0,
+      "observedDirectives": 0,
+      "contentOk": true,
+      "observedNotices": 0,
+      "noticeOk": true,
+      "reminderLeaks": 0,
+      "exitStatus": 0,
+      "entries": 11,
+      "result": "PASS"
+    }
+  ]
+}
