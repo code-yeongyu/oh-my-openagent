@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { computeLineHash, computeLegacyLineHash } from "./hash-computation"
-import { parseLineRef, validateLineRef, validateLineRefs } from "./validation"
+import { HashlineMismatchError, parseLineRef, validateLineRef, validateLineRefs } from "./validation"
 
 describe("parseLineRef", () => {
   it("parses valid LINE#ID reference", () => {
@@ -114,6 +114,31 @@ describe("validateLineRef", () => {
 
     //#when / #then
     expect(() => validateLineRef(lines, "1#ZZ")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}\|/)
+  })
+
+  it("keeps mismatch constructor parameters as observable error fields", () => {
+    //#given
+    const lines = ["function hello() {"]
+    let capturedError: HashlineMismatchError | undefined
+
+    //#when
+    try {
+      validateLineRef(lines, "1#ZZ")
+    } catch (error) {
+      if (!(error instanceof HashlineMismatchError)) {
+        throw error
+      }
+      capturedError = error
+    }
+
+    //#then
+    if (capturedError === undefined) {
+      throw new Error("Expected HashlineMismatchError")
+    }
+    expect(Object.hasOwn(capturedError, "mismatches")).toBe(true)
+    expect(Object.hasOwn(capturedError, "fileLines")).toBe(true)
+    expect(Object.keys(capturedError)).toContain("mismatches")
+    expect(Object.keys(capturedError)).toContain("fileLines")
   })
 
   it("accepts legacy hashes for indented lines", () => {

@@ -6,7 +6,7 @@
     "declaration": true,
     "declarationDir": "dist",
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "packages/omo-opencode/src",
     "strict": true,
     "allowArbitraryExtensions": true,
     "esModuleInterop": true,
@@ -16,6 +16,6 @@
     "lib": ["ESNext"],
     "types": ["bun-types"]
   },
-  "include": ["src/**/*"],
+  "include": ["packages/omo-opencode/src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "script"]
 }

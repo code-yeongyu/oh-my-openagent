@@ -1,0 +1,15 @@
+{
+	"session_id": "00000000-0000-0000-0000-000000000000",
+	"turn_id": "00000000-0000-0000-0000-000000000001",
+	"transcript_path": "/tmp/codex-lsp-transcript.jsonl",
+	"cwd": ".",
+	"hook_event_name": "PostToolUse",
+	"model": "gpt-5.5",
+	"permission_mode": "default",
+	"tool_name": "apply_patch",
+	"tool_input": {
+		"command": "*** Begin Patch\n*** Update File: test/fixtures/broken.py\n@@\n-value: str = 1\n+value: str = 1\n*** End Patch\n"
+	},
+	"tool_response": "Success. Updated files.",
+	"tool_use_id": "toolu_000000000000000000000000"
+}

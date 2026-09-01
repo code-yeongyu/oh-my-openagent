@@ -1,0 +1,8 @@
+{
+	"kind": "add_subgoal",
+	"title": "Investigate auth blocker",
+	"objective": "Validate the blocker, capture evidence, and report findings.",
+	"evidence": "log/test output showing the blocker",
+	"rationale": "blocker materially changes safe execution order",
+	"source": "cli"
+}

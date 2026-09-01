@@ -214,6 +214,39 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["before", "new 1", "new 2", "after"])
   })
 
+it("preserves last replacement line when indentation differs from surrounding context", () => {
+  //#given - re-indentation where closing brace indent deepens
+  const lines = [
+    "    before_context",
+    "old_line_1",
+    "old_line_2",
+    "old_line_3",
+    "    after_context",
+  ]
+
+  //#when - replace 3 lines with 4; last line has deeper indent than line after range
+  const result = applyReplaceLines(
+    lines,
+    anchorFor(lines, 2),
+    anchorFor(lines, 4),
+    [
+      "    before_context",  // exact copy of line[0] → genuine echo, should strip
+      "new_line_1",
+      "new_line_2",
+      "      after_context", // deeper indent than line[4] → NOT an echo, should keep
+    ]
+  )
+
+  //#then
+  expect(result).toEqual([
+    "    before_context",
+    "new_line_1",
+    "new_line_2",
+    "      after_context",
+    "    after_context",
+  ])
+})
+
 
   it("restores indentation for first replace_lines entry", () => {
     //#given

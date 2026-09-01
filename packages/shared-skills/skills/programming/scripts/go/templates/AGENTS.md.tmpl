@@ -1,0 +1,24 @@
+# AGENTS.md
+
+Go 1.23+ $short_purpose service.
+
+## Commands
+- `task` — fmt + lint + test
+- `task build` — produce ./bin/server
+- `task ci` — full CI pipeline locally
+
+## Architecture
+- `cmd/server/main.go` — entrypoint, ≤50 LOC
+- `internal/cmd/` — root command, signal wiring
+- `internal/api/` — HTTP handlers + middleware (gin)
+- `internal/domain/` — smart-constructor types, no I/O
+- `internal/store/` — DB layer (sqlc-generated, never hand-edited)
+- `internal/config/` — env-driven Config
+- `internal/obs/` — slog setup, observability
+
+## Conventions
+- `slog` for all logs; never `log.*`, never `fmt.Println` in libs
+- `context.Context` first arg for every public function with I/O
+- Errors wrapped with `%w`; check with `errors.Is/As`
+- 250 pure LOC ceiling per file
+- Tests follow Given/When/Then; less mock the better

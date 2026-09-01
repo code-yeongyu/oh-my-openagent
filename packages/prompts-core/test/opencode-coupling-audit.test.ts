@@ -11,6 +11,12 @@ describe("opencode coupling audit", () => {
 
     expect(offenders).toEqual([])
   })
+
+  test("#given prompts-core source #when markdown imports are scanned #then they stay package-relative", async () => {
+    const offenders = await findExternalMarkdownImports(SOURCE_DIR)
+
+    expect(offenders).toEqual([])
+  })
 })
 
 async function findOpenCodeImports(sourceDir: string): Promise<readonly string[]> {
@@ -39,4 +45,30 @@ async function collectTypeScriptFiles(directory: string): Promise<readonly strin
   }
 
   return files
+}
+
+async function findExternalMarkdownImports(sourceDir: string): Promise<readonly string[]> {
+  const files = await collectTypeScriptFiles(sourceDir)
+  const offenders: string[] = []
+
+  for (const filePath of files) {
+    const source = await readFile(filePath, "utf8")
+    for (const specifier of collectMarkdownImportSpecifiers(source)) {
+      if (!specifier.startsWith("../prompts/")) offenders.push(`${filePath}: ${specifier}`)
+    }
+  }
+
+  return offenders
+}
+
+function collectMarkdownImportSpecifiers(source: string): readonly string[] {
+  const specifiers: string[] = []
+  const pattern = /import\s+(?:[^"']+\s+from\s+)?["']([^"']+\.md)["']/g
+
+  for (const match of source.matchAll(pattern)) {
+    const specifier = match[1]
+    if (specifier !== undefined) specifiers.push(specifier)
+  }
+
+  return specifiers
 }

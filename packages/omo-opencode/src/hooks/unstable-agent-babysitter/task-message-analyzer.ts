@@ -1,0 +1,133 @@
+import { isRecord } from "@oh-my-opencode/utils"
+import type { BackgroundTask } from "../../features/background-agent"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
+
+export const THINKING_SUMMARY_MAX_CHARS = 500 as const
+
+type MessageInfo = {
+  role?: string
+  agent?: string
+  model?: { providerID: string; modelID: string; variant?: string }
+  providerID?: string
+  modelID?: string
+  tools?: Record<string, boolean | "allow" | "deny" | "ask">
+}
+
+type MessagePart = {
+  type?: string
+  text?: string
+  thinking?: string
+}
+
+function hasData(value: unknown): value is { data?: unknown } {
+  return typeof value === "object" && value !== null && "data" in value
+}
+
+
+
+export function getMessageInfo(value: unknown): MessageInfo | undefined {
+  if (!isRecord(value)) return undefined
+  if (!isRecord(value.info)) return undefined
+  const info = value.info
+  const modelValue = isRecord(info.model)
+    ? info.model
+    : undefined
+  const model = modelValue && typeof modelValue.providerID === "string" && typeof modelValue.modelID === "string"
+    ? {
+        providerID: modelValue.providerID,
+        modelID: modelValue.modelID,
+        ...(typeof modelValue.variant === "string" ? { variant: modelValue.variant } : {}),
+      }
+    : undefined
+  return {
+    role: typeof info.role === "string" ? info.role : undefined,
+    agent: typeof info.agent === "string" ? info.agent : undefined,
+    model,
+    providerID: typeof info.providerID === "string" ? info.providerID : undefined,
+    modelID: typeof info.modelID === "string" ? info.modelID : undefined,
+    tools: isRecord(info.tools)
+      ? Object.entries(info.tools).reduce<Record<string, boolean | "allow" | "deny" | "ask">>((acc, [key, value]) => {
+          if (
+            value === true ||
+            value === false ||
+            value === "allow" ||
+            value === "deny" ||
+            value === "ask"
+          ) {
+            acc[key] = value
+          }
+          return acc
+        }, {})
+      : undefined,
+  }
+}
+
+export function getMessageParts(value: unknown): MessagePart[] {
+  if (!isRecord(value)) return []
+  if (!Array.isArray(value.parts)) return []
+  return value.parts.filter(isRecord).map((part) => ({
+    type: typeof part.type === "string" ? part.type : undefined,
+    text: typeof part.text === "string" ? part.text : undefined,
+    thinking: typeof part.thinking === "string" ? part.thinking : undefined,
+  }))
+}
+
+function parseCreatedAt(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  if (value instanceof Date) {
+    return value.getTime()
+  }
+  return undefined
+}
+
+export function getMessageCreatedAt(value: unknown): number | undefined {
+  if (!isRecord(value)) return undefined
+  const info = isRecord(value.info) ? value.info : undefined
+  const infoTime = isRecord(info?.time) ? info.time : undefined
+  const messageTime = isRecord(value.time) ? value.time : undefined
+  return parseCreatedAt(infoTime?.created ?? messageTime?.created)
+}
+
+export function extractMessages(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value
+  }
+  if (hasData(value) && Array.isArray(value.data)) {
+    return value.data
+  }
+  return []
+}
+
+export function isUnstableTask(task: BackgroundTask): boolean {
+  if (task.isUnstableAgent === true) return true
+  const modelId = task.model?.modelID?.toLowerCase()
+  return modelId ? modelId.includes("gemini") || modelId.includes("minimax") : false
+}
+
+export function buildReminder(task: BackgroundTask, summary: string | null, idleMs: number): string {
+  const idleSeconds = Math.round(idleMs / 1000)
+  const summaryText = summary ?? "(No thinking trace available)"
+  const agentName = normalizeAgentForPrompt(task.agent) ?? task.agent
+  return `Unstable background agent appears idle for ${idleSeconds}s.
+
+Task ID: ${task.id}
+Description: ${task.description}
+Agent: ${agentName}
+Status: ${task.status}
+Session ID: ${task.sessionId ?? "N/A"}
+
+Thinking summary (first ${THINKING_SUMMARY_MAX_CHARS} chars):
+${summaryText}
+
+Suggested actions:
+- background_output task_id="${task.id}" full_session=true include_thinking=true include_tool_results=true message_limit=50
+- background_cancel taskId="${task.id}"
+
+This is a reminder only. No automatic action was taken.`
+}

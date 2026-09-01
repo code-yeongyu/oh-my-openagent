@@ -1,0 +1,32 @@
+COMMAND
+
+  npm exec --yes --package=bun@1.3.12 -- bun test \
+    script/ensure-vendored-lsp-daemon.test.ts \
+    script/test-environment-isolation.test.ts \
+    packages/omo-opencode/src/cli/run/on-complete-hook.test.ts \
+    packages/omo-senpi/src/components/onboarding/state.test.ts \
+    packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts
+
+OBSERVED
+
+  34 pass
+  0 fail
+  64 expect() calls
+  Ran 34 tests across 5 files. [999.00ms]
+
+COVERAGE
+
+- LSP single-writer lock and event-driven waiter;
+- preload environment isolation;
+- Windows Git Bash shell-fixture determinism;
+- onboarding ready/exit listener ordering;
+- onboarding failure-path child termination;
+- IC-8 unconnected exit server and timeout cleanup;
+- existing supervisor graceful/hard containment scenarios.
+
+CLEANUP
+
+- no claim-race child remained;
+- no memory supervisor/bootstrap/model-child remained;
+- no generated Senpi diff remained;
+- Bun test process exited normally.

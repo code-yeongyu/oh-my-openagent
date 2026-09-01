@@ -1,0 +1,20 @@
+surface=runtime-fallback exported modules plus real OpenCode lifecycle event
+
+retry_driver_exit_code=0
+retry_driver_calls=openai/gpt-5.4,google/gemini-2.5-pro
+retry_driver_final_model=google/gemini-2.5-pro
+retry_driver_key=openai/gpt-5.4:1:ai_apicallerror: 5-hour usage limit reached
+
+retention_driver_exit_code=0
+retained_31_minutes=true
+removed_13_hours=true
+cleared_sessions=manual-13h
+
+opencode_version=1.18.13
+opencode_health={"healthy":true,"version":"1.18.13"}
+prompt_http_status=204
+sse_event={"type":"session.status"}
+sse_probe_exit_code=0
+real_db_sessions_before=0
+real_db_sessions_after=0
+result=PASS

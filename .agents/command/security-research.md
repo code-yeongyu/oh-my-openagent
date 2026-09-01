@@ -13,4 +13,3 @@ skill(name="security-research")
 <user-request>
 $ARGUMENTS
 </user-request>
-

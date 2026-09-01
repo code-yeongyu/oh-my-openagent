@@ -1,0 +1,65 @@
+{
+  "result": "PASS",
+  "checks": {
+    "spawn_background": "PASS",
+    "unconditional_wake": "PASS",
+    "followup_revive": "PASS",
+    "task_output_full": "PASS",
+    "task_output_block": "PASS",
+    "jsonl_sequence": "PASS",
+    "extension_suppression": "PASS",
+    "batch_fanout_two_children": "PASS",
+    "sync_inline_no_notification": "PASS",
+    "negative_category_error": "PASS",
+    "real_senpi_untouched": "PASS",
+    "no_leaked_pids": "PASS"
+  },
+  "leakedPids": 0,
+  "spawnedPids": [
+    71756,
+    71953,
+    72205,
+    72502
+  ],
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "concurrentRealSenpiChangedPaths": [
+    "sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-19T13-33-24-239Z_019f7a94-dd8f-74b1-b61d-19d14da69161.jsonl"
+  ],
+  "allRealSenpiChangedPaths": [
+    "sessions/--Users-yeongyu-local-workspaces-senpi--/2026-07-19T13-33-24-239Z_019f7a94-dd8f-74b1-b61d-19d14da69161.jsonl"
+  ],
+  "realSenpiDigestUnchanged": false,
+  "providedAgentDir": "unset",
+  "sandboxAgentDirs": [
+    "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-lPaFsI/agent",
+    "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-ep2Knn/agent",
+    "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-PHyjZq/agent",
+    "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-dgha8b/agent"
+  ],
+  "sandboxCwds": [
+    "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-lPaFsI/project",
+    "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-ep2Knn/project",
+    "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-PHyjZq/project",
+    "/Users/yeongyu/local-workspaces/omo/.local-ignore/worktrees/omo-senpi-curated-agents/.omo/tmp/omo-senpi-qa-dgha8b/project"
+  ],
+  "sandboxTokens": [
+    "omo-senpi-qa-lPaFsI",
+    "omo-senpi-qa-ep2Knn",
+    "omo-senpi-qa-PHyjZq",
+    "omo-senpi-qa-dgha8b"
+  ],
+  "markerChildExtensions": 1,
+  "mainTaskId": "st_019f7aa7",
+  "mainSignatures": [
+    "running/resident",
+    "assistant_message",
+    "completed/resident",
+    "revived",
+    "assistant_message",
+    "completed/resident",
+    "completed/disposed",
+    "destroyed"
+  ],
+  "mainExit": 0
+}

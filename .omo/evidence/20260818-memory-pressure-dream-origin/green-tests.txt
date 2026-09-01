@@ -1,0 +1,167 @@
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/memory-core/src/reflection/reservation.test.ts:
+(pass) persisted reflection reservation > #given an aborted signal #when reservation starts #then active and pending state remain empty [10.55ms]
+(pass) persisted reflection reservation > #given journal state at threshold #when the persisted machine evaluates a successful settle #then it captures and reserves the cursor snapshot [16.37ms]
+(pass) persisted reflection reservation > #given a new active reservation #when it is published #then launch-owner identity and reservation time are durable in the same record [10.33ms]
+(pass) persisted reflection reservation > #given simultaneous trigger requests #when reserved #then one becomes active and all others collapse into one atomic pending record [47.08ms]
+(pass) persisted reflection reservation > #given dream outcomes #when runs complete #then dream state advances only for merged and no_changes [34.73ms]
+(pass) persisted reflection reservation > #given a failed active run #when completed #then its cursor is unchanged and valid pending work is promoted [73.55ms]
+(pass) persisted reflection reservation > #given successful compaction-triggered work #when completed #then its snapshot advances and the compaction flag clears exactly once [113.34ms]
+(pass) persisted reflection reservation > #given a pending threshold request made stale by successful cursor advancement #when dequeued #then it is dropped [26.91ms]
+(pass) persisted reflection reservation > #given automatic pending work below its threshold #when dequeued #then it is dropped but a manual pending request remains launchable [31.46ms]
+
+packages/memory-core/src/reflection/machine.test.ts:
+(pass) reflection trigger machine > #given a successful settle at the configured step threshold #when evaluated #then it requests a step-count reservation [0.18ms]
+(pass) reflection trigger machine > #given zero or undefined thresholds #when a successful run settles #then step count never launches [0.08ms]
+(pass) reflection trigger machine > #given an aborted or failed run #when it settles #then no automatic trigger launches [0.08ms]
+(pass) reflection trigger machine > #given compaction was accepted #when several successful boundaries settle #then its reservation is emitted exactly once [0.11ms]
+(pass) reflection trigger machine > #given an active threshold run #when compaction and manual requests arrive #then one pending slot unions conversations and preserves manual priority [0.10ms]
+(pass) reflection trigger machine > #given reflection and dream requests #when they compete for one pending slot #then the specified priority order and newest tie winner are preserved [0.10ms]
+(pass) reflection trigger machine > #given two dream requests during an active reflection #when they merge #then one pending dream unions snapshots and the newest equal-priority request wins [0.09ms]
+(pass) reflection trigger machine > #given interleaved reflection and dream requests #when every bounded event sequence is applied #then at most one active and one pending run exist [0.52ms]
+(pass) reflection trigger machine > #given every completion outcome #when the active run completes #then only merged and no_changes advance its captured cursor [0.15ms]
+(pass) reflection trigger machine > #given a failed active run and a queued request #when completed #then the cursor stays unmoved and pending is promoted [0.11ms]
+(pass) reflection trigger machine > #given pending automatic work became stale #when dequeued #then it is dropped, while manual work survives [0.09ms]
+
+packages/omo-senpi/src/components/memory/identity-runtime.test.ts:
+(pass) memory identity runtime > #given an unresolved reflection child command #when the real lazy sandbox is constructed #then the unsandboxed escape reaches the injected logger [6.39ms]
+(pass) memory identity runtime agent-dir resolution > #given a rendered reflection sandbox #when OMO_CODING_AGENT_DIR is set #then the agent-dir runtimeWrites grant equals the resolved agent dir [2.92ms]
+(pass) memory identity runtime agent-dir resolution > #given a rendered reflection sandbox #when only SENPI_CODING_AGENT_DIR is set #then the agent-dir runtimeWrites grant equals the resolved agent dir [2.03ms]
+(pass) memory identity runtime agent-dir resolution > #given a rendered reflection sandbox #when no agent-dir env is set #then the agent-dir runtimeWrites grant equals the sentinel-gated branded home [1.93ms]
+
+packages/omo-senpi/src/components/memory/dream-trigger.test.ts:
+(pass) resolveDreamTriggerSettings > #given base dream settings #when no agent override exists #then the base values resolve [0.16ms]
+(pass) resolveDreamTriggerSettings > #given a per-agent dream override #when resolving #then overridden fields win and the rest inherit [0.08ms]
+(pass) evaluateDreamGates > #given every gate failing #when the origin is manual #then the gates are bypassed without probing [0.15ms]
+(pass) evaluateDreamGates > #given dream disabled #when an idle origin evaluates #then it is rejected before probing [0.08ms]
+(pass) evaluateDreamGates > #given dream disabled #when a pressure origin evaluates #then it is rejected before probing [0.07ms]
+(pass) evaluateDreamGates > #given shutdown_launch disabled #when a shutdown origin evaluates #then it is rejected before probing [0.08ms]
+(pass) evaluateDreamGates > #given the last dream exactly min_hours_between ago #when an idle origin evaluates #then the spacing gate rejects without a volume probe [0.10ms]
+(pass) evaluateDreamGates > #given the last dream one millisecond past min_hours_between #when an idle origin evaluates #then it is allowed [0.08ms]
+(pass) evaluateDreamGates > #given the last dream exactly min_hours_between ago #when pressure evaluates #then spacing rejects without probing volume [0.09ms]
+(pass) evaluateDreamGates > #given pressure is past dream spacing #when unreflected volume is zero #then it is allowed without probing volume [0.08ms]
+(pass) evaluateDreamGates > #given no recorded dream #when an idle origin evaluates #then the spacing gate passes [0.09ms]
+(pass) evaluateDreamGates > #given unreflected volume exactly at the floor #when an idle origin evaluates #then the volume gate rejects [0.08ms]
+(pass) evaluateDreamGates > #given unreflected volume one byte above the floor #when a shutdown origin evaluates #then it is allowed [0.08ms]
+
+packages/omo-senpi/src/components/memory/dream-trigger-manual.test.ts:
+(pass) manual dream origin > #given a fresh sub-floor transcript and a recent dream #when a manual dream is requested #then it launches past every gate [14.87ms]
+(pass) manual dream origin > #given dream disabled #when a manual dream is requested #then it still launches [10.89ms]
+(pass) manual dream origin > #given explicit conversation ids #when a manual dream is requested #then those conversations are reserved [8.63ms]
+(pass) manual dream origin > #given no unreflected content anywhere #when a manual dream is requested #then it declines to reserve [3.12ms]
+(pass) dream reservation integration > #given an active reflection run #when the idle timer fires #then the dream queues as pending and does not launch [18.40ms]
+
+packages/omo-senpi/src/components/memory/status.test.ts:
+(pass) refreshMemoryStatus segments > #given a dirty memory worktree #when refresh runs #then the footer carries the dirty marker [1.00ms]
+(pass) refreshMemoryStatus segments > #given a clean worktree with a backlog of fourteen steps #when refresh runs #then the backlog segment renders [0.83ms]
+(pass) refreshMemoryStatus segments > #given a zero backlog #when refresh runs #then no backlog segment renders [0.74ms]
+(pass) refreshMemoryStatus segments > #given three consecutive reflection failures #when refresh runs #then the streak badge renders [1.15ms]
+(pass) refreshMemoryStatus segments > #given only two consecutive failures #when refresh runs #then no streak badge renders [0.91ms]
+(pass) refreshMemoryStatus segments > #given dirty, backlog, and streak all present #when refresh runs #then segments render in fixed order [1.25ms]
+(pass) refreshMemoryStatus segments > #given an assembled line over sixty characters #when refresh runs #then segments drop right to left until it fits [1.50ms]
+(pass) refreshMemoryStatus segments > #given a base line already past the width budget #when refresh runs #then every segment drops [1.50ms]
+(pass) refreshMemoryStatus segments > #given a repo with no HEAD #when refresh runs #then no git status work happens [0.75ms]
+(pass) refreshMemoryStatus segments > #given footer rendering disabled #when refresh runs #then no git status call happens [0.70ms]
+(pass) refreshMemoryStatus segments > #given a future commit timestamp with dirty state #when refresh runs #then the future-age guard still suppresses the footer [0.22ms]
+(pass) refreshMemoryStatus segments > #given git status throws #when refresh runs #then the base footer still renders [0.26ms]
+(pass) refreshMemoryStatus > #given a committed HEAD ninety seconds old #when refresh runs #then footer shows system-clock-relative age [0.21ms]
+(pass) refreshMemoryStatus > #given committed HEAD ages across display buckets #when refresh runs #then compact labels follow the system clock [0.26ms]
+(pass) refreshMemoryStatus > #given system memory exactly at the soft pressure threshold #when refresh runs #then one pressure dream request fires without changing the advisory notify [0.15ms]
+(pass) refreshMemoryStatus > #given system memory below the soft pressure threshold #when refresh runs #then no pressure dream request fires [0.11ms]
+(pass) refreshMemoryStatus > #given pressure advisory work is already deduped #when refresh runs over threshold #then neither estimate-driven path fires again [0.09ms]
+(pass) refreshMemoryStatus > #given system markdown under the advisory threshold #when refresh runs #then no advisory notify fires [220.83ms]
+(pass) refreshMemoryStatus > #given system markdown at or above the advisory threshold #when refresh runs #then one warning notify fires with token estimate [210.25ms]
+(pass) refreshMemoryStatus > #given footer rendering disabled at session bind #when memory is oversized #then advisory fires without a footer [0.20ms]
+(pass) refreshMemoryStatus > #given advisory checking disabled after first memory use #when memory is oversized #then footer renders without another warning [0.17ms]
+(pass) refreshMemoryStatus > #given an already-notified session #when refresh runs again over threshold #then no second notify fires [195.75ms]
+(pass) refreshMemoryStatus > #given a repo with no HEAD #when refresh runs #then no footer or advisory appears [0.74ms]
+(pass) refreshMemoryStatus > #given a committed HEAD without a readable commit timestamp #when refresh runs #then no footer appears [0.15ms]
+(pass) refreshMemoryStatus > #given a commit timestamp later than the system clock #when refresh runs #then no footer appears [0.12ms]
+(pass) refreshMemoryStatus > #given system files with non-system markdown excluded #when refresh estimates tokens #then only system/**/*.md counts [214.60ms]
+
+packages/omo-senpi/src/components/memory/dream-trigger-idle.test.ts:
+(pass) dream idle timer matrix > #given a settled agent #when the settle event arrives #then an idle timer is armed for idle_minutes [2.61ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the agent settles again #then the first timer is cancelled and a fresh one armed [0.54ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when an input event arrives #then the timer resets and the next settle re-arms [11.36ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when an agent_start event arrives #then the timer resets and the next settle re-arms [10.12ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when a session_compact event arrives #then the timer resets and the next settle re-arms [10.18ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the session shuts down #then the timer is cancelled and a stale fire launches nothing [2.82ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when the session aborts #then the timer is cancelled and a stale fire launches nothing [2.78ms]
+(pass) dream idle timer matrix > #given idle_minutes zero #when the agent settles #then no timer is armed [0.54ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when it fires while the agent is streaming #then no dream is requested [2.63ms]
+(pass) dream idle timer matrix > #given an armed idle timer #when it fires with pending messages #then no dream is requested [2.86ms]
+(pass) dream idle timer matrix > #given a timer armed from a context without idle probes #when it fires #then no dream is requested [2.88ms]
+(pass) automatic dream gates > #given dream disabled #when the idle timer fires #then no reservation is made [2.67ms]
+(pass) automatic dream gates > #given a dream one hour ago #when the idle timer fires #then the spacing gate blocks the launch [2.85ms]
+(pass) automatic dream gates > #given unreflected volume exactly at the floor #when the idle timer fires #then the volume gate blocks the launch [4.66ms]
+(pass) automatic dream gates > #given every gate passing #when the idle timer fires #then a dream run is reserved and launched [13.89ms]
+
+packages/omo-senpi/src/components/memory/wiring.test.ts:
+(pass) memory pressure dream wiring > #given committed system memory at soft pressure #when bind refresh computes the advisory estimate #then it attempts one pressure reservation [225.77ms]
+(pass) memory pressure compile wiring > #given a bound fixture repo below pressure #when a committed write crosses the threshold #then the next real compile refresh adds pressure metadata without truncating memory [377.51ms]
+(pass) memory footer wiring > #given committed memory bound without a visible footer #when memory tools return #then only the first result shows relative age [10.12ms]
+(pass) memory footer wiring > #given a completed first-use attempt #when a new session starts #then the once-only footer gate resets [13.50ms]
+(pass) memory footer wiring > #given bind reconciliation is pending #when a footer publishes #then bind completion does not erase it [9.89ms]
+(pass) memory footer wiring > #given a failed first memory result #when a later call succeeds #then the footer waits for success [8.01ms]
+(pass) memory wiring reflection completion delivery > #given a pending completion and a bound session with a real UI callback > #when afterBind drains the identity completion directory > #then the callback receives the completion notification payload and level [2.92ms]
+(pass) memory wiring reflection policy > #given reflection disabled for the bound agent #when an automatic settle arrives #then no reservation evaluation starts [0.56ms]
+(pass) memory wiring reflection policy > #given the memory block is absent #when an automatic settle arrives #then schema-default reflection remains enabled [0.75ms]
+(pass) memory footer live wiring > #given a spinner animating mid-session #when the footer is cleared #then the interval is released and nothing repaints [5.47ms]
+(pass) memory footer live wiring > #given a spinner animating mid-session #when the session shuts down #then the animation interval is released [10.51ms]
+
+packages/omo-senpi/src/components/memory/status-live-wiring.test.ts:
+(pass) memory footer status live wiring > #given an active run for the bound identity #when frames tick #then the memory key animates reflecting [2.96ms]
+(pass) memory footer status live wiring > #given an animating run #when the run stops being active #then the segment line returns [0.39ms]
+(pass) memory footer status live wiring > #given an unbound session #when activity syncs #then no timer starts and no git runs [0.11ms]
+(pass) memory footer status live wiring > #given an unchanged fingerprint #when settles refresh repeatedly #then git head is read but the footer is published once [0.34ms]
+(pass) memory footer status live wiring > #given a cached footer #when HEAD moves #then the stale line is replaced [0.39ms]
+(pass) memory footer status live wiring > #given an animating run #when the footer is stopped #then no further status calls arrive [0.26ms]
+(pass) memory footer status live wiring > #given the same HEAD timestamp #when both footer surfaces render #then the live wiring uses the status.ts age string [0.35ms]
+(pass) memory footer status live wiring > #given a repo with no HEAD #when refresh runs #then nothing is published [0.25ms]
+
+packages/omo-senpi/src/components/memory/dream-trigger-shutdown.test.ts:
+(pass) dream shutdown evaluator > #given every gate passing #when a quit drains through the registered evaluator #then a shutdown dream launches [11.57ms]
+(pass) dream shutdown evaluator > #given every gate passing #when a non-quit shutdown drains #then the evaluator never runs [2.89ms]
+(pass) dream shutdown evaluator > #given shutdown_launch disabled #when the evaluator runs #then no reservation is made [2.69ms]
+(pass) dream shutdown evaluator > #given a dream one hour ago #when the evaluator runs #then the spacing gate blocks the launch [2.73ms]
+(pass) dream shutdown evaluator > #given a pre-aborted drain signal #when the evaluator runs #then no reservation is made [2.56ms]
+(pass) dream shutdown evaluator > #given abort arrives while shutdown reservation is in flight #when the reservation returns active #then no dream child launch starts [8.53ms]
+(pass) dream shutdown evaluator > #given abort after the first snapshot #when multiple conversations were selected #then later snapshots never start [2.87ms]
+(pass) dream shutdown evaluator > #given the clock crosses the shutdown deadline during reservation #when reservation returns #then launch never starts [10.76ms]
+
+packages/omo-senpi/src/components/memory/dream-trigger-pressure.test.ts:
+(pass) pressure dream origin > #given no unreflected transcripts #when pressure fires past spacing #then it attempts one reservation through the shared store [0.37ms]
+
+packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts:
+(pass) reflection and dream run reconciliation > #given an orphaned successful dream worktree #when session-start reconciliation runs #then it merges clears the reservation records completion and publishes final [456.84ms]
+(pass) reflection and dream run reconciliation > #given attempt two is live with a stale attempt-one outcome #when reconciled #then the retry remains active and its worktree stays intact [210.01ms]
+(pass) reflection and dream run reconciliation > #given attempt two is being launched with a stale attempt-one outcome #when reconciled before the shared deadline #then the retry remains active [220.85ms]
+(pass) reflection and dream run reconciliation > #given a failed child outcome with a valid commit #when reconciled #then output is never merged and the cursor remains retryable [317.06ms]
+(pass) reflection and dream run reconciliation > #given genuinely gone processes with unknown liveness and no outcome #when the bounded watch expires #then the run is abandoned without cleanup or cursor advance [230.08ms]
+(pass) reflection and dream run reconciliation > #given a dead identified supervisor and live identified child #when the shared deadline elapses #then reconciliation signals on the persisted timeline and cleans only after confirmed death [275.19ms]
+(pass) reflection and dream run reconciliation > #given old pre-launch reservations with unverifiable or reused launcher pids #when reconciled #then only confirmed pid reuse releases the reservation [233.28ms]
+(pass) reflection and dream run reconciliation > #given an old prelaunch worktree without a ledger and a confirmed-dead launcher #when reconciled #then resources and reservation are released [301.48ms]
+
+packages/omo-senpi/src/components/memory/worker/spawn-supervisor.test.ts:
+(pass) supervised child outcome authority > #given a matching durable outcome and a later supervisor failure #when the parent completes #then the outcome remains authoritative [14.18ms]
+(pass) supervised child outcome authority > #given an outcome before launch cleanup and a supervisor failure #when the parent completes #then the incomplete outcome is rejected [13.12ms]
+(pass) supervised child outcome authority > #given a matching durable outcome while the supervisor stays alive #when the parent completes #then the outcome wins without waiting for close [41.23ms]
+(pass) supervised child outcome authority > #given a supervisor that never publishes #when the parent deadline expires #then publication timeout is reported [5029.56ms]
+
+packages/omo-senpi/src/components/memory/worker/completion.test.ts:
+(pass) reflection completion flow > #given a reflection launch #when its entry renders #then run trigger and backlog are visible [0.79ms]
+(pass) reflection completion flow > #given a legacy completion without enrichment fields #when it renders #then backward compatibility is preserved [0.43ms]
+(pass) reflection completion flow > #given an existing consumed completion #when a retry ensures the same pending record #then consumed delivery is preserved [2.99ms]
+(pass) reflection completion flow > #given an existing completion with a different outcome #when ensured #then corruption is rejected without overwrite [1.30ms]
+(pass) reflection completion flow > #given no live source session #when completion is recorded #then it remains durable and pending [1.12ms]
+(pass) reflection completion flow > #given a worker completion record #when the landed palace collector reads reflection outcomes #then runId outcome and finishedAt match its contract [2.58ms]
+(pass) reflection completion flow > #given a pending offline completion #when its source session starts #then appendEntry notify and consumed state happen without a model message [1.70ms]
+(pass) reflection completion flow > #given target foreign and missing-identity pending completions in one drained directory > #when the target identity drains the backlog > #then only target records are delivered counted and consumed [7.58ms]
+(pass) reflection completion flow > #given a throwing reflection UI > #when a pending completion is delivered > #then the entry is consumed and the UI failure is logged [1.26ms]
+(pass) reflection completion flow > #given eight pending completions for one identity including two older than seven days > #when a different session for that identity drains the backlog twice > #then five details one summary and one notify are emitted once while stale records are silently consumed [5.84ms]
+
+ 133 pass
+ 0 fail
+ 989 expect() calls
+Ran 133 tests across 14 files. [10.34s]

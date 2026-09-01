@@ -1,0 +1,32 @@
+{
+  "result": "PASS",
+  "checks": {
+    "createTwoMembersActive": true,
+    "createListsActiveMembers": true,
+    "leadToMemberEnqueued": true,
+    "memberEnvelopeEchoed": true,
+    "memberToLeadInjected": true,
+    "leadInboxDrained": true,
+    "noBlockingTeamWaitCalls": true,
+    "crashHoldReached": true,
+    "crashKilledMemberAtHold": true,
+    "crashReservationUncommittedAtKill": true,
+    "crashReservationRestoredUnread": true,
+    "crashReservationNoResidue": true,
+    "crashReservedMessageDeliveredExactlyOnce": true,
+    "crashRestartExitClean": true,
+    "crashLivenessInjectedToLead": true,
+    "crashLivenessAcknowledged": true,
+    "resume_member_suspended_on_quit": true,
+    "resume_member_revived": true,
+    "resume_member_mailbox_identity": true,
+    "resume_lead_poller_running": true,
+    "resume_shutdown_approved_setup": true,
+    "resume_shutdown_approved_not_revived": true
+  },
+  "failed": [],
+  "credentialIsolationClean": true,
+  "wholeDirUnchanged": false,
+  "leakedPids": 0,
+  "outDir": "/Users/yeongyu/local-workspaces/omo-wt/subagent-session-resume-revival/.omo/evidence/omo-senpi-adapter/subagent-session-resume-revival/team"
+}

@@ -1,0 +1,13 @@
+Command:
+bun run --cwd packages/omo-senpi typecheck
+
+Observed:
+$ tsgo --noEmit -p tsconfig.json
+
+Exit code: 0
+
+This is also the diagnostics fallback for changed TypeScript files because the built-in LSP rejects fresh-worktree paths outside the original session cwd, including symlinked paths after realpath resolution.
+
+Final merged-dev rerun:
+- Exact Bun version: 1.3.12
+- Command exited 0 after the generated-bundle conflict was rebuilt from merged sources.

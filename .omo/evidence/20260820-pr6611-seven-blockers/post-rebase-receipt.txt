@@ -1,0 +1,8 @@
+pre_rebase_remote_head=3d0694b3084e52aa90777c0bbaa7156b79900359
+rebase_base_before=00bd5b2fc7ca98ecc4732a387033a3c50aa67b0a
+rebased_onto_origin_dev=b8b7b095409828e2d5f2a8619d93a415061609e2
+verified_rebased_code_head=c3596c1bde49a55917f9d07d1a3d56eece6ee560
+merge_base_after=b8b7b095409828e2d5f2a8619d93a415061609e2
+replayed_commits=33
+superseded_commit_skipped=dde2ea84d test(senpi): keep completion fixtures within retention
+superseded_by_upstream=fixed clock injection in completion.test.ts at origin/dev

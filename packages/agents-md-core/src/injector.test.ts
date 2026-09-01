@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
@@ -57,8 +57,8 @@ describe("processFilePathForAgentsInjection", () => {
       metadata: {},
     };
 
-    const srcAgentsPath = join(srcDirectory, "AGENTS.md");
-    const nestedAgentsPath = join(nestedDirectory, "AGENTS.md");
+    const srcAgentsPath = realpathSync(join(srcDirectory, "AGENTS.md"));
+    const nestedAgentsPath = realpathSync(join(nestedDirectory, "AGENTS.md"));
     const expectedOutput =
       "base output" +
       `\n\n[Directory Context: ${srcAgentsPath}]\n${srcAgents}` +
@@ -78,5 +78,66 @@ describe("processFilePathForAgentsInjection", () => {
     // then
     expect(output.output).toBe(expectedOutput);
     expect(output.output).not.toContain(rootAgents);
+  });
+
+  it("#given absolute file path outside root #when injecting AGENTS.md #then outside context is ignored", async () => {
+    // given
+    rootDirectory = join(tmpdir(), `agents-md-core-injector-${randomUUID()}`);
+    const outsideRoot = join(tmpdir(), `agents-md-core-outside-${randomUUID()}`);
+    mkdirSync(rootDirectory, { recursive: true });
+    mkdirSync(outsideRoot, { recursive: true });
+    writeFileSync(join(outsideRoot, "AGENTS.md"), "# outside");
+    writeFileSync(join(outsideRoot, "secret.ts"), "export const secret = true;\n");
+
+    const output = {
+      title: "read result",
+      output: "base output",
+      metadata: {},
+    };
+
+    // when
+    await processFilePathForAgentsInjection({
+      rootDirectory,
+      truncator,
+      sessionCaches,
+      storage,
+      filePath: join(outsideRoot, "secret.ts"),
+      sessionID: "session-outside",
+      output,
+    });
+
+    // then
+    expect(output.output).toBe("base output");
+  });
+
+  it("#given symlinked file path escapes root #when injecting AGENTS.md #then outside context is ignored", async () => {
+    // given
+    rootDirectory = join(tmpdir(), `agents-md-core-injector-${randomUUID()}`);
+    const outsideRoot = join(tmpdir(), `agents-md-core-outside-${randomUUID()}`);
+    mkdirSync(rootDirectory, { recursive: true });
+    mkdirSync(outsideRoot, { recursive: true });
+    writeFileSync(join(outsideRoot, "AGENTS.md"), "# outside symlink");
+    writeFileSync(join(outsideRoot, "secret.ts"), "export const secret = true;\n");
+    symlinkSync(join(outsideRoot, "secret.ts"), join(rootDirectory, "linked-secret.ts"));
+
+    const output = {
+      title: "read result",
+      output: "base output",
+      metadata: {},
+    };
+
+    // when
+    await processFilePathForAgentsInjection({
+      rootDirectory,
+      truncator,
+      sessionCaches,
+      storage,
+      filePath: join(rootDirectory, "linked-secret.ts"),
+      sessionID: "session-symlink",
+      output,
+    });
+
+    // then
+    expect(output.output).toBe("base output");
   });
 });

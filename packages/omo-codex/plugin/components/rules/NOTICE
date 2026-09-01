@@ -1,0 +1,15 @@
+codex-rules
+
+This package implements rule/context loading for Codex plugins.
+Its behavior is ported from pi-rules in the pi coding-agent extension ecosystem
+and inspired by oh-my-openagent (omo) at https://github.com/code-yeongyu/oh-my-openagent,
+including omo's `.omo/rules/` workflow and rules-injector hook architecture.
+omo is originally licensed under the Sustainable Use License 1.0.
+
+Yeongyu Kim (https://github.com/code-yeongyu), author of omo, pi-rules, and this
+package, licenses the source distributed in this repository under the MIT License.
+If any source was ported from omo or pi-rules, that ported source is re-licensed
+here under MIT for distribution as a Codex plugin. See LICENSE for terms.
+
+picomatch is by Jon Schlinkert and contributors (https://github.com/micromatch/picomatch).
+Distributed under the MIT License.

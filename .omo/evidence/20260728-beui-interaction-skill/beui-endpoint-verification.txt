@@ -1,0 +1,34 @@
+--- GET https://beui.dev/r (index head)
+{"name":"beUI","description":"Animated components for React and Next.js.","site":"https://beui.dev","endpoints":{"llms":"https://beui.dev/llms.txt","index":"https://beui.dev/r","shadcn_registry":"https://beui.dev/r/registry.json","shadcn_item":"https://beui.dev/r/{slug}.json","directory_registry":"https://beui.dev/registry.json","directory_item":"https://beui.dev/{slug}.json","detail":"https://beui.dev/r/{slug}","raw":"https://beui.dev/r/{slug}/raw","markdown":"https://beui.dev/components/{categ
+--- GET https://beui.dev/r/button (detail head)
+{"slug":"button","name":"Button","description":"Spring-pressed Button plus StatefulButton (idle → loading → success / error) and MagneticButton.","category":"motion","source_url":"https://beui.dev/r/button/raw","detail_url":"https://beui.dev/r/button","raw_url":"https://beui.dev/r/button/raw","page_url":"https://beui.dev/components/motion/button","markdown_url":"https://beui.dev/components/mot
+--- GET https://beui.dev/r/button/raw (source head)
+export { Button } from "./base";
+export type { ButtonProps, ButtonVariant, ButtonSize } from "./base";
+
+export { StatefulButton } from "./stateful";
+export type { StatefulButtonProps, ButtonState } from "./stateful";
+
+export { MagneticButton } from "./magnetic";
+export type { MagneticButtonProps } f
+--- GET https://beui.dev/llms.txt (head)
+# beUI
+
+> Animated components for React and Next.js.
+
+## Endpoints
+
+- Registry index (JSON): https://beui.dev/r
+- Component detail (JSON): https://beui.dev/r/{slug}
+- Raw source (text/plain): https://beui.dev/r/{slug}/raw
+- Component Markdown: https://beui.dev/components/{category}/{slug}.md
+
+## Components
+
+- [Tilt Card](https://beui.dev/components/motion/tilt-card.md): 3D perspective tilt on hover with cursor-tracked glare.
+- [Button](https://beui.dev/components/motion/button.md): Spring-pressed Button plus StatefulButton (idle → loading → success / error) and MagneticButton.
+- [Animated CTA Buttons](https://beui.dev/components/motion/expanding-arrow-button.md): Expressive call-to-action buttons with expanding, hold, and slide interactions.
+- [Marquee](https://beui.dev/components/motion/marquee.md): Infinite horizontal or vertical scroll with pause-on-hover.
+- [Tabs](https://beui.dev/components/motion/tabs.md): Pill, segment or underline tabs with a spring layoutId indicator.
+- [Switch](https://beui.dev/components/motion/switch.md): Toggle with a spring-driven thumb and press feedback.
+- [Input](https://beui.dev/components/motion/input.md): Text input with label, left/right icons, error shake and success check draw.

@@ -1,0 +1,11 @@
+# Normalize line endings: store LF in git, check out LF on every platform.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.tgz binary
+*.gz binary

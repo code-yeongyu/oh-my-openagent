@@ -1,0 +1,28 @@
+### PR #6485 review rerun
+### surface: real opencode debug config
+### opencode: 1.18.10
+### repo: C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-6338
+=== $ bun build packages/omo-opencode/src/index.ts --outdir dist --target bun --format esm --external zod ===
+Bundled 1976 modules in 1192ms
+
+  index.js  5.75 MB  (entry point)
+
+EXIT=0
+=== $ opencode debug paths ===
+home       C:/Users/pss/AppData/Local/Temp/omo-6338-review-eJBEMt/home
+data       C:\Users\pss\AppData\Local\Temp\omo-6338-review-eJBEMt\home\.local\share\opencode
+bin        C:\Users\pss\AppData\Local\Temp\omo-6338-review-eJBEMt\home\.cache\opencode\bin
+log        C:\Users\pss\AppData\Local\Temp\omo-6338-review-eJBEMt\home\.local\share\opencode\log
+repos      C:\Users\pss\AppData\Local\Temp\omo-6338-review-eJBEMt\home\.local\share\opencode\repos
+cache      C:\Users\pss\AppData\Local\Temp\omo-6338-review-eJBEMt\home\.cache\opencode
+config     C:\Users\pss\AppData\Local\Temp\omo-6338-review-eJBEMt\home\.config\opencode
+state      C:\Users\pss\AppData\Local\Temp\omo-6338-review-eJBEMt\home\.local\state\opencode
+tmp        C:\Users\pss\AppData\Local\Temp\omo-6338-review-eJBEMt\tmp\opencode
+EXIT=0
+=== $ opencode debug config ===
+EXIT=0
+agent_names=oracle, Sisyphus - ultraworker, Hephaestus - Deep Agent, Prometheus - Plan Builder, Atlas - Plan Executor, build, explore, librarian, Metis - Plan Consultant, Momus - Plan Critic, multimodal-looker, plan, Sisyphus-Junior
+oracle_model=custom-provider/future-model
+oracle_temperature_present=false
+configured_order_preserved=true
+--- stderr from debug config (truncated) ---

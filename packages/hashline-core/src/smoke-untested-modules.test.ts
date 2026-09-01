@@ -6,7 +6,6 @@ import {
   NIBBLE_STR,
 } from "./constants"
 import { autocorrectReplacementLines } from "./autocorrect-replacement-lines"
-import { dedupeEdits } from "./edit-deduplication"
 import { collectLineRefs, detectOverlappingRanges } from "./edit-ordering"
 import { toNewLines } from "./edit-text-normalization"
 import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalization"
@@ -27,12 +26,6 @@ describe("smoke coverage for moved modules without direct legacy tests", () => {
 
     const corrected = autocorrectReplacementLines(["  return 1"], ["return 2"])
     expect(corrected).toEqual(["  return 2"])
-
-    const deduped = dedupeEdits([
-      { op: "append", pos: "1#ZZ", lines: "x" },
-      { op: "append", pos: "1#ZZ", lines: "x" },
-    ])
-    expect(deduped.deduplicatedEdits).toBe(1)
 
     const refs = collectLineRefs([{ op: "replace", pos: "1#ZZ", lines: "x" }])
     expect(refs).toEqual(["1#ZZ"])

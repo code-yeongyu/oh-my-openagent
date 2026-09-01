@@ -1,0 +1,15 @@
+{
+  "result": "PASS",
+  "checks": {
+    "process_exit": "PASS",
+    "skill_summary": "PASS",
+    "result_warning": "PASS",
+    "spawn_prompt": "PASS",
+    "child_session": "PASS",
+    "real_agent_dirs_untouched": "PASS"
+  },
+  "taskId": "st_01a022d9",
+  "realAgentDirsUntouched": true,
+  "changedRealDirs": [],
+  "sandboxAgentDir": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-SMpVyI/agent"
+}

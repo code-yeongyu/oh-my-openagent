@@ -1,0 +1,23 @@
+{
+	"name": "@sisyphuslabs/omo-codex-shared",
+	"version": "4.10.0",
+	"description": "Shared source modules for OMO Codex plugin components.",
+	"type": "module",
+	"private": true,
+	"files": [
+		"src"
+	],
+	"scripts": {
+		"build": "tsc --noEmit -p tsconfig.build.json",
+		"test": "bun test test/*.test.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/node": "^26.2.0",
+		"bun-types": "1.4.0",
+		"typescript": "^7.0.2"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
+}

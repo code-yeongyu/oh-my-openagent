@@ -3,7 +3,6 @@ import {
   restoreLeadingIndent,
   stripInsertAnchorEcho,
   stripInsertBeforeEcho,
-  stripInsertBoundaryEcho,
   stripRangeBoundaryEcho,
   toNewLines,
 } from "./edit-text-normalization"

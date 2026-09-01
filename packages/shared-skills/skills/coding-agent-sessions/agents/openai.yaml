@@ -1,0 +1,4 @@
+interface:
+  display_name: "Coding Agent Sessions"
+  short_description: "Find local coding-agent session history"
+  default_prompt: "Use $coding-agent-sessions to find the coding-agent session where I worked on a recent bug."

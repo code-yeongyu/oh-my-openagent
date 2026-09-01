@@ -1,0 +1,24 @@
+POST-WRITE ARCHITECTURAL REVIEW
+
+1. File size
+   runtime.test.ts is 77 total lines.
+   ulw-loop.test-support.ts is 197 total lines.
+   Pure LOC is necessarily below the 250-line hard ceiling for both files.
+
+2. Cohesion
+   Node executable discovery remains inside the test-support module that owns fake omo command creation.
+
+3. Hidden coupling
+   The fixture now depends explicitly on the repository's documented Node prerequisite rather than accidentally coupling to the Bun test runner.
+
+4. Cross-platform symmetry
+   Windows and POSIX wrapper quoting and lifecycle behavior are unchanged; only the resolved executable changes from Bun to Node.
+
+5. Failure model
+   Node resolution is bounded and occurs before temporary-directory creation. Discovery failure cannot leak fixture state.
+
+6. Consumer visibility
+   The change is test support only. Production `runOmoCommand`, its 30-second timeout, and shipped extension behavior are unchanged.
+
+7. Simplest form
+   One cached local resolver, one runtime marker, and one assertion pin the invariant. No shared abstraction, timeout increase, retry, sleep, or production seam was added.
