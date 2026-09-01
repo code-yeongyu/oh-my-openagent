@@ -19,8 +19,8 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `session_started` | `$os_version` | `string` | - |
 | `session_started` | `arch` | `string` | - |
 | `session_started` | `cpu_count` | `number` | - |
-| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
-| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `quotio-openai`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
+| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
 | `session_started` | `memory_bucket` | `string` | `lt_8_gb`, `8_15_gb`, `16_31_gb`, `32_63_gb`, `64_plus_gb` |
 | `session_started` | `model_count` | `number` | - |
 | `session_started` | `provider_count` | `number` | - |
@@ -47,14 +47,14 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `turn_completed` | `cache_write_tokens` | `number` | - |
 | `turn_completed` | `cost_usd` | `number` | - |
 | `turn_completed` | `input_tokens` | `number` | - |
-| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
 | `turn_completed` | `output_tokens` | `number` | - |
-| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `quotio-openai`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
+| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
 | `turn_completed` | `reasoning_tokens` | `number` | - |
 | `turn_completed` | `total_tokens` | `number` | - |
 | `turn_completed` | `turn_index` | `number` | - |
 | `skill_loaded` | `$session_id` | `string` | - |
-| `skill_loaded` | `skill_name` | `string` | `ast-grep`, `coding-agent-sessions`, `dag-library`, `data-scientist`, `debugging`, `frontend`, `git-master`, `give-me-tips`, `hyperplan`, `init-deep`, `lsp-setup`, `mass-ulw`, `onboarding`, `programming`, `refactor`, `remove-ai-slops`, `review-work`, `start-work`, `ultimate-browsing`, `ultrawork`, `ulw-loop`, `ulw-plan`, `ulw-research`, `visual-qa` |
+| `skill_loaded` | `skill_name` | `string` | `ast-grep`, `coding-agent-sessions`, `dag-library`, `data-scientist`, `debugging`, `frontend`, `git-master`, `give-me-tips`, `hyperplan`, `init-deep`, `lsp-setup`, `mass-ulw`, `onboarding`, `programming`, `refactor`, `remove-ai-slops`, `review-work`, `ulw-execute`, `ultimate-browsing`, `ultrawork`, `ulw-loop`, `ulw-plan`, `ulw-research`, `visual-qa` |
 | `delegation_started` | `$session_id` | `string` | - |
 | `delegation_started` | `background` | `boolean` | - |
 | `delegation_started` | `batch_size_bucket` | `string` | `1`, `2_4`, `5_plus` |
@@ -106,11 +106,11 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `delegation_completed` | `execution_mode` | `string` | `in-process`, `process` |
 | `delegation_completed` | `fallback_attempts` | `number` | - |
 | `delegation_completed` | `input_tokens` | `number` | - |
-| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
 | `delegation_completed` | `model_source` | `string` | `category`, `explicit`, `agent`, `none` |
 | `delegation_completed` | `output_tokens` | `number` | - |
 | `delegation_completed` | `owner_kind` | `string` | `plain_child`, `dag_node`, `team_member`, `unknown` |
-| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `quotio-openai`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
+| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
 | `delegation_completed` | `reasoning_effort` | `string` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `other`, `none` |
 | `delegation_completed` | `run_epoch` | `number` | - |
 | `delegation_completed` | `start_reason` | `string` | `initial_spawn`, `runtime_fallback`, `session_resume`, `dag_retry`, `revive_after_completed`, `revive_after_error`, `revive_after_cancelled`, `revive_after_interrupted`, `revive_after_lost`, `unknown` |
@@ -206,6 +206,15 @@ Identity is machine-level, not person-level:
 
 Because identity is machine-level, a shared machine conflates its users into one id. That's an accepted, documented limitation, not a bug.
 
+### Surface attribution and install ids (schema version 3)
+
+Every event carries two shared attribution properties as of schema version 3:
+
+- `surface` is `cli` for standalone CLI sessions, or `desktop` when the runtime is embedded in OmO Desktop. The Desktop host sets `OMO_NATIVE_SURFACE=desktop` in the child environment; anything else is the CLI. A Desktop-driven turn is Desktop usage, not CLI adoption, and must never be counted as one.
+- `install_id` is a random 64-hex value stored (like the session-id salt) under the agent home at `omo-senpi/omo-native/install-id`, created with mode 0600 on first use. It is generated locally and derived from nothing: not the hostname, not hardware, not accounts. The standalone CLI and the Desktop-bundled runtime on one machine converge on the same file, which is what joins the two surfaces without fingerprinting the machine. A valid `OMO_NATIVE_INSTALL_ID` env value overrides the file, so a Desktop host can pin a remote (SSH/WSL) runtime to the local installation's id; a malformed override is ignored.
+
+Rows written before schema version 3 carry neither property. Segment on `schema_version` when mixing eras.
+
 ## SDK-added properties
 
 PostHog's node client attaches `$lib` and `$lib_version` to every event. Since schema version 2 the client omits the `$geoip_disable` flag, so PostHog may add derived location properties such as `$geoip_country_code` after ingestion; before schema version 2 that flag was set and no location was derived. These are SDK or service metadata, not authored by the omo-senpi client, so they don't appear in the allowlists above. They're listed here so an auditor comparing captured and ingested payloads against the schema isn't surprised.
@@ -235,7 +244,17 @@ The following never leaves your machine:
 - Git identities or environment variable values
 - Raw hostnames or IP addresses in the application-authored payload (the transport connection still exposes its sending IP to PostHog for geoip enrichment)
 - Custom (non-builtin) skill names
-- Custom provider or model names, which are masked to `custom`
+- Custom provider names, which are always masked to `custom` — including the name of a self-hosted, proxy, or internal gateway
+- Custom model names — any model id that is not an exact match for a publicly shipped model, such as a fine-tune, a private deployment name, or an internal codename — which are masked to `custom`
+
+How provider and model are masked differs, because they carry different privacy weight:
+
+| Field | Rule |
+|---|---|
+| `provider` | Exported only when it is one of the providers OmO itself ships. Every other value, including a self-hosted or proxy gateway name, is exported as `custom`. |
+| `model_id` | Exported when it exactly matches OmO's published model vocabulary (`claude-opus-5`, `gpt-5.6-sol`, and the other public product names listed in the tables above), **regardless of which provider routed it**. Any other value is exported as `custom`. |
+
+The practical consequence: routing a publicly known model through an unknown gateway reports `custom/claude-opus-5` rather than `custom/custom`. The gateway name — the user-authored half — is still withheld, while the model id is a public product name shared by every user running that model. A model name you chose yourself is never exported.
 
 A structural allowlist enforces this rather than relying on discipline: any property key not in the allowlist is dropped before send, and any string value on a key ending in `_text`, `_path`, or `_prompt` is rejected regardless of allowlisting.
 

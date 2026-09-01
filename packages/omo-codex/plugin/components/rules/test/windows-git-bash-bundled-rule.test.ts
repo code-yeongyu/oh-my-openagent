@@ -1,10 +1,9 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-
-import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 import { findPluginBundledCandidates } from "@oh-my-opencode/rules-engine/engine";
+import { afterEach, describe, expect, it } from "vitest";
+import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 
 const WINDOWS_RULE_DESCRIPTION = "Windows Git Bash guidance for Codex";
 const WINDOWS_RULE_PATH = "bundled-rules/windows-git-bash.md";

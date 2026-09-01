@@ -27,7 +27,7 @@ jobs:
 
     steps:
       # Checkout with sisyphus-dev-ai's PAT
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GH_PAT }}
           fetch-depth: 0
@@ -41,9 +41,13 @@ jobs:
       # gh CLI auth as sisyphus-dev-ai
       - name: Authenticate gh CLI as sisyphus-dev-ai
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          # gh auth login refuses to run while GITHUB_TOKEN/GH_TOKEN are set
+          # ("The value of the GITHUB_TOKEN environment variable is being used
+          # for authentication"), so the PAT is passed under a different name
+          # and the conflicting variables are cleared for the login call only.
+          SISYPHUS_GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          echo "$GITHUB_TOKEN" | gh auth login --with-token
+          echo "$SISYPHUS_GH_PAT" | env -u GITHUB_TOKEN -u GH_TOKEN gh auth login --with-token
           gh auth status
 
       - name: Ensure tmux is available (Linux)
@@ -62,7 +66,7 @@ jobs:
           bun-version: "1.4.0"
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache

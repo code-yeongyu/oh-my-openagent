@@ -1,9 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-
-import { afterEach, describe, expect, it } from "vitest";
 import type { PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { runLspPostCompactHook, runLspPostToolUseHook } from "../src/codex-hook.js";
 
@@ -149,11 +148,11 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 		const input = postToolUseInput("session-daemon-down-probe", ".omo/ulw-loop/evidence/note.md");
 		let calls = 0;
 
-			await withPluginData(pluginData, async () => {
-				await runLspPostToolUseHook(input, async () => {
-					calls += 1;
-					return markdownNotConfigured();
-				});
+		await withPluginData(pluginData, async () => {
+			await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return markdownNotConfigured();
+			});
 			await runLspPostToolUseHook(input, async () => {
 				calls += 1;
 				return "error[markdown] (1000) at 1:1: cached call should have been skipped.";

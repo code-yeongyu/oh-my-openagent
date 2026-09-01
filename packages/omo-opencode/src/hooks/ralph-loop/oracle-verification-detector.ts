@@ -10,6 +10,7 @@ export interface OracleVerificationEvidence {
 
 const AGENT_LINE_PATTERN = /^Agent:[ \t]*(\S+)$/im
 const PROMISE_TAG_PATTERN = /<promise>[ \t]*(\S+?)[ \t]*<\/promise>/is
+const VERIFICATION_AGENTS = new Set(["oracle", "gate-verifier"])
 
 export function parseOracleVerificationEvidence(text: string): OracleVerificationEvidence | undefined {
 	const trimmedText = text.trim()
@@ -46,15 +47,16 @@ export function isOracleVerified(text: string): boolean {
 		return false
 	}
 
-	const isOracleAgent = stripInvisibleAgentCharacters(evidence.agent).toLowerCase() === "oracle"
+	const agent = stripInvisibleAgentCharacters(evidence.agent).toLowerCase()
+	const isVerificationAgent = VERIFICATION_AGENTS.has(agent)
 	const isVerifiedPromise = evidence.promise === ULTRAWORK_VERIFICATION_PROMISE
 
-	return isOracleAgent && isVerifiedPromise
+	return isVerificationAgent && isVerifiedPromise
 }
 
 export function extractOracleSessionID(text: string): string | undefined {
 	const evidence = parseOracleVerificationEvidence(text)
-	if (!evidence || stripInvisibleAgentCharacters(evidence.agent).toLowerCase() !== "oracle") {
+	if (!evidence || !VERIFICATION_AGENTS.has(stripInvisibleAgentCharacters(evidence.agent).toLowerCase())) {
 		return undefined
 	}
 

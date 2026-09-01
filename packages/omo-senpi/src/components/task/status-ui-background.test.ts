@@ -195,9 +195,9 @@ describe("createTaskStatusUi.background progress", () => {
       model: "requested/model",
       resolved_model: {
         source: "category",
-        provider: "quotio-openai",
+        provider: "openai-codex",
         model_id: "gpt-5.6-luna-fast",
-        display: "quotio-openai/gpt-5.6-luna-fast",
+        display: "openai-codex/gpt-5.6-luna-fast",
         reasoning_effort: "high",
       },
       fallback_attempts: [
@@ -209,9 +209,9 @@ describe("createTaskStatusUi.background progress", () => {
         },
         {
           source: "category",
-          provider: "quotio-openai",
+          provider: "openai-codex",
           model_id: "gpt-5.6-luna-fast",
-          display: "quotio-openai/gpt-5.6-luna-fast",
+          display: "openai-codex/gpt-5.6-luna-fast",
           reasoning_effort: "high",
         },
       ],
@@ -224,9 +224,9 @@ describe("createTaskStatusUi.background progress", () => {
       model: "requested/model",
       resolved_model: {
         source: "agent",
-        provider: "quotio-openai",
+        provider: "openai-codex",
         model_id: "gpt-5.6-luna-fast",
-        display: "quotio-openai/gpt-5.6-luna-fast",
+        display: "openai-codex/gpt-5.6-luna-fast",
       },
     })
     const listeners = new Map<string, (event: { readonly type: string; readonly toolName?: string; readonly args?: unknown }) => void>()
@@ -257,8 +257,8 @@ describe("createTaskStatusUi.background progress", () => {
     for (const callback of [...active.values()]) callback()
 
     expect(ui.widgetCalls.at(-1)?.content).toEqual([
-      "⠋ Investigate the unexpectedly long background child description · category:quick(quotio-openai/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
-      "⠋ Review tests · agent:explore(quotio-openai/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
+      "⠋ Investigate the unexpectedly long background child description · category:quick(openai-codex/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
+      "⠋ Review tests · agent:explore(openai-codex/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
     ])
     // C1: the duplicated footer task status line is gone; widget rows are the only task surface.
     expect(ui.statusCalls).toHaveLength(0)

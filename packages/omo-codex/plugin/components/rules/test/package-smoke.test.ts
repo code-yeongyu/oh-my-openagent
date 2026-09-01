@@ -32,7 +32,7 @@ describe("plugin package metadata", () => {
 		// then
 		expect(packageJson.type).toBe("module");
 		expect(packageJson.packageManager).toBe("npm@11.12.1");
-		expect(packageJson.dependencies ?? {}).toEqual({ picomatch: "^4.0.3" });
+		expect(packageJson.dependencies ?? {}).toEqual({ picomatch: "^4.0.7" });
 		expect(packageJson.bin["omo-rules"]).toBe("./dist/cli.js");
 		expect(packageFiles).toContain("bundled-rules");
 		expect(bundledRules).toContain("windows-git-bash.md");

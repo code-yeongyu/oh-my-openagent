@@ -139,8 +139,8 @@ describe("delegation_completed projection", () => {
     })
   })
 
-  test("#given a resolved model on an unknown provider #when projected #then provider and model_id are both \"custom\"", () => {
-    // given / when
+  test("#given a publicly known model on an unknown provider #when projected #then the provider is \"custom\" while the model id survives", () => {
+    // given / when: a shipped model routed through a user-named gateway
     const props = project({
       record: {
         resolved_model: {
@@ -153,7 +153,27 @@ describe("delegation_completed projection", () => {
       },
     })
 
-    // then
+    // then: the user-authored gateway name is withheld, the public product name is exported
+    expect(props.provider).toBe("custom")
+    expect(props.model_id).toBe("claude-opus-5")
+    expect(props.model_source).toBe("explicit")
+  })
+
+  test("#given a privately named model on an unknown provider #when projected #then provider and model_id are both \"custom\"", () => {
+    // given / when: a fine-tune the user named themselves
+    const props = project({
+      record: {
+        resolved_model: {
+          provider: "my-gateway",
+          model_id: "acme-internal-ft",
+          display: "Custom",
+          reasoning: "medium",
+          source: "explicit",
+        },
+      },
+    })
+
+    // then: neither half leaves the machine
     expect(props.provider).toBe("custom")
     expect(props.model_id).toBe("custom")
     expect(props.model_source).toBe("explicit")

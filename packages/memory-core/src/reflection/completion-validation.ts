@@ -1,5 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from "node:path"
-import { readFile } from "node:fs/promises"
+import { readFile } from "../fs/resilient"
 import { createNodeGitExec, type GitExec } from "../git"
 import type { ReflectionWorktree } from "./worktree"
 

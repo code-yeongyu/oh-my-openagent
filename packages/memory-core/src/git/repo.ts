@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { mkdir, writeFile } from "node:fs/promises"
+import { existsSync } from "../fs/resilient"
+import { mkdir, writeFile } from "../fs/resilient"
 import { dirname, join } from "node:path"
 import { withGitLockRetry, withSerializedGitConfigMutation } from "./config-lock"
 import { DirtyRepoError, NoEffectiveChangesError } from "./errors"
@@ -53,7 +53,7 @@ export class GitMemoryRepo {
     }
 
     await (options.installHooks ?? this.hookInstaller)(this.dir)
-    await this.ensureIdentity(options.authorName?.trim() || "Omo Agent")
+    await this.ensureIdentity(options.authorName?.trim() || "OmO Agent")
     const currentHead = await this.head()
     if (currentHead) return currentHead
 
@@ -68,7 +68,7 @@ export class GitMemoryRepo {
 
     const author: GitCommitAuthor = {
       agentId: this.agentId,
-      authorName: options.authorName?.trim() || "Omo Agent",
+      authorName: options.authorName?.trim() || "OmO Agent",
     }
     if (paths.length > 0) {
       await this.stage(paths)

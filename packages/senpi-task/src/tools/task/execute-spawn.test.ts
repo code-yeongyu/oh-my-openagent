@@ -136,6 +136,7 @@ describe("buildTaskExecute spawn", () => {
           task: {
             default_execution_mode: "process",
             default_concurrency: 5,
+            global_concurrency: 8,
             max_depth: 1,
             residency_max_children: 8,
             ttl_ms: 86400000,
