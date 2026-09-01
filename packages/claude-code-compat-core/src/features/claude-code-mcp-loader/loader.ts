@@ -18,10 +18,32 @@ interface McpConfigPath {
   scope: McpScope
 }
 
-function getMcpConfigPaths(): McpConfigPath[] {
-  const claudeConfigDir = getClaudeConfigDir()
-  const homeDir = getHomeDir()
-  const cwd = process.cwd()
+export interface McpLoaderOptions {
+  readonly cwd?: string
+  readonly homeDir?: string
+  readonly claudeConfigDir?: string
+}
+
+interface ResolvedMcpLoaderContext {
+  readonly cwd: string
+  readonly homeDir: string
+  readonly claudeConfigDir: string
+}
+
+function resolveMcpLoaderContext(
+  options: McpLoaderOptions = {}
+): ResolvedMcpLoaderContext {
+  const cwd = options.cwd ?? process.cwd()
+  const homeDir = options.homeDir ?? getHomeDir()
+  const claudeConfigDir = options.claudeConfigDir ?? (
+    options.homeDir === undefined ? getClaudeConfigDir() : join(homeDir, ".claude")
+  )
+
+  return { cwd, homeDir, claudeConfigDir }
+}
+
+function getMcpConfigPaths(context: ResolvedMcpLoaderContext): McpConfigPath[] {
+  const { claudeConfigDir, homeDir, cwd } = context
 
   return [
     { path: join(homeDir, ".claude.json"), scope: "user" },
@@ -55,10 +77,11 @@ async function loadMcpConfigFile(
   }
 }
 
-export function getSystemMcpServerNames(): Set<string> {
+export function getSystemMcpServerNames(options: McpLoaderOptions = {}): Set<string> {
   const names = new Set<string>()
-  const paths = getMcpConfigPaths()
-  const cwd = process.cwd()
+  const context = resolveMcpLoaderContext(options)
+  const paths = getMcpConfigPaths(context)
+  const { cwd } = context
 
   for (const { path } of paths) {
     if (!existsSync(path)) continue
@@ -86,13 +109,15 @@ export function getSystemMcpServerNames(): Set<string> {
 }
 
 export async function loadMcpConfigs(
-  disabledMcps: string[] = []
+  disabledMcps: string[] = [],
+  options: McpLoaderOptions = {}
 ): Promise<McpLoadResult> {
   const servers: McpLoadResult["servers"] = {}
   const loadedServers: LoadedMcpServer[] = []
-  const paths = getMcpConfigPaths()
+  const context = resolveMcpLoaderContext(options)
+  const paths = getMcpConfigPaths(context)
   const disabledSet = new Set(disabledMcps)
-  const cwd = process.cwd()
+  const { cwd } = context
 
   for (const { path, scope } of paths) {
     const config = await loadMcpConfigFile(path)

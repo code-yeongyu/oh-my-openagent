@@ -109,8 +109,18 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
 
         ports.releaseSlot(taskId, model, epoch)
         const runStatsField = runStats === undefined ? {} : { run_stats: runStats }
-        if (outcome.status === "completed") {
+        if (outcome.status === "completed" && outcome.finalResponse.length > 0) {
           ports.store.transition(taskId, { type: "complete", timestamp, final_response: outcome.finalResponse, ...runStatsField })
+        } else if (outcome.status === "completed") {
+          // A clean runner exit is not evidence that the child actually started. A session with
+          // only its initiating user prompt can be reported as an empty completion; never publish
+          // that as success because the parent would treat the missing work as result-ready.
+          ports.store.transition(taskId, {
+            type: "fail",
+            timestamp,
+            error_message: "child turn produced no assistant output",
+            ...runStatsField,
+          })
         } else {
           ports.store.transition(taskId, { type: "cancel", timestamp, ...runStatsField })
         }

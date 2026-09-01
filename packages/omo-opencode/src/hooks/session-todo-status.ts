@@ -16,7 +16,6 @@ export async function hasIncompleteTodos(ctx: PluginInput, sessionID: string): P
     if (!todos || todos.length === 0) return false
     return todos.some((todo) => todo.status !== "completed" && todo.status !== "cancelled")
   } catch (todoError) {
-    todoError instanceof Error
     return false
   }
 }

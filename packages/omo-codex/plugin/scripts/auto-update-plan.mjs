@@ -20,7 +20,7 @@ const MANAGED_COMPONENT_BIN_NAMES = new Set([
 	"omo-git-bash-hook",
 	"omo-lsp",
 	"omo-rules",
-	"omo-start-work-continuation",
+	"omo-ulw-execute-continuation",
 	"omo-telemetry",
 	"omo-ultrawork",
 	"omo-ulw-loop",

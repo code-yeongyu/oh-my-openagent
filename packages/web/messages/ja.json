@@ -47,7 +47,7 @@
       "light": {
         "name": "Light",
         "platform": "Codex CLI",
-        "description": "8コンポーネント — comment-checker, git-bash, LSP, rules, start-work-continuation, telemetry, ultrawork, ulw-loop — Codexイベントに接続。",
+        "description": "8コンポーネント — comment-checker, git-bash, LSP, rules, ulw-execute-continuation, telemetry, ultrawork, ulw-loop — Codexイベントに接続。",
         "install": "npx lazycodex-ai install"
       }
     },
