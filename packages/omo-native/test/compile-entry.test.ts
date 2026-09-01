@@ -12,6 +12,9 @@ import {
   updateLine,
   versionLine,
 } from "../compile-entry"
+import { loadOpenAICodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js"
+import { openaiCodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js"
+import { openaiCodexProvider } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/providers/openai-codex.js"
 import {
   isProvisionedExecutable,
   materializeProvisionedExecutable,
@@ -27,6 +30,24 @@ const temp = () => { const root = mkdtempSync(join(homedir(), "omo-compile-entry
 const sha = (value: string) => createHash("sha256").update(value).digest("hex")
 
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+
+describe("compiled OMO OAuth module identity", () => {
+  test("registers the loader in the same nested pi-ai graph used by the provider", async () => {
+    const loadedFlow = await loadOpenAICodexOAuth()
+
+    expect(loadedFlow).toBe(openaiCodexOAuth)
+    expect(openaiCodexProvider().id).toBe("openai-codex")
+  })
+
+  test("derives OpenAI Codex request auth from a stored OAuth credential", async () => {
+    const secret = "review-secret-must-not-be-printed"
+    const credential = { type: "oauth" as const, access: secret, refresh: "discarded", expires: Date.now() + 60_000 }
+
+    const auth = await openaiCodexProvider().auth.oauth?.toAuth(credential)
+
+    expect(auth).toEqual({ apiKey: secret })
+  })
+})
 
 describe("compiled omo entry launcher parity", () => {
   test("uses the launched Windows executable path for self-provisioning identity", () => {

@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-06-13. Total shim exports found: 316.
+Snapshot date: 2026-08-31. Total shim exports found: 256.
 
 ## Aggregate By Target Package
 
@@ -84,36 +84,6 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/config/schema/team-mode.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/boulder-state/format-duration.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/features/boulder-state/top-level-task.ts` | `@oh-my-opencode/boulder-state` |
-| `packages/omo-opencode/src/features/builtin-skills/index.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skill-file-loader.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/agent-browser-skill.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/agent-browser-template.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/debugging.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/dev-browser.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/frontend.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-atomic-planning.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-context-analysis.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-execution-verification.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-workflow.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/history-search-workflow.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/overview.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/quick-reference.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/rebase-workflow.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master-skill-metadata.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/git-master.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/index.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/init-deep.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/playwright-cli.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/playwright-mcp-skill.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/playwright.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/remove-ai-slops.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/review-work.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/security-research.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/security-review.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/team-mode.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/visual-qa.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/types.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/agent-definitions-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/claude-model-mapper.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/index.ts` | `@oh-my-opencode/claude-code-compat-core` |
@@ -131,25 +101,6 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/features/claude-code-mcp-loader/scope-filter.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-mcp-loader/transformer.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-mcp-loader/types.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/agent-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/command-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/discovery-core.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/discovery-paths.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/discovery.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/hook-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/index.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/install-path-resolver.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/installed-plugin-database.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/loaded-plugin.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/mcp-server-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/plugin-key.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/plugin-manifest.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/plugin-path-resolver.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/plugin-settings.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/scope-filter.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/skill-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-plugin-loader/types.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/mcp-oauth/callback-server.ts` | `@oh-my-opencode/mcp-client-core` |
 | `packages/omo-opencode/src/features/mcp-oauth/dcr.ts` | `@oh-my-opencode/mcp-client-core` |
 | `packages/omo-opencode/src/features/mcp-oauth/discovery.ts` | `@oh-my-opencode/mcp-client-core` |
@@ -316,16 +267,6 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/shared/model-sanitizer.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/model-string-parser.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/process-stream-reader.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/message-inspection-error.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/pending-tool-turn.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/prompt-message-state.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/queue.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/recent-dispatches.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/reservations.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/semantic-dedupe.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/session-idle-dispatch.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/timing.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/prompt-async-gate/types.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/prompt-failure-classifier.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/provider-model-id-transform.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/record-type-guard.ts` | `@oh-my-opencode/utils` |
@@ -343,7 +284,6 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/shared/zip-entry-listing/read-zip-symlink-target.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/zip-entry-listing/tar-zip-entry-listing.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/zip-entry-listing/zipinfo-zip-entry-listing.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/tools/delegate-task/model-string-parser.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/tools/hashline-edit/edit-deduplication.ts` | `@oh-my-opencode/hashline-core` |
 | `packages/omo-opencode/src/tools/hashline-edit/edit-ordering.ts` | `@oh-my-opencode/hashline-core` |
 | `packages/omo-opencode/src/tools/hashline-edit/file-text-canonicalization.ts` | `@oh-my-opencode/hashline-core` |

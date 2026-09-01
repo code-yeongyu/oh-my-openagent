@@ -1,4 +1,4 @@
-# src/features/ — 25 Feature Modules
+# src/features/ — 24 Feature Modules
 
 **Generated:** 2026-08-07
 
@@ -15,9 +15,7 @@ Standalone feature modules wired into `plugin/` layer. Each is self-contained wi
 | **btw-side** | HIGH | no | Codex-aligned ephemeral side conversations: TUI commands and controls, bounded parent-context injection, session metadata, lifecycle cleanup, and isolation guards |
 | **tmux-subagent** | HIGH | yes | Tmux pane management, grid planning, session orchestration via `runTmuxCommand`; reusable tmux primitives live in `packages/tmux-core/` |
 | **opencode-skill-loader** | HIGH | yes | OpenCode adapter for YAML frontmatter skill discovery; reusable loader primitives live in `packages/skills-loader-core/` |
-| **builtin-skills** | LOW–MED | yes | Built-in skill files (git-master, playwright, frontend, review-work, remove-ai-slops, init-deep, security-research, security-review, dev-browser, playwright-cli, **team-mode**, …) |
 | **skill-mcp-manager** | HIGH | yes | OpenCode adapter for tier-3 MCP client lifecycle; reusable client/OAuth primitives live in `packages/mcp-client-core/` |
-| **claude-code-plugin-loader** | MEDIUM | yes | OpenCode adapter for Claude Code plugin discovery; reusable compatibility loaders live in `packages/claude-code-compat-core/` |
 | **builtin-commands** | LOW | yes | Command templates: refactor, init-deep, handoff, ulw-loop, etc. |
 | **mcp-oauth** | HIGH | yes | OAuth 2.0 + PKCE + DCR (RFC 7591) + step-up auth for MCP servers |
 | **claude-code-agent-loader** | LOW | yes | OpenCode adapter for agents from `.opencode/agents/` and Claude Code plugins; shared loader lives in `packages/claude-code-compat-core/` |
@@ -73,21 +71,8 @@ Eligible members: sisyphus, atlas, sisyphus-junior, hephaestus only. See [`team-
 
 State-first tmux integration. Shared tmux primitives are extracted to `packages/tmux-core/`, while this feature owns OpenCode session tracking and pane decisions. Centralized tmux command execution goes through the shared runner. Direct `Bun.spawn(["tmux", ...])` is FORBIDDEN — would drift from retry/timeout discipline.
 
-### builtin-skills (12 skills)
+### builtin-skills (extracted)
 
-| Skill | LOC | MCP | Notes |
-|-------|-----|-----|-------|
-| git-master | 1111 | — | Atomic commits, rebase, history search |
-| playwright | 312 | @playwright/mcp | Browser automation via MCP |
-| playwright-cli | 268 | — | Browser automation via CLI |
-| dev-browser | 221 | — | Persistent page state browser |
-| review-work | ~500 | — | 5-agent post-implementation review orchestrator |
-| $omo:remove-ai-slops | — | — | Remove AI code patterns |
-| init-deep | — | — | Hierarchical AGENTS.md generation |
-| security-research | SKILL.md | — | Team Mode exploitability-driven security research |
-| security-review | wrapper | — | Alias for security-research |
-| **team-mode** | — | — | Loaded only when `team_mode.enabled` (skill explains the 12 tools to agents) |
-| frontend | 79 | — | Design-first UI development |
-| (git-master-skill-metadata) | — | — | Companion to git-master |
+The built-in skill catalog now lives entirely in `packages/skills-loader-core/src/features/builtin-skills/` — see [its AGENTS.md](../../../skills-loader-core/src/features/builtin-skills/AGENTS.md) for the skill table and browser-variant selection rules. Import through `@oh-my-opencode/skills-loader-core/builtin-skills`.
 
 Browser variant selected by `browser_automation_engine` config: `playwright` (default) | `playwright-cli` | `agent-browser`.

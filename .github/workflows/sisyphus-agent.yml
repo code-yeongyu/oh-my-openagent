@@ -27,7 +27,7 @@ jobs:
 
     steps:
       # Checkout with sisyphus-dev-ai's PAT
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GH_PAT }}
           fetch-depth: 0
@@ -66,7 +66,7 @@ jobs:
           bun-version: "1.4.0"
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache

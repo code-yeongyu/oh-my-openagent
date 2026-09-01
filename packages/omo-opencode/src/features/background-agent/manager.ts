@@ -1556,18 +1556,6 @@ The fallback retry session is now created and can be inspected directly.
     this.observedIncompleteTodosBySession.delete(sessionID)
   }
 
-  private messageUpdatedInfoHasParentWakeOutput(info: Record<string, unknown>, role: unknown): boolean {
-    if (role === "tool") {
-      return true
-    }
-    if (role !== "assistant") {
-      return false
-    }
-    if (info.error) {
-      return false
-    }
-    return !isEmptyNoProgressAssistantTurnInfo(info)
-  }
 
   private shouldHoldDispatchedParentWakeForTextDelta(
     eventType: string,

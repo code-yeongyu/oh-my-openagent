@@ -24,7 +24,7 @@ jobs:
       run_heavy: ${{ steps.classify.outputs.run_heavy }}
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -163,9 +163,9 @@ jobs:
           - os: windows-latest
             shard: "2/2"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           node-version: "24"
@@ -178,7 +178,7 @@ jobs:
           bun-version: "1.4.0"
 
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: runner.os != 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
@@ -213,7 +213,7 @@ jobs:
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: |
-          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
           bun --config=bunfig.win2.parallel.toml test
 
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
@@ -222,7 +222,7 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         run: |
-          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun --config=bunfig.win2.parallel.toml test --parallel
 
@@ -244,9 +244,9 @@ jobs:
     needs: [ci-mode]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
@@ -256,7 +256,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
@@ -296,9 +296,9 @@ jobs:
           - os: windows-latest
             suite: platform
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           node-version: "24"
@@ -308,7 +308,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
@@ -383,9 +383,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           node-version: "24"
@@ -395,7 +395,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
@@ -452,7 +452,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
@@ -520,7 +520,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -529,7 +529,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
@@ -570,9 +570,9 @@ jobs:
     needs: [ci-mode]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           node-version: "24"
@@ -582,7 +582,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
@@ -625,7 +625,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -633,7 +633,7 @@ jobs:
         with:
           bun-version: "1.4.0"
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.4.0-${{ hashFiles('bun.lock') }}
@@ -678,7 +678,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
