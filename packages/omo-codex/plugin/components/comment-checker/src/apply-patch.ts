@@ -1,8 +1,5 @@
-import {
-	extractApplyPatchEdits,
-	getApplyPatchMetadataFiles,
-} from "@oh-my-opencode/comment-checker-core";
 import type { CheckerEdit as CoreApplyPatchEdit } from "@oh-my-opencode/comment-checker-core";
+import { extractApplyPatchEdits, getApplyPatchMetadataFiles } from "@oh-my-opencode/comment-checker-core";
 import type { CommentCheckRequest } from "./types.js";
 
 export function extractApplyPatchRequests(event: {
@@ -27,10 +24,7 @@ function extractApplyPatchMetadataRequests(details: unknown, sourceToolName: str
 	return toCommentCheckRequests(edits, sourceToolName);
 }
 
-function toCommentCheckRequests(
-	edits: readonly CoreApplyPatchEdit[],
-	sourceToolName: string,
-): CommentCheckRequest[] {
+function toCommentCheckRequests(edits: readonly CoreApplyPatchEdit[], sourceToolName: string): CommentCheckRequest[] {
 	const requests: CommentCheckRequest[] = [];
 	for (const edit of edits) {
 		if (edit.before.length === 0) {

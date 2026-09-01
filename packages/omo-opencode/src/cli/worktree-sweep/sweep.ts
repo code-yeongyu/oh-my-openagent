@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { stat } from "node:fs/promises"
 import os from "node:os"
+import { normalize } from "node:path"
 
 import { classifyWorktree, DEFAULT_EXCLUDE_PREFIXES, isExcludedPath, worktreeRef } from "./classify"
 import {
@@ -78,7 +79,9 @@ async function sweepRepo(
     readonly now: number
   },
 ): Promise<WorktreeSweepRepoReport> {
-  const root = (await resolveRepoRoot(repo)) ?? repo
+  // git reports forward-separator roots even on Windows; normalize so the
+  // report's repo identity matches platform-native consumer paths.
+  const root = normalize((await resolveRepoRoot(repo)) ?? repo)
   const defaultBranch = await detectDefaultBranch(root)
   if (defaultBranch === undefined) {
     throw new Error(`Could not determine the default branch for ${root}`)

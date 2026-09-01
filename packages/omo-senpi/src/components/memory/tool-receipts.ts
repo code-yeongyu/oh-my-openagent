@@ -9,7 +9,7 @@
 // MCP bundle can inline it.
 
 import { createHash } from "node:crypto"
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, unlink, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 export interface MemoryToolReceipt {

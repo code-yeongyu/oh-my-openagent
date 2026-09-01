@@ -1,3 +1,5 @@
+import { normalize } from "node:path"
+
 import type { WorktreeRecord } from "./types"
 
 interface MutableRecord {
@@ -17,7 +19,10 @@ function emptyRecord(): MutableRecord {
 function finalize(record: MutableRecord): WorktreeRecord | undefined {
   if (record.path === undefined || record.path.length === 0) return undefined
   return {
-    path: record.path,
+    // git emits forward separators even on Windows while Node-side callers
+    // build platform-native paths; normalize at the boundary so one record
+    // path matches every consumer comparison.
+    path: normalize(record.path),
     ...(record.head === undefined ? {} : { head: record.head }),
     ...(record.branch === undefined ? {} : { branch: record.branch }),
     detached: record.detached,

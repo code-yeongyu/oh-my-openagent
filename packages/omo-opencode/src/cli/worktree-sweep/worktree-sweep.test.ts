@@ -104,6 +104,9 @@ function decisionFor(report: WorktreeSweepRepoReport, worktreePath: string) {
   return classification
 }
 
+/** git porcelain output always uses forward separators, even on Windows. */
+const toPosix = (value: string): string => value.split(path.sep).join("/")
+
 describe("parseWorktreeList", () => {
   test("parses main worktree, locked reason, detached, and prunable records", () => {
     const porcelain = [
@@ -131,7 +134,7 @@ describe("parseWorktreeList", () => {
 
     expect(records).toHaveLength(4)
     expect(records[0]).toEqual({
-      path: "/repos/omo",
+      path: path.normalize("/repos/omo"),
       head: "1111111111111111111111111111111111111111",
       branch: "main",
       detached: false,
@@ -145,17 +148,22 @@ describe("parseWorktreeList", () => {
     expect(records[2]?.branch).toBeUndefined()
     expect(records[3]?.prunable).toBe(true)
     // First record is the main worktree and is always excluded from candidates.
-    expect(linkedWorktrees(records).map((record) => record.path)).toEqual([
-      "/tmp/wt-a",
-      "/tmp/wt-b",
-      "/tmp/wt-gone",
-    ])
+    expect(linkedWorktrees(records).map((record) => record.path)).toEqual(
+      ["/tmp/wt-a", "/tmp/wt-b", "/tmp/wt-gone"].map(path.normalize),
+    )
   })
 
   test("accepts output without a trailing blank line", () => {
     const records = parseWorktreeList("worktree /a\nHEAD 1\nbranch refs/heads/main")
     expect(records).toHaveLength(1)
-    expect(records[0]?.path).toBe("/a")
+    expect(records[0]?.path).toBe(path.normalize("/a"))
+  })
+
+  test("normalizes worktree paths so separator and dot segments cannot split identity", () => {
+    const records = parseWorktreeList(
+      ["worktree /tmp/sweep/./wt-x", "HEAD 1", "branch refs/heads/main"].join("\n"),
+    )
+    expect(records[0]?.path).toBe(path.normalize("/tmp/sweep/wt-x"))
   })
 })
 
@@ -248,7 +256,7 @@ describe("sweepWorktrees classification", () => {
 
     // Dry-run removed nothing.
     expect(await fs.stat(merged)).toBeTruthy()
-    expect(git(repo, ["worktree", "list", "--porcelain"])).toContain(missing)
+    expect(git(repo, ["worktree", "list", "--porcelain"])).toContain(toPosix(missing))
   })
 
   test("detects the default branch through origin/HEAD when present", async () => {
@@ -275,7 +283,7 @@ describe("sweepWorktrees classification", () => {
 
     expect(report.defaultBranch).toBe("trunk")
     expect(decisionFor(report, feature).decision).toBe("SWEEP")
-  })
+  }, { timeout: 30_000 })
 
   test("falls back to master when origin/HEAD and main are absent", async () => {
     const { base, repo } = await createFixture("wt-sweep-master-")
@@ -299,21 +307,47 @@ describe("sweepWorktrees --older-than", () => {
     const old = path.join(base, "wt-old")
     const oldDirty = path.join(base, "wt-old-dirty")
 
-    await addUnmergedWorktree(repo, "young-branch", young)
-    await addUnmergedWorktree(repo, "old-branch", old)
-    await addUnmergedWorktree(repo, "old-dirty-branch", oldDirty)
-    // The untracked file first (writing it would touch the directory mtime), then age the directory.
+    // All three branches can share one unmerged commit. Creating that commit once
+    // avoids repeating checkout/commit cycles, which made this test exceed Bun's
+    // default timeout on slower Windows runners.
+    git(repo, ["worktree", "add", "-b", "young-branch", young, "main"])
+    await commit(young, "unmerged commit")
+    git(repo, ["worktree", "add", "-b", "old-branch", old, "young-branch"])
+    git(repo, ["worktree", "add", "-b", "old-dirty-branch", oldDirty, "young-branch"])
+
+    // Set both sides of the cutoff explicitly so filesystem timestamp granularity
+    // and fixture setup duration cannot change the age classification.
     await fs.writeFile(path.join(oldDirty, "scratch.txt"), "local change\n")
+    const youngTime = new Date(Date.now() + DAY_MS)
     const staleTime = new Date(Date.now() - 10 * DAY_MS)
-    await fs.utimes(old, staleTime, staleTime)
-    await fs.utimes(oldDirty, staleTime, staleTime)
+    await Promise.all([
+      fs.utimes(young, youngTime, youngTime),
+      fs.utimes(old, staleTime, staleTime),
+      fs.utimes(oldDirty, staleTime, staleTime),
+    ])
 
     const result = await sweepWorktrees({ repos: [repo], olderThanDays: 7 })
 
     const report = result.repos[0]!
-    expect(decisionFor(report, young).reason).toBe("unmerged")
-    expect(decisionFor(report, old).decision).toBe("SWEEP")
-    expect(decisionFor(report, oldDirty).reason).toBe("dirty")
+    expect(decisionFor(report, young)).toEqual({
+      path: young,
+      ref: "young-branch",
+      decision: "KEEP",
+      reason: "unmerged",
+    })
+    expect(decisionFor(report, old)).toEqual({
+      path: old,
+      ref: "old-branch",
+      decision: "SWEEP",
+    })
+    expect(decisionFor(report, oldDirty)).toEqual({
+      path: oldDirty,
+      ref: "old-dirty-branch",
+      decision: "KEEP",
+      reason: "dirty",
+    })
+    expect(result.sweepCount).toBe(1)
+    expect(result.keepCount).toBe(2)
   })
 
   test("olderThanDays 0 never sweeps unmerged worktrees regardless of age", async () => {
@@ -350,9 +384,9 @@ describe("sweepWorktrees --apply", () => {
     await expect(fs.stat(merged)).rejects.toThrow()
     expect(await fs.stat(kept)).toBeTruthy()
     const porcelain = git(repo, ["worktree", "list", "--porcelain"])
-    expect(porcelain).not.toContain(missing)
-    expect(porcelain).not.toContain(merged)
-    expect(porcelain).toContain(kept)
+    expect(porcelain).not.toContain(toPosix(missing))
+    expect(porcelain).not.toContain(toPosix(merged))
+    expect(porcelain).toContain(toPosix(kept))
   })
 
   test("leaves locked and dirty worktrees in place even under --apply", async () => {

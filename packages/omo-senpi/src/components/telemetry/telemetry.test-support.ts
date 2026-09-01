@@ -96,11 +96,21 @@ export function readStamp(stateDir: string): unknown {
   return JSON.parse(readFileSync(getTelemetryActivityStateFilePath(stateDir), "utf-8"))
 }
 
+import { AGENT_DIR_ENV_NAMES } from "../agent-home/resolve-agent-home"
+
 export async function withTempAgentDir<T>(run: (agentDir: string) => Promise<T>): Promise<T> {
   const agentDir = createTempAgentDir()
+  // Pin EVERY agent-dir env name, not just the senpi one: a host that exports OMO_CODING_AGENT_DIR
+  // ambiently would otherwise win the resolution loop and leak real-home writes out of tests.
+  const originals = AGENT_DIR_ENV_NAMES.map((name) => [name, process.env[name]] as const)
+  for (const name of AGENT_DIR_ENV_NAMES) process.env[name] = agentDir
   try {
     return await run(agentDir)
   } finally {
+    for (const [name, value] of originals) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
     rmSync(agentDir, { recursive: true, force: true })
   }
 }

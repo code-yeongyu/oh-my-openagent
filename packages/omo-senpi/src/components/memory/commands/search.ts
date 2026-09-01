@@ -3,7 +3,7 @@
 // Identity-independent: search reads the senpi sessions directory, not memory
 // storage, so it works in unbound sessions. Output is read-only.
 
-import { existsSync } from "node:fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {

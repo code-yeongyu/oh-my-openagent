@@ -33,7 +33,7 @@ export const ANTHROPIC_CATEGORIES = [
   },
   {
     name: "unspecified-high",
-    config: { model: "kimi-coding/k3", variant: "max" },
+    config: { model: "anthropic/claude-opus-5", variant: "xhigh" },
     description: "Tasks that don't fit other categories, high effort required",
     callerGuidance: UNSPECIFIED_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,

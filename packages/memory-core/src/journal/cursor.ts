@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer"
 import type { TranscriptEntry } from "./entries"
 
 export const REFLECTION_STATE_SCHEMA_VERSION = "v3_assistant_steps" as const
@@ -5,6 +6,7 @@ export const REFLECTION_STATE_SCHEMA_VERSION = "v3_assistant_steps" as const
 export type ReflectionTranscriptState = {
   readonly schema_version: typeof REFLECTION_STATE_SCHEMA_VERSION
   readonly reflected_through_message_id?: string
+  readonly reflected_through_byte_offset?: number
   readonly total_completed_steps: number
   readonly reflected_completed_steps: number
   readonly steps_since_last_successful_reflection: number
@@ -112,11 +114,22 @@ export function finalizeCursor(
     {
       ...state,
       reflected_through_message_id: snapshot.end_message_id,
+      reflected_through_byte_offset: reflectedThroughByteOffset(entries, snapshot.end_message_id),
       reflected_completed_steps: countCompletedSteps(snapshotEntries),
       last_reflection_succeeded_at: succeededAt,
     },
     entries,
   )
+}
+
+export function reflectedThroughByteOffset(entries: readonly TranscriptEntry[], messageId: string): number {
+  let offset = 0
+  let reflectedOffset = 0
+  for (const entry of entries) {
+    offset += Buffer.byteLength(`${JSON.stringify(entry)}\n`, "utf8")
+    if (entry.source_message_id === messageId) reflectedOffset = offset
+  }
+  return reflectedOffset
 }
 
 export function initialReflectionState(): ReflectionTranscriptState {

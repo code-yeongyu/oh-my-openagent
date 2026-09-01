@@ -90,6 +90,46 @@ describe("autoMigrateLegacyPluginEntry", () => {
     })
   })
 
+  describe("#given opencode.json has a tuple-style legacy plugin entry", () => {
+    it("#then reports the entry names as plain strings", async () => {
+      // given
+      writeFileSync(
+        join(testConfigDir, "opencode.json"),
+        JSON.stringify({ plugin: [["oh-my-opencode@3.10.0", { verbose: true }]] }, null, 2) + "\n",
+      )
+
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
+
+      // when
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
+
+      // then
+      expect(result.migrated).toBe(true)
+      expect(result.from).toBe("oh-my-opencode@3.10.0")
+      expect(result.to).toBe("oh-my-openagent@3.10.0")
+    })
+  })
+
+  describe("#given a foreign tuple entry sits before the legacy entry", () => {
+    it("#then the legacy entry is still migrated", async () => {
+      // given
+      writeFileSync(
+        join(testConfigDir, "opencode.json"),
+        JSON.stringify({ plugin: [["some-plugin@1.2.3", { enabled: true }], "oh-my-opencode"] }, null, 2) + "\n",
+      )
+
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
+
+      // when
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
+
+      // then
+      expect(result.migrated).toBe(true)
+      expect(result.from).toBe("oh-my-opencode")
+      expect(result.to).toBe("oh-my-openagent")
+    })
+  })
+
   describe("#given no config file exists", () => {
     it("#then returns migrated false", async () => {
       // given - empty dir
