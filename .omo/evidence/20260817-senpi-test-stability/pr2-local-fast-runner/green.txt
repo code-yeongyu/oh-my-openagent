@@ -1,0 +1,18 @@
+bun test v1.3.12 (700fc117)
+
+script/test-fast.test.ts:
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+[test-fast] opencode-memory: exit 0
+[test-fast] root-rest: exit 0
+[test-fast] senpi: exit 0
+(pass) runTestFast > #given three fixed test groups #when the runner starts #then every group is launched before any exit is released [0.64ms]
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+[test-fast] opencode-memory: exit 0
+[test-fast] root-rest: exit 3
+[test-fast] senpi: exit 0
+(pass) runTestFast > #given one nonzero group exit #when the runner aggregates #then the combined exit is 1 [0.63ms]
+
+ 2 pass
+ 0 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [87.00ms]

@@ -1,9 +1,8 @@
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-
-import { afterEach, describe, expect, it } from "vitest";
 import type { PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { codexLspRequestContext, extractMutatedFilePaths, runLspPostToolUseHook } from "../src/codex-hook.js";
 

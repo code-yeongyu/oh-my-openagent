@@ -5,6 +5,7 @@
 // deliberately no --auto selector.
 
 import type { SenpiExtensionAPI } from "../../../extension/types"
+import { resolveReflectionTriggerConfig } from "../trigger-wiring"
 import { parseCommandArgs } from "./args"
 import {
   requireIdentity,
@@ -27,6 +28,12 @@ export function registerReflectCommand(pi: SenpiExtensionAPI, deps: MemoryComman
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
+
+      const { settings } = deps.loadSettings()
+      const triggerConfig = resolveReflectionTriggerConfig(settings, identity.identity)
+      if (!triggerConfig.enabled) {
+        return respond(ctx, "reflection is disabled; set reflection.enabled to true in your omo config to enable it", "error")
+      }
 
       const sink = deps.reflectionSink
       if (sink === undefined) {

@@ -64,9 +64,10 @@ describe("safeCreateHook", () => {
 
     //#then
     expect(logSpy).toHaveBeenCalled()
-    const callArgs = logSpy.mock.calls[0]
-    expect(callArgs[0]).toContain("my-hook")
-    expect(callArgs[0]).toContain("Hook creation failed")
+    const callArgs = logSpy.mock.calls.find(([message]) => message.includes("[safe-create-hook]"))
+    expect(callArgs).toBeDefined()
+    expect(callArgs?.[0]).toContain("my-hook")
+    expect(callArgs?.[0]).toContain("Hook creation failed")
   })
 
   test("propagates error when enabled is false", async () => {

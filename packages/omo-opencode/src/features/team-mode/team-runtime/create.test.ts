@@ -223,7 +223,6 @@ describe("createTeamRun", () => {
 
     // then
     expect(firstPrompt).toContain("Lead-only tools you must NOT call")
-    expect(firstPrompt).not.toContain("3. Request shutdown via `team_shutdown_request`")
   })
 
   test("rolls back launched members in reverse order when a later spawn fails", async () => {

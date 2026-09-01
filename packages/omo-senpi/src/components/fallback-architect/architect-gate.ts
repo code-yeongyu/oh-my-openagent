@@ -1,4 +1,5 @@
-import { resolveAvailableCategoryNames, type SenpiModelPort, type SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
+import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
+import { resolveAvailableCategoryNames } from "@oh-my-opencode/senpi-task/category-resolver"
 
 import { loadSenpiOmoConfig } from "../config-resolution"
 

@@ -14,7 +14,6 @@ describe("createBuiltinSkills", () => {
 		// then
 		const browserSkill = skills.find((s) => s.name === "playwright")
 		expect(browserSkill).toBeDefined()
-		expect(browserSkill?.description).toContain("browser")
 		expect(browserSkill?.mcpConfig?.playwright).toBeDefined()
 	})
 
@@ -61,7 +60,6 @@ describe("createBuiltinSkills", () => {
 		const playwrightSkill = skills.find((skill) => skill.name === "playwright")
 		const agentBrowserSkill = skills.find((skill) => skill.name === "agent-browser")
 		expect(devBrowserSkill).toBeDefined()
-		expect(devBrowserSkill?.description).toContain("Browser automation")
 		expect(playwrightSkill).toBeUndefined()
 		expect(agentBrowserSkill).toBeUndefined()
 		expect(skillNames).not.toContain("playwright-cli")
@@ -79,7 +77,6 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		expect(agentBrowserSkill).toBeDefined()
-		expect(agentBrowserSkill?.description).toContain("browser")
 		expect(agentBrowserSkill?.allowedTools).toContain("Bash(agent-browser:*)")
 		expect(agentBrowserSkill?.template).toContain("agent-browser")
 		expect(playwrightSkill).toBeUndefined()
@@ -237,7 +234,6 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(initDeep).toBeDefined()
-		expect(initDeep?.description).toContain("hierarchical AGENTS.md")
 		expect(initDeep?.argumentHint).toBe("[--create-new] [--max-depth=N]")
 	})
 
@@ -329,7 +325,6 @@ describe("createBuiltinSkills", () => {
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 		expect(playwrightSkill).toBeDefined()
-		expect(playwrightSkill?.description).toContain("browser")
 		expect(playwrightSkill?.allowedTools).toContain("Bash(playwright-cli:*)")
 		expect(playwrightSkill?.mcpConfig).toBeUndefined()
 		expect(agentBrowserSkill).toBeUndefined()

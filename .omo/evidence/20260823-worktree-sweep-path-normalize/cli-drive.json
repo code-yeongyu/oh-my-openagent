@@ -1,0 +1,12 @@
+[exit 0]
+{
+  "exit": 0,
+  "apply": false,
+  "classifications": [
+    {
+      "path": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/wt-evidence-o7cgOu/wt-linked",
+      "decision": "SWEEP"
+    }
+  ],
+  "linkedReal": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/wt-evidence-o7cgOu/wt-linked"
+}

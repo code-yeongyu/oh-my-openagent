@@ -92,6 +92,12 @@ export async function resolveCategoryExecution(
     const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
     const requiredModel = requirement?.requiresModel ?? BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName]
     const allCategoryNames = Object.keys(enabledCategories).join(", ")
+    const configuredModels = userCategories?.[categoryName]?.models
+
+    if (configuredModels && availableModels.size > 0) {
+      const configuredChain = configuredModels.map((entry) => getConfiguredModel(entry)).join(" -> ")
+      return categoryResolutionError(`Configured model chain is unavailable for category "${categoryName}": ${configuredChain}`)
+    }
 
     if (categoryExists && requiredModel) {
       return categoryResolutionError(`Category "${categoryName}" requires model "${requiredModel}" which is not available.

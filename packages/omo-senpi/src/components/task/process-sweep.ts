@@ -1,3 +1,4 @@
+import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
 import {
   sweepOrphanedLspDaemonProxies,
   sweepStaleLspDaemonVersions,
@@ -12,8 +13,6 @@ import { resolveSenpiDaemonRuntime } from "../lsp/daemon-runtime"
 // runs and each family self-throttles via its stamp file inside the sweep
 // functions. Mirrors the codex best-effort process-sweep pattern
 // (packages/omo-codex/plugin/components/ — codex hook-sweep.ts).
-
-export const SENPI_RPC_CHILD_MARKER_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
 
 export type OmoFamilySweep = () => Promise<unknown>
 
@@ -50,7 +49,7 @@ export function wireSessionStartProcessSweep(
   })
 
   pi.on("session_start", () => {
-    if (env[SENPI_RPC_CHILD_MARKER_ENV] !== undefined) {
+    if (env[OMO_SENPI_TASK_RPC_CHILD] === "1") {
       ctx.logger.info("omo-senpi process sweep skipped: running inside a senpi-task RPC child")
       return undefined
     }

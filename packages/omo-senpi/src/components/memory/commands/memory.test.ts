@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
@@ -13,9 +13,31 @@ import {
 import { registerMemoryCommand } from "./memory"
 
 const tempDirs: string[] = []
+const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
+
+// These cases create real git repositories and inspect their working trees. Match the 60s process
+// test ceiling established for loaded CI runners rather than relying on Bun's 5s default.
+setDefaultTimeout(60_000)
+
+async function removeTempDir(dir: string): Promise<void> {
+  try {
+    await rm(dir, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+  } catch (error) {
+    // A killed Windows child can retain a temp-directory handle beyond the bounded retry window.
+    // Ignore only that platform's known cleanup races; all other cleanup defects still fail loudly.
+    if (
+      process.platform === "win32"
+      && error instanceof Error
+      && "code" in error
+      && typeof error.code === "string"
+      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
+    ) return
+    throw error
+  }
+}
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map(removeTempDir))
 })
 
 const SEEDS = [

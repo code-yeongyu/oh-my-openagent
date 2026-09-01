@@ -1,7 +1,7 @@
 // Git repo helpers shared by the memory commands: construction with the
 // production hook installer, raw read-only git, and formatting.
 
-import { existsSync } from "node:fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {

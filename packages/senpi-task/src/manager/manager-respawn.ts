@@ -16,7 +16,7 @@ const CONTINUATION_MESSAGE =
   "Your previous turn was interrupted by a host process restart. Resume your task from its current state and finish it - do not restart from scratch, and do not repeat work already recorded in this session."
 const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
 
-type RpcRespawnRunner = { start(spec: RpcRunnerSpec): RpcChildHandle }
+type RpcRespawnRunner = { start(spec: RpcRunnerSpec): Promise<RpcChildHandle> }
 
 export async function respawnManagedTask(input: {
   readonly record: TaskRecord
@@ -54,7 +54,7 @@ async function respawnFresh(input: {
   let handle: RpcChildHandle | undefined
   try {
     const trusted = input.trustedLaunch === undefined ? undefined : await input.trustedLaunch(input.record)
-    handle = input.rpcRunner.start({
+    handle = await input.rpcRunner.start({
       task_id: input.record.task_id,
       cwd: rebuilt.spec.cwd,
       state_dir: rebuilt.spec.stateDir,
@@ -117,7 +117,7 @@ async function respawnProcess(input: {
   let handle: RpcChildHandle | undefined
   try {
     const trusted = input.trustedLaunch === undefined ? undefined : await input.trustedLaunch(input.record)
-    handle = input.rpcRunner.start({
+    handle = await input.rpcRunner.start({
       task_id: input.record.task_id,
       cwd: spawnSpec.cwd,
       state_dir: join(input.stateDir, "children", input.record.task_id),

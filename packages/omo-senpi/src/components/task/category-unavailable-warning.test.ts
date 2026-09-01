@@ -97,7 +97,7 @@ describe("createCategoryUnavailableWarningPlanner", () => {
     plan(planner, "quick")
 
     // then
-    expect(notifies).toEqual([{ message: EXPECTED_TEXT, type: "warning" }])
+    expect(notifies).toEqual([{ message: EXPECTED_TEXT, type: "info" }])
     expect(messages).toHaveLength(1)
     expect(messages[0]?.message).toEqual({
       customType: CATEGORY_UNAVAILABLE_MESSAGE_TYPE,
@@ -231,6 +231,6 @@ describe("createCategoryUnavailableWarningPlanner", () => {
     expect(result.error.code).toBe("model_unavailable")
     expect(result.error.category).toBe("quick")
     expect(result.error.attempted_chain).toBeDefined()
-    expect(result.error.missing_providers).toContain("quotio-openai")
+    expect(result.error.missing_providers).toContain("openai-codex")
   })
 })

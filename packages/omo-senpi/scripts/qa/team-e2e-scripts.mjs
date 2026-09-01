@@ -25,8 +25,7 @@ export const LEAD_SCRIPT = {
       },
     }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: "LEAD2QUICK injected handshake: report QUICK2LEAD after this arrives" }),
-    { type: "hang" },
-    text("lead observed the injected member report"),
+    toolCall("task_list", { team_run_id: "__TEAM_RUN_ID__" }),
   ],
   quick: [
     text("quick initial turn ended; waiting for an injected lead message"),
@@ -62,6 +61,10 @@ export const NOOP_SCRIPT = {
   lead: [text("fresh boot for session_start reclaim")],
 }
 
+export const CRASH_RESTART_SCRIPT = {
+  lead: [{ type: "wait_for_liveness" }],
+}
+
 // Print mode exits the moment its scripted turns settle, while the member mailbox poller only ticks
 // on 1s intervals and the ack scanner commits only after the injected envelope reaches the session
 // JSONL at a tool boundary. Two tool-held waits keep the turn (and therefore the process) alive
@@ -91,7 +94,7 @@ export const CRASH_SEED_SCRIPT = {
       },
     }),
     toolCall("task_send", { team_run_id: "__TEAM_RUN_ID__", to: "crash", message: "CRASH-ONCE inject exactly once" }),
-    { type: "hang" },
+    toolCall("task_list", { team_run_id: "__TEAM_RUN_ID__" }),
   ],
   quick: [text("crash member ready and idle"), text("crash message observed")],
 }

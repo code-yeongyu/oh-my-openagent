@@ -23,6 +23,7 @@ type SessionAffinityEntry = {
 
 type RouteRegistration = {
   serverUrl: URL | undefined
+  directory: string
   liveClient: unknown
   available: boolean | undefined
   probeTimestamp: number
@@ -69,6 +70,7 @@ export function initLiveServerRoute(opts: {
 }): void {
   const registration: RouteRegistration = {
     serverUrl: opts.serverUrl,
+    directory: opts.directory,
     liveClient: undefined,
     available: undefined,
     probeTimestamp: 0,
@@ -243,7 +245,10 @@ function getOrBuildLiveClient(registration: RouteRegistration): unknown {
   if (!registration.serverUrl) {
     return undefined
   }
-  const client = createOpencodeClientSdk({ baseUrl: registration.serverUrl.toString() })
+  const client = createOpencodeClientSdk({
+    baseUrl: registration.serverUrl.toString(),
+    directory: registration.directory,
+  })
   injectServerAuthIntoClient(client)
   registration.liveClient = client
   return registration.liveClient
@@ -331,7 +336,17 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
     return false
   }
 
-  const CONNECTION_CODES = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"])
+  const CONNECTION_CODES = new Set([
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ENETUNREACH",
+    "EHOSTUNREACH",
+    "ENETDOWN",
+    "EHOSTDOWN",
+    "EADDRNOTAVAIL",
+    "UND_ERR_CONNECT_TIMEOUT",
+  ])
 
   const self = error as NodeJS.ErrnoException
   if (self.code && CONNECTION_CODES.has(self.code)) {
@@ -342,13 +357,6 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
   if (cause && typeof cause === "object" && cause !== null) {
     const causeCode = (cause as NodeJS.ErrnoException).code
     if (causeCode && CONNECTION_CODES.has(causeCode)) {
-      return true
-    }
-  }
-
-  if (error instanceof TypeError) {
-    const msg = error.message
-    if (msg.includes("fetch failed") || msg.includes("Unable to connect")) {
       return true
     }
   }

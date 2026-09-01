@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { AST_GREP_MCP_TOOLS } from "./mcp";
+import { SCAN_TOOL_DESCRIPTION, scanInputSchema } from "./tools/scan";
 
 // The advertised inputSchema is the ONLY contract a client sees before it calls a tool.
 // Anything the parser rejects at execution time but the schema accepts is a lie the model
@@ -29,48 +30,57 @@ function propertyOf(name: string, property: string): Schema {
   return value;
 }
 
-/**
- * Minimal validator covering exactly the keywords these descriptors use for the
- * rule-source contract: required, not.required and oneOf. Deliberately hand-rolled —
- * the package ships bun-types only, and pulling a JSON Schema engine in for three
- * keywords would be a heavier dependency than the assertion is worth.
- */
-function satisfies(schema: Schema, value: Record<string, unknown>): boolean {
-  const required = schema.required;
-  if (Array.isArray(required) && !required.every((key) => typeof key === "string" && value[key] !== undefined)) {
-    return false;
-  }
-  const negated = schema.not;
-  if (negated !== undefined && satisfies(negated as Schema, value)) return false;
-  const oneOf = schema.oneOf;
-  if (Array.isArray(oneOf)) {
-    const matched = oneOf.filter((branch) => satisfies(branch as Schema, value)).length;
-    if (matched !== 1) return false;
-  }
-  return true;
-}
+describe("ast_grep descriptors: client-safe composition", () => {
+  it("#given every advertised inputSchema #when walked to any depth #then no oneOf/anyOf/allOf/not appears", () => {
+    // Cursor's AgentService gateway cannot carry JSON-Schema composition keywords in an
+    // advertised tool inputSchema: the protobuf conversion fails upstream and the WHOLE run
+    // dies with a wrapped `resource_exhausted`. The parsers enforce every contract the schema
+    // cannot express (scan rule-source exclusivity included), so these keys must never ship.
+    const COMPOSITION_KEYS = new Set(["oneOf", "anyOf", "allOf", "not"]);
+    const offenders: string[] = [];
+    const walk = (node: unknown, trail: string): void => {
+      if (Array.isArray(node)) {
+        node.forEach((item, index) => walk(item, `${trail}[${index}]`));
+        return;
+      }
+      if (typeof node !== "object" || node === null) return;
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (COMPOSITION_KEYS.has(key)) offenders.push(`${trail}.${key}`);
+        walk(value, `${trail}.${key}`);
+      }
+    };
+    for (const tool of AST_GREP_MCP_TOOLS) walk(tool.inputSchema, tool.name);
+    expect(offenders).toEqual([]);
+  });
+});
 
 describe("ast_grep scan descriptor: rule-source exclusivity", () => {
-  it("#given the scan schema #when inspected #then it publishes the ruleFile XOR inlineRules oneOf", () => {
+  // The XOR contract cannot ride in the schema (see the composition test above), so it is
+  // published in prose the model reads and enforced by the parser that runs the call.
+  it("#given the scan schema #when inspected #then exclusivity is published without composition keywords", () => {
     const schema = schemaOf("scan");
-    expect(schema.oneOf).toEqual([
-      { type: "object", required: ["ruleFile"], not: { required: ["inlineRules"] } },
-      { type: "object", required: ["inlineRules"], not: { required: ["ruleFile"] } },
-    ]);
+    expect(schema.oneOf).toBeUndefined();
     expect(schema.required).toEqual(["paths"]);
+    expect(String(propertyOf("scan", "ruleFile").description)).toContain("Mutually exclusive with inlineRules");
+    expect(String(propertyOf("scan", "inlineRules").description)).toContain("Mutually exclusive with ruleFile");
+    expect(String(SCAN_TOOL_DESCRIPTION)).toContain("Provide either ruleFile or inlineRules");
   });
 
-  it("#given scan args with NO rule source #when validated against the descriptor #then they are schema-invalid", () => {
-    expect(satisfies(schemaOf("scan"), { paths: ["src"] })).toBe(false);
+  it("#given scan args with NO rule source #when parsed #then the parser rejects them", () => {
+    expect(() => scanInputSchema.parse({ paths: ["src"] })).toThrow(
+      "Exactly one of ruleFile or inlineRules must be provided",
+    );
   });
 
-  it("#given scan args with BOTH rule sources #when validated against the descriptor #then they are schema-invalid", () => {
-    expect(satisfies(schemaOf("scan"), { paths: ["src"], ruleFile: "r.yml", inlineRules: "id: x" })).toBe(false);
+  it("#given scan args with BOTH rule sources #when parsed #then the parser rejects them", () => {
+    expect(() => scanInputSchema.parse({ paths: ["src"], ruleFile: "r.yml", inlineRules: "id: x" })).toThrow(
+      "Exactly one of ruleFile or inlineRules must be provided",
+    );
   });
 
-  it("#given scan args with exactly one rule source #when validated against the descriptor #then they are schema-valid", () => {
-    expect(satisfies(schemaOf("scan"), { paths: ["src"], ruleFile: "r.yml" })).toBe(true);
-    expect(satisfies(schemaOf("scan"), { paths: ["src"], inlineRules: "id: x" })).toBe(true);
+  it("#given scan args with exactly one rule source #when parsed #then the parser accepts them", () => {
+    expect(() => scanInputSchema.parse({ paths: ["src"], ruleFile: "r.yml" })).not.toThrow();
+    expect(() => scanInputSchema.parse({ paths: ["src"], inlineRules: "id: x" })).not.toThrow();
   });
 });
 

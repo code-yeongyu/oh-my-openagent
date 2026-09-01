@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { readFile, rm, writeFile, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
+import { validateDreamTokenBudget } from "./completion-validation"
 import { createReflectionWorktree, finalizeReflectionWorktree } from "./worktree"
 
 const roots: string[] = []
 
 async function fixture(runId: string) {
-  const root = await mkdtemp(join(tmpdir(), "reflection-validation-"))
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-validation-")))
   roots.push(root)
   const parentDir = join(root, "memory")
   const repo = new GitMemoryRepo({ dir: parentDir, agentId: "agent-one" })
@@ -19,10 +20,37 @@ async function fixture(runId: string) {
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+
+describe("dream token budget completion validation", () => {
+  it("#given a pressure dream whose merged system estimate remains at target #when validated #then budget_not_met is recorded", () => {
+    expect(validateDreamTokenBudget({ origin: "pressure", totalTokens: 80, targetTokens: 80 })).toEqual({
+      status: "budget_not_met",
+      totalTokens: 80,
+      targetTokens: 80,
+      detail: "Committed system/ estimate is 80 tokens; pressure dream target is below 80 tokens",
+    })
+  })
+
+  it("#given a pressure dream below target #when validated #then the estimate is clean", () => {
+    expect(validateDreamTokenBudget({ origin: "pressure", totalTokens: 79, targetTokens: 80 })).toEqual({
+      status: "valid",
+      totalTokens: 79,
+      targetTokens: 80,
+    })
+  })
+
+  it("#given a non-pressure dream above target #when validated #then the estimate is reported without failing", () => {
+    expect(validateDreamTokenBudget({ origin: "manual", totalTokens: 120, targetTokens: 80 })).toEqual({
+      status: "valid",
+      totalTokens: 120,
+      targetTokens: 80,
+    })
+  })
+})
 
 describe("reflection completion validation", () => {
   it("#given an uncommitted worktree edit #when finalized #then it reports dirty_uncommitted and cleans up", async () => {

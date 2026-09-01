@@ -20,6 +20,16 @@ interface BuildResult {
   readonly output: string
 }
 
+const WINDOWS_AGENT_TOOLKIT_LAUNCHER = '@echo off\r\nnode "%~dp0cli.js" %*\r\n'
+
+function isLaunchablePosixShim(mode: number): boolean {
+  return (mode & 0o400) === 0o400 && (mode & 0o100) === 0o100
+}
+
+function isWindowsAgentToolkitLauncher(content: string): boolean {
+  return content === WINDOWS_AGENT_TOOLKIT_LAUNCHER
+}
+
 function makeTempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "omo-native-payload-"))
   tempDirs.push(dir)
@@ -72,6 +82,9 @@ describe("build:omo-native staged payload", () => {
 
           const required = [
             join("extensions", "omo.js"),
+            join("extensions", "reflection-persona.md"),
+            join("extensions", "dream-persona.md"),
+            join("extensions", "facts-persona.md"),
             join("runtime", "ast-grep-mcp", "cli.js"),
             join("runtime", "agent-toolkit", "cli.js"),
             join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
@@ -91,11 +104,15 @@ describe("build:omo-native staged payload", () => {
           }
           expect(manifest.name).toBe("@code-yeongyu/omo-senpi")
 
-          // Windows has no POSIX execute bit, so stat reports 0o666 there regardless of the staged mode.
-          if (process.platform !== "win32") {
-            const shimMode =
-              statSync(join(outputDir, "runtime", "agent-toolkit", "omo-agent-toolkit")).mode & 0o777
-            expect(shimMode).toBe(0o755)
+          const posixShim = join(outputDir, "runtime", "agent-toolkit", "omo-agent-toolkit")
+          const windowsShim = join(outputDir, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd")
+          if (process.platform === "win32") {
+            expect(existsSync(windowsShim)).toBe(true)
+            expect(statSync(windowsShim).mode & 0o400).toBe(0o400)
+            expect(isWindowsAgentToolkitLauncher(readFileSync(windowsShim, "utf8"))).toBe(true)
+          } else {
+            const shimMode = statSync(posixShim).mode & 0o777
+            expect(isLaunchablePosixShim(shimMode)).toBe(true)
           }
 
           const skillCount = readdirSync(join(outputDir, "skills"), {
@@ -113,13 +130,28 @@ describe("build:omo-native staged payload", () => {
             "scripts/install.mjs",
           ])
 
-          expect(readFileSync(join(repoRoot, "packages", "omo-native", ".gitignore"), "utf8")).toBe(
-            "/plugin/\n",
+          expect(
+            readFileSync(join(repoRoot, "packages", "omo-native", ".gitignore"), "utf8").replaceAll(
+              "\r\n",
+              "\n",
+            ),
+          ).toBe("/plugin/\n")
+
+          rmSync(join(outputDir, "extensions", "dream-persona.md"))
+          const missingPersona = runBuild(["--output", outputDir, "--check-only"])
+          expect(missingPersona.exitCode).toBe(1)
+          expect(missingPersona.output).toContain(
+            `missing required artifact: ${join("extensions", "dream-persona.md")}`,
           )
         },
         fullBuildTimeoutMs,
       )
     })
+  })
+
+  test("#then mode 411 and a commented Windows invocation are rejected as non-launchable", () => {
+    expect(isLaunchablePosixShim(0o411)).toBe(false)
+    expect(isWindowsAgentToolkitLauncher('rem node "%~dp0cli.js" %*\r\n')).toBe(false)
   })
 })
 

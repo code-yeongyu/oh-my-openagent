@@ -1,5 +1,5 @@
 import type { MessageRenderer } from "@code-yeongyu/senpi"
-import { linesComponent } from "@oh-my-opencode/senpi-task"
+import { buildNoticeBox } from "@oh-my-opencode/senpi-task/notice-box"
 
 /**
  * User-visible upgrade notice emitted alongside the hidden fallback-architect directive.
@@ -45,15 +45,30 @@ export function buildFallbackArchitectNotice(input: FallbackArchitectNoticeDetai
   ].join("\n")
 }
 
-export const renderFallbackArchitectNotice: MessageRenderer<FallbackArchitectNoticeDetails> = (message) => {
+export const renderFallbackArchitectNotice: MessageRenderer<FallbackArchitectNoticeDetails> = (message, options, theme) => {
   const details = message.details
-  if (details === undefined) return linesComponent(["(model fallback upgrade notice)"])
+  if (details === undefined) {
+    return buildNoticeBox(
+      {
+        title: "⚡ Fallback upgrade engaged",
+        tone: "accent",
+        why: "The session switched to its configured fallback model.",
+      },
+      options,
+      theme,
+    )
+  }
   const from = friendlyModelName(details.from)
   const to = friendlyModelName(details.to)
-  return linesComponent([
-    "⚡ Fallback upgrade engaged",
-    `${from} declined that one — ${to} takes the wheel, zero downtime.`,
-    `Top-tier reasoning stays on call: task(category: "architect") still consults Fable 5 at xhigh.`,
-    `${to} on execution + Fable 5 xhigh on hard thinking — two frontier brains, one session.`,
-  ])
+  return buildNoticeBox(
+    {
+      title: "⚡ Fallback upgrade engaged",
+      tone: "accent",
+      why: `${from} declined that one — ${to} takes the wheel, zero downtime.`,
+      extra: [{ text: `Top-tier reasoning stays on call: task(category: "architect") still consults Fable 5 at xhigh.` }],
+      expandedLine: `${to} on execution + Fable 5 xhigh on hard thinking — two frontier brains, one session.`,
+    },
+    options,
+    theme,
+  )
 }

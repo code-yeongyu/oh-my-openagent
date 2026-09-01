@@ -32,7 +32,7 @@ function run(argv: readonly string[], cwd: string, env: NodeJS.ProcessEnv = {}):
 }
 
 async function tempDir(prefix: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), prefix))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), prefix)))
   tempDirs.push(dir)
   return dir
 }
@@ -42,7 +42,7 @@ async function createRepo(): Promise<string> {
   await run(["git", "init", "--quiet"], dir)
   await run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], dir)
   await run(["git", "config", "user.email", "agent@omo.local"], dir)
-  await run(["git", "config", "user.name", "Omo Agent"], dir)
+  await run(["git", "config", "user.name", "OmO Agent"], dir)
   await run(["git", "config", "commit.gpgsign", "false"], dir)
   installHooks(dir)
   return dir
@@ -83,7 +83,7 @@ async function seedServerFile(dir: string, relativePath: string, content: string
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)

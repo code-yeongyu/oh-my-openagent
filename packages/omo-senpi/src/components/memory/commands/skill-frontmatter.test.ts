@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { realpathSync } from "node:fs"
 
 import {
   formatSkillNameFrontmatterRepairReport,
@@ -12,13 +13,13 @@ import {
 const tempDirs: string[] = []
 
 async function tempRoot(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "skill-frontmatter-"))
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "skill-frontmatter-")))
   tempDirs.push(dir)
   return dir
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("repairSkillNameFrontmatterContent", () => {

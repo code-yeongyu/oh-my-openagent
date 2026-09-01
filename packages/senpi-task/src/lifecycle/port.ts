@@ -11,6 +11,7 @@ import type { BatchAdmissionOptions } from "./residency"
 // children through the port, under the "cancel" deliberate-stop family.
 export type DestroyCause =
   | "cancel"
+  | "cancel_without_abort"
   | "evict"
   | "ttl"
   | "reconcile_lost"
@@ -39,6 +40,13 @@ export type ResidencyRegistry = {
   forget(taskId: string): void
   // A terminal resident with a queued send must NOT be evicted (codex is_unloadable parity).
   hasPendingSends(taskId: string): boolean
+  // Synchronous per-task arbitration held across async teardown. Eviction and sends are mutually
+  // exclusive; callers that lose the race must not touch the child handle.
+  tryClaimEviction?(taskId: string): boolean
+  releaseEviction?(taskId: string): void
+  isEvicting?(taskId: string): boolean
+  tryBeginSend?(taskId: string): boolean
+  endSend?(taskId: string): void
 }
 
 // Injectable OS-process signalling so unit tests never spawn real children. Defaults use
@@ -69,10 +77,16 @@ export type ReattachResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly kind: "already_attached" | "failed"; readonly reason: string }
 
+export type CapacityReservation =
+  | { readonly ok: false }
+  | { readonly ok: true; release(): void }
+
 export type RespawnPort = (record: TaskRecord, resumeSessionPath?: string) => Promise<RespawnResult>
 export type ReattachPort = (record: TaskRecord, handle: ManagedChildHandle) => Promise<ReattachResult>
+export type ReserveReattachPort = (record: TaskRecord) => CapacityReservation
 
 export type LifecycleReattachPorts = {
+  readonly reserve: ReserveReattachPort
   readonly respawn: RespawnPort
   readonly reattach: ReattachPort
 }
@@ -90,12 +104,22 @@ export function getLifecycleReattachPorts(store: TaskRecordStore): LifecycleReat
   return registeredReattachPorts.get(store)
 }
 
+export type IdleReclaimerTimer = {
+  unref?(): void
+}
+
+export type IdleReclaimerScheduler = {
+  setInterval(callback: () => void, delayMs: number): IdleReclaimerTimer
+  clearInterval(timer: IdleReclaimerTimer): void
+}
+
 export type LifecycleDeps = {
   readonly store: TaskRecordStore
   readonly registry: ResidencyRegistry
   readonly config: OmoTaskSettings
   readonly now?: () => number
   readonly signaller?: ProcessSignaller
+  readonly reserveReattach?: ReserveReattachPort
   readonly respawn?: RespawnPort
   readonly reattach?: ReattachPort
   // Delay before escalating an orphan SIGTERM to SIGKILL during reconciliation. Defaults to 5s.
@@ -108,9 +132,15 @@ export type LifecycleDeps = {
   readonly dequeuePending?: (taskId: string) => void
   // Test seam for bounded admission-lease timing and deterministic contention.
   readonly reconcileAdmission?: BatchAdmissionOptions
+  // Injectable timer seam keeps lifecycle tests deterministic and prevents test-created timers.
+  readonly idleReclaimerScheduler?: IdleReclaimerScheduler
 }
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {
   if (deps.respawn === undefined || deps.reattach === undefined) return undefined
-  return { respawn: deps.respawn, reattach: deps.reattach }
+  return {
+    reserve: deps.reserveReattach ?? (() => ({ ok: true, release: () => undefined })),
+    respawn: deps.respawn,
+    reattach: deps.reattach,
+  }
 }
