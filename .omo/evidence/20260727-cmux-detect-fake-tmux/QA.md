@@ -452,6 +452,33 @@ profile scrubs `CMUX_*` while the cmux tmux shim still injects `TMUX`.
 variables. Without that the suite would read this host's cmux configuration and the
 "cmux socket directory without `CMUX_SOCKET_PATH`" guard would invert on any cmux machine.
 
+### CI on the rebased head
+
+The first push after the rebase (`e6007ce28`) came back 23 pass / 1 fail, and the failure was
+mine. `script/agent-command-string-audit.test.ts` scans tracked sources for uncategorized agent
+command strings, and the new doc comment spelled the launch kind as an assignment, which the
+scanner reads as one:
+
+```
++   "packages/tmux-core/src/cmux-detect.ts: =omo",
+- Expected  - 0
++ Received  + 1
+```
+
+It reproduced locally on the first try. Fixed by dropping the value from that one sentence rather
+than widening the allowlist — the sentence is about the variable being inherited, and the value is
+already carried by `CMUX_OMO_LAUNCH_KIND` and its own doc comment. This is a gate the local
+per-package sweep cannot see, the same class of miss as the shim-inventory audit in the original
+round.
+
+The same run also reported `omo setup credential inheritance` in `packages/omo-native` as a
+5000 ms timeout. That file contains no tmux or cmux reference and is untouched by this PR
+(`git log origin/dev..HEAD -- packages/omo-native/test/setup-import.test.ts` is empty), so it is
+runner timing rather than this diff.
+
+On `66f651f30` the full protected matrix is **25 pass / 0 fail**, including the `ubuntu-latest`
+shard that failed on the pre-rebase head, and `mergeable_state` is `clean`.
+
 ## Residual
 
 `findTmuxPath()` still probes a bare `cmux` on `PATH` before falling back to a verified `tmux`
