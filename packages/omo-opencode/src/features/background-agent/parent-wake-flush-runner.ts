@@ -49,6 +49,7 @@ export class ParentWakeFlushRunner {
     }
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
+    const forceDispatchAfterSustainedDefer = latestWake.shouldReply && this.getQueuedAgeMs(latestWake) >= PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS
     if (sessionActive && !forceDispatchAfterActiveDefer) {
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred parent wake because parent session is active:", {
@@ -57,22 +58,34 @@ export class ParentWakeFlushRunner {
       return
     }
 
-    if (!forceDispatchAfterActiveDefer && this.hasRecentParentSessionActivity(sessionID)) {
+    if (!forceDispatchAfterActiveDefer && !forceDispatchAfterSustainedDefer && this.hasRecentParentSessionActivity(sessionID)) {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+        return
+      }
+      if (latestWake.shouldReply) {
+        // The parent session is still within the activity window. Sending a
+        // forceNoReply here would refresh the parent's last-activity timestamp,
+        // guaranteeing that the next hasRecentParentSessionActivity() check
+        // will also be true and creating an infinite re-flush loop.
+        //
+        // Instead, defer the entire flush past the activity window (5500 ms).
+        // When the timer fires, the window has expired (we didn't extend it),
+        // and the normal reply-producing path runs.
+        this.schedulePendingParentWakeFlush(sessionID, 5500)
+        log("[background-agent] Deferred reply-required parent wake because parent session activity is still fresh:", {
+          sessionID,
+        })
         return
       }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry: false,
         toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
         forceNoReply: true,
-        retainPendingWake: latestWake.shouldReply,
+        retainPendingWake: false,
       })
       log("[background-agent] Recorded admit-only parent wake because parent session activity is still fresh:", {
         sessionID,
       })
-      if (latestWake.shouldReply) {
-        this.schedulePendingParentWakeFlush(sessionID)
-      }
       return
     }
 
@@ -143,10 +156,16 @@ export class ParentWakeFlushRunner {
     await this.sendParentWakePrompt(sessionID, latestWake, {
       emptyAssistantTurnRetry,
       toolWaitDecision: finalToolWaitDecision,
-      ...(forceDispatchAfterActiveDefer ? { skipPromptGateStatusCheck: true } : {}),
+      ...(forceDispatchAfterActiveDefer || forceDispatchAfterSustainedDefer ? { skipPromptGateStatusCheck: true } : {}),
     })
     if (forceDispatchAfterActiveDefer) {
       log("[background-agent] Sent parent wake after active-session defer ceiling:", {
+        sessionID,
+        queuedAgeMs: this.getQueuedAgeMs(latestWake),
+      })
+    }
+    if (forceDispatchAfterSustainedDefer) {
+      log("[background-agent] Sent parent wake after sustained-defer ceiling (idle but streaming):", {
         sessionID,
         queuedAgeMs: this.getQueuedAgeMs(latestWake),
       })
