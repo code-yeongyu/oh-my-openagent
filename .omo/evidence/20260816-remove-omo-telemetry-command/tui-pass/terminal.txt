@@ -1,0 +1,32 @@
+redraws, rules, service-tier, src, terminal, todo, tool-pair-guard, tool-search, ttsr, video-in, webfetch, websearch    
+
+
+ Warning: Non-recommended model 'unknown': odd behavior is the default state; a working session is the anomaly.         
+
+ This project is not trusted. Project .senpi resources and packages are ignored. Use /trust to save a trust decision,   
+ then restart pi.                                                                                                       
+ Runtime error (send_message): Context remains above the compaction threshold because compaction did not complete       
+
+ Warning: No models available. Use /login to log into a provider via OAuth or API key. See:                             
+                                                                                                                        
+ /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/node_modules/.bun/@code-yeongyu+senpi@20 
+ 26.8.14+4fc72482645226fb/node_modules/@code-yeongyu/senpi/docs/providers.md                                            
+                                                                                                                        
+ /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/node_modules/.bun/@code-yeongyu+senpi@20 
+ 26.8.14+4fc72482645226fb/node_modules/@code-yeongyu/senpi/docs/models.md                                               
+
+ Error: No API key found for the selected model.                                                                        
+                                                                                                                        
+ Use /login to log into a provider via OAuth or API key. See:                                                           
+                                                                                                                        
+ /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/node_modules/.bun/@code-yeongyu+senpi@20 
+ 26.8.14+4fc72482645226fb/node_modules/@code-yeongyu/senpi/docs/providers.md                                            
+                                                                                                                        
+ /Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/node_modules/.bun/@code-yeongyu+senpi@20 
+ 26.8.14+4fc72482645226fb/node_modules/@code-yeongyu/senpi/docs/models.md                                               
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                       
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+…ge/local-workspaces/omo-wt/remove-omo-telemetry-command • fix/remove-omo-telemetry-command • ?/0 (0.0%) (auto)  unknown
+(😺 OmO Native)

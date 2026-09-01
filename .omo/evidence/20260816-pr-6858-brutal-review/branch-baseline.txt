@@ -1,0 +1,30 @@
+PR: https://github.com/code-yeongyu/oh-my-openagent/pull/6858
+Captured: 2026-08-16T03:22:26Z
+
+Exact RED command:
+gh api repos/code-yeongyu/oh-my-openagent/pulls/6858/reviews --paginate --jq '[.[] | select(.user.login == "code-yeongyu" and .state == "CHANGES_REQUESTED")]'
+
+RED observable:
+[]
+
+PR state:
+{"baseRefName":"dev","headRefName":"fix/senpi-task-windows-console-flash","headRefOid":"5e530b4e2885a9a38d0fe108f27fa5a055b37142","headRepositoryOwner":{"id":"MDQ6VXNlcjE5NDIxNjky","name":"sanguneo","login":"sanguneo"},"mergeStateStatus":"DIRTY","mergeable":"CONFLICTING","reviewDecision":"","state":"OPEN","url":"https://github.com/code-yeongyu/oh-my-openagent/pull/6858"}
+
+Review worktree:
+/Volumes/mengmotaStorage/local-workspaces/omo-wt/review-pr-6858-brutal
+
+Worktree status:
+## HEAD (no branch)
+
+PR head:
+5e530b4e2885a9a38d0fe108f27fa5a055b37142
+
+Current origin/dev:
+038ed0cbbefe2b40677b63867aeea0d16bc303e0
+
+Diff stat:
+ .omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console/qa.md |  73 +++++++++++++++++++++++++
+ packages/omo-senpi/plugin/extensions/omo-task.js                          | 228 +++++++++++++++++++++++++++++++++++++++---------------------------------------
+ packages/senpi-task/src/runners/rpc-process.test.ts                       |  22 +++++++-
+ packages/senpi-task/src/runners/rpc-process.ts                            |  15 ++++--
+ 4 files changed, 219 insertions(+), 119 deletions(-)

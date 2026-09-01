@@ -1,3 +1,4 @@
+import { moveMigrationBackup } from "./backup-move"
 import { prepareTargetReplacement, prepareTargetWrite, targetDocument, writePreparedTarget } from "./commit"
 import { readMigrationJournal, removeMigrationJournal, writeMigrationJournal } from "./journal"
 import { hasMigrationMarker } from "./predicate"
@@ -48,7 +49,7 @@ export function resumeMigrationJournal(input: {
       if (input.fileSystem.existsSync(move.to)) {
         throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`)
       }
-      input.fileSystem.renameSync(move.from, move.to)
+      moveMigrationBackup(input.fileSystem, move.from, move.to)
     } else if (!input.fileSystem.existsSync(move.to)) {
       throw new MigrationTransactionError(`Migration source and backup are both missing: ${move.from}`)
     }

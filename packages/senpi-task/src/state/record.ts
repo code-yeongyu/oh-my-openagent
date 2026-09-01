@@ -20,6 +20,12 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     task_summary,
     tool_allow,
     tool_deny,
+    notify_on_terminal,
+    owner,
+    pending_steering,
+    task_seq,
+    config_generation,
+    background_mode,
   } = input
   return {
     task_id: nowMs === undefined ? createTaskId() : createTaskId(nowMs),
@@ -30,6 +36,7 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     depth,
     execution_mode,
     model,
+    notify_on_terminal,
     created_at: timestamp,
     updated_at: timestamp,
     notification: {
@@ -47,5 +54,10 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     ...(resolved_model === undefined ? {} : { resolved_model }),
     ...(tool_allow === undefined ? {} : { tool_allow }),
     ...(tool_deny === undefined ? {} : { tool_deny }),
+    ...(owner === undefined ? {} : { owner }),
+    ...(pending_steering === undefined || pending_steering.length === 0 ? {} : { pending_steering }),
+    ...(task_seq === undefined ? {} : { task_seq }),
+    ...(config_generation === undefined ? {} : { config_generation }),
+    ...(background_mode === undefined ? {} : { background_mode }),
   }
 }

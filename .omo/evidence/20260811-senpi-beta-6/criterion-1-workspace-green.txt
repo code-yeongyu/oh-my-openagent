@@ -1,0 +1,55 @@
+Scenario: every workspace Senpi consumer and lock entry uses 2026.8.11-4
+Command:
+cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/chore-senpi-2026-8-11-4 && bun -e '<all four manifest slots plus stale/current lock assertion>'
+
+Binary observable:
+PASS only when every declaration is 2026.8.11-4, staleLockEntries is zero, and latestLockEntries is nonzero.
+
+Observed:
+{
+  "want": "2026.8.11-4",
+  "declarations": [
+    {
+      "path": "package.json",
+      "section": "devDependencies",
+      "declared": "2026.8.11-4",
+      "ok": true
+    },
+    {
+      "path": "packages/omo-senpi/package.json",
+      "section": "peerDependencies",
+      "declared": "2026.8.11-4",
+      "ok": true
+    },
+    {
+      "path": "packages/omo-senpi/package.json",
+      "section": "devDependencies",
+      "declared": "2026.8.11-4",
+      "ok": true
+    },
+    {
+      "path": "packages/senpi-task/package.json",
+      "section": "peerDependencies",
+      "declared": "2026.8.11-4",
+      "ok": true
+    },
+    {
+      "path": "packages/senpi-task/package.json",
+      "section": "devDependencies",
+      "declared": "2026.8.11-4",
+      "ok": true
+    },
+    {
+      "path": "packages/omo-native/package.json",
+      "section": "dependencies",
+      "declared": "2026.8.11-4",
+      "ok": true
+    }
+  ],
+  "staleLockEntries": 0,
+  "latestLockEntries": 12
+}
+
+Command exited with code 0.
+GREEN PASS.
+

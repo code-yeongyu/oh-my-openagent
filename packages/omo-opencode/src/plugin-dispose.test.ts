@@ -26,6 +26,24 @@ describe("createPluginDispose", () => {
     expect(shutdownSpy).toHaveBeenCalledTimes(1)
   })
 
+  test("#given plugin with a TUI mirror #when dispose() is called #then the mirror is stopped", async () => {
+    // given
+    const tuiStateMirror = { stop: (): void => {} }
+    const stopSpy = spyOn(tuiStateMirror, "stop")
+    const dispose = createPluginDispose({
+      backgroundManager: { shutdown: async (): Promise<void> => {} },
+      skillMcpManager: { disconnectAll: async (): Promise<void> => {} },
+      tuiStateMirror,
+      disposeHooks: (): void => {},
+    })
+
+    // when
+    await dispose()
+
+    // then
+    expect(stopSpy).toHaveBeenCalledTimes(1)
+  })
+
   test("#given plugin with active MCP connections #when dispose() is called #then skillMcpManager.disconnectAll() is called", async () => {
     // given
     const backgroundManager = {
@@ -59,6 +77,9 @@ describe("createPluginDispose", () => {
     const runtimeFallback = {
       dispose: (): void => {},
     }
+    const atlasHook = {
+      dispose: (): void => {},
+    }
     const todoContinuationEnforcer = {
       dispose: (): void => {},
     }
@@ -68,6 +89,7 @@ describe("createPluginDispose", () => {
     const claudeCodeHooksDisposeSpy = spyOn(claudeCodeHooks, "dispose")
     const commentCheckerDisposeSpy = spyOn(commentChecker, "dispose")
     const runtimeFallbackDisposeSpy = spyOn(runtimeFallback, "dispose")
+    const atlasHookDisposeSpy = spyOn(atlasHook, "dispose")
     const todoContinuationEnforcerDisposeSpy = spyOn(todoContinuationEnforcer, "dispose")
     const autoSlashCommandDisposeSpy = spyOn(autoSlashCommand, "dispose")
     const dispose = createPluginDispose({
@@ -82,6 +104,7 @@ describe("createPluginDispose", () => {
           claudeCodeHooks,
           commentChecker,
           runtimeFallback,
+          atlasHook,
           todoContinuationEnforcer,
           autoSlashCommand,
         })
@@ -95,6 +118,7 @@ describe("createPluginDispose", () => {
     expect(claudeCodeHooksDisposeSpy).toHaveBeenCalledTimes(1)
     expect(commentCheckerDisposeSpy).toHaveBeenCalledTimes(1)
     expect(runtimeFallbackDisposeSpy).toHaveBeenCalledTimes(1)
+    expect(atlasHookDisposeSpy).toHaveBeenCalledTimes(1)
     expect(todoContinuationEnforcerDisposeSpy).toHaveBeenCalledTimes(1)
     expect(autoSlashCommandDisposeSpy).toHaveBeenCalledTimes(1)
   })

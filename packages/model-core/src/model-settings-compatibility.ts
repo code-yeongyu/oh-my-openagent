@@ -1,5 +1,6 @@
 import { detectHeuristicModelFamily } from "./model-capability-heuristics"
-import { clampReasoningLevel, REASONING_LEVELS } from "./reasoning-level"
+import { isClaudeOpus47OrLaterModel } from "./model-family-detectors"
+import { clampReasoningLevel } from "./reasoning-level"
 
 type CompatibilityField = "variant" | "reasoningEffort" | "temperature" | "topP" | "maxTokens" | "thinking"
 
@@ -72,7 +73,6 @@ type FieldResolution = { value?: string; reason?: ModelSettingsCompatibilityChan
 function resolveField(
   normalized: string,
   familyCaps: string[] | undefined,
-  ladder: string[],
   familyKnown: boolean,
   metadataOverride?: string[],
   familyAliases?: Record<string, string>,
@@ -117,7 +117,7 @@ export function resolveCompatibleModelSettings(
   let variant = input.desired.variant
   if (variant !== undefined) {
     const normalized = variant.toLowerCase()
-    const resolved = resolveField(normalized, family?.variants, REASONING_LEVELS as unknown as string[], familyKnown, metadataVariants)
+    const resolved = resolveField(normalized, family?.variants, familyKnown, metadataVariants)
     if (resolved.value !== normalized && resolved.reason) {
       changes.push({ field: "variant", from: variant, to: resolved.value, reason: resolved.reason })
     }
@@ -130,7 +130,6 @@ export function resolveCompatibleModelSettings(
     const resolved = resolveField(
       normalized,
       family?.reasoningEfforts,
-      REASONING_LEVELS as unknown as string[],
       familyKnown,
       metadataReasoningEfforts,
       family?.reasoningEffortAliases,
@@ -142,12 +141,22 @@ export function resolveCompatibleModelSettings(
   }
 
   let temperature = input.desired.temperature
-  if (temperature !== undefined && input.capabilities?.supportsTemperature === false) {
+  const metadataSupportsTemperature = input.capabilities?.supportsTemperature
+  const familyDisallowsTemperature =
+    metadataSupportsTemperature === undefined &&
+    (isClaudeOpus47OrLaterModel(input.modelID) || family?.supportsTemperature === false)
+  if (
+    temperature !== undefined &&
+    (metadataSupportsTemperature === false || familyDisallowsTemperature)
+  ) {
     changes.push({
       field: "temperature",
       from: String(temperature),
       to: undefined,
-      reason: "unsupported-by-model-metadata",
+      reason:
+        metadataSupportsTemperature === false
+          ? "unsupported-by-model-metadata"
+          : "unsupported-by-model-family",
     })
     temperature = undefined
   }

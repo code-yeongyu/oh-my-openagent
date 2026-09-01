@@ -29,6 +29,7 @@ function runningRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
     model: "gpt-5.2",
     created_at: "2026-07-06T01:00:00.000Z",
     updated_at: "2026-07-06T01:00:01.000Z",
+    notify_on_terminal: false,
     notification: { run_epoch: 0, notified_epoch: -1 },
     ...overrides,
   }

@@ -1,0 +1,13 @@
+Exact command:
+find .omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console -maxdepth 1 -type f -print
+
+RED observable:
+.omo/evidence/omo-senpi-adapter/20260814-senpi-task-windows-console/qa.md
+
+Only the prose summary exists. There is no checked-in probe and no captured raw output artifact.
+
+PR body inspection:
+gh pr view 6858 --repo code-yeongyu/oh-my-openagent --json body --jq '.body'
+
+RED observable:
+The obsolete path `.omo/evidence/20260814-senpi-task-windows-console/qa.md` appears 4 times.

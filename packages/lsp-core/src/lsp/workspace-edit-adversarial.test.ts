@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -84,6 +84,25 @@ describe("workspace edit adversarial inputs", () => {
 		expect(result.success).toBe(false);
 		expect(result.errors.join("\n")).toContain("outside workspace");
 		expect(readFileSync(dirty, "utf-8")).toBe("user-owned dirty bytes\n");
+		expect(readFileSync(outsideFile, "utf-8")).toBe("outside bytes\n");
+	});
+
+	it("#given an in-workspace symlink to an outside file #when applying an edit #then rejects without modifying target", () => {
+		const workspace = makeTempDirectory("lsp-workspace-");
+		const outside = makeTempDirectory("lsp-outside-");
+		const outsideFile = join(outside, "outside.ts");
+		const canonicalWorkspace = realpathSync(workspace);
+		const linkedDirectory = join(canonicalWorkspace, "linked");
+		writeFileSync(outsideFile, "outside bytes\n", "utf-8");
+		symlinkSync(outside, linkedDirectory);
+
+		const result = applyWorkspaceEdit(
+			{ changes: { [pathToFileURL(join(linkedDirectory, "outside.ts")).href]: [insertion()] } },
+			{ workspaceRoot: canonicalWorkspace },
+		);
+
+		expect(result.success).toBe(false);
+		expect(result.errors.join("\n")).toContain("outside workspace");
 		expect(readFileSync(outsideFile, "utf-8")).toBe("outside bytes\n");
 	});
 

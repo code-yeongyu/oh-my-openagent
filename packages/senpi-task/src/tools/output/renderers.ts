@@ -65,9 +65,10 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
           agentType: details.snapshot.agent_type,
           resolvedModel: details.snapshot.resolved_model,
         }) ?? `model:${normalizeRendererText(details.snapshot.model)}`
+      const statusLabel = details.snapshot.suspended !== undefined ? "suspended" : normalizeRendererText(details.snapshot.status)
       return {
         color: statusThemeColor(details.snapshot.status),
-        text: `${joinRendererTokens([`task_output ${identity}`, idSuffix, normalizeRendererText(details.snapshot.status)])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
+        text: `${joinRendererTokens([`task_output ${identity}`, idSuffix, statusLabel])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
       }
     }
     case "transcript":

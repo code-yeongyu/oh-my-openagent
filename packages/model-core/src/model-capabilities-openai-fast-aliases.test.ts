@@ -105,4 +105,29 @@ describe("OpenAI GPT-5.6 fast capability aliases", () => {
       },
     })
   })
+
+  test.each([
+    { providerID: "openai", modelID: "gpt-5.6-sol-fast:high" },
+    { providerID: "vercel", modelID: "openai/gpt-5.6-sol-fast:high" },
+  ])("inherits canonical capabilities for suffixed fast alias $providerID/$modelID", ({ providerID, modelID }) => {
+    const alias = getModelCapabilities({
+      providerID,
+      modelID,
+      bundledSnapshot,
+    })
+
+    expect(alias).toMatchObject({
+      requestedModelID: modelID,
+      canonicalModelID: "gpt-5.6-sol",
+      supportsTemperature: false,
+      diagnostics: {
+        resolutionMode: "alias-backed",
+        canonicalization: {
+          source: "pattern-alias",
+          ruleID: "openai-gpt-5.6-fast-service-tier-alias",
+        },
+        snapshot: { source: "bundled-snapshot" },
+      },
+    })
+  })
 })

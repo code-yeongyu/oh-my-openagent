@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test"
 
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
 import { InProcessRunner, type ChildSession, type ChildSpec } from "./in-process"
@@ -23,6 +27,7 @@ test("#given a parent model runtime #when the child session is constructed #then
   const spec: ChildSpec = {
     taskId: "task-1",
     cwd: process.cwd(),
+    sessionDir: mkdtempSync(join(tmpdir(), "senpi-task-model-runtime-")),
     modelRuntime,
     depth: 0,
     parentSessionId: "parent-1",

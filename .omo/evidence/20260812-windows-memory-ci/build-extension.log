@@ -1,0 +1,53 @@
+Bundled 727 modules in 32ms
+
+  omo.js  0.75 MB  (entry point)
+
+Bundled 599 modules in 21ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 10ms
+
+  omo-member.js  117.79 KB  (entry point)
+
+Bundled 87 modules in 5ms
+
+  omo-memory-mcp.js  68.54 KB  (entry point)
+
+Bundled 83 modules in 5ms
+
+  memory-run-supervisor.mjs  17.16 KB  (entry point)
+
+Bundled 96 modules in 7ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Built omo-senpi extensions: /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/extensions/omo.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/extensions/omo-task.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/extensions/omo-member.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+Senpi LSP runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Senpi ast-grep-mcp runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js sha256=cbff6be91f343c59c4f7d05f9acf6b0f8bde6d05e19d5d6f5a46b45a6a26bd50
+Senpi agent-toolkit runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/runtime/agent-toolkit sha256=cc9abae7399e352cf848f6cad4694da07bc7661220f78cd0515061fee60e6764
+Bundled 727 modules in 28ms
+
+  omo.js  0.75 MB  (entry point)
+
+Bundled 599 modules in 20ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 10ms
+
+  omo-member.js  117.79 KB  (entry point)
+
+Bundled 87 modules in 5ms
+
+  omo-memory-mcp.js  68.54 KB  (entry point)
+
+Bundled 83 modules in 5ms
+
+  memory-run-supervisor.mjs  17.16 KB  (entry point)
+
+Bundled 96 modules in 6ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+omo-senpi extension build is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/st_019ff542-windows-ci/packages/omo-senpi/plugin/extensions/omo.js

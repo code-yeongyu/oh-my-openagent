@@ -20,10 +20,10 @@ type TimeoutProbeResult = {
   server: Server | undefined
 }
 
-type AvailabilityProbeResult = {
+type AvailabilityProbeResult<Result> = {
   errorMessage: string | undefined
   probedPorts: number[]
-  selectedPort: number | undefined
+  selectedResult: Result | undefined
 }
 
 function getRequiredPropertyDescriptor(target: object, propertyName: string): PropertyDescriptor {
@@ -282,15 +282,16 @@ async function runTimedOutAvailabilityProbe(port: number): Promise<TimeoutProbeR
   }
 }
 
-async function runAvailabilityProbe(
+async function runAvailabilityProbe<Result>(
   startPort: number,
-  unavailableProbeCount: number
-): Promise<AvailabilityProbeResult> {
+  unavailableProbeCount: number,
+  operation: () => Promise<Result>,
+): Promise<AvailabilityProbeResult<Result>> {
   const listenDescriptor = getRequiredPropertyDescriptor(Server.prototype, "listen")
   const closeDescriptor = getRequiredPropertyDescriptor(Server.prototype, "close")
   const probedPorts: number[] = []
   let errorMessage: string | undefined
-  let selectedPort: number | undefined
+  let selectedResult: Result | undefined
 
   Object.defineProperty(Server.prototype, "listen", {
     configurable: true,
@@ -317,14 +318,14 @@ async function runAvailabilityProbe(
 
   try {
     try {
-      selectedPort = await findAvailablePort(startPort)
+      selectedResult = await operation()
     } catch (error) {
       if (!(error instanceof Error)) {
         throw error
       }
       errorMessage = error.message
     }
-    return { errorMessage, probedPorts, selectedPort }
+    return { errorMessage, probedPorts, selectedResult }
   } finally {
     Object.defineProperty(Server.prototype, "listen", listenDescriptor)
     Object.defineProperty(Server.prototype, "close", closeDescriptor)
@@ -433,7 +434,11 @@ describe("port-utils", () => {
     test("#when the first three ports are blocked #then returns the next free port", async () => {
       const startPort = 40_000
 
-      const { errorMessage, probedPorts, selectedPort } = await runAvailabilityProbe(startPort, 3)
+      const { errorMessage, probedPorts, selectedResult: selectedPort } = await runAvailabilityProbe(
+        startPort,
+        3,
+        () => findAvailablePort(startPort),
+      )
 
       expect(selectedPort).toBe(startPort + 3)
       expect(errorMessage).toBeUndefined()
@@ -443,7 +448,11 @@ describe("port-utils", () => {
     test("#when every attempted port is blocked #then throws", async () => {
       const startPort = 40_000
 
-      const { errorMessage, probedPorts, selectedPort } = await runAvailabilityProbe(startPort, MAX_PORT_ATTEMPTS)
+      const { errorMessage, probedPorts, selectedResult: selectedPort } = await runAvailabilityProbe(
+        startPort,
+        MAX_PORT_ATTEMPTS,
+        () => findAvailablePort(startPort),
+      )
 
       expect(selectedPort).toBeUndefined()
       expect(errorMessage).toBe(`No available port found in range ${startPort}-${startPort + MAX_PORT_ATTEMPTS - 1}`)
@@ -461,11 +470,17 @@ describe("port-utils", () => {
     })
 
     test("#when the preferred port is blocked #then returns the next port with auto-selection", async () => {
-      const preferredPort = await findContiguousAvailableStart(2)
-      await startTrackedServer(preferredPort)
+      const preferredPort = 40_000
 
-      const result = await getAvailableServerPort(preferredPort)
-      expect(result).toEqual({ port: preferredPort + 1, wasAutoSelected: true })
+      const { errorMessage, probedPorts, selectedResult } = await runAvailabilityProbe(
+        preferredPort,
+        1,
+        () => getAvailableServerPort(preferredPort),
+      )
+
+      expect(selectedResult).toEqual({ port: preferredPort + 1, wasAutoSelected: true })
+      expect(errorMessage).toBeUndefined()
+      expect(probedPorts).toEqual([preferredPort, preferredPort + 1])
     })
   })
 

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
 
+import "./residency-unlimited.test"
 import { createTaskLifecycle } from "../lifecycle"
 import type { ResidentHandle, ResidencyRegistry } from "../lifecycle"
 import type { ResolvedModelRecord } from "../state"
@@ -246,8 +247,9 @@ describe("TaskManager.start", () => {
 
     const rawRecord = readFileSync(join(store.stateDir, "tasks", `${result.task_id}.json`), "utf8")
     expect(rawRecord).toContain('"resolved_model"')
-    expect(rawRecord).not.toContain("private prompt payload")
-    expect(rawRecord).not.toContain('"prompt"')
+    // The spawn_spec v1 persisted at spawn deliberately carries the effective prompt for respawn
+    // rebuilds; message transcripts still never land on the record.
+    expect(rawRecord).toContain("private prompt payload")
     expect(rawRecord).not.toContain('"messages"')
   })
 

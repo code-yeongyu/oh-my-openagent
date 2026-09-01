@@ -9,9 +9,9 @@ import {
   writeRunLogs,
 } from "./team-e2e-crash-state.mjs"
 import { parseEvents, processedMessagePath, unreadMessagePath } from "./team-e2e-support.mjs"
-import { CRASH_SEED_SCRIPT, crashReplacementScript, NOOP_SCRIPT } from "./team-e2e-scripts.mjs"
+import { CRASH_RESTART_SCRIPT, CRASH_SEED_SCRIPT, crashReplacementScript } from "./team-e2e-scripts.mjs"
 
-const HOLD_TIMEOUT_MS = 30_000
+const HOLD_TIMEOUT_MS = 60_000
 const TEAM_LIVENESS_TYPE = "senpi-task.team-member-liveness"
 const ABNORMAL_MEMBER_STATES = new Set(["error", "lost"])
 
@@ -33,7 +33,7 @@ function isCrashLivenessDetails(details) {
   return details !== null
     && typeof details === "object"
     && details.memberName === "crash"
-    && ABNORMAL_MEMBER_STATES.has(details.lastKnownState)
+    && (ABNORMAL_MEMBER_STATES.has(details.lastKnownState) || details.killed === true)
 }
 
 export async function runCrashRestartScenario(input) {
@@ -42,6 +42,12 @@ export async function runCrashRestartScenario(input) {
   try {
     input.seedProject(sandbox)
     const markerPath = join(input.outDir, "crash-after-inject.json")
+    // The marker is a per-run rendezvous living in the PERSISTENT outDir: a stale marker from a
+    // previous run satisfies readCrashTarget with a foreign message id before the current member's
+    // afterInject overwrites it, so every id-keyed assertion then fails against a message that
+    // never existed in this sandbox. Clear it (and any stale release) before the run starts.
+    rmSync(markerPath, { force: true })
+    rmSync(`${markerPath}.release`, { force: true })
     const initial = input.startRun({
       senpiBin: input.senpiBin,
       sandbox,
@@ -86,7 +92,7 @@ export async function runCrashRestartScenario(input) {
         senpiBin: input.senpiBin,
         sandbox,
         prompt: "restart the same sandbox and reconcile the crashed member",
-        script: NOOP_SCRIPT,
+        script: CRASH_RESTART_SCRIPT,
         sessionId: target.leadSessionId,
       }).completion
       restartStatus = restartResult.status

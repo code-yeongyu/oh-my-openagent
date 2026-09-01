@@ -1,0 +1,29 @@
+{
+  "title": "OmO telemetry command removal",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "isolated omo-senpi telemetry command removal"
+  },
+  "interaction": [
+    "/omo-telemetry{Enter}"
+  ],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 120,
+    "rows": 32
+  },
+  "cleanup": "pty pid 87045 killed",
+  "files": {
+    "png": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/.omo/evidence/20260816-remove-omo-telemetry-command/tui/terminal.png",
+    "text": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/.omo/evidence/20260816-remove-omo-telemetry-command/tui/terminal.txt",
+    "ansi": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/.omo/evidence/20260816-remove-omo-telemetry-command/tui/terminal-ansi.txt",
+    "metadata": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/remove-omo-telemetry-command/.omo/evidence/20260816-remove-omo-telemetry-command/tui/metadata.json"
+  }
+}

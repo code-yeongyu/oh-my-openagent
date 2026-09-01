@@ -1,0 +1,41 @@
+Command:
+bun test packages/memory-core/src/git/repo.test.ts packages/omo-senpi/src/components/memory/status.test.ts packages/omo-senpi/src/components/memory/wiring.test.ts
+
+RED relative-time failures before production edits:
+
+FAIL GitMemoryRepo > fixed committer date should return epoch seconds.
+Observed:
+  TypeError: repo.headCommitTimestamp is not a function
+
+FAIL refreshMemoryStatus > committed HEAD ninety seconds old should render system-clock-relative age.
+Expected:
+  mem:fake-agent 1m ago
+Received:
+  mem:fake-agent @abcdef1
+
+FAIL refreshMemoryStatus > repository with no HEAD should emit no footer.
+Expected:
+  []
+Received:
+  mem:agent-empty @uncommitted
+
+FAIL refreshMemoryStatus > HEAD without readable commit timestamp should emit no footer.
+Expected:
+  []
+Received:
+  mem:fake-agent @abcdef1
+
+FAIL refreshMemoryStatus > future commit timestamp should emit no footer.
+Expected:
+  []
+Received:
+  mem:fake-agent @abcdef1
+
+Binary conclusion:
+The unchanged implementation lacks commit-time retrieval, ignores the injected system clock, renders a short SHA, and renders `@uncommitted` when no commit exists.
+
+Suite summary:
+12 pass
+7 fail
+39 expect() calls
+Ran 19 tests across 3 files. [4.60s]

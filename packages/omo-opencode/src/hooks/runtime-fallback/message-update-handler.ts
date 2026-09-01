@@ -47,6 +47,15 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         return
       }
 
+      // Layer-2 guard: when omo's own fallback machinery aborted the in-flight
+      // request, the assistant message update carries no visible content and no
+      // error — this is an internal abort artifact, not a real response. Skip
+      // the visible-response check to avoid "Assistant update observed without
+      // visible final response" log noise for every fallback hop.
+      if (sessionRetryInFlight.has(sessionID)) {
+        return
+      }
+
       const hasVisible = await checkVisibleResponse(ctx, sessionID, info)
       if (!hasVisible) {
         log(`[${HOOK_NAME}] Assistant update observed without visible final response; keeping fallback timeout`, {
@@ -118,14 +127,25 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         errorType: classifyErrorType(error),
       })
 
+      const terminalQuota402Abort =
+        classifyErrorType(error) === "abort" && extractStatusCode(error, config.retry_on_errors) === 402
+
       if (!isRetryableError(error, config.retry_on_errors)) {
-        log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
+        if (!terminalQuota402Abort) {
+          log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
+            sessionID,
+            statusCode: extractStatusCode(error, config.retry_on_errors),
+            errorName: extractErrorName(error),
+            errorType: classifyErrorType(error),
+          })
+          return
+        }
+        log(`[${HOOK_NAME}] message.updated terminal-quota 402 abort with fallback chain; dispatching session-stable fallback`, {
           sessionID,
           statusCode: extractStatusCode(error, config.retry_on_errors),
           errorName: extractErrorName(error),
           errorType: classifyErrorType(error),
         })
-        return
       }
 
       const agent = info?.agent as string | undefined

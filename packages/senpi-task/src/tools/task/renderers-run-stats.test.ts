@@ -97,6 +97,25 @@ describe("taskResultLines run stats", () => {
     expect(line.indexOf("ch:87%")).toBeLessThan(line.indexOf("tps:118"))
   })
 
+  test("#given run stats with zero cost #when rendered #then the empty price is omitted", () => {
+    // when
+    const [line = ""] = taskResultLines({
+      task_id: "st_00000009",
+      status: "completed",
+      mode: "spawn" as const,
+      run_stats: {
+        runtime_ms: 1_000,
+        turns: 1,
+        tool_calls: 0,
+        cost_usd: 0,
+      },
+    })
+
+    // then
+    expect(line).not.toContain("cost:")
+    expect(line).not.toContain("$0")
+  })
+
   test("#given run stats without cost or cache facts #when rendered #then neither token appears", () => {
     // when
     const [line = ""] = taskResultLines({

@@ -1,0 +1,7 @@
+# F3 teardown receipt
+command: git checkout -- packages/omo-senpi/plugin/extensions/
+bundle_status=clean
+isolated_root_present=no
+spawned_processes=0
+f3_tmux_sessions=0
+receipt=PASS

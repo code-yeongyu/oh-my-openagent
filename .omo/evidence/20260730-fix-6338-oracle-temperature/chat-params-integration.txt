@@ -1,0 +1,51 @@
+### PR #6485 -- chat.params integration proof (real handler, real model-core)
+### surface: createChatParamsHandler() from packages/omo-opencode/src/plugin/chat-params.ts
+### chat.params is the boundary where OpenCode hands the plugin the outgoing request params.
+### scenario: reporter's setup -- agent pinned to a Claude Opus 4.8 model on a custom provider
+###           absent from every capability catalog, with temperature 0.1 and topP 0.9 set.
+### control:  openai/gpt-4o must KEEP temperature, proving the driver is not vacuous.
+
+========== BEFORE: packages/model-core reverted to upstream/dev ==========
+azure-anthropic/claude-opus-4-8
+    reported case: custom provider hosting Opus 4.8
+    temperature_sent=false topP_sent=true
+    resulting_keys=maxOutputTokens,options,topP
+azure-anthropic/claude-opus-4-8-thinking
+    same family, reasoning suffix
+    temperature_sent=true (0.1) topP_sent=true
+    resulting_keys=maxOutputTokens,options,temperature,topP
+    ^^ MISMATCH: expected temperature_sent=false
+anthropic/claude-opus-4-8
+    first-party Anthropic Opus 4.8
+    temperature_sent=false topP_sent=true
+    resulting_keys=maxOutputTokens,options,topP
+openai/gpt-4o
+    control: model that supports temperature
+    temperature_sent=true (0.1) topP_sent=true
+    resulting_keys=maxOutputTokens,options,temperature,topP
+
+RESULT: 1 scenario(s) mismatched
+
+driver EXIT=1  (non-zero = temperature still sent for Opus 4.8 = the #6338 bug)
+
+========== AFTER: fix applied ==========
+azure-anthropic/claude-opus-4-8
+    reported case: custom provider hosting Opus 4.8
+    temperature_sent=false topP_sent=true
+    resulting_keys=maxOutputTokens,options,topP
+azure-anthropic/claude-opus-4-8-thinking
+    same family, reasoning suffix
+    temperature_sent=false topP_sent=true
+    resulting_keys=maxOutputTokens,options,topP
+anthropic/claude-opus-4-8
+    first-party Anthropic Opus 4.8
+    temperature_sent=false topP_sent=true
+    resulting_keys=maxOutputTokens,options,topP
+openai/gpt-4o
+    control: model that supports temperature
+    temperature_sent=true (0.1) topP_sent=true
+    resulting_keys=maxOutputTokens,options,temperature,topP
+
+RESULT: all scenarios behave as expected
+
+driver EXIT=0  (zero = temperature dropped for Opus 4.8, kept for gpt-4o)

@@ -1,14 +1,41 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, statSync } from "node:fs"
-import { join } from "node:path"
 
 import { bunWhich } from "../runtime/which"
-import { sgBinaryName } from "./sg-manifest"
-import { SG_PATH_ENV_KEY, type SgResolverOptions } from "./types"
+import { planSgCandidates } from "./sg-candidates"
+import { sgBinaryNotFoundMessage, sgInstallHints } from "./sg-install-hints"
+import { SG_BINARY_NOT_FOUND, type SgCandidate, type SgResolution, type SgResolverOptions } from "./types"
 
-function nonEmptyValue(value: string | undefined): string | null {
-  const trimmed = value?.trim()
-  return trimmed === undefined || trimmed.length === 0 ? null : trimmed
+export const SG_VERSION_PROBE_TIMEOUT_MS = 5_000
+
+interface CacheEntry {
+  readonly fingerprint: string
+  readonly resolution: SgResolution
+}
+
+let cacheEntry: CacheEntry | null = null
+
+interface ResolverDeps {
+  readonly fileExists: (filePath: string) => boolean
+  readonly platform: NodeJS.Platform
+  readonly runVersionProbeSync: (binaryPath: string) => string
+  readonly which: (commandName: string) => string | null
+}
+
+export function clearSgResolutionCache(): void {
+  cacheEntry = null
+}
+
+/**
+ * Cache key: only a resolution over the same inputs may be reused, so callers that inject
+ * different environments, platforms, or probes never observe each other's results.
+ */
+function cacheFingerprint(options: SgResolverOptions, plan: { readonly beforePath: readonly SgCandidate[] }): string {
+  return JSON.stringify([
+    options.platform ?? process.platform,
+    options.arch ?? process.arch,
+    plan.beforePath.map((candidate) => candidate.path),
+  ])
 }
 
 function defaultFileExists(filePath: string): boolean {
@@ -16,8 +43,7 @@ function defaultFileExists(filePath: string): boolean {
   try {
     const stats = statSync(filePath)
     return stats.isFile() && stats.size > 0
-  } catch (error) {
-    if (error instanceof Error) return false
+  } catch {
     return false
   }
 }
@@ -27,52 +53,100 @@ function defaultVersionProbe(binaryPath: string): string {
     execFileSync(binaryPath, ["--version"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
-      timeout: 5_000,
+      timeout: SG_VERSION_PROBE_TIMEOUT_MS,
     }),
   )
 }
 
-function isAstGrepVersionOutput(output: string): boolean {
-  return output.toLowerCase().includes("ast-grep")
-}
-
-function hasAstGrepVersion(binaryPath: string, runVersionProbeSync: (binaryPath: string) => string): boolean {
+/**
+ * The single acceptance rule for every candidate in every tier: the probe must actually run and
+ * report `ast-grep`. A non-zero exit, a thrown error, a 5s timeout, ENOENT, or EACCES all reject
+ * the candidate, and resolution continues with the next one. Neither a candidate's name nor the
+ * location it came from grants any exemption - a binary that cannot answer `--version` cannot be
+ * used to run ast-grep either.
+ */
+function probePasses(binaryPath: string, deps: ResolverDeps): boolean {
   try {
-    return isAstGrepVersionOutput(runVersionProbeSync(binaryPath))
-  } catch (error) {
-    if (error instanceof Error) return false
+    return deps.runVersionProbeSync(binaryPath).toLowerCase().includes("ast-grep")
+  } catch {
     return false
   }
 }
 
-function pathCommandCandidates(): readonly string[] {
-  return ["ast-grep", "sg"]
+function acceptsCandidate(binaryPath: string, deps: ResolverDeps): boolean {
+  return deps.fileExists(binaryPath) && probePasses(binaryPath, deps)
+}
+
+function firstAccepted(candidates: readonly SgCandidate[], deps: ResolverDeps): SgResolution | null {
+  for (const candidate of candidates) {
+    if (acceptsCandidate(candidate.path, deps)) return { found: true, path: candidate.path, tier: candidate.tier }
+  }
+  return null
+}
+
+function pathCandidates(commands: readonly string[], deps: ResolverDeps): readonly SgCandidate[] {
+  const resolved: SgCandidate[] = []
+  for (const commandName of commands) {
+    const found = deps.which(commandName)
+    if (found !== null) resolved.push({ path: found, tier: "path" })
+  }
+  return resolved
+}
+
+function notFound(platform: NodeJS.Platform): SgResolution {
+  return {
+    error: { code: SG_BINARY_NOT_FOUND, hints: sgInstallHints(platform), message: sgBinaryNotFoundMessage(platform) },
+    found: false,
+  }
+}
+
+function cacheIsStillValid(resolution: SgResolution, deps: ResolverDeps, revalidate: boolean): boolean {
+  if (!resolution.found) return false
+  if (!deps.fileExists(resolution.path)) return false
+  return !revalidate || probePasses(resolution.path, deps)
+}
+
+function resolverDeps(options: SgResolverOptions): ResolverDeps {
+  return {
+    fileExists: options.fileExists ?? defaultFileExists,
+    platform: options.platform ?? process.platform,
+    runVersionProbeSync: options.runVersionProbeSync ?? defaultVersionProbe,
+    which: options.which ?? bunWhich,
+  }
+}
+
+/**
+ * Resolve the ast-grep (`sg`) binary across five tiers, in order:
+ * env override → OMO runtime dirs → skill bin cache → PATH → Homebrew/Linuxbrew prefixes.
+ * Every candidate must be a non-empty regular file AND pass a 5s `--version` probe whose output
+ * contains `ast-grep`; a candidate that fails for any reason is rejected and resolution continues
+ * to the next candidate and tier.
+ */
+export function resolveSgBinarySync(options: SgResolverOptions = {}): SgResolution {
+  const deps = resolverDeps(options)
+  const useCache = options.cache ?? true
+  try {
+    const plan = planSgCandidates(options)
+    const fingerprint = cacheFingerprint(options, plan)
+    if (useCache && cacheEntry !== null && cacheEntry.fingerprint === fingerprint) {
+      if (cacheIsStillValid(cacheEntry.resolution, deps, options.revalidate ?? false)) return cacheEntry.resolution
+      cacheEntry = null
+    }
+
+    const resolution =
+      firstAccepted(plan.beforePath, deps) ??
+      firstAccepted(pathCandidates(plan.pathCommands, deps), deps) ??
+      firstAccepted(plan.afterPath, deps) ??
+      notFound(deps.platform)
+
+    if (useCache && resolution.found) cacheEntry = { fingerprint, resolution }
+    return resolution
+  } catch {
+    return notFound(deps.platform)
+  }
 }
 
 export function findSgBinarySync(options: SgResolverOptions = {}): string | null {
-  const env = options.env ?? process.env
-  const platform = options.platform ?? process.platform
-  const fileExists = options.fileExists ?? defaultFileExists
-  const runVersionProbeSync = options.runVersionProbeSync ?? defaultVersionProbe
-  const which = options.which ?? bunWhich
-
-  try {
-    const envOverride = nonEmptyValue(env[SG_PATH_ENV_KEY])
-    if (envOverride !== null && fileExists(envOverride)) return envOverride
-
-    if (options.runtimeDir !== undefined) {
-      const runtimeCandidate = join(options.runtimeDir, sgBinaryName(platform))
-      if (fileExists(runtimeCandidate)) return runtimeCandidate
-    }
-
-    for (const commandName of pathCommandCandidates()) {
-      const pathCandidate = which(commandName)
-      if (pathCandidate === null || !fileExists(pathCandidate)) continue
-      if (commandName !== "sg" || hasAstGrepVersion(pathCandidate, runVersionProbeSync)) return pathCandidate
-    }
-    return null
-  } catch (error) {
-    if (error instanceof Error) return null
-    return null
-  }
+  const resolution = resolveSgBinarySync(options)
+  return resolution.found ? resolution.path : null
 }

@@ -30,6 +30,7 @@ function snapshot(overrides: Partial<TaskSnapshot> = {}): TaskSnapshot {
   return {
     task_id: "st_done",
     status: "completed",
+    residency_state: "resident",
     execution_mode: "in-process",
     model: "raw-model",
     parent_session_id: "session-parent",
@@ -340,5 +341,52 @@ describe("task_output run stats rendering", () => {
     // then
     expect(line).not.toContain("ran ")
     expect(line).not.toContain("tok/s")
+  })
+})
+
+describe("task_output suspended residency rendering", () => {
+  test("#given a persisted_only snapshot #when the status row renders #then it shows suspended", () => {
+    // given
+    const detail: TaskOutputDetails = {
+      kind: "status",
+      snapshot: snapshot({ status: "running", residency_state: "persisted_only", suspended: { explanation: "suspended (resumes with session)" } }),
+    }
+
+    // when
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    // then
+    expect(line).toContain("suspended")
+    expect(line).not.toContain("running")
+  })
+
+  test("#given an rpc_detached snapshot #when the status row renders #then it shows suspended", () => {
+    // given
+    const detail: TaskOutputDetails = {
+      kind: "status",
+      snapshot: snapshot({ status: "running", residency_state: "rpc_detached", suspended: { explanation: "suspended (resumes with session)" } }),
+    }
+
+    // when
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    // then
+    expect(line).toContain("suspended")
+    expect(line).not.toContain("running")
+  })
+
+  test("#given a resident snapshot #when the status row renders #then the status label is unchanged (regression pin)", () => {
+    // given
+    const detail: TaskOutputDetails = {
+      kind: "status",
+      snapshot: snapshot({ status: "running", residency_state: "resident" }),
+    }
+
+    // when
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    // then
+    expect(line).toContain("running")
+    expect(line).not.toContain("suspended")
   })
 })

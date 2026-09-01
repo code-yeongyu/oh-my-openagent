@@ -1,0 +1,21 @@
+Command:
+  cd /Users/yeongyu/local-workspaces/omo-wt/fix/team-create-inline-precedence
+  bun test ./packages/senpi-task/src/tools/team/lifecycle-precedence.test.ts
+
+Observed before production change:
+  Expected: "created"
+  Received: "invalid_arguments"
+
+Failing test:
+  team_create inline precedence >
+  #given both team_name and inline_spec #when team_create runs #then inline_spec is authoritative
+
+Summary:
+  0 pass
+  1 fail
+  1 expect() calls
+
+Why this is RED for the reported regression:
+  The reconstructed payload contains both fields, as the recovered Kimi
+  sessions did. Current runTeamCreate rejects before calling the service,
+  instead of executing the complete inline specification.

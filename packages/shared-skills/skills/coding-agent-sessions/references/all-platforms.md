@@ -10,7 +10,7 @@ Registered platform keys: `codex`, `claude`, `senpi`, `oh-my-pi`, `gajae-code`, 
 |---|---|---|
 | Codex | `$CODEX_HOME`, `~/.codex` | `%CODEX_HOME%`, `%USERPROFILE%\.codex` |
 | Claude | `~/.claude` | `%USERPROFILE%\.claude`, `%APPDATA%\Claude` |
-| Senpi / pi | `~/.senpi/agent`, `~/.pi/agent` | `%USERPROFILE%\.senpi\agent`, `%USERPROFILE%\.pi\agent` |
+| OMO / Senpi / pi | `~/.omo/agent`, `~/.senpi/agent`, `~/.pi/agent` | `%USERPROFILE%\.omo\agent`, `%USERPROFILE%\.senpi\agent`, `%USERPROFILE%\.pi\agent` |
 | oh-my-pi (`omp`) | `~/.omp/agent`, `~/.omp/profiles/*/agent`, `$XDG_DATA_HOME/omp` | `%USERPROFILE%\.omp\agent` |
 | gajae-code (`gjc`) | `~/.gjc/agent`, `~/.gjc/profiles/*/agent`, `$XDG_DATA_HOME/gjc` | `%USERPROFILE%\.gjc\agent` |
 | OpenCode | `$OPENCODE_HOME`, `~/.opencode`, `~/.local/share/opencode` | `%OPENCODE_HOME%`, `%APPDATA%\opencode`, `%USERPROFILE%\.opencode` |

@@ -27,7 +27,7 @@ export function runStatsSuffix(stats: TaskRunStats | undefined): string {
 export function runStatsResultTokens(stats: TaskRunStats | undefined): readonly string[] {
   if (stats === undefined) return []
   const duration = formatRunDuration(stats.runtime_ms).replaceAll(" ", "")
-  const cost = formatCostUsd(stats.cost_usd)
+  const cost = stats.cost_usd === 0 ? undefined : formatCostUsd(stats.cost_usd)
   const cacheHit = formatCacheHitPercent(stats.cache_hit_rate_run)
   return [
     `ran:${duration}`,
