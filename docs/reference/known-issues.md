@@ -115,8 +115,9 @@ BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first p
 
 - **Affects**: OpenCode installs that load `oh-my-openagent@latest` or legacy `oh-my-opencode@latest` through OpenCode's `Npm.add()` package sandbox under `~/.cache/opencode/packages/`.
 - **Symptom**: OMO reports that an update is available, or `doctor` reports a loaded-version mismatch, but restarting OpenCode keeps loading the older package. Clearing the general npm cache does not necessarily change the sandbox path OpenCode is using.
-- **Why it happens**: When the plugin is running from an OpenCode-managed sandbox such as `~/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/`, OMO cannot reliably rewrite that sandbox itself. The auto-update checker therefore avoids claiming "Updated!" from that path and should surface an update-available notice instead.
-- **Workaround**: Close OpenCode and keep exactly one OMO entry in the config that currently owns the plugin. If that entry still uses `oh-my-opencode@latest`, replace it with `oh-my-openagent@latest` instead of adding a second entry. Remove the stale OpenCode package sandbox, then reinstall with `--force` in the same config scope:
+- **Why it happens**: When the plugin runs from an OpenCode-managed sandbox such as `~/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/`, OpenCode only reinstalls when its cached resolution is gone, and the shared `~/.cache/opencode/packages/bun.lock` keeps pinning the first resolution of a tag spec like `@latest`.
+- **Automatic recovery (current versions)**: When the auto-update checker detects an update while running from an OpenCode-managed sandbox, it now removes the stale per-spec sandbox, the flat `node_modules` copy, and the `bun.lock` pin itself, so the next OpenCode start re-resolves the tag fresh. Restart OpenCode when the update toast appears.
+- **Workaround (older versions, or if `auto_update` is disabled)**: Close OpenCode and keep exactly one OMO entry in the config that currently owns the plugin. If that entry still uses `oh-my-opencode@latest`, replace it with `oh-my-openagent@latest` instead of adding a second entry. Remove the stale OpenCode package sandbox, then reinstall with `--force` in the same config scope:
 
   ```sh
   rm -rf ~/.cache/opencode/packages/oh-my-openagent@latest \
@@ -131,7 +132,7 @@ BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first p
   bunx oh-my-openagent doctor --json
   ```
 
-- **Status**: Open. The runtime now avoids the misleading auto-updated toast when it detects an OpenCode-managed sandbox, but users may still need the manual cache refresh above until OpenCode exposes a reliable package-sandbox update path. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5367.
+- **Status**: Fixed for auto-update users: the stale sandbox and lock pin are invalidated automatically when an update is detected (see #6620), so a restart applies the new version. The manual refresh above remains for older versions or disabled auto-update. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5367.
 
 ## #4710: `@plan` does not switch to Prometheus
 
