@@ -12,6 +12,7 @@ import type { DagRunEvent, DagRunId } from "./types"
 const cleanupRoots: string[] = []
 const runId = "run-1" as DagRunId
 const otherRunId = "run-2" as DagRunId
+const storePath = join(import.meta.dir, "store.ts")
 
 const counts = {
   total: 0,
@@ -64,6 +65,66 @@ function checkpoint(input: {
     ...(input.completedAt === undefined ? {} : { completedAt: input.completedAt }),
     nodes: input.taskId === undefined ? [] : [{ taskId: input.taskId }],
   }
+}
+
+function lineReader(stream: ReadableStream<Uint8Array>): () => Promise<string> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let buffered = ""
+  return async () => {
+    for (;;) {
+      const newline = buffered.indexOf("\n")
+      if (newline >= 0) {
+        const line = buffered.slice(0, newline)
+        buffered = buffered.slice(newline + 1)
+        return line
+      }
+      const chunk = await reader.read()
+      if (chunk.done) return buffered
+      buffered += decoder.decode(chunk.value, { stream: true })
+    }
+  }
+}
+
+function reclaimWorkerSource(projectDir: string, reclaimPath: string, preemptAfterOpen: boolean): string {
+  return [
+    `const { createRequire, syncBuiltinESMExports } = await import("node:module")`,
+    `const require = createRequire(import.meta.url)`,
+    `const fs = require("node:fs")`,
+    `const runId = ${JSON.stringify(runId)}`,
+    `const reclaimPath = ${JSON.stringify(reclaimPath)}`,
+    `if (${JSON.stringify(preemptAfterOpen)}) {`,
+    `  const realOpen = fs.openSync`,
+    `  const realLink = fs.linkSync`,
+    `  let preempted = false`,
+    `  fs.linkSync = (existingPath, newPath) => {`,
+    `    realLink(existingPath, newPath)`,
+    `    if (newPath !== reclaimPath) return`,
+    `    const value = JSON.parse(fs.readFileSync(reclaimPath, "utf8"))`,
+    `    const hasOwnerRecord = typeof value === "object" && value !== null &&`,
+    `      typeof value.hostPid === "number" && typeof value.token === "string"`,
+    `    process.stdout.write(JSON.stringify({ event: "published", hasOwnerRecord }) + "\\n")`,
+    `  }`,
+    `  fs.openSync = (path, flags, mode) => {`,
+    `    const fd = realOpen(path, flags, mode)`,
+    `    if (preempted || flags !== "wx" || typeof path !== "string" || !path.startsWith(reclaimPath)) return fd`,
+    `    preempted = true`,
+    `    process.stdout.write(JSON.stringify({ event: "opened", sentinelExists: fs.existsSync(reclaimPath) }) + "\\n")`,
+    `    fs.readSync(0, Buffer.alloc(1), 0, 1, null)`,
+    `    return fd`,
+    `  }`,
+    `  syncBuiltinESMExports()`,
+    `}`,
+    `const { createDagFileStore } = await import(${JSON.stringify(storePath)})`,
+    `const store = createDagFileStore({ project_dir: ${JSON.stringify(projectDir)} })`,
+    `try {`,
+    `  store.withRunLock(runId, () => {})`,
+    `  process.stdout.write(JSON.stringify({ event: "outcome", ok: true }) + "\\n")`,
+    `} catch (error) {`,
+    `  process.stdout.write(JSON.stringify({ event: "outcome", ok: false, message: error instanceof Error ? error.message : String(error) }) + "\\n")`,
+    `  process.exitCode = 1`,
+    `}`,
+  ].join("\n")
 }
 
 describe("createDagFileStore event WAL", () => {
@@ -553,70 +614,53 @@ describe("createDagFileStore locks and retention", () => {
     })
   })
 
-  test("#given a second reclaimer observes sentinel initialization #when the first is preempted after open #then no ownerless sentinel is visible", () => {
+  test("#given a second reclaimer observes sentinel initialization #when the first is preempted after open #then no ownerless sentinel is visible", async () => {
     // given
     const project = tempProject()
-    const isProcessAlive = (pid: number) => pid === process.pid
-    const first = createDagFileStore({ project_dir: project }, { isProcessAlive })
-    const second = createDagFileStore({ project_dir: project }, { isProcessAlive })
-    const canonical = first.paths.runLock(runId)
+    const store = createDagFileStore({ project_dir: project })
+    const canonical = store.paths.runLock(runId)
     const reclaimSentinel = `${canonical}.reclaim`
-    fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
-    const realOpen = fs.openSync
-    const realLink = fs.linkSync
-    let preempted = false
-    let secondReclaimerEntered = false
-    let sentinelAbsentDuringInitialization = false
-    let ownerlessSentinelObserved = false
-    let publishedSentinelHadOwnerRecord = false
-    spyOn(fs, "linkSync").mockImplementation((existingPath, newPath) => {
-      realLink(existingPath, newPath)
-      if (newPath !== reclaimSentinel) return
-      const value = JSON.parse(fs.readFileSync(reclaimSentinel, "utf8")) as unknown
-      publishedSentinelHadOwnerRecord = typeof value === "object" && value !== null &&
-        "hostPid" in value && typeof value.hostPid === "number" &&
-        "token" in value && typeof value.token === "string"
-    })
-    spyOn(fs, "openSync").mockImplementation((path, flags, mode) => {
-      const fd = realOpen(path, flags, mode)
-      if (preempted || flags !== "wx" || typeof path !== "string" || !path.startsWith(reclaimSentinel)) return fd
-      preempted = true
-      sentinelAbsentDuringInitialization = !fs.existsSync(reclaimSentinel)
-      if (!sentinelAbsentDuringInitialization) {
-        const content = fs.readFileSync(reclaimSentinel, "utf8")
-        try {
-          const value = JSON.parse(content) as unknown
-          ownerlessSentinelObserved = typeof value !== "object" || value === null ||
-            !("hostPid" in value) || typeof value.hostPid !== "number" ||
-            !("token" in value) || typeof value.token !== "string"
-        } catch (error) {
-          if (!(error instanceof SyntaxError)) throw error
-          ownerlessSentinelObserved = true
-        }
-      }
-      second.withRunLock(runId, () => {
-        secondReclaimerEntered = true
-      })
-      return fd
-    })
+    fs.writeFileSync(canonical, JSON.stringify({ hostPid: 2_147_483_647, token: "stale-holder" }))
+    const first = Bun.spawn(
+      [process.execPath, "-e", reclaimWorkerSource(project, reclaimSentinel, true)],
+      { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+    )
+    const firstRead = lineReader(first.stdout)
+    const firstStderr = new Response(first.stderr).text()
+    let second: typeof first | undefined
 
-    // when
-    first.withRunLock(runId, () => {})
+    try {
+      // when
+      const opened = JSON.parse(await firstRead()) as { readonly event: string; readonly sentinelExists: boolean }
+      expect(opened).toEqual({ event: "opened", sentinelExists: false })
 
-    // then
-    expect({
-      preempted,
-      secondReclaimerEntered,
-      sentinelAbsentDuringInitialization,
-      ownerlessSentinelObserved,
-      publishedSentinelHadOwnerRecord,
-    }).toEqual({
-      preempted: true,
-      secondReclaimerEntered: true,
-      sentinelAbsentDuringInitialization: true,
-      ownerlessSentinelObserved: false,
-      publishedSentinelHadOwnerRecord: true,
-    })
+      second = Bun.spawn(
+        [process.execPath, "-e", reclaimWorkerSource(project, reclaimSentinel, false)],
+        { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+      )
+      const secondRead = lineReader(second.stdout)
+      const secondStderr = new Response(second.stderr).text()
+      const secondOutcome = JSON.parse(await secondRead()) as { readonly event: string; readonly ok: boolean }
+      const secondExit = await second.exited
+      expect(secondExit, await secondStderr).toBe(0)
+      expect(secondOutcome).toEqual({ event: "outcome", ok: true })
+
+      first.stdin.write("g")
+      first.stdin.flush()
+      const published = JSON.parse(await firstRead()) as { readonly event: string; readonly hasOwnerRecord: boolean }
+      const firstOutcome = JSON.parse(await firstRead()) as { readonly event: string; readonly ok: boolean }
+      const firstExit = await first.exited
+
+      // then
+      expect(firstExit, await firstStderr).toBe(0)
+      expect(published).toEqual({ event: "published", hasOwnerRecord: true })
+      expect(firstOutcome).toEqual({ event: "outcome", ok: true })
+      expect(fs.existsSync(reclaimSentinel)).toBe(false)
+    } finally {
+      if (first.exitCode === null) first.kill()
+      if (second?.exitCode === null) second.kill()
+      await Promise.all([first.exited, ...(second === undefined ? [] : [second.exited])])
+    }
   })
 
   test("#given a crashed reclaimer left its sentinel #when another process reclaims the stale holder #then the sentinel cannot wedge acquisition", () => {

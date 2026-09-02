@@ -78,6 +78,8 @@ function raceWorkerSource(projectDir: string, prompt: string): string {
     `}`,
     `process.stdout.write("ready\\n")`,
     `readSync(0, Buffer.alloc(1), 0, 1, null)`,
+    `process.stdout.write("armed\\n")`,
+    `readSync(0, Buffer.alloc(1), 0, 1, null)`,
     `try {`,
     `  const started = await dag.start({ definition, parentSessionId: ${JSON.stringify(parentSessionId)}, rootSessionId: ${JSON.stringify(rootSessionId)} })`,
     `  process.stdout.write(JSON.stringify({ ok: true, reused: started.reused, runId: started.snapshot.runId }) + "\\n")`,
@@ -122,6 +124,12 @@ async function raceStarts(projectDir: string, prompts: readonly string[]): Promi
   const errors = children.map((child) => new Response(child.stderr).text())
   const ready = await Promise.all(readers.map((read) => read()))
   expect(ready).toEqual(prompts.map(() => "ready"))
+  for (const child of children) {
+    child.stdin.write("r")
+    child.stdin.flush()
+  }
+  const armed = await Promise.all(readers.map((read) => read()))
+  expect(armed).toEqual(prompts.map(() => "armed"))
   for (const child of children) {
     child.stdin.write("g")
     child.stdin.flush()

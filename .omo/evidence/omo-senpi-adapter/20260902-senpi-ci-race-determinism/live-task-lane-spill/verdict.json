@@ -1,0 +1,195 @@
+{
+  "result": "PASS",
+  "checks": {
+    "s1-spill": "PASS",
+    "s2-global-cap": "PASS",
+    "real_senpi_untouched": "PASS",
+    "no_leaked_pids": "PASS",
+    "sandboxes_removed": "PASS",
+    "child_pids_terminal": "PASS"
+  },
+  "scenarios": [
+    {
+      "result": "PASS",
+      "scenario": "s1-spill",
+      "checks": {
+        "two_tasks_spawned": "PASS",
+        "first_on_primary": "PASS",
+        "first_running": "PASS",
+        "second_spilled_to_fallback": "PASS",
+        "second_running_not_pending": "PASS",
+        "second_not_queued": "PASS"
+      },
+      "exit": 0,
+      "signal": null,
+      "spawnItems": [
+        {
+          "task_id": "st_01a060e2",
+          "name": "lane-one",
+          "category": "lanecat",
+          "resolved_model": {
+            "source": "category",
+            "provider": "vendor-a",
+            "model_id": "primary",
+            "display": "primary"
+          },
+          "status": "running"
+        },
+        {
+          "task_id": "st_01a060e3",
+          "name": "lane-two",
+          "category": "lanecat",
+          "resolved_model": {
+            "source": "category",
+            "provider": "vendor-b",
+            "model_id": "fallback",
+            "display": "vendor-b/fallback"
+          },
+          "status": "running"
+        }
+      ],
+      "taskRecords": [
+        {
+          "task_id": "st_01a060e2",
+          "name": "lane-one",
+          "status": "completed",
+          "model": "vendor-a/primary",
+          "requested_model": "vendor-a/primary",
+          "resolved_model": "primary",
+          "fallback_models": [
+            "vendor-b/fallback"
+          ]
+        },
+        {
+          "task_id": "st_01a060e3",
+          "name": "lane-two",
+          "status": "completed",
+          "model": "vendor-b/fallback",
+          "requested_model": "vendor-a/primary",
+          "resolved_model": "vendor-b/fallback",
+          "fallback_models": []
+        }
+      ],
+      "sandboxRoot": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-sW6Iz9",
+      "sandboxAgentDir": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-sW6Iz9/a/agent"
+    },
+    {
+      "result": "PASS",
+      "scenario": "s2-global-cap",
+      "checks": {
+        "three_tasks_spawned": "PASS",
+        "first_running": "PASS",
+        "second_running": "PASS",
+        "distinct_lanes": "PASS",
+        "third_pending": "PASS",
+        "third_queued": "PASS"
+      },
+      "exit": 0,
+      "signal": null,
+      "spawnItems": [
+        {
+          "task_id": "st_01a060e2",
+          "name": "cap-one",
+          "category": "lane1",
+          "resolved_model": {
+            "source": "category",
+            "provider": "vendor-a",
+            "model_id": "primary",
+            "display": "primary"
+          },
+          "status": "running"
+        },
+        {
+          "task_id": "st_01a060e3",
+          "name": "cap-two",
+          "category": "lane2",
+          "resolved_model": {
+            "source": "category",
+            "provider": "vendor-b",
+            "model_id": "fallback",
+            "display": "fallback"
+          },
+          "status": "running"
+        },
+        {
+          "task_id": "st_01a060e4",
+          "name": "cap-three",
+          "category": "lane3",
+          "resolved_model": {
+            "source": "category",
+            "provider": "vendor-c",
+            "model_id": "third",
+            "display": "third"
+          },
+          "status": "pending",
+          "queue_position": 1
+        }
+      ],
+      "taskRecords": [
+        {
+          "task_id": "st_01a060e2",
+          "name": "cap-one",
+          "status": "completed",
+          "model": "vendor-a/primary",
+          "requested_model": "vendor-a/primary",
+          "resolved_model": "primary"
+        },
+        {
+          "task_id": "st_01a060e3",
+          "name": "cap-two",
+          "status": "completed",
+          "model": "vendor-b/fallback",
+          "requested_model": "vendor-b/fallback",
+          "resolved_model": "fallback"
+        },
+        {
+          "task_id": "st_01a060e4",
+          "name": "cap-three",
+          "status": "completed",
+          "model": "vendor-c/third",
+          "requested_model": "vendor-c/third",
+          "resolved_model": "third"
+        }
+      ],
+      "sandboxRoot": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-VocoBI",
+      "sandboxAgentDir": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-VocoBI/a/agent"
+    }
+  ],
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "concurrentRealSenpiChangedPaths": [],
+  "allRealSenpiChangedPaths": [],
+  "providedAgentDir": "unset",
+  "sandboxAgentDirs": [
+    "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-sW6Iz9/a/agent",
+    "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-VocoBI/a/agent"
+  ],
+  "sandboxTokens": [
+    "omo-senpi-qa-sW6Iz9",
+    "omo-senpi-qa-VocoBI"
+  ],
+  "cleanup": {
+    "sandboxesRemoved": [
+      {
+        "root": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-sW6Iz9",
+        "removed": true
+      },
+      {
+        "root": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-VocoBI",
+        "removed": true
+      }
+    ],
+    "allSandboxesRemoved": true,
+    "spawnedPids": [
+      82004,
+      82632
+    ],
+    "helperPids": [
+      82003,
+      82631
+    ],
+    "leakedPids": [],
+    "liveHelpers": [],
+    "childPidsTerminal": true
+  }
+}

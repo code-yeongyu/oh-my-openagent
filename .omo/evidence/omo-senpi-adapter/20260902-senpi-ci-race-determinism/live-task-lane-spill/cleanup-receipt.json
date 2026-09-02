@@ -1,0 +1,24 @@
+{
+  "sandboxesRemoved": [
+    {
+      "root": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-sW6Iz9",
+      "removed": true
+    },
+    {
+      "root": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-VocoBI",
+      "removed": true
+    }
+  ],
+  "allSandboxesRemoved": true,
+  "spawnedPids": [
+    82004,
+    82632
+  ],
+  "helperPids": [
+    82003,
+    82631
+  ],
+  "leakedPids": [],
+  "liveHelpers": [],
+  "childPidsTerminal": true
+}
