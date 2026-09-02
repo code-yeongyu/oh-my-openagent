@@ -1,0 +1,3 @@
+Live Senpi driver: PASS; sandbox agent/project paths were under $TMPDIR and are absent after completion.
+Driver isolation fields: realSenpiUntouched=true, realSenpiCredentialDigestUntouched=true, realOmoUntouched=true.
+No leaked child processes were reported by the driver.

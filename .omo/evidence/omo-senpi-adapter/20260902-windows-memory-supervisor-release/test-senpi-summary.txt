@@ -1,0 +1,5 @@
+Command: bun run test:senpi
+Result: PASS
+Adapter suite: 2530 pass, 1 platform skip, 0 fail, 8063 expectations.
+Evidence resolver contract: 10 pass, 0 fail, 31 expectations.
+The command rebuilt and verified the Senpi plugin artifacts before running the adapter suite.

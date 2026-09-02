@@ -1,0 +1,16 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoChangedPaths": [],
+  "realOmoProtectedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "unset",
+  "sandboxAgentDir": "$TMPDIR/omo-senpi-qa-<redacted>/agent",
+  "sandboxCwd": "$TMPDIR/omo-senpi-qa-<redacted>/project",
+  "cleanup": "sandbox removed; driver reported no leaked child processes"
+}

@@ -1,0 +1,4 @@
+bun run typecheck: PASS
+bun run build: PASS
+Senpi artifact check: deferred to the CI Bun 1.4 Ubuntu job. Local Bun 1.3.14 produces non-byte-identical bundles, and this test-only change does not alter extension inputs.
+Local bun test: not a clean gate on this workstation. Bun 1.3.14 lacks the required directory-asset capability for the Darwin embedded-payload test, and the non-isolated HOME injected a local OpenCode skill path. After the build, the Codex installer version test passed and the config-reader suite passed with an empty HOME. Final CI runs Bun 1.4 in isolated hosted environments.
