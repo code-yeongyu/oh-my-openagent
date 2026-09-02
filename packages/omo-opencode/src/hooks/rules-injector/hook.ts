@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin";
+import { contextCollector } from "../../features/context-injector";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../../shared/event-session-id";
 import {
@@ -34,6 +35,15 @@ interface EventInput {
 }
 
 const TRACKED_TOOLS = ["read", "write", "edit", "multiedit"];
+
+function getFilePathFromArgs(args: unknown): string | undefined {
+	if (typeof args !== "object" || args === null) return undefined;
+	const record = args as Record<string, unknown>;
+	const candidate = record.filePath ?? record.path ?? record.file_path;
+	return typeof candidate === "string" && candidate.length > 0
+		? candidate
+		: undefined;
+}
 
 export function createRulesInjectorHook(
 	ctx: PluginInput,
@@ -83,8 +93,27 @@ export function createRulesInjectorHook(
 		input: ToolExecuteInput,
 		output: ToolExecuteBeforeOutput,
 	): Promise<void> => {
-		void input;
-		void output;
+		const toolName = input.tool.toLowerCase();
+
+		if (!TRACKED_TOOLS.includes(toolName)) return;
+
+		const filePath = getFilePathFromArgs(output.args);
+		if (!filePath) return;
+
+		await processFilePathForInjection(
+			filePath,
+			input.sessionID,
+			{ title: "", output: "", metadata: undefined },
+			(entry) => {
+				contextCollector.register(input.sessionID, {
+					id: entry.id,
+					source: "rules-injector",
+					content: entry.content,
+					priority: "critical",
+					metadata: { registeredAt: "tool.execute.before" },
+				});
+			},
+		);
 	};
 
 	const eventHandler = async ({ event }: EventInput) => {
