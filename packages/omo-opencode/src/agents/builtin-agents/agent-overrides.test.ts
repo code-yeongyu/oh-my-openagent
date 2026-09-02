@@ -179,4 +179,122 @@ describe("applyOverrides", () => {
       expect(result.variant).toBe("high")
     })
   })
+
+  describe("#given a manual-path Claude thinking config", () => {
+    function makeClaudeBase(overrides: Partial<AgentConfig> = {}): AgentConfig {
+      return {
+        instructions: "test prompt",
+        model: "anthropic/claude-sonnet-5",
+        mode: "subagent",
+        thinking: { type: "enabled", budgetTokens: 32000 },
+        ...overrides,
+      } as AgentConfig
+    }
+
+    function readThinking(config: AgentConfig): { type?: unknown; budgetTokens?: unknown } {
+      const candidate = config as AgentConfig & { thinking?: { type?: unknown; budgetTokens?: unknown } }
+      return candidate.thinking ?? {}
+    }
+
+    test("re-derives budgetTokens from the resolved variant", () => {
+      // given
+      const base = makeClaudeBase({ variant: "max" })
+
+      // when
+      const result = applyOverrides(base, undefined, {})
+
+      // then
+      expect(readThinking(result)).toEqual({ type: "enabled", budgetTokens: 60000 })
+    })
+
+    test("different variants produce different budgets", () => {
+      // given
+      const lowBase = makeClaudeBase({ variant: "low" })
+      const maxBase = makeClaudeBase({ variant: "max" })
+
+      // when
+      const lowResult = applyOverrides(lowBase, undefined, {})
+      const maxResult = applyOverrides(maxBase, undefined, {})
+
+      // then
+      expect(readThinking(lowResult).budgetTokens).toBe(8192)
+      expect(readThinking(maxResult).budgetTokens).toBe(60000)
+    })
+
+    test("keeps the legacy default budget when no variant is resolved", () => {
+      // given
+      const base = makeClaudeBase()
+
+      // when
+      const result = applyOverrides(base, undefined, {})
+
+      // then
+      expect(readThinking(result)).toEqual({ type: "enabled", budgetTokens: 32000 })
+    })
+
+    test("explicit override thinking wins over the variant-derived budget", () => {
+      // given
+      const base = makeClaudeBase({ variant: "max" })
+      const override: AgentOverrideConfig = {
+        thinking: { type: "enabled", budgetTokens: 12345 },
+      }
+
+      // when
+      const result = applyOverrides(base, override, {})
+
+      // then
+      expect(readThinking(result)).toEqual({ type: "enabled", budgetTokens: 12345 })
+    })
+
+    test("explicit category thinking wins over the variant-derived budget", () => {
+      // given
+      const base = makeClaudeBase({ variant: "max" })
+      const categories: Record<string, CategoryConfig> = {
+        "ultrabrain": {
+          variant: "max",
+          thinking: { type: "enabled", budgetTokens: 54321 },
+        } as CategoryConfig,
+      }
+      const override: AgentOverrideConfig = { category: "ultrabrain" }
+
+      // when
+      const result = applyOverrides(base, override, categories)
+
+      // then
+      expect(readThinking(result)).toEqual({ type: "enabled", budgetTokens: 54321 })
+    })
+
+    test("derives from the final variant when both category and direct reasoning are set", () => {
+      // given
+      const base = makeClaudeBase()
+      const categories: Record<string, CategoryConfig> = {
+        "ultrabrain": { reasoning: "low" } as CategoryConfig,
+      }
+      const override: AgentOverrideConfig = {
+        category: "ultrabrain",
+        reasoning: "medium",
+      }
+
+      // when
+      const result = applyOverrides(base, override, categories)
+
+      // then
+      expect(result.variant).toBe("medium")
+      expect(readThinking(result)).toEqual({ type: "enabled", budgetTokens: 16000 })
+    })
+
+    test("leaves non-enabled thinking configs untouched", () => {
+      // given
+      const base = makeClaudeBase({
+        variant: "max",
+        thinking: { type: "adaptive" },
+      } as Partial<AgentConfig>)
+
+      // when
+      const result = applyOverrides(base, undefined, {})
+
+      // then
+      expect(readThinking(result)).toEqual({ type: "adaptive" })
+    })
+  })
 })

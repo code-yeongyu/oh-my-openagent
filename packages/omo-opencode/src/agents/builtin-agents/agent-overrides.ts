@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentOverrideConfig } from "../types"
+import { resolveClaudeThinkingBudget } from "../types"
 import type { CategoryConfig } from "../../config/schema"
 import { deepMerge, migrateAgentConfig } from "../../shared"
 import { resolvePromptAppend } from "./resolve-file-uri"
@@ -64,6 +65,43 @@ export function mergeAgentConfig(
   return merged
 }
 
+type EnabledThinkingConfig = { type?: unknown; budgetTokens?: unknown }
+
+function readEnabledThinking(config: AgentConfig): EnabledThinkingConfig | undefined {
+  const candidate = config as AgentConfig & { thinking?: unknown }
+  if (typeof candidate.thinking !== "object" || candidate.thinking === null || Array.isArray(candidate.thinking)) {
+    return undefined
+  }
+  const thinking = candidate.thinking as EnabledThinkingConfig
+  return thinking.type === "enabled" ? thinking : undefined
+}
+
+/**
+ * Scales an existing manual-path Claude thinking budget by the FINAL resolved
+ * variant (issue #6387). Runs after category and direct overrides so the last
+ * variant wins. Explicit thinking from the category or the direct override
+ * always wins; agents without an enabled thinking block (GPT/GLM/adaptive
+ * Claude paths) are returned untouched.
+ */
+function applyVariantDerivedThinkingBudget(
+  config: AgentConfig,
+  categoryConfig: CategoryConfig | undefined,
+  override: AgentOverrideConfig | undefined,
+): AgentConfig {
+  const thinking = readEnabledThinking(config)
+  if (!thinking) return config
+  if (categoryConfig?.thinking !== undefined) return config
+  if ((override as { thinking?: unknown } | undefined)?.thinking !== undefined) return config
+
+  const variant = (config as AgentConfig & { variant?: string }).variant
+  const budgetTokens = resolveClaudeThinkingBudget(variant)
+  if (thinking.budgetTokens === budgetTokens) return config
+  return {
+    ...config,
+    thinking: { ...thinking, budgetTokens },
+  } as AgentConfig
+}
+
 export function applyOverrides(
   config: AgentConfig,
   override: AgentOverrideConfig | undefined,
@@ -72,6 +110,7 @@ export function applyOverrides(
 ): AgentConfig {
   let result = config
   const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
+  const categoryConfig = overrideCategory ? mergedCategories[overrideCategory] : undefined
   if (overrideCategory) {
     result = applyCategoryOverride(result, overrideCategory, mergedCategories)
   }
@@ -80,5 +119,5 @@ export function applyOverrides(
     result = mergeAgentConfig(result, override, directory)
   }
 
-  return result
+  return applyVariantDerivedThinkingBudget(result, categoryConfig, override)
 }

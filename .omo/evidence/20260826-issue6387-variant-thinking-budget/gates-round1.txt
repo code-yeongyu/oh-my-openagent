@@ -1,0 +1,23 @@
+=== GATE ROUND 1 ===
+--- focused bun test (touched areas) ---
+
+ 107 pass
+ 0 fail
+ 207 expect() calls
+Ran 107 tests across 3 files. [1042.00ms]
+--- agents dir ---
+ 326 pass
+ 0 fail
+ 860 expect() calls
+Ran 326 tests across 29 files. [1.67s]
+--- plugin-handlers config/prometheus/plan ---
+ 72 pass
+ 0 fail
+ 181 expect() calls
+Ran 72 tests across 3 files. [1462.00ms]
+--- tsgo ---
+TSGO_EXIT=0
+--- git diff --check ---
+DIFF_CHECK_EXIT=0
+--- hygiene scan on added lines ---
+HYGIENE_EXIT=1 (1 = clean)
