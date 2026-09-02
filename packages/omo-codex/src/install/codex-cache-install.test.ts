@@ -285,7 +285,7 @@ describe("codex-cache install", () => {
   })
 
   test(
-    "#given packaged plugin has stale aggregate skills #when caching plugin #then syncs skills after production dependencies install",
+    "#given packaged plugin has prebuilt aggregate skills #when caching plugin #then does not run source-only skill generation",
     async () => {
       // given
       const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-skills-"))
@@ -293,8 +293,8 @@ describe("codex-cache install", () => {
       const sourceRoot = join(root, "plugin")
       const commands: string[] = []
       await mkdir(join(sourceRoot, "scripts"), { recursive: true })
-      await mkdir(join(sourceRoot, "skills", "ulw-plan"), { recursive: true })
-      await writeFile(join(sourceRoot, "skills", "ulw-plan", "SKILL.md"), "---\nname: ulw-plan\n---\n")
+      await mkdir(join(sourceRoot, "skills", "ultrawork"), { recursive: true })
+      await writeFile(join(sourceRoot, "skills", "ultrawork", "SKILL.md"), "---\nname: ultrawork\n---\nprebuilt directive\n")
       await writeFile(
         join(sourceRoot, "package.json"),
         JSON.stringify({
@@ -315,15 +315,14 @@ describe("codex-cache install", () => {
         runCommand: async (command, args, options) => {
           commands.push(`${command} ${args.join(" ")}`)
           if (command === "npm" && args.join(" ") === "run sync:skills") {
-            await mkdir(join(options.cwd, "skills", "ulw-research"), { recursive: true })
-            await writeFile(join(options.cwd, "skills", "ulw-research", "SKILL.md"), "---\nname: ulw-research\n---\n")
+            throw new Error(`Published plugin cache has no source prompt sibling at ${options.cwd}`)
           }
         },
       })
 
       // then
-      expect(commands).toEqual(["npm ci --omit=dev", "npm run sync:skills"])
-      expect(await readFile(join(installed.path, "skills", "ulw-research", "SKILL.md"), "utf8")).toContain("name: ulw-research")
+      expect(commands).toEqual(["npm ci --omit=dev"])
+      expect(await readFile(join(installed.path, "skills", "ultrawork", "SKILL.md"), "utf8")).toBe("---\nname: ultrawork\n---\nprebuilt directive\n")
     },
     15000,
   )

@@ -45,7 +45,6 @@ export async function installCachedPlugin(input: {
       : ["ci", "--omit=dev"]
     await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs)
     await removeCachedManagedNpmBinShims(tempPath)
-    if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand, env)
     await assertNoRemovedSparkshellPromptReferences(tempPath)
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
@@ -75,15 +74,6 @@ async function maybeRunNpmBuild(cwd: string, runCommand: RunCommand, env: NodeJS
   const scripts = packageJson.scripts
   if (!isPlainRecord(scripts) || typeof scripts.build !== "string") return
   await runCommand("npm", ["run", "build"], { cwd, env })
-}
-
-async function maybeRunNpmSyncSkills(cwd: string, runCommand: RunCommand, env: NodeJS.ProcessEnv): Promise<void> {
-  if (!(await fileExistsStrict(join(cwd, "package.json")))) return
-  const packageJson: unknown = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"))
-  if (!isPlainRecord(packageJson)) return
-  const scripts = packageJson.scripts
-  if (!isPlainRecord(scripts) || typeof scripts["sync:skills"] !== "string") return
-  await runCommand("npm", ["run", "sync:skills"], { cwd, env })
 }
 
 function sanitizeNpmInstallEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

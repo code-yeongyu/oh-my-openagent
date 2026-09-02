@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:205bedf47724fa71954f05ae72d7770ef1df26ce392216cb7e5ef72300f7c2be:2c6b840fadcd993447fd3e4c1b3e0965718c343ab68ad16a4972970dd0b828e7
+// omo-codex-install:cf440685af3053cf5485fe2b3c45a1d95a65f56bbef468688ff955473035ce87:568e508df660f3d8c1c0363c9a15afcbc7fee447f4f79c3922899dd16d16b327
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -7977,7 +7977,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0-beta.31",
+    version: "5.0.0-beta.33",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -9655,8 +9655,6 @@ async function installCachedPlugin(input) {
     const installArgs = rewroteLocalFileDependencies ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"];
     await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs);
     await removeCachedManagedNpmBinShims(tempPath);
-    if (input.buildSource === false)
-      await maybeRunNpmSyncSkills(tempPath, input.runCommand, env);
     await assertNoRemovedSparkshellPromptReferences(tempPath);
     await rewriteCachedMcpManifest(tempPath, input.sourcePath);
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
@@ -9683,17 +9681,6 @@ async function maybeRunNpmBuild(cwd, runCommand, env) {
   if (!isPlainRecord(scripts) || typeof scripts.build !== "string")
     return;
   await runCommand("npm", ["run", "build"], { cwd, env });
-}
-async function maybeRunNpmSyncSkills(cwd, runCommand, env) {
-  if (!await fileExistsStrict(join12(cwd, "package.json")))
-    return;
-  const packageJson = JSON.parse(await readFile8(join12(cwd, "package.json"), "utf8"));
-  if (!isPlainRecord(packageJson))
-    return;
-  const scripts = packageJson.scripts;
-  if (!isPlainRecord(scripts) || typeof scripts["sync:skills"] !== "string")
-    return;
-  await runCommand("npm", ["run", "sync:skills"], { cwd, env });
 }
 function sanitizeNpmInstallEnv(env) {
   return Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== "npm_config_allow_scripts"));

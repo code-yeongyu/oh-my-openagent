@@ -1,0 +1,1 @@
+Removed the disposable beta.33 reproduction sandbox after capturing its isolated failure; publish-shaped package and Codex QA helpers each removed their own temporary homes on exit.
