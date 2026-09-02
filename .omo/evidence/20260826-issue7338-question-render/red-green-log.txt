@@ -1,0 +1,7 @@
+=== RED STATE (before watchdog.ts existed) ===
+$ bun test packages/omo-opencode/src/features/question-visibility-watchdog/watchdog.test.ts
+error: Cannot find module './watchdog' from ...
+ 0 pass / 1 fail / 1 error
+
+=== GREEN STATE (after implementation, final) ===
+9/9 watchdog tests + 21/21 tool-execute-before tests = 30 pass 0 fail (see gates.txt)

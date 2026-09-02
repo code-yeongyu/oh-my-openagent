@@ -1,0 +1,1 @@
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed6b5d001F2bspAgnrQtr9r","type":"tui.toast.show","properties":{"message":"The agent asked a question in session ses_fc4131d63ffe1n9Sq2kZj3kGUb and is waiting for your answer. If no question prompt is visible, reply to it as a normal chat message.","variant":"info","duration":10000}}}

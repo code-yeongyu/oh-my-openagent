@@ -13,6 +13,10 @@ import { createEventHandler } from "./plugin/event"
 import { createToolDefinitionHandler } from "./plugin/tool-definition"
 import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
+import {
+  createQuestionVisibilityWatchdog,
+  createSessionMessageQuestionProbe,
+} from "./features/question-visibility-watchdog"
 
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
@@ -32,6 +36,21 @@ export function createPluginInterface(args: {
 }): PluginInterface {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
     args
+
+  const questionVisibilityWatchdog = createQuestionVisibilityWatchdog({
+    probeQuestionToolState: createSessionMessageQuestionProbe(ctx.client, ctx.directory),
+    showToast: async (body) => {
+      const tui = ctx.client.tui
+      if (tui?.showToast === undefined) return
+      await tui.showToast({
+        body: {
+          message: body,
+          variant: "info",
+          duration: 10_000,
+        },
+      })
+    },
+  })
 
   return {
     tool: tools,
@@ -99,6 +118,7 @@ export function createPluginInterface(args: {
       ctx,
       hooks,
       backgroundManager: managers.backgroundManager,
+      questionVisibilityWatchdog,
     }),
 
     "tool.execute.after": createToolExecuteAfterHandler({
