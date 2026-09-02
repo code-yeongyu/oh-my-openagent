@@ -22,3 +22,6 @@ WHY IT IS ENOUGH
 WHAT WAS OMITTED
 - Raw model/session transcripts and environment dumps were not committed because they can contain unrelated prompt material and machine-local paths.
 - Only the reviewer-readable summary and structured verdict are tracked.
+
+PR #7662 REVIEW FOLLOW-UP
+- `review-followup.md` records the fresh failing-first regression receipt, the bounded `no_progress` fix, the accepted-only compaction cache gate, focused test results, and generated-bundle integrity checks.

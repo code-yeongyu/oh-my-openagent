@@ -94,7 +94,7 @@ export function wireEventBridge(
   pi.on("session_compact", (payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
-    if (!isRejectedCompaction(payload) && sessionId !== undefined) {
+    if (isAcceptedCompaction(payload) && sessionId !== undefined) {
       state.forgetTaskOutputReads?.(sessionId)
       taskRpc.forgetOutputReads(sessionId)
     }
@@ -181,6 +181,6 @@ function isLiveContext(value: unknown): value is LiveTaskContext {
   return typeof value === "object" && value !== null
 }
 
-function isRejectedCompaction(payload: unknown): boolean {
-  return typeof payload === "object" && payload !== null && "accepted" in payload && payload.accepted === false
+function isAcceptedCompaction(payload: unknown): boolean {
+  return typeof payload === "object" && payload !== null && "accepted" in payload && payload.accepted === true
 }
