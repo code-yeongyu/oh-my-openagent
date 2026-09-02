@@ -1,0 +1,25 @@
+{
+  "result": "PASS",
+  "transitions": [
+    {
+      "event": "session_start",
+      "agent": "omo",
+      "agentStatus": "idle"
+    },
+    {
+      "event": "agent_start",
+      "agent": "omo",
+      "agentStatus": "working"
+    },
+    {
+      "event": "agent_settled",
+      "agent": "omo",
+      "agentStatus": "done"
+    },
+    {
+      "event": "session_shutdown",
+      "errorCode": "agent_not_found"
+    }
+  ],
+  "warnings": []
+}

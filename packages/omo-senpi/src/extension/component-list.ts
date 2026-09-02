@@ -4,6 +4,7 @@ import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 import { createGitMasterAttributionComponent } from "../components/git-master"
+import { createHerdrAgentStateComponent } from "../components/herdr-agent-state"
 import { createInitDeepAdvisorComponent } from "../components/init-deep-advisor"
 import { createLspComponent } from "../components/lsp"
 import { createMemoryComponent } from "../components/memory"
@@ -20,6 +21,7 @@ import type { OmoSenpiComponent } from "./types"
 export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoSenpiComponent[] {
   return [
     createConfigStartupComponent(),
+    createHerdrAgentStateComponent(),
     createNativeBadgeComponent(),
     createOnboardingComponent(),
     createInitDeepAdvisorComponent(),

@@ -1,0 +1,17 @@
+{
+  "result": "PASS",
+  "senpiExitStatus": 0,
+  "senpiSignal": null,
+  "recordedCallCount": 5,
+  "reportStates": [
+    "idle",
+    "working",
+    "idle",
+    "idle"
+  ],
+  "releaseCount": 1,
+  "allTargetPane": true,
+  "allOmoSource": true,
+  "recorderPath": "<temp>/herdr-recorder.mjs",
+  "paneId": "qa:herdr-lifecycle"
+}

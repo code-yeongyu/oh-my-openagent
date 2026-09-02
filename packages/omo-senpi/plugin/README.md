@@ -31,7 +31,7 @@ The plugin ships 19 skills by default:
 Build the plugin artifacts before installing:
 
 ```sh
-bun run --cwd packages/omo-senpi build
+bun run build:senpi-plugin
 ```
 
 Then install the built local path:
@@ -47,6 +47,30 @@ omo install --platform=senpi
 ```
 
 Only local-path installs are supported in v1. `git:` and `npm:` installs are not supported because `extensions/` and `skills/` are generated build outputs, not checked-in source trees.
+
+## Herdr lifecycle reporting
+
+When OMO Senpi runs in a Herdr-managed pane, the extension reports lifecycle state through
+Herdr's custom-agent API automatically:
+
+| Senpi event | Herdr state |
+|---|---|
+| `session_start` | `idle` |
+| `agent_start` | `working` |
+| `agent_settled` | `idle` |
+| `session_shutdown` | releases the `omo` agent claim |
+
+After a preceding `working` state, Herdr exposes the settled `idle` report as the
+user-facing `done` status.
+
+Shutdown uses a synchronous final `idle` report followed by `release-agent`. The same
+cleanup runs from a process-exit fallback because Ctrl-D can terminate Senpi without a
+`session_shutdown` event, and Herdr requires a current report before release to invalidate
+an already materialized custom-agent status.
+
+The integration activates only when Herdr provides `HERDR_ENV=1`, `HERDR_BIN_PATH`, and
+`HERDR_PANE_ID`. Outside Herdr it performs no command. A failed Herdr report is logged as a
+warning and does not interrupt the OMO session.
 
 ## Disable Components
 

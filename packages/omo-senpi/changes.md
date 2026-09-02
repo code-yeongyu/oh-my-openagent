@@ -1,3 +1,22 @@
+## 2026-09-01 - Bound every Herdr lifecycle call and log only safe metadata
+
+The `herdr-agent-state` reporter and its `process.exit` cleanup called Herdr with
+no timeout, so a stuck Herdr binary could hold a live session or the process exit
+open. Both the async reporter (`runCommand`) and the two synchronous exit-path calls
+(`runCommandSync`) now run under a bounded timeout and kill the child on expiry, so
+every path returns within a fixed budget. The async timeout also destroys the stderr
+stream, drops listeners, and unrefs the child so a wedged binary or descendant pipe
+cannot keep the process open. Failure logging no longer emits raw `stderr` or
+exception text; it records bounded, non-sensitive metadata only: `reason`, exit
+`code`, `stderrBytes`, and an error-name token sanitized to letters and capped so an
+attacker-set name cannot inject or leak. Signal-terminated runs are reported as a
+`signal` failure, and timeouts are detected only from `ETIMEDOUT` so a stderr
+overflow is not mislabeled as a timeout. The `session_shutdown` handler still
+unregisters the process-exit fallback so exit cannot release twice. Deterministic
+coverage was added for the async timeout, synchronous timeout, synchronous nonzero
+exit, signal termination, thrown-error, bounded error-name logging, exit-handler
+unregistration, and safe-logging paths.
+
 ## 2026-08-29 — Teach "mass ulw research" the mass path
 
 A combined mass + research invocation collected at team scale instead of mass
@@ -81,6 +100,22 @@ The ulw-loop skill pointer now normalizes the resolved executable path to
 POSIX separators before embedding it in the machine-consumed command sentence.
 Windows Senpi compatibility therefore receives the same canonical path shape as
 POSIX while the actual executable path remains unchanged.
+## 2026-08-26 — Report the native OMO lifecycle to Herdr
+
+Herdr does not classify OMO as a built-in interactive agent, so process titles and wrapper
+names cannot reliably distinguish ready, working, and settled states. The Senpi adapter now
+uses Herdr's custom-agent reporting contract whenever the host provides `HERDR_ENV=1`,
+`HERDR_BIN_PATH`, and `HERDR_PANE_ID`.
+
+Keep the source and agent identifiers stable as `omo-senpi` and `omo`. `session_start` and
+`agent_settled` report `idle`, `agent_start` reports `working`, and `session_shutdown`
+releases the claim. After `working`, Herdr exposes the settled `idle` report as `done`.
+Ctrl-D can terminate Senpi without `session_shutdown`, so process exit performs the same
+synchronous cleanup. Cleanup reports one final `idle` before `release-agent`; Herdr needs
+that current report to invalidate a previously materialized custom-agent status. Reporting
+is intentionally best-effort: failures warn through the component logger but must not
+interrupt the OMO session. Revisit this adapter only if Herdr adds OMO as a built-in agent
+kind with an equivalent authoritative lifecycle contract.
 
 ## 2026-08-25 — Name the executable in the local-launcher brand profile
 
@@ -310,7 +345,6 @@ tool boundary after `task_send`. The old sequence ended the parent turn with
 text first and incorrectly relied on another wake, so both the old and new
 Senpi pins could finish every real task transition while the harness reported
 a false `task_output_peek` failure.
-
 ## 2026-08-13 — Follow the Senpi 2026.8.13 host contract
 
 The adapter peer and development dependency now require Senpi `2026.8.13`.

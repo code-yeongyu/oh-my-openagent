@@ -1,0 +1,18 @@
+{
+  "result": "PASS",
+  "reproduction": {
+    "exitMethod": "Ctrl-D",
+    "foregroundAfterExit": "shell",
+    "sessionShutdownObserved": false,
+    "staleAgentDurationSeconds": 30
+  },
+  "causeToggle": {
+    "releaseOnly": "agent status remained materialized",
+    "finalIdleThenRelease": "agent_not_found"
+  },
+  "verification": {
+    "runtime": "rebuilt omo-native branch",
+    "foregroundAfterExit": "shell",
+    "agentReadback": "agent_not_found"
+  }
+}
