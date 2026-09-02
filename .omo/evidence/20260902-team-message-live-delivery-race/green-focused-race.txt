@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts:
+(pass) createTeamSendMessageTool > #given transform already listed a peer message while recipient becomes idle #when live delivery races it #then only the live prompt receives the message [21.11ms]
+
+ 1 pass
+ 40 filtered out
+ 0 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [645.00ms]

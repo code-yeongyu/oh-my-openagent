@@ -1,0 +1,18 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts:
+140 |   description: string,
+141 |   timeoutMs = TEST_EVENT_TIMEOUT_MS,
+142 | ): Promise<T> {
+143 |   let timeoutID: ReturnType<typeof setTimeout> | undefined
+144 |   const timeout = new Promise<never>((_resolve, reject) => {
+145 |     timeoutID = realSetTimeout(() => reject(new Error(`timed out waiting for ${description}`)), timeoutMs)
+                                                      ^
+error: timed out waiting for live-delivery mailbox reservation
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-st_01a0616f/packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts:145:49)
+(fail) createTeamSendMessageTool > #given transform already listed a peer message while recipient becomes idle #when live delivery races it #then only the live prompt receives the message [3016.98ms]
+
+ 0 pass
+ 40 filtered out
+ 1 fail
+Ran 1 test across 1 file. [3.67s]

@@ -59,7 +59,7 @@ type LiveDeliveryClient = {
   }
 }
 
-function createRecordingClient(): { client: LiveDeliveryClient; calls: PromptAsyncCall[] } {
+function createRecordingClient(options: { onPromptAsync?: () => void } = {}): { client: LiveDeliveryClient; calls: PromptAsyncCall[] } {
   const calls: PromptAsyncCall[] = []
   const client = {
     session: {
@@ -81,6 +81,7 @@ function createRecordingClient(): { client: LiveDeliveryClient; calls: PromptAsy
           variant: input.body.variant,
           directory: input.query?.directory,
         })
+        options.onPromptAsync?.()
         return undefined
       },
     },
@@ -1539,61 +1540,69 @@ describe("createTeamSendMessageTool", () => {
   test("#given transform already listed a peer message while recipient becomes idle #when live delivery races it #then only the live prompt receives the message", async () => {
     // given
     const fixture = await createTeamFixture()
-    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
-    let loadCount = 0
+    const mailboxReserved = createDeferred<void>()
+    const livePromptReceived = createDeferred<void>()
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
+    const eventOrder: string[] = []
+    let mailboxEntry: string | undefined
+    let mailboxTransform: ReturnType<typeof pollAndBuildInjection> | undefined
     let transformResult: Awaited<ReturnType<typeof pollAndBuildInjection>> | undefined
     const deps = {
       loadRuntimeState: async (teamRunId: string) => {
-        loadCount += 1
-        const state = await loadState(teamRunId, fixture.config)
-        if (loadCount === 2) {
-          return {
-            ...state,
-            members: state.members.map((member) => (
-              member.name === "m2"
-                ? { ...member, status: "running" as const, pendingInjectedMessageIds: [] }
-                : member
-            )),
-          }
-        }
-        if (loadCount === 3) {
-          const staleIdleSnapshot = {
-            ...state,
-            members: state.members.map((member) => (
-              member.name === "m2"
-                ? { ...member, status: "idle" as const, pendingInjectedMessageIds: [] }
-                : member
-            )),
-          }
-          await saveState(staleIdleSnapshot, fixture.config)
-          transformResult = await pollAndBuildInjection(
+        const inboxEntries = await readdir(inboxDir).catch(() => [] as string[])
+        const reservedEntry = inboxEntries.find((entry) => entry.startsWith(".delivering-") && entry.endsWith(".json"))
+        if (reservedEntry !== undefined && mailboxTransform === undefined) {
+          mailboxEntry = reservedEntry
+          eventOrder.push("mailbox reserved")
+          mailboxTransform = pollAndBuildInjection(
             fixture.memberTwoSessionId,
             "m2",
             fixture.teamRunId,
             fixture.config,
             "turn-race",
           )
-          return staleIdleSnapshot
+          mailboxReserved.resolve(undefined)
         }
-        return state
+        return await loadRuntimeState(teamRunId, fixture.config)
       },
     }
-    const { client, calls } = createRecordingClient()
-    const liveTool = createTeamSendMessageTool(fixture.config, client, deps)
+    const { client, calls } = createRecordingClient({
+      onPromptAsync: () => {
+        eventOrder.push("live prompt")
+        livePromptReceived.resolve(undefined)
+      },
+    })
+    const racingClient = {
+      session: {
+        ...client.session,
+        status: async () => {
+          if (mailboxTransform === undefined) throw new Error("mailbox transform did not start before recipient became idle")
+          transformResult = await mailboxTransform
+          eventOrder.push("mailbox transform", "recipient idle")
+          return { data: { [fixture.memberTwoSessionId]: { type: "idle" } } }
+        },
+      },
+    } satisfies LiveDeliveryClient
+    const liveTool = createTeamSendMessageTool(fixture.config, racingClient, deps)
 
     // when
-    await liveTool.execute({
+    const delivery = liveTool.execute({
       teamRunId: fixture.teamRunId,
       to: "m2",
       body: "race payload",
     }, fixture.toolContext(fixture.memberOneSessionId))
+    await waitForEvent(mailboxReserved.promise, "live-delivery mailbox reservation")
+    await waitForEvent(livePromptReceived.promise, "live delivery prompt")
+    await delivery
 
     // then
+    expect(mailboxEntry?.startsWith(".delivering-")).toBe(true)
     expect(transformResult).toEqual({
       injected: false,
       messageIds: [],
       reason: "no unread",
     })
+    expect(eventOrder).toEqual(["mailbox reserved", "mailbox transform", "recipient idle", "live prompt"])
     expect(calls).toHaveLength(1)
     expect(calls[0]?.parts[0]?.text).toContain("race payload")
   })
