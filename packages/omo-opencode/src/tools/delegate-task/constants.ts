@@ -412,3 +412,20 @@ export function isCoordinatorAgent(agentName: string | undefined): boolean {
   const normalized = getAgentConfigKey(agentName).toLowerCase().trim()
   return COORDINATOR_AGENT_NAMES.some((name) => normalized === name)
 }
+
+/**
+ * Subagents Hephaestus may reach via task(). Single source of truth shared by the
+ * hephaestus prompt builders' delegation table (gpt-5-5/gpt-5-6) and the task
+ * request preflight, so the advertised table and the invocation-time enforcement
+ * cannot drift (issue #6318).
+ */
+export const HEPHAESTUS_DELEGATION_ALLOWLIST = ["explore", "librarian", "oracle"]
+
+/**
+ * Returns true when the given agent name refers to Hephaestus (canonical config key,
+ * display name, or legacy alias) via getAgentConfigKey normalization.
+ */
+export function isHephaestusAgent(agentName: string | undefined): boolean {
+  if (!agentName) return false
+  return getAgentConfigKey(agentName).toLowerCase().trim() === "hephaestus"
+}
