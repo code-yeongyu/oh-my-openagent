@@ -1,7 +1,7 @@
 /// <reference path="../../../../bun-test.d.ts" />
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { dirname, join } from "path"
 import { fileURLToPath, pathToFileURL } from "url"
@@ -167,30 +167,21 @@ describe("startReplyListener", () => {
       livePids.add(nextPid)
       daemonPids.add(nextPid)
 
-      const markReady = (): void => {
-        if (!existsSync(stateFilePath)) {
-          setTimeout(markReady, 5)
-          return
-        }
-
-        const pendingState = JSON.parse(readFileSync(stateFilePath, "utf-8")) as Record<string, unknown>
-        writeFileSync(
-          stateFilePath,
-          JSON.stringify(
-            {
-              ...pendingState,
-              isRunning: true,
-              pid: nextPid,
-              lastPollAt: "2026-04-07T00:00:00.000Z",
-              messagesSeen: 2,
-            },
-            null,
-            2,
-          ),
-        )
-      }
-
-      setTimeout(markReady, 5)
+      const pendingState = JSON.parse(readFileSync(stateFilePath, "utf-8")) as Record<string, unknown>
+      writeFileSync(
+        stateFilePath,
+        JSON.stringify(
+          {
+            ...pendingState,
+            isRunning: true,
+            pid: nextPid,
+            lastPollAt: "2026-04-07T00:00:00.000Z",
+            messagesSeen: 2,
+          },
+          null,
+          2,
+        ),
+      )
 
       return {
         pid: nextPid,
