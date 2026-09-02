@@ -58,6 +58,12 @@ export type TaskSnapshot = {
 export type TaskOutputDetails =
   | { readonly kind: "status"; readonly snapshot: TaskSnapshot }
   | {
+      readonly kind: "no_progress"
+      readonly task_id: string
+      readonly status: TaskStatus
+      readonly reason: string
+    }
+  | {
       readonly kind: "transcript"
       readonly mode: "tail" | "full"
       readonly source: TranscriptSource

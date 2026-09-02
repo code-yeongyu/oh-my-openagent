@@ -17,6 +17,9 @@ type EventBridgeState = {
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
+  // Accepted compaction invalidates the task_output progress cache: the first peek after a
+  // compact must reissue the full snapshot so a rehydrated session can still read final_response.
+  readonly forgetTaskOutputReads?: (sessionId: string) => void
   // Live DAG runs veto a reload alongside running children: a reload pauses them mid-flight.
   readonly dagReloadSource?: ReloadGuardDagSource
 }
@@ -90,7 +93,9 @@ export function wireEventBridge(
 
   pi.on("session_compact", (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
-    transitions.onCompact(engine.runtime.sessionId())
+    const sessionId = engine.runtime.sessionId()
+    if (sessionId !== undefined) state.forgetTaskOutputReads?.(sessionId)
+    transitions.onCompact(sessionId)
     statusUi.scheduleSync()
   })
 
