@@ -1,9 +1,0 @@
-
-added 18 packages in 2s
-Installed 1 plugin(s) from sisyphuslabs.
-npm notice
-npm notice New major version of npm available! 10.9.2 -> 12.0.2
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
-npm notice To update run: npm install -g npm@12.0.2
-npm notice
-exit=0

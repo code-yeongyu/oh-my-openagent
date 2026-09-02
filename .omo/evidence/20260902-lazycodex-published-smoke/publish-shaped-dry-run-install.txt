@@ -1,1 +1,0 @@
-sh: /tmp/lazycodex-publish-shaped.YhQKJf/packs/lazycodex-ai-5.0.0-beta.33.tgz: Permission denied

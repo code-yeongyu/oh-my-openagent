@@ -1,1 +1,0 @@
-plan=.omo/plans/20260902-lazycodex-published-smoke-beta33.md

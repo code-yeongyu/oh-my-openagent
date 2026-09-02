@@ -1,2 +1,0 @@
-bun_1_4_0=/tmp/bun-1.4.0-darwin-arm64.ojQssV/bun-darwin-aarch64/bun
-persistent_bun_1_4_0=/tmp/omo-bun-1.4.0

@@ -1,4 +1,0 @@
-package_kind=publish-shaped-local-tarball
-HOME=/tmp/lazycodex-publish-shaped.YhQKJf/smoke/home
-CODEX_HOME=/tmp/lazycodex-publish-shaped.YhQKJf/smoke/codex
-CODEX_LOCAL_BIN_DIR=/tmp/lazycodex-publish-shaped.YhQKJf/smoke/bin
