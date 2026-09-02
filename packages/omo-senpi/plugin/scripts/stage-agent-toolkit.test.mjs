@@ -146,4 +146,14 @@ describe("agent-toolkit runtime staging", () => {
     assert.equal(result.status, 1)
     assert.match(result.stderr, /Available components: ulw-loop/)
   })
+
+  test("#given an inherited component name #when dispatched #then it is rejected as unknown", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
+    const fixture = await makeFixture()
+    await stageAgentToolkit({ ...fixture, buildBundle: false })
+
+    const result = spawnSync(process.execPath, [join(fixture.targetDir, "cli.js"), "__proto__"], { encoding: "utf8" })
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /Unknown component: __proto__\. Available components: ulw-loop/)
+  })
 })

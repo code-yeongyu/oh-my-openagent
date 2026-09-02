@@ -48,11 +48,9 @@
   "[opencode]": {
     "agents": {
       "explore": {
-        "models": [
-          {
-            "model": "openai/gpt-5.6-luna-fast",
-            "reasoning": "off"
-          },
+        "model": "openai/gpt-5.6-luna-fast",
+        "reasoning": "off",
+        "fallback_models": [
           "openai/gpt-5.6-luna-fast"
         ]
       }

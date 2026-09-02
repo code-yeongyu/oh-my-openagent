@@ -1,0 +1,7 @@
+Deprecated config key issues from built CLI doctor fixture:
+
+<tmp>/home-doctor/.omo/omo.jsonc: [opencode].categories.deep.fallback_models
+
+The output did not contain:
+
+<tmp>/home-doctor/.omo/omo.jsonc: [opencode].agents.oracle.fallback_models

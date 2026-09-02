@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "version": "5.0.0-beta.31",
+  "inputDigest": "sha256:858b6dbf85523225a57282289db35b4a82d608613a4a5930ce1d85a86b4296b4",
+  "outputs": [
+    {
+      "path": "cli.d.ts",
+      "sha256": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012"
+    },
+    {
+      "path": "cli.js",
+      "sha256": "7bf8fb144d6dd5c05384376fc65dcf1e0d5397243e6bc27cc544ecdc8db5aa9b"
+    },
+    {
+      "path": "codex-hook-cli.d.ts",
+      "sha256": "bd48e303e97da1d606dff5fa073090d494ed489f9d4f51a5ff566e97b708d34b"
+    },
+    {
+      "path": "codex-hook-cli.js",
+      "sha256": "bc83ec2045b69fc7ecff052262c675757dbb2a66168b40eae7541214736c4fd3"
+    },
+    {
+      "path": "codex-hook.d.ts",
+      "sha256": "70537f67c91bb7b72242396831d4441ead673336537e1f07d94df055d887aeac"
+    },
+    {
+      "path": "codex-hook.js",
+      "sha256": "9a4f53b980521752f603c9a46de8001294c1b964a31f7945eb48ecdae4bf12ac"
+    },
+    {
+      "path": "daemon-cli-path.d.ts",
+      "sha256": "a44c2c2a0edbfa5489a094d875a2cf2a282f1c089bbc315fe70f205a0d7dd526"
+    },
+    {
+      "path": "daemon-cli-path.js",
+      "sha256": "96812ddde5100fc408c6109949f07df3df817282dae48428f01a4c3967b4795a"
+    },
+    {
+      "path": "lsp-session-state.d.ts",
+      "sha256": "403a805ef4c42eae0954c9f39432d0d132b65b6ab066e345aee1dbd383b524e0"
+    },
+    {
+      "path": "lsp-session-state.js",
+      "sha256": "d9c1f4bbace5a8a1fad3d0c3d225e4019700946b2391d1d5ae4d2362ca2e495f"
+    },
+    {
+      "path": "mutated-file-paths.d.ts",
+      "sha256": "a049a783e853964aa88b5a604441540acb56ec91f7b7c5c728cce28d86a6942f"
+    },
+    {
+      "path": "mutated-file-paths.js",
+      "sha256": "bf9d07872875bb1581d5e446b565b903cc24800836bd1dfdfdab8d3efadd963f"
+    }
+  ]
+}

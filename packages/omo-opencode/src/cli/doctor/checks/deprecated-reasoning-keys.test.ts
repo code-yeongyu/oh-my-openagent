@@ -66,6 +66,8 @@ describe("deprecated reasoning keys check", () => {
       expect(result.issues.map((issue) => issue.description)).toEqual([
         `${configPath}: categories.deep.variant`,
         `${configPath}: agents.oracle.reasoningEffort`,
+        `${configPath}: [opencode].agents.sisyphus.thinking`,
+        `${configPath}: [opencode].agents.sisyphus.textVerbosity`,
       ])
     } finally {
       process.chdir(originalCwd)
@@ -83,7 +85,7 @@ describe("deprecated reasoning keys check", () => {
     }
   })
 
-  it("ignores plugin-supported reasoning keys inside opencode harness blocks", async () => {
+  it("reports deprecated reasoning keys inside opencode harness blocks", async () => {
     //#given canonical base config plus plugin-specific opencode tuning
     const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     const originalHome = process.env.HOME
@@ -101,12 +103,6 @@ describe("deprecated reasoning keys check", () => {
         configPath,
         JSON.stringify(
           {
-            categories: {
-              deep: {
-                model: "openai/gpt-5.6-sol",
-                variant: "high",
-              },
-            },
             "[opencode]": {
               agents: {
                 explore: {
@@ -119,7 +115,7 @@ describe("deprecated reasoning keys check", () => {
             "[senpi]": {
               agents: {
                 explore: {
-                  variant: "medium",
+                  fallback_models: ["openai/gpt-5.6-terra"],
                 },
               },
             },
@@ -142,11 +138,11 @@ describe("deprecated reasoning keys check", () => {
       const { checkDeprecatedReasoningKeys } = await import("./deprecated-reasoning-keys")
       const result = await checkDeprecatedReasoningKeys()
 
-      //#then only canonical base keys are reported
+      //#then opencode reasoning keys and typed harness leftovers are reported
       expect(result.status).toBe("warn")
       expect(result.issues.map((issue) => issue.description)).toEqual([
-        `${configPath}: categories.deep.variant`,
-        `${configPath}: [senpi].agents.explore.variant`,
+        `${configPath}: [opencode].agents.explore.variant`,
+        `${configPath}: [senpi].agents.explore.fallback_models`,
         `${configPath}: [codex].categories.deep.fallback_models`,
       ])
     } finally {
@@ -166,7 +162,7 @@ describe("deprecated reasoning keys check", () => {
   })
 
   it("ignores canonical provider_options passthrough keys while keeping accurate labels", async () => {
-    //#given migrated canonical config using provider_options passthrough plus two genuinely deprecated keys
+    //#given migrated canonical config using provider_options passthrough plus three genuinely deprecated keys
     const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     const originalHome = process.env.HOME
     const originalCwd = process.cwd()
@@ -188,6 +184,7 @@ describe("deprecated reasoning keys check", () => {
                 model: "openai/gpt-5.6-sol",
                 variant: "high",
                 thinking: { type: "disabled" },
+                fallback_models: ["openai/gpt-5.6-terra"],
                 provider_options: {
                   thinking: { type: "enabled", budgetTokens: 64000 },
                   textVerbosity: "high",
@@ -230,16 +227,19 @@ describe("deprecated reasoning keys check", () => {
       expect(result.issues.map((issue) => issue.description)).toEqual([
         `${configPath}: categories.deep.variant`,
         `${configPath}: categories.deep.thinking`,
+        `${configPath}: categories.deep.fallback_models`,
       ])
       expect(result.issues.map((issue) => issue.title)).toEqual([
+        "Deprecated config key",
         "Deprecated config key",
         "Deprecated config key",
       ])
       expect(result.issues.map((issue) => issue.fix)).toEqual([
         "Replace variant with reasoning, or run: oh-my-openagent config migrate",
         'Replace thinking with reasoning: "off" or provider_options.thinking, or run: oh-my-openagent config migrate',
+        "Run: oh-my-openagent config migrate to convert fallback_models into a models chain",
       ])
-      expect(result.message).toBe("2 deprecated config key(s) found")
+      expect(result.message).toBe("3 deprecated config key(s) found")
     } finally {
       process.chdir(originalCwd)
       rmSync(testRootDir, { recursive: true, force: true })

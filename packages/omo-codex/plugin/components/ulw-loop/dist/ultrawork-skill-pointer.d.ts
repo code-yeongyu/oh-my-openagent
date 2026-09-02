@@ -1,0 +1,7 @@
+export declare const ULTRAWORK_SKILL_POINTER_TEMPLATE = "<ultrawork-mode>\nULTRAWORK MODE IS ACTIVE FOR THIS TASK.\n\nMANDATORY BOOTSTRAP: do all three steps, in order, before anything else.\n\n1. First user-visible line this turn MUST be exactly:\n`ULTRAWORK MODE ENABLED!`\n\n2. Call `create_goal` NOW with `objective` set to the user's request.\nSend `objective` only: no `status`, no budget fields. If the\n`create_goal` tool is unavailable, open your reply with a binding\n`# Goal` block instead. Never skip this step.\n\n3. Read the FULL ultrawork directive NOW, before any other tool call,\nplan, or edit. It is the `ultrawork` skill, stored at:\n\n{{ULTRAWORK_SKILL_PATH}}\n\nRead the whole file. If a read result comes back truncated, keep\nreading the remaining line ranges until you have seen every line.\nEvery rule in that file is binding for this entire task: no\ncompromise, no summarizing from memory, no skipping. If the file does\nnot exist, tell the user the omo ultrawork skill is missing and\ncontinue with steps 1 and 2 plus evidence-bound execution.\n\nDo not start the requested work until all three steps are complete.\n</ultrawork-mode>\n";
+export interface UltraworkAdditionalContextOptions {
+    readonly skillFilePath?: string | null;
+}
+export declare function resolveUltraworkSkillFilePath(): string;
+export declare function buildUltraworkSkillPointer(skillFilePath: string): string;
+export declare function buildUltraworkAdditionalContext(options?: UltraworkAdditionalContextOptions): string;

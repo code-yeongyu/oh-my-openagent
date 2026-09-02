@@ -1,0 +1,16 @@
+{
+  "[opencode]": {
+    "agents": {
+      "oracle": {
+        "model": "openai/gpt-5.6-sol",
+        "fallback_models": ["openai/gpt-5.6-terra"]
+      }
+    },
+    "categories": {
+      "deep": {
+        "model": "openai/gpt-5.6-sol",
+        "fallback_models": ["openai/gpt-5.6-terra"]
+      }
+    }
+  }
+}

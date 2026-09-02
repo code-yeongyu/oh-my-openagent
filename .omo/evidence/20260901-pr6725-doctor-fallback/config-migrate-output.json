@@ -1,0 +1,16 @@
+{
+  "[opencode]": {
+    "agents": {
+      "oracle": {
+        "model": "openai/gpt-5.6-sol",
+        "fallback_models": ["openai/gpt-5.6-terra"]
+      }
+    },
+    "categories": {
+      "deep": {
+        "models": ["openai/gpt-5.6-sol", "openai/gpt-5.6-terra"]
+      }
+    }
+  },
+  "_migrations": ["2026-08-reasoning-unification"]
+}

@@ -25,7 +25,7 @@ const [requestedComponent, ...requestedArgs] = process.argv.slice(2)
 const forwardsHelp = requestedComponent === undefined || requestedComponent === "help" || requestedComponent === "--help" || requestedComponent === "-h"
 const component = forwardsHelp ? "ulw-loop" : requestedComponent
 const args = forwardsHelp ? ["help"] : requestedArgs
-const entry = components[component]
+const entry = Object.hasOwn(components, component) ? components[component] : undefined
 if (entry === undefined) {
   console.error(\`Unknown component: \${component ?? "(missing)"}. Available components: ulw-loop\`)
   process.exit(1)
@@ -241,11 +241,18 @@ function isErrno(error, code) {
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     if (process.argv.includes("--check")) {
-      // Fresh-checkout-safe: if the aggregate ulw-loop bundle was never built locally (its dist is a
-      // gitignored build output), there is nothing to verify - CI covers the full build in its dedicated job.
-      if (!(await fileExists(defaultSourceEntry))) {
-        console.log(`runtime dist not built locally; skipping freshness check: ${defaultSourceEntry}`)
-      } else {
+      // Fresh-checkout-safe: the agent-toolkit source and target are generated together by the Senpi
+      // build. A totally unstaged checkout can skip; a missing target is staged before validation.
+      const sourceExists = await fileExists(defaultSourceEntry)
+      const targetExists = await fileExists(defaultTargetDir)
+      if (!sourceExists && !targetExists) {
+        console.log(`agent-toolkit runtime not staged locally; skipping freshness check: ${defaultTargetDir}`)
+      } else if (!sourceExists) {
+        throw new Error(`Senpi aggregate ulw-loop bundle is missing: ${defaultSourceEntry}`)
+      } else if (!targetExists) {
+        await stageAgentToolkit({ buildBundle: false })
+      }
+      if (sourceExists) {
         const result = await checkAgentToolkitFresh()
         console.log(`Senpi agent-toolkit runtime is current: ${result.targetDir} sha256=${result.sha256}`)
       }

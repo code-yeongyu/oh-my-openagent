@@ -1,0 +1,26 @@
+{
+  "dryRun": false,
+  "journalResumed": false,
+  "migratedFrom": [],
+  "migrations": [
+    {
+      "diagnostics": [],
+      "movePlan": [],
+      "status": "migrated",
+      "targetPath": "/tmp/omo-migrate-qa.g3FNjY/.omo/omo.jsonc",
+      "transform": {
+        "[opencode]": {
+          "agents": {
+            "sisyphus": {
+              "models": [
+                "openai/gpt-5.6-sol",
+                "openai/gpt-5.6-terra"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "skippedConflictCount": 0
+}

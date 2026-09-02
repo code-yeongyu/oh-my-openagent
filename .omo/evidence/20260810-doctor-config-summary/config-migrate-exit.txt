@@ -1,0 +1,2 @@
+config-migrate-json=0
+post-migrate-doctor-json=1
