@@ -42,6 +42,22 @@ export function defaultAgentDir(home) {
   return join(home, ".omo", "agent")
 }
 
+/**
+ * Where the branded omo product keeps engine state.
+ *
+ * Only an explicit brand-prefixed override is honored here. A `SENPI_CODING_AGENT_DIR` or
+ * `PI_CODING_AGENT_DIR` exported by the shell is a leftover from a standalone engine install,
+ * and letting it win silently split a branded install's state across two directories (#6717):
+ * sessions kept landing in the legacy directory, so `/exit` resumed through a `.senpi` path
+ * while `~/.omo` held only the migration copy. Users who want a custom location set
+ * `OMO_CODING_AGENT_DIR`.
+ */
+export function brandedAgentDir(env = process.env, home = runtimeHome(env)) {
+  const configured = env.OMO_CODING_AGENT_DIR?.trim()
+  if (configured) return resolve(configured)
+  return defaultAgentDir(home)
+}
+
 /** Pre-unification layout: engine state written directly under the config directory. */
 export function legacyFlatAgentDir(home) {
   return join(home, ".omo")
@@ -95,7 +111,7 @@ function backfillSettings(source, target) {
 export function adoptLegacyFlatState(env = process.env, home = runtimeHome(env)) {
   /** @type {AdoptionResult} */
   const result = { adopted: false, copied: [], backfilled: [] }
-  const canonical = canonicalAgentDir(env, home)
+  const canonical = brandedAgentDir(env, home)
   if (canonical !== defaultAgentDir(home)) return result
 
   const flat = legacyFlatAgentDir(home)

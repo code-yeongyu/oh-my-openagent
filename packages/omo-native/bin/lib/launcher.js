@@ -3,7 +3,7 @@ import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
 import { runDoctor } from "./doctor.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
-import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
+import { adoptLegacyFlatState, brandedAgentDir } from "./agent-dir.js"
 import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
@@ -63,8 +63,10 @@ function senpiEnvironment(senpiRoot) {
   delete env.SENPI_BIN
   env.OMO_AGENT_TOOLKIT_BIN = join(packageRoot, "bin", "omo-agent-toolkit.js")
   // One directory for every surface. The legacy name travels too, so a bare senpi spawned by a
-  // tool inherits the same state instead of falling back to its own home.
-  const agentDir = canonicalAgentDir(env)
+  // tool inherits the same state instead of falling back to its own home. The branded resolution
+  // ignores shell-inherited legacy engine variables (#6717): a leftover SENPI_CODING_AGENT_DIR
+  // used to win and split state into ~/.senpi/agent.
+  const agentDir = brandedAgentDir(env)
   env.OMO_CODING_AGENT_DIR = agentDir
   env.SENPI_CODING_AGENT_DIR = agentDir
   // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load

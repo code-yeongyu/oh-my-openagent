@@ -204,6 +204,49 @@ describe("omo launcher", () => {
     })
 
 
+    describe("#given a shell that still exports a legacy engine agent-dir variable", () => {
+      test("#then state resolves to the canonical branded directory instead of the legacy one", () => {
+        const fixture = createFixture()
+        const home = join(fixture.root, "home")
+        const result = run(fixture, ["say", "hi"], {
+          HOME: home,
+          SENPI_CODING_AGENT_DIR: join(home, ".senpi", "agent"),
+        })
+        expect(result.status).toBe(0)
+        const environment = capture(fixture).env
+        expect(environment.OMO_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
+        expect(environment.SENPI_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
+      })
+
+      test("#then an inherited pi variable does not hijack the directory either", () => {
+        const fixture = createFixture()
+        const home = join(fixture.root, "home")
+        const result = run(fixture, ["say", "hi"], {
+          HOME: home,
+          PI_CODING_AGENT_DIR: join(home, ".pi", "agent"),
+        })
+        expect(result.status).toBe(0)
+        const environment = capture(fixture).env
+        expect(environment.OMO_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
+        expect(environment.SENPI_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
+      })
+
+      test("#then an explicit OMO_CODING_AGENT_DIR still wins over any legacy variable", () => {
+        const fixture = createFixture()
+        const home = join(fixture.root, "home")
+        const override = join(home, "custom-agent-dir")
+        const result = run(fixture, ["say", "hi"], {
+          HOME: home,
+          OMO_CODING_AGENT_DIR: override,
+          SENPI_CODING_AGENT_DIR: join(home, ".senpi", "agent"),
+        })
+        expect(result.status).toBe(0)
+        const environment = capture(fixture).env
+        expect(environment.OMO_CODING_AGENT_DIR).toBe(override)
+        expect(environment.SENPI_CODING_AGENT_DIR).toBe(override)
+      })
+    })
+
     describe("#when the product identity is handed to the engine", () => {
       test("#then the brand profile names the product, its home and its update channel", () => {
         const fixture = createFixture()

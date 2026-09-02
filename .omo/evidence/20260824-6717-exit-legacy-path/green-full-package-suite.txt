@@ -1,0 +1,46 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-native/test/payload.test.ts:
+66 |       test(
+67 |         "#then every required artifact is present with preserved modes and no dev clutter",
+68 |         () => {
+69 |           const outputDir = join(makeTempDir(), "plugin")
+70 |           const result = runBuild(["--output", outputDir])
+71 |           expect(result.exitCode, `build failed:\n${result.output.slice(-2000)}`).toBe(0)
+                                                                                       ^
+error: build failed:
+/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+Cloning into '/home/viprix/projects/oom-wt-6717/packages/shared-skills/upstreams/taste-skill'...
+Cloning into '/home/viprix/projects/oom-wt-6717/packages/shared-skills/upstreams/ui-ux-pro-max'...
+fatal: Unable to find current revision in submodule path 'packages/shared-skills/upstreams/open-design'
+file:///home/viprix/projects/oom-wt-6717/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///home/viprix/projects/oom-wt-6717/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///home/viprix/projects/oom-wt-6717/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///home/viprix/projects/oom-wt-6717/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:633:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.16.0
+error: script "build:materialize-frontend" exited with code 1
+error: script "build:senpi-plugin:stage" exited with code 1
+error: script "build:senpi-plugin" exited with code 1
+build:senpi-plugin failed with exit code 1
+
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6717/packages/omo-native/test/payload.test.ts:71:83)
+(fail) build:omo-native staged payload > #given a full plugin build > #when the payload is staged to a temp output dir > #then every required artifact is present with preserved modes and no dev clutter [166721.08ms]
+
+ 129 pass
+ 6 skip
+ 1 fail
+ 378 expect() calls
+Ran 136 tests across 14 files. [207.29s]
