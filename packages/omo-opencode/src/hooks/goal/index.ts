@@ -1,7 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
+import {
+  createInternalAgentContinuationTextPart,
+  withInternalNoReplyMarker,
+} from "../../shared/internal-initiator-marker"
 import { createGoalController, type GoalController } from "./controller"
 import { buildContinuationPrompt } from "./prompt"
+import { buildSessionGoalAnchor } from "./session-goal"
 import type { Goal } from "./types"
 
 export type GoalHookOptions = {
@@ -76,6 +81,41 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
     controller.clearGoal(sessionID)
   }
 
+  async function handleSessionCompacted(sessionID: string): Promise<void> {
+    const goal = controller.getGoal(sessionID)
+    if (goal === null || (goal.status !== "active" && goal.status !== "paused")) {
+      return
+    }
+    if (inFlightContinuations.has(sessionID)) {
+      return
+    }
+    inFlightContinuations.add(sessionID)
+    try {
+      const anchorText = buildSessionGoalAnchor(goal)
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
+        client: ctx.client,
+        sessionID,
+        source: `${HOOK_NAME}:compaction-anchor`,
+        settleMs: 150,
+        queueBehavior: "defer",
+        input: {
+          path: { id: sessionID },
+          body: {
+            parts: [withInternalNoReplyMarker(createInternalAgentContinuationTextPart(anchorText))],
+          },
+        },
+      })
+      if (promptResult.status === "failed" && !isInternalPromptDispatchAccepted(promptResult)) {
+        // Log only; the dispatch may still have been accepted by another route.
+        // eslint-disable-next-line no-console
+        console.warn(`[${HOOK_NAME}] Compaction anchor dispatch failed`, promptResult.error)
+      }
+    } finally {
+      inFlightContinuations.delete(sessionID)
+    }
+  }
+
   return {
     setGoal: controller.setGoal,
     getGoal: controller.getGoal,
@@ -93,6 +133,9 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
       switch (event.type) {
         case "session.idle":
           await handleSessionIdle(sessionID)
+          break
+        case "session.compacted":
+          await handleSessionCompacted(sessionID)
           break
         case "session.deleted":
           await handleSessionDeleted(sessionID)

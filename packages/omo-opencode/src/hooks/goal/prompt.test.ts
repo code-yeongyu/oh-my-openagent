@@ -46,3 +46,36 @@ describe("buildResumePrompt", () => {
     expect(resumePayload).not.toBe(objective)
   })
 })
+
+describe("session-goal anchor embedding", () => {
+  test("continuation prompt embeds original and current objectives with pending deliverables", () => {
+    const prompt = buildContinuationPrompt({
+      ...createGoal("Narrowed subtask"),
+      originalObjective: "Full original request",
+      deliverables: [{ text: "first artifact" }, { text: "second artifact" }],
+    })
+
+    expect(prompt).toContain("<session-goal>")
+    expect(prompt).toContain("Full original request")
+    expect(prompt).toContain("Narrowed subtask")
+    expect(prompt).toContain("first artifact")
+    expect(prompt).toContain("second artifact")
+  })
+
+  test("anchor falls back to the current objective for version-1 goals without an original", () => {
+    const prompt = buildContinuationPrompt(createGoal("Legacy only"))
+
+    expect(prompt).toContain("<session-goal>")
+    expect(prompt).toContain("Legacy only")
+  })
+
+  test("resume prompt embeds the session-goal anchor", () => {
+    const prompt = buildResumePrompt({
+      ...createGoal("Current objective", { status: "paused" }),
+      originalObjective: "Original objective",
+    })
+
+    expect(prompt).toContain("<session-goal>")
+    expect(prompt).toContain("Original objective")
+  })
+})

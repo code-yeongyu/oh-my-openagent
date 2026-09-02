@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { GoalFileSchema, type Goal, type GoalFile, type GoalStoreRef, type GoalUpdate } from "./types"
+import { deriveDeliverables } from "./session-goal"
 
 const STORE_VERSION = 1
 
@@ -53,10 +54,13 @@ export function clearGoal(ref: GoalStoreRef): boolean {
 
 export function createGoal(ref: GoalStoreRef, objective: string): Goal {
   const now = nowSeconds()
+  const normalizedObjective = objective.trim()
   const goal: Goal = {
     id: randomUUID(),
     sessionID: ref.sessionID,
-    objective: objective.trim(),
+    objective: normalizedObjective,
+    originalObjective: normalizedObjective,
+    deliverables: deriveDeliverables(normalizedObjective),
     status: "active",
     tokensUsed: 0,
     timeUsedSeconds: 0,

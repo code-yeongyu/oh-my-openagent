@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -165,6 +165,79 @@ describe("goal store", () => {
 
 		expect(await clearGoal(ref)).toBe(true);
 		expect(await readGoal(ref)).toBeNull();
+	});
+
+	it("initializes the original objective and derived deliverables once at creation", async () => {
+		const ref = await tempStore("thread-original");
+		const objective = "Ship the release\n- tag the repo\n* publish the package\n2. announce the changelog";
+
+		const goal = await createGoal(ref, objective);
+
+		expect(goal.originalObjective).toBe(objective);
+		expect(goal.deliverables).toEqual([
+			{ text: "tag the repo" },
+			{ text: "publish the package" },
+			{ text: "announce the changelog" },
+		]);
+	});
+
+	it("derives a single deliverable from a single-line objective", async () => {
+		const ref = await tempStore("thread-single");
+
+		const goal = await createGoal(ref, "Fix the bug");
+
+		expect(goal.originalObjective).toBe("Fix the bug");
+		expect(goal.deliverables).toEqual([{ text: "Fix the bug" }]);
+	});
+
+	it("preserves the original objective and deliverables across status and usage updates", async () => {
+		const ref = await tempStore();
+		const created = await createGoal(ref, "Original multi-part objective");
+
+		await updateGoal(ref, { status: "paused" });
+		await accountGoalUsage(ref, { input: 5, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 5 }, 1);
+		const resumed = await updateGoal(ref, { status: "active" });
+
+		expect(resumed.id).toBe(created.id);
+		expect(resumed.originalObjective).toBe("Original multi-part objective");
+		expect(resumed.deliverables).toEqual([{ text: "Original multi-part objective" }]);
+	});
+
+	it("replaces the original objective only on an explicit objective reset", async () => {
+		const ref = await tempStore();
+		const created = await createGoal(ref, "Original objective");
+
+		const redirected = await updateGoal(ref, { objective: "Redirected objective" });
+
+		expect(redirected.id).not.toBe(created.id);
+		expect(redirected.originalObjective).toBe("Redirected objective");
+		expect(redirected.deliverables).toEqual([{ text: "Redirected objective" }]);
+	});
+
+	it("parses version-1 goal files without originalObjective or deliverables", async () => {
+		const ref = await tempStore("thread-legacy");
+		const legacyGoal = {
+			id: "legacy-1",
+			threadId: "thread-legacy",
+			objective: "Legacy objective",
+			status: "active",
+			tokensUsed: 0,
+			timeUsedSeconds: 0,
+			createdAt: 1_777_766_400,
+			updatedAt: 1_777_766_400,
+		};
+		await mkdir(ref.baseDir, { recursive: true });
+		await writeFile(
+			goalFilePath(ref),
+			`${JSON.stringify({ version: 1, goal: legacyGoal }, null, 2)}\n`,
+			"utf8",
+		);
+
+		const goal = await readGoal(ref);
+
+		expect(goal).toMatchObject({ id: "legacy-1", objective: "Legacy objective" });
+		expect(goal?.originalObjective).toBeUndefined();
+		expect(goal?.deliverables).toBeUndefined();
 	});
 });
 

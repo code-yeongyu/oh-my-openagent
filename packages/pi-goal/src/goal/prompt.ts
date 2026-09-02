@@ -1,4 +1,5 @@
 import type { Goal } from "./types.js";
+import { buildSessionGoalAnchor } from "./session-goal.js";
 
 export function buildContinuationPrompt(goal: Goal): string {
 	return [
@@ -9,6 +10,8 @@ export function buildContinuationPrompt(goal: Goal): string {
 		"<objective>",
 		escapeXmlText(goal.objective),
 		"</objective>",
+		"",
+		buildSessionGoalAnchor(goal),
 		"",
 		"Continuation behavior:",
 		"- This goal persists across turns. Ending this turn does not require shrinking the objective to what fits now.",
@@ -65,6 +68,8 @@ export function buildBudgetLimitedPrompt(goal: Goal): string {
 		"<objective>",
 		escapeXmlText(goal.objective),
 		"</objective>",
+		"",
+		buildSessionGoalAnchor(goal),
 		"",
 		"Budget:",
 		`- Time spent pursuing goal: ${goal.timeUsedSeconds} seconds`,
