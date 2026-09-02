@@ -10,6 +10,7 @@ export const expectedSkills = [
 	"comment-checker",
 	"data-scientist",
 	"debugging",
+	"eval-integrity",
 	"frontend",
 	"git-master",
 	"init-deep",

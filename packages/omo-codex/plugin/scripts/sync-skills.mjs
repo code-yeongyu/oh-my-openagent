@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isCliEntry } from "./entry-guard.mjs";
@@ -47,8 +47,8 @@ const skillSources = [
 const componentSkillNames = new Set([...skillSources.map(([name]) => name), "ultrawork"]);
 const skillDisplayPrefix = "(OmO) ";
 
-function shouldCopySkillSource(source) {
-	const normalized = source.replaceAll("\\", "/");
+export function shouldCopySkillSource(source, sourceRoot) {
+	const normalized = relative(dirname(sourceRoot), source).replaceAll("\\", "/");
 	const segments = normalized.split("/");
 	const name = segments.at(-1) ?? "";
 	if (segments.some((segment) => ignoredSkillSourceDirNames.has(segment))) return false;
@@ -56,6 +56,10 @@ function shouldCopySkillSource(source) {
 	if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false;
 	const scriptsIndex = segments.lastIndexOf("scripts");
 	return scriptsIndex === -1 || segments[scriptsIndex + 1] !== "tests";
+}
+
+function createSkillSourceFilter(sourceRoot) {
+	return (source) => shouldCopySkillSource(source, sourceRoot);
 }
 
 const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
@@ -291,8 +295,9 @@ async function syncSkills() {
 
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
-		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
-			filter: shouldCopySkillSource,
+		const source = join(sharedSkillsRoot, skillName);
+		await cp(source, join(skillsRoot, skillName), {
+			filter: createSkillSourceFilter(source),
 			recursive: true,
 		});
 		await adaptSkillForCodex(skillName);
