@@ -18,6 +18,14 @@ All references in this document are repository-relative to this evidence directo
 - `red-resweep-scheduling.log`: before the scheduler repair, controlled-clock coverage failed because the aged candidate was never reswept and a non-sharing cleanup error did not rearm the next sweep.
 - `green-resweep-scheduling.log`: after the repair, 7 pass, 0 fail. It proves immediate fresh cleanup is skipped, an aged sharing-blocked candidate is retried once at eligibility, the next immediate acquire is deferred again, a later healthy eligibility reclaims it, and a non-sharing throw rearms the next sweep.
 
+## Post-merge verification
+
+- `post-merge-evidence-path-resolution.txt`: canonical Senpi evidence resolver matched.
+- `post-merge-focused.log`: 16 pass, 0 fail across the focused lock and facts suites.
+- `post-merge-generated-bundle-check.log`: committed extension bundles are current.
+- `post-merge-test-senpi.log`: 2,530 pass, 1 Windows-only skip, 0 fail.
+- `post-merge-senpi-drive-self-test.log` and `post-merge-senpi-drive-live.json`: isolated real Senpi self-test and live driver passed with protected host state unchanged.
+
 ## Full-root suite accounting
 
 The local root-suite attempts are environmental diagnostics, not passing gates:

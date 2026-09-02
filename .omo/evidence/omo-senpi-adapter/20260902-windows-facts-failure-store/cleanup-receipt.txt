@@ -1,3 +1,4 @@
 lsp_daemon_pid=52263 terminated; post_termination_kill_0=absent
 rebase_lsp_daemon_pid=70774 terminated; post_termination_kill_0=absent
 post_cubic_worktree_lsp_daemon=none_present; post_termination_pgrep=absent
+post_merge_lsp_daemon_pid=31214 terminated; post_termination_pgrep=absent

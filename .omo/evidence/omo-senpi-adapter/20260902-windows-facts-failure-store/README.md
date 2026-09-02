@@ -20,13 +20,14 @@ The repair schedules each directory's advisory sweep once per candidate stale-ag
 - `post-cubic-generated-bundle-build.log` and `post-cubic-generated-bundle-check.log`: the committed Senpi extension bundles were regenerated from source and are current.
 - `post-cubic-test-senpi.log`: exact captured `bun run test:senpi` output; 2,530 pass, 1 Windows-only skip, 0 fail.
 - `post-cubic-senpi-drive-self-test.log` and `post-cubic-senpi-drive-live.json`: isolated real Senpi QA passed. The normalized JSON records ultrawork injection, comment checker success, isolated sandbox use, and unchanged protected host Senpi/OMO state.
+- After merging `origin/dev` at `1291b02c1` without a bundle conflict, `post-merge-focused.log` passed 16/16, `post-merge-generated-bundle-check.log` confirmed current bundles, `post-merge-test-senpi.log` captured 2,530 pass, 1 Windows-only skip, 0 fail, and `post-merge-senpi-drive-live.json` recorded another isolated live-driver PASS. `post-merge-evidence-path-resolution.txt` confirms the canonical evidence resolver again.
 
 The earlier baseline evidence remains for the original failure diagnosis and rebase history. All committed artifact paths are normalized as `<HOME>`, `<WORKTREE>`, or `<TEMP>` where needed; no credentials, host paths, or raw host logs are committed.
 
 ## Full-root suite accounting
 
-The local root-suite attempts are not claimed as passing gates. `full-suite-failure-summary.txt` accounts for every one of the 17,169 tests in each attempt, listing all 9 skips and all environmental failures without workstation paths. The authoritative platform proof is CI run `33610291206`: its two Windows root shards succeeded in 11m10s and 11m07s, and Windows Senpi compatibility succeeded in 11m40s. A fresh full-matrix run is required for this follow-up head.
+The local root-suite attempts are not claimed as passing gates. `full-suite-failure-summary.txt` accounts for every one of the 17,169 tests in each attempt, listing all 9 skips and all environmental failures without workstation paths. The authoritative platform proof before this merge was CI run `33610291206`: its two Windows root shards succeeded in 11m10s and 11m07s, and Windows Senpi compatibility succeeded in 11m40s. The final pushed head requires a fresh `ci:full-matrix` Windows run and Cubic review.
 
 ## Cleanup and scope
 
-`cleanup-receipt.txt` records terminated worktree-owned LSP PIDs and explicit post-termination absence checks. The current real-driver sandbox was verified absent after completion. No OpenCode or Codex production source changed; no real OpenCode or Codex harness was required. The only shipped adapter changes are regenerated Senpi bundles, covered by the Senpi gate and live isolated QA above.
+`cleanup-receipt.txt` records terminated worktree-owned LSP PIDs and explicit post-termination absence checks. Each real-driver sandbox was verified absent after completion. No OpenCode or Codex production source changed; no real OpenCode or Codex harness was required. The only shipped adapter changes are regenerated Senpi bundles, covered by the Senpi gate and live isolated QA above.
