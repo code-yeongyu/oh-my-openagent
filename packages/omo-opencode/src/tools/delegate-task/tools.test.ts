@@ -4619,7 +4619,7 @@ describe("sisyphus-task", () => {
   })
 
   describe("session title and metadata format (OpenCode compatibility)", () => {
-    test("sync session title follows OpenCode format: '{description} (@{agent} subagent)'", async () => {
+    test("categorized sync session persists an OpenCode-compatible category-prefixed child title", async () => {
       // given
       const { createDelegateTask } = require("./tools")
       let createBody: CapturedSessionCreateBody = {}
@@ -4668,8 +4668,8 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - title should follow OpenCode format
-      expect(createBody.title).toBe("Implement feature X (@Sisyphus-Junior subagent)")
+      // then - title should prefix the category while preserving the OpenCode agent suffix
+      expect(createBody.title).toBe("[quick] Implement feature X (@Sisyphus-Junior subagent)")
     }, { timeout: 10000 })
 
     test("sync task output includes <task_metadata> block with session_id", async () => {
