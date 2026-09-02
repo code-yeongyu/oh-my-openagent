@@ -1755,7 +1755,15 @@ describe("sisyphus-task", () => {
             promptCalled = true
             return { data: {} }
           },
-          messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }] }),
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                parts: [{ type: "text", text: "Done" }],
+              },
+            ]
+          }),
           status: async () => ({ data: { ses_explicit_false: { type: "idle" } } }),
         },
       }
@@ -3431,7 +3439,13 @@ describe("sisyphus-task", () => {
           },
           promptAsync: async () => ({ data: {} }),
           messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                parts: [{ type: "text", text: "Done" }],
+              },
+            ]
           }),
           status: async () => ({ data: {} }),
         },
