@@ -1,10 +1,15 @@
 import { cleanupCodexLight } from "./install-codex/codex-cleanup"
+import {
+  removeManagedOpenCodeAgentDefinitions,
+  type OpenCodeAgentCleanupResult,
+} from "./opencode-agent-cleanup"
 
 export type CleanupPlatform = "codex"
 
 export interface CleanupOptions {
   readonly platform?: CleanupPlatform | "opencode" | "both"
   readonly codexHome?: string
+  readonly configDir?: string
   readonly project?: string
   readonly json?: boolean
 }
@@ -17,22 +22,9 @@ export function resolveCleanupPlatform(
   return invocationName === "lazycodex" || invocationName === "lazycodex-ai" ? "codex" : undefined
 }
 
-export async function cleanup(options: CleanupOptions): Promise<number> {
-  if (options.platform !== "codex") {
-    console.error("Error: cleanup currently supports only --platform=codex")
-    return 1
-  }
+type CodexCleanupResult = Awaited<ReturnType<typeof cleanupCodexLight>>
 
-  const result = await cleanupCodexLight({
-    codexHome: options.codexHome,
-    projectDirectory: options.project,
-  })
-
-  if (options.json === true) {
-    console.log(JSON.stringify(result, null, 2))
-    return 0
-  }
-
+function printCodexResult(result: CodexCleanupResult): void {
   console.log(`Codex Light cleanup complete: ${result.codexHome}`)
   if (result.configChanged) {
     console.log(`- Updated ${result.configPath}`)
@@ -58,6 +50,45 @@ export async function cleanup(options: CleanupOptions): Promise<number> {
   for (const artifact of result.projectCleanup.artifacts) {
     console.log(`- Left project-local artifact in place ${artifact.path}`)
   }
+}
+
+function printOpencodeResult(result: OpenCodeAgentCleanupResult): void {
+  for (const dir of result.scannedDirs) {
+    console.log(`- Scanned OpenCode agents directory ${dir}`)
+  }
+  for (const path of result.removedPaths) {
+    console.log(`- Removed omo agent definition ${path}`)
+  }
+}
+
+export async function cleanup(options: CleanupOptions): Promise<number> {
+  const platform = options.platform ?? "opencode"
+  const runCodex = platform === "codex" || platform === "both"
+  const runOpencode = platform === "opencode" || platform === "both"
+
+  let codexResult: CodexCleanupResult | undefined
+  if (runCodex) {
+    codexResult = await cleanupCodexLight({
+      codexHome: options.codexHome,
+      projectDirectory: options.project,
+    })
+  }
+
+  let opencodeResult: OpenCodeAgentCleanupResult | undefined
+  if (runOpencode) {
+    opencodeResult = removeManagedOpenCodeAgentDefinitions({
+      configDir: options.configDir,
+      project: options.project,
+    })
+  }
+
+  if (options.json === true) {
+    console.log(JSON.stringify({ platform, ...codexResult, ...opencodeResult }, null, 2))
+    return 0
+  }
+
+  if (codexResult !== undefined) printCodexResult(codexResult)
+  if (opencodeResult !== undefined) printOpencodeResult(opencodeResult)
 
   return 0
 }

@@ -420,7 +420,19 @@ To remove oh-my-openagent:
    # Plugin should no longer be loaded
    ```
 
-4. **Remove omo-codex (Codex CLI Light edition)**
+4. **Remove leftover omo agent definitions**
+
+   If any omo agent markdown files (`sisyphus.md`, `hephaestus.md`, `prometheus.md`, and friends) were left in OpenCode's agents directories (`~/.config/opencode/agent/`, `~/.config/opencode/agents/`, or `<project>/.opencode/agent/`), remove them with:
+
+   ```bash
+   bunx oh-my-openagent uninstall
+   # explicit form:
+   bunx oh-my-openagent uninstall --platform=opencode
+   ```
+
+   Only files named exactly after omo's built-in agents are removed; your own agent definitions are never touched.
+
+5. **Remove omo-codex (Codex CLI Light edition)**
 
    ```bash
    npx lazycodex-ai uninstall
