@@ -1,0 +1,48 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/senpi-task/src/tools/task/execute-batch-concentration.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './batch-concentration' from '/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/tools/task/execute-batch-concentration.test.ts'
+-------------------------------
+
+
+packages/senpi-task/src/tools/task/start-presentation.test.ts:
+34 |     // given / when
+35 |     const text = backgroundConversionText(STARTED, { taskSummary: "Audit the boundary" }, 270)
+36 | 
+37 |     // then
+38 |     expect(text).toContain("prompt-cache-safe budget (270s)")
+39 |     expect(text).toContain('task_output(task_id: "st_00000001", mode: "tail")')
+                      ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "task_output(task_id: \"st_00000001\", mode: \"tail\")"
+Received: "Foreground wait reached the prompt-cache-safe budget (270s) for task st_00000001; the task continues in background. Completion will arrive as a notification; steer with task_send, read with task_output.\n\nStarted task Audit the boundary (st_00000001, running). Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it."
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/tools/task/start-presentation.test.ts:39:18)
+(fail) backgroundConversionText > #given a foreground task promoted at its prompt-cache-safe budget #when the conversion text is built #then it keeps the budget line and adds the task_output tail peek with the respawn hint [0.69ms]
+
+packages/senpi-task/src/tools/task/batch-concentration.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './batch-concentration' from '/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/tools/task/batch-concentration.test.ts'
+-------------------------------
+
+
+packages/senpi-task/src/runners/in-process/lsp-call-cap.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './lsp-call-cap' from '/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/runners/in-process/lsp-call-cap.test.ts'
+-------------------------------
+
+
+ 3 pass
+ 4 fail
+ 3 errors
+ 6 expect() calls
+Ran 7 tests across 4 files. [15.85s]

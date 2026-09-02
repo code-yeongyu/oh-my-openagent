@@ -1,0 +1,157 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/components/task/dag-runtime.test.ts:
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishDurableEvents (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:542:58)
+      at writeCheckpoint (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:108:9)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:110:21)
+      at withLock (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/store.ts:570:12)
+      at appendPayload (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:90:32)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/manager.ts:386:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+
+ 478 pass
+ 0 fail
+ 1311 expect() calls
+Ran 478 tests across 63 files. [46.47s]

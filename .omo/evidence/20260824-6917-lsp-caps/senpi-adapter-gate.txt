@@ -1,0 +1,578 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/skills-sync.test.ts:
+103 | describe("OMO Senpi scoped skill sync", () => {
+104 |   test("#given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen", () => {
+105 |     const telemetrySkillNames: readonly string[] = BUILTIN_SKILL_NAMES
+106 |     expect(Object.isFrozen(BUILTIN_SKILL_NAMES)).toBe(true)
+107 |     expect(BUILTIN_SKILL_NAMES.length).toBeGreaterThan(0)
+108 |     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
+                                                  ^
+error: expect(received).toEqual(expected)
+
+  [
++   "ast-grep",
++   "coding-agent-sessions",
++   "dag-library",
++   "data-scientist",
++   "debugging",
++   "frontend",
++   "git-master",
++   "give-me-tips",
++   "hyperplan",
+    "init-deep",
++   "lsp-setup",
++   "mass-ulw",
+    "onboarding",
++   "programming",
++   "refactor",
++   "remove-ai-slops",
++   "review-work",
++   "start-work",
++   "ultimate-browsing",
++   "ultrawork",
++   "ulw-loop",
++   "ulw-plan",
++   "ulw-research",
++   "visual-qa",
+  ]
+
+- Expected  - 0
++ Received  + 22
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/skills-sync.test.ts:108:45)
+(fail) OMO Senpi scoped skill sync > #given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen [0.68ms]
+108 |     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
+109 |   })
+110 | 
+111 |   test("#given synced skill output #when inspected #then exactly 24 roots exist with valid names", () => {
+112 |     const actualNames = listDirectoryNames(skillsRoot)
+113 |     expect(actualNames).toEqual([...expectedSkillNames].sort())
+                              ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "ast-grep",
+-   "coding-agent-sessions",
+-   "dag-library",
+-   "data-scientist",
+-   "debugging",
+-   "frontend",
+-   "git-master",
+-   "give-me-tips",
+-   "hyperplan",
+    "init-deep",
+-   "lsp-setup",
+-   "mass-ulw",
+    "onboarding",
+-   "programming",
+-   "refactor",
+-   "remove-ai-slops",
+-   "review-work",
+-   "start-work",
+-   "ultimate-browsing",
+-   "ultrawork",
+-   "ulw-loop",
+-   "ulw-plan",
+-   "ulw-research",
+-   "visual-qa",
+  ]
+
+- Expected  - 22
++ Received  + 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/skills-sync.test.ts:113:25)
+(fail) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 24 roots exist with valid names [0.27ms]
+121 |   })
+122 | 
+123 |   test("#given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values", () => {
+124 |     for (const skillName of expectedSkillNames) {
+125 |       const skillFile = join(skillsRoot, skillName, "SKILL.md")
+126 |       const content = readFileSync(skillFile, "utf8")
+                            ^
+error: ENOENT: no such file or directory, open '/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/skills/ast-grep/SKILL.md'
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/skills-sync.test.ts:126:23)
+(fail) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [0.25ms]
+163 |       const sourceFile = join(repoRoot, "packages", "omo-senpi", "skills", skillName, "SKILL.md")
+164 |       expect(existsSync(sourceFile), `${relative(repoRoot, sourceFile)} must exist`).toBe(true)
+165 | 
+166 |       const source = readFileSync(sourceFile, "utf8").replace(/\n{3,}/g, "\n\n")
+167 |       const shippedPath = join(skillsRoot, skillName, "SKILL.md")
+168 |       const shipped = readFileSync(shippedPath, "utf8")
+                            ^
+error: ENOENT: no such file or directory, open '/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/skills/dag-library/SKILL.md'
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/skills-sync.test.ts:168:23)
+(fail) OMO Senpi scoped skill sync > #given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization [0.86ms]
+170 |     }
+171 |   })
+172 | 
+173 |   test("#given start-work skill #when inspected #then session ids reference senpi, not codex", () => {
+174 |     const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+175 |     const content = readFileSync(skillFile, "utf8")
+                          ^
+error: ENOENT: no such file or directory, open '/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/skills/start-work/SKILL.md'
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/skills-sync.test.ts:175:21)
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.15ms]
+178 |     expect(content.includes("codex:<session_id>"), "start-work must not reference codex:<session_id>").toBe(false)
+179 |   })
+180 | 
+181 |   test("#given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom", () => {
+182 |     const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+183 |     const content = readFileSync(skillFile, "utf8")
+                          ^
+error: ENOENT: no such file or directory, open '/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/skills/start-work/SKILL.md'
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/skills-sync.test.ts:183:21)
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom [0.12ms]
+236 |     expect(invalidTargets).toEqual([])
+237 |   })
+238 | 
+239 |   test("#given frontend skill #when inspected #then materialized design references exist", () => {
+240 |     const refsDir = join(skillsRoot, "frontend", "references", "design")
+241 |     expect(existsSync(refsDir), "frontend/references/design must exist after materialization").toBe(true)
+                                                                                                     ^
+error: frontend/references/design must exist after materialization
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/skills-sync.test.ts:241:96)
+(fail) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.13ms]
+Bundled 804 modules in 376ms
+
+  omo.js  1.28 MB  (entry point)
+
+Bundled 671 modules in 158ms
+
+  omo-task.js  0.92 MB  (entry point)
+
+killed 1 dangling process
+
+packages/omo-senpi/plugin/scripts/build-extension.test.mjs:
+(fail) checkExtensionCurrent > #given freshly built outputs #when the executable bundles are inspected #then the shebang stays the first bytes and the marker still parses [30003.60ms]
+  ^ this test timed out after 30000ms.
+
+# Unhandled error between tests
+-------------------------------
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+-------------------------------
+
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given an empty output directory #when extensions are built #then all runtime personas match their sources [201.79ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given current generated outputs with old mtimes #when checked #then freshness passes [0.34ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given a missing supervisor artifact #when checked #then freshness reports that output [0.18ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given a stale supervisor artifact #when checked #then freshness reports that output [0.20ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given changed generated bytes with future mtimes #when checked #then freshness fails [0.17ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given intact generated bytes with a stale source digest #when checked #then source reproduction fails [0.27ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given freshly built outputs #when inspected #then normalization removes whitespace-only lines [0.20ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar [0.17ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) checkExtensionCurrent > #given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar [0.22ms]
+86 |     minifier.idleTimer = setTimeout(() => closeNodeMinifier(minifier), MINIFIER_IDLE_MS)
+87 |   })
+88 |   child.on("exit", (code, signal) => {
+89 |     clearTimeout(minifier.idleTimer)
+90 |     if (nodeMinifier === minifier) nodeMinifier = undefined
+91 |     const reason = new Error(`Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`)
+                            ^
+error: Node minifier exited before completing requests: code=null signal=SIGTERM
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/scripts/build-artifact.mjs:91:24)
+      at emit (node:events:98:22)
+      at #handleOnExit (node:child_process:520:14)
+(fail) (unnamed) [0.10ms]
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+changed
+ulw-loop help
+
+packages/omo-senpi/src/extension/compose.test.ts:
+omo-senpi component disabled by flag {
+  component: "beta",
+}
+
+packages/omo-senpi/src/extension/index.test.ts:
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: "ast-grep",
+  entry: "/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/runtime/ast-grep-mcp/cli.js",
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: "ast-grep",
+  entry: "/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/runtime/ast-grep-mcp/cli.js",
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+
+packages/omo-senpi/src/install/install-senpi-refresh.test.ts:
+62 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
+63 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+64 |   }
+65 | 
+66 |   if (await hasMissingPluginArtifact(context.pluginPath)) {
+67 |     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+                   ^
+error: Packed omo-senpi plugin is missing required runtime artifacts at /home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin
+      at ensurePluginArtifacts (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/plugin-artifacts.ts:67:15)
+      at async runSenpiInstaller (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/install-senpi.ts:47:9)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/install-senpi-refresh.test.ts:41:11)
+(fail) runSenpiInstaller source refresh > #given complete generated artifacts #when installing from source #then every build step still refreshes them [3.55ms]
+62 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
+63 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+64 |   }
+65 | 
+66 |   if (await hasMissingPluginArtifact(context.pluginPath)) {
+67 |     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+                   ^
+error: Packed omo-senpi plugin is missing required runtime artifacts at /home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin
+      at ensurePluginArtifacts (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/plugin-artifacts.ts:67:15)
+      at async runSenpiInstaller (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/install-senpi.ts:47:9)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/install-senpi-refresh.test.ts:74:11)
+(fail) runSenpiInstaller source refresh > #given an older local OMO package entry #when installing the current source #then the stale package is replaced [4.34ms]
+62 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
+63 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+64 |   }
+65 | 
+66 |   if (await hasMissingPluginArtifact(context.pluginPath)) {
+67 |     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+                   ^
+error: Packed omo-senpi plugin is missing required runtime artifacts at /home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin
+      at ensurePluginArtifacts (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/plugin-artifacts.ts:67:15)
+      at async runSenpiInstaller (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/install-senpi.ts:47:9)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/install/install-senpi-refresh.test.ts:91:11)
+(fail) runSenpiInstaller source refresh > #given current and stale OMO entries #when refreshing #then the current package keeps its precedence [1.06ms]
+145 |     env: sessionEnv(sessionId),
+146 |     encoding: "utf8",
+147 |     timeout: 30_000,
+148 |   })
+149 |   if (child.status !== expectedStatus) {
+150 |     throw new Error(`toolkit exited ${child.status}: ${child.stderr || child.stdout}`)
+                    ^
+error: toolkit exited undefined: null
+      at runToolkit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/scripts/qa/probe-cross-session.mjs:150:15)
+      at /home/viprix/projects/oom-wt-6917/packages/omo-senpi/scripts/qa/probe-cross-session.mjs:30:3
+
+Bun v1.3.14 (Linux x64)
+
+packages/omo-senpi/src/components/ulw-loop/index.test.ts:
+27 |       args: ["/d", "/s", "/c", bin, "ulw-loop", "status", "--json"],
+28 |     })
+29 |   })
+30 | 
+31 |   it("#given two independent sessions share one cwd #when the child-process probe runs #then only the owner continues", () => {
+32 |     const output = execFileSync(
+                        ^
+error: Command failed: /home/viprix/.bun/bin/bun /home/viprix/projects/oom-wt-6917/packages/omo-senpi/scripts/qa/probe-cross-session.mjs
+145 |     env: sessionEnv(sessionId),
+146 |     encoding: "utf8",
+147 |     timeout: 30_000,
+148 |   })
+149 |   if (child.status !== expectedStatus) {
+150 |     throw new Error(`toolkit exited ${child.status}: ${child.stderr || child.stdout}`)
+                    ^
+error: toolkit exited undefined: null
+      at runToolkit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/scripts/qa/probe-cross-session.mjs:150:15)
+      at /home/viprix/projects/oom-wt-6917/packages/omo-senpi/scripts/qa/probe-cross-session.mjs:30:3
+
+Bun v1.3.14 (Linux x64)
+
+      at execFileSync (node:child_process:271:14)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/ulw-loop/index.test.ts:32:20)
+(fail) omo-senpi ulw-loop continuation session isolation > #given two independent sessions share one cwd #when the child-process probe runs #then only the owner continues [207.16ms]
+
+packages/omo-senpi/src/components/ultrawork/ultrawork-arming.test.ts:
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: "ast-grep",
+  entry: "/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js",
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+lsp-daemon stale-version sweep skipped: Senpi packaged LSP daemon CLI is missing: /home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/runtime/lsp-daemon/dist/cli.js undefined
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: "ast-grep",
+  entry: "/home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js",
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+lsp-daemon stale-version sweep skipped: Senpi packaged LSP daemon CLI is missing: /home/viprix/projects/oom-wt-6917/packages/omo-senpi/plugin/runtime/lsp-daemon/dist/cli.js undefined
+
+packages/omo-senpi/src/components/task/dag-runtime.test.ts:
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishDurableEvents (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:542:58)
+      at writeCheckpoint (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:108:9)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:110:21)
+      at withLock (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/store.ts:570:12)
+      at appendPayload (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:90:32)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/manager.ts:386:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/home/viprix/projects/oom-wt-6917/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/home/viprix/projects/oom-wt-6917/packages/senpi-task/src/dag/journal.ts:226:13)
+
+Preparing worktree (new branch 'linked-branch')
+fatal: not a git repository (or any of the parent directories): .git
+fatal: git cat-file: could not get object info
+fatal: git cat-file: could not get object info
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git

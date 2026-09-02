@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { backgroundStartText } from "./start-presentation"
+import { backgroundConversionText, backgroundStartText } from "./start-presentation"
 
 const STARTED = {
   kind: "started" as const,
@@ -26,5 +26,18 @@ describe("backgroundStartText", () => {
     // given / when / then
     expect(backgroundStartText(STARTED, {})).toContain("Started task auditor (st_00000001, running)")
     expect(backgroundStartText({ ...STARTED, name: STARTED.task_id }, {})).toContain("Started task st_00000001 (running)")
+  })
+})
+
+describe("backgroundConversionText", () => {
+  test("#given a foreground task promoted at its prompt-cache-safe budget #when the conversion text is built #then it keeps the budget line and adds the task_output tail peek with the respawn hint", () => {
+    // given / when
+    const text = backgroundConversionText(STARTED, { taskSummary: "Audit the boundary" }, 270)
+
+    // then
+    expect(text).toContain("prompt-cache-safe budget (270s)")
+    expect(text).toContain('task_output(task_id: "st_00000001", mode: "tail")')
+    expect(text).toContain("4 peeks")
+    expect(text).toContain("smaller subtasks")
   })
 })

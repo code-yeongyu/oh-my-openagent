@@ -22,5 +22,6 @@ export function backgroundConversionText(
   budgetSeconds: number,
 ): string {
   const prefix = `Foreground wait reached the prompt-cache-safe budget (${budgetSeconds}s) for task ${started.task_id}; the task continues in background. Completion will arrive as a notification; steer with task_send, read with task_output.`
-  return `${prefix}\n\n${backgroundStartText(started, labels)}`
+  const peekHint = ` After about 5 minutes, peek once with task_output(task_id: "${started.task_id}", mode: "tail"). If the tail stays silent after 4 peeks, cancel the task and respawn it as smaller subtasks of about 10 minutes each.`
+  return `${prefix}${peekHint}\n\n${backgroundStartText(started, labels)}`
 }

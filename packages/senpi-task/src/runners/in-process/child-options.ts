@@ -4,6 +4,7 @@ import { CURATED_READONLY_AGENT_NAMES } from "../../agents/builtin"
 import type { ChildSpec } from "../in-process"
 import { createChildResourceLoader } from "./child-loader"
 import { createCuratedReadonlyBashTool } from "./curated-readonly-bash"
+import { applyLspCallCap } from "./lsp-call-cap"
 import { RunnerError } from "./runner-error"
 import { createRuntimeFallbackSettings } from "./runtime-fallback-settings"
 import { mergeChildCustomTools } from "./shared-tool-filter"
@@ -83,12 +84,13 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
   const customTools = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
     ? [...mergedCustomTools.filter((tool) => tool.name !== "bash"), createCuratedReadonlyBashTool(spec.cwd)]
     : mergedCustomTools
+  const cappedCustomTools = applyLspCallCap(customTools)
   const settingsManager = createRuntimeFallbackSettings(spec.selectedModel, spec.fallbackModels)
   return {
     cwd: spec.cwd,
     sessionManager,
     resourceLoader: createChildResourceLoader(),
-    customTools,
+    customTools: cappedCustomTools,
     ...(spec.agentDir !== undefined && { agentDir: spec.agentDir }),
     ...(spec.authStorage !== undefined && { authStorage: spec.authStorage }),
     ...(spec.modelRegistry !== undefined && { modelRegistry: spec.modelRegistry }),

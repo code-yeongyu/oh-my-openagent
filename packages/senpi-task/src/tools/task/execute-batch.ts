@@ -2,6 +2,8 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 
 import type { PlanResolutionError, StartResult, TaskManager } from "../../manager"
 import type { TaskRecord } from "../../state"
+import { lintProviderConcentration, observeStartedItem } from "./batch-concentration"
+import type { ConcentrationObservation } from "./batch-concentration"
 import type { ForegroundWaitOptions, ForegroundWaitResult } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
 import { MAX_TASK_BATCH_ITEMS } from "./params"
@@ -125,6 +127,19 @@ function oversizedBatchResult(): AgentToolResult<TaskToolDetails> {
   return result(reason, { task_id: "", status: "invalid_arguments", mode: "spawn", reason })
 }
 
+function withConcentrationWarning(text: string, warning: string | undefined): string {
+  return warning === undefined ? text : `${text}\n\n${warning}`
+}
+
+function concentrationWarningFor(starts: readonly BatchStart[]): string | undefined {
+  const observations = starts.flatMap((start): ConcentrationObservation[] => {
+    if (start.kind !== "started") return []
+    const observation = observeStartedItem(start.item, start.result.resolved_model)
+    return observation === undefined ? [] : [observation]
+  })
+  return lintProviderConcentration(observations)
+}
+
 function backgroundText(starts: readonly BatchStart[], status: "running" | "error"): string {
   const lines = starts.map((start, index) => {
     if (start.kind === "failed") {
@@ -136,12 +151,15 @@ function backgroundText(starts: readonly BatchStart[], status: "running" | "erro
   return [`Batch ${status}.`, ...lines].join("\n")
 }
 
-function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskToolDetails> {
+function backgroundResult(starts: readonly BatchStart[], concentrationWarning: string | undefined): AgentToolResult<TaskToolDetails> {
   const live = starts.filter((start): start is Extract<BatchStart, { kind: "started" }> => start.kind === "started")
   const status = live.length > 0 ? "running" : "error"
   const taskId = live[0]?.result.task_id ?? ""
   const items = starts.map((start) => start.kind === "started" ? startedDetail(start.item, start.result, start.skills) : start.detail)
-  return result(appendMissingSkills(backgroundText(starts, status), starts.map((start) => start.skills)), {
+  return result(withConcentrationWarning(
+    appendMissingSkills(backgroundText(starts, status), starts.map((start) => start.skills)),
+    concentrationWarning,
+  ), {
     task_id: taskId,
     status,
     mode: "spawn",
@@ -210,7 +228,11 @@ function syncText(status: "running" | "error" | "cancelled" | "completed", outpu
   return [`Batch ${status}.`, ...lines].join("\n")
 }
 
-async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[]): Promise<AgentToolResult<TaskToolDetails>> {
+async function syncResult(
+  input: ExecuteBatchInput,
+  starts: readonly BatchStart[],
+  concentrationWarning: string | undefined,
+): Promise<AgentToolResult<TaskToolDetails>> {
   const live = starts.filter((start): start is Extract<BatchStart, { kind: "started" }> => start.kind === "started")
   const settled = await Promise.allSettled(live.map((start) => waitForForegroundTask({
     manager: input.manager,
@@ -252,7 +274,10 @@ async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[
   const status = aggregateStatus(items, batchAborted)
   const taskId = live[0]?.result.task_id ?? ""
   const runInBackground = items.some((item) => item.run_in_background === true)
-  return result(appendMissingSkills(syncText(status, outputs), starts.map((start) => start.skills)), {
+  return result(withConcentrationWarning(
+    appendMissingSkills(syncText(status, outputs), starts.map((start) => start.skills)),
+    concentrationWarning,
+  ), {
     task_id: taskId,
     status,
     mode: "spawn",
@@ -268,5 +293,8 @@ export async function executeBatch(input: ExecuteBatchInput): Promise<AgentToolR
   }
   if (input.items.length > MAX_TASK_BATCH_ITEMS) return oversizedBatchResult()
   const starts = await startAll(input)
-  return input.runInBackground ? backgroundResult(starts) : syncResult(input, starts)
+  const concentrationWarning = concentrationWarningFor(starts)
+  return input.runInBackground
+    ? backgroundResult(starts, concentrationWarning)
+    : syncResult(input, starts, concentrationWarning)
 }
