@@ -1,16 +1,32 @@
+import {
+  OPENAI_ONLY_AGENT_RECOMMENDATIONS,
+  OPENAI_ONLY_CATEGORY_RECOMMENDATIONS,
+  type OpenAiOnlyRecommendation,
+} from "@oh-my-opencode/delegate-core"
+
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig, ProviderAvailability } from "./model-fallback-types"
 
-const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = {
-  explore: { model: "openai/gpt-5.6-luna-fast", variant: "low" },
-  librarian: { model: "openai/gpt-5.6-luna-fast", variant: "low" },
+// Derived, never hand-mirrored: delegate-core owns the maintained catalog and OMO Native compiles
+// the same record at runtime. Duplicating the literals here would let a catalog update silently
+// leave one edition stale, which no test on a self-consistent copy can detect.
+function toOverride(recommendation: OpenAiOnlyRecommendation): AgentConfig & CategoryConfig {
+  return {
+    model: `openai/${recommendation.modelId}`,
+    ...(recommendation.variant === undefined ? {} : { variant: recommendation.variant }),
+  }
 }
 
-const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, CategoryConfig> = {
-  artistry: { model: "openai/gpt-5.6-sol", variant: "xhigh" },
-  quick: { model: "openai/gpt-5.6-luna-fast" },
-  "visual-engineering": { model: "openai/gpt-5.6-sol", variant: "high" },
-  writing: { model: "openai/gpt-5.6-sol", variant: "medium" },
+function toOverrides(
+  recommendations: Readonly<Record<string, OpenAiOnlyRecommendation>>,
+): Record<string, AgentConfig & CategoryConfig> {
+  return Object.fromEntries(Object.entries(recommendations).map(([name, rec]) => [name, toOverride(rec)]))
 }
+
+const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = toOverrides(OPENAI_ONLY_AGENT_RECOMMENDATIONS)
+
+const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, CategoryConfig> = toOverrides(
+  OPENAI_ONLY_CATEGORY_RECOMMENDATIONS,
+)
 
 export function isOpenAiOnlyAvailability(availability: ProviderAvailability): boolean {
   return (

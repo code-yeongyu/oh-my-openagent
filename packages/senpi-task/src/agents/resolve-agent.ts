@@ -1,5 +1,6 @@
-import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
+import { resolveModelForDelegateTask, OPENAI_ONLY_AGENT_RECOMMENDATIONS } from "@oh-my-opencode/delegate-core"
 
+import { compileOpenAiOnlyOverlay } from "../category/openai-only-overlay"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
 import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
 import type { ResolvedModelRecord } from "../state"
@@ -104,7 +105,10 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   // still resolves and the child dies on the first provider call. Gate every candidate on the
   // auth-filtered available set so `models[]` and the builtin chain can actually take over. An
   // unparseable available set keeps the find-only behavior rather than failing every resolution.
-  const availableModels = parseAvailableAgentModels(registry.getAvailable())
+  // One snapshot per resolution, shared with the overlay below so identity, availability and
+  // lookup cannot disagree about which authenticated inventory they are talking about.
+  const availableSnapshot = registry.getAvailable()
+  const availableModels = parseAvailableAgentModels(availableSnapshot)
   let attemptedModel: string | undefined
   const configuredTuning = {
     ...(definition.variant === undefined ? {} : { variant: definition.variant }),
@@ -128,6 +132,49 @@ export function resolveAgent<TModel extends SenpiModelPort>(
         source: "agent",
       }),
     )
+  }
+
+  // Maintained OpenAI-only recommendation (issue #6813): applies only when the agent definition
+  // carries no explicit model choice of its own, the live inventory is safely identified as
+  // OpenAI-only, and the exact recommended model exists. An explicit definition.model/models entry
+  // is a user decision and always wins through the directModels loop above.
+  if (availableModels !== undefined && definition.model === undefined && (definition.models?.length ?? 0) === 0) {
+    const overlay = compileOpenAiOnlyOverlay(OPENAI_ONLY_AGENT_RECOMMENDATIONS, name, registry, availableSnapshot)
+    if (overlay !== undefined) {
+      const overlayModel = `${overlay.target.provider}/${overlay.target.modelId}`
+      const found = findExactAgentModel(overlayModel, registry)
+      // findExactAgentModel answers from the whole catalog, so gate it on the same auth-filtered
+      // set every other candidate passes through (see the directModels loop above).
+      if (found !== undefined && availableModels.includes(`${found.provider}/${found.modelId}`)) {
+        // Same tuning precedence as the chain path below: configured values beat the maintained variant.
+        const variant = configuredTuning.variant ?? overlay.recommendation.variant
+        const availableModelSet = new Set(availableModels)
+        const selectedRungEntry = fallbackChain?.find((entry) => entry.model === overlay.recommendation.modelId)
+        const chainCandidates = fallbackChain === undefined
+          ? []
+          : chainRungCandidates({
+              chain: fallbackChain,
+              selectedModel: overlayModel,
+              ...(selectedRungEntry !== undefined ? { selectedRungEntry } : {}),
+              availableModels: availableModelSet,
+            })
+        return resolvedAgent(
+          context,
+          found,
+          variant,
+          configuredTuning.reasoningEffort,
+          buildRuntimeModelChain({
+            candidates: [
+              { model: overlayModel, ...(variant !== undefined ? { variant } : {}) },
+              ...chainCandidates,
+            ],
+            selectedModel: overlayModel,
+            availableModels: availableModelSet,
+            source: "agent",
+          }),
+        )
+      }
+    }
   }
 
   if (availableModels !== undefined && fallbackChain !== undefined) {

@@ -60,4 +60,17 @@ describe("resolveAvailableCategoryNames", () => {
       })
     })
   })
+
+  describe("#given an OpenAI-only registry that activates maintained category overlays", () => {
+    describe("#when the runtime category list is resolved", () => {
+      it("#then categories with no live static rung are still exposed", () => {
+        const names = resolveAvailableCategoryNames({}, fakeRegistry([
+          { provider: "openai", id: "gpt-5.6-sol" },
+          { provider: "openai", id: "gpt-5.6-luna-fast" },
+        ]))
+        expect(names).toContain("artistry")
+        expect(names).toContain("writing")
+      })
+    })
+  })
 })

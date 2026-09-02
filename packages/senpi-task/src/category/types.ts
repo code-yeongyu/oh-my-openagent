@@ -21,6 +21,12 @@ export type SenpiModelPort = {
 export type SenpiModelRegistryPort<TModel extends SenpiModelPort> = {
   readonly getAvailable: () => readonly TModel[] | unknown
   readonly find: (provider: string, modelId: string) => TModel | unknown
+  // Optional senpi ModelRegistry surface returning a model's EXPLICITLY configured upstream model id
+  // (models.json `upstreamModelId` mapping). Present only on registries that expose it; used to
+  // identify an explicitly mapped provider alias safely - never to infer identity from a compatible
+  // wire protocol alone. Declared as a method so the concrete senpi registry (whose parameter is the
+  // wider Model type) stays structurally assignable.
+  getUpstreamModelId?(model: TModel): unknown
 }
 
 export type ResolvedChildSpec<TModel extends SenpiModelPort> = {

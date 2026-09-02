@@ -1,4 +1,5 @@
 import {
+  OPENAI_ONLY_CATEGORY_RECOMMENDATIONS,
   resolveModelForDelegateTask,
   type DelegateFallbackEntry,
 } from "@oh-my-opencode/delegate-core"
@@ -19,8 +20,10 @@ import {
   isCategoryChainViable,
   isCategoryGateSatisfied,
 } from "./builtins"
+import { compileOpenAiOnlyOverlay, type OpenAiOnlyOverlay } from "./openai-only-overlay"
 import { buildRuntimeModelChain, chainRungCandidates, type ModelChainCandidate } from "../model-chain"
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
+import { isSafeSenpiModel, ownStringDataProperty } from "./model-registry-boundary"
 import type {
   CategoryModelSelection,
   CategoryResolutionResult,
@@ -52,41 +55,15 @@ type AvailableModelsParseResult = {
   readonly validContainer: boolean
 }
 
-const SECRET_LIKE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
-  "accesstoken", "apikey", "auth", "authorization",
-  "bearertoken", "clientsecret", "password", "privatekey",
-  "privatetoken", "secret", "secretkey", "token",
-] as const)
-
 function formatModel(model: ParsedModel): string {
   return `${model.provider}/${model.modelId}`
-}
-
-function normalizeModelFieldName(key: string): string {
-  return key.replaceAll(/[^a-zA-Z0-9]/g, "").toLowerCase()
-}
-
-function hasSecretLikeModelField(model: object): boolean {
-  return Object.getOwnPropertyNames(model).some((key) =>
-    SECRET_LIKE_MODEL_FIELD_NAMES.has(normalizeModelFieldName(key))
-  )
-}
-
-function ownStringDataProperty(model: object, key: "provider" | "id" | "name"): string | undefined {
-  const descriptor = Object.getOwnPropertyDescriptor(model, key)
-  return descriptor && "value" in descriptor && typeof descriptor.value === "string" ? descriptor.value : undefined
-}
-
-function isSenpiModelPort<TModel extends SenpiModelPort>(model: unknown): model is TModel {
-  if (typeof model !== "object" || model === null || hasSecretLikeModelField(model)) return false
-  return ownStringDataProperty(model, "provider") !== undefined && ownStringDataProperty(model, "id") !== undefined
 }
 
 function parseRegistryModel<TModel extends SenpiModelPort>(
   model: unknown,
   expected?: ParsedModel,
 ): ParsedRegistryModel<TModel> | undefined {
-  if (!isSenpiModelPort<TModel>(model)) {
+  if (!isSafeSenpiModel<TModel>(model)) {
     return undefined
   }
   const provider = ownStringDataProperty(model, "provider")
@@ -174,15 +151,40 @@ function categoryModelCandidates(config: OmoCategoryConfig): readonly ModelChain
   return [...primary, ...fallbacks]
 }
 
-function availableCategoryNames(config: OmoConfig, availableModelIds?: ReadonlySet<string>): readonly string[] {
+function availableCategoryNames(
+  config: OmoConfig,
+  availableModelIds?: ReadonlySet<string>,
+  activeOverlays?: ReadonlyMap<string, OpenAiOnlyOverlay>,
+): readonly string[] {
   const names = Array.from(new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(config.categories ?? {})])).sort()
   if (availableModelIds === undefined) return names
   const userCategories = config.categories ?? {}
   return names.filter((name) => {
     const hasExplicitUserConfig = getOwnRecordValue(userCategories, name) !== undefined
     return isCategoryGateSatisfied(name, hasExplicitUserConfig, availableModelIds)
-      && isCategoryChainViable(name, hasExplicitUserConfig, availableModelIds)
+      && (isCategoryChainViable(name, hasExplicitUserConfig, availableModelIds)
+        || activeOverlays?.has(name) === true)
   })
+}
+
+function compileOpenAiOnlyCategoryOverlays<TModel extends SenpiModelPort>(
+  config: OmoConfig,
+  senpiModelRegistry: SenpiModelRegistryPort<TModel>,
+  availableSnapshot: unknown,
+): ReadonlyMap<string, OpenAiOnlyOverlay> {
+  const overlays = new Map<string, OpenAiOnlyOverlay>()
+  const userCategories = config.categories ?? {}
+  for (const categoryName of Object.keys(OPENAI_ONLY_CATEGORY_RECOMMENDATIONS)) {
+    if (getOwnRecordValue(userCategories, categoryName) !== undefined) continue
+    const overlay = compileOpenAiOnlyOverlay(
+      OPENAI_ONLY_CATEGORY_RECOMMENDATIONS,
+      categoryName,
+      senpiModelRegistry,
+      availableSnapshot,
+    )
+    if (overlay !== undefined) overlays.set(categoryName, overlay)
+  }
+  return overlays
 }
 
 // Gated listing for the disabled/not_found early returns. The registry is only consulted best
@@ -193,9 +195,11 @@ function gatedAvailableCategories<TModel extends SenpiModelPort>(
   senpiModelRegistry: SenpiModelRegistryPort<TModel>,
 ): readonly string[] {
   try {
-    const parsed = parseAvailableModels(senpiModelRegistry.getAvailable())
+    const availableSnapshot = senpiModelRegistry.getAvailable()
+    const parsed = parseAvailableModels(availableSnapshot)
     if (!parsed.validContainer) return availableCategoryNames(config)
-    return availableCategoryNames(config, modelIdsOf(parsed.models))
+    const activeOverlays = compileOpenAiOnlyCategoryOverlays(config, senpiModelRegistry, availableSnapshot)
+    return availableCategoryNames(config, modelIdsOf(parsed.models), activeOverlays)
   } catch {
     return availableCategoryNames(config)
   }
@@ -308,7 +312,10 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   }
 
   const config = { ...builtinConfig, ...userConfig }
-  const availableModelsResult = parseAvailableModels(senpiModelRegistry.getAvailable())
+  // One snapshot per resolution: identity, availability and lookup must all agree on the same
+  // authenticated inventory, so this value is threaded into the overlay instead of re-sampled.
+  const availableSnapshot = senpiModelRegistry.getAvailable()
+  const availableModelsResult = parseAvailableModels(availableSnapshot)
   const availableModels = availableModelsResult.models
   if (!availableModelsResult.validContainer) {
     return {
@@ -321,7 +328,12 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   }
 
   const availableModelIds = modelIdsOf(availableModels)
-  const gatedCategories = availableCategoryNames(omoConfig, availableModelIds)
+  // Maintained OpenAI-only recommendation (issue #6813): compiled only when the user has no explicit
+  // entry for this category, the live inventory is safely identified as OpenAI-only, and the exact
+  // recommended model exists. Any explicit categories.<name> entry above already won.
+  const activeOverlays = compileOpenAiOnlyCategoryOverlays(omoConfig, senpiModelRegistry, availableSnapshot)
+  const overlay = activeOverlays.get(categoryName)
+  const gatedCategories = availableCategoryNames(omoConfig, availableModelIds, activeOverlays)
   const fallbackChain = getOwnRecordValue(CATEGORY_FALLBACK_CHAINS, categoryName)
   const chainDead = fallbackChain !== undefined
     && fallbackChain.length > 0
@@ -345,7 +357,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   // fallback list opts the category out (its failure stays a plain user-model miss without chain
   // details), and a caller-supplied system default remains the resolver's last resort.
   const userHasCanonicalModels = (userConfig?.models?.length ?? 0) > 0
-  if (deadChain !== undefined && !userHasCanonicalModels && userConfig?.model === undefined && userConfig?.fallback_models === undefined && options.systemDefaultModel === undefined) {
+  if (deadChain !== undefined && overlay === undefined && !userHasCanonicalModels && userConfig?.model === undefined && userConfig?.fallback_models === undefined && options.systemDefaultModel === undefined) {
     return {
       kind: "model_unavailable",
       category: categoryName,
@@ -364,7 +376,11 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   const canonicalReasoningByModel = new Map(
     (canonicalChain ?? []).map((candidate) => [candidate.model, candidate.reasoningEffort]),
   )
-  const userModel = canonicalChain !== undefined ? canonicalChain[0].model : userConfig?.model
+  const userModel = overlay !== undefined
+    ? `${overlay.target.provider}/${overlay.target.modelId}`
+    : canonicalChain !== undefined
+      ? canonicalChain[0].model
+      : userConfig?.model
   const userFallbackModels = canonicalChain !== undefined
     ? canonicalChain.slice(1).map((candidate) => candidate.model)
     : flattenFallbackModels(config.fallback_models)
@@ -419,7 +435,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   }
 
   const prompt_append = promptAppendForCategory(categoryName, selection.selectedModel, userConfig?.prompt_append)
-  const variant = userConfig?.variant ?? selection.variant ?? config.variant
+  const variant = userConfig?.variant ?? overlay?.recommendation.variant ?? selection.variant ?? config.variant
   // Canonical reasoning outranks the legacy reasoningEffort, whether it sits on the category or
   // on the selected canonical models entry; legacy reasoningEffort is the final fallback.
   const effectiveReasoningEffort = canonicalReasoningByModel.get(selection.selectedModel)
@@ -437,7 +453,14 @@ export function resolveCategory<TModel extends SenpiModelPort>(
         availableModels: availableModelSet,
       })
   const runtimeModelChain = buildRuntimeModelChain({
-    candidates: [...categoryModelCandidates(config), ...chainCandidates],
+    candidates: [
+      // The recommendation rides as the requested head so the record reflects what the overlay chose.
+      ...(overlay !== undefined
+        ? [{ model: selection.selectedModel, ...(variant !== undefined ? { variant } : {}) }]
+        : []),
+      ...categoryModelCandidates(config),
+      ...chainCandidates,
+    ],
     selectedModel: selection.selectedModel,
     availableModels: availableModelSet,
     source: "category",
