@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { rmEfaultTolerant } from "../teardown.test-support"
+import { createMemoryRunSupervisorIc8ExitResources } from "./memory-run-supervisor-ic8-exit-resources"
 import {
   advanceTestClock,
   createTestClock,
@@ -15,6 +16,7 @@ import {
 // plus git work. The 5s default is a fast-machine assumption, not a budget those subprocesses
 // fit on a loaded CI runner; the assertions stay event-driven with no sleeps.
 const WAIT_MS = 60_000
+const POST_KILL_WAIT_MS = 15_000
 setDefaultTimeout(WAIT_MS)
 
 const supervisorPath = join(import.meta.dir, "memory-run-supervisor.ts")
@@ -22,6 +24,7 @@ const childFixture = join(import.meta.dir, "__fixtures__", "supervisor-child.ts"
 const parentFixture = join(import.meta.dir, "__fixtures__", "supervisor-parent.ts")
 const roots: string[] = []
 const processGroups = new Set<number>()
+const exitResources = createMemoryRunSupervisorIc8ExitResources(WAIT_MS)
 const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
 
 // Windows releases file handles asynchronously when killed processes die, so an immediate recursive
@@ -56,6 +59,7 @@ async function makeRun(options: {
   readonly hardDeadlineAt?: number
   readonly terminationGraceMs?: number
   readonly nextAttempt?: { readonly attempt: number; readonly model: string; readonly thinking?: string }
+  readonly childExitPort?: number
 }): Promise<string> {
   const runDir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-run-supervisor-")))
   roots.push(runDir)
@@ -70,7 +74,12 @@ async function makeRun(options: {
     command: process.execPath,
     args: [childFixture, options.mode, runDir],
     cwd: runDir,
-    env: { ...process.env },
+    env: {
+      ...process.env,
+      ...(options.childExitPort === undefined
+        ? {}
+        : { OMO_MEMORY_SUPERVISOR_EXIT_PORT: String(options.childExitPort) }),
+    },
     // Non-deadline runs get a load-tolerant budget: cold bun spawns plus fsync'd identity
     // writes overshoot 10s on a loaded windows-latest runner, and the supervisor records
     // timedOut from the deadline instant being reached even when the child exited cleanly.
@@ -108,12 +117,23 @@ async function waitForPath(path: string, timeoutMs = WAIT_MS): Promise<void> {
   await waitForFilesystemState(dirname(path), () => existsSync(path) ? true : undefined, timeoutMs, path)
 }
 
-async function waitForLedgerChild(runDir: string): Promise<{ readonly childPid: number }> {
-  const path = join(runDir, "ledger.json")
-  return await waitForFilesystemState(runDir, async () => {
-    const value = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>
-    return typeof value.childPid === "number" ? { childPid: value.childPid } : undefined
-  }, WAIT_MS, "child identity")
+async function waitForReleasedChild(runDir: string): Promise<{ readonly childPid: number }> {
+  // The child writes this marker only after the supervisor has durably recorded the bootstrap PID
+  // and released it. Waiting for it prevents the test reader from racing the Windows ledger rename.
+  await waitForPath(join(runDir, "child-started.json"))
+  const [child, ledger] = await Promise.all([
+    readFile(join(runDir, "child-started.json"), "utf8"),
+    readFile(join(runDir, "ledger.json"), "utf8"),
+  ])
+  const childPid = (JSON.parse(ledger) as Record<string, unknown>).childPid
+  const modelPid = (JSON.parse(child) as Record<string, unknown>).pid
+  if (typeof childPid !== "number" || !Number.isInteger(childPid) || childPid <= 0) {
+    throw new Error("released child has no durable process-group pid")
+  }
+  if (typeof modelPid !== "number" || !Number.isInteger(modelPid) || modelPid <= 0) {
+    throw new Error("released child did not publish its running process pid")
+  }
+  return { childPid }
 }
 
 async function readOutcome(runDir: string): Promise<Outcome> {
@@ -121,15 +141,31 @@ async function readOutcome(runDir: string): Promise<Outcome> {
   return JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8")) as Outcome
 }
 
-async function waitForExit(child: ChildProcess): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
-  return await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`waited ${WAIT_MS}ms for process exit`)), WAIT_MS)
+function observeProcessExit(child: ChildProcess): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  return new Promise((resolve, reject) => {
     child.once("error", reject)
-    child.once("close", (code, signal) => {
-      clearTimeout(timeout)
-      resolve({ code, signal })
-    })
+    child.once("close", (code, signal) => resolve({ code, signal }))
   })
+}
+
+async function waitForSignal<T>(signal: Promise<T>, description: string, timeoutMs = WAIT_MS): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`waited ${timeoutMs}ms for ${description}`)), timeoutMs)
+    void signal.then(
+      (value) => {
+        clearTimeout(timeout)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timeout)
+        reject(error)
+      },
+    )
+  })
+}
+
+async function waitForExit(child: ChildProcess): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  return await waitForSignal(observeProcessExit(child), "process exit")
 }
 
 function signalGroup(pid: number, signal: NodeJS.Signals): void {
@@ -152,10 +188,27 @@ function groupIsAlive(pid: number): boolean {
 // for the run directory to be removable.
 function killTree(pid: number): void {
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" })
+    spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true })
     return
   }
   signalGroup(pid, "SIGKILL")
+}
+
+async function terminateReleasedTree(pid: number): Promise<void> {
+  if (process.platform !== "win32") {
+    signalGroup(pid, "SIGTERM")
+    return
+  }
+  const taskkill = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+    stdio: "ignore",
+    windowsHide: true,
+  })
+  const result = await waitForSignal(
+    observeProcessExit(taskkill),
+    "taskkill /T /F completion",
+    POST_KILL_WAIT_MS,
+  )
+  if (result.code !== 0) throw new Error(`taskkill /T /F exited with ${result.code ?? result.signal ?? "unknown status"}`)
 }
 
 afterEach(async () => {
@@ -167,6 +220,7 @@ afterEach(async () => {
     }
   }
   processGroups.clear()
+  await exitResources.cleanup()
   await Promise.all(roots.splice(0).map(removeRoot))
 })
 
@@ -278,23 +332,24 @@ describe("memory run supervisor", () => {
   }, 60_000)
 
   test("#given a released child #when the supervisor is killed abruptly #then the recorded live process group can be terminated", async () => {
-    // given
-    const runDir = await makeRun({ mode: "graceful" })
+    // given: every event listener is attached before the lifecycle transition it observes.
+    const childExit = await exitResources.openServer()
+    const runDir = await makeRun({ mode: "graceful", childExitPort: childExit.port })
     const supervisor = launchSupervisor(runDir)
-    const supervisorExit = waitForExit(supervisor)
-    const { childPid } = await waitForLedgerChild(runDir)
+    const supervisorExit = observeProcessExit(supervisor)
+    const { childPid } = await waitForReleasedChild(runDir)
     processGroups.add(childPid)
-    await waitForPath(join(runDir, "child-started.json"))
+    await waitForSignal(childExit.exitSocketAccepted, "released model child connection")
 
-    // when
+    // when: distinguish supervisor exit, taskkill completion, and child-tree exit independently.
     supervisor.kill("SIGKILL")
-    await supervisorExit
-    if (process.platform === "win32") killTree(childPid)
-    else {
-      expect(groupIsAlive(childPid)).toBe(true)
-      signalGroup(childPid, "SIGTERM")
-      await waitForPath(join(runDir, "child-terminated.json"))
-    }
+    await waitForSignal(supervisorExit, "supervisor exit after abrupt kill", POST_KILL_WAIT_MS)
+    if (process.platform !== "win32") expect(groupIsAlive(childPid)).toBe(true)
+    await terminateReleasedTree(childPid)
+    if (process.platform !== "win32") await waitForPath(join(runDir, "child-terminated.json"))
+    await waitForSignal(childExit.childExited, "released child exit after tree termination", POST_KILL_WAIT_MS)
+    processGroups.delete(childPid)
+    if (supervisor.pid !== undefined) processGroups.delete(supervisor.pid)
 
     // then
     expect(existsSync(join(runDir, "outcome.json"))).toBe(false)
