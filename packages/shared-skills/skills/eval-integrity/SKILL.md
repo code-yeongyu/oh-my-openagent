@@ -6,8 +6,10 @@ description: "Assess integrity of an eval, benchmark, metric, A/B test, holdout,
 # Evaluation Integrity
 
 Provide a read-only audit of whether an evaluation can support its stated claim. Do not alter code,
-data, prompts, labels, or study operations. State exactly one mandatory verdict: **PASS**, **FAIL**,
-or **INCONCLUSIVE**. A favorable score is not itself evidence of integrity.
+data, prompts, labels, or study operations. Begin with exactly one verdict line in the form
+`**Verdict: PASS**`, `**Verdict: FAIL**`, or `**Verdict: INCONCLUSIVE**`. Emit no other verdict
+line and do not restate the verdict later in the report. A favorable score is not itself evidence
+of integrity.
 
 ## Route correctly
 
