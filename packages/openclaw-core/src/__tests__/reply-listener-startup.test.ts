@@ -139,31 +139,22 @@ describe("startReplyListener", () => {
     })
 
     spawnImplementation = () => {
-      const markReady = (): void => {
-        if (!existsSync(stateFilePath)) {
-          setTimeout(markReady, 5)
-          return
-        }
-
-        const pendingState = JSON.parse(readFileSync(stateFilePath, "utf-8")) as Record<string, unknown>
-        writeFileSync(
-          stateFilePath,
-          JSON.stringify(
-            {
-              ...pendingState,
-              isRunning: true,
-              pid: 4321,
-              lastPollAt: "2026-04-07T00:00:00.000Z",
-              discordLastMessageId: "discord-99",
-              messagesSeen: 4,
-            },
-            null,
-            2,
-          ),
-        )
-      }
-
-      setTimeout(markReady, 5)
+      const pendingState = JSON.parse(readFileSync(stateFilePath, "utf-8")) as Record<string, unknown>
+      writeFileSync(
+        stateFilePath,
+        JSON.stringify(
+          {
+            ...pendingState,
+            isRunning: true,
+            pid: 4321,
+            lastPollAt: "2026-04-07T00:00:00.000Z",
+            discordLastMessageId: "discord-99",
+            messagesSeen: 4,
+          },
+          null,
+          2,
+        ),
+      )
 
       return {
         pid: 4321,

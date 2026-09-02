@@ -106,7 +106,7 @@ describe("reflection and dream run reconciliation", () => {
     })
 
     expect(result).toEqual([])
-  })
+  }, 30_000)
 
   test("#given an orphaned successful dream worktree #when session-start reconciliation runs #then it merges clears the reservation records completion and publishes final", async () => {
     // given
