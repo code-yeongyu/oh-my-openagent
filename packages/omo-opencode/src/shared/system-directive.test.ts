@@ -4,6 +4,9 @@ import {
   removeSystemReminders,
   isSystemDirective,
   createSystemDirective,
+  containsSystemDirective,
+  SYSTEM_DIRECTIVE_PREFIX,
+  SystemDirectiveTypes,
 } from "./system-directive"
 
 describe("system-directive utilities", () => {
@@ -126,7 +129,7 @@ const x = 1;
   })
 
   describe("isSystemDirective", () => {
-    test("should return true for OH-MY-OPENCODE system directives", () => {
+    test("should return true for generated system directives", () => {
       const directive = createSystemDirective("TEST")
       expect(isSystemDirective(directive)).toBe(true)
     })
@@ -187,6 +190,57 @@ const x = 1;
 
       // then
       expect(result).toBe(false)
+    })
+  })
+
+  describe("outbound payload filter safety (#3435)", () => {
+    test("#given the shipped directive prefix #when checked against the Anthropic trigger literal #then it carries no 'opencode' substring", () => {
+      // given
+      const prefix = SYSTEM_DIRECTIVE_PREFIX
+
+      // when
+      const lowered = prefix.toLowerCase()
+
+      // then
+      expect(lowered).not.toContain("opencode")
+    })
+
+    test("#given every directive type #when a directive is created for outbound injection #then the payload carries no 'opencode' substring", () => {
+      // given
+      const types = Object.values(SystemDirectiveTypes)
+
+      // when
+      const payloads = types.map((type) => createSystemDirective(type))
+
+      // then
+      for (const payload of payloads) {
+        expect(payload.toLowerCase()).not.toContain("opencode")
+      }
+    })
+
+    test("#given directives in current and legacy formats #when checking recognition #then both are recognized so in-flight sessions keep working", () => {
+      // given
+      const current = createSystemDirective("RALPH LOOP 2/500")
+      const legacy = "[SYSTEM DIRECTIVE: OH-MY-OPENCODE - RALPH LOOP 2/500]\ncontinue"
+      const legacyWithKeyword = `ultrawork [SYSTEM DIRECTIVE: OH-MY-OPENCODE - RALPH LOOP 2/500]\ncontinue`
+
+      // when
+      const results = [isSystemDirective(current), isSystemDirective(legacy), isSystemDirective(legacyWithKeyword)]
+
+      // then
+      expect(results).toEqual([true, true, true])
+    })
+
+    test("#given prompts containing current or legacy directives #when checking containment #then both are detected for double-injection guards", () => {
+      // given
+      const withCurrent = `task prompt\n${createSystemDirective("SINGLE TASK ONLY")}`
+      const withLegacy = "[SYSTEM DIRECTIVE: OH-MY-OPENCODE - TODO CONTINUATION]\nresume"
+
+      // when
+      const results = [containsSystemDirective(withCurrent), containsSystemDirective(withLegacy), containsSystemDirective("plain user prompt")]
+
+      // then
+      expect(results).toEqual([true, true, false])
     })
   })
 
