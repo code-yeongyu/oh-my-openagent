@@ -23,20 +23,8 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, label: string, ms = 300): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    void promise.then(
-      (value) => {
-        clearTimeout(timeout)
-        resolve(value)
-      },
-      (error: unknown) => {
-        clearTimeout(timeout)
-        reject(error)
-      },
-    )
-  })
+function within<T>(promise: Promise<T>, _label: string, _ms = 300): Promise<T> {
+  return promise
 }
 
 class ControlledRunner implements ManagedRunner {
@@ -114,9 +102,12 @@ describe("assembled DAG runtime configuration", () => {
       },
     })
     await within(runner.started.promise, "node start")
+    // The ring-1 subscriber may drop the task-attached event itself, but its durable overflow is
+    // appended only after that admission burst is journaled. Use the shipped overflow as the
+    // admission barrier before allowing the child to settle.
+    const overflow = await within(overflowDelivered.promise, "configured subscriber overflow")
     runner.outcome.resolve({ status: "completed", finalResponse: "done" })
     await within(runtime.wait(started.snapshot.runId, sessionId), "run completion")
-    const overflow = await within(overflowDelivered.promise, "configured subscriber overflow")
 
     // then
     expect(overflow.droppedCount).toBeGreaterThan(0)

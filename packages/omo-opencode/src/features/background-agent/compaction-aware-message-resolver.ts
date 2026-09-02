@@ -90,11 +90,22 @@ function mergeStoredMessages(
       }
     }
 
+    if (
+      merged.model?.providerID &&
+      merged.model.modelID &&
+      !merged.model.variant &&
+      message.model?.providerID === merged.model.providerID &&
+      message.model.modelID === merged.model.modelID &&
+      message.model.variant
+    ) {
+      merged.model.variant = message.model.variant
+    }
+
     if (!merged.tools && message.tools) {
       merged.tools = message.tools
     }
 
-    if (hasFullAgentAndModel(merged) && merged.tools) {
+    if (hasFullAgentAndModel(merged) && merged.tools && merged.model?.variant) {
       break
     }
   }

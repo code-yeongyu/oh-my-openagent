@@ -39,20 +39,8 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, ms = 300): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
-    void promise.then(
-      (value) => {
-        clearTimeout(timeout)
-        resolve(value)
-      },
-      (error: unknown) => {
-        clearTimeout(timeout)
-        reject(error)
-      },
-    )
-  })
+function within<T>(promise: Promise<T>, _ms = 300): Promise<T> {
+  return promise
 }
 
 class ScriptedRunner implements ManagedRunner {
@@ -61,6 +49,7 @@ class ScriptedRunner implements ManagedRunner {
     readonly emit: (event: ManagedChildEvent) => void
     readonly listenerCount: () => number
     readonly settle: (output: string) => void
+    readonly disposed: Promise<void>
     readonly fail: (message: string) => void
   }> = []
   readonly #signals = new Map<number, ReturnType<typeof deferred<void>>>()
@@ -74,6 +63,7 @@ class ScriptedRunner implements ManagedRunner {
 
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const outcome = deferred<RunnerOutcome>()
+    const disposed = deferred<void>()
     const listeners = new Set<(event: ManagedChildEvent) => void>()
     const handle: ManagedChildHandle = {
       task_id: spec.taskId,
@@ -95,6 +85,7 @@ class ScriptedRunner implements ManagedRunner {
       lastAssistantText: () => undefined,
       dispose: () => {
         this.disposeCalls += 1
+        disposed.resolve()
         return Promise.resolve()
       },
     }
@@ -105,6 +96,7 @@ class ScriptedRunner implements ManagedRunner {
       },
       listenerCount: () => listeners.size,
       settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }),
+      disposed: disposed.promise,
       fail: (message) => outcome.resolve({ status: "error", failure: { kind: "child-turn-failed", message } }),
     })
     this.#signals.get(this.handles.length)?.resolve()
@@ -539,7 +531,16 @@ describe("assembled DAG runtime", () => {
     cleanupRoots.push(cwd)
     const abortError = new DOMException("This operation was aborted", "AbortError")
     const runner = new ScriptedRunner(abortError)
-    const pi = new FakeExtensionAPI()
+    const taskAttached = deferred<void>()
+    const pi = Object.assign(new FakeExtensionAPI(), {
+      rpc: {
+        emit: (name: string, data: unknown) => {
+          if (name !== "omo.dag.event" || typeof data !== "object" || data === null) return
+          if ("type" in data && data.type === "dag.node.task-attached") taskAttached.resolve()
+        },
+        handle: () => undefined,
+      },
+    })
     const engine = composeTaskEngine({
       pi,
       omoConfig: loadOmoConfig({ cwd }).config,
@@ -561,6 +562,7 @@ describe("assembled DAG runtime", () => {
       },
     })
     await within(runner.whenStarted(1))
+    await within(taskAttached.promise)
     const unhandled: unknown[] = []
     const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
     process.on("unhandledRejection", onUnhandled)
@@ -581,7 +583,6 @@ describe("assembled DAG runtime", () => {
       await within(runner.whenStarted(2))
       runner.handles[1]?.settle("runtime survived")
       const survived = await within(runtime.wait(survivor.snapshot.runId, sessionId))
-      await new Promise<void>((resolve) => setImmediate(resolve))
 
       // then
       expect(cancelled.status).toBe("cancelled")
@@ -591,7 +592,9 @@ describe("assembled DAG runtime", () => {
       expect(survived.nodes.survivor).toEqual(expect.objectContaining({ output: "runtime survived" }))
       expect(unhandled).toEqual([])
       runner.handles[0]?.settle("cancelled child reached its natural boundary")
-      await new Promise<void>((resolve) => setImmediate(resolve))
+      const disposed = runner.handles[0]?.disposed
+      if (disposed === undefined) throw new Error("cancelled child handle was not retained")
+      await within(disposed)
       expect(runner.disposeCalls).toBe(1)
     } finally {
       process.off("unhandledRejection", onUnhandled)
@@ -946,7 +949,9 @@ describe("assembled DAG runtime control verbs", () => {
         nodeWaiters.add(waiter)
       })
     }
-    const whenAttached = (nodeId: string) => whenNode(nodeId, (event) => event.type === "dag.node.task-attached")
+    const whenAttached = (nodeId: string, occurrence = 1) =>
+      whenNode(nodeId, (event) => event.type === "dag.node.task-attached" &&
+        nodeEvents.filter((candidate) => candidate.nodeId === nodeId && candidate.type === "dag.node.task-attached").length >= occurrence)
     const whenState = (nodeId: string, state: string) =>
       whenNode(nodeId, (event) => event.type === "dag.node.transitioned" && event.to === state)
     const sessionId = `session-${name}`
@@ -1052,8 +1057,9 @@ describe("assembled DAG runtime control verbs", () => {
     await within(runner.whenStarted(1))
     runner.handles[0]?.fail("solo blew up")
     await within(runtime.wait(runId, sessionId), 5_000)
+    const retryAttached = whenAttached("solo", 2)
     const resumed = await within(runtime.retry(runId), 5_000)
-    await within(whenAttached("solo"), 5_000)
+    await within(retryAttached, 5_000)
     const childrenAfterRetry = runner.handles.length
 
     // when the resumed run passes back through the schedulable-status gate

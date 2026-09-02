@@ -1,0 +1,14 @@
+{
+  "base": "upstream/dev@12697e3ae",
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoProtectedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "IGNORED",
+  "sandboxAgentDir": "[redacted task-owned sandbox]/agent",
+  "sandboxCwd": "[redacted task-owned sandbox]/project"
+}

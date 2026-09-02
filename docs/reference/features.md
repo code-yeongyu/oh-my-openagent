@@ -679,6 +679,14 @@ AST-aware search and rewrite now lives in the `ast-grep` skill. Load it with the
 | **background_output** | Retrieve background task results                                                                                                                                                                                                        |
 | **background_cancel** | Cancel running background tasks                                                                                                                                                                                                         |
 
+`task` is the broader delegation path for category routing, direct
+`subagent_type` calls, skills, and sync/background execution.
+`call_omo_agent` is the narrow compatibility path for the small
+explore/librarian-style agent allowlist. Keep the split in mind when
+configuring permissions: Sisyphus-Junior blocks `task` to avoid nested
+delegation loops, but can still use `call_omo_agent` where that narrower
+path is explicitly allowed.
+
 ### Visual Analysis Tools
 
 | Tool        | Description                                                                                                                                                    |
@@ -907,7 +915,7 @@ Current composition counts:
 | ---------------------------- | ------------------- | -------------------------------------------------------------------------------------------------- |
 | **auto-update-checker**      | Event               | Checks for new versions on session creation, shows startup toast with version and Sisyphus status. |
 | **background-notification**  | Event               | Notifies when background agent tasks complete.                                                     |
-| **session-notification**     | Event               | OS notifications when agents go idle. Works on macOS, Linux, Windows.                              |
+| **session-notification**     | Event               | OS notifications when agents go idle. Works on macOS, Linux, Windows. Use one notification path with OpenCode native Attention to avoid duplicates. |
 | **agent-usage-reminder**     | PostToolUse + Event | Reminds you to leverage specialized agents for better results.                                     |
 | **question-label-truncator** | PreToolUse          | Truncates long question labels in the Question tool UI.                                            |
 
