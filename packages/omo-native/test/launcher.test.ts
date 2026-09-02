@@ -150,8 +150,10 @@ function expectedBunUpdateCommand(packageRoot: string): string {
   const quotedRoot = process.platform === "win32"
     ? `"${packageRoot.replaceAll("\\", "/")}"`
     : `'${packageRoot.replaceAll("'", "'\\''")}'`
-  return `omo is updated via bun: bun add --cwd ${quotedRoot} -g omo-ai@beta`
+  return `Run: bun add --cwd ${quotedRoot} -g omo-ai@beta`
 }
+
+const SELF_UPDATE_REFUSAL = "omo does not self-update (the senpi engine is version-pinned)."
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
@@ -282,11 +284,12 @@ describe("omo launcher", () => {
 
     describe("#when a self-update is requested", () => {
       for (const args of [["update", "--self"], ["update", "self"], ["update", "senpi"]]) {
-        test(`#then ${args.join(" ")} is answered with the product's own update command`, () => {
+        test(`#then ${args.join(" ")} is refused with the product's own update command`, () => {
           const fixture = createFixture()
           const result = run(fixture, args)
-          expect(result.status).toBe(0)
-          expect(result.stdout).toContain("npm i -g omo-ai@beta")
+          expect(result.status).toBe(1)
+          expect(result.stdout).toContain(SELF_UPDATE_REFUSAL)
+          expect(result.stdout).toContain("Run: npm i -g omo-ai@beta")
           expect(existsSync(fixture.captureFile)).toBe(false)
         })
       }
@@ -324,8 +327,9 @@ describe("omo launcher", () => {
       test("#then npm beta guidance is printed without spawning senpi", () => {
         const fixture = createFixture()
         const result = run(fixture, ["update"])
-        expect(result.status).toBe(0)
-        expect(result.stdout).toContain("omo is updated via npm: npm i -g omo-ai@beta")
+        expect(result.status).toBe(1)
+        expect(result.stdout).toContain(SELF_UPDATE_REFUSAL)
+        expect(result.stdout).toContain("Run: npm i -g omo-ai@beta")
         expect(existsSync(fixture.captureFile)).toBe(false)
       })
 
@@ -333,8 +337,8 @@ describe("omo launcher", () => {
         const fixture = createFixture({ installLayout: "bun" })
         const result = run(fixture, ["update"])
 
-        expect(result.status).toBe(0)
-        expect(result.stdout.trim()).toBe(expectedBunUpdateCommand(fixture.packageRoot))
+        expect(result.status).toBe(1)
+        expect(result.stdout.trim()).toBe(`${SELF_UPDATE_REFUSAL}\n${expectedBunUpdateCommand(fixture.packageRoot)}`)
         expect(existsSync(fixture.captureFile)).toBe(false)
       })
 
@@ -342,8 +346,8 @@ describe("omo launcher", () => {
         const fixture = createFixture({ installLayout: "bun-posix-special" })
         const result = run(fixture, ["update"])
 
-        expect(result.status).toBe(0)
-        expect(result.stdout.trim()).toBe(expectedBunUpdateCommand(fixture.packageRoot))
+        expect(result.status).toBe(1)
+        expect(result.stdout.trim()).toBe(`${SELF_UPDATE_REFUSAL}\n${expectedBunUpdateCommand(fixture.packageRoot)}`)
       })
 
       test("#then a Windows-style Bun path uses shell-compatible forward slashes", () => {
@@ -359,8 +363,8 @@ describe("omo launcher", () => {
         const fixture = createFixture({ installLayout: "npm" })
         const result = run(fixture, ["update"])
 
-        expect(result.status).toBe(0)
-        expect(result.stdout.trim()).toBe("omo is updated via npm: npm i -g omo-ai@beta")
+        expect(result.status).toBe(1)
+        expect(result.stdout.trim()).toBe(`${SELF_UPDATE_REFUSAL}\nRun: npm i -g omo-ai@beta`)
         expect(existsSync(fixture.captureFile)).toBe(false)
       })
 
@@ -368,8 +372,35 @@ describe("omo launcher", () => {
         const fixture = createFixture({ installLayout: "unknown" })
         const result = run(fixture, ["update"])
 
-        expect(result.status).toBe(0)
-        expect(result.stdout.trim()).toBe("omo is updated via npm: npm i -g omo-ai@beta")
+        expect(result.status).toBe(1)
+        expect(result.stdout.trim()).toBe(`${SELF_UPDATE_REFUSAL}\nRun: npm i -g omo-ai@beta`)
+        expect(existsSync(fixture.captureFile)).toBe(false)
+      })
+    })
+
+    // Regression tests for #7172: a self-update request must never read as success. The launcher
+    // refuses by design (the pinned engine would break pairing), so the refusal has to say so in
+    // words a human cannot misread and an exit code automation can act on.
+    describe("#when any self-update spelling is answered", () => {
+      for (const args of [["update"], ["update", "--self"], ["update", "self"], ["update", "senpi"], ["update", "omo"]]) {
+        test(`#then omo ${args.join(" ")} exits non-zero with honest refusal guidance and spawns nothing`, () => {
+          const fixture = createFixture()
+          const result = run(fixture, args)
+
+          expect(result.status).toBe(1)
+          expect(result.stdout).toContain(SELF_UPDATE_REFUSAL)
+          expect(result.stdout).toContain("Run: npm i -g omo-ai@beta")
+          expect(result.stdout).not.toContain("is updated")
+          expect(existsSync(fixture.captureFile)).toBe(false)
+        })
+      }
+
+      test("#then a Bun-managed install's refusal names that install's own update command", () => {
+        const fixture = createFixture({ installLayout: "bun" })
+        const result = run(fixture, ["update"])
+
+        expect(result.status).toBe(1)
+        expect(result.stdout.trim()).toBe(`${SELF_UPDATE_REFUSAL}\n${expectedBunUpdateCommand(fixture.packageRoot)}`)
         expect(existsSync(fixture.captureFile)).toBe(false)
       })
     })
