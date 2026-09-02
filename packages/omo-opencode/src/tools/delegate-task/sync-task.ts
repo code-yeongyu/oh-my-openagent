@@ -1,6 +1,7 @@
 import { handedBackSyncSessions, subagentSessions } from "../../features/claude-code-session-state"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
+import { abortWithTimeout } from "../../features/background-agent/abort-with-timeout"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
 import { scheduleSyncSessionDeletion } from "./sync-session-cleanup"
@@ -117,8 +118,16 @@ export async function executeSyncTask(
       syncSessionID = currentSessionID
     }
 
-    const cleanupRetrySession = (currentSessionID: string): void => {
+    const cleanupRetrySession = async (currentSessionID: string): Promise<void> => {
       cleanupSyncSessionSideEffects(currentSessionID, executorCtx)
+      // Retire the superseded session before its fallback replacement is created:
+      // it already received the prompt, so without an abort two subagent sessions
+      // would run the same workspace in parallel (#6487). Marking it handed-back
+      // also stops todo-continuation-enforcer from re-awakening it on session.idle.
+      handedBackSyncSessions.add(currentSessionID)
+      if (typeof client.session.abort === "function") {
+        await abortWithTimeout(client, currentSessionID).catch(() => {})
+      }
     }
 
     try {
