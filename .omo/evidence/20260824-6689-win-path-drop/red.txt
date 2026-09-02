@@ -1,0 +1,38 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/extension/toolkit-path-provisioning.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+114 |           Path: ["C:\\Windows\\System32", "C:\\Program Files\\nodejs"].join(";"),
+115 |         }
+116 | 
+117 |         createToolkitPathProvisioning({ baseDir, env: windowsEnv })()
+118 | 
+119 |         expect(windowsEnv.Path).toBe([baseDir, "C:\\Windows\\System32", "C:\\Program Files\\nodejs"].join(";"))
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/omo-toolkit-path-XOnlAH/agent-toolkit;C:\Windows\System32;C:\Program Files\nodejs"
+Received: "C:\Windows\System32;C:\Program Files\nodejs"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/extension/toolkit-path-provisioning.test.ts:119:33)
+(fail) toolkit path provisioning > #given a Windows-style env whose inherited path key is 'Path' > #when provisioning prepends the toolkit dir > #then the full inherited Path survives under its original key and no duplicate uppercase PATH is created [0.71ms]
+132 |           Path: "C:\\Windows\\System32",
+133 |         }
+134 | 
+135 |         createToolkitPathProvisioning({ baseDir, env: mixedEnv })()
+136 | 
+137 |         expect(mixedEnv.PATH).toBe([baseDir, "C:\\truncated"].join(";"))
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/omo-toolkit-path-tAbzeE/agent-toolkit;C:\truncated"
+Received: "C:\truncated"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/extension/toolkit-path-provisioning.test.ts:137:31)
+(fail) toolkit path provisioning > #given an env that already carries both PATH spellings > #when provisioning runs > #then it prepends onto the first resolved path key without adding a third variant [61.64ms]
+
+ 5 pass
+ 2 fail
+ 12 expect() calls
+Ran 7 tests across 1 file. [7.22s]
+exit=1

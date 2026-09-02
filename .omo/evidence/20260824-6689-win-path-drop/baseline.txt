@@ -1,0 +1,183 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/skills-sync.test.ts:
+103 | describe("OMO Senpi scoped skill sync", () => {
+104 |   test("#given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen", () => {
+105 |     const telemetrySkillNames: readonly string[] = BUILTIN_SKILL_NAMES
+106 |     expect(Object.isFrozen(BUILTIN_SKILL_NAMES)).toBe(true)
+107 |     expect(BUILTIN_SKILL_NAMES.length).toBeGreaterThan(0)
+108 |     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
+                                                  ^
+error: expect(received).toEqual(expected)
+
+  [
++   "ast-grep",
++   "coding-agent-sessions",
++   "dag-library",
++   "data-scientist",
++   "debugging",
++   "frontend",
++   "git-master",
++   "give-me-tips",
++   "hyperplan",
+    "init-deep",
++   "lsp-setup",
++   "mass-ulw",
+    "onboarding",
++   "programming",
++   "refactor",
++   "remove-ai-slops",
++   "review-work",
++   "start-work",
++   "ultimate-browsing",
++   "ultrawork",
++   "ulw-loop",
++   "ulw-plan",
++   "ulw-research",
++   "visual-qa",
+  ]
+
+- Expected  - 0
++ Received  + 22
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/skills-sync.test.ts:108:45)
+(fail) OMO Senpi scoped skill sync > #given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen [1.70ms]
+108 |     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
+109 |   })
+110 | 
+111 |   test("#given synced skill output #when inspected #then exactly 24 roots exist with valid names", () => {
+112 |     const actualNames = listDirectoryNames(skillsRoot)
+113 |     expect(actualNames).toEqual([...expectedSkillNames].sort())
+                              ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "ast-grep",
+-   "coding-agent-sessions",
+-   "dag-library",
+-   "data-scientist",
+-   "debugging",
+-   "frontend",
+-   "git-master",
+-   "give-me-tips",
+-   "hyperplan",
+    "init-deep",
+-   "lsp-setup",
+-   "mass-ulw",
+    "onboarding",
+-   "programming",
+-   "refactor",
+-   "remove-ai-slops",
+-   "review-work",
+-   "start-work",
+-   "ultimate-browsing",
+-   "ultrawork",
+-   "ulw-loop",
+-   "ulw-plan",
+-   "ulw-research",
+-   "visual-qa",
+  ]
+
+- Expected  - 22
++ Received  + 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/skills-sync.test.ts:113:25)
+(fail) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 24 roots exist with valid names [0.29ms]
+121 |   })
+122 | 
+123 |   test("#given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values", () => {
+124 |     for (const skillName of expectedSkillNames) {
+125 |       const skillFile = join(skillsRoot, skillName, "SKILL.md")
+126 |       const content = readFileSync(skillFile, "utf8")
+                            ^
+error: ENOENT: no such file or directory, open '/home/viprix/projects/oom-wt-6689/packages/omo-senpi/plugin/skills/ast-grep/SKILL.md'
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/skills-sync.test.ts:126:23)
+(fail) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [0.27ms]
+163 |       const sourceFile = join(repoRoot, "packages", "omo-senpi", "skills", skillName, "SKILL.md")
+164 |       expect(existsSync(sourceFile), `${relative(repoRoot, sourceFile)} must exist`).toBe(true)
+165 | 
+166 |       const source = readFileSync(sourceFile, "utf8").replace(/\n{3,}/g, "\n\n")
+167 |       const shippedPath = join(skillsRoot, skillName, "SKILL.md")
+168 |       const shipped = readFileSync(shippedPath, "utf8")
+                            ^
+error: ENOENT: no such file or directory, open '/home/viprix/projects/oom-wt-6689/packages/omo-senpi/plugin/skills/dag-library/SKILL.md'
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/skills-sync.test.ts:168:23)
+(fail) OMO Senpi scoped skill sync > #given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization [0.67ms]
+170 |     }
+171 |   })
+172 | 
+173 |   test("#given start-work skill #when inspected #then session ids reference senpi, not codex", () => {
+174 |     const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+175 |     const content = readFileSync(skillFile, "utf8")
+                          ^
+error: ENOENT: no such file or directory, open '/home/viprix/projects/oom-wt-6689/packages/omo-senpi/plugin/skills/start-work/SKILL.md'
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/skills-sync.test.ts:175:21)
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then session ids reference senpi, not codex [0.20ms]
+178 |     expect(content.includes("codex:<session_id>"), "start-work must not reference codex:<session_id>").toBe(false)
+179 |   })
+180 | 
+181 |   test("#given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom", () => {
+182 |     const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+183 |     const content = readFileSync(skillFile, "utf8")
+                          ^
+error: ENOENT: no such file or directory, open '/home/viprix/projects/oom-wt-6689/packages/omo-senpi/plugin/skills/start-work/SKILL.md'
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/skills-sync.test.ts:183:21)
+(fail) OMO Senpi scoped skill sync > #given start-work skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom [0.20ms]
+236 |     expect(invalidTargets).toEqual([])
+237 |   })
+238 | 
+239 |   test("#given frontend skill #when inspected #then materialized design references exist", () => {
+240 |     const refsDir = join(skillsRoot, "frontend", "references", "design")
+241 |     expect(existsSync(refsDir), "frontend/references/design must exist after materialization").toBe(true)
+                                                                                                     ^
+error: frontend/references/design must exist after materialization
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/skills-sync.test.ts:241:96)
+(fail) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.14ms]
+
+packages/omo-senpi/src/install/install-senpi-refresh.test.ts:
+62 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
+63 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+64 |   }
+65 | 
+66 |   if (await hasMissingPluginArtifact(context.pluginPath)) {
+67 |     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+                   ^
+error: Packed omo-senpi plugin is missing required runtime artifacts at /home/viprix/projects/oom-wt-6689/packages/omo-senpi/plugin
+      at ensurePluginArtifacts (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/plugin-artifacts.ts:67:15)
+      at async runSenpiInstaller (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/install-senpi.ts:47:9)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/install-senpi-refresh.test.ts:41:11)
+(fail) runSenpiInstaller source refresh > #given complete generated artifacts #when installing from source #then every build step still refreshes them [18.41ms]
+62 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
+63 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+64 |   }
+65 | 
+66 |   if (await hasMissingPluginArtifact(context.pluginPath)) {
+67 |     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+                   ^
+error: Packed omo-senpi plugin is missing required runtime artifacts at /home/viprix/projects/oom-wt-6689/packages/omo-senpi/plugin
+      at ensurePluginArtifacts (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/plugin-artifacts.ts:67:15)
+      at async runSenpiInstaller (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/install-senpi.ts:47:9)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/install-senpi-refresh.test.ts:74:11)
+(fail) runSenpiInstaller source refresh > #given an older local OMO package entry #when installing the current source #then the stale package is replaced [2.02ms]
+62 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
+63 |     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+64 |   }
+65 | 
+66 |   if (await hasMissingPluginArtifact(context.pluginPath)) {
+67 |     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+                   ^
+error: Packed omo-senpi plugin is missing required runtime artifacts at /home/viprix/projects/oom-wt-6689/packages/omo-senpi/plugin
+      at ensurePluginArtifacts (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/plugin-artifacts.ts:67:15)
+      at async runSenpiInstaller (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/install-senpi.ts:47:9)
+      at async <anonymous> (/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/install/install-senpi-refresh.test.ts:91:11)
+(fail) runSenpiInstaller source refresh > #given current and stale OMO entries #when refreshing #then the current package keeps its precedence [1.01ms]
+
+ 24 pass
+ 10 fail
+ 72 expect() calls
+Ran 34 tests across 5 files. [4.55s]
+exit=1

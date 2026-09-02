@@ -1,0 +1,32 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/extension/compose.test.ts:
+omo-senpi component disabled by flag {
+  component: "beta",
+}
+
+packages/omo-senpi/src/extension/index.test.ts:
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: "ast-grep",
+  entry: "/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/components/runtime/ast-grep-mcp/cli.js",
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: "ast-grep",
+  entry: "/home/viprix/projects/oom-wt-6689/packages/omo-senpi/src/components/runtime/ast-grep-mcp/cli.js",
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+
+ 65 pass
+ 0 fail
+ 146 expect() calls
+Ran 65 tests across 10 files. [3.59s]
+exit=0
