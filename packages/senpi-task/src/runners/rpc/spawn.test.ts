@@ -170,14 +170,17 @@ describe("buildChildArgs", () => {
 })
 
 describe("buildRpcSpawn spawn strategy", () => {
-  test("#given a Windows npm senpi installation #when building an RPC child #then Node launches the npm package CLI without shell forwarding", () => {
+  test("#given a Windows npm senpi installation #when building an RPC child #then Node launches the package RPC entrypoint without shell forwarding", () => {
     // given
     const npmDir = mkdtempSync(join(tmpdir(), "senpi-npm-rpc-"))
     const shim = join(npmDir, "senpi.cmd")
-    const cli = join(npmDir, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
-    mkdirSync(dirname(cli), { recursive: true })
+    const packageDist = join(npmDir, "node_modules", "@code-yeongyu", "senpi", "dist")
+    const cli = join(packageDist, "cli.js")
+    const rpcEntry = join(packageDist, "rpc-entry.js")
+    mkdirSync(packageDist, { recursive: true })
     writeFileSync(shim, "@echo off\n")
     writeFileSync(cli, "")
+    writeFileSync(rpcEntry, "")
 
     try {
       // when
@@ -192,30 +195,33 @@ describe("buildRpcSpawn spawn strategy", () => {
         },
       )
 
-      // then
+      // then: the npm CLI rejects --mode (#6715), so the child boots through the package's own
+      // rpc-entry, which re-injects the mode selector itself; child args stay untouched.
       expect(descriptor.command).toBe("C:\\Program Files\\nodejs\\node.exe")
       expect(descriptor.args).toEqual([
-        realpathSync.native(cli),
-        "--mode",
-        "rpc",
+        realpathSync.native(rpcEntry),
         "--no-extensions",
         "--model",
         "omo-mock/mock-1",
       ])
+      expect(descriptor.args).not.toContain("--mode")
     } finally {
       rmSync(npmDir, { recursive: true, force: true })
     }
   })
 
-  test("#given a project-local node_modules/.bin Senpi shim #when building an RPC child #then Node launches its package CLI without rpc-entry fallback", () => {
+  test("#given a project-local node_modules/.bin Senpi shim #when building an RPC child #then Node launches that package's RPC entrypoint directly", () => {
     const root = mkdtempSync(join(tmpdir(), "senpi-local-bin-rpc-"))
     const shimDir = join(root, "node_modules", ".bin")
     const shim = join(shimDir, "senpi.cmd")
-    const cli = join(root, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
-    mkdirSync(dirname(cli), { recursive: true })
+    const packageDist = join(root, "node_modules", "@code-yeongyu", "senpi", "dist")
+    const cli = join(packageDist, "cli.js")
+    const rpcEntry = join(packageDist, "rpc-entry.js")
+    mkdirSync(packageDist, { recursive: true })
     mkdirSync(shimDir, { recursive: true })
     writeFileSync(shim, "@echo off\n")
     writeFileSync(cli, "")
+    writeFileSync(rpcEntry, "")
     try {
       const descriptor = buildRpcSpawn(
         { ...baseSpec, model: "omo-mock/mock-1" },
@@ -229,8 +235,76 @@ describe("buildRpcSpawn spawn strategy", () => {
       )
 
       expect(descriptor.command).toBe("C:\\Program Files\\nodejs\\node.exe")
-      expect(descriptor.args[0]).toBe(realpathSync.native(cli))
-      expect(descriptor.args).not.toContain("/fallback/rpc-entry.js")
+      expect(descriptor.args[0]).toBe(realpathSync.native(rpcEntry))
+      expect(descriptor.args).not.toContain("--mode")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given SENPI_BIN resolves to the npm package cli.js as in the native global layout #when building an RPC child #then the child boots through that package's rpc-entry with no --mode on the argv", () => {
+    // given: npm global shape - bin/senpi realpaths to <prefix>/lib/node_modules/@code-yeongyu/senpi/dist/cli.js,
+    // whose strict option parser rejects --mode before the JSON-RPC handshake (#6715)
+    const root = mkdtempSync(join(tmpdir(), "senpi-native-rpc-"))
+    const packageDist = join(root, "lib", "node_modules", "@code-yeongyu", "senpi", "dist")
+    const cli = join(packageDist, "cli.js")
+    const rpcEntry = join(packageDist, "rpc-entry.js")
+    mkdirSync(packageDist, { recursive: true })
+    writeFileSync(cli, "")
+    writeFileSync(rpcEntry, "")
+    try {
+      // when
+      const descriptor = buildRpcSpawn(
+        { ...baseSpec, model: "omo-mock/mock-1", extensions: ["/tmp/mock.ts"] },
+        {
+          isBunBinary: false,
+          execPath: "/usr/local/bin/node",
+          platform: "darwin",
+          parentEnv: { SENPI_BIN: cli },
+          resolveRpcEntry: () => "/fallback/rpc-entry.js",
+        },
+      )
+
+      // then
+      expect(descriptor.command).toBe("/usr/local/bin/node")
+      expect(descriptor.args).toEqual([
+        realpathSync.native(rpcEntry),
+        "--no-extensions",
+        "--extension",
+        "/tmp/mock.ts",
+        "--model",
+        "omo-mock/mock-1",
+      ])
+      expect(descriptor.args).not.toContain("--mode")
+      expect(descriptor.cwd).toBe(baseSpec.cwd)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given the package CLI lacks a sibling rpc-entry #when building an RPC child #then resolution falls back to the injected rpc-entry resolver", () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "senpi-cli-no-entry-"))
+    const cli = join(root, "lib", "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
+    mkdirSync(dirname(cli), { recursive: true })
+    writeFileSync(cli, "")
+    try {
+      // when
+      const descriptor = buildRpcSpawn(
+        { ...baseSpec, model: "omo-mock/mock-1" },
+        {
+          isBunBinary: false,
+          execPath: "/usr/local/bin/node",
+          platform: "darwin",
+          parentEnv: { SENPI_BIN: cli },
+          resolveRpcEntry: () => "/fallback/rpc-entry.js",
+        },
+      )
+
+      // then
+      expect(descriptor.command).toBe("/usr/local/bin/node")
+      expect(descriptor.args[0]).toBe("/fallback/rpc-entry.js")
+      expect(descriptor.args).not.toContain("--mode")
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

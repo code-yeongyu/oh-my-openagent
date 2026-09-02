@@ -1,0 +1,72 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/senpi-task/src/runners/rpc/spawn.test.ts:
+196 |       )
+197 | 
+198 |       // then: the npm CLI rejects --mode (#6715), so the child boots through the package's own
+199 |       // rpc-entry, which re-injects the mode selector itself; child args stay untouched.
+200 |       expect(descriptor.command).toBe("C:\\Program Files\\nodejs\\node.exe")
+201 |       expect(descriptor.args).toEqual([
+                                    ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,5 @@
+  [
+-   "/tmp/senpi-npm-rpc-9C6xl4/node_modules/@code-yeongyu/senpi/dist/rpc-entry.js",
++   "/tmp/senpi-npm-rpc-9C6xl4/node_modules/@code-yeongyu/senpi/dist/cli.js",
++   "--mode",
++   "rpc",
+    "--no-extensions",
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6715/packages/senpi-task/src/runners/rpc/spawn.test.ts:201:31)
+(fail) buildRpcSpawn spawn strategy > #given a Windows npm senpi installation #when building an RPC child #then Node launches the package RPC entrypoint without shell forwarding [14.41ms]
+233 |           resolveRpcEntry: () => "/fallback/rpc-entry.js",
+234 |         },
+235 |       )
+236 | 
+237 |       expect(descriptor.command).toBe("C:\\Program Files\\nodejs\\node.exe")
+238 |       expect(descriptor.args[0]).toBe(realpathSync.native(rpcEntry))
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/senpi-local-bin-rpc-Bp39aE/node_modules/@code-yeongyu/senpi/dist/rpc-entry.js"
+Received: "/tmp/senpi-local-bin-rpc-Bp39aE/node_modules/@code-yeongyu/senpi/dist/cli.js"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6715/packages/senpi-task/src/runners/rpc/spawn.test.ts:238:34)
+(fail) buildRpcSpawn spawn strategy > #given a project-local node_modules/.bin Senpi shim #when building an RPC child #then Node launches that package's RPC entrypoint directly [2.96ms]
+264 |           resolveRpcEntry: () => "/fallback/rpc-entry.js",
+265 |         },
+266 |       )
+267 | 
+268 |       // then
+269 |       expect(descriptor.command).toBe("/usr/local/bin/node")
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "/usr/local/bin/node"
+Received: "/tmp/senpi-native-rpc-6jNFiN/lib/node_modules/@code-yeongyu/senpi/dist/cli.js"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6715/packages/senpi-task/src/runners/rpc/spawn.test.ts:269:34)
+(fail) buildRpcSpawn spawn strategy > #given SENPI_BIN resolves to the npm package cli.js as in the native global layout #when building an RPC child #then the child boots through that package's rpc-entry with no --mode on the argv [4.57ms]
+300 |           resolveRpcEntry: () => "/fallback/rpc-entry.js",
+301 |         },
+302 |       )
+303 | 
+304 |       // then
+305 |       expect(descriptor.command).toBe("/usr/local/bin/node")
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "/usr/local/bin/node"
+Received: "/tmp/senpi-cli-no-entry-RbzvD3/lib/node_modules/@code-yeongyu/senpi/dist/cli.js"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6715/packages/senpi-task/src/runners/rpc/spawn.test.ts:305:34)
+(fail) buildRpcSpawn spawn strategy > #given the package CLI lacks a sibling rpc-entry #when building an RPC child #then resolution falls back to the injected rpc-entry resolver [2.81ms]
+
+ 22 pass
+ 4 fail
+ 59 expect() calls
+Ran 26 tests across 1 file. [1137.00ms]

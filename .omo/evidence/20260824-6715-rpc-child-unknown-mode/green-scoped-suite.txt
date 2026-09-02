@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/senpi-task/src/__adversarial__/chaos-bench.test.ts:
+[chaos] seed=senpi-task-w1-chaos base=2337725802 iterations=200
+
+ 1744 pass
+ 1 skip
+ 0 fail
+ 5547 expect() calls
+Ran 1745 tests across 246 files. [96.82s]

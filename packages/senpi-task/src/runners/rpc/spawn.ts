@@ -115,6 +115,34 @@ function normalizeSenpiLauncher(executable: string, runtime: RpcSpawnRuntime): S
   return cliPath === undefined ? null : { command: runtime.execPath, prefixArgs: [cliPath] }
 }
 
+const SENPI_PACKAGE_SCOPE_DIR_NAME = "@code-yeongyu"
+const SENPI_PACKAGE_DIR_NAME = "senpi"
+
+// The npm package CLI (bin -> dist/cli.js) is a strict option parser that REJECTS the RPC mode
+// selector; only the compiled single-file Senpi binary dispatches on `--mode`. Handing the CLI
+// `--mode rpc` killed the child before the JSON-RPC handshake with `unknown option '--mode'` (#6715).
+function senpiPackageCliScript(launcher: SenpiLauncher): string | null {
+  const targets = launcher.prefixArgs.length > 0 ? launcher.prefixArgs : [launcher.command]
+  for (const target of targets) {
+    const distDir = dirname(target)
+    const packageDir = dirname(distDir)
+    if (
+      basename(target) === "cli.js"
+      && basename(distDir) === "dist"
+      && basename(packageDir) === SENPI_PACKAGE_DIR_NAME
+      && basename(dirname(packageDir)) === SENPI_PACKAGE_SCOPE_DIR_NAME
+    ) {
+      return target
+    }
+  }
+  return null
+}
+
+function senpiRpcEntryNextToCli(cliPath: string): string | null {
+  const sibling = join(dirname(cliPath), "rpc-entry.js")
+  return existsSync(sibling) ? sibling : null
+}
+
 export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
   const executable = (runtime.resolveSenpiExecutable ?? resolveSenpiExecutable)(runtime)
   if (executable !== null) {
@@ -197,10 +225,11 @@ function defaultRuntime(): RpcSpawnRuntime {
 /**
  * Build the child spawn descriptor. The child inherits the parent env plus an isolated
  * SENPI_CODING_AGENT_SESSION_DIR; member-only identity is stripped before explicit memberEnv is
- * applied. The real agent dir is deliberately left unset so auth/models resolve normally. It prefers
- * the senpi EXECUTABLE (`<exe> --mode rpc <childArgs>`) so loader-alias hijacking cannot break child
- * resolution; when no executable is found it falls back to the documented `execPath + rpc-entry` path
- * (rpc-entry re-injects `--mode rpc`, so the child args follow the entry).
+ * applied. The real agent dir is deliberately left unset so auth/models resolve normally. A resolved
+ * senpi EXECUTABLE that is NOT the npm package CLI spawns as `<exe> --mode rpc <childArgs>` so
+ * loader-alias hijacking cannot break child resolution; the package CLI cannot take `--mode` (#6715),
+ * so it routes through its own `dist/rpc-entry.js` sibling (which re-injects `--mode rpc`), falling
+ * back to the documented `execPath + rpc-entry` path when no executable or sibling entry exists.
  */
 /**
  * The env/extension preamble shared by the real child and the catalog probe. Both MUST strip member
@@ -229,11 +258,18 @@ export function buildRpcSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRunt
   const childArgs = buildChildArgs(profile.spec)
   const launcher = resolveSenpiLauncher(resolved)
   if (launcher !== null) {
-    return {
-      command: launcher.command,
-      args: [...launcher.prefixArgs, "--mode", "rpc", ...childArgs],
-      cwd: spec.cwd,
-      env,
+    const packageCli = senpiPackageCliScript(launcher)
+    if (packageCli === null) {
+      return {
+        command: launcher.command,
+        args: [...launcher.prefixArgs, "--mode", "rpc", ...childArgs],
+        cwd: spec.cwd,
+        env,
+      }
+    }
+    const siblingEntry = senpiRpcEntryNextToCli(packageCli)
+    if (siblingEntry !== null) {
+      return { command: resolved.execPath, args: [siblingEntry, ...childArgs], cwd: spec.cwd, env }
     }
   }
   return { command: resolved.execPath, args: [resolved.resolveRpcEntry(), ...childArgs], cwd: spec.cwd, env }

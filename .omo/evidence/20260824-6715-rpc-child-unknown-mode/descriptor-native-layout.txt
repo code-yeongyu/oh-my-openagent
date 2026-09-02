@@ -1,0 +1,3 @@
+command: /usr/local/bin/node
+args: ["/tmp/omo6715-desc-THBjnF/lib/node_modules/@code-yeongyu/senpi/dist/rpc-entry.js","--no-extensions","--extension","/tmp/provider.ts","--model","omo-mock/mock-1"]
+hands --mode to a CLI layer: false

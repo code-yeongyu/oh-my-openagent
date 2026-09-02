@@ -1,0 +1,17 @@
+# Real-surface probe against the pinned @code-yeongyu/senpi 2026.8.23 (2026-08-24T16:27Z)
+Isolation: HOME=/tmp/opencode/omo6715-isolation-ij4f/home SENPI_CODING_AGENT_DIR=/tmp/opencode/omo6715-isolation-ij4f/agent (throwaway dirs, real ~/.senpi untouched)
+
+## Probe A: the reported child command - cli.js with --mode rpc (#6715 reproduction)
+exit=124
+
+## Probe B: the supported entrypoint - rpc-entry.js with unchanged child args
+exit=124 (124 = stayed alive until the harness timeout, i.e. past option parsing)
+
+unknown-option-error-in-probeB: 0
+## Probe A2 (pinned 2026.8.11-2): cli.js --mode rpc - the reported failing child command
+exit=124
+
+## Probe B2 (pinned 2026.8.11-2): rpc-entry.js --no-extensions - the supported entrypoint
+exit=124 (124 = stayed alive past option parsing)
+
+unknown-option-error-in-probeB2: 0
