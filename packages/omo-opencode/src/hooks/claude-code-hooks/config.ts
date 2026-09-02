@@ -5,6 +5,7 @@ import { bunFile } from "../../shared/bun-file-shim"
 import { getAllowedMcpEnvVars } from "../../features/claude-code-mcp-loader/configure-allowed-env-vars"
 import type { ClaudeHooksConfig, HookMatcher, HookAction, PluginHooksConfig } from "./types"
 import { log } from "../../shared/logger"
+import { resolveProjectTrust } from "./project-trust"
 
 const CONFIG_CACHE_TTL_MS = 30_000
 
@@ -70,13 +71,25 @@ function normalizeHooksConfig(raw: RawClaudeHooksConfig): ClaudeHooksConfig {
   return result
 }
 
-export function getClaudeSettingsPaths(customPath?: string): string[] {
+interface ScopedClaudeSettingsPaths {
+  userPaths: string[]
+  projectPaths: string[]
+}
+
+function getScopedClaudeSettingsPaths(customPath?: string): ScopedClaudeSettingsPaths {
   const claudeConfigDir = getClaudeConfigDir()
-  const paths = [
-    join(claudeConfigDir, "settings.json"),
-    join(process.cwd(), ".claude", "settings.json"),
-    join(process.cwd(), ".claude", "settings.local.json"),
-  ]
+  return {
+    userPaths: [join(claudeConfigDir, "settings.json")],
+    projectPaths: [
+      join(process.cwd(), ".claude", "settings.json"),
+      join(process.cwd(), ".claude", "settings.local.json"),
+    ],
+  }
+}
+
+export function getClaudeSettingsPaths(customPath?: string): string[] {
+  const { userPaths, projectPaths } = getScopedClaudeSettingsPaths(customPath)
+  const paths = [...userPaths, ...projectPaths]
 
   if (customPath && existsSync(customPath)) {
     paths.unshift(customPath)
@@ -238,10 +251,23 @@ export async function loadClaudeHooksConfig(
     return cachedConfig
   }
 
-  const paths = getClaudeSettingsPaths(customSettingsPath)
+  const { userPaths, projectPaths } = getScopedClaudeSettingsPaths(customSettingsPath)
+  const trust = await resolveProjectTrust(process.cwd())
+  if (!trust.trusted) {
+    log("Skipping project-level Claude settings for untrusted directory", {
+      projectDir: process.cwd(),
+      trustSource: trust.source,
+      projectPaths,
+    })
+  }
+  const orderedPaths = [
+    ...(customSettingsPath && existsSync(customSettingsPath) ? [customSettingsPath] : []),
+    ...userPaths,
+    ...(trust.trusted ? projectPaths : []),
+  ]
   let mergedConfig: ClaudeHooksConfig = {}
 
-  for (const settingsPath of paths) {
+  for (const settingsPath of orderedPaths) {
     if (existsSync(settingsPath)) {
       try {
         const content = await bunFile(settingsPath).text()
