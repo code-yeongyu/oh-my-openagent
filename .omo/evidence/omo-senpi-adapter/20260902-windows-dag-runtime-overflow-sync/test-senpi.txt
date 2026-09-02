@@ -1,0 +1,15 @@
+Command:
+PATH=/private/tmp/bun-1.4.0/bin:$PATH bun run test:senpi
+
+Observed:
+2530 pass
+1 skip
+0 fail
+8063 expect() calls
+Ran 2531 tests across 334 files. [145.25s]
+
+Evidence resolver suite:
+10 pass
+0 fail
+31 expect() calls
+Ran 10 tests across 1 file. [895.00ms]
