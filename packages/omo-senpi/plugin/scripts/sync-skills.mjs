@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
-import { dirname, extname, join } from "node:path"
+import { dirname, extname, join, relative } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createNativeSkillSources } from "./native-skill-sources.mjs"
 import { insertSenpiCompatibilityGuidance } from "./senpi-compatibility-guidance.mjs"
@@ -203,8 +203,8 @@ function applySharedTierAdaptation(skillName, content) {
   return normalizeBlankLines(adapted)
 }
 
-function shouldCopySkillSource(source) {
-  const normalized = source.replaceAll("\\", "/")
+export function shouldCopySkillSource(source, sourceRoot) {
+  const normalized = relative(dirname(sourceRoot), source).replaceAll("\\", "/")
   const segments = normalized.split("/")
   const name = segments.at(-1) ?? ""
   if (segments.some((segment) => ignoredSkillSourceDirNames.has(segment))) return false
@@ -212,6 +212,10 @@ function shouldCopySkillSource(source) {
   if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false
   const scriptsIndex = segments.lastIndexOf("scripts")
   return scriptsIndex === -1 || segments[scriptsIndex + 1] !== "tests"
+}
+
+function createSkillSourceFilter(sourceRoot) {
+  return (source) => shouldCopySkillSource(source, sourceRoot)
 }
 
 async function listFiles(root) {
@@ -257,14 +261,14 @@ export async function syncSkills() {
   for (const { name, source } of skillSources) {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
-    await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
+    await cp(source, destination, { filter: createSkillSourceFilter(source), recursive: true })
     await adaptSkillTree(destination, normalizeBlankLines)
   }
 
   for (const { name, source } of nativeSkillSources) {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
-    await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
+    await cp(source, destination, { filter: createSkillSourceFilter(source), recursive: true })
     await adaptSkillTree(destination, normalizeBlankLines)
   }
 
@@ -278,7 +282,7 @@ export async function syncSkills() {
     if (componentSkillNames.has(skillName) || nativeSkillNames.has(skillName)) continue
     const source = join(sharedSkillsRoot, skillName)
     const destination = join(skillsRoot, skillName)
-    await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
+    await cp(source, destination, { filter: createSkillSourceFilter(source), recursive: true })
     await adaptSkillTree(destination, (content) => applySharedTierAdaptation(skillName, content))
   }
 
