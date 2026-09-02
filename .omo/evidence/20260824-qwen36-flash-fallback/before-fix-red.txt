@@ -1,0 +1,72 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/model-core/src/opencode-go-provider-invariant.test.ts:
+50 | 
+51 |       // when
+52 |       const violations = unservedOpenCodeGoRungs(quick.fallbackChain)
+53 | 
+54 |       // then
+55 |       expect(violations).toEqual([])
+                              ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "model": "qwen3.6-flash",
++     "providers": [
++       "qwen-token-plan",
++       "alibaba-token-plan",
++       "bailian-coding-plan",
++       "opencode-go",
++       "vercel",
++     ],
++     "variant": "low",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 13
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6685/packages/model-core/src/opencode-go-provider-invariant.test.ts:55:26)
+(fail) opencode-go fallback invariant > #given the quick category chain > #then no rung pairs opencode-go with a model Go does not serve [1.53ms]
+62 |       // when
+63 |       const qwenRung = quick.fallbackChain.find((entry) => entry.model === "qwen3.6-flash")
+64 | 
+65 |       // then
+66 |       expect(qwenRung).toBeDefined()
+67 |       expect(qwenRung?.providers).not.toContain("opencode-go")
+                                           ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "opencode-go"
+Received: [ "qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan", "opencode-go",
+  "vercel"
+]
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6685/packages/model-core/src/opencode-go-provider-invariant.test.ts:67:39)
+(fail) opencode-go fallback invariant > #given the quick category chain > #then the qwen3.6-flash rung does not advertise opencode-go (issue #6685) [5.15ms]
+80 |       const violations = chains.flatMap(([name, requirement]) =>
+81 |         unservedOpenCodeGoRungs(requirement.fallbackChain).map((entry) => `${name}:${entry.model}`),
+82 |       )
+83 | 
+84 |       // then
+85 |       expect(violations).toEqual([])
+                              ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "quick:qwen3.6-flash",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6685/packages/model-core/src/opencode-go-provider-invariant.test.ts:85:26)
+(fail) opencode-go fallback invariant > #given every hardcoded category and agent chain > #then opencode-go only appears on rungs whose model is in the served catalog [4.91ms]
+
+ 0 pass
+ 3 fail
+ 4 expect() calls
+Ran 3 tests across 1 file. [333.00ms]
