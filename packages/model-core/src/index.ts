@@ -35,6 +35,7 @@ export {
 	transformModelForProviderDisplay,
 } from "./provider-model-id-transform"
 export * from "./fallback-chain-from-models"
+export * from "./fallback-chain-provider-filter"
 export {
   _setModelResolutionLogImplementationForTesting,
   resolveModelPipeline,

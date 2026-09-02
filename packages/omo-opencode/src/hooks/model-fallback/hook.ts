@@ -54,12 +54,13 @@ type ModelFallbackHookArgs = {
   toast?: FallbackToast
   onApplied?: FallbackCallback
   controllerAccessor?: ModelFallbackControllerAccessor
+  readonly disabledProviders?: readonly string[]
 }
 
 export function setSessionFallbackChain(
   controller: Pick<ModelFallbackStateController, "setSessionFallbackChain">,
   sessionID: string,
-  fallbackChain: FallbackEntry[] | undefined,
+  fallbackChain: readonly FallbackEntry[] | undefined,
 ): void {
   controller.setSessionFallbackChain(sessionID, fallbackChain)
 }
@@ -151,6 +152,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     pendingModelFallbacks,
     lastToastKey,
     sessionFallbackChains,
+    disabledProviders: args?.disabledProviders,
   })
 
   args?.controllerAccessor?.register(controller)

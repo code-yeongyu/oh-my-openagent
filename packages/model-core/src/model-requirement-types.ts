@@ -1,5 +1,5 @@
 export type FallbackEntry = {
-  providers: string[];
+  providers: readonly string[];
   model: string;
   variant?: string; // Entry-specific variant (e.g., GPT->high, Opus->max)
   reasoning?: string;

@@ -121,6 +121,7 @@ async function createCoreAgentConfig(
       userCategories: pluginConfig.categories,
       currentModel,
       disabledTools: pluginConfig.disabled_tools,
+      disabledProviders: pluginConfig.disabled_providers,
     });
   }
 

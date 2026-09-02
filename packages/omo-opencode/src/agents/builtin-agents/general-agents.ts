@@ -14,7 +14,8 @@ import { log } from "../../shared/logger"
 export function collectPendingBuiltinAgents(input: {
   agentSources: Record<BuiltinAgentName, import("../agent-builder").AgentSource>
   agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>>
-  disabledAgents: string[]
+  disabledAgents: readonly string[]
+  disabledProviders?: readonly string[]
   agentOverrides: AgentOverrides
   directory?: string
   systemDefaultModel?: string
@@ -33,6 +34,7 @@ export function collectPendingBuiltinAgents(input: {
     agentSources,
     agentMetadata,
     disabledAgents,
+    disabledProviders,
     agentOverrides,
     directory,
     systemDefaultModel,
@@ -82,6 +84,7 @@ export function collectPendingBuiltinAgents(input: {
       requirement,
       availableModels,
       systemDefaultModel,
+      disabledProviders,
     })
     if (!resolution) {
       if (override?.model) {
@@ -93,7 +96,7 @@ export function collectPendingBuiltinAgents(input: {
         })
         resolution = { model: override.model, provenance: "override" as const }
       } else {
-        resolution = getFirstFallbackModel(requirement)
+        resolution = getFirstFallbackModel(requirement, disabledProviders)
       }
     }
     if (!resolution) {

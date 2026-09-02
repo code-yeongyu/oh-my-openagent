@@ -29,7 +29,7 @@ type PrometheusOverride = Record<string, unknown> & {
 
 function isModelInFallbackChain(
   model: string | undefined,
-  fallbackChain: FallbackEntry[] | undefined,
+  fallbackChain: readonly FallbackEntry[] | undefined,
 ): boolean {
   if (!model || !fallbackChain || fallbackChain.length === 0) {
     return false;
@@ -47,6 +47,7 @@ export async function buildPrometheusAgentConfig(params: {
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
   disabledTools?: readonly string[];
+  disabledProviders?: readonly string[];
 }): Promise<Record<string, unknown>> {
   const categoryConfig = params.pluginPrometheusOverride?.category
     ? resolveCategoryConfig(params.pluginPrometheusOverride.category, params.userCategories)
@@ -76,7 +77,10 @@ export async function buildPrometheusAgentConfig(params: {
       userModel: params.pluginPrometheusOverride?.model,
       categoryDefaultModel: categoryConfig?.model,
     },
-    constraints: { availableModels },
+    constraints: {
+      availableModels,
+      disabledProviders: params.disabledProviders,
+    },
     policy: {
       fallbackChain: requirement?.fallbackChain,
       systemDefaultModel: undefined,

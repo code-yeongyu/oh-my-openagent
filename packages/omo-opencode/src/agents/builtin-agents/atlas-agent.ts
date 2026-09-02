@@ -9,7 +9,8 @@ import { applyModelResolution } from "./model-resolution"
 import { createAtlasAgent } from "../atlas"
 
 export function maybeCreateAtlasConfig(input: {
-  disabledAgents: string[]
+  disabledAgents: readonly string[]
+  disabledProviders?: readonly string[]
   agentOverrides: AgentOverrides
   uiSelectedModel?: string
   availableModels: Set<string>
@@ -23,6 +24,7 @@ export function maybeCreateAtlasConfig(input: {
 }): AgentConfig | undefined {
   const {
     disabledAgents,
+    disabledProviders,
     agentOverrides,
     uiSelectedModel,
     availableModels,
@@ -45,6 +47,7 @@ export function maybeCreateAtlasConfig(input: {
     requirement: atlasRequirement,
     availableModels,
     systemDefaultModel,
+    disabledProviders,
   })
 
   if (!atlasResolution && orchestratorOverride?.model) {

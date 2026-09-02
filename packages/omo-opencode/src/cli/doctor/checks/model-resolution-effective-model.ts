@@ -1,6 +1,6 @@
 import type { ModelRequirement } from "../../../shared/model-requirements"
 
-function formatProviderChain(providers: string[]): string {
+function formatProviderChain(providers: readonly string[]): string {
   return providers.join(" → ")
 }
 

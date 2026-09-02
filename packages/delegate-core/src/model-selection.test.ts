@@ -73,6 +73,37 @@ describe("resolveModelForDelegateTask", () => {
     })
   })
 
+  test("#given one mirror provider is disabled #when another mirror is connected #then selects the next allowed entry", () => {
+    const allowedEntry: DelegateFallbackEntry = {
+      providers: ["openai"],
+      model: "gpt-5.6",
+      variant: "high",
+    }
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(),
+      disabledProviders: ["anthropic"],
+      fallbackChain: [
+        {
+          providers: ["anthropic", "opencode"],
+          model: "claude-opus-5",
+          variant: "max",
+        },
+        allowedEntry,
+      ],
+    }, {
+      connectedProviders: ["opencode", "openai"],
+      hasProviderModelsCache: true,
+      hasConnectedProvidersCache: true,
+    })
+
+    expect(result).toEqual({
+      model: "openai/gpt-5.6",
+      variant: "high",
+      fallbackEntry: allowedEntry,
+      matchedFallback: true,
+    })
+  })
+
   test("#given only transformed Vercel GPT-5.6 Sol #when fallback resolves #then Vercel keeps the native xhigh rung", () => {
     const result = resolveModelForDelegateTask({
       availableModels: new Set(["vercel/openai/gpt-5.6-sol"]),

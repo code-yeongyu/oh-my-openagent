@@ -1,0 +1,20 @@
+OpenCode version: 1.18.26
+Surface: authenticated server /agent API
+Project: identical isolated empty project
+
+baseline.explore=openai/gpt-5.6-luna-fast variant=low
+baseline.librarian=openai/gpt-5.6-luna-fast variant=low
+candidate.disabled_providers=openai-codex
+candidate.explore=deepseek/deepseek-v4-flash variant=max
+candidate.librarian=deepseek/deepseek-v4-flash variant=max
+
+registered_tool_count=27
+registered_required_tools=call_omo_agent,look_at,task
+
+real_db_sessions_before=73
+real_db_sessions_after=74
+real_db_rows_for_qa_directories=0
+candidate_isolated_db_sessions=0
+baseline_isolated_db_sessions=0
+candidate_server_stopped=true
+baseline_server_stopped=true

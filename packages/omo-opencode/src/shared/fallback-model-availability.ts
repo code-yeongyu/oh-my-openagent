@@ -2,7 +2,7 @@ import { readConnectedProvidersCache } from "./connected-providers-cache"
 import { log } from "./logger"
 import { fuzzyMatchModel } from "./model-availability"
 
-type FallbackEntry = { providers: string[]; model: string }
+type FallbackEntry = { providers: readonly string[]; model: string }
 
 type ResolvedFallbackModel = {
 	provider: string
@@ -10,7 +10,7 @@ type ResolvedFallbackModel = {
 }
 
 export function resolveFirstAvailableFallback(
-	fallbackChain: FallbackEntry[],
+	fallbackChain: readonly FallbackEntry[],
 	availableModels: Set<string>,
 ): ResolvedFallbackModel | null {
 	for (const entry of fallbackChain) {
@@ -45,7 +45,7 @@ export function resolveFirstAvailableFallback(
 }
 
 export function isAnyFallbackModelAvailable(
-	fallbackChain: FallbackEntry[],
+	fallbackChain: readonly FallbackEntry[],
 	availableModels: Set<string>,
 ): boolean {
 	if (resolveFirstAvailableFallback(fallbackChain, availableModels) !== null) {
@@ -70,7 +70,7 @@ export function isAnyFallbackModelAvailable(
 }
 
 export function isAnyProviderConnected(
-	providers: string[],
+	providers: readonly string[],
 	availableModels: Set<string>,
 ): boolean {
 	if (availableModels.size > 0) {

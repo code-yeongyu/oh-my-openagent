@@ -12,7 +12,8 @@ import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard
 import { setSisyphusRuntimePromptContext } from "../sisyphus-runtime-prompt-reconciler"
 
 export function maybeCreateSisyphusConfig(input: {
-  disabledAgents: string[]
+  disabledAgents: readonly string[]
+  disabledProviders?: readonly string[]
   agentOverrides: AgentOverrides
   uiSelectedModel?: string
   availableModels: Set<string>
@@ -29,6 +30,7 @@ export function maybeCreateSisyphusConfig(input: {
 }): AgentConfig | undefined {
   const {
     disabledAgents,
+    disabledProviders,
     agentOverrides,
     uiSelectedModel,
     availableModels,
@@ -65,10 +67,11 @@ export function maybeCreateSisyphusConfig(input: {
     requirement: sisyphusRequirement,
     availableModels,
     systemDefaultModel,
+    disabledProviders,
   })
 
   if (isFirstRunNoCache && !sisyphusOverride?.model && !uiSelectedModel) {
-    sisyphusResolution = getFirstFallbackModel(sisyphusRequirement)
+    sisyphusResolution = getFirstFallbackModel(sisyphusRequirement, disabledProviders)
   }
 
   if (!sisyphusResolution) {

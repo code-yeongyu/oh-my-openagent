@@ -18,7 +18,7 @@ export {
 }
 
 export function selectFallbackProvider(
-  providers: string[],
+  providers: readonly string[],
   preferredProviderID?: string,
 ): string {
   return selectFallbackProviderWithCache(

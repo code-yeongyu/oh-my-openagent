@@ -11,7 +11,8 @@ import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 
 export function maybeCreateHephaestusConfig(input: {
-  disabledAgents: string[]
+  disabledAgents: readonly string[]
+  disabledProviders?: readonly string[]
   agentOverrides: AgentOverrides
   availableModels: Set<string>
   systemDefaultModel?: string
@@ -26,6 +27,7 @@ export function maybeCreateHephaestusConfig(input: {
 }): AgentConfig | undefined {
   const {
     disabledAgents,
+    disabledProviders,
     agentOverrides,
     availableModels,
     systemDefaultModel,
@@ -64,10 +66,11 @@ export function maybeCreateHephaestusConfig(input: {
     requirement: hephaestusRequirement,
     availableModels,
     systemDefaultModel,
+    disabledProviders,
   })
 
   if (isFirstRunNoCache && !hephaestusOverride?.model) {
-    hephaestusResolution = getFirstFallbackModel(hephaestusRequirement)
+    hephaestusResolution = getFirstFallbackModel(hephaestusRequirement, disabledProviders)
   }
 
   if (!hephaestusResolution) {

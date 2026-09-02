@@ -10,7 +10,10 @@ import { getMissingLookAtFilePath } from "./missing-file-error"
 
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
-export function createLookAt(ctx: PluginInput): ToolDefinition {
+export function createLookAt(
+  ctx: PluginInput,
+  disabledProviders: readonly string[] = [],
+): ToolDefinition {
   return tool({
     description: LOOK_AT_DESCRIPTION,
     args: {
@@ -43,6 +46,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           toolContext,
           goal: args.goal,
           inputParts: preparedInput.inputParts,
+          disabledProviders,
         })
       } catch (error) {
         const missingFilePath = getMissingLookAtFilePath(error, args)

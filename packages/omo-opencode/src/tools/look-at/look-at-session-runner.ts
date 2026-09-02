@@ -9,10 +9,11 @@ import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadat
 import { waitForLookAtSessionResult } from "./session-poller"
 
 interface RunLookAtSessionInput {
-  ctx: PluginInput
-  toolContext: ToolContext
-  goal: string
-  inputParts: LookAtInputPart[]
+  readonly ctx: PluginInput
+  readonly toolContext: ToolContext
+  readonly goal: string
+  readonly inputParts: LookAtInputPart[]
+  readonly disabledProviders?: readonly string[]
 }
 
 export async function runLookAtSession({
@@ -20,10 +21,11 @@ export async function runLookAtSession({
   toolContext,
   goal,
   inputParts,
+  disabledProviders,
 }: RunLookAtSessionInput): Promise<string> {
   const fileParts = inputParts.filter((part): part is LookAtFilePart => part.type === "file")
   const prompt = buildLookAtPrompt(goal, fileParts)
-  const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
+  const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx, disabledProviders)
 
   log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
   const parentSession = await ctx.client.session.get({

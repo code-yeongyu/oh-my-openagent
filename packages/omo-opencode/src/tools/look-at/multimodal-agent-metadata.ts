@@ -85,6 +85,7 @@ async function resolveRegisteredAgentMetadata(
 async function resolveDynamicAgentMetadata(
   ctx: PluginInput,
   visionCapableModels = readVisionCapableModelsCache(),
+  disabledProviders: readonly string[] = [],
 ): Promise<ResolvedAgentMetadata> {
   const fallbackChain = buildMultimodalLookerFallbackChain(visionCapableModels)
   const connectedProviders = readConnectedProvidersCache()
@@ -96,6 +97,7 @@ async function resolveDynamicAgentMetadata(
     constraints: {
       availableModels,
       connectedProviders,
+      disabledProviders,
     },
     policy: {
       fallbackChain,
@@ -125,7 +127,8 @@ function isConfiguredVisionModel(
 }
 
 export async function resolveMultimodalLookerAgentMetadata(
-  ctx: PluginInput
+  ctx: PluginInput,
+  disabledProviders: readonly string[] = [],
 ): Promise<ResolvedAgentMetadata> {
   try {
     const registeredMetadata = await resolveRegisteredAgentMetadata(ctx)
@@ -150,7 +153,7 @@ export async function resolveMultimodalLookerAgentMetadata(
       return registeredMetadata
     }
 
-    const dynamicMetadata = await resolveDynamicAgentMetadata(ctx, visionCapableModels)
+    const dynamicMetadata = await resolveDynamicAgentMetadata(ctx, visionCapableModels, disabledProviders)
     if (dynamicMetadata.agentModel) {
       log("[look_at] No registered model, using dynamic resolution", {
         model: getFullModelKey(dynamicMetadata.agentModel),

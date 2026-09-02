@@ -59,7 +59,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
 }
 
 export async function createBuiltinAgents(
-  disabledAgents: string[] = [],
+  disabledAgents: readonly string[] = [],
   agentOverrides: AgentOverrides = {},
   directory?: string,
   systemDefaultModel?: string,
@@ -73,6 +73,7 @@ export async function createBuiltinAgents(
   useTaskSystem = false,
   disableOmoEnv = false,
   teamModeEnabled = false,
+  disabledProviders: readonly string[] = [],
 ): Promise<Record<string, AgentConfig>> {
 
   const connectedProviders = readConnectedProvidersCache()
@@ -105,6 +106,7 @@ export async function createBuiltinAgents(
     agentSources,
     agentMetadata,
     disabledAgents,
+    disabledProviders,
     agentOverrides,
     directory,
     systemDefaultModel,
@@ -121,6 +123,7 @@ export async function createBuiltinAgents(
 
   const sisyphusConfig = maybeCreateSisyphusConfig({
     disabledAgents,
+    disabledProviders,
     agentOverrides,
     uiSelectedModel,
     availableModels,
@@ -141,6 +144,7 @@ export async function createBuiltinAgents(
 
   const hephaestusConfig = maybeCreateHephaestusConfig({
     disabledAgents,
+    disabledProviders,
     agentOverrides,
     availableModels,
     systemDefaultModel,
@@ -164,6 +168,7 @@ export async function createBuiltinAgents(
 
   const atlasConfig = maybeCreateAtlasConfig({
     disabledAgents,
+    disabledProviders,
     agentOverrides,
     uiSelectedModel,
     availableModels,

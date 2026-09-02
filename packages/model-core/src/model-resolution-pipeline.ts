@@ -3,6 +3,7 @@ import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { normalizeModel } from "./model-normalization"
 import type { ProviderCache } from "./provider-cache"
+import { resolveHardcodedFallback } from "./hardcoded-fallback-resolution"
 
 type LogImplementation = (message: string, data?: unknown) => void
 
@@ -30,15 +31,16 @@ export type ModelResolutionRequest = {
   intent?: {
     uiSelectedModel?: string
     userModel?: string
-    userFallbackModels?: string[]
+    userFallbackModels?: readonly string[]
     categoryDefaultModel?: string
   }
   constraints: {
     availableModels: Set<string>
-    connectedProviders?: string[] | null
+    connectedProviders?: readonly string[] | null
+    disabledProviders?: readonly string[]
   }
   policy?: {
-    fallbackChain?: FallbackEntry[]
+    fallbackChain?: readonly FallbackEntry[]
     systemDefaultModel?: string
   }
 }
@@ -78,7 +80,7 @@ function modelIDForProvider(provider: string, model: string): string {
 
 function findFallbackVariantForModel(
   model: string,
-  fallbackChain: FallbackEntry[] | undefined,
+  fallbackChain: readonly FallbackEntry[] | undefined,
   transformModelForProvider: ModelResolutionDeps["transformModelForProvider"],
 ): string | undefined {
   const [provider, ...modelParts] = model.split("/")
@@ -208,67 +210,18 @@ export function resolveModelPipeline(
     }
   }
 
-  if (fallbackChain && fallbackChain.length > 0) {
-    if (availableModels.size === 0) {
-      const connectedProviders = constraints.connectedProviders ?? providerCache.readConnectedProvidersCache()
-      const connectedSet = connectedProviders ? new Set(connectedProviders) : null
-
-      if (connectedSet === null) {
-        log("Model fallback chain skipped (no connected providers cache) - falling through to system default")
-      } else {
-        for (const entry of fallbackChain) {
-          for (const provider of entry.providers) {
-            if (connectedSet.has(provider)) {
-              const entryModelID = modelIDForProvider(provider, entry.model)
-              const transformedModelId = deps.transformModelForProvider(provider, entryModelID)
-              const model = `${provider}/${transformedModelId}`
-              log("Model resolved via fallback chain (connected provider)", {
-                provider,
-                model: transformedModelId,
-                variant: entry.variant,
-              })
-              return {
-                model,
-                provenance: "provider-fallback",
-                variant: entry.variant,
-                attempted,
-              }
-            }
-          }
-        }
-        log("No connected provider found in fallback chain, falling through to system default")
-      }
-    } else {
-      for (const entry of fallbackChain) {
-        for (const provider of entry.providers) {
-          const entryModelID = modelIDForProvider(provider, entry.model)
-          const transformedModelId = deps.transformModelForProvider(provider, entryModelID)
-          const candidateModelIds = transformedModelId === entryModelID
-            ? [entryModelID]
-            : [entryModelID, transformedModelId]
-          for (const modelID of candidateModelIds) {
-            const fullModel = `${provider}/${modelID}`
-            const match = deps.fuzzyMatchModel(fullModel, availableModels, [provider])
-            if (match) {
-              log("Model resolved via fallback chain (availability confirmed)", {
-                provider,
-                model: entry.model,
-                match,
-                variant: entry.variant,
-              })
-              return {
-                model: match,
-                provenance: "provider-fallback",
-                variant: entry.variant,
-                attempted,
-              }
-            }
-          }
-        }
-
-      }
-      log("No available model found in fallback chain, falling through to system default")
-    }
+  const hardcodedFallback = resolveHardcodedFallback({
+    fallbackChain,
+    disabledProviders: constraints.disabledProviders,
+    availableModels,
+    connectedProviders: constraints.connectedProviders,
+    attempted,
+    providerCache,
+    deps,
+    log,
+  })
+  if (hardcodedFallback) {
+    return hardcodedFallback
   }
 
   if (systemDefaultModel === undefined) {

@@ -34,6 +34,7 @@ export function createCoreTools(args: {
     pluginConfig.agents,
     pluginConfig.categories,
     managers.modelFallbackControllerAccessor,
+    pluginConfig.disabled_providers ?? [],
   )
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -69,6 +70,7 @@ export function createCoreTools(args: {
     nativeSkills,
     getLoadedSkills,
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
+    disabledProviders: pluginConfig.disabled_providers ?? [],
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
     onSyncSessionCreated: async (event) => {
@@ -136,7 +138,7 @@ export function createCoreTools(args: {
     call_omo_agent: callOmoAgent,
   }
   if (isMultimodalLookerEnabled) {
-    tools.look_at = factories.createLookAt(ctx)
+    tools.look_at = factories.createLookAt(ctx, pluginConfig.disabled_providers ?? [])
   }
   tools.task = delegateTask
   tools.skill_mcp = skillMcpTool
