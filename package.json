@@ -182,7 +182,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.8.31",
+    "@code-yeongyu/senpi": "2026.9.2",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
@@ -252,6 +252,6 @@
     "@code-yeongyu/comment-checker"
   ],
   "patchedDependencies": {
-    "@code-yeongyu/senpi@2026.8.31": "patches/@code-yeongyu%2Fsenpi@2026.8.31.patch"
+    "@code-yeongyu/senpi@2026.9.2": "patches/@code-yeongyu%2Fsenpi@2026.9.2.patch"
   }
 }

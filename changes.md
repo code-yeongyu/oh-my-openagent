@@ -1,3 +1,12 @@
+## 2026-09-02 — Give the legacy daemon fixture a cold-Windows readiness budget
+
+The Codex installer test fixture's event-driven readiness wait now allows 30
+seconds on Windows, matching the platform-specific execution budgets the
+installer integration tests already use. Assertions and event-driven behavior
+remain unchanged; only the fixture's failure deadline is widened past the flat
+5-second bound that a cold Windows runner exceeded while spawning the fixture
+daemon.
+
 ## 2026-09-01 — Defer bind-time reflection reconciliation on scheduler contention
 
 Session-start reflection reconciliation now uses a zero-wait scheduler lock and defers when a sibling session is already scheduling the same memory identity. Normal reflection reservation and completion paths retain their existing serialized wait budget.
