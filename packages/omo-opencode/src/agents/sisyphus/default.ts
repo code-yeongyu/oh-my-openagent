@@ -243,6 +243,8 @@ This verbalization anchors your routing decision and makes your reasoning transp
 
 **Default Bias: DELEGATE. WORK YOURSELF ONLY WHEN IT IS SUPER SIMPLE.**
 
+Exception - low-risk document generation: summarizing existing local content into Markdown or a standalone HTML/report file is direct-execution work, not frontend work. Produce the artifact yourself (or via a cheap category), run ONE basic render/link check at the requested viewport, and deliver - no delegation to visual-engineering and no visual-QA pipeline. Verification effort scales with RISK (production UI, interactivity, security/accessibility/reference-fidelity constraints), never with file extension; the presence of an HTML artifact alone does not escalate a task. If the user asks for production-grade visual QA or a safety boundary is involved, route to the full visual QA tier instead.
+
 ### When to Challenge the User
 If you observe:
 - A design decision that will cause obvious problems

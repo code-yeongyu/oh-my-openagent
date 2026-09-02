@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/skills-loader-core/src/features/builtin-skills/skills.test.ts:
+384 |
+385 | 		// #then
+386 | 		expect(hadFrontmatter).toBe(true)
+387 | 		expect(parseError).toBe(false)
+388 | 		expect(visualQa).toBeDefined()
+389 | 		expect(visualQa?.description).toBe(data.description)
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: "MUST USE after building/changing any UI or when asked whether a page, component, or TUI looks right. Rigorous visual QA across web/page, terminal, and paginated-document surfaces. Risk selects the verification tier: a static non-interactive low-stakes document takes the bounded fast path inside (one render/link check, no independent reviewers); production or interactive UI gets the full dual-oracle gates. Prefer browser:control-in-app-browser for unauthenticated browser/page QA in Codex, then Playwright/agent-browser/dev-browser. Captures screenshot/TUI evidence with bundled diff scripts, runs design-system/functional and visual-fidelity/CJK reviewer passes, then synthesizes a good/bad verdict. Triggers: visual QA, screenshot/pixel diff, UI looks wrong, reference fidelity, design system check, responsive check, CJK text clipping, TUI alignment, box-drawing drift, PDF page check, deck review, blank or near-empty page, wrong page break."
+Received: "MUST USE after building/changing any UI or when asked whether a page, component, or TUI looks right. Rigorous visual QA across web/page, terminal, and paginated-document surfaces. Prefer browser:control-in-app-browser for unauthenticated browser/page QA in Codex, then Playwright/agent-browser/dev-browser. Captures screenshot/TUI evidence with bundled diff scripts, runs design-system/functional and visual-fidelity/CJK reviewer passes, then synthesizes a good/bad verdict. Triggers: visual QA, screenshot/pixel diff, UI looks wrong, reference fidelity, design system check, responsive check, CJK text clipping, TUI alignment, box-drawing drift, PDF page check, deck review, blank or near-empty page, wrong page break."
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6754/packages/skills-loader-core/src/features/builtin-skills/skills.test.ts:389:33)
+(fail) createBuiltinSkills > #given the shipped visual-qa SKILL.md #when comparing its frontmatter description to the builtin wrapper #then both copies are identical [0.87ms]
+
+ 23 pass
+ 1 fail
+ 106 expect() calls
+Ran 24 tests across 1 file. [1125.00ms]

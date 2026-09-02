@@ -1,0 +1,21 @@
+PASS shared-skills root resolves into this worktree - /home/viprix/projects/oom-wt-6754/packages/shared-skills/skills/
+PASS visual-qa loads via loadSkillsFromDir - 17 shared skills loaded
+PASS visual-qa frontmatter parses with tier clause - description length 948
+PASS loaded visual-qa body carries Step 0 tier gate - tier gate present in loaded template
+PASS builtin visual-qa wrapper loads - template bytes 28669
+PASS wrapper description equals shipped frontmatter - equality between real artifacts
+PASS frontend loads via loadSkillsFromDir - template bytes 19272
+PASS ultrawork/planner bundles and parses - packages/prompts-core/prompts/ultrawork/planner.md (1718 bytes)
+PASS ultrawork/gpt bundles and parses - packages/prompts-core/prompts/ultrawork/gpt.md (15504 bytes)
+PASS ultrawork/gemini bundles and parses - packages/prompts-core/prompts/ultrawork/gemini.md (20788 bytes)
+PASS ultrawork/glm bundles and parses - packages/prompts-core/prompts/ultrawork/glm.md (11010 bytes)
+PASS ultrawork/default bundles and parses - packages/prompts-core/prompts/ultrawork/default.md (22647 bytes)
+PASS ultrawork/codex bundles and parses - packages/prompts-core/prompts/ultrawork/codex.md (27228 bytes)
+PASS default QA row defers to risk tier - row updated in bundled content
+
+TOTAL: 14/14 checks pass
+=== SANDBOX WRITES (what the QA run created inside the sandbox) ===
+/tmp/opencode/issue-6754/sandbox/cache/bun/@t@/78ff5695248ab9fa.pile
+/tmp/opencode/issue-6754/sandbox/cache/bun/@t@/7a87559fbb4087c4.pile
+/tmp/opencode/issue-6754/sandbox/cache/bun/@t@/cf86f20c120ce818.pile
+QA_EXIT=0

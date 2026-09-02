@@ -1,6 +1,6 @@
 ---
 name: visual-qa
-description: "MUST USE after building/changing any UI or when asked whether a page, component, or TUI looks right. Rigorous visual QA across web/page, terminal, and paginated-document surfaces. Prefer browser:control-in-app-browser for unauthenticated browser/page QA in Codex, then Playwright/agent-browser/dev-browser. Captures screenshot/TUI evidence with bundled diff scripts, runs design-system/functional and visual-fidelity/CJK reviewer passes, then synthesizes a good/bad verdict. Triggers: visual QA, screenshot/pixel diff, UI looks wrong, reference fidelity, design system check, responsive check, CJK text clipping, TUI alignment, box-drawing drift, PDF page check, deck review, blank or near-empty page, wrong page break."
+description: "MUST USE after building/changing any UI or when asked whether a page, component, or TUI looks right. Rigorous visual QA across web/page, terminal, and paginated-document surfaces. Risk selects the verification tier: a static non-interactive low-stakes document takes the bounded fast path inside (one render/link check, no independent reviewers); production or interactive UI gets the full dual-oracle gates. Prefer browser:control-in-app-browser for unauthenticated browser/page QA in Codex, then Playwright/agent-browser/dev-browser. Captures screenshot/TUI evidence with bundled diff scripts, runs design-system/functional and visual-fidelity/CJK reviewer passes, then synthesizes a good/bad verdict. Triggers: visual QA, screenshot/pixel diff, UI looks wrong, reference fidelity, design system check, responsive check, CJK text clipping, TUI alignment, box-drawing drift, PDF page check, deck review, blank or near-empty page, wrong page break."
 ---
 
 # Visual QA - Dual-Oracle Web and TUI Verification
@@ -9,11 +9,39 @@ Verify a rendered UI against intent using objective script evidence plus two par
 
 ## Purpose and when to use
 
-- Use after you build or change any UI, before calling it done. Covers web/page UIs, TUI/terminal UIs, and paginated documents.
+- Use after you build or change any UI, before calling it done. Covers web/page UIs, TUI/terminal UIs, and paginated documents. The verification tier follows the surface's risk (Step 0): a static low-stakes document exits through the bounded fast path; product UI work runs the full gates below.
 - Use when output must match a mock, a baseline, or a stated design intent; when you suspect a regression; when CJK (Korean/Japanese/Chinese) text may clip, misalign, or wrap awkwardly; when a claimed design system might actually be a flat image; when a terminal layout may overflow or its borders may break.
 - Skip when there is no rendered surface (pure backend or library logic with no visual or terminal output). For broad post-implementation review use review-work; this skill is the visual specialist.
 
 In the commands below, `$SKILL_DIR` is this skill's own directory (the folder containing this SKILL.md). The bundled Node evidence CLI lives at `scripts/visual-qa.mjs` inside it; the TypeScript source in `scripts/cli.ts` is for development.
+
+## Step 0 - Classify the verification tier by risk
+
+Risk, not file extension, selects the verification tier. An HTML file alone proves nothing about the effort owed: classify the surface BEFORE capturing anything.
+
+**T0 - static-document fast path.** All of these hold at once:
+
+- The deliverable is a static document generated from local or user-supplied content: a Markdown summary, a standalone HTML report, an exported deck or PDF meant to be read.
+- It is non-interactive: no JavaScript behavior, no forms, no client-side state, no navigation beyond in-page anchors.
+- The audience is the requester (personal notes, small-group reading), not production users.
+- No escalation trigger below applies. Explicit budget terms from the user such as `quick`, `simple`, or `just summarize` confirm T0.
+
+T0 path (bounded - do all of it, then stop):
+
+1. Read the source material and create the requested artifacts.
+2. Perform ONE basic render check at the viewport or page size the user asked for: open the HTML in a browser (or render one page of the PDF/deck) and confirm it loads, styles and images resolve, and links point somewhere real.
+3. Fix what that check surfaced, re-check once, deliver. No independent reviewer subagents, no reference packet, and no print, sub-390px, accessibility, or reference-fidelity passes unless the user asked for them.
+
+**Full tier - production UI verification.** Everything else: product web UI changes, interactive surfaces, TUIs, reference-fidelity targets, and anything serving a production or shared audience. These run Steps 1-5 in full, including the independent dual-oracle gate.
+
+Escalate from T0 to the full tier the moment any of these becomes true - at triage or because a T0 check surfaced it:
+
+- The user asked for production-grade, rigorous, or independent visual QA.
+- A safety boundary is involved: security-sensitive content, accessibility requirements, or fidelity to a concrete design target.
+- The surface turned out interactive rather than a static document.
+- The artifact will ship to end users or customers rather than the requesting reader.
+
+If a T0 check fails in a way one more pass cannot fix, say so and ask the user whether to escalate instead of silently running the full pipeline.
 
 ## Step 1 - Detect the surface
 
@@ -100,9 +128,9 @@ Static screenshots miss what moves. For every interactive element and every anim
 
 **Animation is never an excuse to skip or pass a region.** A high `diffRatio` caused by an in-flight animation is **never a valid excuse** to dismiss a defect or wave a region through. Compare **settled state to settled state** for pixel fidelity, and separately verify the motion against the **reference's own motion** (or, with no reference, against the stated intent). "The pixels differ because it animates" is a reason to capture the settled frame and the motion properly — not a reason to pass.
 
-## Step 3 - Dispatch two read-only QA subagents in parallel
+## Step 3 - Dispatch two read-only QA subagents in parallel (full tier only)
 
-This independent review is REQUIRED before any "done" claim. Do not self-review inside the main agent and call the UI verified - a self-graded pass is the failure mode this step exists to stop. Dispatch it yourself, every time, without waiting to be told. Give each reviewer the captures for every enumerated page from Step 2, not a sample, and tell it the page count so it can confirm none were skipped.
+For full-tier surfaces, this independent review is REQUIRED before any "done" claim. A T0 static-document surface skips Steps 3-4 entirely: it is done when its Step 0 bounded check passes. Do not self-review inside the main agent and call the UI verified - a self-graded pass is the failure mode this step exists to stop. Dispatch it yourself, every time, without waiting to be told. Give each reviewer the captures for every enumerated page from Step 2, not a sample, and tell it the page count so it can confirm none were skipped.
 
 Dispatch through your harness's own subagent tool. In OpenCode: `task(subagent_type="oracle", ...)`. In Codex: `multi_agent_v1.spawn_agent({"message": "...", "agent_type": "lazycodex-gate-reviewer", "fork_context": false})` (the code blocks below are written in OpenCode `task(...)` form; translate them to that `spawn_agent` call, putting the full prompt in `message`).
 
@@ -218,9 +246,9 @@ BLOCKING: items that must be fixed; empty if PASS
 
 When both passes return, merge them into a single report. Per dimension, mark good or bad with evidence. For each bad item, state what is wrong, where (file/line, hotspot grid, or capture line), and the concrete fix. Call out what is genuinely good so it is not regressed later.
 
-### Completion gate - loop until an independent pass on fresh evidence
+### Completion gate - loop until an independent pass on fresh evidence (full tier)
 
-This is a hard stop rule, not a guideline. The UI is NOT done until ALL of these hold at once on the SAME current build:
+For full-tier surfaces this is a hard stop rule, not a guideline. The UI is NOT done until ALL of these hold at once on the SAME current build:
 
 - An independent read-only reviewer subagent returned PASS with no BLOCKING findings.
 - That reviewer judged a FRESH capture of every enumerated page from Step 2 - no stale artifacts, no skipped pages.

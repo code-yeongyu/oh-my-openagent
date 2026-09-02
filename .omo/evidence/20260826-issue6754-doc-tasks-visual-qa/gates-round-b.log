@@ -1,0 +1,24 @@
+=== ROUND B 2026-08-26T02:27:38Z ===
+--- bun test packages/skills-loader-core ---
+ 232 pass
+ 0 fail
+ 551 expect() calls
+Ran 232 tests across 37 files. [8.56s]
+--- bun test packages/prompts-core ---
+ 26 pass
+ 0 fail
+ 40 expect() calls
+Ran 26 tests across 5 files. [2.05s]
+--- bun test omo-opencode focused ---
+ 25 pass
+ 0 fail
+ 129 expect() calls
+Ran 25 tests across 3 files. [1.53s]
+--- tsgo skills-loader-core ---
+EXIT0
+--- tsgo prompts-core ---
+EXIT0
+--- tsgo omo-opencode ---
+EXIT0
+--- git diff --check ---
+CLEAN

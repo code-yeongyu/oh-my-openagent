@@ -1,6 +1,10 @@
 /// <reference path="../../../../../bun-test.d.ts" />
 
 import { describe, test, expect } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { parseFrontmatter } from "@oh-my-opencode/utils"
+import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills"
 import { createBuiltinSkills } from "./skills"
 import { agentBrowserSkill, playwrightSkill } from "./skills/playwright"
 
@@ -367,5 +371,21 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(playwright?.mcpConfig?.playwright?.args).toEqual(["@playwright/mcp@latest"])
+	})
+
+	test("#given the shipped visual-qa SKILL.md #when comparing its frontmatter description to the builtin wrapper #then both copies are identical", () => {
+		// #given - shared-skills source and builtin wrapper must stay in lockstep
+		const skillMdPath = join(sharedSkillsRootPath(), "visual-qa", "SKILL.md")
+		const skillMd = readFileSync(skillMdPath, "utf8")
+
+		// #when
+		const { data, hadFrontmatter, parseError } = parseFrontmatter<{ description?: string }>(skillMd)
+		const visualQa = createBuiltinSkills().find((skill) => skill.name === "visual-qa")
+
+		// #then
+		expect(hadFrontmatter).toBe(true)
+		expect(parseError).toBe(false)
+		expect(visualQa).toBeDefined()
+		expect(visualQa?.description).toBe(data.description)
 	})
 })
