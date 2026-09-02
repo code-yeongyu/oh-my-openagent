@@ -9,6 +9,7 @@ import { BUILTIN_CATEGORY_REQUIRES_MODEL, CATEGORY_PROMPT_APPEND_RESOLVERS } fro
 import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
+import { resolveEffectiveModelChain } from "../../shared/effective-model-chain"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
@@ -113,12 +114,24 @@ Available categories: ${allCategoryNames}`)
   }
 
   const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category!]
-  const hasCanonicalModels = resolved.config.models !== undefined
-  const canonicalPrimaryEntry = resolved.config.models?.[0]
+  // resolved.config.model is defaults-polluted (resolveCategoryConfig always sets
+  // one), so the legacy model is taken from the raw user entry when merging it
+  // into a canonical chain.
+  const effectiveChain = resolveEffectiveModelChain({
+    model: userCategories?.[args.category!]?.model,
+    models: resolved.config.models,
+    fallback_models: resolved.config.fallback_models,
+  })
+  // A canonical chain exists only when the user actually wrote `models`;
+  // a legacy-only entry (model + fallback_models) must keep taking the
+  // legacy branches below or its fallback_models would be dropped.
+  const hasCanonicalModels =
+    Array.isArray(resolved.config.models) && resolved.config.models.length > 0
+  const canonicalPrimaryEntry = effectiveChain.entries[0]
   const configuredPrimaryModel = getConfiguredModel(canonicalPrimaryEntry)
   const categoryResolvedModel = hasCanonicalModels ? configuredPrimaryModel : resolved.model
   const normalizedConfiguredFallbackModels = normalizeFallbackModels(
-    hasCanonicalModels ? resolved.config.models?.slice(1) : resolved.config.fallback_models,
+    hasCanonicalModels ? effectiveChain.entries.slice(1) : resolved.config.fallback_models,
   )
   let actualModel: string | undefined
   let modelInfo: ModelFallbackInfo | undefined
@@ -131,7 +144,6 @@ Available categories: ${allCategoryNames}`)
   const explicitCategoryModel = hasCanonicalModels
     ? configuredPrimaryModel
     : userCategories?.[args.category!]?.model
-
   if (!requirement) {
     // Precedence: explicit category model > sisyphus-junior default > category resolved model
     // This keeps `sisyphus-junior.model` useful as a global default while allowing
@@ -246,7 +258,7 @@ Available categories: ${categoryNames.join(", ")}`)
     defaultProviderID,
   )
   const canonicalModelChain = hasCanonicalModels
-    ? buildFallbackChainFromModels(resolved.config.models, defaultProviderID)
+    ? buildFallbackChainFromModels(effectiveChain.entries, defaultProviderID)
     : undefined
 
   // Canonical model entries carry settings for both the primary and fallback rungs.

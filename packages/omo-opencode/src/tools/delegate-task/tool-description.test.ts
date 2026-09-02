@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { CATEGORY_PROMPT_APPENDS } from "./builtin-categories"
 import { createDelegateTaskPresentation } from "./tool-description"
+import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 describe("createDelegateTaskPresentation", () => {
   test("#given sync task usage #when description is rendered #then timeout is described as inactivity based", () => {
@@ -46,5 +47,21 @@ describe("createDelegateTaskPresentation", () => {
       expect(CATEGORY_PROMPT_APPENDS[category]).not.toContain("<Selection_Gate>")
       expect(CATEGORY_PROMPT_APPENDS[category]).not.toContain("<Caller_Warning>")
     }
+  })
+
+  test("#given a user category with a canonical models chain #when presentation is built #then the roster row shows the chain primary (issue #6868)", () => {
+    //#given
+    const userCategories = unsafeTestValue({
+      quick: {
+        models: ["opencode-go/deepseek-v4-pro", "opencode-go/qwen3.7-plus"],
+      },
+    })
+
+    //#when
+    const presentation = createDelegateTaskPresentation({ userCategories })
+
+    //#then
+    const quick = presentation.availableCategories.find((category) => category.name === "quick")
+    expect(quick?.model).toBe("opencode-go/deepseek-v4-pro")
   })
 })

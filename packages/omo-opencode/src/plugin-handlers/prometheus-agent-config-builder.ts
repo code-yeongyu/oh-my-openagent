@@ -1,9 +1,10 @@
 import type { CategoryConfig } from "../config/schema";
-import type { FallbackModels } from "../config/schema/fallback-models";
+import type { FallbackModelObject, FallbackModels } from "../config/schema/fallback-models";
 import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import type { FallbackEntry } from "../shared/model-requirements";
+import { resolveEffectiveModelChain } from "../shared/effective-model-chain";
 import {
   fetchAvailableModels,
   readConnectedProvidersCache,
@@ -14,6 +15,7 @@ import { resolveCategoryConfig } from "./category-config-resolver";
 type PrometheusOverride = Record<string, unknown> & {
   category?: string;
   model?: string;
+  models?: (string | FallbackModelObject)[];
   reasoning?: string;
   variant?: string;
   reasoningEffort?: string;
@@ -58,8 +60,11 @@ export async function buildPrometheusAgentConfig(params: {
     connectedProviders: connectedProviders ?? undefined,
   });
 
+  const overrideChain = resolveEffectiveModelChain(params.pluginPrometheusOverride ?? {});
+  const categoryChain = resolveEffectiveModelChain(categoryConfig ?? {});
+
   const configuredPrometheusModel =
-    params.pluginPrometheusOverride?.model ?? categoryConfig?.model;
+    overrideChain.primaryModel ?? categoryChain.primaryModel;
 
   const shouldUseCurrentModel = isModelInFallbackChain(
     params.currentModel,
@@ -73,8 +78,8 @@ export async function buildPrometheusAgentConfig(params: {
         : shouldUseCurrentModel
           ? params.currentModel
           : undefined,
-      userModel: params.pluginPrometheusOverride?.model,
-      categoryDefaultModel: categoryConfig?.model,
+      userModel: overrideChain.primaryModel,
+      categoryDefaultModel: categoryChain.primaryModel,
     },
     constraints: { availableModels },
     policy: {
@@ -106,7 +111,7 @@ export async function buildPrometheusAgentConfig(params: {
   const maxTokensToUse =
     params.pluginPrometheusOverride?.maxTokens ?? categoryConfig?.maxTokens;
   const fallbackModelsToUse =
-    params.pluginPrometheusOverride?.fallback_models ?? categoryConfig?.fallback_models;
+    overrideChain.fallbackEntries ?? categoryChain.fallbackEntries;
 
   const base: Record<string, unknown> = {
     ...(resolvedModel ? { model: resolvedModel } : {}),
