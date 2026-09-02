@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/atlas/idle-event-complete-boulder.test.ts:
+139 |         properties: { sessionID },
+140 |       },
+141 |     })
+142 | 
+143 |     // then: Atlas terminates cleanly - no continuation prompt is dispatched
+144 |     expect(promptAsyncCallCount()).toBe(0)
+                                         ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-4744/packages/omo-opencode/src/hooks/atlas/idle-event-complete-boulder.test.ts:144:36)
+(fail) atlas hook idle-event complete boulder > does not re-enter the continuation loop when a completed work goes idle with its plan file gone [2540.45ms]
+
+ 2 pass
+ 1 fail
+ 6 expect() calls
+Ran 3 tests across 1 file. [4.18s]
