@@ -1,0 +1,2 @@
+TYPECHECK: bun run --cwd packages/utils typecheck
+$ tsgo --noEmit -p tsconfig.json

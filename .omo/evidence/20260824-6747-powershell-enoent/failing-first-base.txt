@@ -1,0 +1,22 @@
+RED: temporary minimal repro against origin/dev exec.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/utils/src/process-sweep/exec.red.test.ts:
+13 |   const previousSystemRoot = process.env.SystemRoot
+14 |   const previousPath = process.env.PATH
+15 |   process.env.SystemRoot = root
+16 |   process.env.PATH = "/nonexistent"
+17 |   try {
+18 |     await expect(enumerateProcesses("win32")).resolves.toEqual([{ command: "node lsp-daemon-proxy.js mcp", pid: 4242, ppid: 1 }])
+                                                            ^
+error: expect(received).resolves.toEqual(expected)
+
+Expected promise that resolves
+Received promise that rejected: Promise { <rejected> }
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/bip-7213/packages/utils/src/process-sweep/exec.red.test.ts:18:56)
+(fail) base repro resolves powershell from SystemRoot instead of PATH [10.38ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [123.00ms]

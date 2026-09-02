@@ -1,0 +1,16 @@
+GREEN: bun test packages/utils/src/process-sweep/exec.test.ts
+bun test v1.4.0-canary.1 (b58cd4685)
+
+packages/utils/src/process-sweep/exec.test.ts:
+(pass) windows sweep launcher resolution > resolveWindowsSystemBinary > #given SystemRoot with the binary under System32 #when resolving #then the absolute path wins over the bare name [0.74ms]
+(pass) windows sweep launcher resolution > resolveWindowsSystemBinary > #given only windir set #when resolving #then the windir tree is used [0.12ms]
+(pass) windows sweep launcher resolution > resolveWindowsSystemBinary > #given the SystemRoot candidate missing on disk #when resolving #then the bare name is kept as the PATH fallback [0.10ms]
+(pass) windows sweep launcher resolution > resolveWindowsSystemBinary > #given neither SystemRoot nor windir #when resolving #then the bare name is kept [2.50ms]
+(pass) windows sweep launcher resolution > #given a fake SystemRoot powershell tree #when enumerating win32 processes #then rows come from the resolved absolute binary [245.15ms]
+(pass) windows sweep launcher resolution > #given a fake SystemRoot taskkill tree #when the win32 killer terminates and kills #then the absolute taskkill runs with the expected arguments [347.90ms]
+(pass) windows sweep launcher resolution > #given no SystemRoot and no powershell on PATH #when enumerating win32 processes #then the rejection names the attempted launcher [0.91ms]
+
+ 7 pass
+ 0 fail
+ 9 expect() calls
+Ran 7 tests across 1 file. [703.00ms]
