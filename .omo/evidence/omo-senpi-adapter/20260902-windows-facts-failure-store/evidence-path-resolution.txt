@@ -1,0 +1,4 @@
+resolver=.agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs
+slug=20260902-windows-facts-failure-store
+repository_relative=.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store
+status=resolved-and-matched

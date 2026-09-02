@@ -8,5 +8,5 @@ Ran 2531 tests across 334 files. [143.68s]
  10 pass
  0 fail
 Ran 10 tests across 1 file. [1156.00ms]
-omo-senpi extension build is current: /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/extensions/omo.js
+omo-senpi extension build is current: <WORKTREE>/packages/omo-senpi/plugin/extensions/omo.js
 {"result":"PASS","ultraworkInjected":true,"commentChecker":"PASS","realSenpiUntouched":true,"realOmoUntouched":true,"realSenpiChangedPaths":[],"realOmoChangedPaths":[]}

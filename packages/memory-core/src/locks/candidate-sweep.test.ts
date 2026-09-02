@@ -100,13 +100,20 @@ describe("sweepStaleLockCandidates", () => {
     expect((await readdir(directory)).sort()).toEqual([blocked])
   })
 
-  test("#given persistent sharing failure #when the next lock is acquired #then fresh candidate cleanup is not retried and aged candidates remain reclaimable", async () => {
+  test("#given a sharing-blocked candidate #when resweep eligibility advances #then fresh cleanup is deferred and stale cleanup is bounded", async () => {
     const directory = await createLocksDirectory()
     const lockPath = path.join(directory, "resource.lock")
+    const clock = { now: Date.now() }
     const attemptsByPath = new Map<string, number>()
+    let sharing = true
     const restore = setLockCandidateFsForTests({
-      isSharingError: () => true,
+      now: () => clock.now,
+      isSharingError: () => sharing,
       unlink: async (candidatePath) => {
+        if (!sharing) {
+          await rm(candidatePath)
+          return
+        }
         attemptsByPath.set(candidatePath, (attemptsByPath.get(candidatePath) ?? 0) + 1)
         const error = new Error("sharing") as NodeJS.ErrnoException
         error.code = "EPERM"
@@ -119,19 +126,61 @@ describe("sweepStaleLockCandidates", () => {
       await releaseLock(lockPath, first)
       const firstCandidate = (await readdir(directory)).find((name) => name.includes(".candidate-"))
       expect(firstCandidate).toBeDefined()
+      const firstCandidatePath = path.join(directory, firstCandidate!)
+      await utimes(firstCandidatePath, clock.now / 1000, clock.now / 1000)
 
       const second = await createLockRecord("memory-write", {})
       await acquireLock(lockPath, second)
       await releaseLock(lockPath, second)
-      expect(attemptsByPath.get(path.join(directory, firstCandidate!))).toBe(CANDIDATE_UNLINK_ATTEMPTS)
+      expect(attemptsByPath.get(firstCandidatePath)).toBe(CANDIDATE_UNLINK_ATTEMPTS)
+
+      clock.now += CANDIDATE_STALE_AGE_MS + 1
+      const third = await createLockRecord("memory-write", {})
+      await acquireLock(lockPath, third)
+      await releaseLock(lockPath, third)
+      expect(attemptsByPath.get(firstCandidatePath)).toBe(CANDIDATE_UNLINK_ATTEMPTS * 2)
+
+      const fourth = await createLockRecord("memory-write", {})
+      await acquireLock(lockPath, fourth)
+      await releaseLock(lockPath, fourth)
+      expect(attemptsByPath.get(firstCandidatePath)).toBe(CANDIDATE_UNLINK_ATTEMPTS * 2)
+
+      sharing = false
+      clock.now += CANDIDATE_STALE_AGE_MS + 1
+      const fifth = await createLockRecord("memory-write", {})
+      await acquireLock(lockPath, fifth)
+      await releaseLock(lockPath, fifth)
+      expect((await readdir(directory)).filter((name) => name.includes(".candidate-"))).toEqual([])
+    } finally {
+      restore()
+    }
+  })
+
+  test("#given a non-sharing candidate cleanup failure #when acquisition throws #then the next acquire rearms its sweep", async () => {
+    const directory = await createLocksDirectory()
+    const lockPath = path.join(directory, "resource.lock")
+    const restore = setLockCandidateFsForTests({
+      unlink: async () => {
+        const error = new Error("non-sharing cleanup failure") as NodeJS.ErrnoException
+        error.code = "EIO"
+        throw error
+      },
+    })
+    const first = await createLockRecord("memory-write", {})
+    try {
+      await expect(acquireLock(lockPath, first)).rejects.toThrow("non-sharing cleanup failure")
+      await releaseLock(lockPath, first)
     } finally {
       restore()
     }
 
-    const leakedCandidates = (await readdir(directory)).filter((name) => name.includes(".candidate-"))
-    for (const name of leakedCandidates) await utimes(path.join(directory, name), 0, 0)
-    expect(await sweepStaleLockCandidates(directory)).toBe(leakedCandidates.length)
-    expect((await readdir(directory)).filter((name) => name.includes(".candidate-"))).toEqual([])
+    const staleName = "other.lock.candidate-11111111-aaaa-bbbb-cccc-000000000012"
+    await writeAged(directory, staleName, CANDIDATE_STALE_AGE_MS * 2)
+    const second = await createLockRecord("memory-write", {})
+    await acquireLock(lockPath, second)
+    await releaseLock(lockPath, second)
+
+    expect((await readdir(directory)).includes(staleName)).toBe(false)
   })
 
   test("#given a stale candidate #when the first lock in that directory is acquired #then the candidate is swept", async () => {

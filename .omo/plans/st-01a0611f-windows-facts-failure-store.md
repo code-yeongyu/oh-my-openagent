@@ -12,16 +12,16 @@ Repair the Windows lock-candidate cleanup path that can consume the 5-second tim
 
 ## Atomic todo
 1. Read the complete existing candidate-sweep tests and the final PR #7602 commits; formulate the minimal invariant: an advisory Windows sharing error cannot make the next lock acquisition wait on stale candidate cleanup.
-2. Add one deterministic red test in `packages/memory-core/src/locks/candidate-sweep.test.ts` using the existing filesystem seam. It must prove a still-sharing candidate does not get synchronously re-swept during the next acquisition and that a later healthy sweep reclaims it.
-3. Implement the smallest lock cleanup change in `packages/memory-core/src/locks/` that preserves exclusive lock publication and eventual candidate cleanup while removing the repeated synchronous cleanup path.
+2. Add controlled-clock deterministic red tests in `packages/memory-core/src/locks/candidate-sweep.test.ts` using the existing filesystem seam. They must prove a still-sharing candidate is not re-swept during the next acquisition, is reconsidered only after the stale-age eligibility boundary, and a non-sharing cleanup error rearms the sweep before it throws.
+3. Implement the smallest lock cleanup change in `packages/memory-core/src/locks/` that preserves exclusive lock publication and eventual candidate cleanup while removing repeated synchronous cleanup. A sharing-blocked stale candidate must schedule one bounded later eligibility window rather than retrying on every acquisition.
 4. Run the red/green focused lock and facts-store tests with CI-pinned Bun 1.4.0; run diagnostics/typecheck for memory-core and the package test suite.
 5. Rebuild required generated Senpi plugin artifacts, run `bun run test:senpi`, and run the real isolated Senpi driver prescribed by `.agents/skills/senpi-qa`.
-6. Write reviewer-readable evidence under `.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/`, including CI log facts, local red/green output, real-harness isolation result, generated-artifact freshness, and cleanup receipt.
+6. Before writing Senpi evidence, resolve its directory with `node .agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs --repo-root "$(git rev-parse --show-toplevel)" --slug 20260902-windows-facts-failure-store`; write only under the resolver result. Record repository-relative, redacted CI facts, local red/green output, real-harness isolation result, generated-artifact freshness, and cleanup receipt.
 7. Review the diff, commit the atomic repair and evidence, push a PR to `dev`, wait for CI and Cubic, and address only verified findings. Do not merge.
 
 ## Verification contract
-- Focused lock test: simulated persistent `EPERM` sharing failure cannot block a subsequent acquisition; after the seam becomes healthy, the leaked candidate is reclaimed.
-- Focused facts store tests: all nine persistence cases, including the three original failures, pass once in one Bun process.
+- Focused lock tests: simulated persistent `EPERM` sharing failure cannot block the immediate next acquisition; controlled time proves the same stale candidate is retried only after the age boundary, then deferred again after a failed stale retry. A non-sharing cleanup throw rearms the next sweep.
+- Focused facts store tests: the file's eight persistence cases plus one layout case (nine tests total), including the three original failures, pass once in one Bun process.
 - Package gate: `bun run --cwd packages/memory-core typecheck` and `bun test packages/memory-core/src` pass using Bun 1.4.0.
 - Senpi adapter gate and live harness QA complete with isolated agent-directory evidence; no host Senpi directory mutation.
 - PR gates: GitHub CI green and latest Cubic review reports no issues, or a documented Cubic quota skip. Stop when the unmerged PR is green and review-clean.

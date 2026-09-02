@@ -14,7 +14,11 @@ import type { FileHandle } from "../fs/resilient"
 import { hostname } from "node:os"
 import path from "node:path"
 
-import { CANDIDATE_UNLINK_ATTEMPTS, sweepStaleLockCandidates } from "./candidate-sweep"
+import {
+  CANDIDATE_STALE_AGE_MS,
+  CANDIDATE_UNLINK_ATTEMPTS,
+  sweepStaleLockCandidates,
+} from "./candidate-sweep"
 import type { LockRecord } from "./lock-record"
 import { parseLockRecord } from "./lock-record"
 import { getPidLiveness, getProcessStartIdentity } from "./process-identity"
@@ -62,7 +66,10 @@ async function unlinkCandidate(candidatePath: string): Promise<boolean> {
     } catch (error) {
       if (errorCode(error) === "ENOENT") return true
       const sharing = isUnlinkSharingError(error, candidateFs.isSharingError)
-      if (!sharing) throw error
+      if (!sharing) {
+        rearmCandidateSweep(path.dirname(candidatePath))
+        throw error
+      }
       if (attempt + 1 === CANDIDATE_UNLINK_ATTEMPTS) return false
     }
   }
@@ -143,11 +150,15 @@ export function isCandidatePublishRace(error: unknown): boolean {
   return code === "EEXIST" || code === "ENOENT"
 }
 
-const sweptLockDirectories = new Set<string>()
+// Candidate files are advisory garbage, not locks. Sweep each directory once per stale-age
+// window: this skips fresh sharing-blocked candidates on the immediate next acquire, but gives
+// aged candidates a bounded later cleanup opportunity even in a long-lived process.
+const candidateSweepEligibleAt = new Map<string, number>()
 
 export interface LockCandidateFs {
   readonly unlink?: (path: string) => Promise<void>
   readonly isSharingError?: (error: unknown) => boolean
+  readonly now?: () => number
 }
 
 let candidateFs: LockCandidateFs = {}
@@ -160,7 +171,24 @@ export function setLockCandidateFsForTests(next: LockCandidateFs | undefined): (
 }
 
 function rearmCandidateSweep(lockDirectory: string): void {
-  sweptLockDirectories.delete(lockDirectory)
+  candidateSweepEligibleAt.delete(lockDirectory)
+}
+
+async function sweepCandidateDirectoryWhenEligible(lockDirectory: string): Promise<void> {
+  const now = candidateFs.now ?? Date.now
+  const observedAt = now()
+  const eligibleAt = candidateSweepEligibleAt.get(lockDirectory)
+  if (eligibleAt !== undefined && observedAt < eligibleAt) return
+
+  // Schedule before sweeping. A sharing-blocked stale candidate therefore waits for the next
+  // bounded eligibility window instead of consuming unlink retries on every acquisition.
+  candidateSweepEligibleAt.set(lockDirectory, observedAt + CANDIDATE_STALE_AGE_MS)
+  await sweepStaleLockCandidates(lockDirectory, now, {
+    ...(candidateFs.unlink === undefined ? {} : { unlink: candidateFs.unlink }),
+    ...(candidateFs.isSharingError === undefined ? {} : { isSharingError: candidateFs.isSharingError }),
+  }).catch(() => {
+    rearmCandidateSweep(lockDirectory)
+  })
 }
 
 async function isProvenDead(owner: LockRecord): Promise<boolean> {
@@ -211,17 +239,7 @@ export async function acquireLock(
   const retryDelayMs = options.retryDelayMs ?? 25
   if (waitTimeoutMs < 0 || retryDelayMs <= 0) throw new Error("lock wait options must be positive")
   const lockDirectory = path.dirname(lockPath)
-  if (!sweptLockDirectories.has(lockDirectory)) {
-    sweptLockDirectories.add(lockDirectory)
-    // Opportunistic hygiene, once per process per directory: a failed sweep must never
-    // block or fail the acquisition it rides on. Failed candidate cleanup re-arms this memo.
-    await sweepStaleLockCandidates(lockDirectory, Date.now, {
-      ...(candidateFs.unlink === undefined ? {} : { unlink: candidateFs.unlink }),
-      ...(candidateFs.isSharingError === undefined ? {} : { isSharingError: candidateFs.isSharingError }),
-    }).catch(() => {
-      rearmCandidateSweep(lockDirectory)
-    })
-  }
+  await sweepCandidateDirectoryWhenEligible(lockDirectory)
   const deadline = Date.now() + waitTimeoutMs
 
   for (;;) {

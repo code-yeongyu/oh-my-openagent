@@ -19,7 +19,7 @@ error: expect(received).toBe(expected)
 Expected: 3
 Received: 6
 
-      at <anonymous> (/private/tmp/omo-st_01a0611f/packages/memory-core/src/locks/candidate-sweep.test.ts:127:73)
+      at <anonymous> (<WORKTREE>/packages/memory-core/src/locks/candidate-sweep.test.ts:127:73)
 (fail) sweepStaleLockCandidates > #given persistent sharing failure #when the next lock is acquired #then fresh candidate cleanup is not retried and aged candidates remain reclaimable [13.65ms]
 (pass) sweepStaleLockCandidates > #given a tracked candidate directory disappears #when the sweep sees ENOENT #then the path is untracked [1.12ms]
 (pass) sweepStaleLockCandidates > #given a stale candidate #when the first lock in that directory is acquired #then the candidate is swept [4.55ms]

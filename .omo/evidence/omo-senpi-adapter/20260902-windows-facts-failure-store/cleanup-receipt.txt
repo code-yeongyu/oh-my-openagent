@@ -1,2 +1,3 @@
-lsp_daemon_pid=52263 terminated
-rebase_lsp_daemon_pid=70774 terminated
+lsp_daemon_pid=52263 terminated; post_termination_kill_0=absent
+rebase_lsp_daemon_pid=70774 terminated; post_termination_kill_0=absent
+post_cubic_worktree_lsp_daemon=none_present; post_termination_pgrep=absent

@@ -1,0 +1,41 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/memory-core/src/locks/candidate-sweep.test.ts:
+(pass) sweepStaleLockCandidates > #given stale and fresh candidates #when swept #then only stale candidates are deleted [11.52ms]
+(pass) sweepStaleLockCandidates > #given a missing locks directory #when swept #then nothing is swept [0.52ms]
+(pass) sweepStaleLockCandidates > #given a legal lock name containing .candidate- #when swept #then the live lock survives [0.87ms]
+(pass) sweepStaleLockCandidates > #given one sharing-failing candidate and one removable candidate #when stale candidates are swept #then the failure is bounded and the rest are reclaimed [1.05ms]
+132 |
+133 |       clock.now += CANDIDATE_STALE_AGE_MS + 1
+134 |       const third = await createLockRecord("memory-write", {})
+135 |       await acquireLock(lockPath, third)
+136 |       await releaseLock(lockPath, third)
+137 |       expect(attemptsByPath.get(firstCandidatePath)).toBe(CANDIDATE_UNLINK_ATTEMPTS * 2)
+                                                           ^
+error: expect(received).toBe(expected)
+
+Expected: 6
+Received: 3
+
+      at <anonymous> (<WORKTREE>/packages/memory-core/src/locks/candidate-sweep.test.ts:137:54)
+(fail) sweepStaleLockCandidates > #given a sharing-blocked candidate #when resweep eligibility advances #then fresh cleanup is deferred and stale cleanup is bounded [16.88ms]
+175 |     await writeAged(directory, staleName, CANDIDATE_STALE_AGE_MS * 2)
+176 |     const second = await createLockRecord("memory-write", {})
+177 |     await acquireLock(lockPath, second)
+178 |     await releaseLock(lockPath, second)
+179 |
+180 |     expect((await readdir(directory)).includes(staleName)).toBe(false)
+                                                                 ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (<WORKTREE>/packages/memory-core/src/locks/candidate-sweep.test.ts:180:60)
+(fail) sweepStaleLockCandidates > #given a non-sharing candidate cleanup failure #when acquisition throws #then the next acquire rearms its sweep [7.24ms]
+(pass) sweepStaleLockCandidates > #given a stale candidate #when the first lock in that directory is acquired #then the candidate is swept [3.68ms]
+
+ 5 pass
+ 2 fail
+ 14 expect() calls
+Ran 7 tests across 1 file. [2.17s]

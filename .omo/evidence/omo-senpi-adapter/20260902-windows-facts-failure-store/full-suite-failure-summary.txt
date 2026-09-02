@@ -1,0 +1,39 @@
+# Full-root suite environmental exceptions
+
+These two local root-suite attempts are documented for transparency only; neither is claimed as a passing gate. Every total is accounted for as pass + skip + fail.
+
+## Normal HOME
+
+Command result: 17,155 pass + 9 skip + 5 fail = 17,169 tests across 2,194 files (437.51 s).
+
+The five failures are all `readOpencodeConfigSkills` cases:
+1. `returns undefined when no opencode config exists`
+2. `reads skills.paths and skills.urls from project opencode.jsonc`
+3. `returns undefined when skills key is missing`
+4. `ignores non-string entries and trims whitespace`
+5. `tolerates malformed jsonc gracefully`
+
+Cause: the normal workstation HOME supplied an existing global `.agents/skills` entry, so the reader correctly returned that external configured skill path where these fixtures expected no global skills.
+
+## Clean HOME
+
+Command result: 17,144 pass + 9 skip + 16 fail = 17,169 tests across 2,194 files (426.14 s).
+
+The sixteen failures are all isolation-path conditions:
+- 6 LSP request-context/default-path tests (`LspRequestContext` x5 and `missingDependencyResult` x1): macOS realpath canonicalizes the temporary HOME through its alternate temporary-root alias while fixtures compare the original spelling.
+- 1 `scan tool: pinned real-binary fixtures` test: the isolated HOME lacks the provisioned pinned ast-grep runtime fixture.
+- 9 `opencode-config-dir` default-path tests: the same temporary-root realpath alias mismatch affects expected default config paths.
+
+## Skips in both attempts (9)
+
+1. `embedded manifest parity (darwin-arm64)` binary size budget.
+2. `bounded sg NDJSON runner` Windows abort path.
+3. `bounded sg NDJSON runner` Windows whole-call budget path.
+4. Production task-driver Windows real RPC child.
+5. Console-less parent Windows RPC-child console suppression.
+6. `WorkspaceDocumentState` Windows re-encoded URI diagnostics.
+7. `team-mode live tmux smoke` in the team-core surface.
+8. `reapLspDaemons live ownership` Windows named-pipe legacy daemon.
+9. `team-mode live tmux smoke` in the omo-opencode surface.
+
+The required authoritative Windows proof is CI run 33610291206, where both Windows root shards and Windows Senpi compatibility completed successfully for more than eleven minutes each.

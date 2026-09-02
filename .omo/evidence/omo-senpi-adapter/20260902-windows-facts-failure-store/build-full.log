@@ -276,8 +276,8 @@ build:senpi-plugin
 $ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
 $ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
 [materialize] skipped (OMO_SKIP_MATERIALIZE=1)
-Staged Senpi LSP runtime: /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
-Staged Senpi ast-grep MCP runtime: /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+Staged Senpi LSP runtime: <WORKTREE>/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: <WORKTREE>/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
 Bundled 44 modules in 6ms
 
   cli.js  176.94 KB  (entry point)
@@ -299,7 +299,7 @@ Usage:
 
 All subcommands accept [--session-id <id>] to isolate state under .omo/ulw-loop/<id>/; without it, Codex session env is used when present.
 Every subcommand accepts --help | -h to print its own usage line.
-Staged Senpi agent-toolkit runtime: /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/runtime/agent-toolkit
+Staged Senpi agent-toolkit runtime: <WORKTREE>/packages/omo-senpi/plugin/runtime/agent-toolkit
 Bundled 889 modules in 43ms
 
   omo.js  1.49 MB  (entry point)
@@ -324,12 +324,12 @@ Bundled 118 modules in 10ms
 
   omo-init-deep-advisor.js  77.95 KB  (entry point)
 
-Built omo-senpi extensions: /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/extensions/omo.js, /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/extensions/omo-task.js, /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/extensions/omo-member.js, /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
-synced omo-senpi skills to /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/skills
-generated directive is current: /private/tmp/omo-st_01a0611f/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Built omo-senpi extensions: <WORKTREE>/packages/omo-senpi/plugin/extensions/omo.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-task.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-member.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to <WORKTREE>/packages/omo-senpi/plugin/skills
+generated directive is current: <WORKTREE>/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
 Bundled 6 modules in 5ms
 
   install.mjs  19.93 KB  (entry point)
 
-Built omo-senpi installer: /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/scripts/install.mjs
+Built omo-senpi installer: <WORKTREE>/packages/omo-senpi/plugin/scripts/install.mjs
 build: all steps completed

@@ -1,42 +1,27 @@
-Focused red/green and package gates:
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/red-fresh-candidate-retry.log:Expected: 3
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/red-fresh-candidate-retry.log:Received: 6
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/red-fresh-candidate-retry.log: 6 pass
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/red-fresh-candidate-retry.log: 1 fail
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/red-fresh-candidate-retry.log:Ran 7 tests across 1 file. [3.53s]
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/green-candidate-sweep.log: 6 pass
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/green-candidate-sweep.log: 0 fail
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/green-candidate-sweep.log:Ran 6 tests across 1 file. [641.00ms]
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/green-facts-failure-store.log: 9 pass
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/green-facts-failure-store.log: 0 fail
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/green-facts-failure-store.log:Ran 9 tests across 1 file. [756.00ms]
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/package-memory-core.log: 652 pass
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/package-memory-core.log: 0 fail
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/package-memory-core.log:Ran 652 tests across 80 files. [53.47s]
+# Local gate summary
 
-Senpi package gate:
- 2530 pass
- 0 fail
-Ran 2531 tests across 334 files. [124.83s]
- 10 pass
- 0 fail
-Ran 10 tests across 1 file. [1151.00ms]
+All references in this document are repository-relative to this evidence directory.
 
-Full typecheck:
-$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
-$ tsgo --noEmit -p script/tsconfig.json
-$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
+## Original repair evidence
 
-Build:
-  install.mjs  19.93 KB  (entry point)
+- `red-fresh-candidate-retry.log`: unchanged code was RED (`Expected: 3`, `Received: 6`).
+- `green-candidate-sweep.log`: 6 pass, 0 fail.
+- `green-facts-failure-store.log`: 9 pass, 0 fail; this file contains 8 persistence cases plus 1 layout case.
+- `package-memory-core.log`: 652 pass, 0 fail.
+- `typecheck-full.log`: full typecheck passed.
+- `build-full.log`: full build passed.
+- `generated-bundle-check.log` and `generated-directive-check.log`: generated Senpi artifacts were current.
+- `senpi-drive-live.json`: isolated real Senpi driver passed; host state checks passed.
 
-Built omo-senpi installer: /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/scripts/install.mjs
-build: all steps completed
+## Post-Cubic scheduler evidence
 
-Full root suite attempts:
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/test-full-after-build.log: 17155 pass
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/test-full-after-build.log: 5 fail
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/test-full-after-build.log:Ran 17169 tests across 2194 files. [437.51s]
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/test-full-clean-home.log: 17144 pass
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/test-full-clean-home.log: 16 fail
-/private/tmp/omo-st_01a0611f/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store/test-full-clean-home.log:Ran 17169 tests across 2194 files. [426.14s]
+- `red-resweep-scheduling.log`: before the scheduler repair, controlled-clock coverage failed because the aged candidate was never reswept and a non-sharing cleanup error did not rearm the next sweep.
+- `green-resweep-scheduling.log`: after the repair, 7 pass, 0 fail. It proves immediate fresh cleanup is skipped, an aged sharing-blocked candidate is retried once at eligibility, the next immediate acquire is deferred again, a later healthy eligibility reclaims it, and a non-sharing throw rearms the next sweep.
+
+## Full-root suite accounting
+
+The local root-suite attempts are environmental diagnostics, not passing gates:
+- Normal HOME: 17,155 pass + 9 skip + 5 fail = 17,169.
+- Clean HOME: 17,144 pass + 9 skip + 16 fail = 17,169.
+
+`full-suite-failure-summary.txt` lists every failure, every skip, and its cause without workstation paths. The authoritative Windows proof is CI run `33610291206`.
