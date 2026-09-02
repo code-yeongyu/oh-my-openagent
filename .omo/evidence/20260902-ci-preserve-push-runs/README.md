@@ -45,3 +45,19 @@ policy before the two workflow edits.
 ## Why this is enough
 
 GitHub Actions evaluates `cancel-in-progress` for each run. The predicate is true
+only for pull-request events, so a newer revision still cancels obsolete review
+work. It is false for protected-branch push events, so a later merge can no
+longer cancel validation of an earlier merged commit in the same workflow/ref
+group. The YAML-parsing regression covers both affected workflows, while
+actionlint and the repository workflow tests cover expression syntax and
+surrounding workflow wiring.
+
+The final real-surface proof is performed after this PR merges: the following
+repair PR merges intentionally create adjacent `dev` push runs, and each run
+must reach a terminal non-cancelled result.
+
+## What was omitted
+
+No credentials, environment dumps, auth headers, or secret-bearing logs are
+stored. The evidence keeps only command lines, sanitized test output, and
+GitHub run identifiers needed for review.
