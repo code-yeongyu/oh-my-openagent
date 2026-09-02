@@ -23,3 +23,8 @@ export const CONTINUATION_COOLDOWN_MS = 5_000
 export const MAX_STAGNATION_COUNT = 3
 export const MAX_CONSECUTIVE_FAILURES = 5
 export const FAILURE_RESET_WINDOW_MS = 5 * 60 * 1000
+
+// A gate-declined injection ("active"/"reserved") has no later wake source: without a
+// bounded retry the turn stays parked until the user sends a message (issue 6517).
+export const GATE_RETRY_DELAY_MS = 5_000
+export const MAX_GATE_RETRIES = 3

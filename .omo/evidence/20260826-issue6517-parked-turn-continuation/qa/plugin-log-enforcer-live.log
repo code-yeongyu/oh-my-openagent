@@ -1,0 +1,49 @@
+[2026-08-26T02:44:31.316Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"/tmp/omo-qa-sandbox.3EXBLJ/project"}
+[2026-08-26T02:44:31.325Z] [config-migration] startup completed {"journalResumed":false,"migratedFrom":[],"skippedConflictCount":0}
+[2026-08-26T02:44:31.338Z] lsp-daemon stale-version sweep skipped: current lsp-daemon version is unknown
+[2026-08-26T02:44:31.397Z] [live-server-route] registered {"directory":"/tmp/omo-qa-sandbox.3EXBLJ/project","hasServerUrl":true,"registrationCount":1}
+[2026-08-26T02:44:31.407Z] [tmux-session-manager] initialized {"configEnabled":false,"tmuxConfig":{"enabled":false,"layout":"main-vertical","main_pane_size":60,"main_pane_min_width":120,"agent_pane_min_width":40,"isolation":"inline"},"projectDirectory":"/tmp/omo-qa-sandbox.3EXBLJ/project","serverUrl":"http://127.0.0.1:4499/"}
+[2026-08-26T02:44:31.856Z] [tool-registry] Built tool registry {"totalTools":13,"teamModeEnabled":false,"teamToolCount":0}
+[2026-08-26T02:44:32.575Z] directory-agents-injector auto-disabled due to native OpenCode support {"currentVersion":"1.18.23","nativeVersion":"1.1.37"}
+[2026-08-26T02:44:32.584Z] Loaded 0 plugins with 0 commands, 0 skills, 0 agents, 0 MCP servers
+[2026-08-26T02:44:32.643Z] [agent-source-loader] Agent sources loaded {"user":0,"project":0,"opencodeGlobal":0,"opencodeProject":0,"plugin":0,"agentDefinitions":0,"opencodeConfig":0,"config":0}
+[2026-08-26T02:44:32.644Z] [connected-providers-cache] Cache file not found {"cacheFile":"/tmp/omo-qa-sandbox.3EXBLJ/cache/oh-my-opencode/connected-providers.json"}
+[2026-08-26T02:44:32.645Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-26T02:44:32.645Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution
+[2026-08-26T02:44:32.652Z] [agent-registration] Agent skipped: model resolution returned no result {"agent":"atlas"}
+[2026-08-26T02:44:32.653Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-26T02:44:32.653Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution
+[2026-08-26T02:44:32.655Z] [config-handler] agents loaded {"agentKeys":["Sisyphus - ultraworker","Hephaestus - Deep Agent","Prometheus - Plan Builder","build","explore","librarian","Metis - Plan Consultant","Momus - Plan Critic","multimodal-looker","oracle","plan","Sisyphus-Junior"]}
+[2026-08-26T02:44:32.728Z] [config-handler] config handler applied {"agentCount":12,"commandCount":16}
+[2026-08-26T02:44:32.806Z] [codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap {"matchedRoot":"/tmp","projectRoot":"/tmp/omo-qa-sandbox.3EXBLJ/project","reason":"tmp-root"}
+[2026-08-26T02:44:34.658Z] [connected-providers-cache] Provider-models cache file not found {"cacheFile":"/tmp/omo-qa-sandbox.3EXBLJ/cache/oh-my-opencode/provider-models.json"}
+[2026-08-26T02:44:39.047Z] [connected-providers-cache] Fetched connected providers {"count":8,"providers":["deepseek","google","anthropic","openai","opencode-go","zai-coding-plan","opencode","github-copilot"]}
+[2026-08-26T02:44:39.047Z] [connected-providers-cache] Cache written {"count":8,"updatedAt":"2026-08-26T02:44:39.047Z"}
+[2026-08-26T02:44:39.056Z] [connected-providers-cache] Extracted models from provider list {"providerCount":8,"totalModels":141}
+[2026-08-26T02:44:39.063Z] [connected-providers-cache] Provider-models cache written {"providerCount":8,"updatedAt":"2026-08-26T02:44:39.056Z"}
+[2026-08-26T02:44:39.063Z] [auto-update-checker] Connected providers cache created on first run
+[2026-08-26T02:44:39.618Z] [model-capabilities-cache] Cache written {"modelCount":3349,"generatedAt":"2026-08-26T02:44:39.609Z"}
+[2026-08-26T02:44:39.620Z] [auto-update-checker] Plugin not found in config
+[2026-08-26T02:44:40.790Z] [oh-my-openagent] Downloading comment-checker binary...
+[2026-08-26T02:44:43.753Z] [oh-my-openagent] comment-checker binary ready.
+[2026-08-26T02:44:44.258Z] [todo-continuation-enforcer] session.idle {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:44.315Z] [todo-continuation-enforcer] Agent check {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","agentName":"Sisyphus - ultraworker","skipAgents":["prometheus","compaction","plan"],"compactionGuardActive":false,"acknowledgedCompaction":false}
+[2026-08-26T02:44:44.315Z] [todo-continuation-enforcer] Countdown started {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","seconds":2,"incompleteCount":1}
+[2026-08-26T02:44:44.316Z] [atlas] session.idle {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:44.316Z] [atlas] Skipped: session not registered in active boulder {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:46.382Z] [todo-continuation-enforcer] Injecting continuation {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","agent":"Sisyphus - ultraworker","model":{"providerID":"opencode","modelID":"big-pickle"},"incompleteCount":1}
+[2026-08-26T02:44:46.507Z] [prompt-async-gate] promptAsync dispatching {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","source":"todo-continuation-enforcer"}
+[2026-08-26T02:44:46.507Z] [live-server-route] dispatch via live listener {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","source":"todo-continuation-enforcer"}
+[2026-08-26T02:44:46.547Z] [chat-message] Skipping synthetic/internal-only message {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:46.572Z] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","source":"todo-continuation-enforcer","holdMs":5000}
+[2026-08-26T02:44:46.572Z] [prompt-async-gate] promptAsync dispatched {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","source":"todo-continuation-enforcer"}
+[2026-08-26T02:44:46.572Z] [todo-continuation-enforcer] Injection successful {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","status":"dispatched"}
+[2026-08-26T02:44:46.585Z] [context-injector] Latest user message is synthetic/internal, skipping injection {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:46.671Z] [todo-continuation-enforcer] Deferred user interruption classification until message part {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","messageID":"msg_03bf4af50001y6n6aSyLvQ7M7o"}
+[2026-08-26T02:44:46.869Z] [auto-update-checker] Startup toast shown: v5.0.0-beta.20
+[2026-08-26T02:44:52.823Z] [todo-continuation-enforcer] session.idle {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:52.841Z] [todo-continuation-enforcer] Deferred user interruption classification until message part {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","messageID":"msg_03bf4af50001y6n6aSyLvQ7M7o"}
+[2026-08-26T02:44:52.892Z] [todo-continuation-enforcer] Agent check {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","agentName":"Sisyphus - ultraworker","skipAgents":["prometheus","compaction","plan"],"compactionGuardActive":false,"acknowledgedCompaction":false}
+[2026-08-26T02:44:52.892Z] [todo-continuation-enforcer] Skipped: continuation paused at turn boundary {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","reason":"directive-response","hasProgressed":false}
+[2026-08-26T02:44:52.892Z] [atlas] session.idle {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:52.893Z] [atlas] Skipped: session not registered in active boulder {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}

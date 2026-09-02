@@ -1,0 +1,49 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/todo-continuation-enforcer/gate-retry.test.ts:
+219 |     })
+220 |     expect(promptCalls.count).toBe(0)
+221 |
+222 |     // then - the watchdog re-dispatches once the transient status settles
+223 |     await fakeTimers.advanceBy(GATE_RETRY_DELAY_MS, true)
+224 |     expect(promptCalls.count).toBe(1)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6517/packages/omo-opencode/src/hooks/todo-continuation-enforcer/gate-retry.test.ts:224:31)
+(fail) continuation injection gate-decline watchdog > #given the gate declines with a transient active status #when the watchdog elapses #then the continuation is re-dispatched [12.41ms]
+263 |     expect(promptCalls.count).toBe(0)
+264 |
+265 |     // then - releasing the hold lets the watchdog deliver the continuation
+266 |     releasePromptAsyncReservation(sessionID, "team-live-delivery")
+267 |     await fakeTimers.advanceBy(GATE_RETRY_DELAY_MS, true)
+268 |     expect(promptCalls.count).toBe(1)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6517/packages/omo-opencode/src/hooks/todo-continuation-enforcer/gate-retry.test.ts:268:31)
+(fail) continuation injection gate-decline watchdog > #given the gate declines with a transient reserved status #when the hold is released #then the watchdog re-dispatches [1.97ms]
+341 |         agent: "Sisyphus - ultraworker",
+342 |         model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+343 |       },
+344 |       sessionStateStore,
+345 |     })
+346 |     expect(sessionStateStore.getExistingState(sessionID)?.gateRetryTimer).toBeDefined()
+                                                                                ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6517/packages/omo-opencode/src/hooks/todo-continuation-enforcer/gate-retry.test.ts:346:75)
+(fail) continuation injection gate-decline watchdog > #given a watchdog retry is pending #when the countdown is cancelled #then the retry is torn down with it [0.67ms]
+
+ 2 pass
+ 3 fail
+ 9 expect() calls
+Ran 5 tests across 1 file. [1181.00ms]
