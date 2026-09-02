@@ -1,0 +1,7 @@
+dry-run-install=0
+dry-run-doctor=0
+install=1
+wrapper-present=1
+legacy-omo-absent=0
+wrapper-version=125
+wrapper-ulw-help=125

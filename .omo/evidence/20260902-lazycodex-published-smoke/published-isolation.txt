@@ -1,0 +1,6 @@
+smoke_dir=/tmp/lazycodex-published-beta33.YVUDjZ
+HOME=/tmp/lazycodex-published-beta33.YVUDjZ/home
+CODEX_HOME=/tmp/lazycodex-published-beta33.YVUDjZ/codex
+CODEX_LOCAL_BIN_DIR=/tmp/lazycodex-published-beta33.YVUDjZ/bin
+real_codex_config_unchanged=0
+temporary artifacts retained=/tmp/lazycodex-published-beta33.YVUDjZ

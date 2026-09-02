@@ -36,7 +36,7 @@ the cache.
   CODEX_HOME, bin directory, real-config hash equality, and cleanup.
 - `codex-qa-install-verify.txt`: local installer landed the cache, enabled
   `omo@sisyphuslabs`, and linked bins plus agent TOMLs in an isolated home.
-- `codex-qa-app-server-plugin.json`: the real `codex app-server` completed a
+- `codex-qa-app-server-plugin.txt`: the real `codex app-server` completed a
   local-mock turn and emitted `hook/completed` for `sessionStart` and
   `userPromptSubmit`; the helper also proved the real Codex config was unchanged.
 

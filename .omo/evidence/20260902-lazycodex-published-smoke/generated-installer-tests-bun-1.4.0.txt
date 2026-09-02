@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: \#given source plugin has an npm lockfile \#when caching plugin \#then lockfile is preserved for deterministic install
+ok 1 - \#given source plugin has an npm lockfile \#when caching plugin \#then lockfile is preserved for deterministic install
+  ---
+  duration_ms: 7.995542
+  ...
+# Subtest: \#given cached file dependency is rewritten \#when lockfile exists \#then package lock stays in sync
+ok 2 - \#given cached file dependency is rewritten \#when lockfile exists \#then package lock stays in sync
+  ---
+  duration_ms: 4.901708
+  ...
+# Subtest: \#given npm creates workspace bin shims in the cache \#when caching plugin \#then plugin-owned shims are removed
+ok 3 - \#given npm creates workspace bin shims in the cache \#when caching plugin \#then plugin-owned shims are removed
+  ---
+  duration_ms: 6.814209
+  ...
+# Subtest: \#given packaged root CLI runtimes \#when caching omo plugin \#then root dist is materialized into the plugin cache
+ok 4 - \#given packaged root CLI runtimes \#when caching omo plugin \#then root dist is materialized into the plugin cache
+  ---
+  duration_ms: 27.527583
+  ...
+# Subtest: \#given existing cache \#when npm install fails \#then previous active cache is preserved
+ok 5 - \#given existing cache \#when npm install fails \#then previous active cache is preserved
+  ---
+  duration_ms: 3.306291
+  ...
+# Subtest: \#given existing cache \#when final promotion fails \#then previous active cache is restored
+ok 6 - \#given existing cache \#when final promotion fails \#then previous active cache is restored
+  ---
+  duration_ms: 2.866083
+  ...
+# Subtest: \#given the stable installer entrypoint \#when inspecting imports \#then it delegates to generated output
+ok 7 - \#given the stable installer entrypoint \#when inspecting imports \#then it delegates to generated output
+  ---
+  duration_ms: 1.900666
+  ...
+# Subtest: \#given generated installer output \#when importing install-local \#then public installer API comes from the bundle
+ok 8 - \#given generated installer output \#when importing install-local \#then public installer API comes from the bundle
+  ---
+  duration_ms: 1.322125
+  ...
+# Subtest: \#given generated installer output \#when importing direct bundle \#then compatibility helper APIs are exported
+ok 9 - \#given generated installer output \#when importing direct bundle \#then compatibility helper APIs are exported
+  ---
+  duration_ms: 6.840708
+  ...
+# Subtest: \#given no root model \#when generated bundle updates config \#then it does not introduce agents max_threads
+ok 10 - \#given no root model \#when generated bundle updates config \#then it does not introduce agents max_threads
+  ---
+  duration_ms: 4.332125
+  ...
+# Subtest: \#given an inline-commented V2 thread cap \#when generated bundle updates config twice \#then preserves the line and ordering byte-for-byte
+ok 11 - \#given an inline-commented V2 thread cap \#when generated bundle updates config twice \#then preserves the line and ordering byte-for-byte
+  ---
+  duration_ms: 4.124333
+  ...
+# Subtest: \#given explicit v1 model_catalog_json and stale models_cache v2 \#when generated bundle updates config \#then explicit catalog preserves disable and cap
+ok 12 - \#given explicit v1 model_catalog_json and stale models_cache v2 \#when generated bundle updates config \#then explicit catalog preserves disable and cap
+  ---
+  duration_ms: 1.742375
+  ...
+# Subtest: \#given explicit v2 model_catalog_json and stale models_cache v1 \#when generated bundle updates config \#then explicit catalog clears managed disable and cap
+ok 13 - \#given explicit v2 model_catalog_json and stale models_cache v1 \#when generated bundle updates config \#then explicit catalog clears managed disable and cap
+  ---
+  duration_ms: 2.022875
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 98.267875
+exit=0

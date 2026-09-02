@@ -1,0 +1,4 @@
+
+added 18 packages in 3s
+Installed 1 plugin(s) from sisyphuslabs.
+exit=0

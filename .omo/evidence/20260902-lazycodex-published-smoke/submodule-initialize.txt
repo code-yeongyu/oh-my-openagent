@@ -1,0 +1,17 @@
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/designpowers'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/open-design'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/taste-skill'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/ui-ux-pro-max'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Submodule path 'packages/shared-skills/upstreams/designpowers': checked out 'cb00757da9d554591fa78d27aa1854d60a05c4f7'
+Submodule path 'packages/shared-skills/upstreams/open-design': checked out '6afe7eae156bfa29251a51fd0636649c257f7444'
+Submodule path 'packages/shared-skills/upstreams/taste-skill': checked out 'b17742737e796305d829b3ad39eda3add0d79060'
+Submodule path 'packages/shared-skills/upstreams/ui-ux-pro-max': checked out 'f32d6a61cdf0bfd57404c45854583fd19ff95088'
+exit=0

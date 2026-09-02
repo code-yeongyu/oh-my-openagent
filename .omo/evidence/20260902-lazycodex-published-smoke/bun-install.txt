@@ -1,0 +1,54 @@
+bun install v1.3.14 (0d9b296a)
+Resolving dependencies
+Resolved, downloaded and extracted [1]
+
+$ node postinstall.mjs
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/designpowers'...
+warning: --depth is ignored in local clones; use file:// instead.
+fatal: transport 'file' not allowed
+fatal: clone of '/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.git/modules/packages/shared-skills/upstreams/designpowers' into submodule path '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/designpowers' failed
+Failed to clone 'packages/shared-skills/upstreams/designpowers'. Retry scheduled
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/open-design'...
+warning: --depth is ignored in local clones; use file:// instead.
+fatal: transport 'file' not allowed
+fatal: clone of '/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.git/modules/packages/shared-skills/upstreams/open-design' into submodule path '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/open-design' failed
+Failed to clone 'packages/shared-skills/upstreams/open-design'. Retry scheduled
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/taste-skill'...
+warning: --depth is ignored in local clones; use file:// instead.
+fatal: transport 'file' not allowed
+fatal: clone of '/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.git/modules/packages/shared-skills/upstreams/taste-skill' into submodule path '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/taste-skill' failed
+Failed to clone 'packages/shared-skills/upstreams/taste-skill'. Retry scheduled
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/ui-ux-pro-max'...
+warning: --depth is ignored in local clones; use file:// instead.
+fatal: transport 'file' not allowed
+fatal: clone of '/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.git/modules/packages/shared-skills/upstreams/ui-ux-pro-max' into submodule path '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/ui-ux-pro-max' failed
+Failed to clone 'packages/shared-skills/upstreams/ui-ux-pro-max'. Retry scheduled
+Cloning into '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/designpowers'...
+warning: --depth is ignored in local clones; use file:// instead.
+fatal: transport 'file' not allowed
+fatal: clone of '/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.git/modules/packages/shared-skills/upstreams/designpowers' into submodule path '/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/shared-skills/upstreams/designpowers' failed
+Failed to clone 'packages/shared-skills/upstreams/designpowers' a second time, aborting
+file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:271:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:578:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.14.0
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1

@@ -35,5 +35,5 @@ Stop when the PR is open and unmerged, all required CI checks are green, Cubic i
 - Published beta.33 red: `.omo/evidence/20260902-lazycodex-published-smoke/published-install.txt`
 - Focused red then green: `focused-regression.red.txt`, `focused-regression.final-green.txt`
 - Publish-shaped local tarball pass: `publish-shaped-fixed-assertion-status.txt`
-- Isolated real-Codex proofs: `codex-qa-install-verify.txt`, `codex-qa-app-server-plugin.json`
+- Isolated real-Codex proofs: `codex-qa-install-verify.txt`, `codex-qa-app-server-plugin.txt`
 - Full gate result and independent control: `test-codex-bun-1.4.0.txt`, `test-codex-codegraph-baseline.txt`

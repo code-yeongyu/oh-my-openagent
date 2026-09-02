@@ -1,0 +1,4 @@
+[plugins."omo@sisyphuslabs"]
+enabled = true
+
+exit=0

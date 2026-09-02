@@ -1,0 +1,17 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-codex/src/install/codex-cache-install.test.ts:
+(pass) codex-cache install > #given source plugin has development-only directories #when caching plugin #then writes only the plugin payload under the versioned cache [9.51ms]
+(pass) codex-cache install > #given outer npx env has allow-scripts case variants #when caching plugin #then npm install commands preserve only unrelated env [1.78ms]
+(pass) codex-cache install > #given the local file: dependency rewrite changed package.json #when caching plugin #then npm install reconciles the lock drift instead of npm ci [1.71ms]
+(pass) codex-cache install > #given the local file: dependency rewrite changed nothing #when caching plugin #then the install stays npm ci --omit=dev [2.92ms]
+(pass) codex-cache install > #given a component ships its own nested .mcp.json #when caching plugin #then only the plugin-root .mcp.json is cached [2.96ms]
+(pass) codex-cache install > #given source plugin references missing hook command target #when caching plugin #then previous active cache is preserved [3.62ms]
+(pass) codex-cache install > #given npm creates workspace bin shims in the cache #when caching plugin #then plugin-owned shims are removed [3.72ms]
+(pass) codex-cache install > #given packaged plugin has prebuilt aggregate skills #when caching plugin #then does not run source-only skill generation [3.01ms]
+
+ 8 pass
+ 0 fail
+ 20 expect() calls
+Ran 8 tests across 1 file. [1135.00ms]
+exit=0
