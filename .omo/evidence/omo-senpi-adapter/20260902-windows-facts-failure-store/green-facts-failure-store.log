@@ -1,0 +1,17 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/memory-core/src/facts/failures-store.test.ts:
+(pass) facts failures layout > #given an identity #when the queue layout is built #then failures.json sits beside consumed.json [0.77ms]
+(pass) facts failure store persistence > #given no failures file #when the store reads #then empty state is returned [6.20ms]
+(pass) facts failure store persistence > #given a recorded failure #when the store persists it #then the file is 0600 with a trailing newline [5.42ms]
+(pass) facts failure store persistence > #given a persisted failure #when the same failureId replays #then the streak stays at one [11.24ms]
+(pass) facts failure store persistence > #given persisted failures #when the batch succeeds #then only its records are cleared [9.80ms]
+(pass) facts failure store persistence > #given parked records #when a retry clears one conversation #then the rest stay parked [21.26ms]
+(pass) facts failure store persistence > #given a corrupt failures file #when the store reads #then it fails closed with a typed error [6.66ms]
+(pass) facts failure store persistence > #given a corrupt failures file #when a failure is recorded #then the write fails closed and the file is untouched [6.59ms]
+(pass) facts failure store persistence > #given the facts-queue lock is held #when the store records a failure #then it waits for the lock instead of writing [59.17ms]
+
+ 9 pass
+ 0 fail
+ 19 expect() calls
+Ran 9 tests across 1 file. [756.00ms]

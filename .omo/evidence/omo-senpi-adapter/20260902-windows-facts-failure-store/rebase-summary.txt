@@ -1,0 +1,12 @@
+Rebased onto origin/dev bd702cb8cac0b7fb480de9b266aaead0039bccc7.
+ 15 pass
+ 0 fail
+Ran 15 tests across 2 files. [2.09s]
+ 2530 pass
+ 0 fail
+Ran 2531 tests across 334 files. [143.68s]
+ 10 pass
+ 0 fail
+Ran 10 tests across 1 file. [1156.00ms]
+omo-senpi extension build is current: /private/tmp/omo-st_01a0611f/packages/omo-senpi/plugin/extensions/omo.js
+{"result":"PASS","ultraworkInjected":true,"commentChecker":"PASS","realSenpiUntouched":true,"realOmoUntouched":true,"realSenpiChangedPaths":[],"realOmoChangedPaths":[]}

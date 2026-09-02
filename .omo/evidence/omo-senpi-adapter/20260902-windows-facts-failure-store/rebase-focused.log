@@ -1,0 +1,25 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/memory-core/src/locks/candidate-sweep.test.ts:
+(pass) sweepStaleLockCandidates > #given stale and fresh candidates #when swept #then only stale candidates are deleted [12.71ms]
+(pass) sweepStaleLockCandidates > #given a missing locks directory #when swept #then nothing is swept [0.52ms]
+(pass) sweepStaleLockCandidates > #given a legal lock name containing .candidate- #when swept #then the live lock survives [0.74ms]
+(pass) sweepStaleLockCandidates > #given one sharing-failing candidate and one removable candidate #when stale candidates are swept #then the failure is bounded and the rest are reclaimed [0.80ms]
+(pass) sweepStaleLockCandidates > #given persistent sharing failure #when the next lock is acquired #then fresh candidate cleanup is not retried and aged candidates remain reclaimable [14.15ms]
+(pass) sweepStaleLockCandidates > #given a stale candidate #when the first lock in that directory is acquired #then the candidate is swept [4.92ms]
+
+packages/memory-core/src/facts/failures-store.test.ts:
+(pass) facts failures layout > #given an identity #when the queue layout is built #then failures.json sits beside consumed.json [0.55ms]
+(pass) facts failure store persistence > #given no failures file #when the store reads #then empty state is returned [5.90ms]
+(pass) facts failure store persistence > #given a recorded failure #when the store persists it #then the file is 0600 with a trailing newline [7.17ms]
+(pass) facts failure store persistence > #given a persisted failure #when the same failureId replays #then the streak stays at one [14.22ms]
+(pass) facts failure store persistence > #given persisted failures #when the batch succeeds #then only its records are cleared [14.35ms]
+(pass) facts failure store persistence > #given parked records #when a retry clears one conversation #then the rest stay parked [37.27ms]
+(pass) facts failure store persistence > #given a corrupt failures file #when the store reads #then it fails closed with a typed error [8.59ms]
+(pass) facts failure store persistence > #given a corrupt failures file #when a failure is recorded #then the write fails closed and the file is untouched [10.31ms]
+(pass) facts failure store persistence > #given the facts-queue lock is held #when the store records a failure #then it waits for the lock instead of writing [62.53ms]
+
+ 15 pass
+ 0 fail
+ 32 expect() calls
+Ran 15 tests across 2 files. [2.09s]

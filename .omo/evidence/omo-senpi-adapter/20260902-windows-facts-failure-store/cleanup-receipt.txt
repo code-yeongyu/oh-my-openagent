@@ -1,0 +1,2 @@
+lsp_daemon_pid=52263 terminated
+rebase_lsp_daemon_pid=70774 terminated

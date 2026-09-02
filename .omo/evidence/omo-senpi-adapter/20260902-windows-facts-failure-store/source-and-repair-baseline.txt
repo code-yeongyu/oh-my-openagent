@@ -1,0 +1,6 @@
+base=bd702cb8cac0b7fb480de9b266aaead0039bccc7
+failed_sha=60c8577fca325cc5680730ca9aaf0e80ce202785
+memory_and_senpi_source_delta_since_failed_sha=none
+merged_repair_pr=https://github.com/code-yeongyu/oh-my-openagent/pull/7602
+merged_repair_commit=185a90b30d3735be8a58793127dd8fc0d715b917
+repair_commits=97692c27,987a44fe,0c6f70c0,4b8a9304

@@ -5,17 +5,6 @@ import { readdir, stat, unlink } from "../fs/resilient"
 export const CANDIDATE_STALE_AGE_MS = 60 * 60 * 1000
 export const CANDIDATE_UNLINK_ATTEMPTS = 3
 
-const knownLeakedCandidates = new Set<string>()
-
-export function trackLeakedCandidate(candidatePath: string): void {
-  knownLeakedCandidates.add(candidatePath)
-}
-
-export function forgetLeakedCandidate(candidatePath: string): void {
-  knownLeakedCandidates.delete(candidatePath)
-}
-
-
 export interface CandidateSweepOptions {
   readonly unlink?: (path: string) => Promise<void>
   readonly isSharingError?: (error: unknown) => boolean
@@ -60,12 +49,7 @@ export async function sweepStaleLockCandidates(
   try {
     names = await readdir(lockDirectory)
   } catch (error) {
-    if (errorCode(error) === "ENOENT") {
-      for (const candidatePath of knownLeakedCandidates) {
-        if (path.dirname(candidatePath) === lockDirectory) forgetLeakedCandidate(candidatePath)
-      }
-      return 0
-    }
+    if (errorCode(error) === "ENOENT") return 0
     throw error
   }
   let swept = 0
@@ -74,17 +58,15 @@ export async function sweepStaleLockCandidates(
     const candidatePath = path.join(lockDirectory, name)
     try {
       const status = await stat(candidatePath)
-      if (!knownLeakedCandidates.has(candidatePath) && now() - status.mtimeMs <= CANDIDATE_STALE_AGE_MS) continue
+      if (now() - status.mtimeMs <= CANDIDATE_STALE_AGE_MS) continue
       let removed = false
       for (let attempt = 0; attempt < CANDIDATE_UNLINK_ATTEMPTS; attempt += 1) {
         try {
           await (options.unlink ?? unlink)(candidatePath)
-          forgetLeakedCandidate(candidatePath)
           removed = true
           break
         } catch (error) {
           if (errorCode(error) === "ENOENT") {
-            forgetLeakedCandidate(candidatePath)
             removed = true
             break
           }
@@ -94,8 +76,7 @@ export async function sweepStaleLockCandidates(
         }
       }
       if (removed) swept += 1
-    } catch (error) {
-      if (errorCode(error) === "ENOENT") forgetLeakedCandidate(candidatePath)
+    } catch {
       // A single sharing error must not prevent the remaining candidates from being
       // reclaimed. The outer acquisition deliberately treats sweep failures as advisory.
       notifyFailure(options, candidatePath)

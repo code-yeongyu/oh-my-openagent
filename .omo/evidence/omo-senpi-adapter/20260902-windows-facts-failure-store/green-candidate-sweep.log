@@ -1,0 +1,14 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/memory-core/src/locks/candidate-sweep.test.ts:
+(pass) sweepStaleLockCandidates > #given stale and fresh candidates #when swept #then only stale candidates are deleted [2.41ms]
+(pass) sweepStaleLockCandidates > #given a missing locks directory #when swept #then nothing is swept [0.37ms]
+(pass) sweepStaleLockCandidates > #given a legal lock name containing .candidate- #when swept #then the live lock survives [0.62ms]
+(pass) sweepStaleLockCandidates > #given one sharing-failing candidate and one removable candidate #when stale candidates are swept #then the failure is bounded and the rest are reclaimed [0.73ms]
+(pass) sweepStaleLockCandidates > #given persistent sharing failure #when the next lock is acquired #then fresh candidate cleanup is not retried and aged candidates remain reclaimable [9.41ms]
+(pass) sweepStaleLockCandidates > #given a stale candidate #when the first lock in that directory is acquired #then the candidate is swept [3.45ms]
+
+ 6 pass
+ 0 fail
+ 13 expect() calls
+Ran 6 tests across 1 file. [641.00ms]

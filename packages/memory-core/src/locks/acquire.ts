@@ -14,12 +14,7 @@ import type { FileHandle } from "../fs/resilient"
 import { hostname } from "node:os"
 import path from "node:path"
 
-import {
-  CANDIDATE_UNLINK_ATTEMPTS,
-  forgetLeakedCandidate,
-  sweepStaleLockCandidates,
-  trackLeakedCandidate,
-} from "./candidate-sweep"
+import { CANDIDATE_UNLINK_ATTEMPTS, sweepStaleLockCandidates } from "./candidate-sweep"
 import type { LockRecord } from "./lock-record"
 import { parseLockRecord } from "./lock-record"
 import { getPidLiveness, getProcessStartIdentity } from "./process-identity"
@@ -63,24 +58,12 @@ async function unlinkCandidate(candidatePath: string): Promise<boolean> {
   for (let attempt = 0; attempt < CANDIDATE_UNLINK_ATTEMPTS; attempt += 1) {
     try {
       await (candidateFs.unlink ?? unlink)(candidatePath)
-      forgetLeakedCandidate(candidatePath)
       return true
     } catch (error) {
-      if (errorCode(error) === "ENOENT") {
-        forgetLeakedCandidate(candidatePath)
-        return true
-      }
+      if (errorCode(error) === "ENOENT") return true
       const sharing = isUnlinkSharingError(error, candidateFs.isSharingError)
-      if (!sharing) {
-        trackLeakedCandidate(candidatePath)
-        rearmCandidateSweep(path.dirname(candidatePath))
-        throw error
-      }
-      if (attempt + 1 === CANDIDATE_UNLINK_ATTEMPTS) {
-        trackLeakedCandidate(candidatePath)
-        rearmCandidateSweep(path.dirname(candidatePath))
-        return false
-      }
+      if (!sharing) throw error
+      if (attempt + 1 === CANDIDATE_UNLINK_ATTEMPTS) return false
     }
   }
   return false
@@ -123,8 +106,7 @@ async function openFreshCandidate(
     try {
       return { candidatePath, handle: await open(candidatePath, "wx", 0o600) }
     } catch (error) {
-      const removed = await unlinkCandidate(candidatePath)
-      if (!removed) rearmCandidateSweep(path.dirname(lockPath))
+      await unlinkCandidate(candidatePath)
       if (errorCode(error) !== "EINTR" || attempt >= EINTR_RETRY_CAP) throw error
     }
   }
@@ -149,7 +131,7 @@ async function publishExclusive(lockPath: string, record: LockRecord): Promise<b
       throw error
     }
   } finally {
-    if (!(await unlinkCandidate(candidatePath))) rearmCandidateSweep(path.dirname(lockPath))
+    await unlinkCandidate(candidatePath)
   }
 }
 
@@ -236,7 +218,6 @@ export async function acquireLock(
     await sweepStaleLockCandidates(lockDirectory, Date.now, {
       ...(candidateFs.unlink === undefined ? {} : { unlink: candidateFs.unlink }),
       ...(candidateFs.isSharingError === undefined ? {} : { isSharingError: candidateFs.isSharingError }),
-      onFailure: () => rearmCandidateSweep(lockDirectory),
     }).catch(() => {
       rearmCandidateSweep(lockDirectory)
     })

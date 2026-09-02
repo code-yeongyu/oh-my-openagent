@@ -1,0 +1,28 @@
+CI run 33582797101 attempt 1, Windows shard 1 failures:
+965-test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:26.2481877Z
+966:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:26.2483111Z (fail) facts failure store persistence > #given persisted failures #when the batch succeeds #then only its records are cleared [5390.98ms]
+967:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:26.2483606Z   ^ this test timed out after 5000ms.
+968:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:32.5045877Z (fail) facts failure store persistence > #given parked records #when a retry clears one conversation #then the rest stay parked [6260.17ms]
+969:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:32.5046495Z   ^ this test timed out after 5000ms.
+970-test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:37.7153473Z
+--
+1000-test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:37.7177590Z
+1001:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:37.7179007Z (fail) facts failure store persistence > #given a corrupt failures file #when the store reads #then it fails closed with a typed error [5212.22ms]
+1002:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:37.7179729Z   ^ this test timed out after 5000ms.
+1003-test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:29:42.9049951Z (pass) facts failure store persistence > #given a corrupt failures file #when a failure is recorded #then the write fails closed and the file is untouched [5188.38ms]
+--
+14149-test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:37:46.3508097Z 3 tests failed:
+14150:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:37:46.3509928Z (fail) facts failure store persistence > #given persisted failures #when the batch succeeds #then only its records are cleared [5390.98ms]
+14151:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:37:46.3511818Z   ^ this test timed out after 5000ms.
+14152:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:37:46.3512416Z (fail) facts failure store persistence > #given parked records #when a retry clears one conversation #then the rest stay parked [6260.17ms]
+14153:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:37:46.3512935Z   ^ this test timed out after 5000ms.
+14154:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:37:46.3513561Z (fail) facts failure store persistence > #given a corrupt failures file #when the store reads #then it fails closed with a typed error [5212.22ms]
+14155:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:37:46.3514105Z   ^ this test timed out after 5000ms.
+14156-test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:37:46.3514267Z
+
+Same SHA, attempt 2 Windows shard 1:
+976:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:46:47.5262452Z (pass) facts failure store persistence > #given persisted failures #when the batch succeeds #then only its records are cleared [36.34ms]
+977:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:46:47.6109480Z (pass) facts failure store persistence > #given parked records #when a retry clears one conversation #then the rest stay parked [84.64ms]
+978:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:46:47.6363816Z (pass) facts failure store persistence > #given a corrupt failures file #when the store reads #then it fails closed with a typed error [25.46ms]
+979:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:46:47.6615242Z (pass) facts failure store persistence > #given a corrupt failures file #when a failure is recorded #then the write fails closed and the file is untouched [25.01ms]
+14105:test (windows-latest, 1/2)	UNKNOWN STEP	2026-09-02T02:53:11.6265180Z Ran 9034 tests across 1077 files. [434.50s]
