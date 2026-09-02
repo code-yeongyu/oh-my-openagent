@@ -487,8 +487,9 @@ describe("model fallback hook", () => {
       (entry) => entry.providers.includes("anthropic") && entry.model === "claude-opus-5",
     )
     expect(matches.length).toBe(1)
+    // providers 列表与 packages/model-core/src/agent-model-requirements.ts:7 的 sisyphus 链头保持一致
     expect(chain[0]).toEqual({
-      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+      providers: ["anthropic", "github-copilot", "opencode"],
       model: "claude-opus-5",
       variant: "max",
     })
@@ -545,8 +546,9 @@ describe("model fallback hook", () => {
     //#then
     expect(set).toBe(true)
     const state = getFallbackState(hook, sessionID)
+    // providers 列表与 packages/model-core/src/agent-model-requirements.ts:7 的 sisyphus 链头保持一致
     expect(state?.fallbackChain[0]).toEqual({
-      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+      providers: ["anthropic", "github-copilot", "opencode"],
       model: "claude-opus-5",
       variant: "max",
     })
