@@ -192,6 +192,17 @@ async function isProvenDead(owner: LockRecord): Promise<boolean> {
   return actualStart !== owner.process_start
 }
 
+async function reclaimStaleRecoveryLock(recoveryPath: string): Promise<void> {
+  const existing = await readOwner(recoveryPath)
+  if (existing === null || existing.record === null) return
+  if (!(await isProvenDead(existing.record))) return
+  try {
+    await unlink(recoveryPath)
+  } catch (error) {
+    if (errorCode(error) !== "ENOENT") throw error
+  }
+}
+
 async function recoverDeadOwner(
   lockPath: string,
   snapshot: OwnerSnapshot,
@@ -200,6 +211,7 @@ async function recoverDeadOwner(
   if (snapshot.record === null || !(await isProvenDead(snapshot.record))) return false
 
   const recoveryPath = `${lockPath}.recovery`
+  await reclaimStaleRecoveryLock(recoveryPath)
   const recoveryRecord: LockRecord = {
     ...contender,
     nonce: randomUUID(),
