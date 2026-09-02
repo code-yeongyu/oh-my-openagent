@@ -149,6 +149,8 @@ and what you keep for yourself.
 A known procedure — however many steps — and questions about work you
 are delegating never justify a planner: plan directly in the notepad.
 Never spawn the planner before the discovery wave has returned.
+After first-wave discovery returns, MUST declare TOPOLOGY (task | workflow | team | solo) before planning or dispatch, sized to the ideal end state and the current phase. Under ulw-loop or ulw-execute, preserve its one-worktree and one-workflow-run-per-phase ownership; never create one cross-phase graph. Otherwise, dispatch independent branches in parallel before serial work — inline serial is a defect.
+LIGHT != solo — launching payload does not make this session LIGHT->solo; control-plane work stays LIGHT even if delegated project is large.
 
 ## 1. Create the goal with binding success criteria
 You MUST register the goal with the `create_goal` tool — NOT prose,
