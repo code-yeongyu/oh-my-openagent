@@ -2905,7 +2905,8 @@ The task was re-queued on a fallback model after a retryable failure.
           this.idleDeferralTimers.delete(taskId)
         }
         if (wasPending) {
-          const key = this.concurrencyManager.getConcurrencyKey(this.getRawConcurrencyKeyFromTask(task))
+          const rawKey = this.getRawConcurrencyKeyFromTask(task)
+          const key = this.concurrencyManager.getConcurrencyKey(rawKey)
           const queue = this.queuesByKey.get(key)
           if (queue) {
             const index = queue.findIndex((item) => item.task.id === taskId)
@@ -2916,6 +2917,10 @@ The task was re-queued on a fallback model after a retryable failure.
               }
             }
           }
+          // The task may already be shifted out of queuesByKey and parked on
+          // acquire() inside processKey; reject that waiter so the processing
+          // loop can settle instead of blocking the key forever (#3286).
+          this.concurrencyManager.cancelWaiter(rawKey, taskId)
         }
         this.cleanupPendingByParent(task)
         // Update continuation marker for CLI run mode
