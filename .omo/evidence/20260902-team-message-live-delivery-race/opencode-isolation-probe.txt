@@ -1,0 +1,5 @@
+Command: source .agents/skills/opencode-qa/scripts/lib/common.sh; oqa_mk_isolated_xdg; opencode db path; oqa_cleanup
+Result: pass.
+- Resolved database: <SANDBOX>/data/opencode/opencode.db.
+- XDG_DATA_HOME: <SANDBOX>/data; HOME: <SANDBOX>/home.
+- The resolved database was a descendant of the sandbox before TUI QA, and cleanup completed.

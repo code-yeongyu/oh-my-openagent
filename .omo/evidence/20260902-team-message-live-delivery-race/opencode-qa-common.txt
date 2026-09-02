@@ -1,8 +1,5 @@
-PASS: dependencies present (opencode sqlite3 curl jq tmux)
-PASS: oqa_db_path -> /Users/sungsoopark/.local/share/opencode/opencode.db
-PASS: oqa_sql_escape quotes single quotes
-PASS: oqa_free_port -> 55854
-PASS: isolated XDG sandbox auto-removed on exit (/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.TqeV0h5Blf)
-PASS: isolated HOME points inside sandbox
-PASS: isolated HOME preserves HOME-based opencode shim
-PASS: common.sh self-check
+Command: bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+Result: pass.
+- Required dependencies are present.
+- The protected host database was read only; its path is redacted.
+- The helper created an isolated XDG sandbox, placed HOME and OPENCODE_TEST_HOME inside it, preserved the OpenCode shim, and removed the sandbox on exit.

@@ -1,1 +1,4 @@
-LSP diagnostics: 0
+Command: typescript-language-server --stdio
+Scope: initialized workspace <WORKTREE>; opened <WORKTREE>/packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts; awaited that document's textDocument/publishDiagnostics notification with a 60-second bound.
+Result: success; query errors: none; diagnostics: 0.
+Note: the provided LSP diagnostic tool refused this task-owned worktree because it is outside the parent request checkout, so this direct TypeScript LSP query was used for the actual changed file.

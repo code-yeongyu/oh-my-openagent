@@ -17,14 +17,14 @@ PR #7643 is unrelated: it raised the Windows outer budget only for `generic fall
 
 - `messaging-suite.txt`: complete messaging file: 41 pass, 0 fail.
 - `team-mode-suite.txt`: team-mode, team mailbox, and state-store suites: 352 pass, 1 platform tmux skip, 0 fail.
-- `package-typecheck.txt`, `root-typecheck.txt`, and `lsp-diagnostics.txt`: OpenCode package and root typechecks plus task-worktree TypeScript LSP diagnostics: all clean.
+- `package-typecheck.txt`, `root-typecheck.txt`, and `lsp-diagnostics.txt`: OpenCode package and root typechecks plus task-worktree TypeScript LSP diagnostics: all clean. The LSP artifact records its command, changed-file scope, bounded diagnostic event, and zero results.
 - `root-build.txt`: root build passed. Generated Codex installer and Senpi extension churn was restored and excluded from the change.
-- `opencode-qa-common.txt` and `opencode-tui-smoke.txt`: isolated real OpenCode QA passed. The TUI rendered under tmux, received input, cleaned up, and the real database session count stayed at 8046.
+- `opencode-qa-common.txt`, `opencode-isolation-probe.txt`, and `opencode-tui-smoke.txt`: isolated real OpenCode QA passed. Before TUI launch, `opencode db path` resolved to `<SANDBOX>/data/opencode/opencode.db` under the isolated XDG root. The TUI rendered under tmux, received input, cleaned up, and left the protected host database session count unchanged at 8047.
 
 ## Root test suite
 
-`root-test.txt` records the required `bun test` run: 16988 pass, 15 skip, 7 fail. The changed messaging test passed. `root-test-baseline-unrelated-failures.txt` reproduces the same seven failures after restoring this test to `origin/dev`: one darwin embedded-manifest parity, one Codex installer embedded-version parity, and five skill-reader assertions polluted by the existing `/Users/sungsoopark/.agents/skills` global configuration. They are pre-existing and unrelated to this test-only repair.
+`root-test.txt` records the required `bun test` run: 16988 pass, 15 skip, 7 fail. The changed messaging test passed. `root-test-baseline-unrelated-failures.txt` reproduces the same seven failures after restoring this test to `origin/dev`: one darwin embedded-manifest parity, one Codex installer embedded-version parity, and five skill-reader assertions polluted by the existing `<HOME>/.agents/skills` global configuration. They are pre-existing and unrelated to this test-only repair.
 
 ## Sanitization
 
-Artifacts retain commands, test summaries, and isolation receipts only. They omit credentials, headers, environment dumps, database rows, and raw terminal capture.
+Artifacts retain commands, concise test summaries, and isolation receipts only. They omit credentials, headers, environment dumps, database paths and rows, raw terminal capture, raw stack traces, generated source, and host-specific paths.

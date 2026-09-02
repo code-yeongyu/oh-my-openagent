@@ -1,4 +1,4 @@
 Command: bun test
 Result: 16988 pass, 15 skip, 7 fail across 17010 tests.
-The changed messaging suite passed. The same 7 failures reproduce with the changed test restored; see root-test-baseline-unrelated-failures.txt.
-Unrelated baseline failures: darwin sidecar embedded-manifest parity, Codex installer embedded-version parity, and five opencode-config skill-reader assertions polluted by the pre-existing /Users/sungsoopark/.agents/skills global configuration.
+The changed messaging test passed. The same seven failures reproduce with the changed test restored; see root-test-baseline-unrelated-failures.txt.
+Unrelated baseline failures: darwin sidecar embedded-manifest parity, Codex installer embedded-version parity, and five OpenCode config-skill reader assertions polluted by the pre-existing <HOME>/.agents/skills global configuration.
