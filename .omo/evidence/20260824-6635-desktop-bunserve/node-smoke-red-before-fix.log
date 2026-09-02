@@ -1,0 +1,44 @@
+# RED state before fix (recorded verbatim from session transcript; reproducible by
+# reverting the six skills/*.ts modules to eager `template: loadSharedSkillTemplate(...)`)
+#
+# Command: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts
+
+    at readFileSync (node:fs:441:20)
+    at file:///home/viprix/projects/oom-wt-6635/dist/index.js:109788:41
+    at loadSharedSkillTemplate (file:///home/viprix/projects/oom-wt-6635/dist/index.js:109801:10)
+    at file:///home/viprix/projects/oom-wt-6635/dist/index.js:109808:13
+    at ModuleJob.run (node:internal/modules/esm/loader:439:25)
+    at async node:internal/modules/esm/loader:633:26
+    at async file:///home/viprix/projects/oom-wt-6635/[eval1]:1:13 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/home/viprix/projects/oom-wt-6635/dist/skills/frontend/SKILL.md'
+}
+
+Node.js v24.16.0
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6635/packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts:171:37)
+(fail) dist bundle Bun globals > #given dist bundle #when imported under node --input-type=module #then it loads without error [2080.83ms]
+(fail) dist bundle Bun globals > #given dist bundle #when imported and inspected under node --input-type=module #then stderr has no Bun reference errors [3336.88ms]
+
+ 3 pass
+ 2 fail
+ 11 expect() calls
+Ran 5 tests across 1 file. [32.76s]
+
+# Command: bun test packages/skills-loader-core/src/features/builtin-skills/skill-template-lazy-evaluation.test.ts (new pin, written first)
+
+- skills/frontend.ts
+- skills/init-deep.ts
+- skills/visual-qa.ts
+- skills/remove-ai-slops.ts
+- skills/review-work.ts
+- skills/debugging.ts
+(fail) builtin skill template lazy evaluation > #given builtin skill modules #when scanned for template initialization #then no module-scope loadSharedSkillTemplate call remains
+
+ 0 pass
+ 1 fail
