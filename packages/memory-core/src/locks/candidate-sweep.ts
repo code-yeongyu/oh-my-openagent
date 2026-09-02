@@ -9,6 +9,7 @@ export interface CandidateSweepOptions {
   readonly unlink?: (path: string) => Promise<void>
   readonly isSharingError?: (error: unknown) => boolean
   readonly onFailure?: (path: string) => void
+  readonly onNonSharingFailure?: (path: string) => void
 }
 
 // Lock DOMAIN names may legally contain ".candidate-" (runFinalizationLockPath permits dots
@@ -25,6 +26,14 @@ function errorCode(error: unknown): string | undefined {
 function notifyFailure(options: CandidateSweepOptions, candidatePath: string): void {
   try {
     options.onFailure?.(candidatePath)
+  } catch {
+    // Cleanup notifications are advisory and must not prevent later candidates from being swept.
+  }
+}
+
+function notifyNonSharingFailure(options: CandidateSweepOptions, candidatePath: string): void {
+  try {
+    options.onNonSharingFailure?.(candidatePath)
   } catch {
     // Cleanup notifications are advisory and must not prevent later candidates from being swept.
   }
@@ -76,9 +85,11 @@ export async function sweepStaleLockCandidates(
         }
       }
       if (removed) swept += 1
-    } catch {
-      // A single sharing error must not prevent the remaining candidates from being
-      // reclaimed. The outer acquisition deliberately treats sweep failures as advisory.
+    } catch (error) {
+      // Sharing failures retain their scheduled age-window backoff. Other filesystem errors
+      // rearm the outer acquisition before remaining candidates continue to be swept.
+      const sharing = options.isSharingError?.(error) ?? isSharingError(error)
+      if (!sharing) notifyNonSharingFailure(options, candidatePath)
       notifyFailure(options, candidatePath)
     }
   }

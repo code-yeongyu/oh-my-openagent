@@ -186,6 +186,7 @@ async function sweepCandidateDirectoryWhenEligible(lockDirectory: string): Promi
   await sweepStaleLockCandidates(lockDirectory, now, {
     ...(candidateFs.unlink === undefined ? {} : { unlink: candidateFs.unlink }),
     ...(candidateFs.isSharingError === undefined ? {} : { isSharingError: candidateFs.isSharingError }),
+    onNonSharingFailure: () => rearmCandidateSweep(lockDirectory),
   }).catch(() => {
     rearmCandidateSweep(lockDirectory)
   })

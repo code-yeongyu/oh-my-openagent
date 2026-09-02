@@ -183,6 +183,47 @@ describe("sweepStaleLockCandidates", () => {
     expect((await readdir(directory)).includes(staleName)).toBe(false)
   })
 
+  test("#given a non-sharing stale-sweep failure #when the next acquire runs #then sweep eligibility is rearmed", async () => {
+    const directory = await createLocksDirectory()
+    const lockPath = path.join(directory, "resource.lock")
+    const clock = { now: Date.now() }
+    const staleName = "other.lock.candidate-11111111-aaaa-bbbb-cccc-000000000013"
+    const stalePath = path.join(directory, staleName)
+    let failStale = true
+    const restore = setLockCandidateFsForTests({
+      now: () => clock.now,
+      isSharingError: () => false,
+      unlink: async (candidatePath) => {
+        if (candidatePath === stalePath && failStale) {
+          const error = new Error("non-sharing stale sweep failure") as NodeJS.ErrnoException
+          error.code = "EIO"
+          throw error
+        }
+        await rm(candidatePath)
+      },
+    })
+    try {
+      const first = await createLockRecord("memory-write", {})
+      await acquireLock(lockPath, first)
+      await releaseLock(lockPath, first)
+      await writeAged(directory, staleName, CANDIDATE_STALE_AGE_MS * 2)
+
+      clock.now += CANDIDATE_STALE_AGE_MS + 1
+      const second = await createLockRecord("memory-write", {})
+      await acquireLock(lockPath, second)
+      await releaseLock(lockPath, second)
+      expect((await readdir(directory)).includes(staleName)).toBe(true)
+
+      failStale = false
+      const third = await createLockRecord("memory-write", {})
+      await acquireLock(lockPath, third)
+      await releaseLock(lockPath, third)
+      expect((await readdir(directory)).includes(staleName)).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+
   test("#given a stale candidate #when the first lock in that directory is acquired #then the candidate is swept", async () => {
     const directory = await createLocksDirectory()
     const staleName = "other.lock.candidate-11111111-aaaa-bbbb-cccc-000000000009"

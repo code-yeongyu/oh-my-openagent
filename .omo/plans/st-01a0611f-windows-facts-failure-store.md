@@ -20,7 +20,7 @@ Repair the Windows lock-candidate cleanup path that can consume the 5-second tim
 7. Review the diff, commit the atomic repair and evidence, push a PR to `dev`, wait for CI and Cubic, and address only verified findings. Do not merge.
 
 ## Verification contract
-- Focused lock tests: simulated persistent `EPERM` sharing failure cannot block the immediate next acquisition; controlled time proves the same stale candidate is retried only after the age boundary, then deferred again after a failed stale retry. A non-sharing cleanup throw rearms the next sweep.
+- Focused lock tests: simulated persistent `EPERM` sharing failure cannot block the immediate next acquisition; controlled time proves the same stale candidate is retried only after the age boundary, then deferred again after a failed stale retry. Non-sharing cleanup throws and non-sharing stale-sweep failures both rearm the next sweep.
 - Focused facts store tests: the file's eight persistence cases plus one layout case (nine tests total), including the three original failures, pass once in one Bun process.
 - Package gate: `bun run --cwd packages/memory-core typecheck` and `bun test packages/memory-core/src` pass using Bun 1.4.0.
 - Senpi adapter gate and live harness QA complete with isolated agent-directory evidence; no host Senpi directory mutation.
