@@ -473,6 +473,63 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  test("Z.AI weekly/monthly Limit Exhausted triggers fallback despite containing 'monthly limit' (#7161)", () => {
+    //#given - exact Z.AI coding-plan exhaustion message from issue #7161
+    const error = {
+      name: "AI_APICallError",
+      message: "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-05-20 15:43:27",
+    }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then - must cycle to the configured fallback chain instead of stopping
+    expect(result).toBe(true)
+  })
+
+  test("Z.AI weekly-only and monthly-only Limit Exhausted variants trigger fallback", () => {
+    //#given - weekly-only variant drops the slash; monthly-only drops the prefix
+    const errors = [
+      { message: "Weekly Limit Exhausted. Your limit will reset at 2026-05-28 10:30:00" },
+      { message: "Monthly Limit Exhausted. Your limit will reset at 2026-06-01 00:00:00" },
+    ]
+
+    //#when
+    const results = errors.map((error) => shouldRetryError(error))
+
+    //#then
+    expect(results).toEqual([true, true])
+  })
+
+  test("Z.AI Limit Exhausted with 429 statusCode triggers fallback", () => {
+    //#given
+    const error = {
+      statusCode: 429,
+      message: "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-05-20 15:43:27",
+    }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("generic monthly limit phrasing without exhaustion stays non-retryable STOP", () => {
+    //#given - other providers emit 'monthly limit' without the Z.AI exhausted shape
+    const errors = [
+      { message: "You have reached your monthly limit for this model" },
+      { message: "Daily call limit for this API key has been reached. Limit will reset at midnight UTC." },
+      { message: "Monthly limit will reset tomorrow" },
+    ]
+
+    //#when
+    const results = errors.map((error) => shouldRetryError(error))
+
+    //#then
+    expect(results).toEqual([false, false, false])
+  })
 })
 
 export {}
