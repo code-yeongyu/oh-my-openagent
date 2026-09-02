@@ -27,6 +27,7 @@ export interface TaskRpcBridge {
   attach(): void
   sync(): void
   detach(): void
+  forgetOutputReads(sessionId: string): void
   dispose(): void
 }
 
@@ -129,7 +130,7 @@ export function wireTaskRpcBridge(
     emit(selection)
   }
 
-  registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId))
+  const forgetOutputReads = registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId))
 
   return {
     attach() {
@@ -140,6 +141,7 @@ export function wireTaskRpcBridge(
     },
     sync,
     detach,
+    forgetOutputReads,
     dispose() {
       if (disposed) return
       disposed = true
@@ -152,10 +154,16 @@ function registerTaskHandlers(
   pi: SenpiExtensionAPI,
   engine: TaskEngine,
   currentSessionId: () => string | undefined,
-): void {
+): (sessionId: string) => void {
   const handle = pi.rpc?.handle
-  if (handle === undefined) return
   const statusReads = new Map<string, string>()
+  const forgetSession = (sessionId: string): void => {
+    for (const key of statusReads.keys()) {
+      const parsed: unknown = JSON.parse(key)
+      if (Array.isArray(parsed) && parsed[0] === sessionId) statusReads.delete(key)
+    }
+  }
+  if (handle === undefined) return forgetSession
   handle("omo.task.send", async (data) => {
     const sessionId = currentSessionId()
     if (sessionId === undefined) return unavailable()
@@ -183,6 +191,7 @@ function registerTaskHandlers(
       await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId, statusReads)
     ).details)
   })
+  return forgetSession
 }
 
 function isLive(record: TaskRecord): boolean {

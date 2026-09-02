@@ -94,7 +94,10 @@ export function wireEventBridge(
   pi.on("session_compact", (payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
-    if (!isRejectedCompaction(payload) && sessionId !== undefined) state.forgetTaskOutputReads?.(sessionId)
+    if (!isRejectedCompaction(payload) && sessionId !== undefined) {
+      state.forgetTaskOutputReads?.(sessionId)
+      taskRpc.forgetOutputReads(sessionId)
+    }
     transitions.onCompact(sessionId)
     statusUi.scheduleSync()
   })
