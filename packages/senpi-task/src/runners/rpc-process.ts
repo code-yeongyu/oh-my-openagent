@@ -106,6 +106,10 @@ function defaultSpawnChild(
   descriptor: RpcSpawnDescriptor,
   spawnProcess: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess,
 ): ChildProcess {
+  // windowsHide is load-bearing (#6857): senpi/node are console-subsystem binaries, so a child
+  // spawned from a console-less Windows host without it allocates a fresh visible console window.
+  // The piped stdio RPC channels and tree termination keep working with the flag set (live probe:
+  // rpc-process.windows.test.ts); win32 stays non-detached so no second console is allocated.
   return spawnProcess(descriptor.command, [...descriptor.args], {
     cwd: descriptor.cwd,
     env: descriptor.env,
