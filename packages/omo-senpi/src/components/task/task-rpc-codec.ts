@@ -142,7 +142,7 @@ export function invalidArguments(reason: string) {
 
 export function boundedTaskOutput(details: TaskOutputDetails) {
   if (details.kind === "not_found") return { kind: "not_found", reason: "Task not found." } as const
-  if (details.kind === "invalid_arguments") return details
+  if (details.kind === "invalid_arguments" || details.kind === "no_progress") return details
   const snapshot = boundedOutputSnapshot(details.snapshot)
   if (details.kind === "status") return { ...details, snapshot }
   const transcript = bounded(details.transcript, MAX_SNAPSHOT_TEXT_LENGTH)
