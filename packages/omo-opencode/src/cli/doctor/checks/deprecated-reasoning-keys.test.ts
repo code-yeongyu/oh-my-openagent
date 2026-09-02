@@ -142,13 +142,92 @@ describe("deprecated reasoning keys check", () => {
       const { checkDeprecatedReasoningKeys } = await import("./deprecated-reasoning-keys")
       const result = await checkDeprecatedReasoningKeys()
 
-      //#then only canonical base keys are reported
+      //#then only canonical base keys are reported; fallback_models is valid and never flagged
       expect(result.status).toBe("warn")
       expect(result.issues.map((issue) => issue.description)).toEqual([
         `${configPath}: categories.deep.variant`,
         `${configPath}: [senpi].agents.explore.variant`,
-        `${configPath}: [codex].categories.deep.fallback_models`,
       ])
+    } finally {
+      process.chdir(originalCwd)
+      rmSync(testRootDir, { recursive: true, force: true })
+      if (originalConfigDir === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+      }
+      if (originalHome === undefined) {
+        delete process.env.HOME
+      } else {
+        process.env.HOME = originalHome
+      }
+    }
+  })
+
+  it("does not flag fallback_models as deprecated in base config or any harness block", async () => {
+    //#given a config with fallback_models in base, [opencode], [senpi], and [codex] blocks
+    const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    const originalHome = process.env.HOME
+    const originalCwd = process.cwd()
+    const testRootDir = mkdtempSync(join(tmpdir(), "omo-doctor-fallback-models-"))
+    const projectDir = join(testRootDir, "project")
+    const configPath = join(testRootDir, ".omo", "omo.jsonc")
+
+    try {
+      mkdirSync(projectDir, { recursive: true })
+      mkdirSync(join(testRootDir, ".omo"), { recursive: true })
+      process.env.HOME = testRootDir
+      delete process.env.OPENCODE_CONFIG_DIR
+      writeFileSync(
+        configPath,
+        JSON.stringify(
+          {
+            agents: {
+              sisyphus: {
+                fallback_models: ["openai/gpt-5.6-sol"],
+              },
+            },
+            categories: {
+              deep: {
+                fallback_models: ["openai/gpt-5.6-sol"],
+              },
+            },
+            "[opencode]": {
+              agents: {
+                explore: {
+                  fallback_models: ["openai/gpt-5.6-terra"],
+                },
+              },
+            },
+            "[senpi]": {
+              agents: {
+                explore: {
+                  fallback_models: ["openai/gpt-5.6-terra"],
+                },
+              },
+            },
+            "[codex]": {
+              categories: {
+                deep: {
+                  fallback_models: ["openai/gpt-5.6-terra"],
+                },
+              },
+            },
+          },
+          null,
+          2,
+        ) + "\n",
+        "utf-8",
+      )
+      process.chdir(projectDir)
+
+      //#when running the deprecated reasoning keys check
+      const { checkDeprecatedReasoningKeys } = await import("./deprecated-reasoning-keys")
+      const result = await checkDeprecatedReasoningKeys()
+
+      //#then no issues are reported because fallback_models is a valid schema key
+      expect(result.status).toBe("pass")
+      expect(result.issues).toEqual([])
     } finally {
       process.chdir(originalCwd)
       rmSync(testRootDir, { recursive: true, force: true })

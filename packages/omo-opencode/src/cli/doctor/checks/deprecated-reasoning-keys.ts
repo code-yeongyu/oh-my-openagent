@@ -10,7 +10,6 @@ const CANONICAL_REPLACEMENT = new Map([
   ["reasoningEffort", "reasoning"],
   ["thinking", 'reasoning: "off" or provider_options.thinking'],
   ["textVerbosity", "provider_options.textVerbosity"],
-  ["fallback_models", "models"],
 ])
 
 const TUNING_CONTAINERS = new Set(["agents", "categories", "models"])
