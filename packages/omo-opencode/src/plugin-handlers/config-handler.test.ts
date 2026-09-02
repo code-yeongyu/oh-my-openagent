@@ -5,6 +5,10 @@ import type { CategoryConfig } from "../config/schema"
 import type { OhMyOpenCodeConfig } from "../config"
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
 import { resolveCategoryConfig } from "./category-config-resolver"
+import {
+  _resetForTesting as _resetAgentRegistrySnapshotForTesting,
+  getAppliedRegistry,
+} from "../features/agent-registry-recovery/registry-snapshot"
 
 import * as agents from "../agents"
 import * as sisyphusJunior from "../agents/sisyphus-junior"
@@ -1917,5 +1921,61 @@ describe("Agent merge priority — project-local overrides global", () => {
     const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
     expect(agentConfig["my-custom-agent"]?.description).toBe("(user) global version")
     expect(agentConfig["my-custom-agent"]?.prompt).toBe("user-agent-prompt-sentinel")
+  })
+})
+
+describe("agent registry snapshot recording", () => {
+  test("records applied agent names after config application", async () => {
+    // #given
+    _resetAgentRegistrySnapshotForTesting()
+    const pluginConfig = createPluginConfig({})
+    const config: Record<string, unknown> = {
+      model: "opencode/kimi-k2.5-free",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const recorded = getAppliedRegistry()
+    expect(recorded.length).toBeGreaterThan(0)
+    expect(recorded).toContain(getAgentDisplayName("sisyphus"))
+    expect(recorded).toContain("oracle")
+  })
+
+  test("keeps recording on the cache-hit replay path of the same handler", async () => {
+    // #given
+    _resetAgentRegistrySnapshotForTesting()
+    const pluginConfig = createPluginConfig({})
+    const config: Record<string, unknown> = {
+      model: "opencode/kimi-k2.5-free",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+    await handler(config)
+
+    // #when — second apply with an unchanged cache key replays the snapshot
+    await handler({ ...config, agent: {} })
+
+    // #then
+    const recorded = getAppliedRegistry()
+    expect(recorded.length).toBeGreaterThan(0)
+    expect(recorded).toContain(getAgentDisplayName("sisyphus"))
   })
 })
