@@ -1,0 +1,33 @@
+WROTE provider-models cache via production writer
+/tmp/opencode/issue-6484/sandbox/cache/bun/@t@/36001c6562de5ebb.pile
+/tmp/opencode/issue-6484/sandbox/cache/bun/@t@/78ff5695248ab9fa.pile
+/tmp/opencode/issue-6484/sandbox/cache/bun/@t@/7a87559fbb4087c4.pile
+/tmp/opencode/issue-6484/sandbox/cache/bun/@t@/c9d1bd9503ff4d0e.pile
+/tmp/opencode/issue-6484/sandbox/cache/bun/@t@/cf86f20c120ce818.pile
+/tmp/opencode/issue-6484/sandbox/cache/oh-my-opencode/provider-models.json
+{
+  "models": {
+    "openai": [
+      "gpt-5.4",
+      {
+        "id": "gpt-5.5"
+      }
+    ],
+    "anthropic": [
+      {
+        "id": "claude-opus-4-7"
+      }
+    ],
+    "google": [
+      {
+        "id": "gemini-2.5-pro"
+      }
+    ]
+  },
+  "connected": [
+    "openai",
+    "anthropic",
+    "google"
+  ],
+  "updatedAt": "2026-08-26T00:41:34.869Z"
+}

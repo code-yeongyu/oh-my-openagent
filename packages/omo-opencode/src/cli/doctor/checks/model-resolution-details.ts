@@ -14,7 +14,7 @@ export function buildModelResolutionDetails(options: {
   config: OmoConfig
 }): string[] {
   const details: string[] = []
-  const cacheFile = join(getOpenCodeCacheDir(), "models.json")
+  const cacheFile = options.available.cachePath ?? join(getOpenCodeCacheDir(), "models.json")
 
   details.push("═══ Available Models (from cache) ═══")
   details.push("")

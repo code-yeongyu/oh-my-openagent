@@ -35,4 +35,5 @@ export interface AvailableModelsInfo {
   providers: string[]
   modelCount: number
   cacheExists: boolean
+  cachePath?: string
 }
