@@ -1,0 +1,28 @@
+bun test v1.3.14 (0d9b296a)
+
+script/ci-job-summary-workflow.test.ts:
+(pass) GitHub workflow job summaries > #given a new step-based workflow job #when workflow coverage is checked #then the job is discovered automatically [0.91ms]
+(pass) GitHub workflow job summaries > #given repository workflows #when inspected #then every step-based job writes a concise Markdown summary [6.13ms]
+(pass) GitHub workflow job summaries > #given a privileged publish summary #when it renders dispatch inputs #then raw inputs are passed through env [0.17ms]
+(pass) GitHub workflow job summaries > #given summary inputs #when the shared writer runs #then it emits the Markdown contract GitHub renders [18.75ms]
+
+script/ci-fast-path.test.ts:
+(pass) CI fast-path classifier > ships the classifier consumed by CI [0.14ms]
+(pass) CI fast-path classifier > release-state pull request [32.48ms]
+(pass) CI fast-path classifier > ordinary source push [28.41ms]
+(pass) CI fast-path classifier > generated release merge push [27.09ms]
+(pass) CI fast-path classifier > direct release commit [29.56ms]
+(pass) CI fast-path classifier > web-only pull request [27.89ms]
+(pass) CI fast-path classifier > mixed web and root change [27.71ms]
+(pass) CI fast-path classifier > fails closed when a release-looking push is not a real merge commit [26.69ms]
+(pass) CI fast-path classifier > fails closed when a release-looking merge push has no available diff [23.25ms]
+(pass) CI fast-path classifier > fails closed when the diff is unavailable or empty [51.60ms]
+(pass) CI fast-path workflow wiring > preserves required job identities while gating expensive work [4.59ms]
+(pass) CI fast-path workflow wiring > keeps schema generation on master and skips duplicate draft generation [0.98ms]
+(pass) CI fast-path workflow wiring > keeps the Web CI path contract aligned with classifier inputs [0.32ms]
+(pass) CI fast-path workflow wiring > cancels superseded pull requests without cancelling protected branch pushes [0.86ms]
+
+ 18 pass
+ 0 fail
+ 91 expect() calls
+Ran 18 tests across 2 files. [793.00ms]

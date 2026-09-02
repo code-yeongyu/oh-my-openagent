@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+script/ci-fast-path.test.ts:
+(pass) CI fast-path classifier > ships the classifier consumed by CI [0.51ms]
+(pass) CI fast-path classifier > release-state pull request [30.13ms]
+(pass) CI fast-path classifier > ordinary source push [24.82ms]
+(pass) CI fast-path classifier > generated release merge push [24.98ms]
+(pass) CI fast-path classifier > direct release commit [26.15ms]
+(pass) CI fast-path classifier > web-only pull request [27.14ms]
+(pass) CI fast-path classifier > mixed web and root change [26.56ms]
+(pass) CI fast-path classifier > fails closed when a release-looking push is not a real merge commit [26.98ms]
+(pass) CI fast-path classifier > fails closed when a release-looking merge push has no available diff [26.71ms]
+(pass) CI fast-path classifier > fails closed when the diff is unavailable or empty [50.47ms]
+(pass) CI fast-path workflow wiring > preserves required job identities while gating expensive work [4.99ms]
+(pass) CI fast-path workflow wiring > keeps schema generation on master and skips duplicate draft generation [1.02ms]
+(pass) CI fast-path workflow wiring > keeps the Web CI path contract aligned with classifier inputs [0.33ms]
+(pass) CI fast-path workflow wiring > cancels superseded pull requests without cancelling protected branch pushes [0.85ms]
+
+ 14 pass
+ 0 fail
+ 26 expect() calls
+Ran 14 tests across 1 file. [894.00ms]

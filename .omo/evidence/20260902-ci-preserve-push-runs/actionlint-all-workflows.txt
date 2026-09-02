@@ -1,0 +1,14 @@
+Start downloading actionlint v1.7.10 to /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/tmp.fR8pgMLAcZ
+Detected OS=darwin ext=tar.gz arch=arm64
+Downloading https://github.com/rhysd/actionlint/releases/download/v1.7.10/actionlint_1.7.10_darwin_arm64.tar.gz with curl
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+x actionlint100 2041k  100 2041k    0     0  8300k      0 --:--:-- --:--:-- --:--:-- 8300k
+
+Downloaded and unarchived executable: /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/tmp.fR8pgMLAcZ/actionlint
+Done: 1.7.10
+installed by downloading from release page
+built with go1.25.5 compiler for darwin/arm64
+
+exit=0

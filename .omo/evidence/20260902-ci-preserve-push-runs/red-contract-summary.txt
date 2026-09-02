@@ -1,0 +1,9 @@
+Command:
+  bun test script/ci-fast-path.test.ts
+
+Result before the workflow edits: exit 1.
+Expected: ${{ github.event_name == 'pull_request' }}
+Received: true
+
+The contract parses both CI workflow paths. The old unconditional policy fails
+when it reaches the first workflow because `true` is not the event predicate.

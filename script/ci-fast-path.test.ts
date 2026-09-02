@@ -194,4 +194,15 @@ describe("CI fast-path workflow wiring", () => {
       ".github/workflows/web-ci.yml",
     ])
   })
+
+  test("cancels superseded pull requests without cancelling protected branch pushes", () => {
+    for (const workflowPath of [ciWorkflowPath, webWorkflowPath]) {
+      const workflow = parseWorkflow(workflowPath)
+      const concurrency = workflow["concurrency"]
+      if (!isRecord(concurrency)) throw new Error(`${workflowPath.pathname} must define concurrency`)
+
+      expect(concurrency["group"]).toBe("${{ github.workflow }}-${{ github.ref }}")
+      expect(concurrency["cancel-in-progress"]).toBe("${{ github.event_name == 'pull_request' }}")
+    }
+  })
 })
