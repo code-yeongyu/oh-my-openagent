@@ -108,6 +108,9 @@ export function createChatParamsHandler(_args: {
           ...storedPromptParams.options,
         }
       }
+      if (storedPromptParams.reasoningViaVariant && output.options.reasoningEffort !== undefined) {
+        delete output.options.reasoningEffort
+      }
     }
 
     const capabilities = getModelCapabilities({
