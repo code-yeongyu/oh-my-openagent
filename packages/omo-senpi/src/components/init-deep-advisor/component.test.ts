@@ -223,8 +223,12 @@ describe("createInitDeepAdvisorComponent", () => {
     jest.useFakeTimers()
     const root = makeCoverageRepo()
     const { pi, select, eventCtx } = createHarness(root)
-    createInitDeepAdvisorComponent({ runAfterPreflight: runAdvisorAfterPreflight })
-      .register(pi, componentContext)
+    createInitDeepAdvisorComponent({
+      runAfterPreflight: runAdvisorAfterPreflight,
+      // Deterministic preflight: the production git probe is async child-process
+      // work that fake timers cannot control, so the unit test injects a seam.
+      advisorPreflight: async () => ({ root, stateDir: advisorStateDir() }),
+    }).register(pi, componentContext)
     const handler = pi.handlers.find((entry) => entry.event === "session_start")!.handler
 
     // when
@@ -232,6 +236,10 @@ describe("createInitDeepAdvisorComponent", () => {
 
     // then
     expect(select).not.toHaveBeenCalled()
+    // The injected preflight resolves on a microtask after the handler returns;
+    // let that settle before the runner schedules its setTimeout on the fake clock.
+    await Promise.resolve()
+    await Promise.resolve()
     jest.advanceTimersByTime(0)
     await Promise.resolve()
     expect(select).toHaveBeenCalledTimes(1)

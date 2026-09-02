@@ -1,5 +1,6 @@
-import { execFileSync } from "node:child_process"
+import { execFile } from "node:child_process"
 import { join } from "node:path"
+import { promisify } from "node:util"
 
 import type { ExtensionContext, SessionStartEvent } from "@code-yeongyu/senpi"
 
@@ -10,12 +11,13 @@ import {
 } from "../onboarding/component"
 import { getOnboardingMarkerMtime } from "../onboarding/state"
 import { getOmoNativeStateDir } from "../telemetry/product-identity"
-import { gitIsRepo } from "./git-helpers"
 import type { AdvisorPreflight } from "./runtime"
 
 declare const OMO_SENPI_BUNDLED: boolean
 
 const RUNTIME_FILE_NAME = "omo-init-deep-advisor.js"
+
+const execFileAsync = promisify(execFile)
 
 type AdvisorRunner = (
   pi: SenpiExtensionAPI,
@@ -23,8 +25,15 @@ type AdvisorRunner = (
   preflight: AdvisorPreflight,
 ) => Promise<void>
 
+export type AdvisorPreflightFn = (
+  pi: SenpiExtensionAPI,
+  eventCtx: ExtensionContext,
+) => Promise<AdvisorPreflight | null>
+
 export interface InitDeepAdvisorComponentDependencies {
   readonly runAfterPreflight: AdvisorRunner
+  /** Inject for deterministic unit tests; defaults to the git-probing preflight. */
+  readonly advisorPreflight?: AdvisorPreflightFn
 }
 
 const defaultDependencies: InitDeepAdvisorComponentDependencies = {
@@ -45,7 +54,13 @@ export function createInitDeepAdvisorComponent(
         if (payload.reason !== "startup") return
         if (!isExtensionContext(rawEventCtx)) return
         const eventCtx: ExtensionContext = rawEventCtx
-        void runAdvisor(pi, ctx, eventCtx, dependencies.runAfterPreflight).catch((error) => {
+        void runAdvisor(
+          pi,
+          ctx,
+          eventCtx,
+          dependencies.runAfterPreflight,
+          dependencies.advisorPreflight,
+        ).catch((error) => {
           ctx.logger.warn("init-deep-advisor failed", { error })
         })
       })
@@ -58,10 +73,11 @@ export async function runAdvisor(
   _ctx: ComponentContext,
   eventCtx: ExtensionContext,
   runner: AdvisorRunner = runBundledAdvisorAfterPreflight,
+  preflight: AdvisorPreflightFn = advisorPreflight,
 ): Promise<void> {
-  const preflight = advisorPreflight(pi, eventCtx)
-  if (preflight === null) return
-  await runner(pi, eventCtx, preflight)
+  const result = await preflight(pi, eventCtx)
+  if (result === null) return
+  await runner(pi, eventCtx, result)
 }
 
 async function runBundledAdvisorAfterPreflight(
@@ -88,20 +104,25 @@ async function runAdvisorRuntime(
   await Reflect.apply(runner, undefined, [pi, eventCtx, preflight])
 }
 
-function advisorPreflight(
+async function advisorPreflight(
   pi: SenpiExtensionAPI,
   eventCtx: ExtensionContext,
-): AdvisorPreflight | null {
+): Promise<AdvisorPreflight | null> {
   if (!eventCtx.hasUI) return null
   if (pi.getFlag("omo-senpi-init-deep-advisor-disabled") === true) return null
   const onboardingStateDir = getOmoNativeStateDir(process.env)
   const stateDir = join(onboardingStateDir, "init-deep-advisor-state")
   const cwd = eventCtx.cwd ?? process.cwd()
-  if (!gitIsRepo(cwd)) return null
-  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+  try {
+    await execFileAsync("git", ["rev-parse", "--is-inside-work-tree"], { cwd })
+  } catch {
+    return null
+  }
+  const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], {
     cwd,
     encoding: "utf8",
-  }).trim()
+  })
+  const root = stdout.trim()
   const markerMtime = getOnboardingMarkerMtime(onboardingStateDir)
   if (markerMtime === null || markerMtime >= processStartTime) return null
   return { root, stateDir }
