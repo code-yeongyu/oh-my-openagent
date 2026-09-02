@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { open, readFile, rename, unlink } from "node:fs/promises"
+import { open, readFile, rename, unlink } from "@oh-my-opencode/memory-core/fs"
 import { dirname } from "node:path"
 
 export interface RunLaunchManifest {

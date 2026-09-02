@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, unlink, writeFile } from "../fs/resilient"
 import { hostname } from "node:os"
 import { dirname, join } from "node:path"
 import type { MemoryIdentity } from "../identity"

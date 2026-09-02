@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { readdir, rm } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { readdir, rm } from "@oh-my-opencode/memory-core/fs"
 import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
