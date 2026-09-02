@@ -14,8 +14,10 @@
   reclaimer could wait while the first writer was intentionally unable to
   continue. The replacement has two OS workers and stream events: the parent
   observes the first worker's post-open state, lets the second reclaimer finish,
-  then releases the first. It proves that the sentinel path is absent before
-  publication and has a complete owner record at publication. No production
+  then releases the first. The first worker forces `fs.linkSync` to report
+  `EPERM`, exercising the Windows `wx` fallback. It proves that the sentinel
+  path is absent before publication and has a complete owner record after the
+  fallback writes it. No production
   lock behavior, timeout, sleep, polling loop, or concurrency invariant changed.
 
 ## What was tested

@@ -86,7 +86,12 @@ function lineReader(stream: ReadableStream<Uint8Array>): () => Promise<string> {
   }
 }
 
-function reclaimWorkerSource(projectDir: string, reclaimPath: string, preemptAfterOpen: boolean): string {
+function reclaimWorkerSource(
+  projectDir: string,
+  reclaimPath: string,
+  preemptAfterOpen: boolean,
+  rejectReclaimLink: boolean,
+): string {
   return [
     `const { createRequire, syncBuiltinESMExports } = await import("node:module")`,
     `const require = createRequire(import.meta.url)`,
@@ -96,21 +101,40 @@ function reclaimWorkerSource(projectDir: string, reclaimPath: string, preemptAft
     `if (${JSON.stringify(preemptAfterOpen)}) {`,
     `  const realOpen = fs.openSync`,
     `  const realLink = fs.linkSync`,
+    `  const realWrite = fs.writeSync`,
+    `  let fallbackFd`,
     `  let preempted = false`,
-    `  fs.linkSync = (existingPath, newPath) => {`,
-    `    realLink(existingPath, newPath)`,
-    `    if (newPath !== reclaimPath) return`,
+    `  let published = false`,
+    `  const publish = () => {`,
+    `    if (published) return`,
+    `    published = true`,
     `    const value = JSON.parse(fs.readFileSync(reclaimPath, "utf8"))`,
     `    const hasOwnerRecord = typeof value === "object" && value !== null &&`,
     `      typeof value.hostPid === "number" && typeof value.token === "string"`,
     `    process.stdout.write(JSON.stringify({ event: "published", hasOwnerRecord }) + "\\n")`,
     `  }`,
+    `  fs.linkSync = (existingPath, newPath) => {`,
+    `    if (newPath === reclaimPath && ${JSON.stringify(rejectReclaimLink)}) {`,
+    `      const error = new Error("operation not permitted")`,
+    `      Object.assign(error, { code: "EPERM" })`,
+    `      throw error`,
+    `    }`,
+    `    realLink(existingPath, newPath)`,
+    `    if (newPath === reclaimPath) publish()`,
+    `  }`,
+    `  fs.writeSync = (fd, ...args) => {`,
+    `    const written = realWrite(fd, ...args)`,
+    `    if (fd === fallbackFd) publish()`,
+    `    return written`,
+    `  }`,
     `  fs.openSync = (path, flags, mode) => {`,
     `    const fd = realOpen(path, flags, mode)`,
-    `    if (preempted || flags !== "wx" || typeof path !== "string" || !path.startsWith(reclaimPath)) return fd`,
-    `    preempted = true`,
-    `    process.stdout.write(JSON.stringify({ event: "opened", sentinelExists: fs.existsSync(reclaimPath) }) + "\\n")`,
-    `    fs.readSync(0, Buffer.alloc(1), 0, 1, null)`,
+    `    if (!preempted && flags === "wx" && typeof path === "string" && path.startsWith(reclaimPath)) {`,
+    `      preempted = true`,
+    `      process.stdout.write(JSON.stringify({ event: "opened", sentinelExists: fs.existsSync(reclaimPath) }) + "\\n")`,
+    `      fs.readSync(0, Buffer.alloc(1), 0, 1, null)`,
+    `    }`,
+    `    if (preempted && flags === "wx" && path === reclaimPath) fallbackFd = fd`,
     `    return fd`,
     `  }`,
     `  syncBuiltinESMExports()`,
@@ -622,7 +646,7 @@ describe("createDagFileStore locks and retention", () => {
     const reclaimSentinel = `${canonical}.reclaim`
     fs.writeFileSync(canonical, JSON.stringify({ hostPid: 2_147_483_647, token: "stale-holder" }))
     const first = Bun.spawn(
-      [process.execPath, "-e", reclaimWorkerSource(project, reclaimSentinel, true)],
+      [process.execPath, "-e", reclaimWorkerSource(project, reclaimSentinel, true, true)],
       { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
     )
     const firstRead = lineReader(first.stdout)
@@ -635,7 +659,7 @@ describe("createDagFileStore locks and retention", () => {
       expect(opened).toEqual({ event: "opened", sentinelExists: false })
 
       second = Bun.spawn(
-        [process.execPath, "-e", reclaimWorkerSource(project, reclaimSentinel, false)],
+        [process.execPath, "-e", reclaimWorkerSource(project, reclaimSentinel, false, false)],
         { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
       )
       const secondRead = lineReader(second.stdout)
