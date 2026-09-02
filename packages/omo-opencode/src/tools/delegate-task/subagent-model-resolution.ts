@@ -15,9 +15,56 @@ import { resolveModelForDelegateTask } from "./model-selection"
 import type { AgentInfo } from "./subagent-discovery"
 import type { ResolvedSubagentModel } from "./subagent-resolution-types"
 
-function findAgentOverride(agentOverrides: AgentOverrides | undefined, agentConfigKey: string) {
-  return agentOverrides?.[agentConfigKey]
+function decodeFileUriPath(raw: string): string | undefined {
+  try {
+    return decodeURIComponent(raw)
+  } catch (error) {
+    log("[delegate-task] Ignoring malformed file URI while scanning agent override aliases", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return undefined
+  }
+}
+
+function toAliasSlug(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+}
+
+function collectOverrideAliasNames(override: AgentOverrides[string]): string[] {
+  const names = new Set<string>()
+  if (override?.displayName) {
+    const slug = toAliasSlug(override.displayName)
+    if (slug) names.add(slug)
+  }
+  const promptAppend = override?.prompt_append
+  if (promptAppend?.startsWith("file://")) {
+    const decoded = decodeFileUriPath(promptAppend.slice("file://".length))
+    const base = decoded?.split(/[\\/]/).pop() ?? ""
+    const stem = base.replace(/\.[^.]+$/, "")
+    const slug = toAliasSlug(stem)
+    if (slug) names.add(slug)
+  }
+  return [...names]
+}
+
+function findAgentOverride(agentOverrides: AgentOverrides | undefined, agentToUse: string) {
+  const agentConfigKey = getAgentConfigKey(agentToUse)
+  const direct = agentOverrides?.[agentConfigKey]
     ?? Object.entries(agentOverrides ?? {}).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
+  if (direct) {
+    return direct
+  }
+
+  const aliasMatch = Object.entries(agentOverrides ?? {}).find(
+    ([, override]) => collectOverrideAliasNames(override).includes(toAliasSlug(agentConfigKey)),
+  )
+  if (aliasMatch) {
+    log("[delegate-task] Matched agent override via reverse alias", {
+      agent: agentToUse,
+      overrideKey: aliasMatch[0],
+    })
+  }
+  return aliasMatch?.[1]
 }
 
 export async function resolveSubagentModel(
@@ -28,9 +75,8 @@ export async function resolveSubagentModel(
   let categoryModel = undefined
   let fallbackChain = undefined
 
-  const agentConfigKey = getAgentConfigKey(agentToUse)
-  const agentOverride = findAgentOverride(executorCtx.agentOverrides, agentConfigKey)
-  const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey]
+  const agentOverride = findAgentOverride(executorCtx.agentOverrides, agentToUse)
+  const agentRequirement = AGENT_MODEL_REQUIREMENTS[getAgentConfigKey(agentToUse)]
   const agentCategoryConfig = agentOverride?.category
     ? executorCtx.userCategories?.[agentOverride.category]
     : undefined

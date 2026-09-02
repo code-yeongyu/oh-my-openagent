@@ -1,0 +1,2 @@
+command: bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+exit code: 0 (no diagnostics emitted)
