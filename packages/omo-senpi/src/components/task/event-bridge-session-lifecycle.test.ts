@@ -141,6 +141,19 @@ describe("event-bridge session_start recovery chain", () => {
   })
 })
 
+
+describe("event-bridge session_compact", () => {
+  it("#given rejected and accepted compactions #when they fire #then only accepted compaction forgets task-output status reads", async () => {
+    const { pi, forgottenTaskOutputSessions } = wireHarness("parent-session")
+
+    await pi.dispatch("session_compact", { type: "session_compact", accepted: false }, {})
+    expect(forgottenTaskOutputSessions).toEqual([])
+
+    await pi.dispatch("session_compact", { type: "session_compact", accepted: true }, {})
+    expect(forgottenTaskOutputSessions).toEqual(["parent-session"])
+  })
+})
+
 describe("event-bridge session_shutdown", () => {
   it("#given a session_shutdown with a reason and a captured session id #when the event fires #then it suspends with parentSessionId and reason", async () => {
     const { pi, calls, order } = wireHarness("parent-session")

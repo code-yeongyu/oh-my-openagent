@@ -91,10 +91,10 @@ export function wireEventBridge(
     transitions.onBeforeCompact(engine.runtime.sessionId())
   })
 
-  pi.on("session_compact", (_payload, eventCtx) => {
+  pi.on("session_compact", (payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
-    if (sessionId !== undefined) state.forgetTaskOutputReads?.(sessionId)
+    if (!isRejectedCompaction(payload) && sessionId !== undefined) state.forgetTaskOutputReads?.(sessionId)
     transitions.onCompact(sessionId)
     statusUi.scheduleSync()
   })
@@ -176,4 +176,8 @@ function asLiveContext(value: unknown): LiveTaskContext {
 
 function isLiveContext(value: unknown): value is LiveTaskContext {
   return typeof value === "object" && value !== null
+}
+
+function isRejectedCompaction(payload: unknown): boolean {
+  return typeof payload === "object" && payload !== null && "accepted" in payload && payload.accepted === false
 }
