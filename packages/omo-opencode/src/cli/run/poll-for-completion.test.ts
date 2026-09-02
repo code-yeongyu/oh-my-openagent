@@ -570,4 +570,105 @@ describe("pollForCompletion", () => {
     expect(result).toBe(130)
   })
 
+  it("returns 1 when the session stays interrupted after worker termination instead of hanging forever", async () => {
+    //#given - #3981 WSL repro through mocks: the session worker died mid-run
+    // (read hung, "Worker has been terminated") and the server keeps reporting
+    // the session as 'interrupted', a status outside the old idle/busy/retry model
+    const ctx = createMockContext({
+      statuses: { "test-session": { type: "interrupted" } },
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+    // Safety net so a regression back to the infinite loop fails fast as 130
+    const clock = createVirtualClock((elapsedMs) => {
+      if (elapsedMs >= 200) {
+        abortController.abort()
+      }
+    })
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 3,
+      minStabilizationMs: 500,
+      now: clock.now,
+      sleep: clock.sleep,
+    })
+
+    //#then - terminates with exit 1 after the grace cycles, never reaching the abort net
+    expect(result).toBe(1)
+    expect(clock.now()).toBeLessThan(200)
+    const errorCalls = (console.error as ReturnType<typeof mock>).mock.calls
+    expect(errorCalls.some((call: unknown[]) =>
+      String(call[0] ?? "").includes("interrupted")
+    )).toBe(true)
+  })
+
+  it("completes normally when an interruption recovers to busy then idle", async () => {
+    //#given - runtime fallback rearms the session shortly after an interruption
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+    let statusCalls = 0
+    ;(unsafeTestValue(ctx.client.session)).status = mock(async () => {
+      statusCalls++
+      if (statusCalls <= 2) {
+        return { data: { "test-session": { type: "interrupted" } } }
+      }
+      if (statusCalls === 3) {
+        return { data: { "test-session": { type: "busy" } } }
+      }
+      return { data: { "test-session": { type: "idle" } } }
+    })
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 10,
+    })
+
+    //#then - brief interruption recovers; run completes 0 instead of exiting 1
+    expect(result).toBe(0)
+    expect(statusCalls).toBeGreaterThanOrEqual(4)
+  })
+
+  it("treats running status as active work and does not complete while it persists", async () => {
+    //#given - server reports 'running' (outside the old idle/busy/retry model)
+    // indefinitely while work is still in flight; events had shown idle earlier
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+    // Virtual clock: abort at virtual 200ms as the harness net; a correct impl
+    // must hit this net instead of exiting 0 while the session is still running
+    const clock = createVirtualClock((elapsedMs) => {
+      if (elapsedMs >= 200) {
+        abortController.abort()
+      }
+    })
+    ;(unsafeTestValue(ctx.client.session)).status = mock(async () => ({
+      data: { "test-session": { type: "running" } },
+    }))
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 2,
+      minStabilizationMs: 10,
+      now: clock.now,
+      sleep: clock.sleep,
+    })
+
+    //#then - never reported complete while 'running'; completion never evaluated
+    expect(result).toBe(130)
+    const todoCallCount = (ctx.client.session.todo as ReturnType<typeof mock>).mock.calls.length
+    expect(todoCallCount).toBe(0)
+  })
+
 })
