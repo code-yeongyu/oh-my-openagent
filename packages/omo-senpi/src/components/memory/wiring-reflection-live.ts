@@ -125,6 +125,7 @@ export function createMemoryReflectionLiveWiring(
       await rpcBridge.current?.sync()
     },
     shutdown(identity): void {
+      liveSession.current = undefined
       if (identity !== undefined) activeRuns.clear(identity)
       footerLive.dispose()
       rpcBridge.current?.detach()

@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
-import type { MemoryIdentityRuntime } from "./identity-runtime"
+import type { MemoryIdentityRuntime, MemoryIdentityRuntimeDeps } from "./identity-runtime"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { createMemoryComponent, ensureIdentityRuntimeDirs } from "./index"
@@ -451,6 +451,66 @@ const eventCtx = {
   },
 }
 
+describe("memory shutdown context wiring", () => {
+  test("#given print mode replaced the bound extension context #when shutdown evaluators resolve runtime state #then they use the current shutdown context", async () => {
+    // given
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-shutdown-context-")))
+    roots.push(root)
+    const sessionId = "session-replaced"
+    const identity = createMemoryIdentityContext({
+      identity: "agent-shutdown-context",
+      identityPaths: buildIdentityPaths(root, "agent-shutdown-context"),
+      binding: { identity: "agent-shutdown-context", repoPathHash: "hash", boundAt: 1 },
+    })
+    const settings = memorySettings()
+    settings.dream.shutdown_launch = false
+    let runtimeDeps: MemoryIdentityRuntimeDeps | undefined
+    const wiring = createMemoryWiring({
+      sessions: new Map([[sessionId, { context: identity }]]),
+      loadConfig: () => loadedMemoryConfig(settings),
+      cwd: () => root,
+      env: {},
+      createRuntime: (_identity, deps) => {
+        runtimeDeps = deps
+        return { reconcile: async () => {} } as unknown as MemoryIdentityRuntime
+      },
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    const staleContext = {
+      get model(): never {
+        throw new Error("stale extension context")
+      },
+      sessionManager: { getSessionId: () => sessionId, getEntries: () => [] },
+      ui: { setStatus: () => {}, notify: () => {} },
+    }
+    const currentContext = {
+      model: { provider: "current-provider", id: "current-model" },
+      sessionManager: { getSessionId: () => sessionId, getEntries: () => [] },
+      ui: { setStatus: () => {}, notify: () => {} },
+    }
+    await wiring.afterBind(pi, sessionId, identity, staleContext)
+    let resolvedModel: { readonly provider: string; readonly id: string } | undefined
+    let liveSessionPresentDuringShutdown: boolean | undefined
+    wiring.registerShutdownEvaluator(() => {
+      resolvedModel = runtimeDeps?.resolveSessionModel?.()
+      liveSessionPresentDuringShutdown = runtimeDeps?.liveSession?.() !== undefined
+    })
+    const shutdownInput = {
+      reason: "quit" as const,
+      sessionId,
+      deadlineAt: Date.now() + 1_000,
+      eventCtx: currentContext,
+    }
+
+    // when
+    await wiring.onSessionShutdown(shutdownInput)
+
+    // then
+    expect(resolvedModel).toEqual({ provider: "current-provider", id: "current-model" })
+    expect(liveSessionPresentDuringShutdown).toBe(false)
+  })
+})
+
 describe("memory wiring reflection completion delivery", () => {
   describe("#given a pending completion and a bound session with a real UI callback", () => {
     describe("#when afterBind drains the identity completion directory", () => {
@@ -646,6 +706,7 @@ describe("memory footer live wiring", () => {
       sessionId: harness.sessionId,
       deadlineAt: Date.now() + 1_000,
       now: () => Date.now(),
+      eventCtx: harness.eventCtx,
     })
     const afterShutdown = harness.statusCalls.length
 
