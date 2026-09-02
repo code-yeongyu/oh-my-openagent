@@ -153,11 +153,13 @@ export async function runLauncher(args = process.argv.slice(2)) {
     return
   }
   // The engine is pinned by this package, so a self-update would break the pairing; every
-  // self-update spelling is answered with the command that actually updates the product.
+  // self-update spelling is refused with the command that actually updates the product. The
+  // non-zero exit lets wrappers and CI steps tell "not updated" apart from success (#7172).
   if (isSelfUpdate(args)) {
     const update = updateTarget()
-    console.log(`omo is updated via ${update.manager}: ${update.command}`)
-    process.exitCode = 0
+    console.log("omo does not self-update (the senpi engine is version-pinned).")
+    console.log(`Run: ${update.command}`)
+    process.exitCode = 1
     return
   }
   if (earlyCommands.has(command) || command === "update") {
