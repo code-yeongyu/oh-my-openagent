@@ -182,4 +182,26 @@ describe("runtime-fallback quota error regressions", () => {
     expect(errorType).toBe("quota_exceeded")
     expect(retryable).toBe(true)
   })
+
+  test("classifies MiniMax 用量上限 (2056) as quota_exceeded and triggers fallback", () => {
+    //#given
+    // MiniMax emits this exact message with error code 2056 when the
+    // coding-plan Token quota is exhausted. Before this fix neither the
+    // classifier nor the retryable-patterns list matched 用量上限, so the
+    // runtime-fallback never fired and the user was stuck on the dead model.
+    const error = {
+      name: "AI_APICallError",
+      code: 2056,
+      message:
+        "已达到 Token Plan 用量上限：请升级 Token Plan 套餐或购买积分补充用量。",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
 })
