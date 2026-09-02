@@ -1,0 +1,9 @@
+Command:
+bun test ./packages/omo-senpi/src/components/memory/commands/memfs.test.ts ./packages/omo-senpi/src/components/memory/commands/memfs-extra.test.ts
+
+Observed:
+(pass) /memfs restore > #given backups and an interactive session #when restore runs without a name #then the user selects one [504.76ms]
+26 pass
+0 fail
+84 expect() calls
+Ran 26 tests across 2 files. [15.18s]

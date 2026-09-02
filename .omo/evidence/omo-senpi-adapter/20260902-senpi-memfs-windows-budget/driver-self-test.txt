@@ -1,0 +1,5 @@
+Command:
+node packages/omo-senpi/scripts/qa/drive.mjs --self-test
+
+Observed:
+SELF-TEST OK

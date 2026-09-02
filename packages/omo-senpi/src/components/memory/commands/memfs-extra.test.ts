@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
@@ -20,6 +20,10 @@ const tempDirs: string[] = []
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
+
+// These cases drive real git subprocesses (init, commit, backup, restore); the 5s default is not a budget
+// they fit on a loaded Windows runner.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
 const SEEDS = [
   { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" },
