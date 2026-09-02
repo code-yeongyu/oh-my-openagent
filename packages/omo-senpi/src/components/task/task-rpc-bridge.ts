@@ -228,6 +228,7 @@ function registerTaskHandlers(
 ): void {
   const handle = pi.rpc?.handle
   if (handle === undefined) return
+  const statusReads = new Map<string, string>()
   handle("omo.task.list", async (data) => {
     const sessionId = currentSessionId()
     if (sessionId === undefined) return unavailable()
@@ -260,7 +261,7 @@ function registerTaskHandlers(
     const input = parseTaskOutput(data)
     if ("error" in input) return invalidArguments(input.error)
     return boundedTaskOutput((
-      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId)
+      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId, statusReads)
     ).details)
   })
 }
