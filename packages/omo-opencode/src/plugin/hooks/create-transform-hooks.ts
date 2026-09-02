@@ -21,7 +21,7 @@ export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   btwSideContextInjector: ReturnType<typeof createBtwSideContextInjectorHook>
-  contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
+  contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook> | null
   teamModeStatusInjector: ReturnType<typeof createTeamModeStatusInjector> | null
   teamMailboxInjector: ReturnType<typeof createTeamMailboxInjector> | null
   toolPairValidator: ReturnType<typeof createToolPairValidatorHook> | null
@@ -69,8 +69,9 @@ export function createTransformHooks(args: {
       )
     : null
 
-  const contextInjectorMessagesTransform =
-    createContextInjectorMessagesTransformHook(contextCollector)
+  const contextInjectorMessagesTransform = isHookEnabled("context-injector")
+    ? createContextInjectorMessagesTransformHook(contextCollector)
+    : null
   const btwSideContextInjector = createBtwSideContextInjectorHook({
     client: ctx.client,
   })
