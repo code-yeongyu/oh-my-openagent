@@ -200,6 +200,29 @@ describe("event-bridge native task telemetry and controls", () => {
         parent_session_id: "parent-session",
       },
     })
+    await expect(
+      invokeRpc("omo.task.output", {
+        task_id: current.task_id,
+        mode: "status",
+      }),
+    ).resolves.toMatchObject({
+      kind: "no_progress",
+      task_id: current.task_id,
+      status: "running",
+    })
+  })
+
+
+  it("#given a cached RPC status read #when the bridge forgets the session #then the next status request returns a fresh snapshot", async () => {
+    const current = taskRecord({ task_id: "st_compacted", status: "completed", final_response: "done" })
+    const { pi, invokeRpc } = wireHarness("parent-session", { records: { [current.task_id]: current }, withRpc: true })
+
+    await pi.dispatch("session_start", {}, {})
+    await expect(invokeRpc("omo.task.output", { task_id: current.task_id, mode: "status" })).resolves.toMatchObject({ kind: "status" })
+    await expect(invokeRpc("omo.task.output", { task_id: current.task_id, mode: "status" })).resolves.toMatchObject({ kind: "no_progress" })
+
+    await pi.dispatch("session_compact", { type: "session_compact", accepted: true }, {})
+    await expect(invokeRpc("omo.task.output", { task_id: current.task_id, mode: "status" })).resolves.toMatchObject({ kind: "status" })
   })
 
   it("#given a live child subscription #when the task settles #then the bridge unsubscribes and ignores later child events", async () => {

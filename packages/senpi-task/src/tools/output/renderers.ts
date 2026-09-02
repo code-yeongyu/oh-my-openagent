@@ -71,6 +71,11 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
         text: `${joinRendererTokens([`task_output ${identity}`, idSuffix, statusLabel])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
       }
     }
+    case "no_progress":
+      return {
+        color: statusThemeColor(details.status),
+        text: `task_output ${normalizeRendererText(details.task_id)} ${normalizeRendererText(details.status)} · no new progress; await notification`,
+      }
     case "transcript":
       return {
         color: statusThemeColor(details.snapshot.status),
