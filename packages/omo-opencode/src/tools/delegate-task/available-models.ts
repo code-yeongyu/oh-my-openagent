@@ -2,6 +2,7 @@ import type { OpencodeClient } from "./types"
 import { log } from "../../shared/logger"
 import { isRecord } from "../../shared/record-type-guard"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+import * as exhaustedProvidersCache from "../../shared/exhausted-providers-cache"
 
 type ModelListClient = OpencodeClient & {
   model: { list: () => Promise<unknown> }
@@ -33,6 +34,20 @@ function addFromProviderModels(
   }
 }
 
+function removeExhaustedProviderModels(out: Set<string>): Set<string> {
+  const exhaustedProviders = exhaustedProvidersCache.getExhaustedProviderIDs()
+  if (exhaustedProviders.length === 0) return out
+
+  const exhaustedSet = new Set(exhaustedProviders.map((providerID) => providerID.toLowerCase()))
+  for (const model of out) {
+    const provider = model.split("/")[0]
+    if (provider && exhaustedSet.has(provider.toLowerCase())) {
+      out.delete(model)
+    }
+  }
+  return out
+}
+
 export async function getAvailableModelsForDelegateTask(client: OpencodeClient): Promise<Set<string>> {
   const providerModelsCache = connectedProvidersCache.readProviderModelsCache()
 
@@ -44,7 +59,7 @@ export async function getAvailableModelsForDelegateTask(client: OpencodeClient):
       if (!connected.has(providerID)) continue
       addFromProviderModels(out, providerID, models as Array<string | { id?: string }> | undefined)
     }
-    return out
+    return removeExhaustedProviderModels(out)
   }
 
   const connectedProviders = connectedProvidersCache.readConnectedProvidersCache()
@@ -67,7 +82,7 @@ export async function getAvailableModelsForDelegateTask(client: OpencodeClient):
       if (!connected.has(row.provider)) continue
       out.add(`${row.provider}/${row.id}`)
     }
-    return out
+    return removeExhaustedProviderModels(out)
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     log("[delegate-task] client.model.list failed", { error: errorMessage })
