@@ -1,7 +1,7 @@
 prior_live_capture tested_commit=1f9ecb94b551e17043b8d949c5d5a6defa8bfed0 sandbox_id=omo-senpi-qa-VIL2o4 driver_result=PASS
 observed_after_driver_return=true
 process_pid=97175 process_ppid=97170 process_pgid=97166 process_state=S
-process_command=/usr/local/bin/node <HOME>/.local/lib/node_modules/typescript/lib/typingsInstaller.js --globalTypingsCacheLocation <TEMP>/omo-senpi-qa-VIL2o4/xdg-cache/typescript/5.9 --typesMapLocation <HOME>/.local/lib/node_modules/typescript/lib/typesMap.json --validateDefaultNpmLocation
+process_command=node <HOME>/.local/lib/node_modules/typescript/lib/typingsInstaller.js --globalTypingsCacheLocation <TEMP>/omo-senpi-qa-VIL2o4/xdg-cache/typescript/5.9 --typesMapLocation <HOME>/.local/lib/node_modules/typescript/lib/typesMap.json --validateDefaultNpmLocation
 ownership=driver-associated: globalTypingsCacheLocation matched that invocation's exact sandbox root
 cleanup=manual: terminated PID 97175 and its observed tsserver ancestors 97170 and 97166; exact sandbox-reference scan then absent
 signal_only_exit_window=not_measured; not classified as a reproducible QA/runtime defect
