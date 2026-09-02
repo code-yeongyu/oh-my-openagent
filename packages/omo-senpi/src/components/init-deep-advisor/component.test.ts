@@ -1,5 +1,9 @@
 /// <reference types="bun-types" />
 
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import { afterEach, beforeEach, describe, expect, jest, mock, spyOn, test } from "bun:test"
 
 import {
@@ -243,5 +247,21 @@ describe("createInitDeepAdvisorComponent", () => {
     jest.advanceTimersByTime(0)
     await Promise.resolve()
     expect(select).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given a non-git directory #when startup runs #then the advisor stays silent", async () => {
+    // given
+    const nonRepo = mkdtempSync(join(tmpdir(), "omo-init-deep-nonrepo-"))
+    const { pi, select, eventCtx } = createHarness(nonRepo)
+
+    // when
+    try {
+      await runAdvisor(pi, componentContext, eventCtx)
+    } finally {
+      rmSync(nonRepo, { recursive: true, force: true })
+    }
+
+    // then
+    expect(select).not.toHaveBeenCalled()
   })
 })
