@@ -153,15 +153,23 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {
-        if (
-          subagentSessions.has(sessionID) &&
-          classifyErrorType(error) === "quota_exceeded"
-        ) {
-          log(`[${HOOK_NAME}] Aborting subagent on unrecoverable quota error (no fallback configured)`, {
+        const errorType = classifyErrorType(error)
+        // Terminal configuration errors cannot self-heal within the session and
+        // have no fallback chain to advance, so retrying re-delegates to the
+        // same unavailable model forever (issue #5046). Abort the subagent so
+        // the parent tool call resolves and the parent can skip or re-plan.
+        const terminalNoFallbackSource =
+          errorType === "quota_exceeded"
+            ? "message.updated.subagent-quota-no-fallback"
+            : errorType === "model_not_found" || errorType === "missing_api_key"
+              ? "message.updated.subagent-model-unavailable-no-fallback"
+              : undefined
+        if (subagentSessions.has(sessionID) && terminalNoFallbackSource) {
+          log(`[${HOOK_NAME}] Aborting subagent on unrecoverable ${errorType} error (no fallback configured)`, {
             sessionID,
             model,
           })
-          await helpers.abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
+          await helpers.abortSessionRequest(sessionID, terminalNoFallbackSource)
         }
         return
       }
