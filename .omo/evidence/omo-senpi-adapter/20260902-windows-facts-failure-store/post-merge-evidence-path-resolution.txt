@@ -1,1 +1,7 @@
-post_merge_resolver=matched
+resolver=.agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs
+invocation=node .agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs --repo-root <WORKTREE> --slug 20260902-windows-facts-failure-store
+slug=20260902-windows-facts-failure-store
+resolver_output=<WORKTREE>/.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store
+repository_relative=.omo/evidence/omo-senpi-adapter/20260902-windows-facts-failure-store
+status=resolved-and-matched
+command_exit=0
