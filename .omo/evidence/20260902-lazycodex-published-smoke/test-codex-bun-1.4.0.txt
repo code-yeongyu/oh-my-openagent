@@ -1,0 +1,428 @@
+$ bun run build:codex-install && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && npm --prefix packages/omo-codex/plugin/components/ulw-loop test && bun run --cwd packages/omo-codex/plugin build && npm --prefix packages/omo-codex/plugin/components/codegraph run typecheck && npm --prefix packages/omo-codex/plugin/components/codegraph test && node scripts/check-third-party-notices.mjs --ship && bun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts packages/omo-codex/src/install/codex-cache.test.ts packages/omo-codex/src/install/codex-cleanup.test.ts packages/omo-codex/src/install/codex-config-agent-cleanup.test.ts packages/omo-codex/src/install/codex-config-autonomous-features.test.ts packages/omo-codex/src/install/codex-config-reasoning.test.ts packages/omo-codex/src/install/codex-config-toml.test.ts packages/omo-codex/src/install/codex-project-local-cleanup.test.ts packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts packages/omo-codex/src/install/install-codex.test.ts packages/omo-codex/src/install/install-codex-packaged.test.ts packages/omo-codex/src/install/link-cached-plugin-agents.test.ts packages/omo-codex/src/**/*.test.ts packages/utils/src/jsonc-parser.test.ts packages/utils/src/frontmatter.test.ts packages/hashline-core/src/hash-computation.test.ts packages/hashline-core/src/smoke-untested-modules.test.ts packages/rules-engine/src/index.test.ts packages/rules-engine/src/security-boundary.test.ts packages/agents-md-core/src/injector.test.ts packages/omo-codex/plugin/components/lsp/test/package-smoke.test.ts && node --test packages/omo-codex/plugin/test/*.test.mjs packages/omo-codex/scripts/install-cache-copy.test.mjs packages/omo-codex/scripts/install-cli-args.test.mjs packages/omo-codex/scripts/install-delegated-command.test.mjs packages/omo-codex/scripts/install-config-autonomous-features.test.mjs packages/omo-codex/scripts/install-config-autonomous.test.mjs packages/omo-codex/scripts/install-config-reasoning.test.mjs packages/omo-codex/scripts/install-config.test.mjs packages/omo-codex/scripts/install-hook-targets.test.mjs packages/omo-codex/scripts/install-project-local-cleanup.test.mjs packages/omo-codex/scripts/install-lazycodex-version-stamp.test.mjs packages/omo-codex/scripts/install-local-entrypoint.test.mjs packages/omo-codex/scripts/install-local-git-bash-preflight.test.mjs packages/omo-codex/scripts/install-local.test.mjs packages/omo-codex/scripts/install-marketplace-cache.test.mjs packages/omo-codex/scripts/install-mcp-context7-runtime.test.mjs packages/omo-codex/scripts/install-mcp-runtime.test.mjs packages/omo-codex/scripts/install-packaged-local.test.mjs packages/omo-codex/scripts/install-generated-bundle.test.mjs packages/omo-codex/scripts/install-agent-links.test.mjs packages/omo-codex/scripts/install-bin-links.test.mjs
+$ bun run script/build-codex-install.ts
+$ bun run --cwd packages/git-bash-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 15 modules in 4ms
+
+  cli.js  22.68 KB  (entry point)
+
+$ npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build
+
+added 52 packages, and audited 55 packages in 717ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 build
+> node scripts/ensure-core-links.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm
+
+Bundled 70 modules in 7ms
+
+  cli.js               195.14 KB  (entry point)
+  mcp.js               194.67 KB  (entry point)
+  tools.js             182.78 KB  (entry point)
+  request-context.js   7.47 KB    (entry point)
+  lsp/manager.js       109.33 KB  (entry point)
+
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 52 packages, and audited 55 packages in 614ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/build.mjs
+
+Bundled 83 modules in 7ms
+
+  cli.js     250.22 KB  (entry point)
+  index.js   231.0 KB   (entry point)
+  client.js  228.73 KB  (entry point)
+
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 test
+> vitest --run
+
+
+ RUN  v4.1.8 /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/lsp-tools-mcp
+
+
+ Test Files  25 passed (25)
+      Tests  97 passed (97)
+   Start at  15:37:48
+   Duration  1.11s (transform 1.51s, setup 0ms, import 2.08s, tests 1.32s, environment 1ms)
+
+
+added 75 packages, and audited 95 packages in 2s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.33 test
+> vitest --run
+
+
+ RUN  v4.1.11 /Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/plugin/components/ulw-loop
+
+
+ Test Files  46 passed (46)
+      Tests  490 passed (490)
+   Start at  15:37:52
+   Duration  1.45s (transform 1.82s, setup 0ms, import 3.02s, tests 3.61s, environment 2ms)
+
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+Synced OMO Codex manifests to version 5.0.0-beta.33 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] wrote 148 frontend reference files from submodules
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.33 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 13ms
+
+  cli.js  19.25 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 13ms
+
+  cli.js  19.43 KB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.33 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 10ms
+
+  cli.js  14.55 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.33 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 15ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.33 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 16ms
+
+  cli.js  155.86 KB  (entry point)
+
+Building components/codegraph
+
+> @sisyphuslabs/codex-codegraph@5.0.0-beta.33 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 163 modules in 23ms
+
+  serve.js  0.34 MB  (entry point)
+
+Bundled 186 modules in 27ms
+
+  cli.js  0.43 MB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 10ms
+
+  cli.js  14.80 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 5ms
+
+  cli.js  4.22 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.33 build
+> tsc -p tsconfig.build.json
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.33 build
+> tsc -p tsconfig.build.json
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.33 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 24ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 16ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.33 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 11ms
+
+  cli.js  34.91 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 16ms
+
+  cli.js  156.1 KB  (entry point)
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 8ms
+
+  cli.js  5.75 KB  (entry point)
+
+Bundling components/codegraph/dist/cli.js
+Bundled 186 modules in 22ms
+
+  cli.js  0.43 MB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 4ms
+
+  cli.js  8.32 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 3ms
+
+  cli.js  35.1 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 10ms
+
+  cli.js  0.27 MB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.33 build
+> tsc -p tsconfig.build.json
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.33 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.33 build
+> node scripts/build-runtime.mjs
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 44 modules in 5ms
+
+  cli.js  175.69 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.33 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+
+  dist/cli.js  148.7kb
+
+⚡ Done in 10ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 6ms
+
+  cli.js  153.16 KB  (entry point)
+
+
+> @sisyphuslabs/codex-codegraph@5.0.0-beta.33 typecheck
+> tsc --noEmit
+
+
+> @sisyphuslabs/codex-codegraph@5.0.0-beta.33 test
+> bun test ./test
+
+bun test v1.4.0 (34cbb9a40)
+
+test/hook-session-start-guard.test.ts:
+(pass) CodeGraph SessionStart spawn guards > #given an inconclusive probe timeout #when SessionStart runs #then timeout is not treated as uninitialized [2.16ms]
+{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"LazyCodex CodeGraph bootstrap scheduled in background"}}
+(pass) CodeGraph SessionStart spawn guards > #given one hook already owns the project lock #when a second SessionStart runs #then it records skipped-locked without spawning [2.21ms]
+{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"LazyCodex CodeGraph bootstrap scheduled in background"}}
+(pass) CodeGraph SessionStart spawn guards > #given a failed worker cooldown #when SessionStart retries before and after expiry #then only the expired retry spawns [1.72ms]
+(pass) CodeGraph SessionStart spawn guards > #given an ancestor has a CodeGraph database #when SessionStart runs in a nested project #then it records skipped-nested-root [0.78ms]
+
+test/hook-exclusion.test.ts:
+(pass) CodeGraph SessionStart exclusion policy > #given project root is inside an OMO state directory #when SessionStart fires #then it skips before probing or spawning [0.61ms]
+(pass) CodeGraph SessionStart exclusion policy > #given project root is under a configured excluded root #when SessionStart fires #then it skips before spawning [0.34ms]
+(pass) CodeGraph SessionStart exclusion policy > #given project root is under /tmp #when SessionStart fires on POSIX #then it skips before spawning [2.55ms]
+
+test/session-start-project.test.ts:
+(pass) CodeGraph SessionStart project probe > #given the exact project directory has a CodeGraph database #when probing #then it is initialized [0.30ms]
+(pass) CodeGraph SessionStart project probe > #given an ancestor directory has a CodeGraph database #when probing a nested project #then the ancestor covers it [0.65ms]
+(pass) CodeGraph SessionStart project probe > #given neither the project nor its ancestors have a CodeGraph database #when probing #then it is definitively uninitialized [0.27ms]
+
+test/cache-gc.test.ts:
+(pass) CodeGraph cache GC wrapper > #given cache GC hits an expected filesystem race #when best-effort wrapper runs #then it logs and continues [0.05ms]
+(pass) CodeGraph cache GC wrapper > #given cache GC hits an unknown code bug #when best-effort wrapper runs #then it rethrows [0.03ms]
+
+test/sweep-cli.test.ts:
+41 | 			});
+42 |
+43 | 			// then
+44 | 			expect(exitCode).toBe(0);
+45 | 			expect(killed).toEqual([]);
+46 | 			expect(JSON.parse(stdout.join(""))).toMatchObject({
+                                            ^
+error: expect(received).toMatchObject(expected)
+
+  {
+    "action": "swept",
+-   "candidates": [
+-     {
+-       "pid": 601,
+-     },
+-   ],
++   "candidates": [],
+    "dryRun": true,
++   "failed": [],
+    "killed": [],
++   "ownedRoots": [
++     "/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-codegraph-sweep-cli-home-4BsnbJ/.codex/plugins/cache/sisyphuslabs/omo/4.15.1",
++   ],
++   "spared": [],
++   "stampFile": "/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-codegraph-sweep-cli-home-4BsnbJ/.omo/codegraph/zombie-sweep.stamp",
+  }
+
+- Expected  - 5
++ Received  + 7
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/plugin/components/codegraph/test/sweep-cli.test.ts:46:40)
+(fail) CodeGraph sweep CLI > #given sweep dry-run args with an injected root #when invoked #then it reports candidates as JSON and does not kill [0.95ms]
+
+test/provisioned-node-guard.test.ts:
+(pass) CodeGraph provisioned launcher Node guard > #given provisioned CodeGraph binary #when serve runs under unsupported local Node #then it trusts the launcher [5.49ms]
+(pass) CodeGraph provisioned launcher Node guard > #given provisioned CodeGraph exists #when SessionStart worker runs under unsupported local Node #then it bootstraps through the launcher [2.13ms]
+
+test/session-start-state.test.ts:
+(pass) CodeGraph SessionStart lock > #given a live project lock #when a second hook acquires it #then the second hook is deduplicated [1.10ms]
+(pass) CodeGraph SessionStart lock > #given a project lock older than the stale threshold #when another hook acquires it #then the stale lock is recovered [1.22ms]
+(pass) CodeGraph SessionStart cooldown > #given a failed worker outcome #when the cooldown is checked #then retries are suppressed until expiry and the next failure backs off [1.36ms]
+
+test/session-start-worker-flow.test.ts:
+(pass) CodeGraph SessionStart worker flow > #given install_dir has the pinned platform binary #when worker resolves provisioned CodeGraph #then it uses that launcher [1.38ms]
+(pass) CodeGraph SessionStart worker flow > #given Windows codegraph.cmd #when default worker runner builds invocation #then it runs through cmd.exe [0.04ms]
+(pass) CodeGraph SessionStart worker flow > #given Windows CodeGraph resolves to a Node script #when default worker runner builds invocation #then Node executes it
+(pass) CodeGraph SessionStart worker flow > #given non-Windows codegraph command #when default worker runner builds invocation #then it executes directly
+(pass) CodeGraph SessionStart worker flow > #given an uninitialized exact project #when worker runs #then it invokes init directly without a status command [1.07ms]
+(pass) CodeGraph SessionStart worker flow > #given codegraph.daemon=true #when the indexing worker runs #then its env stays daemon-less with CODEGRAPH_NO_DAEMON=1 [0.87ms]
+(pass) CodeGraph SessionStart worker flow > #given ambient provider tokens #when default worker runner spawns CodeGraph #then child env only gets safe and controlled variables [37.25ms]
+
+test/serve-unavailable-idle.test.ts:
+(pass) unavailable codegraph MCP idle teardown > #given the codex host (no respawn for exited stdio servers) #when the unavailable stub starts #then the idle timeout is disabled [504.42ms]
+
+test/serve-mcp-facade.test.ts:
+(pass) runCodegraphServe MCP unavailable facade > #given CodeGraph is unavailable #when an MCP client initializes #then it answers with an empty-tool facade [2.12ms]
+
+test/serve-unavailable.test.ts:
+(pass) runCodegraphServe unavailable CodeGraph paths > #given CodeGraph is unresolved #when serving MCP #then exposes an empty facade with a skip hint [0.44ms]
+(pass) runCodegraphServe unavailable CodeGraph paths > #given an unsupported local Node #when serving MCP #then exposes an empty facade without spawning codegraph [3.13ms]
+(pass) runCodegraphServe unavailable CodeGraph paths > #given OMO_CODEGRAPH_BIN points at a missing path #when serving MCP #then exposes an empty facade before spawn [2.78ms]
+(pass) runCodegraphServe unavailable CodeGraph paths > #given Codex SOT disables CodeGraph #when serving MCP #then exposes an empty facade with a disabled hint [3.65ms]
+(pass) runCodegraphServe unavailable CodeGraph paths > #given the unavailable facade with held-open stdio and a dead parent #when the watchdog polls #then the placeholder server settles without waiting for stdin EOF [10.31ms]
+
+test/hook-sweep.test.ts:
+(pass) CodeGraph SessionStart zombie sweep > #given the zombie sweep fails #when SessionStart fires #then the hook still exits zero [0.20ms]
+
+test/serve-mcp-bridge-lifecycle.test.ts:
+(pass) runCodegraphServe MCP bridge lifecycle > #given an exiting Codegraph child and delayed closed parent output #when the final response write fails #then the output error is preserved [543.71ms]
+(pass) runCodegraphServe MCP bridge lifecycle > #given a held-open Codegraph child and a dead parent #when the bridge watchdog polls #then the child is terminated and the bridge settles through the child-exit path [422.16ms]
+
+test/session-start-node-support.test.ts:
+(pass) CodeGraph SessionStart worker Node support > #given an unsupported local Node and a PATH CodeGraph command with auto provisioning disabled #when worker runs #then it skips without touching the workspace [2.19ms]
+(pass) CodeGraph SessionStart worker Node support > #given an unsupported local Node and a PATH CodeGraph command #when auto provisioning succeeds #then it bootstraps with the provisioned binary [2.65ms]
+(pass) CodeGraph SessionStart worker Node support > #given bundled CodeGraph and a stale managed install #when the worker runs #then it upgrades and uses the managed runtime [3.09ms]
+(pass) CodeGraph SessionStart worker Node support > #given an unsupported local Node but bundled CodeGraph resolves through CODEGRAPH_NODE_BIN #when worker runs #then it bootstraps with the compatible runtime [2.12ms]
+
+test/serve.test.ts:
+(pass) runCodegraphServe > #given CodeGraph resolves #when serving MCP #then execs codegraph serve --mcp with bridged stdio and telemetry disabled [2.05ms]
+(pass) runCodegraphServe > #given codegraph.daemon=false #when serving MCP #then CODEGRAPH_NO_DAEMON pins daemon-off [0.18ms]
+(pass) runCodegraphServe > #given an unsupported local Node but the unsafe override is set #when serving MCP #then it still spawns codegraph [1.44ms]
+(pass) runCodegraphServe > #given an unsupported local Node but CODEGRAPH_NODE_BIN resolves a bundled shim with Node 22 #when serving MCP #then it spawns the compatible runtime [1.23ms]
+(pass) runCodegraphServe > #given OMO_CODEGRAPH_BIN points at an explicit command #when local Node is unsupported #then serve trusts the configured command [1.23ms]
+(pass) runCodegraphServe > #given Codex SOT install_dir has the pinned launcher and daemon is omitted #when serving MCP #then it defaults daemon-on [1.17ms]
+(pass) runCodegraphServe > #given Codex SOT install_dir with codegraph.daemon=false #when serving MCP #then CODEGRAPH_NO_DAEMON pins daemon-off [0.94ms]
+(pass) runCodegraphServe > #given project cwd is under a configured excluded root #when serving MCP #then it exposes an unavailable stub without spawning CodeGraph [0.58ms]
+(pass) runCodegraphServe > #given Windows OMO_CODEGRAPH_BIN is a Node script #when resolving serve invocation #then Node executes the script path [0.02ms]
+(pass) runCodegraphServe > #given Windows CodeGraph resolves to a cmd shim #when resolving serve invocation #then cmd.exe executes the shim [0.01ms]
+
+test/serve-built-wrapper.test.ts:
+(pass) built CodeGraph serve wrappers > #given built serve entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once [480.01ms]
+(pass) built CodeGraph serve wrappers > #given built cli entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once [298.38ms]
+
+test/serve-provision.test.ts:
+(pass) runCodegraphServe provisioning > #given CodeGraph is unresolved and daemon is omitted #when serving MCP #then provisions CodeGraph with daemon-on [1.12ms]
+(pass) runCodegraphServe provisioning > #given a bundled runtime and a stale managed install #when serving MCP #then it upgrades and uses the managed runtime [1.11ms]
+(pass) runCodegraphServe provisioning > #given CodeGraph is unresolved and codegraph.daemon=false #when serving MCP #then provisions CodeGraph with daemon-off [0.17ms]
+
+test/package-runtime.test.ts:
+(pass) CodeGraph component runtime package metadata > #given the CodeGraph component package #when validating runtime distribution metadata #then upstream CodeGraph installs optionally with shipped legal files [0.16ms]
+(pass) CodeGraph component runtime package metadata > #given marketplace payload includes only the plugin tree #when reading CodeGraph NOTICE #then it is self-contained [0.20ms]
+(pass) CodeGraph component runtime package metadata > #given CodeGraph platform bundles include Node #when reading runtime licenses #then Node license text ships with the component [0.35ms]
+(pass) CodeGraph component runtime package metadata > #given third-party notices #when validating CodeGraph component notices #then aggregate Codex notices list CodeGraph as shipped [0.17ms]
+
+test/session-start-worker-cooldown.test.ts:
+(pass) CodeGraph SessionStart worker cooldown > #given codegraph init times out #when the worker finishes #then it records a failed outcome and cooldown [1.10ms]
+(pass) CodeGraph SessionStart worker cooldown > #given codegraph init exits zero without an exact database #when the worker verifies the result #then it records a failure cooldown [1.03ms]
+
+test/hook.test.ts:
+(pass) CodeGraph SessionStart hook > #given hook session-start cli args #when invoked with empty JSON input #then it emits valid JSON and exits zero [1.91ms]
+(pass) CodeGraph SessionStart hook > #given CodeGraph MCP reports an uninitialized project #when PostToolUse fires #then it emits OMO global-store init guidance [0.21ms]
+(pass) CodeGraph SessionStart hook > #given real CodeGraph status output has no MCP path phrase #when PostToolUse fires #then it emits OMO global-store init guidance [0.10ms]
+(pass) CodeGraph SessionStart hook > #given CodeGraph is disabled by Codex SOT config #when SessionStart fires #then it skips without spawning [0.10ms]
+(pass) CodeGraph SessionStart hook > #given HOME OMO config disables Codex CodeGraph #when SessionStart fires #then it skips without spawning [1.50ms]
+(pass) CodeGraph SessionStart hook > #given project Codex SOT disables global CodeGraph enablement #when SessionStart fires #then project config wins [1.46ms]
+(pass) CodeGraph SessionStart hook > #given env disables CodeGraph over SOT enablement #when SessionStart fires #then it skips without spawning [1.24ms]
+(pass) CodeGraph SessionStart hook > #given CodeGraph is enabled #when SessionStart fires #then it detaches a background worker immediately [1.10ms]
+(pass) CodeGraph SessionStart hook > #given CodeGraph is already initialized #when SessionStart fires #then it stays silent without spawning [0.59ms]
+(pass) CodeGraph SessionStart hook > #given malformed hook input with CodeGraph disabled #when SessionStart fires #then it stays silent and exits zero [0.08ms]
+
+test/hook-registration.test.ts:
+(pass) CodeGraph hook registration > #given plugin hook config #when inspected #then CodeGraph is registered after bootstrap SessionStart [0.08ms]
+
+test/session-start-worker-availability.test.ts:
+(pass) CodeGraph SessionStart worker availability > #given CodeGraph cannot be resolved or provisioned #when worker runs #then it logs a graceful skip [1.70ms]
+(pass) CodeGraph SessionStart worker availability > #given CodeGraph is unavailable and auto provisioning is disabled #when worker runs #then it leaves the project untouched [1.05ms]
+
+test/session-start-trust-boundary.test.ts:
+(pass) CodeGraph SessionStart trust boundary > #given project config sets install_dir #when worker provisions CodeGraph #then it uses the trusted home install root [2.18ms]
+
+test/serve-node-support.test.ts:
+(pass) runCodegraphServe node support > #given Node is too new and no command resolves #when serving MCP #then the unsupported-node hint wins [1.19ms]
+
+test/hook-store-upgrade.test.ts:
+(pass) CodeGraph SessionStart hook with a migrated 1.0.1 project store under CodeGraph 1.5.0 > #given the migrated store has an exact database #when SessionStart runs #then it never invokes the CodeGraph CLI [0.58ms]
+
+test/serve-mcp-bridge.test.ts:
+(pass) runCodegraphServe MCP protocol bridge > #given Codex framed stdio and a newline-json CodeGraph child #when listing tools #then it bridges frames and serves from the project cwd [449.00ms]
+(pass) runCodegraphServe MCP protocol bridge > #given old upstream codegraph_node metadata and container outline guidance #when bridging #then it exposes the corrected LazyCodex contract [431.67ms]
+(pass) runCodegraphServe MCP protocol bridge > #given a held-open Codegraph child and closed parent output #when response forwarding fails #then the child is terminated before rejection [192.90ms]
+
+1 tests failed:
+(fail) CodeGraph sweep CLI > #given sweep dry-run args with an injected root #when invoked #then it reports candidates as JSON and does not kill [0.95ms]
+
+ 78 pass
+ 1 fail
+ 251 expect() calls
+Ran 79 tests across 26 files. [3.52s]
+error: script "test:codex" exited with code 1

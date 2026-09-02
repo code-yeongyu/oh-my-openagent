@@ -1,0 +1,13 @@
+dry-run-install=0
+dry-run-doctor=0
+install=0
+cache-present=0
+config-enabled=0
+wrapper-present=0
+legacy-omo-absent=0
+wrapper-version=0
+wrapper-ulw-help=0
+upgrade-marked-install=0
+upgrade-marked-legacy-removed=0
+upgrade-unmarked-install=0
+upgrade-unmarked-legacy-preserved=0

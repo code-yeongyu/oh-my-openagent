@@ -69,28 +69,3 @@ Raw environment dumps, npm caches, temporary package tarballs, temporary
 Codex homes, and mock-server logs are omitted because they are transient or may
 contain machine-specific paths. The committed summary and named sanitized logs
 retain each command result, isolation proof, and cleanup outcome.
-`[]`); the complete local output is `test-codex-bun-1.4.0.txt`. The unchanged
-`a0dd6cc91` control worktree produces the same empty candidate set in
-`test-codex-codegraph-baseline.txt`, so this is unrelated to the installer
-change.
-
-PR CI is the authoritative clean Codex gate for this commit: CI run
-`33600631170` passed `codex-compatibility (ubuntu-latest, full)` and the macOS
-and Windows platform lanes, as well as `lazycodex-published-smoke`, at
-`901d1c3c9`. Those standardized runner lanes exercise the submitted commit
-rather than this workstation's pre-existing CodeGraph test condition.
-
-## Why this is enough
-
-The red-to-green installer seam pins the removed invalid subprocess, the
-publish-shaped tarball proves the generated packaged installer succeeds without
-the unavailable prompt sibling, and real Codex app-server notifications prove
-the installed plugin hooks run. Green PR CI then validates the submitted commit
-on the repository's required platforms and Codex lanes.
-
-## What was omitted
-
-Raw environment dumps, npm caches, temporary package tarballs, temporary
-Codex homes, and mock-server logs are omitted because they are transient or may
-contain machine-specific paths. The committed summary and named sanitized logs
-retain each command result, isolation proof, and cleanup outcome.

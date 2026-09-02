@@ -1,0 +1,24 @@
+
+added 18 packages in 3s
+
+> @sisyphuslabs/omo-codex-plugin@5.0.0-beta.33 sync:skills
+> node scripts/sync-skills.mjs
+
+node:internal/fs/promises:638
+  return new FileHandle(await PromisePrototypeThen(
+                        ^
+
+Error: ENOENT: no such file or directory, open '/private/tmp/lazycodex-published-beta33.YVUDjZ/codex/plugins/cache/packages/prompts-core/prompts/ultrawork/codex.md'
+    at async open (node:internal/fs/promises:638:25)
+    at async readFile (node:internal/fs/promises:1242:14)
+    at async syncSkills (file:///private/tmp/lazycodex-published-beta33.YVUDjZ/codex/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.33-32403-1788330599816/scripts/sync-skills.mjs:278:38)
+    at async file:///private/tmp/lazycodex-published-beta33.YVUDjZ/codex/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.33-32403-1788330599816/scripts/sync-skills.mjs:303:2 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/private/tmp/lazycodex-published-beta33.YVUDjZ/codex/plugins/cache/packages/prompts-core/prompts/ultrawork/codex.md'
+}
+
+Node.js v22.14.0
+npm run sync:skills failed in /tmp/lazycodex-published-beta33.YVUDjZ/codex/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.33-32403-1788330599816 with exit code 1
+exit=1

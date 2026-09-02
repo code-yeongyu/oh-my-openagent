@@ -1,0 +1,180 @@
+baseline_head=a0dd6cc91f495a66faa57a7653ab61ddf8023199
+baseline_status_before=10
+
+> @sisyphuslabs/codex-codegraph@5.0.0-beta.33 test
+> bun test ./test
+
+bun test v1.4.0 (34cbb9a40)
+
+test/hook-session-start-guard.test.ts:
+(pass) CodeGraph SessionStart spawn guards > #given an inconclusive probe timeout #when SessionStart runs #then timeout is not treated as uninitialized [2.83ms]
+{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"LazyCodex CodeGraph bootstrap scheduled in background"}}
+(pass) CodeGraph SessionStart spawn guards > #given one hook already owns the project lock #when a second SessionStart runs #then it records skipped-locked without spawning [2.82ms]
+{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"LazyCodex CodeGraph bootstrap scheduled in background"}}
+(pass) CodeGraph SessionStart spawn guards > #given a failed worker cooldown #when SessionStart retries before and after expiry #then only the expired retry spawns [2.43ms]
+(pass) CodeGraph SessionStart spawn guards > #given an ancestor has a CodeGraph database #when SessionStart runs in a nested project #then it records skipped-nested-root [1.31ms]
+
+test/hook-exclusion.test.ts:
+(pass) CodeGraph SessionStart exclusion policy > #given project root is inside an OMO state directory #when SessionStart fires #then it skips before probing or spawning [0.96ms]
+(pass) CodeGraph SessionStart exclusion policy > #given project root is under a configured excluded root #when SessionStart fires #then it skips before spawning [0.57ms]
+(pass) CodeGraph SessionStart exclusion policy > #given project root is under /tmp #when SessionStart fires on POSIX #then it skips before spawning [11.39ms]
+
+test/session-start-project.test.ts:
+(pass) CodeGraph SessionStart project probe > #given the exact project directory has a CodeGraph database #when probing #then it is initialized [6.20ms]
+(pass) CodeGraph SessionStart project probe > #given an ancestor directory has a CodeGraph database #when probing a nested project #then the ancestor covers it [11.60ms]
+(pass) CodeGraph SessionStart project probe > #given neither the project nor its ancestors have a CodeGraph database #when probing #then it is definitively uninitialized [1.06ms]
+
+test/cache-gc.test.ts:
+(pass) CodeGraph cache GC wrapper > #given cache GC hits an expected filesystem race #when best-effort wrapper runs #then it logs and continues [0.13ms]
+(pass) CodeGraph cache GC wrapper > #given cache GC hits an unknown code bug #when best-effort wrapper runs #then it rethrows [0.04ms]
+
+test/sweep-cli.test.ts:
+41 | 			});
+42 |
+43 | 			// then
+44 | 			expect(exitCode).toBe(0);
+45 | 			expect(killed).toEqual([]);
+46 | 			expect(JSON.parse(stdout.join(""))).toMatchObject({
+                                            ^
+error: expect(received).toMatchObject(expected)
+
+  {
+    "action": "swept",
+-   "candidates": [
+-     {
+-       "pid": 601,
+-     },
+-   ],
++   "candidates": [],
+    "dryRun": true,
++   "failed": [],
+    "killed": [],
++   "ownedRoots": [
++     "/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-codegraph-sweep-cli-home-ndQkh7/.codex/plugins/cache/sisyphuslabs/omo/4.15.1",
++   ],
++   "spared": [],
++   "stampFile": "/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-codegraph-sweep-cli-home-ndQkh7/.omo/codegraph/zombie-sweep.stamp",
+  }
+
+- Expected  - 5
++ Received  + 7
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/ci-preserve-merge-push-runs/packages/omo-codex/plugin/components/codegraph/test/sweep-cli.test.ts:46:40)
+(fail) CodeGraph sweep CLI > #given sweep dry-run args with an injected root #when invoked #then it reports candidates as JSON and does not kill [3.71ms]
+
+test/provisioned-node-guard.test.ts:
+(pass) CodeGraph provisioned launcher Node guard > #given provisioned CodeGraph binary #when serve runs under unsupported local Node #then it trusts the launcher [6.59ms]
+(pass) CodeGraph provisioned launcher Node guard > #given provisioned CodeGraph exists #when SessionStart worker runs under unsupported local Node #then it bootstraps through the launcher [3.05ms]
+
+test/session-start-state.test.ts:
+(pass) CodeGraph SessionStart lock > #given a live project lock #when a second hook acquires it #then the second hook is deduplicated [1.66ms]
+(pass) CodeGraph SessionStart lock > #given a project lock older than the stale threshold #when another hook acquires it #then the stale lock is recovered [1.63ms]
+(pass) CodeGraph SessionStart cooldown > #given a failed worker outcome #when the cooldown is checked #then retries are suppressed until expiry and the next failure backs off [1.92ms]
+
+test/session-start-worker-flow.test.ts:
+(pass) CodeGraph SessionStart worker flow > #given install_dir has the pinned platform binary #when worker resolves provisioned CodeGraph #then it uses that launcher [1.85ms]
+(pass) CodeGraph SessionStart worker flow > #given Windows codegraph.cmd #when default worker runner builds invocation #then it runs through cmd.exe [0.04ms]
+(pass) CodeGraph SessionStart worker flow > #given Windows CodeGraph resolves to a Node script #when default worker runner builds invocation #then Node executes it [0.01ms]
+(pass) CodeGraph SessionStart worker flow > #given non-Windows codegraph command #when default worker runner builds invocation #then it executes directly
+(pass) CodeGraph SessionStart worker flow > #given an uninitialized exact project #when worker runs #then it invokes init directly without a status command [1.47ms]
+(pass) CodeGraph SessionStart worker flow > #given codegraph.daemon=true #when the indexing worker runs #then its env stays daemon-less with CODEGRAPH_NO_DAEMON=1 [0.94ms]
+(pass) CodeGraph SessionStart worker flow > #given ambient provider tokens #when default worker runner spawns CodeGraph #then child env only gets safe and controlled variables [66.31ms]
+
+test/serve-unavailable-idle.test.ts:
+(pass) unavailable codegraph MCP idle teardown > #given the codex host (no respawn for exited stdio servers) #when the unavailable stub starts #then the idle timeout is disabled [509.27ms]
+
+test/serve-mcp-facade.test.ts:
+(pass) runCodegraphServe MCP unavailable facade > #given CodeGraph is unavailable #when an MCP client initializes #then it answers with an empty-tool facade [4.04ms]
+
+test/serve-unavailable.test.ts:
+(pass) runCodegraphServe unavailable CodeGraph paths > #given CodeGraph is unresolved #when serving MCP #then exposes an empty facade with a skip hint [0.60ms]
+(pass) runCodegraphServe unavailable CodeGraph paths > #given an unsupported local Node #when serving MCP #then exposes an empty facade without spawning codegraph [3.61ms]
+(pass) runCodegraphServe unavailable CodeGraph paths > #given OMO_CODEGRAPH_BIN points at a missing path #when serving MCP #then exposes an empty facade before spawn [2.56ms]
+(pass) runCodegraphServe unavailable CodeGraph paths > #given Codex SOT disables CodeGraph #when serving MCP #then exposes an empty facade with a disabled hint [3.32ms]
+(pass) runCodegraphServe unavailable CodeGraph paths > #given the unavailable facade with held-open stdio and a dead parent #when the watchdog polls #then the placeholder server settles without waiting for stdin EOF [10.32ms]
+
+test/hook-sweep.test.ts:
+(pass) CodeGraph SessionStart zombie sweep > #given the zombie sweep fails #when SessionStart fires #then the hook still exits zero [0.24ms]
+
+test/serve-mcp-bridge-lifecycle.test.ts:
+(pass) runCodegraphServe MCP bridge lifecycle > #given an exiting Codegraph child and delayed closed parent output #when the final response write fails #then the output error is preserved [493.61ms]
+(pass) runCodegraphServe MCP bridge lifecycle > #given a held-open Codegraph child and a dead parent #when the bridge watchdog polls #then the child is terminated and the bridge settles through the child-exit path [241.70ms]
+
+test/session-start-node-support.test.ts:
+(pass) CodeGraph SessionStart worker Node support > #given an unsupported local Node and a PATH CodeGraph command with auto provisioning disabled #when worker runs #then it skips without touching the workspace [2.57ms]
+(pass) CodeGraph SessionStart worker Node support > #given an unsupported local Node and a PATH CodeGraph command #when auto provisioning succeeds #then it bootstraps with the provisioned binary [2.18ms]
+(pass) CodeGraph SessionStart worker Node support > #given bundled CodeGraph and a stale managed install #when the worker runs #then it upgrades and uses the managed runtime [2.72ms]
+(pass) CodeGraph SessionStart worker Node support > #given an unsupported local Node but bundled CodeGraph resolves through CODEGRAPH_NODE_BIN #when worker runs #then it bootstraps with the compatible runtime [2.08ms]
+
+test/serve.test.ts:
+(pass) runCodegraphServe > #given CodeGraph resolves #when serving MCP #then execs codegraph serve --mcp with bridged stdio and telemetry disabled [1.47ms]
+(pass) runCodegraphServe > #given codegraph.daemon=false #when serving MCP #then CODEGRAPH_NO_DAEMON pins daemon-off [0.25ms]
+(pass) runCodegraphServe > #given an unsupported local Node but the unsafe override is set #when serving MCP #then it still spawns codegraph [1.27ms]
+(pass) runCodegraphServe > #given an unsupported local Node but CODEGRAPH_NODE_BIN resolves a bundled shim with Node 22 #when serving MCP #then it spawns the compatible runtime [1.40ms]
+(pass) runCodegraphServe > #given OMO_CODEGRAPH_BIN points at an explicit command #when local Node is unsupported #then serve trusts the configured command [1.70ms]
+(pass) runCodegraphServe > #given Codex SOT install_dir has the pinned launcher and daemon is omitted #when serving MCP #then it defaults daemon-on [1.51ms]
+(pass) runCodegraphServe > #given Codex SOT install_dir with codegraph.daemon=false #when serving MCP #then CODEGRAPH_NO_DAEMON pins daemon-off [1.26ms]
+(pass) runCodegraphServe > #given project cwd is under a configured excluded root #when serving MCP #then it exposes an unavailable stub without spawning CodeGraph [0.78ms]
+(pass) runCodegraphServe > #given Windows OMO_CODEGRAPH_BIN is a Node script #when resolving serve invocation #then Node executes the script path [0.02ms]
+(pass) runCodegraphServe > #given Windows CodeGraph resolves to a cmd shim #when resolving serve invocation #then cmd.exe executes the shim [0.02ms]
+
+test/serve-built-wrapper.test.ts:
+(pass) built CodeGraph serve wrappers > #given built serve entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once [285.90ms]
+(pass) built CodeGraph serve wrappers > #given built cli entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once [252.08ms]
+
+test/serve-provision.test.ts:
+(pass) runCodegraphServe provisioning > #given CodeGraph is unresolved and daemon is omitted #when serving MCP #then provisions CodeGraph with daemon-on [1.20ms]
+(pass) runCodegraphServe provisioning > #given a bundled runtime and a stale managed install #when serving MCP #then it upgrades and uses the managed runtime [1.06ms]
+(pass) runCodegraphServe provisioning > #given CodeGraph is unresolved and codegraph.daemon=false #when serving MCP #then provisions CodeGraph with daemon-off [0.17ms]
+
+test/package-runtime.test.ts:
+(pass) CodeGraph component runtime package metadata > #given the CodeGraph component package #when validating runtime distribution metadata #then upstream CodeGraph installs optionally with shipped legal files [0.15ms]
+(pass) CodeGraph component runtime package metadata > #given marketplace payload includes only the plugin tree #when reading CodeGraph NOTICE #then it is self-contained [0.17ms]
+(pass) CodeGraph component runtime package metadata > #given CodeGraph platform bundles include Node #when reading runtime licenses #then Node license text ships with the component [0.33ms]
+(pass) CodeGraph component runtime package metadata > #given third-party notices #when validating CodeGraph component notices #then aggregate Codex notices list CodeGraph as shipped [0.18ms]
+
+test/session-start-worker-cooldown.test.ts:
+(pass) CodeGraph SessionStart worker cooldown > #given codegraph init times out #when the worker finishes #then it records a failed outcome and cooldown [1.05ms]
+(pass) CodeGraph SessionStart worker cooldown > #given codegraph init exits zero without an exact database #when the worker verifies the result #then it records a failure cooldown [1.03ms]
+
+test/hook.test.ts:
+(pass) CodeGraph SessionStart hook > #given hook session-start cli args #when invoked with empty JSON input #then it emits valid JSON and exits zero [1.85ms]
+(pass) CodeGraph SessionStart hook > #given CodeGraph MCP reports an uninitialized project #when PostToolUse fires #then it emits OMO global-store init guidance [0.25ms]
+(pass) CodeGraph SessionStart hook > #given real CodeGraph status output has no MCP path phrase #when PostToolUse fires #then it emits OMO global-store init guidance [0.10ms]
+(pass) CodeGraph SessionStart hook > #given CodeGraph is disabled by Codex SOT config #when SessionStart fires #then it skips without spawning [0.09ms]
+(pass) CodeGraph SessionStart hook > #given HOME OMO config disables Codex CodeGraph #when SessionStart fires #then it skips without spawning [1.36ms]
+(pass) CodeGraph SessionStart hook > #given project Codex SOT disables global CodeGraph enablement #when SessionStart fires #then project config wins [1.70ms]
+(pass) CodeGraph SessionStart hook > #given env disables CodeGraph over SOT enablement #when SessionStart fires #then it skips without spawning [1.22ms]
+(pass) CodeGraph SessionStart hook > #given CodeGraph is enabled #when SessionStart fires #then it detaches a background worker immediately [1.22ms]
+(pass) CodeGraph SessionStart hook > #given CodeGraph is already initialized #when SessionStart fires #then it stays silent without spawning [0.57ms]
+(pass) CodeGraph SessionStart hook > #given malformed hook input with CodeGraph disabled #when SessionStart fires #then it stays silent and exits zero [0.09ms]
+
+test/hook-registration.test.ts:
+(pass) CodeGraph hook registration > #given plugin hook config #when inspected #then CodeGraph is registered after bootstrap SessionStart [0.23ms]
+
+test/session-start-worker-availability.test.ts:
+(pass) CodeGraph SessionStart worker availability > #given CodeGraph cannot be resolved or provisioned #when worker runs #then it logs a graceful skip [1.91ms]
+(pass) CodeGraph SessionStart worker availability > #given CodeGraph is unavailable and auto provisioning is disabled #when worker runs #then it leaves the project untouched [1.00ms]
+
+test/session-start-trust-boundary.test.ts:
+(pass) CodeGraph SessionStart trust boundary > #given project config sets install_dir #when worker provisions CodeGraph #then it uses the trusted home install root [1.88ms]
+
+test/serve-node-support.test.ts:
+(pass) runCodegraphServe node support > #given Node is too new and no command resolves #when serving MCP #then the unsupported-node hint wins [1.13ms]
+
+test/hook-store-upgrade.test.ts:
+(pass) CodeGraph SessionStart hook with a migrated 1.0.1 project store under CodeGraph 1.5.0 > #given the migrated store has an exact database #when SessionStart runs #then it never invokes the CodeGraph CLI [0.55ms]
+
+test/serve-mcp-bridge.test.ts:
+(pass) runCodegraphServe MCP protocol bridge > #given Codex framed stdio and a newline-json CodeGraph child #when listing tools #then it bridges frames and serves from the project cwd [174.91ms]
+(pass) runCodegraphServe MCP protocol bridge > #given old upstream codegraph_node metadata and container outline guidance #when bridging #then it exposes the corrected LazyCodex contract [177.65ms]
+(pass) runCodegraphServe MCP protocol bridge > #given a held-open Codegraph child and closed parent output #when response forwarding fails #then the child is terminated before rejection [180.61ms]
+
+1 tests failed:
+(fail) CodeGraph sweep CLI > #given sweep dry-run args with an injected root #when invoked #then it reports candidates as JSON and does not kill [3.71ms]
+
+ 78 pass
+ 1 fail
+ 251 expect() calls
+Ran 79 tests across 26 files. [2.65s]
+baseline_test_exit=1

@@ -1,0 +1,30 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-codex/src/install/codex-cache-install.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+(pass) codex-cache install > #given source plugin has development-only directories #when caching plugin #then writes only the plugin payload under the versioned cache [21.75ms]
+(pass) codex-cache install > #given outer npx env has allow-scripts case variants #when caching plugin #then npm install commands preserve only unrelated env [2.54ms]
+(pass) codex-cache install > #given the local file: dependency rewrite changed package.json #when caching plugin #then npm install reconciles the lock drift instead of npm ci [2.67ms]
+(pass) codex-cache install > #given the local file: dependency rewrite changed nothing #when caching plugin #then the install stays npm ci --omit=dev [3.42ms]
+(pass) codex-cache install > #given a component ships its own nested .mcp.json #when caching plugin #then only the plugin-root .mcp.json is cached [3.44ms]
+(pass) codex-cache install > #given source plugin references missing hook command target #when caching plugin #then previous active cache is preserved [5.61ms]
+(pass) codex-cache install > #given npm creates workspace bin shims in the cache #when caching plugin #then plugin-owned shims are removed [4.18ms]
+313 |         sourcePath: sourceRoot,
+314 |         version: "0.1.0",
+315 |         runCommand: async (command, args, options) => {
+316 |           commands.push(`${command} ${args.join(" ")}`)
+317 |           if (command === "npm" && args.join(" ") === "run sync:skills") {
+318 |             throw new Error(`Published plugin cache has no source prompt sibling at ${options.cwd}`)
+                            ^
+error: Published plugin cache has no source prompt sibling at /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-codex-cache-skills-1L6slY/codex-home/plugins/cache/debug/omo/.tmp-0.1.0-34979-1788330865964
+      at runCommand (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/src/install/codex-cache-install.test.ts:318:23)
+      at maybeRunNpmSyncSkills (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/src/install/codex-cache-install.ts:86:9)
+      at async installCachedPlugin (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/src/install/codex-cache-install.ts:48:44)
+      at async <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent-wt/lazycodex-published-smoke-beta33/packages/omo-codex/src/install/codex-cache-install.test.ts:308:31)
+(fail) codex-cache install > #given packaged plugin has prebuilt aggregate skills #when caching plugin #then does not run source-only skill generation [2.99ms]
+
+ 7 pass
+ 1 fail
+ 18 expect() calls
+Ran 8 tests across 1 file. [3.06s]
+exit=1
