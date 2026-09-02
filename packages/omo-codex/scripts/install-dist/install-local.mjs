@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:205bedf47724fa71954f05ae72d7770ef1df26ce392216cb7e5ef72300f7c2be:2c6b840fadcd993447fd3e4c1b3e0965718c343ab68ad16a4972970dd0b828e7
+// omo-codex-install:4c2cf806f738afdb6669160f1b4a630e65da013dc297be7cc36b361192403a21:774951d3a77a5a46d7112112b453669c1f67fe41e80b2cc5c8850c6c325e1abc
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -7977,7 +7977,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0-beta.31",
+    version: "5.0.0-beta.33",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -9652,6 +9652,7 @@ async function installCachedPlugin(input) {
     const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
+    await copyCanonicalPromptSources({ pluginRoot: tempPath, sourcePath: input.sourcePath });
     const installArgs = rewroteLocalFileDependencies ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"];
     await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs);
     await removeCachedManagedNpmBinShims(tempPath);
@@ -9806,6 +9807,20 @@ async function copyRootRuntimeDists(input) {
       continue;
     await mkdir3(dirname5(join12(input.pluginRoot, runtimePath)), { recursive: true });
     await cp2(sourcePath, join12(input.pluginRoot, runtimePath), { recursive: true });
+  }
+}
+var canonicalPromptRelativePaths = [join12("packages", "prompts-core", "prompts", "ultrawork", "codex.md")];
+async function copyCanonicalPromptSources(input) {
+  const repoRoot = repoRootForCodexPluginSource(input.sourcePath);
+  if (repoRoot === null)
+    return;
+  for (const relativePath of canonicalPromptRelativePaths) {
+    const sourceFile = join12(repoRoot, relativePath);
+    if (!await fileExistsStrict(sourceFile))
+      continue;
+    const targetFile = join12(input.pluginRoot, relativePath);
+    await mkdir3(dirname5(targetFile), { recursive: true });
+    await cp2(sourceFile, targetFile);
   }
 }
 function repoRootForCodexPluginSource(sourcePath) {
