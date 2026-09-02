@@ -60,7 +60,7 @@ export function createSpec(): TeamSpec {
   }
 }
 
-function createRuntimeState(spec: TeamSpec, leadSessionId: string, teamRunId: string): RuntimeState {
+export function createRuntimeState(spec: TeamSpec, leadSessionId: string, teamRunId: string): RuntimeState {
   return {
     version: 1,
     teamRunId,

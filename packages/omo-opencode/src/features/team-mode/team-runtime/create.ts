@@ -18,7 +18,10 @@ import { resolveMember } from "./resolve-member"
 import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
 import { registerTeamRunForSessionCleanup } from "./session-team-run-registry"
+import { TeamRunCreateError } from "./team-run-create-error"
 import { assertNoUnresolvedTeamMembers, hasUnresolvedTeamMembers } from "./unresolved-team-members"
+
+export { TeamRunCreateError } from "./team-run-create-error"
 
 const SESSION_ID_POLL_MS = 25
 
@@ -30,23 +33,6 @@ type SpawnedMemberResource = {
 type CreateTeamRunOptions = {
   callerAgentTypeId?: string
   parentMessageID?: string
-}
-
-export class TeamRunCreateError extends Error {
-  constructor(
-    message: string,
-    public readonly cleanupReport: {
-      cancelledTaskIds: string[]
-      removedLayout: boolean
-      removedWorktrees: string[]
-      errors: string[]
-    },
-    cause: Error,
-  ) {
-    super(`${message}: ${cause.message}`)
-    this.name = "TeamRunCreateError"
-    this.cause = cause
-  }
 }
 
 async function pathExists(filePath: string): Promise<boolean> {
@@ -257,9 +243,17 @@ export async function createTeamRun(
 
     const launchedRuntimeState = await loadRuntimeState(runtimeState.teamRunId, config)
     assertNoUnresolvedTeamMembers(launchedRuntimeState.members)
-    createdLayout = await activateTeamLayout(launchedRuntimeState, config, ctx.directory, tmuxMgr)
+    const layoutActivation = await activateTeamLayout(launchedRuntimeState, config, ctx.directory, tmuxMgr)
+    createdLayout = layoutActivation.activated
 
-    return await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({ ...currentState, status: "active" }), config)
+    return await transitionRuntimeState(runtimeState.teamRunId, (currentState) => {
+      const { visualizationSkipReason: _previousSkipReason, ...stateWithoutSkipReason } = currentState
+      return {
+        ...stateWithoutSkipReason,
+        status: "active",
+        ...(layoutActivation.skipReason ? { visualizationSkipReason: layoutActivation.skipReason } : {}),
+      }
+    }, config)
   } catch (error) {
     const cleanupReport = await cleanupTeamRunResources({
       teamRunId: runtimeState.teamRunId,

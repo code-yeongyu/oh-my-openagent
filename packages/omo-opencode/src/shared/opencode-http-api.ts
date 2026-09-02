@@ -46,39 +46,29 @@ function getInternalClient(client: unknown): UnknownRecord | null {
   return isRecord(internal) ? internal : null
 }
 
-export function getServerBaseUrl(client: unknown): string | null {
-  // Try client._client.getConfig().baseUrl
-  const internal = getInternalClient(client)
-  if (internal) {
-    const getConfig = internal["getConfig"]
-    if (typeof getConfig === "function") {
-      const config = getConfig()
-      if (isRecord(config)) {
-        const baseUrl = config["baseUrl"]
-        if (typeof baseUrl === "string") {
-          return baseUrl
-        }
-      }
-    }
-  }
+function getConfiguredBaseUrl(internal: UnknownRecord | null): string | null {
+  if (!internal) return null
+  const getConfig = internal["getConfig"]
+  if (typeof getConfig !== "function") return null
 
-  // Try client.session._client.getConfig().baseUrl
+  try {
+    const config = getConfig.call(internal)
+    if (!isRecord(config)) return null
+    const baseUrl = config["baseUrl"]
+    return typeof baseUrl === "string" ? baseUrl : null
+  } catch {
+    return null
+  }
+}
+
+export function getServerBaseUrl(client: unknown): string | null {
+  const directBaseUrl = getConfiguredBaseUrl(getInternalClient(client))
+  if (directBaseUrl) return directBaseUrl
+
   if (isRecord(client)) {
     const session = client["session"]
     if (isRecord(session)) {
-      const internal = session["_client"]
-      if (isRecord(internal)) {
-        const getConfig = internal["getConfig"]
-        if (typeof getConfig === "function") {
-          const config = getConfig()
-          if (isRecord(config)) {
-            const baseUrl = config["baseUrl"]
-            if (typeof baseUrl === "string") {
-              return baseUrl
-            }
-          }
-        }
-      }
+      return getConfiguredBaseUrl(getInternalClient(session))
     }
   }
 

@@ -316,6 +316,61 @@ describe("createTeamRun", () => {
     expect(launchMock).toHaveBeenCalledTimes(2)
   })
 
+  test("#given tmux_visualization enabled but visualization cannot launch #when createTeamRun runs #then the persisted runtime state carries visualizationSkipReason (issue #5107)", async () => {
+    // given - outside tmux so the real layout chain skips with a reason
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-viz-skip-"))
+    temporaryDirectories.push(baseDir)
+    const { manager } = createManager(baseDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+    const config = TeamModeConfigSchema.parse({ base_dir: baseDir, tmux_visualization: true, max_wall_clock_minutes: 1 })
+    const tmuxMgr = { getServerUrl: () => "http://127.0.0.1:4096", getCtxServerUrl: () => undefined }
+    const previousTmuxEnv = process.env.TMUX
+    delete process.env.TMUX
+    try {
+      // when
+      const runtimeState = await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), config, manager, tmuxMgr as never)
+
+      // then
+      expect(runtimeState.status).toBe("active")
+      expect(runtimeState.tmuxLayout).toBeUndefined()
+      expect(runtimeState.visualizationSkipReason).toBeTruthy()
+      expect(runtimeState.visualizationSkipReason).toContain("tmux")
+    } finally {
+      if (previousTmuxEnv === undefined) {
+        delete process.env.TMUX
+      } else {
+        process.env.TMUX = previousTmuxEnv
+      }
+    }
+  })
+
+  test("#given a stale visualization skip reason #when the current layout activation has no failure #then the active runtime clears the stale reason", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-viz-recovered-"))
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const { manager } = createManager(baseDir, async () => {
+      const creatingRuntime = await loadSingleRuntimeState(baseDir)
+      await transitionRuntimeState(creatingRuntime.teamRunId, (currentState) => ({
+        ...currentState,
+        visualizationSkipReason: "stale visualization failure",
+      }), config)
+      return { id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask
+    })
+
+    // when
+    const runtimeState = await createTeamRun(
+      createSpec(1),
+      "lead-session",
+      createContext(baseDir, manager),
+      config,
+      manager,
+    )
+
+    // then
+    expect(runtimeState.status).toBe("active")
+    expect(runtimeState).not.toHaveProperty("visualizationSkipReason")
+  })
+
   test("#given an existing active runtime with unresolved members #when createTeamRun runs again #then it creates a fresh runtime", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-unresolved-existing-"))

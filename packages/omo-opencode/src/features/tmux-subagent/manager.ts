@@ -26,6 +26,7 @@ import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusResponse } from "./session-status-parser"
 import { FailedReadinessCache, type FailedReadinessSessionSeed } from "./failed-readiness-cache"
 import { resolveServerUrl } from "./resolve-server-url"
+import { getServerBaseUrl } from "../../shared/opencode-http-api"
 import { sweepStaleTmuxResources } from "./stale-tmux-resource-sweeper"
 type OpencodeClient = PluginInput["client"]
 
@@ -151,7 +152,18 @@ export class TmuxSessionManager {
     })
     const rawServerUrl = ctx.serverUrl?.toString()
     this.ctxServerUrl = rawServerUrl
-    this.serverUrl = resolveServerUrl(rawServerUrl, process.env, this.deps.log)
+    // Issue #5107: a vanilla `opencode` TUI launch (no --port/OPENCODE_PORT) binds an
+    // ephemeral random port and leaves ctx.serverUrl undefined, so the :4096 fallback
+    // below points at nothing and tmux visualization silently skips. The in-process
+    // SDK client knows the real URL; recover it before falling back.
+    const discoveredServerUrl = rawServerUrl ? undefined : getServerBaseUrl(this.client)
+    if (discoveredServerUrl) {
+      this.deps.log("[tmux-session-manager] ctx.serverUrl undefined; recovered server URL from in-process client", {
+        kind: "info",
+        discoveredServerUrl,
+      })
+    }
+    this.serverUrl = resolveServerUrl(discoveredServerUrl ?? rawServerUrl, process.env, this.deps.log)
     this.sourcePaneId = this.deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,

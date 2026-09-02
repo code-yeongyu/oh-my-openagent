@@ -54,6 +54,54 @@ describe("getServerBaseUrl", () => {
     expect(result).toBe("https://session.example.com")
   })
 
+  it("falls through to the session client when the primary getConfig throws", async () => {
+    // given
+    const { getServerBaseUrl } = await loadOpencodeHttpApi()
+    const mockClient = {
+      _client: {
+        getConfig: () => {
+          throw new Error("primary config unavailable")
+        },
+      },
+      session: {
+        _client: {
+          getConfig: () => ({ baseUrl: "https://session.example.com" }),
+        },
+      },
+    }
+
+    // when
+    const result = getServerBaseUrl(mockClient)
+
+    // then
+    expect(result).toBe("https://session.example.com")
+  })
+
+  it("returns null when every optional getConfig accessor throws", async () => {
+    // given
+    const { getServerBaseUrl } = await loadOpencodeHttpApi()
+    const mockClient = {
+      _client: {
+        getConfig: () => {
+          throw new Error("primary config unavailable")
+        },
+      },
+      session: {
+        _client: {
+          getConfig: () => {
+            throw new Error("session config unavailable")
+          },
+        },
+      },
+    }
+
+    // when
+    const result = getServerBaseUrl(mockClient)
+
+    // then
+    expect(result).toBeNull()
+  })
+
   it("returns null for incompatible client", async () => {
     // given
     const { getServerBaseUrl } = await loadOpencodeHttpApi()

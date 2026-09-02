@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, mock, test } from "bun:test"
 
-import { canVisualize, createTeamLayout, removeTeamLayout, type TeamLayoutCleanupTarget, type TeamLayoutDeps } from "./layout"
+import { canVisualize, createTeamLayout, createTeamLayoutWithReason, removeTeamLayout, type TeamLayoutCleanupTarget, type TeamLayoutDeps } from "./layout"
 
 let nextWindowNumber = 1
 let nextPaneNumber = 1
@@ -91,6 +91,9 @@ async function loadLayoutModule() {
     canVisualize,
     createTeamLayout: (teamRunId: string, members: Parameters<typeof createTeamLayout>[1], tmuxMgr: Parameters<typeof createTeamLayout>[2]) => {
       return createTeamLayout(teamRunId, members, tmuxMgr, deps)
+    },
+    createTeamLayoutWithReason: (teamRunId: string, members: Parameters<typeof createTeamLayoutWithReason>[1], tmuxMgr: Parameters<typeof createTeamLayoutWithReason>[2]) => {
+      return createTeamLayoutWithReason(teamRunId, members, tmuxMgr, deps)
     },
     removeTeamLayout: (
       teamRunId: string,
@@ -570,5 +573,68 @@ describe("team-layout-tmux", () => {
       expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
       expect(commands.some((args) => args[0] === "send-keys" && args.includes("Enter"))).toBe(true)
     })
+  })
+})
+
+describe("createTeamLayoutWithReason (issue #5107)", () => {
+  beforeEach(() => {
+    runTmuxCommandMock.mockClear()
+    logMock.mockClear()
+    isServerRunningMock.mockClear()
+    isServerRunningMock.mockImplementation(async () => true)
+    nextWindowNumber = 1
+    nextPaneNumber = 1
+    displaySessionId = "$7"
+    displaySuccess = true
+    panesByWindow.clear()
+    runTmuxCommandMock.mockImplementation(defaultRunTmuxCommand)
+    process.env.TMUX = "/tmp/tmux-1"
+    process.env.TMUX_PANE = "%42"
+  })
+
+  test("#given caller inside tmux and no server on the resolved URL #when createTeamLayoutWithReason runs #then it returns a skipReason naming the URL and the port fix hint", async () => {
+    // given - v4.8.1 scenario: fallback :4096 with nothing listening
+    isServerRunningMock.mockImplementation(async () => false)
+    const { createTeamLayoutWithReason } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "ses-1" },
+      { name: "m2", sessionId: "ses-2" },
+    ]
+
+    // when
+    const attempt = await createTeamLayoutWithReason("run-skip-reason", members, tmuxMgr as never)
+
+    // then
+    expect(attempt.layout).toBeNull()
+    expect(attempt.skipReason).toBeTruthy()
+    expect(attempt.skipReason).toContain("http://127.0.0.1:12345")
+    expect(attempt.skipReason).toContain("--port")
+  })
+
+  test("#given the layout launches successfully #when createTeamLayoutWithReason runs #then no skipReason is reported", async () => {
+    // given
+    const { createTeamLayoutWithReason } = await loadLayoutModule()
+    const members = [{ name: "m1", sessionId: "ses-1" }]
+
+    // when
+    const attempt = await createTeamLayoutWithReason("run-success-reason", members, tmuxMgr as never)
+
+    // then
+    expect(attempt.layout).not.toBeNull()
+    expect(attempt.skipReason).toBeUndefined()
+  })
+
+  test("#given not inside tmux #when createTeamLayoutWithReason runs #then the skipReason says tmux visualization is unavailable outside tmux", async () => {
+    // given
+    delete process.env.TMUX
+    const { createTeamLayoutWithReason } = await loadLayoutModule()
+    const members = [{ name: "m1", sessionId: "ses-1" }]
+
+    // when
+    const attempt = await createTeamLayoutWithReason("run-no-tmux-reason", members, tmuxMgr as never)
+
+    // then
+    expect(attempt.layout).toBeNull()
+    expect(attempt.skipReason).toContain("tmux")
   })
 })

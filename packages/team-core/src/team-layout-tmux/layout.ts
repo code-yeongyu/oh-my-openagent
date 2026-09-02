@@ -1,16 +1,13 @@
 import { isServerRunning, runTmuxCommand, type TmuxCommandResult } from "@oh-my-opencode/tmux-core"
 import { log } from "../logger"
-import { shellSingleQuote } from "../shell-quote"
+import { createCallerWindowTeamLayout, type TeamLayoutMember } from "./caller-window-layout"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
 
-type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
 type TmuxSessionManager = {
   getServerUrl: () => string
   getCtxServerUrl?: () => string | undefined
 }
-const TEAM_PANE_TITLE_PREFIX = "omo-team-"
-const OMO_ATTACH_SERVER_URL_OPTION = "@omo_attach_server_url"
-const OMO_ATTACH_SESSION_ID_OPTION = "@omo_attach_session_id"
+const INTERNAL_TMUX_FAILURE_REASON = "tmux visualization unavailable: internal tmux operation failed"
 
 export type TeamLayoutDeps = {
   runTmuxCommand: (tmuxPath: string, args: Array<string>, options?: { retry?: number; timeoutMs?: number }) => Promise<TmuxCommandResult>
@@ -47,101 +44,19 @@ export type TeamLayoutCleanupTarget = {
 
 export function canVisualize(): boolean { return process.env.TMUX !== undefined }
 
-function getPaneWorkingDirectory(member: TeamLayoutMember): string {
-  return member.worktreePath ?? process.cwd()
+export type TeamLayoutAttempt = {
+  layout: TeamLayoutResult | null
+  skipReason?: string
 }
 
-function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
-}
-
-function buildPaneEnvironmentArgs(): string[] {
-  const password = process.env.OPENCODE_SERVER_PASSWORD
-  if (!password) {
-    return []
-  }
-
-  const environmentArgs = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`]
-  const username = process.env.OPENCODE_SERVER_USERNAME
-  if (username !== undefined) {
-    environmentArgs.push("-e", `OPENCODE_SERVER_USERNAME=${username}`)
-  }
-
-  return environmentArgs
-}
-
-async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
-  const result = await deps.runTmuxCommand(tmuxPath, ["list-panes", "-t", windowTarget, "-F", "#{pane_id}"])
-  if (!result.success || !result.output) return []
-  return result.output.trim().split("\n").filter(Boolean)
-}
-
-function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: string): string {
-  return teammatePanes[Math.floor(teammatePanes.length / 2)] ?? teammatePanes[teammatePanes.length - 1] ?? callerPaneId
-}
-
-function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
-  const environmentArgs = buildPaneEnvironmentArgs()
-  if (teammatePanes.length === 0) {
-    return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
-  }
-
-  return [
-    "split-window",
-    ...environmentArgs,
-    "-t",
-    selectExistingTeammatePane(teammatePanes, callerPaneId),
-    teammatePanes.length % 2 === 1 ? "-v" : "-h",
-    "-d",
-    "-P",
-    "-F",
-    "#{pane_id}",
-    "-c",
-    getPaneWorkingDirectory(member),
-  ]
-}
-
-async function createTeamLayoutInCallerWindow(
-  tmuxPath: string,
-  callerPaneId: string,
-  windowTarget: string,
-  members: Array<TeamLayoutMember>,
-  serverUrl: string,
-  deps: TeamLayoutDeps,
-): Promise<{ focusWindowId: string; focusPanesByMember: Record<string, string> } | null> {
-  const panesByMember: Record<string, string> = {}
-  const existingPanes = await listPanesInWindow(tmuxPath, windowTarget, deps)
-  let teammatePanes = existingPanes.filter((paneId) => paneId !== callerPaneId)
-
-  for (const member of members) {
-    const split = await deps.runTmuxCommand(tmuxPath, buildSplitArgs(callerPaneId, teammatePanes, member))
-    if (!split.success || !split.output) return null
-
-    const paneId = split.output.trim()
-    teammatePanes = [...teammatePanes, paneId]
-    panesByMember[member.name] = paneId
-    await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${TEAM_PANE_TITLE_PREFIX}${member.name}`])
-    await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION, serverUrl])
-    await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SESSION_ID_OPTION, member.sessionId])
-    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
-  }
-
-  const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
-  if (!layoutResult.success) return null
-
-  const resizeResult = await deps.runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"])
-  if (!resizeResult.success) return null
-
-  return { focusWindowId: windowTarget, focusPanesByMember: panesByMember }
-}
-
-export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutResult | null> {
+export async function createTeamLayoutWithReason(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutAttempt> {
   if (!canVisualize()) {
-    deps.log("tmux visualization unavailable, skipping")
-    return null
+    const skipReason = "tmux visualization unavailable: not inside a tmux session"
+    deps.log(skipReason)
+    return { layout: null, skipReason }
   }
   if (members.length === 0) {
-    return null
+    return { layout: null }
   }
 
   try {
@@ -158,37 +73,58 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
             ? "ctx.serverUrl was discarded (likely port 0); launch opencode with --port N and OPENCODE_PORT=N to bind a real port"
             : "no opencode server is listening on the fallback URL",
       })
-      return null
+      const skipReason = ctxServerUrl && ctxServerUrl !== serverUrl
+        ? `tmux visualization skipped: opencode server not reachable at ${serverUrl} (ctx.serverUrl was discarded, likely port 0); launch opencode with --port N and OPENCODE_PORT=N to bind a real port`
+        : `tmux visualization skipped: no opencode server is listening at ${serverUrl}; launch opencode with --port N and OPENCODE_PORT=N to bind a real port`
+      return { layout: null, skipReason }
     }
 
     const tmuxPath = await deps.getTmuxPath()
     if (!tmuxPath) {
-      deps.log("tmux visualization unavailable, skipping")
-      return null
+      const skipReason = "tmux visualization unavailable: tmux binary not found"
+      deps.log(skipReason)
+      return { layout: null, skipReason }
     }
 
     const callerSession = await deps.resolveCallerTmuxSession(tmuxPath)
     if (!callerSession) {
-      deps.log("tmux visualization requires a resolvable caller tmux pane, skipping", { teamRunId })
-      return null
+      const skipReason = "tmux visualization skipped: could not resolve the caller tmux pane"
+      deps.log(skipReason, { teamRunId })
+      return { layout: null, skipReason }
     }
 
-    const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl, deps)
-    if (!focus) return null
+    const focus = await createCallerWindowTeamLayout(
+      teamRunId,
+      tmuxPath,
+      callerSession.paneId,
+      callerSession.windowTarget,
+      members,
+      serverUrl,
+      deps,
+    )
+    if (!focus) {
+      return { layout: null, skipReason: "tmux visualization skipped: failed to split tmux panes for team members" }
+    }
 
     return {
-      focusWindowId: focus.focusWindowId,
-      gridWindowId: undefined,
-      focusPanesByMember: focus.focusPanesByMember,
-      gridPanesByMember: {},
-      targetSessionId: callerSession.sessionId,
-      ownedSession: false,
+      layout: {
+        focusWindowId: focus.focusWindowId,
+        gridWindowId: undefined,
+        focusPanesByMember: focus.focusPanesByMember,
+        gridPanesByMember: {},
+        targetSessionId: callerSession.sessionId,
+        ownedSession: false,
+      },
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? String(error) : String(error)
+    const errorMessage = error instanceof Error ? error.toString() : String(error)
     deps.log("tmux visualization unavailable, skipping", { error: errorMessage })
-    return null
+    return { layout: null, skipReason: INTERNAL_TMUX_FAILURE_REASON }
   }
+}
+
+export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutResult | null> {
+  return (await createTeamLayoutWithReason(teamRunId, members, tmuxMgr, deps)).layout
 }
 
 export async function removeTeamLayout(

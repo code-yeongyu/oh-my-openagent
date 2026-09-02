@@ -182,6 +182,7 @@ export const RuntimeStateSchema = z.object({
   status: z.enum(RUNTIME_STATUSES),
   leadSessionId: z.string().optional(),
   tmuxLayout: RuntimeStateTmuxLayoutSchema.optional(),
+  visualizationSkipReason: z.string().optional(),
   members: z.array(RuntimeStateMemberSchema),
   shutdownRequests: z.array(ShutdownRequestSchema).default([]),
   bounds: RuntimeBoundsSchema,

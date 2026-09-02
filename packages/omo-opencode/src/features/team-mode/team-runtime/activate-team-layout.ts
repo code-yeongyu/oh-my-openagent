@@ -1,6 +1,6 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
-import { createTeamLayout } from "../team-layout-tmux/layout"
+import { createTeamLayoutWithReason } from "../team-layout-tmux/layout"
 import type { TeamLayoutResult } from "../team-layout-tmux/layout"
 import type { RuntimeState } from "../types"
 import { transitionRuntimeState } from "../team-state-store/store"
@@ -13,15 +13,20 @@ function normalizeTeamLayout(teamRunId: string, layout: TeamLayoutResult): TeamL
   }
 }
 
+export type TeamLayoutActivation = {
+  activated: boolean
+  skipReason?: string
+}
+
 export async function activateTeamLayout(
   runtimeState: RuntimeState,
   config: TeamModeConfig,
   projectRoot: string,
   tmuxMgr?: TmuxSessionManager,
-): Promise<boolean> {
-  if (!config.tmux_visualization || !tmuxMgr) return false
+): Promise<TeamLayoutActivation> {
+  if (!config.tmux_visualization || !tmuxMgr) return { activated: false }
 
-  const layout = await createTeamLayout(
+  const attempt = await createTeamLayoutWithReason(
     runtimeState.teamRunId,
     runtimeState.members.flatMap((member) => member.sessionId && member.agentType !== "leader"
       ? [{
@@ -33,7 +38,10 @@ export async function activateTeamLayout(
       : []),
     tmuxMgr,
   )
-  if (!layout) return false
+  const layout = attempt.layout
+  if (!layout) {
+    return attempt.skipReason ? { activated: false, skipReason: attempt.skipReason } : { activated: false }
+  }
   const normalizedLayout = normalizeTeamLayout(runtimeState.teamRunId, layout)
   const paneIds = [
     ...Object.values(normalizedLayout.focusPanesByMember),
@@ -55,5 +63,5 @@ export async function activateTeamLayout(
       tmuxGridPaneId: normalizedLayout.gridPanesByMember[member.name] ?? member.tmuxGridPaneId,
     })),
   }), config)
-  return true
+  return { activated: true }
 }

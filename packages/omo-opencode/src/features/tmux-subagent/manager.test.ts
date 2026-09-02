@@ -3040,6 +3040,70 @@ describe('TmuxSessionManager', () => {
     })
   })
 
+  describe('server URL recovery (issue #5107)', () => {
+    test('#given ctx.serverUrl undefined and client exposes baseUrl #when manager is constructed #then getServerUrl returns the client baseUrl instead of the :4096 fallback', async () => {
+      // given - vanilla `opencode` TUI launch: no --port, ctx.serverUrl undefined,
+      // but the in-process SDK client knows the real ephemeral-port URL.
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = cast<TmuxSessionManagerContext>({
+        serverUrl: undefined,
+        client: {
+          _client: {
+            getConfig: () => ({ baseUrl: 'http://127.0.0.1:50946' }),
+          },
+        },
+      })
+      const config = createTmuxConfig({ enabled: true })
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then
+      expect(manager.getServerUrl()).toBe('http://127.0.0.1:50946')
+    })
+
+    test('#given ctx.serverUrl undefined and client without discoverable baseUrl #when manager is constructed #then getServerUrl falls back to OPENCODE_PORT/:4096 as before', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = cast<TmuxSessionManagerContext>({
+        serverUrl: undefined,
+        client: {},
+      })
+      const config = createTmuxConfig({ enabled: true })
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then
+      expect(manager.getServerUrl()).toBe('http://localhost:4096')
+    })
+
+    test('#given optional client config discovery throws #when manager is constructed #then it falls back without crashing', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = cast<TmuxSessionManagerContext>({
+        serverUrl: undefined,
+        client: {
+          _client: {
+            getConfig: () => {
+              throw new Error('optional SDK config unavailable')
+            },
+          },
+        },
+      })
+      const config = createTmuxConfig({ enabled: true })
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then
+      expect(manager.getServerUrl()).toBe('http://localhost:4096')
+    })
+  })
+
 })
 
 describe('DecisionEngine', () => {

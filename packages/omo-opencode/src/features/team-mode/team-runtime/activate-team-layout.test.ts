@@ -8,7 +8,7 @@ import * as storeModule from "../team-state-store/store"
 import { RuntimeStateSchema, type RuntimeState } from "../types"
 import { activateTeamLayout } from "./activate-team-layout"
 
-let createTeamLayoutSpy: ReturnType<typeof spyOn<typeof layoutModule, "createTeamLayout">>
+let createTeamLayoutWithReasonSpy: ReturnType<typeof spyOn<typeof layoutModule, "createTeamLayoutWithReason">>
 let transitionRuntimeStateSpy: ReturnType<typeof spyOn<typeof storeModule, "transitionRuntimeState">>
 
 function createRuntimeState() {
@@ -59,8 +59,8 @@ describe("activateTeamLayout", () => {
   })
 
   beforeEach(() => {
-    createTeamLayoutSpy = spyOn(layoutModule, "createTeamLayout")
-    createTeamLayoutSpy.mockResolvedValue(null)
+    createTeamLayoutWithReasonSpy = spyOn(layoutModule, "createTeamLayoutWithReason")
+    createTeamLayoutWithReasonSpy.mockResolvedValue({ layout: null })
     transitionRuntimeStateSpy = spyOn(storeModule, "transitionRuntimeState")
     transitionRuntimeStateSpy.mockImplementation(async (
       _teamRunId,
@@ -72,13 +72,15 @@ describe("activateTeamLayout", () => {
   test("#given a leader and one member #when activateTeamLayout runs #then it excludes the leader from layout members and only persists panes for non-leaders", async () => {
     // given
     const runtimeState = createRuntimeState()
-    createTeamLayoutSpy.mockResolvedValue({
-      focusWindowId: "@10",
-      gridWindowId: "@11",
-      focusPanesByMember: { "member-a": "%11" },
-      gridPanesByMember: { "member-a": "%21" },
-      targetSessionId: "$caller",
-      ownedSession: false,
+    createTeamLayoutWithReasonSpy.mockResolvedValue({
+      layout: {
+        focusWindowId: "@10",
+        gridWindowId: "@11",
+        focusPanesByMember: { "member-a": "%11" },
+        gridPanesByMember: { "member-a": "%21" },
+        targetSessionId: "$caller",
+        ownedSession: false,
+      },
     })
 
     // when
@@ -90,9 +92,10 @@ describe("activateTeamLayout", () => {
     )
 
     // then
-    expect(result).toBe(true)
-    expect(createTeamLayoutSpy).toHaveBeenCalledTimes(1)
-    const createLayoutCall = createTeamLayoutSpy.mock.calls[0]
+    expect(result.activated).toBe(true)
+    expect(result.skipReason).toBeUndefined()
+    expect(createTeamLayoutWithReasonSpy).toHaveBeenCalledTimes(1)
+    const createLayoutCall = createTeamLayoutWithReasonSpy.mock.calls[0]
     expect(createLayoutCall?.[1]).toEqual([
       {
         name: "member-a",
@@ -130,24 +133,30 @@ describe("activateTeamLayout", () => {
     })
   })
 
-  test("#given createTeamLayout returns null #when activateTeamLayout runs #then returns false and no state transition fires", async () => {
-    // given
+  test("#given the layout attempt is skipped with a reason #when activateTeamLayout runs #then it returns activated false and carries the skip reason for the team_create response", async () => {
+    // given - issue #5107: server unreachable on the fallback URL
     const runtimeState = createRuntimeState()
+    createTeamLayoutWithReasonSpy.mockResolvedValue({
+      layout: null,
+      skipReason: "tmux visualization skipped: no opencode server is listening at http://localhost:4096; launch opencode with --port N and OPENCODE_PORT=N to bind a real port",
+    })
 
     // when
     const result = await activateTeamLayout(
       runtimeState,
       createConfig(true),
       "/project",
-      { getServerUrl: () => "http://127.0.0.1:12345" } as never,
+      { getServerUrl: () => "http://localhost:4096" } as never,
     )
 
     // then
-    expect(result).toBe(false)
+    expect(result.activated).toBe(false)
+    expect(result.skipReason).toContain("http://localhost:4096")
+    expect(result.skipReason).toContain("--port")
     expect(transitionRuntimeStateSpy).not.toHaveBeenCalled()
   })
 
-  test("#given config.tmux_visualization is false #when activateTeamLayout runs #then it short-circuits, no state change, returns false", async () => {
+  test("#given config.tmux_visualization is false #when activateTeamLayout runs #then it short-circuits with no skip reason and no state change", async () => {
     // given
     const runtimeState = createRuntimeState()
 
@@ -160,8 +169,9 @@ describe("activateTeamLayout", () => {
     )
 
     // then
-    expect(result).toBe(false)
-    expect(createTeamLayoutSpy).not.toHaveBeenCalled()
+    expect(result.activated).toBe(false)
+    expect(result.skipReason).toBeUndefined()
+    expect(createTeamLayoutWithReasonSpy).not.toHaveBeenCalled()
     expect(transitionRuntimeStateSpy).not.toHaveBeenCalled()
   })
 })

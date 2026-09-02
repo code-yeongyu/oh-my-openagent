@@ -10,6 +10,7 @@ import {
   approveShutdownMock,
   backgroundManager,
   config,
+  createRuntimeState,
   createSpec,
   createTeamRunMock,
   createToolContext,
@@ -119,6 +120,26 @@ describe("team lifecycle tools", () => {
     expect(result.runtimeState.members).toHaveLength(2)
     expect(result.runtimeState.members[0]).not.toHaveProperty("lastInjectedTurnMarker")
     expect(result.runtimeState.members[0]).not.toHaveProperty("pendingInjectedMessageIds")
+  })
+
+  test("#given layout activation reports a stable skip reason #when team_create serializes the runtime #then the machine field is preserved", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest()
+    const runtimeState = {
+      ...createRuntimeState(createSpec(), "lead-session", "team-run-serialized"),
+      visualizationSkipReason: "tmux visualization unavailable: internal tmux operation failed",
+    }
+    createTeamRunMock.mockResolvedValueOnce(runtimeState)
+
+    // when
+    const result = parseToolResult<{ runtimeState: RuntimeState }>(
+      await teamCreateTool.execute({ inline_spec: createSpec() }, createToolContext("lead-session")),
+    )
+
+    // then
+    expect(result.runtimeState.visualizationSkipReason).toBe(
+      "tmux visualization unavailable: internal tmux operation failed",
+    )
   })
 
   test("team_create normalizes inline lead shorthand before creating the runtime", async () => {

@@ -6,7 +6,7 @@ import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { removeTeamLayout } from "../team-layout-tmux/layout"
 import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
-import type { TeamRunCreateError } from "./create"
+import type { TeamRunCleanupReport } from "./team-run-create-error"
 import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 
 type SpawnedMemberResource = {
@@ -41,8 +41,8 @@ export async function cleanupTeamRunResources(args: {
   bgMgr: BackgroundManager
   tmuxMgr?: TmuxSessionManager
   createdLayout: boolean
-}): Promise<TeamRunCreateError["cleanupReport"]> {
-  const cleanupReport: TeamRunCreateError["cleanupReport"] = {
+}): Promise<TeamRunCleanupReport> {
+  const cleanupReport: TeamRunCleanupReport = {
     cancelledTaskIds: [],
     removedLayout: false,
     removedWorktrees: [],
