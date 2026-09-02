@@ -35,6 +35,7 @@ type InstallCommandOptions = {
   readonly vercelAiGateway?: InstallArgs["vercelAiGateway"]
   readonly codexAutonomous?: InstallArgs["codexAutonomous"]
   readonly skipAuth?: boolean
+  readonly configScope?: InstallArgs["configScope"]
 }
 
 type RootCommandOptions = {
@@ -83,6 +84,7 @@ export function resolveInstallArgs(
     vercelAiGateway: options.vercelAiGateway,
     codexAutonomous: options.codexAutonomous,
     skipAuth: options.skipAuth ?? false,
+    configScope: options.configScope,
   }
 }
 
@@ -106,6 +108,7 @@ program
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
   .addOption(new Option("--platform <platform>", `Install target platform: ${availableInstallPlatforms().join(", ")}`).choices(availableInstallPlatforms()))
+  .addOption(new Option("--config-scope <scope>", "Where to register the plugin when a custom OpenCode config dir is active: active, global").choices(["active", "global"] as const))
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")

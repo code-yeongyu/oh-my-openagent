@@ -4,8 +4,10 @@ import type {
   ClaudeSubscription,
   DetectedConfig,
   InstallConfig,
+  InstallConfigScope,
   InstallPlatform,
 } from "./types"
+import type { InstallScopeRoots } from "./install-config-scope"
 import { detectedToInitialValues } from "./install-validators"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
 import { isSenpiPlatformEnabled } from "./senpi-platform-flag"
@@ -45,6 +47,27 @@ export async function promptInstallPlatform(
     message: "Which platform do you want to install?",
     options,
     initialValue,
+  })
+}
+
+export async function promptInstallConfigScope(
+  roots: InstallScopeRoots,
+): Promise<InstallConfigScope | null> {
+  return selectOrCancel<InstallConfigScope>({
+    message: "A custom OpenCode config directory is active. Where should the plugin be registered?",
+    options: [
+      {
+        value: "active",
+        label: "Active (custom directory)",
+        hint: `${roots.activeCustomDir} - visible inside hosts that set OPENCODE_CONFIG_DIR`,
+      },
+      {
+        value: "global",
+        label: "Global (default directory)",
+        hint: `${roots.defaultGlobalDir} - user-wide; also loaded when the custom directory is active`,
+      },
+    ],
+    initialValue: "active",
   })
 }
 

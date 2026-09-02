@@ -77,6 +77,7 @@ describe("install CLI - binary check behavior", () => {
       copilot: "no",
       opencodeZen: "no",
       zaiCodingPlan: "no",
+      configScope: "active",
     }
 
     // when running install
@@ -112,6 +113,7 @@ describe("install CLI - binary check behavior", () => {
       copilot: "no",
       opencodeZen: "no",
       zaiCodingPlan: "no",
+      configScope: "active",
     }
 
     // when running install
@@ -151,6 +153,7 @@ describe("install CLI - binary check behavior", () => {
       copilot: "no",
       opencodeZen: "no",
       zaiCodingPlan: "no",
+      configScope: "active",
     }
 
     // when running install
@@ -163,5 +166,156 @@ describe("install CLI - binary check behavior", () => {
     const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
     expect(allCalls).toContain("[OK]")
     expect(allCalls).toContain("OpenCode 1.4.0")
+  })
+})
+
+describe("install CLI - config scope confirmation", () => {
+  let customDir: string
+  let xdgDir: string
+  let originalCustomEnv: string | undefined
+  let originalXdgEnv: string | undefined
+  let originalFetch: typeof globalThis.fetch
+
+  beforeEach(() => {
+    // given a distinct active custom config dir and an isolated default global root
+    customDir = join(tmpdir(), `omo-scope-custom-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    xdgDir = join(tmpdir(), `omo-scope-xdg-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(customDir, { recursive: true })
+    mkdirSync(xdgDir, { recursive: true })
+
+    originalCustomEnv = process.env.OPENCODE_CONFIG_DIR
+    originalXdgEnv = process.env.XDG_CONFIG_HOME
+    process.env.OPENCODE_CONFIG_DIR = customDir
+    process.env.XDG_CONFIG_HOME = xdgDir
+
+    configManager.resetConfigContext()
+    configManager.initConfigContext("opencode", null)
+
+    originalFetch = globalThis.fetch
+    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "3.0.0" }),
+      } as Response)
+    ))
+
+    spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    if (originalCustomEnv !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalCustomEnv
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+    if (originalXdgEnv !== undefined) {
+      process.env.XDG_CONFIG_HOME = originalXdgEnv
+    } else {
+      delete process.env.XDG_CONFIG_HOME
+    }
+
+    for (const dir of [customDir, xdgDir]) {
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    }
+
+    globalThis.fetch = originalFetch
+    mock.restore()
+  })
+
+  function scopeArgs(configScope?: InstallArgs["configScope"]): InstallArgs {
+    return {
+      tui: false,
+      claude: "yes",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+      ...(configScope !== undefined ? { configScope } : {}),
+    }
+  }
+
+  function givenOpenCodeBinaryDetected(): void {
+    spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)
+    spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0")
+  }
+
+  test("non-TUI install without --config-scope fails and writes no registration in either root", async () => {
+    // given OpenCode is installed so an unguarded flow would reach the write steps
+    givenOpenCodeBinaryDetected()
+
+    // when running install with a distinct custom root but no explicit scope
+    const exitCode = await install(scopeArgs())
+
+    // then the install is rejected before any mutation
+    expect(exitCode).toBe(1)
+    expect(existsSync(join(customDir, "opencode.json"))).toBe(false)
+    expect(existsSync(join(customDir, "tui.json"))).toBe(false)
+    expect(existsSync(join(xdgDir, "opencode"))).toBe(false)
+
+    // then the error names both effective roots and the required flag
+    const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
+    expect(allCalls).toContain("--config-scope")
+    expect(allCalls).toContain(customDir)
+    expect(allCalls).toContain(join(xdgDir, "opencode"))
+  })
+
+  test("non-TUI install with --config-scope=global registers only in the default global directory", async () => {
+    // given OpenCode is installed
+    givenOpenCodeBinaryDetected()
+
+    // when running install scoped to the global root
+    const exitCode = await install(scopeArgs("global"))
+
+    // then the plugin lands in the default global directory only
+    expect(exitCode).toBe(0)
+    const globalConfigPath = join(xdgDir, "opencode", "opencode.json")
+    expect(existsSync(globalConfigPath)).toBe(true)
+    const config = JSON.parse(readFileSync(globalConfigPath, "utf-8"))
+    expect(config.plugin.some((p: string) => p.includes("oh-my-openagent"))).toBe(true)
+    expect(existsSync(join(xdgDir, "opencode", "tui.json"))).toBe(true)
+
+    // then the active custom directory stays untouched
+    expect(existsSync(join(customDir, "opencode.json"))).toBe(false)
+    expect(existsSync(join(customDir, "tui.json"))).toBe(false)
+  })
+
+  test("non-TUI install with --config-scope=active registers only in the active custom directory", async () => {
+    // given OpenCode is installed
+    givenOpenCodeBinaryDetected()
+
+    // when running install scoped to the active custom root
+    const exitCode = await install(scopeArgs("active"))
+
+    // then the plugin lands in the active custom directory only
+    expect(exitCode).toBe(0)
+    const customConfigPath = join(customDir, "opencode.json")
+    expect(existsSync(customConfigPath)).toBe(true)
+    const config = JSON.parse(readFileSync(customConfigPath, "utf-8"))
+    expect(config.plugin.some((p: string) => p.includes("oh-my-openagent"))).toBe(true)
+    expect(existsSync(join(customDir, "tui.json"))).toBe(true)
+
+    // then the default global directory stays untouched
+    expect(existsSync(join(xdgDir, "opencode"))).toBe(false)
+  })
+
+  test("non-TUI install rejects an unsupported --config-scope value", async () => {
+    // given OpenCode is installed and an out-of-contract scope value such as "both"
+    givenOpenCodeBinaryDetected()
+
+    // when running install with that value
+    const exitCode = await install({
+      ...scopeArgs(),
+      configScope: unsafeTestValue<InstallArgs["configScope"]>("both"),
+    })
+
+    // then the install is rejected and nothing is written
+    expect(exitCode).toBe(1)
+    expect(existsSync(join(customDir, "opencode.json"))).toBe(false)
+    expect(existsSync(join(xdgDir, "opencode"))).toBe(false)
+    const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
+    expect(allCalls).toContain("Invalid --config-scope")
   })
 })
