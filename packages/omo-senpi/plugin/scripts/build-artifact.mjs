@@ -28,14 +28,40 @@ export async function normalizeBuiltinImports(output, builtinModuleNames) {
 
 export async function minifyBundle(output) {
   if (process.versions.bun !== undefined) {
-    await minifyBundleWithNode(output)
-    return
+    return minifyBundleWithNode(output)
   }
-  await minifyBundleInProcess(output)
+  return minifyBundleInProcess(output)
+}
+
+async function canonicalizeTopLevelFunctions(source, output) {
+  const shebangEnd = source.startsWith("#!") ? source.indexOf("\n") + 1 : 0
+  const shebang = shebangEnd > 0 ? source.slice(0, shebangEnd) : ""
+  const result = await minify(source.slice(shebangEnd), {
+    compress: false,
+    mangle: false,
+    module: true,
+    format: { ast: true, code: false },
+  })
+  if (result.ast?.TYPE !== "Toplevel") {
+    throw new Error(`Terser did not produce a top-level AST for ${output}`)
+  }
+  const leadingImports = []
+  const remainingStatements = [...result.ast.body]
+  while (remainingStatements[0]?.TYPE === "Import") {
+    leadingImports.push(remainingStatements.shift())
+  }
+  const functionDeclarations = remainingStatements
+    .filter((statement) => statement.TYPE === "Defun")
+    .map((statement) => ({ statement, key: statement.print_to_string() }))
+  const orderedStatements = remainingStatements.filter((statement) => statement.TYPE !== "Defun")
+  functionDeclarations.sort((left, right) => left.key < right.key ? -1 : left.key > right.key ? 1 : 0)
+  result.ast.body = [...leadingImports, ...functionDeclarations.map(({ statement }) => statement), ...orderedStatements]
+  return shebang + result.ast.print_to_string()
 }
 
 async function minifyBundleInProcess(output) {
-  const result = await minify(await readFile(output, "utf8"), {
+  const source = await canonicalizeTopLevelFunctions(await readFile(output, "utf8"), output)
+  const result = await minify(source, {
     compress: true,
     mangle: true,
     module: true,

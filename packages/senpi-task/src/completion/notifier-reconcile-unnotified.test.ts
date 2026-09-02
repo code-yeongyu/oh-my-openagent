@@ -62,7 +62,14 @@ function fakeStore(seed: readonly TaskRecord[], claimOnPersist?: Partial<TaskRec
 
 function capturingNotifier(): { notifier: ParentNotifier; calls: ParentNotifierMessage[] } {
   const calls: ParentNotifierMessage[] = []
-  return { notifier: { enqueue: (message) => calls.push(message) }, calls }
+  return {
+    notifier: {
+      enqueue: (message) => {
+        calls.push(message)
+      },
+    },
+    calls,
+  }
 }
 
 function failingNotifier() {

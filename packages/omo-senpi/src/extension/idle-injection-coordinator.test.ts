@@ -109,6 +109,24 @@ describe("IdleInjectionCoordinator", () => {
     expect(calls[0]?.content).toBe("continue B")
   })
 
+  it("#given an unsettled keyed injection #when a replacement is enqueued #then the displaced producer receives a failure receipt", () => {
+    // given
+    const failures: string[] = []
+    const { coordinator } = createCoordinator()
+    coordinator.enqueue({
+      key: "st_1",
+      source: "task-completion",
+      content: "epoch zero",
+      onDeliveryFailed: (error) => failures.push(error instanceof Error ? error.message : String(error)),
+    })
+
+    // when
+    coordinator.enqueue({ key: "st_1", source: "task-completion", content: "epoch one" })
+
+    // then
+    expect(failures).toEqual(["idle injection st_1 was displaced before delivery"])
+  })
+
   it("#given a queued injection #when removed by key #then the flush no-ops and removal reports true only once", () => {
     // given
     const { coordinator, calls } = createCoordinator()

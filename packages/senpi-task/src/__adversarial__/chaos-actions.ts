@@ -135,10 +135,11 @@ function expectedDelta(result: NotifyResult): number {
   return result.kind === "delivered" ? 1 : 0
 }
 
-function checkDelta(state: ChaosState, before: number, result: NotifyResult): void {
+function checkDelta(state: ChaosState, before: number, result: NotifyResult, pendingBefore = false): void {
   const delta = state.harness.parentNotifier.calls.length - before
-  if (delta !== expectedDelta(result)) {
-    state.seamBreaches.push(`notify result ${result.kind} produced ${delta} enqueue(s), expected ${expectedDelta(result)}`)
+  const expected = pendingBefore && result.kind === "delivered" ? 0 : expectedDelta(result)
+  if (delta !== expected) {
+    state.seamBreaches.push(`notify result ${result.kind} produced ${delta} enqueue(s), expected ${expected}`)
   }
 }
 
@@ -162,10 +163,11 @@ function alreadyNotified(state: ChaosState): string[] {
 function notifyEdge(state: ChaosState, id: string, parentState: ParentState): void {
   const record = load(state, id)
   if (record === null) return
+  const pendingBefore = state.harness.parentNotifier.hasPending(id, record.notification.run_epoch)
   state.observedEdges.add(`${id}:${record.notification.run_epoch}`)
   const before = state.harness.parentNotifier.calls.length
   const result = state.harness.notifier.notifyTerminal({ record, parentState, runInBackground: true })
-  checkDelta(state, before, result)
+  checkDelta(state, before, result, pendingBefore)
 }
 
 async function actNotify(state: ChaosState): Promise<void> {
@@ -173,6 +175,16 @@ async function actNotify(state: ChaosState): Promise<void> {
   if (id === undefined) return
   const parentState = state.rng.bool(0.6) ? state.rng.pick(DELIVER_STATES) : state.rng.pick(BUFFER_STATES)
   notifyEdge(state, id, parentState)
+}
+
+async function actAsyncNotify(state: ChaosState): Promise<void> {
+  const id = pick(state, unobservedNotifying(state))
+  if (id === undefined) return
+  state.harness.parentNotifier.deferNext()
+  notifyEdge(state, id, { kind: "idle" })
+  notifyEdge(state, id, { kind: "idle" })
+  state.harness.parentNotifier.resolvePending()
+  await flushMicrotasks()
 }
 
 // Resume / replay re-observes an ALREADY-notified terminal (persisted notified_epoch >= run_epoch).
@@ -235,6 +247,7 @@ const ACTIONS: readonly Action[] = [
   { name: "abort_wait", run: actAbortParentWait, weight: 4 },
   { name: "revive", run: actRevive, weight: 3 },
   { name: "notify", run: actNotify, weight: 6 },
+  { name: "notify_async", run: actAsyncNotify, weight: 2 },
   { name: "replay_notify", run: actReplayNotify, weight: 3 },
   { name: "flush", run: actFlush, weight: 4 },
   { name: "evict", run: actEvict, weight: 3 },

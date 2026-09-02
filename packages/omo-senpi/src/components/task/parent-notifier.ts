@@ -2,27 +2,32 @@ import type { ParentNotifier, ParentNotifierMessage } from "@oh-my-opencode/senp
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
+import { createCmuxNotifyBridge, type CmuxNotifyBridge } from "./cmux-notify-bridge"
 
 // The senpi-task completion custom-message type; the component registers a renderer for it.
 export const TASK_COMPLETION_MESSAGE_TYPE = "senpi-task.completion"
 
+type CompletionInjectionCoordinator = Pick<IdleInjectionCoordinator, "enqueue" | "scheduleFlush" | "flushSoon">
+
 /**
- * Adapt the engine's synchronous ParentNotifier.enqueue seam onto senpi delivery. EVERY delivered
- * completion routes through the shared idle-injection coordinator with a DEFERRED flush, so all
- * notifications that become ready within the batch window (multiple children completing near-
- * simultaneously, a pending ulw-loop continuation, team lead-messages) collapse into exactly ONE
- * injection steered into the running turn at the next tool-call boundary. Without a coordinator
- * (composition seam absent) it falls back to a direct steer through the rich custom-message channel.
- * senpi swallows async delivery errors, so a synchronous throw here surfaces as the engine's failure.
+ * The returned receipt acknowledges host delivery, not coordinator admission. Completion durability
+ * and the native cmux notice both advance only after that receipt fulfills.
  */
 export function createParentNotifier(
   pi: SenpiExtensionAPI,
-  coordinator?: IdleInjectionCoordinator,
+  coordinator?: CompletionInjectionCoordinator,
   isStreaming?: () => boolean,
+  cmuxNotify: CmuxNotifyBridge = createCmuxNotifyBridge(),
 ): ParentNotifier {
   return {
-    enqueue(message: ParentNotifierMessage): void {
+    enqueue(message: ParentNotifierMessage): void | Promise<void> {
       if (coordinator !== undefined) {
+        let resolveDelivery: (() => void) | undefined
+        let rejectDelivery: ((error: unknown) => void) | undefined
+        const receipt = new Promise<void>((resolve, reject) => {
+          resolveDelivery = resolve
+          rejectDelivery = reject
+        })
         coordinator.enqueue({
           key: injectionKey(message),
           source: "task-completion",
@@ -30,14 +35,19 @@ export function createParentNotifier(
           content: message.content,
           display: message.display,
           details: message.details,
+          onFlushed: () => {
+            cmuxNotify.notify(message)
+            resolveDelivery?.()
+          },
+          onDeliveryFailed: (error) => rejectDelivery?.(error),
         })
         // Mid-turn: collect in the batch window (the agent_end drain backstops a turn that ends first).
         // Idle: flush on the next microtask so same-tick completions batch but delivery is immediate.
         if (isStreaming?.() === true) coordinator.scheduleFlush()
         else coordinator.flushSoon()
-        return
+        return receipt
       }
-      pi.sendMessage(
+      const receipt = pi.sendMessage(
         {
           customType: message.customType,
           content: message.content,
@@ -46,6 +56,11 @@ export function createParentNotifier(
         },
         { triggerTurn: true, deliverAs: "steer" },
       )
+      if (receipt === undefined) {
+        cmuxNotify.notify(message)
+        return
+      }
+      return receipt.then(() => cmuxNotify.notify(message))
     },
   }
 }

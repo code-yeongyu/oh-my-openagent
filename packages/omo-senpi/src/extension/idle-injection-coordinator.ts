@@ -66,6 +66,9 @@ export class IdleInjectionCoordinator {
   }
 
   enqueue(injection: IdleInjection): void {
+    this.#pending.get(injection.key)?.onDeliveryFailed?.(
+      new Error(`idle injection ${injection.key} was displaced before delivery`),
+    )
     this.#pending.set(injection.key, injection)
   }
 

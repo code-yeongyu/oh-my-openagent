@@ -52,10 +52,10 @@ export type ParentNotifierMessage = {
   readonly triggerTurn?: boolean
 }
 
-// SYNCHRONOUS enqueue seam. senpi pi.sendMessage returns void and swallows async delivery errors, so
-// the only observable failure is a synchronous throw from enqueue. Delivery is fire-and-forget.
+// The adapter returns a receipt when host delivery is asynchronous. Completion bookkeeping must not
+// advance notified_epoch until that receipt fulfills.
 export type ParentNotifier = {
-  enqueue(message: ParentNotifierMessage): void
+  enqueue(message: ParentNotifierMessage): void | Promise<void>
 }
 
 export type CompletionNotifierStore = {

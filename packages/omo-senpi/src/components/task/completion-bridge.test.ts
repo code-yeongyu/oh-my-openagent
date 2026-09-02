@@ -49,7 +49,11 @@ function createHarness(): {
   const backing = createTaskRecordStore({ project_dir: tempProject() })
   const messages: ParentNotifierMessage[] = []
   const completion = createCompletionNotifier({
-    notifier: { enqueue: (message) => messages.push(message) },
+    notifier: {
+      enqueue: (message) => {
+        messages.push(message)
+      },
+    },
     store: backing,
   })
   let managerRef: TaskManager | undefined

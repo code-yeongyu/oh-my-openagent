@@ -46,7 +46,14 @@ function fakeStore(seed: TaskRecord) {
 
 function fakeNotifier(): { notifier: ParentNotifier; calls: ParentNotifierMessage[] } {
   const calls: ParentNotifierMessage[] = []
-  return { notifier: { enqueue: (message) => calls.push(message) }, calls }
+  return {
+    notifier: {
+      enqueue: (message) => {
+        calls.push(message)
+      },
+    },
+    calls,
+  }
 }
 
 describe("completion notifier buffered dedupe (W1-V F5)", () => {

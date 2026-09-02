@@ -16,6 +16,48 @@ test("#given an injected bundle body with a recomputed marker #when freshness is
   expect(artifactsMatch(injected, expected)).toBe(false)
 })
 
+test("#given top-level functions in different Bun orders #when bundles are minified #then output bytes match", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-minifier-function-order-"))
+  const first = join(root, "first.js")
+  const second = join(root, "second.js")
+  try {
+    await Promise.all([
+      writeFile(first, "const ready = new Set(); function beta() { return 2 } function alpha() { return 1 } ready.add('ok'); export { alpha, beta, ready }\n"),
+      writeFile(second, "function alpha() { return 1 } const ready = new Set(); function beta() { return 2 } ready.add('ok'); export { alpha, beta, ready }\n"),
+    ])
+
+    await minifyBundle(first)
+    closeNodeMinifier()
+    await minifyBundle(second)
+
+    expect(await readFile(second, "utf8")).toBe(await readFile(first, "utf8"))
+  } finally {
+    closeNodeMinifier()
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("#given effectful statements in different orders #when bundles are minified #then output bytes remain distinct", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-minifier-effect-order-"))
+  const first = join(root, "first.js")
+  const second = join(root, "second.js")
+  try {
+    await Promise.all([
+      writeFile(first, "globalThis.first = 1; globalThis.second = 2\n"),
+      writeFile(second, "globalThis.second = 2; globalThis.first = 1\n"),
+    ])
+
+    await minifyBundle(first)
+    closeNodeMinifier()
+    await minifyBundle(second)
+
+    expect(await readFile(second, "utf8")).not.toBe(await readFile(first, "utf8"))
+  } finally {
+    closeNodeMinifier()
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
+
 test("#given the Node minifier starts closing #when another bundle is queued #then a fresh worker completes it", async () => {
   const root = await mkdtemp(join(tmpdir(), "omo-minifier-close-"))
   const first = join(root, "first.js")

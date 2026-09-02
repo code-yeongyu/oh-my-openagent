@@ -51,7 +51,14 @@ function fakeStore(record: TaskRecord) {
 
 function fakeNotifier(): { notifier: ParentNotifier; calls: ParentNotifierMessage[] } {
   const calls: ParentNotifierMessage[] = []
-  return { notifier: { enqueue: (message) => calls.push(message) }, calls }
+  return {
+    notifier: {
+      enqueue: (message) => {
+        calls.push(message)
+      },
+    },
+    calls,
+  }
 }
 
 describe("unconditional wake", () => {

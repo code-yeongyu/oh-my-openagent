@@ -9,6 +9,7 @@ import { findStaleRuntimePersona, stageRuntimePersonas } from "./persona-artifac
 import {
   artifactsMatch,
   attachBuildMarker,
+  closeNodeMinifier,
   minifyBundle,
   normalizeBuiltinImports,
   toPortableBuildPath,
@@ -76,7 +77,8 @@ const BUILD_SETTINGS = JSON.stringify({
   minifySyntax: true,
   minifyWhitespace: true,
   minifyIdentifiers: false,
-  secondaryMinifier: "terser@5.44.0",
+  secondaryMinifier: "terser@5.50.0",
+  topLevelFunctionCanonicalization: "terser-ast-defun-first-v1",
   loaderAliases: SENPI_LOADER_ALIASES,
 })
 
@@ -130,7 +132,12 @@ async function buildEntry(entry, output, buildDefines) {
       ...externalSpecifiers.flatMap((specifier) => ["--external", specifier]),
     ])
     await normalizeBuiltinImports(output, builtinModuleNames)
-    await minifyBundle(output)
+    try {
+      await minifyBundle(output)
+    } finally {
+      // Terser process state affects generated identifiers, so each artifact needs a fresh worker.
+      closeNodeMinifier()
+    }
     return await attachBuildMarker({
       output,
       entry,
