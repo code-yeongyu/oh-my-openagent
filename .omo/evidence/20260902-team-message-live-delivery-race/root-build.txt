@@ -1,0 +1,2 @@
+Command: bun run build
+Result: pass. The build regenerated only unrelated Codex installer and Senpi extension outputs; those files were restored and are not part of this change.
