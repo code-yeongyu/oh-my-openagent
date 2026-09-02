@@ -10,6 +10,7 @@ import {
   type GitExecResult,
   createNodeGitExec,
   isGitLockError,
+  isGitWorktreeMetadataRaceError,
   withGitLockRetry,
   withSerializedGitConfigMutation,
 } from "./index"
@@ -112,6 +113,35 @@ describe("git lock error classification", () => {
 
     // when / then
     expect(isGitLockError(new Error(message))).toBe(false)
+  })
+})
+
+describe("git worktree metadata race classification", () => {
+  it("#given the linux commondir race message from issue #6852 #when classified #then it is a transient metadata race", () => {
+    // given - verbatim stderr captured from CI run 31732452566
+    const message = [
+      "Preparing worktree (new branch 'memory/concurrent-4')",
+      "fatal: failed to read /tmp/repo/.git/worktrees/checkout-5/commondir: Success",
+    ].join("\n")
+
+    // when / then
+    expect(isGitWorktreeMetadataRaceError(new Error(message))).toBe(true)
+  })
+
+  it("#given the macOS commondir race message #when classified #then it is a transient metadata race", () => {
+    // given - errno 0 is spelled differently per platform
+    const message = "fatal: failed to read /tmp/repo/.git/worktrees/checkout-5/commondir: Undefined error: 0"
+
+    // when / then
+    expect(isGitWorktreeMetadataRaceError(new Error(message))).toBe(true)
+  })
+
+  it("#given an unrelated worktree failure #when classified #then it is NOT a metadata race", () => {
+    // given
+    const message = "fatal: '/tmp/repo/checkout' already exists"
+
+    // when / then
+    expect(isGitWorktreeMetadataRaceError(new Error(message))).toBe(false)
   })
 })
 

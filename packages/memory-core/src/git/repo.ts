@@ -8,6 +8,7 @@ import { describeDirtyMarkdownEncodingIssues } from "./porcelain"
 import { GitPathStateStore } from "./path-state"
 import { authorFlags, commandError, normalizePathspecs, normalizeSeedPath } from "./repo-arguments"
 import { parseLogOutput, parseNulPaths } from "./repo-log"
+import { addWorktreeWithRetry } from "./repo-worktree-add"
 import { assertNoUnrelatedChanges } from "./repo-status"
 import { withSerializedGitWorktreeMutation } from "./worktree-mutation-queue"
 import type {
@@ -168,7 +169,18 @@ export class GitMemoryRepo {
 
   async worktreeAdd(path: string, branch: string, startPoint = "HEAD"): Promise<void> {
     await withSerializedGitWorktreeMutation(this.dir, () =>
-      withGitLockRetry(() => this.git(["worktree", "add", "-b", branch, path, startPoint])),
+      addWorktreeWithRetry(
+        { path, branch, startPoint },
+        {
+          execute: async (argv) => {
+            await withGitLockRetry(() => this.git(argv))
+          },
+          branchExists: async () => {
+            const result = await this.gitResult(["rev-parse", "--verify", "-q", `refs/heads/${branch}`])
+            return result.code === 0
+          },
+        },
+      ),
     )
   }
 
