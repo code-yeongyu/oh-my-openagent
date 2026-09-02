@@ -18,6 +18,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
 import { isGlmModel, isGpt5_5Model, isGpt5_6Model, isGptModel, isGeminiModel, isKimiK2Model, isKimiK27Model, isKimiK3Model, buildClaudeThinkingConfig } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
+import { resolvePromptAppendSources } from "../builtin-agents/resolve-file-uri"
 import {
   createAgentToolRestrictions,
   migrateAgentConfig,
@@ -119,7 +120,9 @@ export function createSisyphusJuniorAgentWithOverrides(
   const model = overrideModel ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
   const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
-  const promptAppend = override?.prompt_append
+  const promptAppend = override?.prompt_append === undefined
+    ? undefined
+    : resolvePromptAppendSources(override.prompt_append)
   const prompt = buildSisyphusJuniorPrompt(model, useTaskSystem, promptAppend)
   const blockedTools = BLOCKED_TOOLS
 

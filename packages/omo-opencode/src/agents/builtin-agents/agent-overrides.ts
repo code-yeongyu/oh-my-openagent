@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentOverrideConfig } from "../types"
 import type { CategoryConfig } from "../../config/schema"
 import { deepMerge, migrateAgentConfig } from "../../shared"
-import { resolvePromptAppend } from "./resolve-file-uri"
+import { resolvePromptAppend, resolvePromptAppendSources } from "./resolve-file-uri"
 
 /**
  * Expands a category reference from an agent override into concrete config properties.
@@ -30,7 +30,10 @@ export function applyCategoryOverride(
   if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
 
   if (categoryConfig.prompt_append && typeof result.prompt === "string") {
-    result.prompt = result.prompt + "\n" + resolvePromptAppend(categoryConfig.prompt_append)
+    const resolvedCategoryAppend = resolvePromptAppendSources(categoryConfig.prompt_append)
+    if (resolvedCategoryAppend !== undefined) {
+      result.prompt = result.prompt + "\n" + resolvedCategoryAppend
+    }
   }
 
   return result as AgentConfig
@@ -58,7 +61,10 @@ export function mergeAgentConfig(
   }
 
   if (prompt_append && merged.prompt) {
-    merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append, directory)
+    const resolvedAppend = resolvePromptAppendSources(prompt_append, directory)
+    if (resolvedAppend !== undefined) {
+      merged.prompt = merged.prompt + "\n" + resolvedAppend
+    }
   }
 
   return merged

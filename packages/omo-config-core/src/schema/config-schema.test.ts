@@ -126,4 +126,51 @@ describe("omo config schema", () => {
     const issuePaths = result.error.issues.map((issue) => issue.path.join("."))
     expect(issuePaths).toContain("task.default_concurrency")
   })
+
+  test("#given a category prompt_append array #when parsed #then entries are preserved in declared order", () => {
+    // given
+    const config = {
+      categories: {
+        deep: {
+          prompt_append: ["first-append-sentinel", "second-append-sentinel"],
+        },
+      },
+    }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) throw new Error(result.error.message)
+    expect(result.data.categories?.deep?.prompt_append).toEqual([
+      "first-append-sentinel",
+      "second-append-sentinel",
+    ])
+  })
+
+  test("#given a non-string non-array category prompt_append #when parsed #then the issue path identifies the bad field", () => {
+    // given
+    const config = { categories: { deep: { prompt_append: 42 } } }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected config parsing to fail")
+    const issuePaths = result.error.issues.map((issue) => issue.path.join("."))
+    expect(issuePaths).toContain("categories.deep.prompt_append")
+  })
+
+  test("#given a category prompt_append array containing a non-string entry #when parsed #then parsing fails", () => {
+    // given
+    const config = { categories: { deep: { prompt_append: ["ok-sentinel", 7] } } }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(false)
+  })
 })

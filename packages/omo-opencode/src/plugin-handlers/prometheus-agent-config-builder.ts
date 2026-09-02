@@ -1,7 +1,7 @@
 import type { CategoryConfig } from "../config/schema";
 import type { FallbackModels } from "../config/schema/fallback-models";
 import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
-import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
+import { resolvePromptAppendSources } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import type { FallbackEntry } from "../shared/model-requirements";
 import {
@@ -24,7 +24,7 @@ type PrometheusOverride = Record<string, unknown> & {
   maxTokens?: number;
   fallback_models?: FallbackModels;
   prompt?: string;
-  prompt_append?: string;
+  prompt_append?: string | string[];
 };
 
 function isModelInFallbackChain(
@@ -138,8 +138,10 @@ export async function buildPrometheusAgentConfig(params: {
   const merged = { ...base, ...restOverride };
   if (typeof merged.prompt === "string") {
     for (const promptAddition of [prompt, prompt_append]) {
-      if (promptAddition) {
-        merged.prompt = merged.prompt + "\n" + resolvePromptAppend(promptAddition);
+      if (!promptAddition) continue;
+      const resolvedAddition = resolvePromptAppendSources(promptAddition);
+      if (resolvedAddition !== undefined) {
+        merged.prompt = merged.prompt + "\n" + resolvedAddition;
       }
     }
   }

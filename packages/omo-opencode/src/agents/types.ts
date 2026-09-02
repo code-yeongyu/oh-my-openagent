@@ -166,7 +166,7 @@ export type AgentName = BuiltinAgentName;
 
 export type AgentOverrideConfig = Partial<AgentConfig> & {
   category?: string;
-  prompt_append?: string;
+  prompt_append?: string | string[];
   skills?: string[];
   tools?: Record<string, boolean>;
   variant?: string;

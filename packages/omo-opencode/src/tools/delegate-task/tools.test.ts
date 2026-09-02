@@ -987,6 +987,42 @@ describe("sisyphus-task", () => {
       expect(resolved.promptAppend).toContain("custom-instructions-sentinel")
     })
 
+    test("user prompt_append array is appended to default in declared order", () => {
+      // given
+      const categoryName = "visual-engineering"
+      const userCategories = {
+        "visual-engineering": {
+          model: "google/gemini-3.1-pro",
+          prompt_append: ["first-append-sentinel", "second-append-sentinel"],
+        },
+      }
+
+      // when
+      const result = resolveCategoryConfig(categoryName, { userCategories, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+
+      // then
+      const resolved = expectResolvedCategoryConfig(result)
+      expect(resolved.promptAppend).toEndWith("\n\nfirst-append-sentinel\n\nsecond-append-sentinel")
+    })
+
+    test("user can define custom category with array prompt_append", () => {
+      // given
+      const categoryName = "my-custom"
+      const userCategories = {
+        "my-custom": {
+          model: "openai/gpt-5.5",
+          prompt_append: ["custom-first-sentinel", "custom-second-sentinel"],
+        },
+      }
+
+      // when
+      const result = resolveCategoryConfig(categoryName, { userCategories, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+
+      // then
+      const resolved = expectResolvedCategoryConfig(result)
+      expect(resolved.promptAppend).toBe("custom-first-sentinel\n\ncustom-second-sentinel")
+    })
+
     test("user can define custom category", () => {
       // given
       const categoryName = "my-custom"

@@ -1209,3 +1209,45 @@ describe("skills schema", () => {
     expect(result.success).toBe(true)
   })
 })
+
+describe("CategoryConfigSchema prompt_append sources", () => {
+  test("accepts an ordered array of prompt_append sources", () => {
+    //#given
+    const config = {
+      categories: {
+        deep: {
+          prompt_append: ["first-append-sentinel", "second-append-sentinel"],
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.categories?.deep?.prompt_append).toEqual([
+        "first-append-sentinel",
+        "second-append-sentinel",
+      ])
+    }
+  })
+
+  test("rejects prompt_append arrays containing non-string entries", () => {
+    //#given
+    const config = {
+      categories: {
+        deep: {
+          prompt_append: ["ok-sentinel", 42],
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})

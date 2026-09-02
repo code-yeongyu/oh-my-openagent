@@ -23,6 +23,11 @@ export interface ResolveCategoryConfigResult {
 
 type CategoryModelEntry = NonNullable<CategoryConfig["models"]>[number]
 
+function normalizePromptAppendSources(promptAppend: string | string[] | undefined): string | undefined {
+  if (promptAppend === undefined) return undefined
+  return Array.isArray(promptAppend) ? promptAppend.join("\n\n") : promptAppend
+}
+
 function resolveAvailableModelEntry(
   entry: CategoryModelEntry,
   availableModels: Set<string>,
@@ -103,10 +108,11 @@ export function resolveCategoryConfig(
   }
 
   let promptAppend = defaultPromptAppend
-  if (userConfig?.prompt_append) {
+  const userPromptAppend = normalizePromptAppendSources(userConfig?.prompt_append)
+  if (userPromptAppend) {
     promptAppend = defaultPromptAppend
-      ? defaultPromptAppend + "\n\n" + userConfig.prompt_append
-      : userConfig.prompt_append
+      ? defaultPromptAppend + "\n\n" + userPromptAppend
+      : userPromptAppend
   }
 
   return { config, promptAppend, model, isUserConfiguredModel }

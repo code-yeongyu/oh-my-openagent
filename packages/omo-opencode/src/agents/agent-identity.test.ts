@@ -35,4 +35,28 @@ describe("mergeAgentConfig prompt composition", () => {
 
     expect(merged.prompt).toBe("SENTINEL_BASE_PROMPT\nSENTINEL_APPEND_CONTENT")
   })
+
+  it("appends array-form prompt_append entries in declared order after the base prompt", () => {
+    // given
+    const base = { prompt: "SENTINEL_BASE_PROMPT" } as AgentConfig
+    const override = { prompt_append: ["SENTINEL_FIRST_APPEND", "SENTINEL_SECOND_APPEND"] }
+
+    // when
+    const merged = mergeAgentConfig(base, override)
+
+    // then
+    expect(merged.prompt).toBe("SENTINEL_BASE_PROMPT\nSENTINEL_FIRST_APPEND\n\nSENTINEL_SECOND_APPEND")
+  })
+
+  it("treats single-string and single-entry array prompt_append identically", () => {
+    // given
+    const base = { prompt: "SENTINEL_BASE_PROMPT" } as AgentConfig
+
+    // when
+    const fromString = mergeAgentConfig(base, { prompt_append: "SENTINEL_APPEND_CONTENT" })
+    const fromArray = mergeAgentConfig(base, { prompt_append: ["SENTINEL_APPEND_CONTENT"] })
+
+    // then
+    expect(fromArray.prompt).toBe(fromString.prompt)
+  })
 })

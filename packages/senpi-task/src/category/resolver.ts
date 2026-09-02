@@ -258,15 +258,16 @@ function parseAvailableModels(models: unknown): AvailableModelsParseResult {
   return { models: models.map((model) => parseRegistryModel(model)).filter((model) => model !== undefined).map(formatModel).sort(), validContainer: true }
 }
 
-function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | undefined): string | undefined {
+function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | string[] | undefined): string | undefined {
+  const userAppend = Array.isArray(userPromptAppend) ? userPromptAppend.join("\n\n") : userPromptAppend
   const promptAppendResolver = getOwnRecordValue(CATEGORY_PROMPT_APPEND_RESOLVERS, categoryName)
   const basePromptAppend = promptAppendResolver?.(model)
     ?? getOwnRecordValue(CATEGORY_PROMPT_APPENDS, categoryName)
     ?? ""
-  if (!userPromptAppend) {
+  if (!userAppend) {
     return basePromptAppend || undefined
   }
-  return basePromptAppend ? `${basePromptAppend}\n\n${userPromptAppend}` : userPromptAppend
+  return basePromptAppend ? `${basePromptAppend}\n\n${userAppend}` : userAppend
 }
 
 function nearestFallback(selection: CategoryModelSelection): string | undefined {

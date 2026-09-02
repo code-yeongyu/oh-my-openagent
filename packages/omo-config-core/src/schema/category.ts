@@ -35,7 +35,8 @@ export const OmoCategoryConfigObjectSchema = z.object({
   /** @deprecated Use provider_options.textVerbosity. */
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
-  prompt_append: z.string().optional(),
+  /** Inline text or file:// URI; an array of sources is appended in array-index order. */
+  prompt_append: z.union([z.string(), z.array(z.string())]).optional(),
   max_prompt_tokens: z.number().int().positive().optional(),
   is_unstable_agent: z.boolean().optional(),
   disable: z.boolean().optional(),

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
-import { resolvePromptAppend } from "./resolve-file-uri"
+import { resolvePromptAppend, resolvePromptAppendSources } from "./resolve-file-uri"
 
 describe("resolvePromptAppend", () => {
   const fixtureRoot = join(tmpdir(), `resolve-file-uri-${Date.now()}`)
@@ -164,5 +164,86 @@ describe("resolvePromptAppend", () => {
     //#then
     expect(resolved).toContain("[WARNING: Path rejected:")
     expect(resolved).not.toContain("secret-content")
+  })
+})
+
+describe("resolvePromptAppendSources", () => {
+  const fixtureRoot = join(tmpdir(), `prompt-append-sources-${Date.now()}`)
+  const firstFile = join(fixtureRoot, "first.md")
+  const secondFile = join(fixtureRoot, "second.md")
+
+  beforeAll(() => {
+    mkdirSync(fixtureRoot, { recursive: true })
+    writeFileSync(firstFile, "first-file-content-sentinel", "utf8")
+    writeFileSync(secondFile, "second-file-content-sentinel", "utf8")
+  })
+
+  afterAll(() => {
+    rmSync(fixtureRoot, { recursive: true, force: true })
+  })
+
+  test("resolves a single string identically to resolvePromptAppend", () => {
+    //#given
+    const input = "inline-append-sentinel"
+
+    //#when
+    const resolved = resolvePromptAppendSources(input, fixtureRoot)
+
+    //#then
+    expect(resolved).toBe(resolvePromptAppend(input, fixtureRoot))
+    expect(resolved).toBe("inline-append-sentinel")
+  })
+
+  test("resolves each file URI entry and joins contents in array order", () => {
+    //#given
+    const input = [`file://${secondFile}`, `file://${firstFile}`]
+
+    //#when
+    const resolved = resolvePromptAppendSources(input, fixtureRoot)
+
+    //#then
+    expect(resolved).toBe("second-file-content-sentinel\n\nfirst-file-content-sentinel")
+  })
+
+  test("mixes inline text and file URI entries in declared order", () => {
+    //#given
+    const input = ["inline-first-sentinel", `file://${firstFile}`]
+
+    //#when
+    const resolved = resolvePromptAppendSources(input, fixtureRoot)
+
+    //#then
+    expect(resolved).toBe("inline-first-sentinel\n\nfirst-file-content-sentinel")
+  })
+
+  test("returns undefined for an empty source array", () => {
+    //#given
+    const input: string[] = []
+
+    //#when
+    const resolved = resolvePromptAppendSources(input, fixtureRoot)
+
+    //#then
+    expect(resolved).toBeUndefined()
+  })
+
+  test("expands home-relative URIs per entry within allowed home subdirs", () => {
+    //#given
+    const testSubdirName = `.omo-test-sources-${Date.now()}`
+    const testSubdir = join(homedir(), ".config", "opencode", testSubdirName)
+    mkdirSync(testSubdir, { recursive: true })
+    writeFileSync(join(testSubdir, "home-prompt.txt"), "home-content-sentinel", "utf8")
+
+    try {
+      const input = [`file://~/.config/opencode/${testSubdirName}/home-prompt.txt`]
+
+      //#when
+      const resolved = resolvePromptAppendSources(input, fixtureRoot)
+
+      //#then
+      expect(resolved).toBe("home-content-sentinel")
+    } finally {
+      rmSync(testSubdir, { recursive: true, force: true })
+    }
   })
 })

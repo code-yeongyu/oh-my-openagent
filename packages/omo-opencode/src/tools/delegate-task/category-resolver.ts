@@ -20,21 +20,27 @@ function getConfiguredModel(entry: string | { model: string } | undefined): stri
   return typeof entry === "string" ? entry : entry?.model
 }
 
+function normalizePromptAppendSources(promptAppend: string | string[] | undefined): string | undefined {
+  if (promptAppend === undefined) return undefined
+  return Array.isArray(promptAppend) ? promptAppend.join("\n\n") : promptAppend
+}
+
 function resolveCategoryPromptAppendForModel(
   categoryName: string,
   actualModel: string | undefined,
   staticPromptAppend: string,
-  userPromptAppend: string | undefined,
+  userPromptAppend: string | string[] | undefined,
 ): string | undefined {
+  const userAppend = normalizePromptAppendSources(userPromptAppend)
   const dynamicResolver = CATEGORY_PROMPT_APPEND_RESOLVERS[categoryName]
   if (!dynamicResolver) {
     return staticPromptAppend || undefined
   }
   const dynamicBase = dynamicResolver(actualModel)
-  if (!userPromptAppend) {
+  if (!userAppend) {
     return dynamicBase || undefined
   }
-  return dynamicBase ? `${dynamicBase}\n\n${userPromptAppend}` : userPromptAppend
+  return dynamicBase ? `${dynamicBase}\n\n${userAppend}` : userAppend
 }
 
 export interface CategoryResolutionResult {

@@ -220,7 +220,7 @@ This table is the `[opencode].agents` surface only. Shared-base agents use the c
 | `temperature`     | number                  | Sampling temperature                                            |
 | `top_p`           | number                  | Top-p sampling                                                  |
 | `prompt`          | string                  | Replace system prompt. Supports `file://` URIs                  |
-| `prompt_append`   | string                  | Append to system prompt. Supports `file://` URIs                |
+| `prompt_append`   | string\|string[]        | Append to system prompt. Supports `file://` URIs; an array of sources is appended in array order |
 | `tools`           | record<string, boolean> | Per-tool enable/disable map                                     |
 | `disable`         | boolean                 | Disable this agent                                              |
 | `description`     | string                  | Agent description                                               |
@@ -341,6 +341,22 @@ For Prometheus, file-backed `prompt` content is appended after the mandatory bas
 
 Paths can be absolute (`file:///abs/path`), relative to project root (`file://./rel/path`), or home-relative (`file://~/home/path`). Home-relative files are limited to `~/.config/opencode`, `~/.config/oh-my-openagent`, `~/.omo`, and `~/.opencode`. If a file URI cannot be decoded, resolved, accepted, or read, OmO inserts a warning placeholder into the prompt instead of failing hard.
 
+`prompt_append` also accepts an array of sources. Each entry is resolved independently (inline text or `file://` URI, with per-entry `~` expansion) and entries are appended in array-index order: entry `[0]` first, the last entry last. Later entries win when instructions conflict. Single-string configs keep working unchanged.
+
+```jsonc
+{
+  "agents": {
+    "oracle": {
+      "prompt_append": [
+        "file://~/.omo/prompts/universal-rules.md",
+        "file://~/.omo/prompts/model-specific.md",
+        "Inline fallback rule if no file exists"
+      ]
+    }
+  }
+}
+```
+
 ### Categories
 
 Domain-specific model delegation used by the `task()` tool. When Sisyphus delegates work, it picks a category, not a model name.
@@ -377,7 +393,7 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `reasoningEffort`   | string        | -       | Deprecated compatibility input; use `reasoning`                     |
 | `textVerbosity`     | string        | -       | Text verbosity                                                      |
 | `tools`             | object        | -       | Tool usage control (disable with `{ "tool_name": false }`)         |
-| `prompt_append`     | string        | -       | Append to system prompt                                             |
+| `prompt_append`     | string\|string[] | -    | Append to system prompt; array entries are appended in array order  |
 | `max_prompt_tokens` | number        | -       | Maximum prompt tokens for delegated tasks                           |
 | `variant`           | string        | -       | Deprecated compatibility input; use `reasoning`                     |
 | `description`       | string        | -       | Shown in `task()` tool prompt                                       |
