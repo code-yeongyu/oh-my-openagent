@@ -1,0 +1,23 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/atlas/compaction-loop-guard.test.ts:
+264 |       await hook.handler({
+265 |         event: { type: "session.idle", properties: { sessionID: SESSION_ID } },
+266 |       })
+267 |
+268 |       // then - internal messages must not resume a stalled boulder
+269 |       expect(mockInput._promptMock).not.toHaveBeenCalled()
+                                              ^
+error: expect(received).not.toHaveBeenCalled()
+
+Expected number of calls: 0
+Received number of calls: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6303/packages/omo-opencode/src/hooks/atlas/compaction-loop-guard.test.ts:269:41)
+(fail) atlas boulder continuation compaction loop guard > #given continuation stalled by unrecoverable error #when an internal synthetic user message arrives #then the stall is not lifted [3102.80ms]
+
+ 0 pass
+ 5 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [5.95s]

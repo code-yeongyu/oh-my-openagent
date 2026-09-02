@@ -1,0 +1,64 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/atlas/compaction-loop-guard.test.ts:
+115 |     await hook.handler({
+116 |       event: { type: "session.idle", properties: { sessionID: SESSION_ID } },
+117 |     })
+118 |
+119 |     // then
+120 |     expect(mockInput._promptMock).not.toHaveBeenCalled()
+                                            ^
+error: expect(received).not.toHaveBeenCalled()
+
+Expected number of calls: 0
+Received number of calls: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6303/packages/omo-opencode/src/hooks/atlas/compaction-loop-guard.test.ts:120:39)
+(fail) atlas boulder continuation compaction loop guard > #given incomplete boulder plan #when non-retryable compaction 400 session.error fires #then no continuation is injected and the following idle stays silent [1090.14ms]
+136 |     await hook.handler({
+137 |       event: { type: "session.idle", properties: { sessionID: SESSION_ID } },
+138 |     })
+139 |
+140 |     // then
+141 |     expect(mockInput._promptMock).not.toHaveBeenCalled()
+                                            ^
+error: expect(received).not.toHaveBeenCalled()
+
+Expected number of calls: 0
+Received number of calls: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6303/packages/omo-opencode/src/hooks/atlas/compaction-loop-guard.test.ts:141:39)
+(fail) atlas boulder continuation compaction loop guard > #given incomplete boulder plan #when token limit session.error fires #then no continuation is injected and the following idle stays silent [23.95ms]
+171 |     await hook.handler({
+172 |       event: { type: "session.idle", properties: { sessionID: SESSION_ID } },
+173 |     })
+174 |
+175 |     // then
+176 |     expect(mockInput._promptMock).not.toHaveBeenCalled()
+                                            ^
+error: expect(received).not.toHaveBeenCalled()
+
+Expected number of calls: 0
+Received number of calls: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6303/packages/omo-opencode/src/hooks/atlas/compaction-loop-guard.test.ts:176:39)
+(fail) atlas boulder continuation compaction loop guard > #given latest persisted message is an errored compaction marker #when idle fires #then no continuation is injected [17.62ms]
+209 |         event: {
+210 |           type: "session.error",
+211 |           properties: { sessionID: SESSION_ID, error: COMPACTION_TOOL_PAIR_400 },
+212 |         },
+213 |       })
+214 |       expect(mockInput._promptMock).not.toHaveBeenCalled()
+                                              ^
+error: expect(received).not.toHaveBeenCalled()
+
+Expected number of calls: 0
+Received number of calls: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6303/packages/omo-opencode/src/hooks/atlas/compaction-loop-guard.test.ts:214:41)
+(fail) atlas boulder continuation compaction loop guard > #given continuation stalled by unrecoverable error #when a genuine user message arrives #then idle can resume continuation [17.81ms]
+
+ 1 pass
+ 4 fail
+ 5 expect() calls
+Ran 5 tests across 1 file. [3.77s]

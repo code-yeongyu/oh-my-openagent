@@ -41,6 +41,8 @@ export interface SessionState {
   lifecycleActive?: boolean
   lastEventWasAbortError?: boolean
   skipNextIdleAfterRuntimeErrorRetry?: boolean
+  tokenLimitDetected?: boolean
+  unrecoverableErrorDetected?: boolean
   lastContinuationInjectedAt?: number
   isInjectingContinuation?: boolean
   promptFailureCount: number
