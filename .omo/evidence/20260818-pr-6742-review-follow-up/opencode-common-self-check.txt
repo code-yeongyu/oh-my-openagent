@@ -1,0 +1,8 @@
+PASS: dependencies present (opencode sqlite3 curl jq tmux)
+PASS: oqa_db_path -> /Users/jonghoPro/.local/share/opencode/opencode.db
+PASS: oqa_sql_escape quotes single quotes
+PASS: oqa_free_port -> 57840
+PASS: isolated XDG sandbox auto-removed on exit (/var/folders/mg/06v1fkqx341gsjxv_l0l3kcw0000gp/T/oqa-xdg.XXXXXX.lNSaZw9RkG)
+PASS: isolated HOME points inside sandbox
+PASS: isolated HOME preserves HOME-based opencode shim
+PASS: common.sh self-check

@@ -1,0 +1,9 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/opencode-skill-loader/shared-skill-harness-scope.test.ts:
+(pass) shared skills reaching the OpenCode harness > #given the shared start-work skill #when OpenCode discovers it #then it carries no Codex-only stop marker [23.12ms]
+
+ 1 pass
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [411.00ms]

@@ -1,0 +1,7 @@
+PASS: OpenCode completed the plugin skill tool call
+PASS: skill(name=programming) returned the programming skill body
+PASS: OpenCode returned the completed skill output to the provider loop
+PASS: advertised skill-tool metadata contains the scoped programming description
+PASS: advertised skill-tool metadata excludes the legacy overbroad trigger
+PASS: programming description is within 1024 bytes (1005)
+PASS: real OpenCode DB session count is unchanged (0)

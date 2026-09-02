@@ -1,0 +1,18 @@
+PR #6742 Codex gate status, verified 2026-08-20
+
+GitHub CI (the repository's supported Node 24 environment):
+- PASS  codex-compatibility (ubuntu-latest, full)
+  https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32107635721/job/95630504131
+- PASS  codex-compatibility (macos-latest, platform)
+  https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32107635721/job/95630504293
+- PASS  codex-compatibility (windows-latest, platform)
+  https://github.com/code-yeongyu/oh-my-openagent/actions/runs/32107635721/job/95630504206
+
+Local diagnostic (Node 22.22.3, npm 10.9.8):
+- `bun run test:codex` reaches `node scripts/check-third-party-notices.mjs --ship` and fails with TS2688 after the nested Codex plugin install inherits `npm_config_dry_run=true` from `npm pack --dry-run`.
+- The same `check-third-party-notices.mjs --ship` failure reproduces on an unchanged `dev` checkout, so it is not caused by this PR.
+- The affected local dependency tree was restored with `npm --prefix packages/omo-codex/plugin ci`; both `@types/node` and `node_modules/.bin/tsc` are present afterward.
+
+Conclusion:
+The mandatory Codex gate is green in all CI jobs. The local npm 10 dry-run inheritance failure is a pre-existing root build issue and is outside this prose-only PR.
+
