@@ -436,6 +436,66 @@ describe("release binary asset lane in the platform publish workflow", () => {
     expect(job).toContain("binary-runtime/${OMO_AI_VERSION}")
   })
 
+  test("smokes musl binaries with their documented libstdc++ runtime installed", () => {
+    // #given
+    // bun's musl compile keeps libstdc++ dynamically linked (NEEDED
+    // libstdc++.so.6), and bare alpine images do not ship it: the smoke must
+    // install the runtime dependency before exec, exactly as real alpine
+    // users must. Verified empirically against bun 1.4.0 output.
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+    const smokeStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Smoke test release binary",
+      "      - name: Upload release binary artifact",
+    )
+    const muslSmokeFn = smokeStep.slice(
+      smokeStep.indexOf("musl_smoke()"),
+      smokeStep.indexOf("verify_checksum_and_size_only()"),
+    )
+    const arm64Job = workflow.slice(workflow.indexOf("  smoke-linux-arm64:"))
+    const arm64MuslBlock = arm64Job.slice(
+      arm64Job.indexOf("# alpine container for the musl binary."),
+      arm64Job.indexOf("      - name: Write job summary"),
+    )
+
+    // #when
+    const x64InstallsRuntime =
+      muslSmokeFn.includes("apk add") && muslSmokeFn.includes("libstdc++")
+    const arm64InstallsRuntime =
+      arm64MuslBlock.includes("apk add") && arm64MuslBlock.includes("libstdc++")
+
+    // #then
+    expect(x64InstallsRuntime, "the x64 musl smoke must install libstdc++ in the alpine container before executing the binary").toBe(true)
+    expect(arm64InstallsRuntime, "the arm64-musl smoke must install libstdc++ in the alpine container before executing the binary").toBe(true)
+  })
+
+  test("isolates native windows home resolution through a Win32 USERPROFILE", () => {
+    // #given
+    // The compiled launcher provisions its embedded runtime under
+    // os.homedir(), which on win32 resolves USERPROFILE and ignores HOME -
+    // and a native exe cannot read MSYS POSIX spellings at all. Every
+    // isolate() definition must therefore hand the exe a Win32 path (via
+    // cygpath) to the same sandboxed home while HOME stays POSIX for the
+    // bash-side assertions.
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+    const smokeStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Smoke test release binary",
+      "      - name: Upload release binary artifact",
+    )
+    const arm64Job = workflow.slice(workflow.indexOf("  smoke-linux-arm64:"))
+
+    // #when
+    const isolateContract = (section: string): boolean =>
+      section.includes("if command -v cygpath >/dev/null 2>&1; then") &&
+      section.includes('export USERPROFILE="$(cygpath -w "${SMOKE_ROOT}/home")"') &&
+      section.includes('export OMO_CODING_AGENT_DIR="$(cygpath -w "${SMOKE_ROOT}/agent")"')
+
+    // #then
+    expect(isolateContract(smokeStep), "the build-job smoke must export a Win32 USERPROFILE so first-run provisioning lands in the sandbox").toBe(true)
+    expect(isolateContract(arm64Job), "the arm64 smoke must carry the identical isolation contract").toBe(true)
+  })
+
   test("leaves npm publishing, runner routing, and matrix fail-fast untouched", () => {
     // #given
     const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
