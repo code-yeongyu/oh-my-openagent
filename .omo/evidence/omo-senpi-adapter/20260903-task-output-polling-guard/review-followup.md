@@ -30,6 +30,7 @@ bun test ./packages/omo-senpi/src/components/task/task-rpc-codec.test.ts \
 - `session_compact` now forgets task-output reads only when `payload.accepted === true`.
 - The compact lifecycle regression covers `accepted: false`, a payload without `accepted`, and `accepted: true`; only the last case clears the cache.
 - Re-running the focused command after the fix passed: 12 tests, 0 failures, 35 assertions.
+- After rebasing with the remote RPC polling guard, the codec, event bridge, and RPC bridge regressions passed together: 18 tests, 0 failures, 61 assertions.
 
 ## Completed local verification
 
@@ -43,7 +44,7 @@ node packages/omo-senpi/scripts/qa/drive.mjs --self-test
 node packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs --self-test
 ```
 
-Each completed with exit status 0. `bun run test:senpi` ran 2,540 tests across 335 files: 2,539 passed, 0 failed, and one Windows-only production task-driver test was skipped on this macOS host. Both Senpi QA driver self-tests reported `SELF-TEST OK`.
+Each completed with exit status 0, and the listed checks were re-run after rebasing onto the fork's polling-guard commits. The final `bun run test:senpi` run covered 2,541 tests across 335 files: 2,540 passed, 0 failed, and one Windows-only production task-driver test was skipped on this macOS host. Both Senpi QA driver self-tests reported `SELF-TEST OK`.
 
 ## Live adapter wiring
 
@@ -69,7 +70,7 @@ All generated JavaScript bundles other than `omo-task.js` retained their SHA-1 v
 | `omo-memory-mcp.js` | `f38706996414e8e6477a52720624dc8d568ede23` | `f38706996414e8e6477a52720624dc8d568ede23` |
 | `omo.js` | `25697bee889a8565a5ded2a91232226a95acc885` | `25697bee889a8565a5ded2a91232226a95acc885` |
 
-`omo-task.js` changed from `e3ab6da368bc788dc3010671f7f28c8144447b7a` to `9758fd9657eacec3b192f616e59b9bde253e4cf3`, as expected for the runtime fix.
+`omo-task.js` is the expected exception: it changed from `e3ab6da368bc788dc3010671f7f28c8144447b7a` to `9758fd9657eacec3b192f616e59b9bde253e4cf3` for the local source fix. After rebasing onto the fork's polling-guard changes, its remote baseline was `d01cfef3d2b5e6234559305604bea791833e3672` and the final regenerated SHA-1 is `b940dd7eb57bae3b223ada320b31706ef33cfc92`. The final bundle passed `node --check` and again contained three parsed `no_progress` markers.
 
 ## Why this is enough
 
