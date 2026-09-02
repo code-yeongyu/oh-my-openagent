@@ -7,6 +7,7 @@ import { createFallbackState, isModelInCooldown, stringifyRuntimeModelWithVarian
 import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { isRuntimeFallbackRetryTextParts } from "../../shared/runtime-fallback-retry-marker"
 
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
@@ -84,6 +85,22 @@ export function createChatMessageHandler(deps: HookDeps) {
       state.pendingFallbackModel = undefined
       state.pendingFallbackPromptMayHaveBeenAccepted = false
       clearModelLessRetryKeys(sessionID)
+      return
+    }
+
+    // Our own retry dispatches carry the runtime-fallback marker in their
+    // parts. If state was replaced mid-cycle (losing pendingFallbackModel),
+    // this dispatch would otherwise be misread as a manual model change and
+    // reset originalModel to the fallback model, enabling a backward hop to
+    // the just-failed primary (issue #6751). Never reset on marked dispatches.
+    if (isRuntimeFallbackRetryTextParts(output.parts)) {
+      if (requestedModel && requestedModel !== state.currentModel) {
+        log(`[${HOOK_NAME}] Ignoring model mismatch on marked fallback retry dispatch`, {
+          sessionID,
+          currentModel: state.currentModel,
+          requestedModel,
+        })
+      }
       return
     }
 

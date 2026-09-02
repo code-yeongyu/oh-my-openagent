@@ -170,6 +170,137 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     })
   })
 
+  test("#given our own marker-carrying fallback retry dispatch after a state wipe #when chat.message fires with the prepared fallback model #then the state is not reset as a manual model change (issue #6751)", async () => {
+    // given - a mid-cycle wipe cleared pendingFallbackModel; OMO's own retry
+    // dispatch (marked parts, model = prepared fallback) must not be misread
+    // as a manual model change, which would corrupt originalModel and enable
+    // a backward hop to the just-failed primary.
+    const deps = createDeps()
+    const sessionID = "session-6751-marker-dispatch"
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "go/fallback-a"
+    state.fallbackIndex = 1
+    state.attemptCount = 1
+    state.failedModels.set("zai/primary", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+    const output: {
+      message: { model?: { providerID: string; modelID: string } }
+      parts?: Array<{ type: string; text?: string }>
+    } = {
+      message: {},
+      parts: [
+        { type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
+      ],
+    }
+
+    // when - requestedModel (go/fallback-a) matches currentModel here only by
+    // coincidence of the wipe shape; the marker alone must suppress resets.
+    await handler(
+      {
+        sessionID,
+        model: {
+          providerID: "go",
+          modelID: "fallback-a",
+        },
+      },
+      output,
+    )
+
+    // then
+    expect(deps.sessionStates.get(sessionID)).toBe(state)
+    expect(state.originalModel).toBe("zai/primary")
+    expect(state.currentModel).toBe("go/fallback-a")
+    expect(state.fallbackIndex).toBe(1)
+    expect(state.attemptCount).toBe(1)
+    expect(state.failedModels.get("zai/primary")).toBeDefined()
+  })
+
+  test("#given our own marker-carrying dispatch whose model mismatches the wiped currentModel #when chat.message fires #then position bookkeeping survives untouched (issue #6751)", async () => {
+    // given - worst-case interleaving from the issue log: the retry dispatch
+    // lands against a state whose currentModel is still the primary and whose
+    // pendingFallbackModel was lost. The manual-change branch must not fire.
+    const deps = createDeps()
+    const sessionID = "session-6751-marker-mismatch"
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "zai/primary"
+    state.fallbackIndex = 1
+    state.attemptCount = 1
+    state.pendingFallbackModel = undefined
+    state.failedModels.set("zai/primary", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+    const output: {
+      message: { model?: { providerID: string; modelID: string } }
+      parts?: Array<{ type: string; text?: string }>
+    } = {
+      message: {},
+      parts: [
+        { type: "text", text: "retry payload\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
+      ],
+    }
+
+    // when
+    await handler(
+      {
+        sessionID,
+        model: {
+          providerID: "go",
+          modelID: "fallback-a",
+        },
+      },
+      output,
+    )
+
+    // then - same object, same position fields, originalModel not corrupted
+    expect(deps.sessionStates.get(sessionID)).toBe(state)
+    expect(state.originalModel).toBe("zai/primary")
+    expect(state.fallbackIndex).toBe(1)
+    expect(state.attemptCount).toBe(1)
+    expect(state.failedModels.get("zai/primary")).toBeDefined()
+  })
+
+  test("#given a marker-carrying dispatch matching pendingFallbackModel #when chat.message fires #then pending is consumed and no reset happens", async () => {
+    // given - happy path that must keep working: the dispatcher set
+    // pendingFallbackModel before sending; chat.message consumes it quietly.
+    const deps = createDeps()
+    const sessionID = "session-6751-marker-consume"
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "go/fallback-a"
+    state.fallbackIndex = 1
+    state.pendingFallbackModel = "go/fallback-a"
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["unknown:1:rate limit"]))
+    const handler = createChatMessageHandler(deps)
+    const output: {
+      message: { model?: { providerID: string; modelID: string } }
+      parts?: Array<{ type: string; text?: string }>
+    } = {
+      message: {},
+      parts: [
+        { type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
+      ],
+    }
+
+    // when
+    await handler(
+      {
+        sessionID,
+        model: {
+          providerID: "go",
+          modelID: "fallback-a",
+        },
+      },
+      output,
+    )
+
+    // then
+    expect(deps.sessionStates.get(sessionID)).toBe(state)
+    expect(state.pendingFallbackModel).toBe(undefined)
+    expect(state.originalModel).toBe("zai/primary")
+    expect(deps.sessionStatusRetryKeys.has(sessionID)).toBe(false)
+  })
+
   test("#given an explicit-variant fallback and a base primary #when cooldown restoration runs #then the fallback-only variant is removed", async () => {
     // given
     const deps = createDeps()

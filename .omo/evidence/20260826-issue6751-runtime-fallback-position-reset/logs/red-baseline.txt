@@ -1,0 +1,8 @@
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6751/packages/omo-opencode/src/hooks/runtime-fallback/runtime-fallback-position.test.ts:153:60)
+(fail) runtime fallback position monotonicity (#6751) > #given primary and first fallback both fail across an internal-abort cycle #when opencode echoes stop/idle/abort-error between hops #then dispatched fallback models only move forward and never revisit failed models [5.99ms]
+
+ 290 pass
+ 5 fail
+ 560 expect() calls
+Ran 295 tests across 31 files. [2.02s]
