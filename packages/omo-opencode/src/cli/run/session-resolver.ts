@@ -1,5 +1,4 @@
 import pc from "picocolors"
-import { PUBLISHED_PACKAGE_NAME } from "../../shared"
 import type { OpencodeClient } from "./types"
 import { serializeError } from "./events"
 
@@ -29,7 +28,6 @@ export async function resolveSession(options: {
   for (let attempt = 1; attempt <= SESSION_CREATE_MAX_RETRIES; attempt++) {
     const res = await client.session.create({
       body: {
-        title: `${PUBLISHED_PACKAGE_NAME} run`,
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],

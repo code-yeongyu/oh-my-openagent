@@ -1,5 +1,5 @@
 import {
-  createInternalAgentTextPart,
+  createInternalAgentContinuationTextPart,
   isAmbiguousPostDispatchPromptFailure,
   log,
   withInternalNoReplyMarker,
@@ -164,8 +164,8 @@ export class MonitorOutputInjector {
             noReply: !shouldReply,
             parts: [
               shouldReply
-                ? createInternalAgentTextPart(content)
-                : withInternalNoReplyMarker(createInternalAgentTextPart(content)),
+                ? createInternalAgentContinuationTextPart(content)
+                : withInternalNoReplyMarker(createInternalAgentContinuationTextPart(content)),
             ],
           },
           query: { directory: this.deps.directory },

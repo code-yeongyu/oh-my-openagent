@@ -87,7 +87,6 @@ describe("resolveSession", () => {
     expect(result).toBe("new-session-id")
     expect(mockClient.session.create).toHaveBeenCalledWith({
       body: {
-        title: "oh-my-openagent run",
         permission: [
           { permission: "question", action: "deny", pattern: "*" },
         ],
@@ -95,6 +94,23 @@ describe("resolveSession", () => {
       query: { directory },
     })
     expect(mockClient.session.get).not.toHaveBeenCalled()
+  })
+
+  it("creates sessions without a custom title so OpenCode auto-titles from the task (#5544)", async () => {
+    // given
+    const mockClient = createMockClient({
+      createResults: [{ data: { id: "new-session-id" } }],
+    })
+
+    // when
+    await resolveSession({ client: mockClient, directory, retryDelayMs: 1 })
+
+    // then: a pre-set title makes OpenCode's ensureTitle skip forever (#5544)
+    const createCall = (mockClient.session.create as ReturnType<typeof mock> & {
+      mock: { calls: Array<[{ body: Record<string, unknown> }]> }
+    }).mock.calls[0]?.[0]
+    expect(createCall?.body).toBeDefined()
+    expect("title" in createCall.body).toBe(false)
   })
 
   it("retries session creation on failure", async () => {
@@ -114,7 +130,6 @@ describe("resolveSession", () => {
     expect(mockClient.session.create).toHaveBeenCalledTimes(2)
     expect(mockClient.session.create).toHaveBeenCalledWith({
       body: {
-        title: "oh-my-openagent run",
         permission: [
           { permission: "question", action: "deny", pattern: "*" },
         ],
