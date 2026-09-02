@@ -26,6 +26,17 @@ All references in this document are repository-relative to this evidence directo
 - `post-merge-test-senpi.log`: 2,530 pass, 1 Windows-only skip, 0 fail.
 - `post-merge-senpi-drive-self-test.log` and `post-merge-senpi-drive-live.json`: isolated real Senpi self-test and live driver passed with protected host state unchanged.
 
+## Final non-sharing stale-sweep verification
+
+- `red-nonsharing-stale-sweep.log`: controlled-clock RED showed an advisory stale `EIO` left the directory ineligible for its next acquire.
+- `green-nonsharing-stale-sweep.log`: 8 pass, 0 fail after non-sharing stale failures rearm the scheduler while sharing failures preserve the age window.
+- `final-focused.log`: 17 pass, 0 fail.
+- `final-memory-core.log`: 654 pass, 0 fail.
+- `final-typecheck.log`: full repository typecheck passed.
+- `final-generated-bundle-build.log` and `final-generated-bundle-check.log`: bundled extensions were regenerated from source and are current.
+- `final-test-senpi.log`: 2,530 pass, 1 Windows-only skip, 0 fail.
+- `final-senpi-drive-self-test.log`, `final-senpi-drive-live.json`, and `final-driver-cleanup-results.txt`: exact-source isolated real Senpi QA passed with sandbox and child-process absence recorded.
+
 ## Full-root suite accounting
 
 The local root-suite attempts are environmental diagnostics, not passing gates:

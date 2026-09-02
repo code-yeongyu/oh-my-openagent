@@ -1,0 +1,2 @@
+final_self_test capture_id=senpi-qa-self-0cc98a97-f593-461b-8592-247b68e24abe tested_commit=09995e71ff243256b9f88ba8b1f15cb85f70073e sandbox_absence=pass child_process_absence=pass sandbox_cleanup=driver
+final_live_driver capture_id=senpi-qa-live-d94a8f11-5aef-4614-a386-23d672aab777 tested_commit=09995e71ff243256b9f88ba8b1f15cb85f70073e captured_at=2026-09-02T09:48:26Z sandbox_absence=pass child_process_absence=pass manual_cleanup=not_needed

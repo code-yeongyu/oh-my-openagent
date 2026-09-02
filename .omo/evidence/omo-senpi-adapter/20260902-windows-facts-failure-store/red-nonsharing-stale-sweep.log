@@ -1,0 +1,29 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/memory-core/src/locks/candidate-sweep.test.ts:
+(pass) sweepStaleLockCandidates > #given stale and fresh candidates #when swept #then only stale candidates are deleted [8.90ms]
+(pass) sweepStaleLockCandidates > #given a missing locks directory #when swept #then nothing is swept [0.47ms]
+(pass) sweepStaleLockCandidates > #given a legal lock name containing .candidate- #when swept #then the live lock survives [0.71ms]
+(pass) sweepStaleLockCandidates > #given one sharing-failing candidate and one removable candidate #when stale candidates are swept #then the failure is bounded and the rest are reclaimed [0.86ms]
+(pass) sweepStaleLockCandidates > #given a sharing-blocked candidate #when resweep eligibility advances #then fresh cleanup is deferred and stale cleanup is bounded [21.34ms]
+(pass) sweepStaleLockCandidates > #given a non-sharing candidate cleanup failure #when acquisition throws #then the next acquire rearms its sweep [6.21ms]
+216 |
+217 |       failStale = false
+218 |       const third = await createLockRecord("memory-write", {})
+219 |       await acquireLock(lockPath, third)
+220 |       await releaseLock(lockPath, third)
+221 |       expect((await readdir(directory)).includes(staleName)).toBe(false)
+                                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (<WORKTREE>/packages/memory-core/src/locks/candidate-sweep.test.ts:221:62)
+(fail) sweepStaleLockCandidates > #given a non-sharing stale-sweep failure #when the next acquire runs #then sweep eligibility is rearmed [10.17ms]
+(pass) sweepStaleLockCandidates > #given a stale candidate #when the first lock in that directory is acquired #then the candidate is swept [3.61ms]
+
+ 7 pass
+ 1 fail
+ 18 expect() calls
+Ran 8 tests across 1 file. [2.26s]

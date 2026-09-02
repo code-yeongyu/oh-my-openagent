@@ -1,0 +1,25 @@
+Bundled 858 modules in 64ms
+
+  omo.js  1.49 MB  (entry point)
+
+Bundled 666 modules in 26ms
+
+  omo-task.js  0.95 MB  (entry point)
+
+Bundled 212 modules in 10ms
+
+  omo-member.js  175.38 KB  (entry point)
+
+Bundled 106 modules in 7ms
+
+  omo-memory-mcp.js  104.21 KB  (entry point)
+
+Bundled 137 modules in 7ms
+
+  memory-run-supervisor.mjs  36.10 KB  (entry point)
+
+Bundled 118 modules in 8ms
+
+  omo-init-deep-advisor.js  77.95 KB  (entry point)
+
+Built omo-senpi extensions: <WORKTREE>/packages/omo-senpi/plugin/extensions/omo.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-task.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-member.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
