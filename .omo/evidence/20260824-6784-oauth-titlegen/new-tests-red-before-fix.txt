@@ -1,0 +1,14 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-native/test/claude-oauth-lane.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '../bin/lib/claude-oauth-lane.js' from '/home/viprix/projects/oom-wt-6784/packages/omo-native/test/claude-oauth-lane.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [484.00ms]

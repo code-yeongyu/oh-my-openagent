@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { assessClaudeSdkOauthLane } from "./claude-oauth-lane.js"
 import { packageManifest, packageRoot, readJson, resolveSenpi } from "./package-paths.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
 
@@ -229,6 +230,12 @@ export function runDoctor(inventory, args = [], options = {}) {
       fail(lines, `senpi version: ${error.message}`)
       failed = true
     }
+  }
+
+  const lane = assessClaudeSdkOauthLane({ agentDir: canonicalAgentDir(), env: process.env })
+  if (lane) {
+    lines.push(...lane.lines)
+    if (lane.failed) failed = true
   }
 
   lines.push(`INFO omo ${packageManifest().version} (engine: senpi ${engineVersionOrUnresolved(senpi)})`)
