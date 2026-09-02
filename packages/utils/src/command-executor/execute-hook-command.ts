@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { getHomeDirectory } from "./home-directory";
 import { findBashPath, findZshPath } from "./shell-path";
+import { resolveWindowsSystemTool } from "../system-tool-paths";
 
 export interface CommandResult {
   exitCode: number;
@@ -155,7 +156,7 @@ export async function executeHookCommand(
         onComplete?.();
         return;
       }
-      const killer = spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+      const killer = spawn(resolveWindowsSystemTool("taskkill.exe"), ["/PID", String(proc.pid), "/T", "/F"], {
         windowsHide: true,
         stdio: "ignore",
       });
