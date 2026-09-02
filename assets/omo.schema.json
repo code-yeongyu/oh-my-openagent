@@ -11065,6 +11065,11 @@
                   "type": "number",
                   "minimum": 0
                 },
+                "first_prompt_watchdog_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
                 "notify_on_fallback": {
                   "type": "boolean"
                 },
@@ -25857,6 +25862,11 @@
                       "timeout_seconds": {
                         "type": "number",
                         "minimum": 0
+                      },
+                      "first_prompt_watchdog_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
                       },
                       "notify_on_fallback": {
                         "type": "boolean"
