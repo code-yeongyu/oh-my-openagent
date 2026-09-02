@@ -200,6 +200,16 @@ describe("event-bridge native task telemetry and controls", () => {
         parent_session_id: "parent-session",
       },
     })
+    await expect(
+      invokeRpc("omo.task.output", {
+        task_id: current.task_id,
+        mode: "status",
+      }),
+    ).resolves.toMatchObject({
+      kind: "no_progress",
+      task_id: current.task_id,
+      status: "running",
+    })
   })
 
   it("#given a live child subscription #when the task settles #then the bridge unsubscribes and ignores later child events", async () => {
