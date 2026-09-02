@@ -112,6 +112,7 @@ import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type Sess
 import { toBackgroundTaskSnapshots } from "./task-snapshot"
 import {
   archiveBackgroundTask,
+  findRegisteredBackgroundTaskBySessionId,
   forgetBackgroundTask,
   getRegisteredBackgroundTask,
   rememberBackgroundTask,
@@ -1062,6 +1063,24 @@ The fallback retry session is now created and can be inspected directly.
 
   getTask(id: string): BackgroundTask | undefined {
     return this.tasks.get(id) ?? this.completedTaskArchive.get(id) ?? getRegisteredBackgroundTask(id)
+  }
+
+  /**
+   * Reverse lookup across all resolution layers (live map, completed-task
+   * archive, persisted registry). Recovery path when only the session ID from
+   * launch metadata is held and the bg_ ID no longer resolves (issue #7010).
+   */
+  getTaskBySessionId(sessionID: string): BackgroundTask | undefined {
+    return this.findBySession(sessionID) ?? this.findArchivedTaskBySessionId(sessionID) ?? findRegisteredBackgroundTaskBySessionId(sessionID)
+  }
+
+  private findArchivedTaskBySessionId(sessionID: string): BackgroundTask | undefined {
+    for (const task of this.completedTaskArchive.values()) {
+      if (task.sessionId === sessionID) {
+        return task
+      }
+    }
+    return undefined
   }
 
   getTasksSnapshot(): BackgroundTaskSnapshot[] { return toBackgroundTaskSnapshots(this.tasks.values()) }
