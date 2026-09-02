@@ -91,6 +91,43 @@ describe("resolveRoster", () => {
     })
   })
 
+  it("#given disabled_agents config #when resolving roster #then it excludes disabled builtin agents", () => {
+    withIsolatedConfig("disabled-agents", (root) => {
+      // given
+      const project = join(root, "project")
+      writeJson(join(project, ".omo", "omo.jsonc"), {
+        "[opencode]": {
+          disabled_agents: ["hephaestus"],
+        },
+      })
+
+      // when
+      const rows = resolveRoster(project)
+
+      // then
+      expect(rows.some((row) => row.label === "hephaestus")).toBe(false)
+      expect(rows.some((row) => row.label === "sisyphus")).toBe(true)
+    })
+  })
+
+  it("#given legacy alias in disabled_agents #when resolving roster #then it excludes the canonical agent", () => {
+    withIsolatedConfig("disabled-agents-alias", (root) => {
+      // given
+      const project = join(root, "project")
+      writeJson(join(project, ".omo", "omo.jsonc"), {
+        "[opencode]": {
+          disabled_agents: ["Hephaestus (Deep Agent)"],
+        },
+      })
+
+      // when
+      const rows = resolveRoster(project)
+
+      // then
+      expect(rows.some((row) => row.label === "hephaestus")).toBe(false)
+    })
+  })
+
   it("#given malformed config #when resolving roster #then it still returns resolver rows", () => {
     withIsolatedConfig("malformed", (root) => {
       // given
