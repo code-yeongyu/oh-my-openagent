@@ -14,6 +14,8 @@
   `node packages/omo-senpi/scripts/qa/drive.mjs --self-test`.
 - Real Senpi adapter:
   `node packages/omo-senpi/scripts/qa/drive.mjs`.
+- Full Senpi gate with repository-pinned Bun 1.4.0:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always bunx bun@1.4.0 run test:senpi`.
 
 ## What was observed
 
@@ -27,6 +29,13 @@ The focused test passed with 1 test, 4 expectations, and 0 failures. Both memfs
 suites passed with 26 tests, 84 expectations, and 0 failures. Package typecheck
 exited 0 with no diagnostics.
 
+The mandatory full Senpi gate passed 2,527 tests across 334 files with 8,053
+expectations, 1 documented Windows-only process-mode skip, and 0 failures. Its
+separate evidence-dir resolver suite also passed all 10 tests. The first gate
+attempt stopped before tests because the task worktree's local submodules
+required explicit `file://` transport permission; the final command supplies
+that worktree-only git setting.
+
 The real Senpi driver reported `PASS`, injected the ultrawork directive, passed
 the comment checker, and reported `realSenpiUntouched: true` with no changed
 real-home paths. The isolated sandbox was removed after the run.
@@ -34,10 +43,11 @@ real-home paths. The isolated sandbox was removed after the run.
 ## Why this is enough
 
 The focused and combined suites exercise the exact restore case and adjacent
-real-git commands without weakening assertions. The typecheck covers the
-changed package. The real Senpi driver proves the consuming adapter still loads
-and executes in an isolated agent directory. Required PR CI supplies the
-authoritative Windows rerun of the original failing surface.
+real-git commands without weakening assertions. The full Senpi gate covers the
+complete adapter and task-engine package surface, while the scoped typecheck
+covers the changed package. The real Senpi driver proves the consuming adapter
+still loads and executes in an isolated agent directory. Required PR CI
+supplies the authoritative Windows rerun of the original failing surface.
 
 ## What was omitted
 
