@@ -342,6 +342,20 @@ describe("task_output run stats rendering", () => {
     expect(line).not.toContain("ran ")
     expect(line).not.toContain("tok/s")
   })
+
+  test("#given no-progress output without a pending notification #when the row renders #then it shows the factual reason", () => {
+    const detail: TaskOutputDetails = {
+      kind: "no_progress",
+      task_id: "st_done",
+      status: "completed",
+      reason: "Task st_done is completed. It will not send a completion notification.",
+    }
+
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    expect(line).toContain("It will not send a completion notification.")
+    expect(line).not.toContain("await notification")
+  })
 })
 
 describe("task_output suspended residency rendering", () => {

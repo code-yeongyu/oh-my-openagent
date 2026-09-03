@@ -3,6 +3,7 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { Type } from "typebox"
 import type { Static } from "typebox"
 
+import { shouldNotifyStatus } from "../../completion/routing"
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
 import { defaultResolveCallerSessionId, toolResult } from "../control"
@@ -160,7 +161,9 @@ function invalidArguments(reason: string): TaskOutputToolResult {
 }
 
 function noProgress(record: TaskRecord): TaskOutputToolResult {
-  const reason = !record.notify_on_terminal
+  const notificationPending =
+    record.notify_on_terminal && shouldNotifyStatus(record.status) && record.notification.notified_epoch < record.notification.run_epoch
+  const reason = !notificationPending
     ? `Task ${record.task_id} is ${record.status}. It will not send a completion notification; use mode:"tail" only for explicit transcript diagnosis.`
     : `Task ${record.task_id} has not changed since the last status read. Await its completion notification; use mode:"tail" only for explicit transcript diagnosis.`
   return toolResult(reason, {

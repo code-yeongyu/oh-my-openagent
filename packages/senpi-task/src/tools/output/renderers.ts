@@ -74,7 +74,7 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
     case "no_progress":
       return {
         color: statusThemeColor(details.status),
-        text: `task_output ${normalizeRendererText(details.task_id)} ${normalizeRendererText(details.status)} · no new progress; await notification`,
+        text: `task_output ${normalizeRendererText(details.task_id)} ${normalizeRendererText(details.status)} · ${normalizeRendererText(details.reason)}`,
       }
     case "transcript":
       return {
