@@ -338,4 +338,28 @@ describe("parent wake idle force reply", () => {
       notifier.shutdown()
     }
   })
+
+  test("#given recent parent activity is fresh and history has running tool calls #when flushing an idle forced wake #then the history guard defers the forced reply into an admit-only noReply deposit", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+      parentActivityWindowMs: 180_000,
+    })
+    notifier.queuePendingParentWake("parent-1", PROGRESS_WAKE, { agent: "sisyphus" }, false)
+    notifier.recordParentSessionActivity("parent-1")
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      expect(notifier.getDispatchedParentWakes().get("parent-1")?.shouldReply).toBe(false)
+    } finally {
+      notifier.shutdown()
+    }
+  })
 })
