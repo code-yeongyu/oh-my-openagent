@@ -89,12 +89,12 @@ describe("createTeamMemberStatusHandler", () => {
     expect(runtimeState.members[0]?.status).toBe("idle")
   })
 
-  test("leaves an already-idle member untouched on a subsequent session.idle", async () => {
+  test("keeps an already-idle member idle but refreshes lastActiveAt on a subsequent session.idle", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
-    await seedRuntimeState(createRuntimeState(teamRunId, buildMember({ status: "idle" })), config)
+    await seedRuntimeState(createRuntimeState(teamRunId, buildMember({ status: "idle", lastActiveAt: 12345 })), config)
     const handler = createTeamMemberStatusHandler(config)
 
     // when
@@ -103,6 +103,7 @@ describe("createTeamMemberStatusHandler", () => {
     // then
     const runtimeState = await loadRuntimeState(teamRunId, config)
     expect(runtimeState.members[0]?.status).toBe("idle")
+    expect(runtimeState.members[0]?.lastActiveAt).toBeGreaterThan(12345)
   })
 
   test("never overrides a terminal errored status on session.idle", async () => {
