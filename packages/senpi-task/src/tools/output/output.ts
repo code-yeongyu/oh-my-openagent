@@ -162,7 +162,10 @@ function invalidArguments(reason: string): TaskOutputToolResult {
 
 function noProgress(record: TaskRecord): TaskOutputToolResult {
   const notificationPending =
-    record.notify_on_terminal && shouldNotifyStatus(record.status) && record.notification.notified_epoch < record.notification.run_epoch
+    record.notify_on_terminal &&
+    (record.status === "pending" ||
+      record.status === "running" ||
+      (shouldNotifyStatus(record.status) && record.notification.notified_epoch < record.notification.run_epoch))
   const reason = !notificationPending
     ? `Task ${record.task_id} is ${record.status}. It will not send a completion notification; use mode:"tail" only for explicit transcript diagnosis.`
     : `Task ${record.task_id} has not changed since the last status read. Await its completion notification; use mode:"tail" only for explicit transcript diagnosis.`
