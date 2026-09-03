@@ -66,13 +66,36 @@ describe("root test CI partition", () => {
     expect(matrix).not.toContain("parallel_args:")
   })
 
+  test("#given Windows shard 2 #when the remainder runs #then it remains serial", () => {
+    const job = rootTestJob()
+    const windowsStepStart = job.indexOf(
+      "runner.os == 'Windows' && matrix.shard == '2/2'",
+    )
+    const windowsStepEnd = job.indexOf(
+      "      - name: Upload Windows post-test telemetry",
+      windowsStepStart,
+    )
+
+    expect(windowsStepStart).toBeGreaterThanOrEqual(0)
+    expect(windowsStepEnd).toBeGreaterThan(windowsStepStart)
+
+    const windowsStep = job.slice(windowsStepStart, windowsStepEnd)
+    if (windowsStep.includes('"--parallel"')) {
+      throw new Error(
+        "windows shard 2 must remain serial while five-gate repairs are pending",
+      )
+    }
+
+    expect(windowsStep).toContain('-Invocation "shard-2-remainder"')
+    expect(windowsStep).toContain(
+      '-TestArguments @("--config=bunfig.win2.parallel.toml", "test")',
+    )
+  })
+
   test("#given global zauc mocks #when Windows root tests are partitioned #then omo-opencode stays in one process", () => {
     const job = rootTestJob()
 
     expect(job).toContain("bun test packages/omo-opencode packages/memory-core")
-    expect(job).toContain(
-      '-TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")',
-    )
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/omo-opencode/**")

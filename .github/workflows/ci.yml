@@ -245,7 +245,7 @@ jobs:
           & .github/scripts/windows-ci-telemetry.ps1 `
             -ArtifactDirectory $telemetryDirectory `
             -Invocation "shard-2-remainder" `
-            -TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")
+            -TestArguments @("--config=bunfig.win2.parallel.toml", "test")
           exit $LASTEXITCODE
 
       - name: Upload Windows post-test telemetry

@@ -1,0 +1,8 @@
+bun test v1.3.14 (0d9b296a)
+
+ 17 pass
+ 0 fail
+ 96 expect() calls
+Ran 17 tests across 1 file. [576.00ms]
+
+Command exited with code 0

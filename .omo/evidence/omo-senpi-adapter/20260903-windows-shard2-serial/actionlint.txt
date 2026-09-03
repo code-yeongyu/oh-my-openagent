@@ -1,0 +1,6 @@
+Command:
+actionlint -shellcheck="" .github/workflows/ci.yml
+
+Observed:
+exit code 0
+stdout/stderr empty

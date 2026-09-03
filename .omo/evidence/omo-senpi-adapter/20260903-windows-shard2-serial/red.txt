@@ -1,0 +1,22 @@
+$ bun test ./script/ci-root-test-partition.test.ts
+bun test v1.3.14 (0d9b296a)
+
+script/ci-root-test-partition.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+81 |
+82 |     const windowsStep = job.slice(windowsStepStart, windowsStepEnd)
+83 |     if (windowsStep.includes('"--parallel"')) {
+84 |       throw new Error(
+85 |         "windows shard 2 must remain serial while five-gate repairs are pending",
+86 |       )
+           ^
+error: windows shard 2 must remain serial while five-gate repairs are pending
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/windows-shard2-serial/script/ci-root-test-partition.test.ts:86:7)
+(fail) root test CI partition > #given Windows shard 2 #when the remainder runs #then it remains serial [0.18ms]
+
+ 16 pass
+ 1 fail
+ 94 expect() calls
+Ran 17 tests across 1 file. [3.40s]
+
+Command exited with code 1
