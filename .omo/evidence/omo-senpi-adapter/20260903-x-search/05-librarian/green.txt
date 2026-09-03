@@ -1,0 +1,17 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/senpi-task/src/agents/builtin/builtin-agents.test.ts:
+(pass) builtin curated agents > #given the builtin defaults #when listing names sorted #then the 4 curated and 3 reviewer agents are present [0.97ms]
+(pass) builtin curated agents > #given the builtin record #when listing keys sorted #then every builtin maps to its definition [1.81ms]
+(pass) builtin curated agents > #given the curated name set #when checking membership #then it contains exactly the 4 curated names [0.08ms]
+(pass) builtin curated agents > #given the reviewer name set #when checking membership #then it contains exactly the 3 reviewer names and stays disjoint from the curated set [0.07ms]
+(pass) builtin curated agents > #given every builtin definition #when inspecting shape #then mode is subagent and executionMode is pinned in-process [0.08ms]
+(pass) builtin curated agents > #given every curated definition #when inspecting tool rules #then the expected literal allow-true rules are present [0.13ms]
+(pass) builtin curated agents > #given every reviewer definition #when inspecting tool rules #then the curated allowlist plus write is present [0.09ms]
+(pass) builtin curated agents > #given the reviewer definitions #when reading their names #then they match the ulw-loop omo-senpi quality-gate identities [0.06ms]
+(pass) builtin curated agents > #given every builtin definition #when inspecting descriptions #then each is non-empty with the brand tag stripped [0.07ms]
+
+ 9 pass
+ 0 fail
+ 146 expect() calls
+Ran 9 tests across 1 file. [483.00ms]

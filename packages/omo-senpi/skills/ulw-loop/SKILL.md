@@ -16,7 +16,7 @@ This skill is compact by design: the run contract below is the whole bootstrap. 
 1. Create goals: `omo-agent-toolkit ulw-loop create-goals --brief "<brief>" --json`. The ulw-loop skill-pointer message carries the resolved absolute CLI path for this installation; use that path verbatim. If the CLI reports the existing aggregate complete, start fresh with `--session-id <new-id>`.
 2. Register the aggregate objective from the printed handoff with `create_goal`, shaped by `references/define-goal.md`. Goal creation is NEVER skipped.
 3. Mirror every atomic step into the live `todo` checklist: one granular step per action, exactly one in_progress, transitions marked the instant they happen.
-4. Loop per goal (`status --json`, the per-criterion cycle, `checkpoint`, `complete-goals`) with real-surface evidence for every criterion. Tests alone never prove done.
+4. Treat each goal as a phase: create its own worktree off the integration base; dispatch its dependency-ordered lanes as ONE `workflow` run (read the mass-ulw skill first; ordering-free lanes stay a `task` batch); verify every criterion with real-surface evidence; land the worktree on the integration base at `checkpoint --status complete` per the repository's flow (direct merge or merged PR); define the next goal's run from what this one proved. Tests alone never prove done. When a mass-ulw pointer accompanies this skill, this contract still owns goals, criteria, evidence, and checkpoints.
 5. Stop when the goal's WHEN-TO-STOP line holds with evidence in hand.
 
 When the injected ultrawork directive accompanies this skill, its goal/notepad/todo bootstrap is subsumed by this contract: the loop CLI owns goal state and the loop ledger is the notepad — do not create a second one.
@@ -29,12 +29,7 @@ When the injected ultrawork directive accompanies this skill, its goal/notepad/t
 - If `omo-agent-toolkit ulw-loop create-goals` says the existing aggregate is already complete, start unrelated new work with a fresh `--session-id <new-id>` instead of steering or forcing the completed default state. Use `--force` only to intentionally overwrite completed evidence.
 - Every success criterion needs observable evidence from a real surface: a channel (terminal/TUI via the xterm.js web terminal, HTTP, browser, computer-use) or, for CLI- or data-shaped criteria, an auxiliary surface (CLI stdout, DB diff, parsed config dump).
 - Evidence is bound to the tree it was captured at (`git rev-parse --short "HEAD^{tree}"`); it goes stale only when tracked content changes — a rebase or amend that keeps the tree identical keeps it valid. When the tree differs, re-run at the current HEAD and re-record, never relabel or regenerate. Record only after cleanup receipts exist.
-- Delegate code edits, test writes, fixes, and QA execution to right-sized omo-senpi subagents through the native `task` tool.
-- Plan and reviewer agents may run for a long time; spawn them with `run_in_background: true` and keep doing independent root work.
-- For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long reading, testing, or review passes, and `BLOCKED: <reason>` only when it cannot progress.
-- Track spawned task ids locally. Completion and progress arrive as injected notifications; use `task_output` for at most one midpoint status or transcript check per child, never a polling loop.
-- While children run, surface the active subagent count, task ids, and latest `WORKING:` phase.
-- If a live child needs context or correction, send it with `task_send`. Fallback only when the child completed without the deliverable, explicitly reported `BLOCKED:`, or is no longer running; then record inconclusive and spawn a smaller native `task` with the missing deliverable.
+- Delegate code edits, test writes, fixes, and QA execution to right-sized omo-senpi subagents through the native `task` tool or through `workflow` nodes when the phase's lanes carry ordering.
 - Use `git-master` for git-tracked edits: inspect recent and touched-path commit history, then commit each verified work unit atomically in the repository's observed language, scope, and message style with only that unit's files staged. Never carry verified units into a later omnibus commit.
 
 ## Team mode: decide it, do not default to it

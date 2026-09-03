@@ -1,0 +1,296 @@
+{
+  "queryId": "q07",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"KOSPI foreign investor flows since:2026-08-22 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-22",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421820,
+    "completed_at": 1788421820,
+    "id": "1e03c451-4112-92ee-9992-3d48ea2679e6",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_1e03c451-4112-92ee-9992-3d48ea2679e6_call-56b85d26-dfff-40df-b3fb-9f6a23066b79-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "KOSPI foreign investor flows",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://en.yna.co.kr/view/AEN20260820003100320"
+            },
+            {
+              "type": "url",
+              "url": "https://seoulclosingbell.com/how-foreign-investor-flows-move-the-kospi/"
+            },
+            {
+              "type": "url",
+              "url": "https://github.com/james-brand/korea-market-data"
+            },
+            {
+              "type": "url",
+              "url": "https://www.koreatimes.co.kr/economy/others/20260612/foreign-investors-return-to-kospi-buying-powering-rally-above-8000"
+            },
+            {
+              "type": "url",
+              "url": "https://www.koreaherald.com/article/10677789"
+            },
+            {
+              "type": "url",
+              "url": "https://en.sedaily.com/finance/2026/05/31/foreign-investors-dump-44-trillion-won-in-may-set-records"
+            },
+            {
+              "type": "url",
+              "url": "https://caelion.dev/en/indicators/kospi_foreign_net_buy/"
+            },
+            {
+              "type": "url",
+              "url": "https://biz.chosun.com/en/en-finance/2025/10/28/C726CXMCI5FYPCKN4RUIVZPXJ4/"
+            },
+            {
+              "type": "url",
+              "url": "https://en.sedaily.com/finance/2026/05/06/foreign-ownership-of-kospi-hits-6-year-high-on-global"
+            },
+            {
+              "type": "url",
+              "url": "https://www.koreaherald.com/article/10757154"
+            },
+            {
+              "type": "url",
+              "url": "https://en.bloomingbit.io/feed/news/104686"
+            },
+            {
+              "type": "url",
+              "url": "https://en.fnnews.com/news/202603101813489152"
+            },
+            {
+              "type": "url",
+              "url": "https://en.fnnews.com/news/202607092055112955"
+            },
+            {
+              "type": "url",
+              "url": "https://www.koreajoongangdaily.com/business/kospi-rally-continues-as-foreign-investors-lead-in-stock-purchases/12608945"
+            },
+            {
+              "type": "url",
+              "url": "https://www.koreajoongangdaily.com/business/korean-individual-investors-purchase-net-7-billion-in-us-stocks-in-2-months/12850153"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_1e03c451-4112-92ee-9992-3d48ea2679e6_call-56b85d26-dfff-40df-b3fb-9f6a23066b79-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**Foreign investor flows into the KOSPI** (Korea Composite Stock Price Index) have been highly volatile in 2026, with massive net selling in several months offset by strong valuation gains from the index's rally, leading to record-high foreign holdings and ownership percentages.[[1]](https://en.yna.co.kr/view/AEN20260820003100320)\n\n### Recent Trends (2026)\n- **Q2 2026**: Foreign securities investment in South Korea surged by $859.3 billion to $2.33 trillion (part of total foreign investment reaching a record $3.02 trillion, up $891.2 billion QoQ). This was driven by a 67.8% KOSPI rally in the quarter, boosting the valuation of existing holdings rather than pure inflows.[[1]](https://en.yna.co.kr/view/AEN20260820003100320)\n- **May 2026**: Record net selling of ₩44.7 trillion on KOSPI (longest consecutive selling streak in years), concentrated in semiconductors like SK Hynix (₩20.7T sold) and Samsung Electronics (₩16.0T sold). Retail investors bought a record ₩35.1T to absorb some of it. Foreigners were net buyers on KOSDAQ (₩2.84T).[[2]](https://en.sedaily.com/finance/2026/05/31/foreign-investors-dump-44-trillion-won-in-may-set-records)\n- **Year-to-date through mid-2026**: Cumulative net selling exceeded ₩190 trillion on KOSPI (including alternative platforms), far above prior years, yet the index continued rising as institutions and retail stepped in. Foreign ownership still climbed due to price appreciation.[[3]](https://en.fnnews.com/news/202607092055112955)\n- **June 2026**: A sharp reversal with heavy selling (e.g., ₩28T over ~8 sessions in late June/early July, including a single-day record of ₩7.73T), contributing to a steep KOSPI drop (sidecar triggered). Foreigners flipped back to net buying around July 8 as retail capitulated.[[4]](https://seoulclosingbell.com/how-foreign-investor-flows-move-the-kospi/)\n- **Weekly data (as of late August 2026)**: Volatile swings, e.g., net selling of ₩8.32T (Aug 24–28), buying of ₩6.55T (Aug 10–14) and ₩0.84T (Aug 17–21). Foreigners own ~30% of KOSPI market value (often ~50% in Samsung Electronics), making their flows a major driver.[[4]](https://seoulclosingbell.com/how-foreign-investor-flows-move-the-kospi/)\n- **Latest (as of Sep 2, 2026)**: Net selling of ₩1.92T on that day (worsening from ₩0.50T the prior day). Daily flows remain a key swing factor tied to FX, global risk appetite, and semiconductors.[[5]](https://caelion.dev/en/indicators/kospi_foreign_net_buy/)\n\n### Broader Context\n- **Ownership levels**: Foreign holdings reached record highs despite net selling in many periods, thanks to the KOSPI rally (e.g., holdings nearly doubled in some reports; ownership hit 6-year highs around 37–39% in early/mid-2026, up significantly from prior levels). US investors have been major participants.[[6]](https://www.koreaherald.com/article/10677789)\n- **Key drivers**: Portfolio rebalancing after big gains, semiconductor/AI exposure (heavy buying/selling in Samsung, SK Hynix), global fund flows, and FX. Foreign flows are structurally important because of their large ownership stake.[[4]](https://seoulclosingbell.com/how-foreign-investor-flows-move-the-kospi/)\n- **Counterparties**: Retail investors and institutions (including the National Pension Service) have often bought during foreign selling streaks, supporting the index.[[7]](https://en.fnnews.com/news/202603101813489152)\n\nFor the most granular daily or stock-level data, sources like the Korea Exchange (KRX), Naver Finance, or open datasets (e.g., GitHub repos tracking all KOSPI/KOSDAQ stocks) are commonly referenced.[[8]](https://github.com/james-brand/korea-market-data) Flows can shift quickly with market sentiment.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://en.yna.co.kr/view/AEN20260820003100320",
+                "start_index": 279,
+                "end_index": 332,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.yna.co.kr/view/AEN20260820003100320",
+                "start_index": 678,
+                "end_index": 731,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.sedaily.com/finance/2026/05/31/foreign-investors-dump-44-trillion-won-in-may-set-records",
+                "start_index": 1047,
+                "end_index": 1153,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.fnnews.com/news/202607092055112955",
+                "start_index": 1432,
+                "end_index": 1484,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://seoulclosingbell.com/how-foreign-investor-flows-move-the-kospi/",
+                "start_index": 1764,
+                "end_index": 1842,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://seoulclosingbell.com/how-foreign-investor-flows-move-the-kospi/",
+                "start_index": 2111,
+                "end_index": 2189,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://caelion.dev/en/indicators/kospi_foreign_net_buy/",
+                "start_index": 2388,
+                "end_index": 2451,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.koreaherald.com/article/10677789",
+                "start_index": 2785,
+                "end_index": 2836,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://seoulclosingbell.com/how-foreign-investor-flows-move-the-kospi/",
+                "start_index": 3073,
+                "end_index": 3151,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.fnnews.com/news/202603101813489152",
+                "start_index": 3320,
+                "end_index": 3372,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://github.com/james-brand/korea-market-data",
+                "start_index": 3572,
+                "end_index": 3627,
+                "title": "8"
+              }
+            ]
+          }
+        ],
+        "id": "msg_1e03c451-4112-92ee-9992-3d48ea2679e6",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 180915500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 180915500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:50:20.937Z"
+}

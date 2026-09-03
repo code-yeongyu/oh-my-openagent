@@ -1,0 +1,27 @@
+command: bun test packages/omo-senpi/scripts/qa/x-search-live-e2e.test.mjs
+exit: 1
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-live-e2e.test.mjs:
+(pass) x-search live QA isolation helpers > uses the observed child x_search execution outcome [0.54ms]
+14 |     expect(fabricatedSuccess.outcome).toBe("success")
+15 |     expect(fabricatedSuccess.outcome).not.toBe("denied")
+16 |     expect(observeChildXSearchCall("assistant said unavailable").observed).toBe(false)
+17 |   })
+18 |   test("detects x_search in a tool execution transcript", () => {
+19 |     expect(skillHasX('{"toolName":"x_search"}')).toBe(true)
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-live-e2e.test.mjs:19:50)
+(fail) x-search live QA isolation helpers > detects x_search in a tool execution transcript [0.39ms]
+(pass) x-search live QA isolation helpers > scrubs XAI and GROK variables from the environment passed to a spawned process [18.76ms]
+(pass) x-search live QA isolation helpers > copies only the xai credential into the sandbox and removes the seeded file [1.08ms]
+
+ 3 pass
+ 1 fail
+ 14 expect() calls
+Ran 4 tests across 1 file. [1.52s]

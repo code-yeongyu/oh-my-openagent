@@ -1,0 +1,39 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/senpi-task/src/agents/resolve-agent.test.ts:
+(pass) resolveAgent > #given an agent with disallowedTools #when resolved #then the denylist rides the persona as toolDenylist [3.38ms]
+(pass) resolveAgent > #given an agent without disallowedTools #when resolved #then no denylist is forced onto the persona [0.16ms]
+(pass) resolveAgent > #given an agent fallback chain and matching live model #when resolved #then it returns agent metadata and persona [0.13ms]
+(pass) resolveAgent > #given def.model and def.models are both available #when resolved #then def.model wins [0.12ms]
+(pass) resolveAgent > #given configured runtime fallback preserves requested and resolved models #when an agent resolves #then the ordered runtime chain is retained [0.11ms]
+(pass) resolveAgent > #given an unavailable primary and ordered def.models #when resolved #then the first available model wins [0.08ms]
+(pass) resolveAgent > #given def.models entries the machine has no credentials for #when resolved #then resolution falls through to the first available entry [0.10ms]
+(pass) resolveAgent > #given every configured model is keyless #when resolved #then the builtin fallback chain still resolves an available model [0.10ms]
+(pass) resolveAgent > #given a disabled agent #when resolved #then it is hidden as not_found [0.07ms]
+(pass) resolveAgent > #given an unknown agent name #when resolved #then it returns the active sorted roster [0.08ms]
+(pass) resolveAgent > #given no registry model matches #when resolved #then it returns model_unavailable without throwing [0.09ms]
+264 |         { pattern: "x_search", allow: true },
+265 |       ],
+266 |     }), undefined, { modelOverride: "openai/explicit" }))
+267 | 
+268 |     expect(explore.toolAllowlist).toEqual(["read"])
+269 |     expect(explore.toolDenylist).toEqual(["x_search"])
+                                       ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "x_search",
++   "read",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/senpi-task/src/agents/resolve-agent.test.ts:269:34)
+(fail) resolveAgent > #given curated tool rules #when resolved #then explicit denies become child exclusions while librarian keeps x_search [3.66ms]
+(pass) resolveAgent > #given a model override without a registry #when resolved #then it returns persona fields and filters the tool allowlist [0.12ms]
+
+ 12 pass
+ 1 fail
+ 25 expect() calls
+Ran 13 tests across 1 file. [1.51s]

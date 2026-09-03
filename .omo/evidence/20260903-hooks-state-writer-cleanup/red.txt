@@ -1,0 +1,39 @@
+$ bun test script/senpi-hooks-state.test.ts
+bun test v1.3.14 (0d9b296a)
+
+script/senpi-hooks-state.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+125 |         signal: () => undefined,
+126 |       },
+127 |       { isAlive: () => false, pause: () => Promise.resolve(), pollAttempts: 1 },
+128 |     )
+129 |
+130 |     expect(calls).toEqual([{
+                        ^
+error: expect(received).toEqual(expected)
+
+- [
+-   {
+-     "args": [
+-       "/PID",
+-       "4242",
+-       "/T",
+-       "/F",
+-     ],
+-     "command": "taskkill.exe",
+-   },
+- ]
++ []
+
+- Expected  - 11
++ Received  + 1
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/hooks-state-writer-cleanup/script/senpi-hooks-state.test.ts:130:19)
+(fail) timed-out hooks-state writer cleanup > uses forced taskkill tree termination on win32 and reports the writer [1.25ms]
+
+ 8 pass
+ 1 fail
+ 13 expect() calls
+Ran 9 tests across 1 file. [3.94s]
+
+Command exited with code 1.

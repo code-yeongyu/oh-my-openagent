@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "createdAt": "2026-08-31T14:00:00.000Z",
+  "updatedAt": "2026-08-31T14:00:00.000Z",
+  "briefPath": ".omo/ulw-loop/s1/brief.md",
+  "goalsPath": ".omo/ulw-loop/s1/goals.json",
+  "ledgerPath": ".omo/ulw-loop/s1/ledger.jsonl",
+  "codexGoalMode": "aggregate",
+  "goals": [
+    {
+      "id": "g1",
+      "title": "Mixed reviewer QA",
+      "objective": "Verify explicit reviewer assignments",
+      "status": "in_progress",
+      "successCriteria": [],
+      "attempt": 1,
+      "createdAt": "2026-08-31T14:00:00.000Z",
+      "updatedAt": "2026-08-31T14:00:00.000Z"
+    }
+  ],
+  "activeGoalId": "g1"
+}

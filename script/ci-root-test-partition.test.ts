@@ -6,6 +6,10 @@ import {
 } from "./root-test-serial-quarantine.ts"
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
+const windowsTelemetryScript = readFileSync(
+  new URL("../.github/scripts/windows-ci-telemetry.ps1", import.meta.url),
+  "utf8",
+)
 const rootConfig = readFileSync(new URL("../bunfig.root.toml", import.meta.url), "utf8")
 const win2ConfigPath = new URL("../bunfig.win2.toml", import.meta.url)
 const win2ParallelConfigPath = new URL("../bunfig.win2.parallel.toml", import.meta.url)
@@ -25,8 +29,25 @@ function rootTestJob(): string {
   return workflow.slice(start, end)
 }
 
+function senpiCompatibilityJob(): string {
+  const start = workflow.indexOf("  senpi-compatibility:\n")
+  const end = workflow.indexOf("\n  lazycodex-published-smoke:", start)
+  if (start < 0 || end < 0) throw new Error("Senpi compatibility job not found")
+  return workflow.slice(start, end)
+}
+
 function quotedPatterns(config: string): readonly string[] {
   return [...config.matchAll(/"([^"]+\/\*\*)"/g)].map((match) => match[1] ?? "")
+}
+
+function assertWindowsTelemetryContract(script: string): void {
+  if (
+    !script.includes("$postTestUtc") ||
+    !script.includes("$postTestStopwatchTimestamp") ||
+    !script.includes("postTest =")
+  ) {
+    throw new Error("windows telemetry contract: missing post-test capture")
+  }
 }
 
 describe("root test CI partition", () => {
@@ -49,7 +70,9 @@ describe("root test CI partition", () => {
     const job = rootTestJob()
 
     expect(job).toContain("bun test packages/omo-opencode packages/memory-core")
-    expect(job).toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
+    expect(job).toContain(
+      '-TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")',
+    )
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/omo-opencode/**")
@@ -61,9 +84,10 @@ describe("root test CI partition", () => {
     const serialCommand = serialQuarantineCommand()
 
     expect(ROOT_TEST_SERIAL_QUARANTINE_PATHS.length).toBeGreaterThan(0)
-    // Both parallel legs (POSIX and Windows shard 2) run the same serial list,
-    // so a file added to or dropped from the module must move both legs.
-    expect([...job.matchAll(new RegExp(escapeForRegExp(serialCommand), "g"))]).toHaveLength(2)
+    expect([...job.matchAll(new RegExp(escapeForRegExp(serialCommand), "g"))]).toHaveLength(1)
+    for (const testPath of ROOT_TEST_SERIAL_QUARANTINE_PATHS) {
+      expect([...job.matchAll(new RegExp(escapeForRegExp(testPath), "g"))]).toHaveLength(2)
+    }
   })
 
   test("#given the shared quarantine module #when the shard-2 bunfig is read #then it ignores exactly the quarantined files", () => {
@@ -125,11 +149,111 @@ describe("root test CI partition", () => {
     const job = rootTestJob()
     const runBlock = job.slice(job.indexOf("      - name: Run tests"))
 
-    expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '1/2'")
+    expect(runBlock).toContain(
+      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2'",
+    )
+    expect(runBlock).toContain(
+      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2'",
+    )
     expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2'")
     expect(runBlock).toContain("if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2'")
     expect(runBlock).not.toContain("shell: bash\n        run: |")
     expect(job).toContain("timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}")
+  })
+
+  test("#given a telemetry fixture without post-test state #when the contract is checked #then the diagnostic is stable", () => {
+    const missingPostTestCapture = `
+      $preTestUtc = [DateTime]::UtcNow.ToString("o")
+      $preTestStopwatchTimestamp = [System.Diagnostics.Stopwatch]::GetTimestamp()
+      exit $testExitCode
+    `
+
+    expect(() => assertWindowsTelemetryContract(missingPostTestCapture)).toThrow(
+      "windows telemetry contract: missing post-test capture",
+    )
+  })
+
+  test("#given Windows root-test telemetry #when the collector runs #then timing and process state avoid secrets", () => {
+    assertWindowsTelemetryContract(windowsTelemetryScript)
+    expect(windowsTelemetryScript).toContain("$preTestUtc")
+    expect(windowsTelemetryScript).toContain("$preTestStopwatchTimestamp")
+    expect(windowsTelemetryScript).toContain("stopwatchFrequency")
+    expect(windowsTelemetryScript).toContain("-OperationTimeoutSec 5")
+    expect(windowsTelemetryScript).toContain("[string]$postTestStopwatchTimestamp")
+    expect(windowsTelemetryScript).toContain("name =")
+    expect(windowsTelemetryScript).toContain("pid =")
+    expect(windowsTelemetryScript).toContain("parentPid =")
+    expect(windowsTelemetryScript).toContain("creationTimeUtc =")
+    expect(windowsTelemetryScript).toContain("temporaryPaths =")
+    expect(windowsTelemetryScript).toContain("testExitCode = $testExitCode")
+    expect(windowsTelemetryScript).toContain("survivingDescendants =")
+    expect(windowsTelemetryScript).not.toContain("CommandLine")
+    expect(windowsTelemetryScript).not.toContain("ExecutablePath")
+    expect(windowsTelemetryScript).not.toContain("Get-ChildItem Env:")
+  })
+
+  test("#given Windows test failures #when telemetry completes #then the Bun exit code remains authoritative", () => {
+    expect(windowsTelemetryScript).toContain("$testExitCode = $testProcess.ExitCode")
+    expect(windowsTelemetryScript).toContain("exit $testExitCode")
+    expect(windowsTelemetryScript).toContain("Write-Warning")
+    expect(windowsTelemetryScript).not.toContain("exit 0")
+  })
+
+  test("#given both Windows shards #when root tests run #then telemetry wraps every Bun invocation", () => {
+    const job = rootTestJob()
+
+    expect([
+      ...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g),
+    ]).toHaveLength(3)
+    expect(job).toContain('-Invocation "shard-1"')
+    expect(job).toContain('-Invocation "shard-2-quarantine"')
+    expect(job).toContain('-Invocation "shard-2-remainder"')
+    expect(job).toContain("WINDOWS_TEST_SHARD: ${{ matrix.shard }}")
+  })
+
+  test("#given Windows Senpi compatibility tests #when the package gate runs #then telemetry wraps the flaky test invocation", () => {
+    const job = senpiCompatibilityJob()
+    const windowsStepName = "      - name: Run Senpi compatibility tests with Windows telemetry"
+    const windowsStepStart = job.indexOf(windowsStepName)
+
+    expect(
+      windowsStepStart,
+      "Windows Senpi compatibility tests must be telemetry-wrapped",
+    ).toBeGreaterThanOrEqual(0)
+
+    const windowsStep = job.slice(
+      windowsStepStart,
+      job.indexOf("      - name: Upload Windows Senpi telemetry", windowsStepStart),
+    )
+    const uploadStep = job.slice(
+      job.indexOf("      - name: Upload Windows Senpi telemetry"),
+      job.indexOf("      - name: Write job summary"),
+    )
+
+    expect(windowsStep).toContain("runner.os == 'Windows'")
+    expect(windowsStep).toContain("shell: pwsh")
+    expect(windowsStep).toContain("& .github/scripts/windows-ci-telemetry.ps1")
+    expect(windowsStep).toContain('-Invocation "senpi-compatibility"')
+    expect(windowsStep).toContain('-TestArguments @("test", "packages/omo-senpi")')
+    expect(windowsStep).toContain("exit $LASTEXITCODE")
+    expect(uploadStep).toContain("if: always() && runner.os == 'Windows'")
+    expect(uploadStep).toContain("continue-on-error: true")
+    expect(uploadStep).toContain("uses: actions/upload-artifact@v6")
+  })
+
+  test("#given Windows telemetry files #when a matrix leg finishes #then immutable artifacts always upload without gating", () => {
+    const job = rootTestJob()
+    const uploadStep = job.slice(
+      job.indexOf("      - name: Upload Windows post-test telemetry"),
+      job.indexOf("      - name: Write job summary"),
+    )
+
+    expect(uploadStep).toContain("if: always() && runner.os == 'Windows'")
+    expect(uploadStep).toContain("continue-on-error: true")
+    expect(uploadStep).toContain("uses: actions/upload-artifact@v6")
+    expect(uploadStep).toContain("${{ github.run_id }}-${{ github.run_attempt }}")
+    expect(uploadStep).toContain("if-no-files-found: warn")
+    expect(uploadStep).toContain("overwrite: false")
   })
 
   test("#given Windows cache restore costs more than install #when the root matrix runs #then only non-Windows jobs restore Bun cache", () => {

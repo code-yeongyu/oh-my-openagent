@@ -1,0 +1,57 @@
+Issue 7392 cross-surface reviewer alias canonicalization
+========================================================
+
+Failing first
+-------------
+Command:
+  npm test -- test/spawn-guard.test.ts -t 'LazyCodex and Senpi aliases alternate'
+
+Observed:
+  1 failed, 20 skipped.
+  The fourth alternating explicit code-review alias returned no denial because
+  the LazyCodex and Senpi spellings persisted separate counters.
+
+Green
+-----
+- Identical focused command: 1 pass, 0 fail.
+- Complete spawn-guard file: 21 pass, 0 fail.
+- Complete ulw-loop component: 449 pass, 0 fail across 41 files.
+- Component TypeScript, Biome, and build: pass.
+- Root Bun 1.4.0 typecheck and build: pass.
+- Exact Bun 1.4.0 Senpi gate: completed with exit 0 in detached session
+  `bash_1563`; its PTY transcript was evicted before parent resumption.
+- Bun 1.4.0 canonical six-extension and staged-runtime freshness: pass.
+
+Built staged Senpi surface
+--------------------------
+The rebuilt `omo-agent-toolkit` received alternating explicit
+`omo-senpi-code-reviewer` and `lazycodex-code-reviewer` prompts.
+
+- attempts 1-3: allowed;
+- attempt 4: denied as `omo-senpi-code-reviewer 4/3`;
+- persisted Senpi code-review counter: 3;
+- LazyCodex code-review counter: absent.
+
+Live harnesses
+--------------
+- Isolated Codex app-server self-test: pass.
+- Isolated local-plugin app-server: completed; `sessionStart`,
+  `userPromptSubmit`, and `stop` started and completed; real Codex config hash
+  unchanged.
+- Senpi adapter self-test: pass.
+- Real isolated Senpi adapter: `result=PASS`; ultrawork injected; comment
+  checker passed; caller agent-dir override ignored; protected Senpi/OMO paths
+  and credential digest unchanged.
+
+Known Codex gate gap
+--------------------
+The exact Bun 1.4.0 `test:codex` run again passed all changed-component tests
+before reaching the existing dry-run pack setup failure. The pack step removes
+workspace development dependencies before the prepare build, which then cannot
+resolve Node types. No changed assertion, direct typecheck, lint, or build
+failed.
+
+Omissions
+---------
+Temporary paths, credentials, raw environment values, private configuration,
+and unrelated session content are omitted.

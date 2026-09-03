@@ -19,9 +19,8 @@ describe("config.jsonc migration transform", () => {
       path: configSource.path,
       value: {
         $schema: "https://legacy.example/config.schema.json",
-        codegraph: { excluded_roots: ["/generated"] },
         "[opencode]": { nested: { value: true } },
-        "[codex]": { codegraph: { daemon: false } },
+        "[codex]": { disabled_hooks: ["startup-toast"] },
         "[omo]": { agents: { oracle: { model: "legacy" } } },
         "[senpi]": { agents: { oracle: { model: "current" } } },
         _migrations: ["legacy-file-marker"],
@@ -35,9 +34,8 @@ describe("config.jsonc migration transform", () => {
     // then
     expect(result.document).toEqual({
       $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
-      codegraph: { excluded_roots: ["/generated"] },
       "[opencode]": { nested: { value: true } },
-      "[codex]": { codegraph: { daemon: false } },
+      "[codex]": { disabled_hooks: ["startup-toast"] },
       "[senpi]": { agents: { oracle: { model: "current" } } },
       legacy_migrations: {
         "/home/alice/.omo/config.jsonc": ["legacy-file-marker", "legacy-top-level-marker"],

@@ -1,0 +1,1 @@
+Mutation proof: not applicable to this prose/data/evidence todo (authoritative instructions explicitly state there is no RED/mutation gate). The deterministic acceptance failure is recorded in red.txt; no mutation was introduced into production code.

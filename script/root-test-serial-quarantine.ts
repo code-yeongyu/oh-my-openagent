@@ -24,10 +24,6 @@ export const ROOT_TEST_SERIAL_QUARANTINE: readonly SerialQuarantineEntry[] = [
     reason: "spawns a real console probe process and asserts on its exclusive console handles",
   },
   {
-    path: "packages/utils/src/codegraph-provision-upgrade.test.ts",
-    reason: "provisions a shared codegraph install directory that concurrent workers would clobber",
-  },
-  {
     path: "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts",
     reason: "a saturation benchmark whose timings degrade once workers compete for the same cores",
   },

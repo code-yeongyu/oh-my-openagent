@@ -69,6 +69,8 @@ export function registerMemoryStatic(input: {
     activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
   } = input
   const api = completionApi(pi)
+  // The gate is detached, so it receives the live appendEntry seam rather than the disposed event ctx.
+  // Registration is capability-gated below; this callback is only used when the host supports it.
   if (api !== undefined) {
     registerReflectionCompletionRenderer(api)
     registerReflectionHealthRenderer(api)
@@ -76,6 +78,7 @@ export function registerMemoryStatic(input: {
   if (hasMemoryCapabilities(pi)) {
     nudgeWiring.register(pi)
     noticeWiring.register(pi)
+    memorianGateWiring.attachEntrySink((customType, data) => pi.appendEntry(customType, data))
   }
   const toolExposure = options.toolExposure ?? "direct"
   const promptHandler = createPromptHandler({

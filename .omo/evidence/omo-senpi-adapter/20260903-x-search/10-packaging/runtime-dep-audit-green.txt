@@ -1,0 +1,10 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/runtime-dependency-resolution.test.ts:
+(pass) omo-senpi local-path runtime dependencies > packageNameOf resolves package names from subpath imports [2.70ms]
+(pass) omo-senpi local-path runtime dependencies > #given a symlinked plugin without host hoisting #when Node imports its runtime dependencies #then each resolves from the real path [412.25ms]
+
+ 2 pass
+ 0 fail
+ 9 expect() calls
+Ran 2 tests across 1 file. [905.00ms]

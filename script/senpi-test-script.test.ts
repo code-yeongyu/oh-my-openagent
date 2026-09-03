@@ -59,6 +59,7 @@ describe("Senpi compatibility test script", () => {
       "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
       "node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs",
       "node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs",
+      "node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs",
       "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
       "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
       "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",

@@ -29,7 +29,6 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
   - [Notification](#notification)
   - [MCPs](#mcps)
   - [LSP](#lsp)
-  - [CodeGraph](#codegraph)
 - [Advanced](#advanced)
   - [Runtime Fallback](#runtime-fallback)
   - [Model Capabilities](#model-capabilities)
@@ -45,7 +44,7 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
 
 ### File Locations
 
-One unified file configures every omo harness: the OpenCode plugin, Senpi (task, codegraph, config-watch), and the Codex codegraph loader. The legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration](#migration)).
+One unified file configures every omo harness: the OpenCode plugin, Senpi (task, config-watch), and Codex. The legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration](#migration)).
 
 1. User layer (lowest precedence): `~/.omo/omo.jsonc` on every platform (`omo.json` is accepted as a fallback basename).
 2. Project layers: `.omo/omo.jsonc` (then `.omo/omo.json`) in every directory from the working directory up to `$HOME`. Farther ancestors merge first, so the nearest project file wins and beats the user layer. `$HOME` itself is skipped by the walk because `~/.omo` is already the user layer. If the working directory is outside `$HOME`, the walk continues to the filesystem root.
@@ -97,7 +96,7 @@ Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to li
 The first time a current harness starts (and again on install or via the CLI), a lock-and-journal migration engine imports the legacy files into the unified file:
 
 - Sources: `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` in the OpenCode user config directory, in each of its `profiles/<name>/` directories, and in walked project `.opencode/` directories, plus `~/.omo/config.jsonc`.
-- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its shared `codegraph` settings plus its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[senpi]`.
+- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[senpi]`.
 - OpenCode legacy files import only model/provider controls (`disabled_providers`, `model_fallback`, `models`, and `omo_agent` renamed to `sisyphus_agent`); agent and category registries, agent disable lists, hooks, and unrelated plugin settings are not imported.
 - Conflict policy: no-clobber. A value already present in the target wins, and every skipped legacy value is reported as a diagnostic instead of overwriting. Prior legacy migration history is preserved under the target's `legacy_migrations` key.
 - Markers: each applied migration records its id in the target's `_migrations` array, so re-runs are no-ops. `2026-07-opencode-config-unification` covers the `oh-my-*` files; `2026-07-codex-config-jsonc` covers `~/.omo/config.jsonc`; `2026-08-reasoning-unification` rewrites persisted model and reasoning fields. Codex startup runs only the second group; OpenCode plugin startup, Senpi startup, install, and the CLI run both groups, so whichever side runs first applies each group exactly once.
@@ -718,7 +717,7 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `codegraph-bootstrap`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `hephaestus-agents-md-injector`, `ulw-execute`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `hephaestus-agents-md-injector`, `ulw-execute`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`
 
 Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, and `tool-pair-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
@@ -813,12 +812,14 @@ Force-enable session notifications:
 
 `force_enable` (`false`) - force session-notification even if external notification plugins are detected.
 
+OpenCode also has native TUI Attention notifications in `tui.json`. Use either native Attention or OmO `session-notification` for the same events, not both, or you may receive duplicate desktop notifications. OmO auto-disables `session-notification` when it detects known external notification plugins such as `opencode-notifier`, but native Attention is OpenCode TUI config rather than a plugin entry, so OmO cannot detect it through the plugin list. Keep `session-notification` enabled when you want OmO's richer idle notification body with session title and recent message context; otherwise prefer native Attention for basic TUI notification and sound events.
+
 ### MCPs
 
-Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), `lsp` (local language-server tools), and `codegraph`. Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
+Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), and `lsp` (local language-server tools). Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
 
 ```json
-{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp", "codegraph"] }
+{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp"] }
 ```
 
 ### LSP
@@ -837,53 +838,7 @@ To disable the LSP MCP entirely:
 { "disabled_mcps": ["lsp"] }
 ```
 
-### CodeGraph
-
-The `codegraph` MCP ships a pinned CodeGraph 1.5.0 binary; managed installs provisioned at 1.0.1 or 1.4.1 upgrade automatically, and project stores built by older versions remain compatible without a manual re-index. The OpenCode plugin block supports the full surface below:
-
-| Option | Type | Default |
-| ------ | ---- | ------- |
-| `auto_init` | boolean | `true` |
-| `auto_provision` | boolean | `true` |
-| `daemon` | boolean | `true` |
-| `enabled` | boolean | `true` |
-| `excluded_roots` | string[] | - |
-| `install_dir` | string | - |
-| `telemetry` | boolean | - |
-| `watch_debounce_ms` | number >= 0 | - |
-
-```jsonc
-{
-  "codegraph": {
-    "auto_init": true,
-    "auto_provision": true,
-    "daemon": true,
-    "enabled": true,
-    "excluded_roots": ["~/scratch/codegraph"],
-    "install_dir": "~/.omo/codegraph/bin",
-    "telemetry": false,
-    "watch_debounce_ms": 500
-  }
-}
-```
-
-`auto_init` is an OpenCode-only key; it does not exist in the shared/core `codegraph` schema. At the shared/core level, `codegraph.telemetry` defaults to `false`.
-
-`session_start_cooldown_ms` is not an OpenCode plugin `codegraph` key. It is a Codex-only shared key, so place it under top-level `codegraph` or `[codex].codegraph` in the unified file:
-
-```jsonc
-{
-  "[codex]": {
-    "codegraph": { "session_start_cooldown_ms": 900000 }
-  }
-}
-```
-
-The Codex SessionStart bootstrap checks only `<projectRoot>/.codegraph/codegraph.db`; it never calls `codegraph status`. An ancestor database covers nested projects, while per-project locks and persistent cooldown stamps suppress duplicate or repeatedly failing background initializers. Suppressions are recorded in `~/.omo/codegraph/session-start.jsonl` as actions including `skipped-cooldown`, `skipped-locked`, and `skipped-nested-root`.
-
-An ambient `CODEGRAPH_NO_DAEMON=1` forces daemon-off even when `codegraph.daemon` is `true`. Inspect or stop running daemons with the upstream `codegraph daemon` command, an interactive picker that lists running daemons and stops the one you select.
-
-Process hygiene is unconditional and has no config keys: a parent-liveness watchdog exits MCP server processes when their parent dies, a newly started lsp daemon reaps older-version daemons at startup, and a best-effort family sweep removes orphaned codegraph and lsp processes at startup on every adapter (OpenCode plugin startup, the Codex `SessionStart` hook, and Senpi session start).
+Process hygiene is unconditional and has no config keys: a parent-liveness watchdog exits MCP server processes when their parent dies, a newly started lsp daemon reaps older-version daemons at startup, and a best-effort family sweep removes orphaned lsp processes at startup on every adapter (OpenCode plugin startup, the Codex `SessionStart` hook, and Senpi session start).
 
 ---
 

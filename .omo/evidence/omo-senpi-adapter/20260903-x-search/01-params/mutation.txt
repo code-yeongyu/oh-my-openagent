@@ -1,0 +1,42 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/thread/params.test.ts:
+(pass) validateXSearchParams > accepts a valid minimal payload and applies defaults [3.75ms]
+(pass) validateXSearchParams > rejects both handle lists as INVALID_FILTERS [0.12ms]
+(pass) validateXSearchParams > rejects more than 20 handles as TOO_MANY_HANDLES [0.08ms]
+(pass) validateXSearchParams > rejects impossible calendar dates as INVALID_DATE [0.14ms]
+34 |   test("rejects impossible calendar dates as INVALID_DATE", () => {
+35 |     expect(validateXSearchParams({ query: "x", from_date: "2026-02-30" })).toMatchObject({ ok: false, code: "INVALID_DATE" })
+36 |   })
+37 | 
+38 |   test("rejects an inverted date range as INVALID_DATE_RANGE", () => {
+39 |     expect(validateXSearchParams({ query: "x", from_date: "2026-03-01", to_date: "2026-02-01" })).toMatchObject({
+                                                                                                       ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "code": "INVALID_DATE_RANGE",
+-   "ok": false,
++   "ok": true,
++   "value": {
++     "enable_image_understanding": false,
++     "enable_video_understanding": false,
++     "from_date": "2026-03-01",
++     "max_results": 10,
++     "mode": "latest",
++     "query": "x",
++     "to_date": "2026-02-01",
++   },
+  }
+
+- Expected  - 2
++ Received  + 10
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/thread/params.test.ts:39:99)
+(fail) validateXSearchParams > rejects an inverted date range as INVALID_DATE_RANGE [0.66ms]
+(pass) validateXSearchParams > rejects unknown properties as INVALID_PARAMS [0.12ms]
+
+ 5 pass
+ 1 fail
+ 6 expect() calls
+Ran 6 tests across 1 file. [786.00ms]

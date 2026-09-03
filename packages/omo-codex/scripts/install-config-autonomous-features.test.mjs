@@ -38,7 +38,7 @@ test("#given autonomous permissions requested #when script installer updates con
 
 	// then
 	const content = await readFile(configPath, "utf8");
-	assert.match(content, /network_access = "enabled"/);
+	assert.doesNotMatch(content, /^\s*network_access\s*=/m);
 	for (const featureName of ALWAYS_ON_FEATURES) {
 		assert.match(content, new RegExp(`${featureName} = true`));
 	}

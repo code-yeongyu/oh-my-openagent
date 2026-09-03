@@ -1,0 +1,182 @@
+{
+  "queryId": "q03",
+  "lane": "api-direct",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"SK하이닉스 HBM 반응 since:2026-08-24 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-24",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421692,
+    "completed_at": 1788421692,
+    "id": "b819822e-812c-9e02-a082-f039277bf615",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.6",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_b819822e-812c-9e02-a082-f039277bf615",
+        "summary": [
+          {
+            "text": "The user wants me to use the x_search tool with x_keyword_search only, mode=Latest. The query is: \"SK하이닉스 HBM 반응 since:2026-08-24 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one...",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-2c69bcdb-c65c-4360-8503-8997962a0ec5-0",
+        "input": "{\"query\":\"SK하이닉스 HBM 반응 since:2026-08-24 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_b819822e-812c-9e02-a082-f039277bf615_call-2c69bcdb-c65c-4360-8503-8997962a0ec5-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_b819822e-812c-9e02-a082-f039277bf615_call-2c69bcdb-c65c-4360-8503-8997962a0ec5-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/_dramalens_/status/2094733835015782570 - SK하이닉스-Intel HBM4E 루머는 회사 반박이 나온 만큼 확정 사실로 보기 어렵다고 언급 (@_dramalens_, 2026-09-01)\nhttps://x.com/TNI_KOREA/status/2092862616486162734 - 엔비디아 실적에 삼성전자·SK하이닉스가 HBM 경쟁력으로 강하게 반응했다고 정리 (@TNI_KOREA, 2026-08-27)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092862616486162734",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092862616486162734"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094733835015782570",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094733835015782570"
+              }
+            ]
+          }
+        ],
+        "id": "msg_b819822e-812c-9e02-a082-f039277bf615",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-24",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 77492400,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e41c6060b2628547"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 77492400,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:48:12.092Z"
+}

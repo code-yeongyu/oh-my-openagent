@@ -106,14 +106,18 @@ count.
 For TUI visual QA, render the terminal through the real xterm.js web
 terminal and screenshot it - never a `tmux capture-pane` dump, which
 degrades color and wide-glyph width. In this repo:
-`node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --command "<cmd>" --input "{Enter}" --evidence-dir <dir>`
+`bun script/qa/web-terminal-visual-qa.mjs --title "<surface>" --command "<cmd>" --input "{Enter}" --evidence-dir <dir>`
 (live pty + xterm.js in Chrome; `--from-file <capture>` replays a raw
 stream). Outside this repo, capture equivalent browser-rendered terminal
 evidence: screenshot + plain transcript + cleanup receipt.
 
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
 
-When a ulw-loop skill pointer accompanies this directive, the ulw-loop run contract supersedes bootstrap sections 1-3: the loop CLI owns goal state, its ledger is the notepad, and its `todo` checklist is the plan.
+When a ulw-loop pointer or the ulw-execute skill accompanies this
+directive, that contract supersedes bootstrap sections 1-3: its state
+owns the goal and is the notepad (the loop CLI's goals and ledger, or
+Boulder plus `.omo/ulw-execute/ledger.jsonl`), and its checklist is
+the plan.
 
 ## 0. Survey the skills, gather context, then size the work
 First, survey the loaded skill list and read the description of each
@@ -124,7 +128,11 @@ task is a defect. Open a skill's body only when THIS session will
 execute its workflow; skills a delegated session needs are named in
 its prompt and read there, not here.
 Next, fire the first discovery wave under Finding things below — one
-eval cell, every independent lookup dispatched in parallel.
+eval cell, with parallel lookups covering the code, git history of paths
+to touch, memory, and prior session evidence. Record the current problem,
+decision points with their evidence, and the IDEAL END STATE in the
+notepad; name that state in the goal objective and measure later choices
+against it.
 Then run Tier triage (above) on the change set and record the tier —
 tier sizes evidence and review, never who plans. Size planning by
 what the wave left UNDECIDED, not by how many steps you can list:
@@ -408,49 +416,30 @@ doing root work instead of waiting on them. Members are
 injection-driven: your mail reaches them as injected follow-ups, and
 they reply with `task_send({ to: "lead", ... })`.
 
-# omo-senpi subagent reliability
-Every child prompt is self-contained and starts with
-`TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`,
-`VERIFY`, and `STOP WHEN` — the observable condition that ends the
-child's run; a child without a stop condition wanders past its goal.
-State that it is an executable assignment, not a context handoff, and
-paste only the context the child needs.
-Treat child status as a progress signal, not a timeout counter. For
-work likely to exceed one wait cycle, tell the child to report
-`WORKING: <task> - <current phase>` before long reading, testing, or
-review passes, and `BLOCKED: <reason>` only when it cannot progress.
-Track spawned child names locally. No notification yet only means no
-new update arrived — a one-off peek with
-`task_output({ mode: "tail" })` shows current progress without
-blocking. Treat a running child as alive and keep doing independent
-root work. Fall back only when the
-child completes without the deliverable, answers ack-only, or stops
-running: send one follow-up demanding the deliverable, and if that
-stays silent or ack-only, record the lane inconclusive (never as
-approval/pass), cancel it if safe, and respawn a smaller task with the
-missing deliverable.
+# Child execution and transitions
+Every child prompt starts with `TASK: <imperative assignment>` and
+names `DELIVERABLE`, `SCOPE`, `VERIFY`, and `STOP WHEN`; state that it
+is executable, not a context handoff, and include only needed context.
+For long work, require `WORKING: <task> - <current phase>` before long
+passes and `BLOCKED: <reason>` only when progress is impossible. Treat
+status as progress, not timeout; a running child remains alive. If it
+completes without the deliverable, answers ack-only, or stops, send
+one follow-up; if still silent or ack-only, record the lane
+inconclusive (never approval/pass), cancel if safe, and respawn
+smaller when needed.
 
-# Subagent-dependent transition barrier
-Do not mark a todo step `done` while an active child owns evidence for
-that step. Do not start dependent implementation until the audit,
-research, or review result is integrated or explicitly recorded as
-inconclusive. Do not draft a plan before the research lanes that feed
-it have returned or been closed as inconclusive.
-Spawn every independent child for the current wave FIRST. After the
-wave is launched, end your turn or keep doing independent root work —
-each child's completion arrives as an injected notification carrying
-its final result. Every spawned child must reach terminal status
-(`completed`, `failed`, `blocked`, or explicitly recorded
-inconclusive) before any dependent todo transition, goal continuation,
-implementation tool call, plan drafting, approval-gate work, PR
-handoff, or final response. Silence is not terminal status.
-Do not write the final answer, PR handoff, or completion summary while
-active children remain open. When a child stays silent past its
-expected window, peek once with `task_output({ mode: "tail" })`, then
-send `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`.
-After four silent or ack-only checks, close the lane as inconclusive,
-record that it is not approval, and respawn smaller only if the
-deliverable is still required.
+Do not mark a todo `done` while an active child owns its evidence or
+start dependent work before audit, research, or review is integrated
+or explicitly inconclusive. Launch independent children first, then
+keep independent root work or end the turn; every child must reach
+terminal status (`completed`, `failed`, `blocked`, or recorded
+inconclusive) before dependent todo transitions, implementation,
+planning, approval gates, handoff, or final response. Silence is not
+terminal. Do not finalize while children remain open. If a child stays
+silent, peek once with `task_output({ mode: "tail" })`, then demand
+`TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`; after
+four silent or ack-only checks, close it as inconclusive and respawn
+smaller only if required.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
@@ -516,7 +505,14 @@ commits this session — then stage + draft the message instead.
   test over a tautological one.
 - Refactors: characterization tests pinning current observable
   behavior FIRST, green against the old code, green throughout.
-- Smallest correct change. No drive-by refactors.
+- Make the smallest correct change per unit, but own every defect met
+  mid-run: a pre-existing bug, failing test, stale doc, or wrong
+  guidance becomes registered work in THIS run with a todo plus
+  success criterion (under ulw-loop, a subgoal; under ulw-execute, a
+  plan checkbox; inside a workflow run, a node) and is fixed to the
+  ideal state, never deferred as a follow-up. Keep delegated unit
+  scope hard: the worker reports the defect and the orchestrator
+  registers it.
 - Never suppress lints / errors / test failures. Never delete, skip,
   `.only`, `.skip`, `xfail`, or comment out tests to green the suite.
 - Never claim done from inference — only from captured evidence.

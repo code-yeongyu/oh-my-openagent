@@ -1,11 +1,31 @@
 import type { Messageability, ResidencyState, TaskStatus } from "./types"
 
-export function messageability(status: TaskStatus, residencyState: ResidencyState): Messageability {
-  // Suspended residencies are never continuable through task_send, for ANY status: messaging a
-  // suspended child must not wake it (no lazy revive-on-send) - resume its session instead.
-  if (residencyState === "disposed" || residencyState === "persisted_only" || residencyState === "rpc_detached") {
-    return "not-continuable"
+export function messageability(
+  status: TaskStatus,
+  residencyState: ResidencyState,
+  executionMode?: string,
+  killed?: boolean,
+): Messageability {
+  if (killed === true) return "not-continuable"
+  // Persisted-only children keep the session-resume contract. A terminal RPC child is different:
+  // its completed transcript can be reattached lazily when task_send explicitly targets it.
+  if (residencyState === "disposed" || residencyState === "persisted_only") return "not-continuable"
+  if (residencyState === "rpc_detached" && executionMode === "process") {
+    switch (status) {
+      case "completed":
+      case "error":
+      case "interrupted":
+        return "revive"
+      case "pending":
+      case "running":
+      case "cancelled":
+      case "lost":
+        return "not-continuable"
+      default:
+        return assertNever(status)
+    }
   }
+  if (residencyState === "rpc_detached") return "not-continuable"
   switch (status) {
     case "pending":
     case "running":

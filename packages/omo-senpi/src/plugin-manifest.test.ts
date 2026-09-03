@@ -50,6 +50,8 @@ describe("OMO Senpi plugin manifest", () => {
     }
 
     expect(Reflect.get(pi, "extensions")).toEqual(["./extensions/omo.js"])
+    // skills-conditional ships in `files` but must NOT join pi.skills: the conditional x-search
+    // skill is contributed at runtime only when an xAI credential exists.
     expect(Reflect.get(pi, "skills")).toEqual(["./skills"])
     expect(Reflect.has(pi, "hooks")).toBe(false)
   })
@@ -77,7 +79,16 @@ describe("OMO Senpi plugin manifest", () => {
     expect(manifest.keywords).toContain("omo")
     expect(manifest.keywords).toContain("oh-my-openagent")
     expect(manifest.keywords).toContain("pi")
-    expect(manifest.files).toEqual(["extensions", "skills", "runtime", "scripts/install.mjs", "README.md", "NOTICE", "LICENSE"])
+    expect(manifest.files).toEqual([
+      "extensions",
+      "skills",
+      "skills-conditional",
+      "runtime",
+      "scripts/install.mjs",
+      "README.md",
+      "NOTICE",
+      "LICENSE",
+    ])
   })
 
   it("#given root and adapter versions #when compared #then the plugin manifest stays in lockstep", () => {

@@ -1,0 +1,67 @@
+MUTATION: hasXaiCredential (auth.ts) ignores the stored entry's type -> returns true for any xai entry
+
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/index.test.ts:
+(pass) createXSearchComponent registration gate > #given a stored xai oauth entry #when registering #then x_search registers once and contributes the x-search skill path [5.16ms]
+(pass) createXSearchComponent registration gate > #given a packaged plugin layout #when resolving the skill path #then the conditional skills-conditional copy wins [0.77ms]
+(pass) createXSearchComponent registration gate > #given no xai entry and no XAI_API_KEY #when registering #then nothing is registered [4.47ms]
+(pass) createXSearchComponent registration gate > #given no stored entry but XAI_API_KEY #when registering #then the tool registers [0.23ms]
+141 |       env: { XAI_API_KEY: "env-token" },
+142 |     })
+143 | 
+144 |     component.register(pi, fakeCtx())
+145 | 
+146 |     expect(pi.tools).toHaveLength(0)
+                           ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 0
+Received length: 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/index.test.ts:146:22)
+(fail) createXSearchComponent registration gate > #given a malformed stored xai entry plus XAI_API_KEY #when registering #then the stored entry owns the decision and nothing registers [0.49ms]
+(pass) createXSearchComponent registration gate > #given an invalid auth.json #when registering #then nothing registers [0.39ms]
+(pass) createXSearchComponent registration gate > #given no agentDir option #when registering #then the agent home is resolved from the environment [0.34ms]
+(pass) createXSearchComponent registered tool execution > #given the probe fixture #when the registered tool executes #then it formats results and reports the server queries [1.28ms]
+(pass) createXSearchComponent registered tool execution > #given no resolvable bearer #when the registered tool executes #then it returns the AUTH error [0.40ms]
+
+ 8 pass
+ 1 fail
+ 19 expect() calls
+Ran 9 tests across 1 file. [1.69s]
+EXIT:1
+
+RESTORED auth.ts (sha256 dc3707af38dddb9b31ae320b9dca7d438729db1732e37b64b21a77d53c050f66; matches pre-mutation dc3707af38dddb9b31ae320b9dca7d438729db1732e37b64b21a77d53c050f66)
+
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/index.test.ts:
+(pass) createXSearchComponent registration gate > #given a stored xai oauth entry #when registering #then x_search registers once and contributes the x-search skill path [2.90ms]
+(pass) createXSearchComponent registration gate > #given a packaged plugin layout #when resolving the skill path #then the conditional skills-conditional copy wins [0.45ms]
+(pass) createXSearchComponent registration gate > #given no xai entry and no XAI_API_KEY #when registering #then nothing is registered [0.29ms]
+(pass) createXSearchComponent registration gate > #given no stored entry but XAI_API_KEY #when registering #then the tool registers [0.21ms]
+(pass) createXSearchComponent registration gate > #given a malformed stored xai entry plus XAI_API_KEY #when registering #then the stored entry owns the decision and nothing registers [0.28ms]
+(pass) createXSearchComponent registration gate > #given an invalid auth.json #when registering #then nothing registers [0.35ms]
+(pass) createXSearchComponent registration gate > #given no agentDir option #when registering #then the agent home is resolved from the environment [0.29ms]
+(pass) createXSearchComponent registered tool execution > #given the probe fixture #when the registered tool executes #then it formats results and reports the server queries [1.21ms]
+(pass) createXSearchComponent registered tool execution > #given no resolvable bearer #when the registered tool executes #then it returns the AUTH error [0.35ms]
+
+packages/omo-senpi/src/components/x-search/tool.test.ts:
+(pass) createXSearchTool definition > #given the definition #when reading discovery metadata #then it is a lazily activatable search-exposed x-search tool [0.09ms]
+(pass) createXSearchTool definition > #given the definition #when reading prompt fields #then no prompt tokens are carried before promotion [0.06ms]
+(pass) createXSearchTool definition > #given the definition #when reading the description #then it condenses the four rules into four sentences [0.08ms]
+(pass) createXSearchTool execute > #given a stored credential and the probe fixture #when executing #then the formatted text and details carry the server queries [0.31ms]
+(pass) createXSearchTool execute > #given OMO_X_SEARCH_MODEL #when executing #then the carrier model is overridden [0.20ms]
+(pass) createXSearchTool execute > #given no credential #when executing #then it returns the AUTH error without calling xAI [0.12ms]
+(pass) createXSearchTool execute > #given invalid parameters #when executing #then validation short-circuits before any request [0.07ms]
+(pass) createXSearchTool execute > #given an upstream rate limit #when executing #then the error code is surfaced in text and details [0.14ms]
+(pass) createXSearchTool execute > #given a resolveBearer override #when executing #then the injected bearer is used [0.20ms]
+
+ 18 pass
+ 0 fail
+ 52 expect() calls
+Ran 18 tests across 2 files. [1020.00ms]
+EXIT:0
+
+Mutation target: hasXaiCredential ignoring the stored entry's type; acceptance (c) malformed-stored-entry case asserted expect(pi.tools).toHaveLength(0) and failed with Received length: 1. Restored -> 18 pass / 0 fail.

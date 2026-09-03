@@ -140,11 +140,13 @@ export function transitionTaskRecord(record: TaskRecord, transition: TaskTransit
 
   const nextResidency = transitionResidency(transition, record.residency_state)
   const withFields = applyTransitionFields(record, transition)
+  const entersTerminal = terminalStatuses.has(nextStatus) && !terminalStatuses.has(record.status)
   const nextRecord = {
     ...withFields,
     status: nextStatus,
     residency_state: nextResidency,
     updated_at: transition.timestamp,
+    ...(entersTerminal ? { terminal_at: transition.timestamp } : {}),
   }
 
   return {
@@ -192,6 +194,7 @@ export function markRecordLostForReconciliation(
     status: "lost" as const,
     error_message: input.error_message,
     updated_at: input.timestamp,
+    ...(terminalStatuses.has(record.status) ? {} : { terminal_at: input.timestamp }),
   }
 
   return {

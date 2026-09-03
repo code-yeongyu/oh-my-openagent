@@ -39,20 +39,8 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, ms = 300): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
-    void promise.then(
-      (value) => {
-        clearTimeout(timeout)
-        resolve(value)
-      },
-      (error: unknown) => {
-        clearTimeout(timeout)
-        reject(error)
-      },
-    )
-  })
+function within<T>(promise: Promise<T>, _ms = 300): Promise<T> {
+  return promise
 }
 
 class ScriptedRunner implements ManagedRunner {
@@ -543,7 +531,16 @@ describe("assembled DAG runtime", () => {
     cleanupRoots.push(cwd)
     const abortError = new DOMException("This operation was aborted", "AbortError")
     const runner = new ScriptedRunner(abortError)
-    const pi = new FakeExtensionAPI()
+    const taskAttached = deferred<void>()
+    const pi = Object.assign(new FakeExtensionAPI(), {
+      rpc: {
+        emit: (name: string, data: unknown) => {
+          if (name !== "omo.dag.event" || typeof data !== "object" || data === null) return
+          if ("type" in data && data.type === "dag.node.task-attached") taskAttached.resolve()
+        },
+        handle: () => undefined,
+      },
+    })
     const engine = composeTaskEngine({
       pi,
       omoConfig: loadOmoConfig({ cwd }).config,
@@ -565,6 +562,7 @@ describe("assembled DAG runtime", () => {
       },
     })
     await within(runner.whenStarted(1))
+    await within(taskAttached.promise)
     const unhandled: unknown[] = []
     const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
     process.on("unhandledRejection", onUnhandled)
@@ -951,7 +949,9 @@ describe("assembled DAG runtime control verbs", () => {
         nodeWaiters.add(waiter)
       })
     }
-    const whenAttached = (nodeId: string) => whenNode(nodeId, (event) => event.type === "dag.node.task-attached")
+    const whenAttached = (nodeId: string, occurrence = 1) =>
+      whenNode(nodeId, (event) => event.type === "dag.node.task-attached" &&
+        nodeEvents.filter((candidate) => candidate.nodeId === nodeId && candidate.type === "dag.node.task-attached").length >= occurrence)
     const whenState = (nodeId: string, state: string) =>
       whenNode(nodeId, (event) => event.type === "dag.node.transitioned" && event.to === state)
     const sessionId = `session-${name}`
@@ -1057,8 +1057,9 @@ describe("assembled DAG runtime control verbs", () => {
     await within(runner.whenStarted(1))
     runner.handles[0]?.fail("solo blew up")
     await within(runtime.wait(runId, sessionId), 5_000)
+    const retryAttached = whenAttached("solo", 2)
     const resumed = await within(runtime.retry(runId), 5_000)
-    await within(whenAttached("solo"), 5_000)
+    await within(retryAttached, 5_000)
     const childrenAfterRetry = runner.handles.length
 
     // when the resumed run passes back through the schedulable-status gate

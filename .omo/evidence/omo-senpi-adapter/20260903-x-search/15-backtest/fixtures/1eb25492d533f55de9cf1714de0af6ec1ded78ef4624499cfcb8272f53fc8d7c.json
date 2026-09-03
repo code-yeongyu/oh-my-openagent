@@ -1,0 +1,167 @@
+{
+  "queryId": "q11",
+  "lane": "omo-tool",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Cloudflare Workers outage since:2026-09-01 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-09-01",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421971,
+    "completed_at": 1788421971,
+    "id": "46fe4ac9-6e99-97bd-97e9-34b519abc650",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.6",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_46fe4ac9-6e99-97bd-97e9-34b519abc650",
+        "summary": [
+          {
+            "text": "The user wants me to use x_keyword_search with mode=Latest and this exact query: \"Cloudflare Workers outage since:2026-09-01 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line...",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-9f748371-a08c-44f7-a9fd-3e737645a9cc-0",
+        "input": "{\"query\":\"Cloudflare Workers outage since:2026-09-01 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_46fe4ac9-6e99-97bd-97e9-34b519abc650_call-9f748371-a08c-44f7-a9fd-3e737645a9cc-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_46fe4ac9-6e99-97bd-97e9-34b519abc650_call-9f748371-a08c-44f7-a9fd-3e737645a9cc-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "No matching posts found.",
+            "logprobs": [],
+            "annotations": []
+          }
+        ],
+        "id": "msg_46fe4ac9-6e99-97bd-97e9-34b519abc650",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-09-01",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 60601200,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e41c6060b2628547"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 60601200,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:52:51.289Z"
+}

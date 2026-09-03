@@ -1,0 +1,2 @@
+Command: bun packages/omo-senpi/scripts/qa/x-search-backtest.mjs --queries packages/omo-senpi/scripts/qa/fixtures/x-search-backtest/queries.v1.json --mode record --with-grok-cli --variants v1,v2 --carriers fast,reasoning --cap-usd 6 --out EV/15-backtest --report --auth-file /Users/yeongyu/.omo/agent/auth.json
+Observed: bounded live record attempt did not complete within 15 minutes and was stopped by the execution timeout. No token content was captured. Partial fixtures were retained only after redactSecrets processing.

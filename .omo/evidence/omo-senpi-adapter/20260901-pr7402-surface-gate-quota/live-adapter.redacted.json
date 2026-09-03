@@ -1,0 +1,15 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiObservedChangedPaths": [],
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoObservedChangedPaths": [],
+  "realOmoProtectedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "IGNORED",
+  "sandboxAgentDir": "[redacted task-owned sandbox]/agent",
+  "sandboxCwd": "[redacted task-owned sandbox]/project"
+}

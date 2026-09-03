@@ -114,7 +114,7 @@ Install oh-my-openagent. Type `ultrawork`. Done.
 oh-my-openagent ships in three editions of the same product: two plugins that load into a host you already run, plus one standalone edition.
 
 - **Ultimate Edition (omo for OpenCode)** — full omo. 11 agents, 54+ lifecycle hooks, 5 built-in MCPs, all slash commands, Team Mode, `/goal`, ultrawork — everything. Hashline edits are opt-in (`hashline_edit: true`).
-- **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `ulw-execute-continuation`, and `telemetry` at the core, plus `teammode` and supporting components (`bootstrap`, `codegraph`, `lcx`, and more), plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It installs Codex agent TOMLs into `~/.codex/agents/`. No OpenCode `team_*` tools — Codex CLI's own spawn/collaboration surface does that work.
+- **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `ulw-execute-continuation`, and `telemetry` at the core, plus `teammode` and supporting components (`bootstrap`, `lcx`, and more), plugin-scoped MCPs for `grep_app`, `context7`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It installs Codex agent TOMLs into `~/.codex/agents/`. No OpenCode `team_*` tools — Codex CLI's own spawn/collaboration surface does that work.
 - **Senpi Edition (standalone, beta)** — the native `omo` command with the OMO extension built in. It installs from `omo-ai@beta` rather than loading into OpenCode or Codex.
 
 Pick the edition(s) you want.

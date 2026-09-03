@@ -42,7 +42,7 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 1. **Discovery + Analysis** (concurrent)
    - Fire background explore agents immediately
-   - Main session: bash structure + LSP/codegraph code map + read existing AGENTS.md
+   - Main session: bash structure + LSP/ast-grep code map + read existing AGENTS.md
 2. **Score & Decide** - Determine AGENTS.md locations from merged findings
 3. **Generate** - Root first, then subdirs in parallel
 4. **Review** - Deduplicate, trim, validate
@@ -51,7 +51,7 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 **TodoWrite ALL phases. Mark in_progress → completed in real-time.**
 ```
 TodoWrite([
-  { id: "discovery", content: "Fire explore agents + LSP/codegraph map + read existing", status: "pending", priority: "high" },
+  { id: "discovery", content: "Fire explore agents + LSP/ast-grep map + read existing", status: "pending", priority: "high" },
   { id: "scoring", content: "Score directories, determine locations", status: "pending", priority: "high" },
   { id: "generate", content: "Generate AGENTS.md files (root + subdirs)", status: "pending", priority: "high" },
   { id: "review", content: "Deduplicate, validate, trim", status: "pending", priority: "medium" }
@@ -67,16 +67,16 @@ TodoWrite([
 
 ### Fire Background Explore Agents IMMEDIATELY
 
-Don't wait-these run async while main session works. **Equip every agent with the code graph**: any task touching structure, entry points, dependencies, or hotspots MUST query `codegraph_*` (explore/search/callers/callees/impact) and `lsp_symbols` when present, and ground its claims in that data instead of guessing from conventions. Richer real-graph context per agent = a more accurate project map.
+Don't wait-these run async while main session works. **Ground every agent in real symbol data**: any task touching structure, entry points, dependencies, or hotspots MUST query `lsp_symbols`/`lsp_find_references` and the ast-grep skill (`sg`) when present, and ground its claims in that data instead of guessing from conventions. Richer real context per agent = a more accurate project map.
 
 ```
 // Fire all at once, collect results later
-task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: map real layout via codegraph_explore/codegraph_files → REPORT deviations from standard patterns")
-task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files, trace reach via codegraph_callees + lsp_symbols → REPORT non-standard organization")
+task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: map real layout via glob + lsp_symbols scope=workspace → REPORT deviations from standard patterns")
+task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files, trace reach via lsp_symbols + lsp_find_references → REPORT non-standard organization")
 task(subagent_type="explore", load_skills=[], description="Find conventions", run_in_background=true, prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
 task(subagent_type="explore", load_skills=[], description="Find anti-patterns", run_in_background=true, prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
 task(subagent_type="explore", load_skills=[], description="Explore build/CI", run_in_background=true, prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
-task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs/structure; codegraph_callers on core modules to see what is covered → REPORT unique conventions")
+task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs/structure; lsp_find_references on core modules to see what is covered → REPORT unique conventions")
 ```
 
 <dynamic-agents>
@@ -138,7 +138,7 @@ For each existing file found:
 
 If `--create-new`: Read all existing first (preserve context) → then delete all → regenerate.
 
-#### 3. Code Map - drive LSP AND codegraph (do NOT skip)
+#### 3. Code Map - drive LSP AND ast-grep (do NOT skip)
 
 Highest-signal source for the CODE MAP and the Symbol/Export/Reference scoring rows. Complementary, not alternatives - run BOTH when present, alongside the explore agents.
 
@@ -147,10 +147,10 @@ Highest-signal source for the CODE MAP and the Symbol/Export/Reference scoring r
 - `lsp_symbols` scope="workspace", query by kind (class/interface/function) -> symbol inventory.
 - `lsp_find_references` on top exports (line/character from the symbols result) -> reference centrality.
 
-**codegraph** - when `codegraph_*` tools exist (check `codegraph_status`); a first-class peer to LSP, NOT a last resort:
-- `codegraph_explore` -> overview; `codegraph_callers`/`codegraph_callees`/`codegraph_impact` -> centrality + blast radius for the scoring matrix; `codegraph_search`/`codegraph_files` -> symbol/file inventory.
+**ast-grep** - load the ast-grep skill; a first-class peer to LSP, NOT a last resort:
+- `sg --pattern 'export $$$' --lang <lang>` -> export inventory; `sg --pattern 'import $$$ from "$MOD"'` -> dependency edges between modules for the scoring matrix.
 
-Only if NEITHER exists: explore agents + the ast-grep skill (`sg`), and mark centrality unmeasured in the CODE MAP.
+Only if LSP is unavailable: explore agents + ast-grep alone, and mark reference centrality unmeasured in the CODE MAP.
 
 ### Collect Background Results
 
@@ -159,7 +159,7 @@ Only if NEITHER exists: explore agents + the ast-grep skill (`sg`), and mark cen
 for each background task ID (`bg_...`): background_output(task_id="bg_...")
 ```
 
-**Merge: bash + LSP/codegraph + existing + explore findings. Mark "discovery" as completed.**
+**Merge: bash + LSP/ast-grep + existing + explore findings. Mark "discovery" as completed.**
 
 ---
 
@@ -235,7 +235,7 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 |------|----------|-------|
 
 ## CODE MAP
-{From LSP/codegraph - skip only if neither exists or project <10 files}
+{From LSP/ast-grep - skip only if neither exists or project <10 files}
 
 | Symbol | Type | Location | Refs | Role |
 |--------|------|----------|------|------|
@@ -318,7 +318,7 @@ Hierarchy:
 ## Anti-Patterns
 
 - **Static agent count**: MUST vary agents based on project size/depth
-- **Sequential execution**: MUST parallel (explore + LSP + codegraph concurrent)
+- **Sequential execution**: MUST parallel (explore + LSP + ast-grep concurrent)
 - **Ignoring existing**: ALWAYS read existing first, even with --create-new
 - **Over-documenting**: Not every dir needs AGENTS.md
 - **Redundancy**: Child never repeats parent

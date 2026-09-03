@@ -1,0 +1,14 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/params.test.ts:
+(pass) validateXSearchParams > accepts a valid minimal payload and applies defaults [3.54ms]
+(pass) validateXSearchParams > rejects both handle lists as INVALID_FILTERS [0.12ms]
+(pass) validateXSearchParams > rejects more than 20 handles as TOO_MANY_HANDLES [0.09ms]
+(pass) validateXSearchParams > rejects impossible calendar dates as INVALID_DATE [0.14ms]
+(pass) validateXSearchParams > rejects an inverted date range as INVALID_DATE_RANGE [0.09ms]
+(pass) validateXSearchParams > rejects unknown properties as INVALID_PARAMS [0.15ms]
+
+ 6 pass
+ 0 fail
+ 6 expect() calls
+Ran 6 tests across 1 file. [1.67s]

@@ -32,7 +32,6 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `thinkMode` | chat.params | Model variant switching for extended thinking |
 | `anthropicContextWindowLimitRecovery` | session.error | Multi-strategy context recovery (truncation, compaction, dedup) |
 | `autoUpdateChecker` | session.created | Check npm for plugin updates |
-| `codegraphBootstrap` | session.created | Bootstrap CodeGraph indexing for the project (pairs with the built-in `codegraph` MCP) |
 | `astGrepSgProvision` | session.created | Provision the ast-grep `sg` binary for the bundled skill |
 | `agentUsageReminder` | chat.message | Remind about available agents |
 | `nonInteractiveEnv` | chat.message | Adjust behavior for `run` command |

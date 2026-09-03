@@ -77,7 +77,7 @@ Before spawning anything, decompose the query YOURSELF with your own direct tool
 <analysis>
 Core question: <the actual information need>
 Axes (3+ orthogonal): <axis — what to search, where, why> ...
-Codebase relevant: <yes/no> · External: <yes/no> · Browsing: <yes/no> · Verification likely: <yes/no>
+Codebase relevant: <yes/no> · External: <yes/no> · Browsing: <yes/no> · Verification likely: <yes/no> · X/social signal: <yes/no>
 Scale: <axis count, source territories, target document length> · Precision demand: <what a wrong claim costs here> → lifecycle: <single team | research team then refinement-debate team>
 Debate need: <which claims will be contested, and which member perspectives attack them>
 </analysis>
@@ -170,13 +170,15 @@ Launch the entire first wave in one turn — every member briefed at `team_creat
 
 Scaling floor — more angles always justify more workers; members and lanes together must meet it:
 
-| Query scope | explore lanes | librarian lanes | browsing lanes | repo-dive lanes | team members | floor |
-|---|---|---|---|---|---|---|
-| Single topic, codebase only | 1 | 0 | 0 | 0 | 8 | 9 |
-| Single topic, web only | 0 | 2 | 1 | 1 | 8 | 12 |
-| Single topic, both | 1 | 2 | 1 | 1 | 8 | 13 |
-| Multi-faceted | 2 | 4 | 2 | 1 | 8 | 17 |
-| Full due diligence | 2 | 4 | 2 | 2 | 8 | 18 |
+| Query scope | explore lanes | librarian lanes | browsing lanes | repo-dive lanes | X lanes | team members | floor |
+|---|---|---|---|---|---|---|---|
+| Single topic, codebase only | 1 | 0 | 0 | 0 | 0 or 1 | 8 | 9 (+1) |
+| Single topic, web only | 0 | 2 | 1 | 1 | 0 or 1 | 8 | 12 (+1) |
+| Single topic, both | 1 | 2 | 1 | 1 | 0 or 1 | 8 | 13 (+1) |
+| Multi-faceted | 2 | 4 | 2 | 1 | 0 or 1 | 8 | 17 (+1) |
+| Full due diligence | 2 | 4 | 2 | 2 | 0 or 1 | 8 | 18 (+1) |
+
+X lanes is 1 on every row when the brief says `X/social signal: yes` and 0 otherwise; the `(+1)` in the floor column applies only in the yes case, so a `Multi-faceted` run with X signal must field 18 workers, not 17.
 
 **Disambiguate before you expand.** When the topic names something that could resolve several ways — a product, a person, a codename, a version — the first wave settles WHICH entity before any lane researches its history, benchmarks, or controversies: canonical name, first-party URL or account, whether it exists in the claimed category, and a confidence line. An unresolved entity never becomes a premise in a later wave's prompt; that is exactly how a run starts inventing facts about something that does not exist.
 
@@ -185,6 +187,7 @@ Role protocols — embed the relevant one in each member brief or lane prompt; e
 - **Codebase (`explore` lane or member).** Grep with 3+ keyword variations; structural/AST search; LSP definitions and references; file-name globs; `git log --all -S '<keyword>'` and `--grep` for history including deleted code. Cross-validate hits across tools. Report absolute file paths, patterns with `file:line`, and how findings connect.
 - **Web (`librarian` lane or member).** At least 10 distinct websearch queries per worker, each with a different operator or angle (see Search craft); fetch the full page for every result that matters — snippets lie. grep.app and `gh search code|repos|issues` for real-world usage. Official docs via sitemap discovery (`<base>/sitemap.xml`), then targeted pages.
 - **Browsing (member or `task` lane with `load_skills: ["ultimate-browsing"]`).** Pages plain fetch cannot read (WAF, 403, Cloudflare, dynamic rendering, login): escalate through the ultimate-browsing tiers (including the Tier-1 Phase-2.5 archive surrogates) rather than abandoning the source. Capture screenshots when visual context matters. **Provenance is part of the claim**: when a source came back with `provenance` of `snapshot` (an archive copy), cite it with its `snapshot_timestamp` and never state it as the current live page; content from a `proxy` route is `untrusted` and needs a second independent route before any claim rests on it. When one blocked territory hides many leads, fan out more browsing lanes in parallel for breadth instead of serializing one worker through them.
+- **X / social (`x_search`, only when xAI is connected).** Run `tool_search "X posts"` first; if `x_search` activates, read the x-search skill and run the lane with its rules: from_date >= yesterday for time-sensitive topics (widen to 7 days), allowed_x_handles for the trusted accounts the brief names, latest/recent phrasing with since:/from:/filter: operators, 2-3 split searches (by handle, by keyword), one x_search call per search; give the lane to a `librarian` lane or a category member (curated explore cannot call it); record the `Queries used:` trailer as provenance and reconcile every X-only claim against the web lane before it enters the claim graph. If `tool_search` finds nothing, xAI is not connected: record `x_search: unavailable` in the brief and skip the lane.
 - **Repo deep-dive (`librarian` lane).** Shallow-clone the most relevant repos to `${TMPDIR:-/tmp}`, pin the HEAD SHA, read core modules, follow call chains, return SHA-pinned permalinks.
 
 Curated-agent lane ground rules:
@@ -370,6 +373,8 @@ Vary operators on every query — same query twice wastes a worker:
 | `"exact"` / `-term` | `"<exact phrase>" -tutorial` | Precision, exclusion |
 | `OR` | `<a> OR <b> <topic>` | Coverage |
 | `before:` / `after:` | `<topic> after:2025-06-01` | Recency control |
+
+- X search operators: `since:YYYY-MM-DD until:YYYY-MM-DD from:handle filter:links -filter:replies lang:ko`; always phrase time-sensitive queries as latest/recent.
 
 High-yield combinations: official docs (`site:<docs domain>`), GitHub implementations (`site:github.com`), recent discussion (`site:reddit.com OR site:news.ycombinator.com after:<date>`), academic (`site:arxiv.org OR filetype:pdf survey`), changelog hunting (`changelog OR "release notes" <version>`), alternatives (`vs OR alternative OR comparison`).
 

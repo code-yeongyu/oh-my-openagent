@@ -14,6 +14,7 @@ import { TranscriptJournal, buildIdentityPaths } from "@oh-my-opencode/memory-co
 
 import { createMemoryJournalWiring, projectSessionEntries } from "./journal-wiring"
 import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
+import { NUDGED_ENTRY_TYPE } from "./memorian-notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
@@ -41,6 +42,12 @@ function branch(): readonly Record<string, unknown>[] {
       customType: RECALL_CUSTOM_TYPE,
       content: RECALL_TEXT,
       display: false,
+    },
+    {
+      type: "custom",
+      id: "n1",
+      customType: NUDGED_ENTRY_TYPE,
+      data: { version: 1, nudges: [{ path: "memory/sentinel.md", hint: "SENTINEL_HINT" }] },
     },
     {
       type: "custom_message",
@@ -85,6 +92,7 @@ describe("recall re-ingestion guard", () => {
     // then
     expect(projections.map((projection) => projection.messageId)).toEqual(["u1", "a1"])
     expect(JSON.stringify(projections)).not.toContain("recalled-memory")
+    expect(JSON.stringify(projections)).not.toContain("SENTINEL_HINT")
     expect(JSON.stringify(projections)).not.toContain("memory_notice")
   })
 
@@ -106,6 +114,8 @@ describe("recall re-ingestion guard", () => {
     // then
     expect(factsEntries.map((entry) => entry.source_message_id)).toEqual(["u1", "a1"])
     expect(JSON.stringify(factsEntries)).not.toContain("recalled-memory")
+    expect(JSON.stringify(factsEntries)).not.toContain("SENTINEL_HINT")
     expect(JSON.stringify(snapshot)).not.toContain("recalled-memory")
+    expect(JSON.stringify(snapshot)).not.toContain("SENTINEL_HINT")
   }, 30_000)
 })

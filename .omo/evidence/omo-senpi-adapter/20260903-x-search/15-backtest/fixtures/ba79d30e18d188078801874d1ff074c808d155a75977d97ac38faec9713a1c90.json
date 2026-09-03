@@ -1,0 +1,230 @@
+{
+  "queryId": "q13",
+  "lane": "omo-tool",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Grok latest release since:2026-08-19 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421481,
+    "completed_at": 1788421481,
+    "id": "d6caf1c4-f110-968e-b2f1-a10e0b405ffd",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-662314bb-ff2b-4acd-8664-be5159b1d9ff-0",
+        "input": "{\"query\":\"Grok latest release since:2026-08-19 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_d6caf1c4-f110-968e-b2f1-a10e0b405ffd_call-662314bb-ff2b-4acd-8664-be5159b1d9ff-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_d6caf1c4-f110-968e-b2f1-a10e0b405ffd_call-662314bb-ff2b-4acd-8664-be5159b1d9ff-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/grok/status/2095184212768747692 - Grok answers on US CPI inflation data from BLS July 2026 (@grok, 2026-09-02)\nhttps://x.com/grok/status/2095131808304132139 - Grok on Gemini 3.8 Flash pricing and possible release (@grok, 2026-09-02)\nhttps://x.com/grok/status/2095018119957794904 - Grok on Elizabeth Holmes projected release date 2031 (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094992579615957039 - Grok confirms ABS national accounts GDP data for 2026 quarters (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094991346473779600 - Grok on rumors of OpenAI release this week (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094991036552548614 - Grok on OpenAI Astra release update from Sept 1 (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094880585948746211 - Grok on Texas Roadhouse sales data latest from Aug 2026 (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094870657263624455 - Grok on NYT review of latest DOJ Epstein release mentioning Trump (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094860609548382248 - Grok confirms Ghislaine Maxwell prison status and 2037 release (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094838052388471110 - Grok details NYT analysis of DOJ Epstein files on Trump references (@grok, 2026-09-01)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094880585948746211",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094880585948746211"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095018119957794904",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095018119957794904"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094860609548382248",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094860609548382248"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094838052388471110",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094838052388471110"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095131808304132139",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095131808304132139"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095184212768747692",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095184212768747692"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094991036552548614",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094991036552548614"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094870657263624455",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094870657263624455"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094991346473779600",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094991346473779600"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094992579615957039",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094992579615957039"
+              }
+            ]
+          }
+        ],
+        "id": "msg_d6caf1c4-f110-968e-b2f1-a10e0b405ffd",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 72346000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 72346000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:44:41.315Z"
+}

@@ -3,6 +3,7 @@ import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveCanonicalUltraworkDirectivePath } from "./canonical-ultrawork-directive.mjs";
 import { isCliEntry } from "./entry-guard.mjs";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 
@@ -14,14 +15,7 @@ const skillsRoot = join(root, "skills");
 // from a component-local copy: sync-skills runs before build-components (see plugin/package.json
 // build chain), so consuming components/ultrawork/scripts/sync-directive.mjs output would break a
 // clean checkout.
-const canonicalUltraworkDirectivePath = join(
-	repoRoot,
-	"packages",
-	"prompts-core",
-	"prompts",
-	"ultrawork",
-	"codex.md",
-);
+const canonicalUltraworkDirectivePath = resolveCanonicalUltraworkDirectivePath(root, repoRoot);
 const ultraworkSkillFrontmatter = `---
 name: ultrawork
 description: Binding ultrawork mode directive for omo on Codex. When a prompt contains ultrawork or ulw, the omo UserPromptSubmit hook injects a short bootstrap that points at this file. Read the whole file and follow every rule in it for the rest of the task.
