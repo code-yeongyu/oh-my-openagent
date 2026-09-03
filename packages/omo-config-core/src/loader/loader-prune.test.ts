@@ -190,4 +190,26 @@ describe("loadOmoConfig surgical pruning", () => {
       rmSync(fixture.root, { force: true, recursive: true })
     }
   })
+
+  test("#given a prototype-pollution payload nested under agents.evil beside a prunable invalid leaf #when loading #then the pollution guard rejects the layer fail-closed instead of pruning and accepting", () => {
+    // given
+    const fixture = makeFixture()
+    writeProjectConfig(
+      fixture.homeDir,
+      `{"agents":{"evil":{"__proto__":{"x":1},"model":123}}}`,
+    )
+
+    try {
+      // when
+      const result = load(fixture)
+
+      // then
+      expect(result.config.agents?.evil).toBeUndefined()
+      expect(result.sources.every((source) => !source.loaded)).toBe(true)
+      expect(result.diagnostics.some((d) => d.kind === "validation")).toBe(true)
+      expect(({} as Record<string, unknown>).x).toBeUndefined()
+    } finally {
+      rmSync(fixture.root, { force: true, recursive: true })
+    }
+  })
 })
