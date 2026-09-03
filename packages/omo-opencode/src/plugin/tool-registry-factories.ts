@@ -17,6 +17,7 @@ import {
   createBackgroundTools,
   createCallOmoAgent,
   createDelegateTask,
+  createDshAgentTool,
   createGlobTools,
   createGrepTools,
   createHashlineEditTool,
@@ -44,6 +45,7 @@ export type ToolRegistryFactories = {
   createGlobTools: typeof createGlobTools
   createSessionManagerTools: typeof createSessionManagerTools
   createDelegateTask: typeof createDelegateTask
+  createDshAgentTool: typeof createDshAgentTool
   discoverCommandsSync: typeof discoverCommandsSync
   interactive_bash: typeof interactive_bash
   createTaskCreateTool: typeof createTaskCreateTool
@@ -76,6 +78,7 @@ export const defaultToolRegistryFactories: ToolRegistryFactories = {
   createGlobTools,
   createSessionManagerTools,
   createDelegateTask,
+  createDshAgentTool,
   discoverCommandsSync,
   interactive_bash,
   createTaskCreateTool,
