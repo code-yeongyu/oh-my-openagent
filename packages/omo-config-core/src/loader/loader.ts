@@ -90,11 +90,15 @@ function hasOnlyRecordLeafIssues(issues: readonly z.core.$ZodIssue[]): boolean {
 
 /**
  * A layer carrying `__proto__`, `prototype`, or `constructor` is hostile input, not a stale key, so it
- * stays fail-closed (whole layer rejected) instead of being stripped and partially loaded.
+ * stays fail-closed (whole layer rejected) instead of being stripped and partially loaded — at ANY
+ * depth, which is why the tamper check runs unconditionally on the validation-failure path.
  *
  * The unrecognized key alone is not the signal: a JSON `"__proto__"` member is written THROUGH the
  * prototype rather than becoming an own property, so the parsed record reports only the injected
  * payload's inner keys (`polluted`) and never `__proto__` itself. Detect the tampering directly.
+ * Zod surfaces those inherited payload keys as `unrecognized_keys` only at the layer root, so
+ * nesting hostile input under `agents.*`/`categories.*` leaves no unrecognized-key issue at all;
+ * `hasTamperedPrototype` is what catches it there.
  */
 function hasUnsafeUnrecognizedKey(parsed: unknown, issues: readonly UnrecognizedKeyIssue[]): boolean {
   if (issues.some((issue) => issue.keys.some((key) => isUnsafeObjectKey(key)))) return true
@@ -192,7 +196,7 @@ function readConfigSource(
     // NOTE: the guard reads `parsed.data` directly. `toRecord` rebuilds the object from its own
     // enumerable properties, which silently discards the tampered prototype this guard looks for.
     const unrecognized = unrecognizedKeyIssues(validation.error.issues)
-    if (unrecognized.length > 0 && hasUnsafeUnrecognizedKey(parsed.data, unrecognized)) {
+    if (hasUnsafeUnrecognizedKey(parsed.data, unrecognized)) {
       return {
         diagnostics: [validationDiagnostic(path, validation.error.issues)],
         source: { exists: true, loaded: false, path, scope },
