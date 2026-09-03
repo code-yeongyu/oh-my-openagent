@@ -3,6 +3,14 @@ import type { OpencodeClient } from "./opencode-client"
 export const MIN_SESSION_GONE_POLLS = 3
 export type SessionExistenceStatus = "exists" | "missing" | "unknown"
 
+// boulder.json stores ids prefixed via normalizeSessionId
+// (@oh-my-opencode/boulder-state); the storage layer resolves bare ids.
+const SESSION_ID_PLATFORM_PREFIX_PATTERN = /^(codex|opencode|senpi):/
+
+export function bareSessionId(sessionID: string): string {
+  return sessionID.replace(SESSION_ID_PLATFORM_PREFIX_PATTERN, "")
+}
+
 function extractErrorMessage(error: unknown): string | undefined {
   if (typeof error === "string") {
     return error
@@ -43,7 +51,7 @@ export async function checkSessionExistence(
 ): Promise<SessionExistenceStatus> {
   try {
     const response = await client.session.get({
-      path: { id: sessionID },
+      path: { id: bareSessionId(sessionID) },
       ...(directory ? { query: { directory } } : {}),
     })
 
