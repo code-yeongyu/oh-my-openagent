@@ -6,6 +6,7 @@ import {
 import { log } from "../shared/logger"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
+import { sanitizeOrphanedToolPartsBeforeSummarize } from "./tool-pair-validator/session-sanitizer"
 import type {
   CachedCompactionState,
   PreemptiveCompactionContext,
@@ -93,6 +94,12 @@ export async function runPreemptiveCompactionIfNeeded(args: {
       cached.providerID,
       cached.modelID,
     )
+
+    await sanitizeOrphanedToolPartsBeforeSummarize({
+      client: ctx.client,
+      sessionID,
+      directory: ctx.directory,
+    })
 
     await withTimeout(
       ctx.client.session.summarize({

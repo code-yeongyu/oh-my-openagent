@@ -170,7 +170,9 @@ describe("preemptive-compaction", () => {
       output
     )
 
-    expect(ctx.client.session.messages).not.toHaveBeenCalled()
+    //#then compaction fires; the pre-summarize tool-pair sanitizer fetches
+    // messages exactly once to settle persisted orphaned tool parts
+    expect(ctx.client.session.messages).toHaveBeenCalledTimes(1)
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 

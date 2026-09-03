@@ -11,7 +11,8 @@ export function toRecord(value: unknown): Record<string, unknown> | null {
   return isRecord(value) ? value : null
 }
 
-export function getToolCallID(part: TransformPart): string | null {
+// Accepts unknown: readers are fully defensive and also consume untyped SDK message JSON.
+export function getToolCallID(part: unknown): string | null {
   const record = toRecord(part)
   if (!record || record["type"] !== "tool") {
     return null
@@ -21,7 +22,7 @@ export function getToolCallID(part: TransformPart): string | null {
   return typeof callID === "string" && callID.length > 0 ? callID : null
 }
 
-export function getToolStatus(part: TransformPart): string {
+export function getToolStatus(part: unknown): string {
   const state = toRecord(toRecord(part)?.["state"])
   if (!state) {
     return UNKNOWN_TOOL_STATUS

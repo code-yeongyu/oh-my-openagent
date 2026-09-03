@@ -2,6 +2,7 @@ import type { OhMyOpenCodeConfig } from "../config"
 import { log } from "../shared/logger"
 import { resolveNoTextTailFromSession } from "./preemptive-compaction-no-text-tail"
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
+import { sanitizeOrphanedToolPartsBeforeSummarize } from "./tool-pair-validator/session-sanitizer"
 
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 const POST_COMPACTION_MONITOR_COUNT = 5
@@ -145,6 +146,8 @@ export function createPostCompactionDegradationMonitor(args: {
           },
         })
         .catch(() => {})
+
+      await sanitizeOrphanedToolPartsBeforeSummarize({ client, sessionID, directory })
 
       await withTimeout(
         client.session.summarize({

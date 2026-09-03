@@ -13,6 +13,7 @@ import { sanitizeEmptyMessagesBeforeSummarize } from "./message-builder"
 import { fixEmptyMessages } from "./empty-content-recovery"
 
 import { resolveCompactionModel } from "../shared/compaction-model-resolver"
+import { sanitizeOrphanedToolPartsBeforeSummarize } from "../tool-pair-validator/session-sanitizer"
 import { log } from "../../shared/logger"
 
 const SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS = 120_000
@@ -128,6 +129,11 @@ export async function runSummarizeRetryStrategy(params: {
     if (providerID && modelID) {
       try {
         await sanitizeEmptyMessagesBeforeSummarize(params.sessionID, params.client)
+        await sanitizeOrphanedToolPartsBeforeSummarize({
+          client: params.client,
+          sessionID: params.sessionID,
+          directory: params.directory,
+        })
 
         await showToastSafely(
           params.client,

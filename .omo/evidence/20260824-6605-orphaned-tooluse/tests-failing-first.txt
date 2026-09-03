@@ -1,0 +1,29 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/tool-pair-validator/session-sanitizer.test.ts:
+289 |         compactedSessions: new Set<string>(),
+290 |         lastCompactionTime: new Map<string, number>(),
+291 |       })
+292 |
+293 |       // then
+294 |       expect(order.filter((entry) => entry.startsWith("patch:"))).toHaveLength(1)
+                                                                        ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6605/packages/omo-opencode/src/hooks/tool-pair-validator/session-sanitizer.test.ts:294:67)
+(fail) sanitizeOrphanedToolPartsBeforeSummarize wiring > #given preemptive compaction fires on a session with an orphaned running tool part > #then the persisted part is patched before summarize is called [3.25ms]
+
+ 8 pass
+ 1 fail
+ 23 expect() calls
+Ran 9 tests across 1 file. [247.00ms]
+
+Context: wiring edits stashed via
+git stash push -m "6605-wiring" -- \
+  packages/omo-opencode/src/hooks/preemptive-compaction-trigger.ts \
+  packages/omo-opencode/src/hooks/preemptive-compaction-degradation-monitor.ts \
+  packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/summarize-retry-strategy.ts \
+  packages/omo-opencode/src/hooks/preemptive-compaction.test.ts
