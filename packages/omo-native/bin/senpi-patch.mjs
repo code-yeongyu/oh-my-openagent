@@ -23,6 +23,20 @@ try {
 }
 
 const transforms = {
+  "dist/core/agent-session.js": [
+    [
+      'import { ModelUsabilityBudgetError, projectModelUsabilityBudget, } from "./extensions/builtin/compaction/model-usability-budget.js";',
+      'import { ModelUsabilityBudgetError, projectModelUsabilityBudget, } from "./extensions/builtin/compaction/model-usability-budget.js";\nconst TERRA_FAST_CONTEXT_WINDOW = 650_000;\nfunction normalizeTerraFastModel(model) {\n    if (model?.id !== "gpt-5.6-terra-fast" || model.contextWindow >= TERRA_FAST_CONTEXT_WINDOW)\n        return model;\n    return { ...model, contextWindow: TERRA_FAST_CONTEXT_WINDOW };\n}',
+    ],
+    [
+      "        this.agent = config.agent;",
+      "        this.agent = config.agent;\n        this.agent.state.model = normalizeTerraFastModel(this.agent.state.model);",
+    ],
+    [
+      "    async _switchActiveModel(model, opts) {",
+      "    async _switchActiveModel(model, opts) {\n        model = normalizeTerraFastModel(model);",
+    ],
+  ],
   "dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js": [
     [
       'throw new SessionTurnAttributionError("Claude SDK OAuth result arrived before replay claim");',
