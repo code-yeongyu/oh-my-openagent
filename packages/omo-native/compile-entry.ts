@@ -17,10 +17,11 @@ import {
 import { propagateResult, runChild } from "./bin/lib/child-process.js"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
+import { propagateResult, runChild } from "./bin/lib/child-process.js"
 import { nearestNodeBin, readJson } from "./bin/lib/package-paths.js"
-import { runDoctor } from "./bin/lib/doctor.js"
+import { reapStaleEngines, runDoctor } from "./bin/lib/doctor.js"
 import { detectHarnesses, needsSetupSuggestion } from "./bin/lib/setup-detect.js"
-import { printSetupReport } from "./bin/lib/setup-report.js"
+import { runSetup } from "./bin/lib/setup-import.js"
 import { delimiter } from "node:path"
 import { registerBunOAuthFlows } from "../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/bun-oauth.js"
 
@@ -124,6 +125,26 @@ function runCompiledDoctor(inventory: Awaited<ReturnType<typeof detectHarnesses>
   process.exitCode = failed ? 1 : 0
 }
 
+export type ToolkitSpawnTarget = { command: string; args: string[] }
+export type ChildResult = { status: number | null; signal: NodeJS.Signals | null }
+export interface CompiledLauncherOptions {
+  spawnToolkit?: (target: ToolkitSpawnTarget) => Promise<ChildResult>
+  runSetup?: (args: string[]) => Promise<void>
+  doctor?: { list?: () => unknown[]; kill?: (pid: number, signal: string) => void }
+}
+
+// The compiled binary is not a JS runtime: under `bun build --compile`, `process.execPath` names omo
+// itself, so a script handed to it is parsed as engine arguments. The staged toolkit shim is the one
+// entry the engine already runs through OMO_AGENT_TOOLKIT_BIN, so `omo ulw-loop` goes through the
+// same door. Windows .cmd shims need cmd.exe, exactly as the engine invokes them.
+export function toolkitSpawnTarget(execDir: string, args: string[], platform: NodeJS.Platform = process.platform): ToolkitSpawnTarget {
+  const shimDir = join(execDir, "plugin", "runtime", "agent-toolkit")
+  if (platform === "win32") {
+    return { command: "cmd.exe", args: ["/d", "/s", "/c", join(shimDir, "omo-agent-toolkit.cmd"), ...args] }
+  }
+  return { command: join(shimDir, "omo-agent-toolkit"), args }
+}
+
 function isSelfUpdate(args: string[]): boolean {
   if (args[0] !== "update") return false
   const rest = args.slice(1)
@@ -155,19 +176,41 @@ export function shouldPrintCompiledBanner(args: string[], stderrIsTTY: boolean):
   return true
 }
 
-export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string): Promise<boolean> {
+export async function runCompiledLauncher(
+  args: string[],
+  execDir: string,
+  enginePin = "unknown",
+  compiledPackageRoot?: string,
+  options: CompiledLauncherOptions = {},
+): Promise<boolean> {
   const packageJson = readJson(join(execDir, "package.json"))
   migrateLegacyBunGlobalManifest(execDir)
   adoptLegacyFlatState()
   const command = args[0]
-  if (command === "ulw-loop") { spawn(process.execPath, [join(execDir, "plugin/runtime/agent-toolkit/ulw-loop/cli.js"), ...args.slice(1)], { stdio: "inherit" }); return true }
-  if (command === "doctor") {
-    const inventory = await detectHarnesses()
-    if (compiledPackageRoot) runCompiledDoctor(inventory, compiledPackageRoot, enginePin)
-    else runDoctor(inventory)
+  if (command === "ulw-loop") {
+    const target = toolkitSpawnTarget(execDir, ["ulw-loop", ...args.slice(1)])
+    const spawnToolkit = options.spawnToolkit ?? ((next: ToolkitSpawnTarget) => runChild(next.command, next.args))
+    propagateResult(await spawnToolkit(target))
     return true
   }
-  if (command === "setup") { printSetupReport(await detectHarnesses()); process.exitCode = 0; return true }
+  if (command === "doctor") {
+    // An explicit reap names pids and nothing else; it never needs the credential-store scan.
+    if (args[1] === "--reap") {
+      const result = reapStaleEngines(args.slice(2), options.doctor ?? {})
+      console.log(result.lines.join("\n"))
+      process.exitCode = result.failed ? 1 : 0
+      return true
+    }
+    const inventory = await detectHarnesses()
+    if (compiledPackageRoot) runCompiledDoctor(inventory, compiledPackageRoot, enginePin)
+    else runDoctor(inventory, args.slice(1), options.doctor ?? {})
+    return true
+  }
+  if (command === "setup") {
+    // Same consent-gated import the npm launcher runs: report, model hints, plan, then auth.json.
+    await (options.runSetup ?? runSetup)(args.slice(1))
+    return true
+  }
   if ((command === "--version" || command === "-v") && args.length === 1) { console.log(versionLine(packageJson, enginePin ?? "unknown")); return true }
   if (isSelfUpdate(args)) { console.log(updateLine(process.platform, process.arch)); return true }
   return false

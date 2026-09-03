@@ -6,6 +6,8 @@ import { join } from "node:path"
 import {
   answerCompiledFastPath,
   buildSenpiArgs,
+  toolkitSpawnTarget,
+  type ToolkitSpawnTarget,
   remapSenpiEnvironment,
   runCompiledLauncher,
   shouldPrintCompiledBanner,
@@ -375,5 +377,161 @@ describe("embedded runtime provisioning", () => {
     writeFileSync(join(runtime, "package.json"), "changed\n")
     await provisionEmbeddedRuntime(manifest, embedded, runtime)
     expect(readFileSync(join(runtime, "package.json"), "utf8")).toBe("changed\n")
+  })
+})
+
+describe("compiled ulw-loop dispatch", () => {
+  describe("#given the compiled entry, whose process.execPath is omo itself", () => {
+    test("#when ulw-loop is requested #then it runs through the staged toolkit shim, not process.execPath", async () => {
+      // given
+      const root = temp()
+      writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
+      const spawned: ToolkitSpawnTarget[] = []
+      const originalExitCode = process.exitCode
+      process.exitCode = undefined
+
+      // when
+      try {
+        await runCompiledLauncher(["ulw-loop", "status", "--json"], root, "2026.8.28", root, {
+          spawnToolkit: async (target) => { spawned.push(target); return { status: 0, signal: null } },
+        })
+      } finally {
+        process.exitCode = originalExitCode
+      }
+
+      // then
+      expect(spawned).toEqual([{
+        command: join(root, "plugin", "runtime", "agent-toolkit", "omo-agent-toolkit"),
+        args: ["ulw-loop", "status", "--json"],
+      }])
+      expect(spawned[0]?.command).not.toBe(process.execPath)
+    })
+
+    test("#when the child is still running #then the launcher stays unsettled and propagates the status the child later exits with", async () => {
+      // given - a child whose completion this test controls explicitly; no timers involved
+      const root = temp()
+      writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
+      let resolveChild!: (result: { status: number | null; signal: null }) => void
+      const child = new Promise<{ status: number | null; signal: null }>((resolvePromise) => {
+        resolveChild = resolvePromise
+      })
+      const originalExitCode = process.exitCode
+      process.exitCode = undefined
+
+      // when
+      try {
+        const launcher = runCompiledLauncher(["ulw-loop", "status"], root, "2026.8.28", root, {
+          spawnToolkit: () => child,
+        })
+        let launcherSettled = false
+        void launcher.then(() => { launcherSettled = true })
+        // Drain the microtask queue: were the launcher not awaiting the child, it would settle here.
+        for (let flush = 0; flush < 10; flush += 1) await Promise.resolve()
+
+        // then - unsettled while the child runs, and the child's status arrives once it exits
+        expect(launcherSettled).toBe(false)
+        resolveChild({ status: 3, signal: null })
+        await launcher
+        const exitCodeAfterChild: unknown = process.exitCode
+        expect(exitCodeAfterChild).toBe(3)
+      } finally {
+        process.exitCode = originalExitCode
+      }
+    })
+  })
+
+  test("#given win32 #when building the toolkit target #then the .cmd shim is invoked through cmd.exe", () => {
+    // given
+    const execDir = "C:\\omo\\runtime"
+
+    // when
+    const target = toolkitSpawnTarget(execDir, ["ulw-loop", "status"], "win32")
+
+    // then
+    expect(target.command).toBe("cmd.exe")
+    expect(target.args.slice(0, 3)).toEqual(["/d", "/s", "/c"])
+    expect(target.args[3]).toMatch(/omo-agent-toolkit\.cmd$/)
+    expect(target.args.slice(4)).toEqual(["ulw-loop", "status"])
+  })
+})
+
+describe("compiled setup dispatch", () => {
+  test.each<{ flags: string[] }>([
+    { flags: ["--yes"] },
+    { flags: ["--dry-run"] },
+  ])("#given omo setup $flags #when dispatched #then the consent-gated import runs with those flags", async ({ flags }) => {
+    // given
+    const root = temp()
+    writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
+    const received: string[][] = []
+
+    // when
+    const handled = await runCompiledLauncher(["setup", ...flags], root, "2026.8.28", root, {
+      runSetup: async (args) => { received.push(args) },
+    })
+
+    // then
+    expect(handled).toBe(true)
+    expect(received).toEqual([flags])
+  })
+})
+
+describe("compiled doctor --reap dispatch", () => {
+  const engine = (pid: number, ppid: number) => ({
+    pid, ppid, elapsed: "01:02", tty: "ttys001",
+    command: `node /tmp/omo/node_modules/@code-yeongyu/senpi/dist/cli.js --extension /tmp/omo/plugin`,
+  })
+
+  async function reap(args: string[], list: () => unknown[]) {
+    const root = temp()
+    writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
+    const output: string[] = []
+    const signaled: number[] = []
+    const originalLog = console.log
+    const originalExitCode = process.exitCode
+    console.log = (value?: unknown) => { output.push(String(value)) }
+    process.exitCode = undefined
+    let exitCode: unknown
+    try {
+      await runCompiledLauncher(["doctor", "--reap", ...args], root, "2026.8.28", root, {
+        doctor: { list, kill: (pid) => { signaled.push(pid) } },
+      })
+      exitCode = process.exitCode
+    } finally {
+      console.log = originalLog
+      process.exitCode = originalExitCode
+    }
+    return { output: output.join("\n"), signaled, exitCode }
+  }
+
+  test("#given a stale interactive engine #when doctor --reap names it #then the compiled entry signals exactly that pid", async () => {
+    // given / when
+    const result = await reap(["75183"], () => [engine(75183, 1), engine(90387, 4242)])
+
+    // then
+    expect(result.signaled).toEqual([75183])
+    expect(result.output).toContain("PASS reaped stale engine pid 75183")
+    expect(result.exitCode).toBe(0)
+  })
+
+  test("#given a live session engine #when doctor --reap names it #then the compiled entry refuses and fails", async () => {
+    // given / when
+    const result = await reap(["90387"], () => [engine(90387, 4242)])
+
+    // then
+    expect(result.signaled).toEqual([])
+    expect(result.output).toContain("FAIL refusing pid 90387")
+    expect(result.exitCode).toBe(1)
+  })
+})
+
+describe("compiled setup data dependencies", () => {
+  test("#given the setup import module #when scanned #then it reads no sibling file through import.meta.url, which the compiled binary cannot serve", () => {
+    // given
+    const source = readFileSync(new URL("../bin/lib/setup-import.js", import.meta.url), "utf8")
+
+    // then
+    expect(source).not.toContain("import.meta.url")
+    expect(source).toMatch(/from "\.\/provider-map\.json" with \{ type: "json" \}/)
   })
 })

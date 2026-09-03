@@ -8,6 +8,7 @@ import { canonicalAgentDir } from "./agent-dir.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { printModelReport } from "./setup-models.js"
 import { printSetupReport } from "./setup-report.js"
+import providerMap from "./provider-map.json" with { type: "json" }
 
 export const API_KEY_TYPE_ACCEPTLIST = new Set(["api_key"])
 const SQLITE_STORES = [
@@ -19,8 +20,10 @@ function sorted(values) {
   return [...new Set(values)].sort()
 }
 
+// Imported statically so the compiled binary bundles the map: resolving a sibling file from the
+// module URL at runtime lands in the binary's virtual filesystem, where no JSON sidecar exists.
 function readProviderMap() {
-  return JSON.parse(readFileSync(new URL("./provider-map.json", import.meta.url), "utf8"))
+  return providerMap
 }
 
 function targetProvider(provider, providerMap) {
