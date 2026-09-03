@@ -28,11 +28,17 @@ export function remapAgentKeysToDisplayNames(
     const displayName = getAgentListDisplayName(key, overrides)
     if (displayName && displayName !== key) {
       result[displayName] = rewriteAgentNameForListDisplay(key, value, overrides)
-      // Regression guard: do not also assign result[key].
-      // This line was repeatedly re-added and caused duplicate agent rows in the UI.
-      // Runtime callers that previously depended on config-key aliases were fixed in:
-      // - hooks/atlas/boulder-continuation-injector.ts (prompt agent normalization)
-      // - features/claude-code-session-state/state.ts (dual registration for display + config forms)
+      // Hidden config-key alias so `opencode run --agent sisyphus` resolves after display-name remap.
+      // TUI/autocomplete filter `hidden`, so this does not add a second visible row.
+      const alias =
+        typeof value === "object" && value !== null
+          ? { ...(value as Record<string, unknown>) }
+          : {}
+      result[key] = {
+        ...alias,
+        name: displayName,
+        hidden: true,
+      }
     } else {
       result[key] = value
     }
