@@ -157,6 +157,51 @@ describe("task_output polling guard", () => {
     }
   })
 
+  test("#given an unchanged task without terminal notifications #when status is polled again #then it does not promise a completion notification", async () => {
+    for (const status of ["running", "completed", "error", "lost", "cancelled", "interrupted"] as const) {
+      const record = makeRecord({ task_id: `st_unnotified_${status}`, name: "worker", status })
+      const manager: OutputManager = {
+        get: () => record,
+        list: () => [{ record }],
+      }
+      const output = createTaskOutputTool({
+        manager,
+        stateDir: "/tmp/state",
+        transcriptReader: () => ({ entries: [], source: "none" }),
+      })
+      const execute = () =>
+        output.execute("call", { task_id: record.task_id }, undefined, undefined, context("session-a"))
+
+      await execute()
+      const repeated = await execute()
+      expect(repeated.details.kind).toBe("no_progress")
+      if (repeated.details.kind === "no_progress") {
+        expect(repeated.details.reason).toContain("will not send a completion notification")
+        expect(repeated.details.reason).not.toContain("Await its completion notification")
+      }
+    }
+  })
+
+  test("#given an unchanged task with terminal notifications #when status is polled again #then it directs the caller to await the notification", async () => {
+    const record = makeRecord({ task_id: "st_notified", name: "worker", status: "completed", notify_on_terminal: true })
+    const manager: OutputManager = {
+      get: () => record,
+      list: () => [{ record }],
+    }
+    const output = createTaskOutputTool({
+      manager,
+      stateDir: "/tmp/state",
+      transcriptReader: () => ({ entries: [], source: "none" }),
+    })
+    const execute = () =>
+      output.execute("call", { task_id: record.task_id }, undefined, undefined, context("session-a"))
+
+    await execute()
+    const repeated = await execute()
+    expect(repeated.details.kind).toBe("no_progress")
+    if (repeated.details.kind === "no_progress") expect(repeated.details.reason).toContain("Await its completion notification")
+  })
+
   test("#given a lost task #when tail is read twice #then both peeks return the lost snapshot", async () => {
     const record = makeRecord({ task_id: "st_lost", name: "worker", status: "lost" })
     const manager: OutputManager = {

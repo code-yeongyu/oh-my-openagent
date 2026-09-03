@@ -3,7 +3,7 @@
   "checks": {
     "spawn_background": "PASS",
     "unconditional_wake": "PASS",
-    "task_output_peek": "PASS",
+    "task_output_polling_guard": "PASS",
     "jsonl_sequence": "PASS",
     "extension_suppression": "PASS",
     "real_senpi_untouched": "PASS",
@@ -26,7 +26,9 @@
   ],
   "mainEventSummary": [
     "tool_execution_start:task_output",
-    "tool_execution_end:task_output:transcript"
+    "tool_execution_end:task_output:status",
+    "tool_execution_start:task_output",
+    "tool_execution_end:task_output:no_progress"
   ],
   "mainExit": 0,
   "batchTaskCount": 0

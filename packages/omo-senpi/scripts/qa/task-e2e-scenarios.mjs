@@ -25,8 +25,9 @@ export const MAIN_SPAWN_SCRIPT = {
 export const MAIN_FOLLOWUP_SCRIPT = {
   childSteps: [],
   parentSteps: [
-    { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "tail" } },
-    { type: "text", text: "parent peeked the child tail, all done" },
+    { type: "tool_call", name: "task_output", arguments: { name: "e2echild" } },
+    { type: "tool_call", name: "task_output", arguments: { name: "e2echild" } },
+    { type: "text", text: "parent read unchanged child status twice, all done" },
   ],
 }
 
