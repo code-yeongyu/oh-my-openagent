@@ -69,15 +69,24 @@ export class ParentWakeFlushRunner {
       // through to the admit-only noReply deposit so the user's own turn can
       // consume the notification without forking another assistant chain.
       if (forceIdleReply && !(await this.isUserMessageInProgress(sessionID))) {
-        await this.sendParentWakePrompt(sessionID, latestWake, {
-          emptyAssistantTurnRetry: false,
-          toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
-          forceReply: true,
-        })
-        log("[background-agent] Forced reply parent wake because parent session is idle", {
-          sessionID,
-        })
-        return
+        // The running-tool-call history guard must hold on the forced-reply
+        // fast path too (PR #7166 review): a reply-producing wake must never
+        // be forced while the session history still blocks internal prompts
+        // (finish:"tool-calls" / running tool state). Fall through to the
+        // admit-only noReply deposit so the live tool turn can finish without
+        // forking a concurrent assistant chain.
+        const historyDecision = await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)
+        if (!historyDecision.defer) {
+          await this.sendParentWakePrompt(sessionID, latestWake, {
+            emptyAssistantTurnRetry: false,
+            toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+            forceReply: true,
+          })
+          log("[background-agent] Forced reply parent wake because parent session is idle", {
+            sessionID,
+          })
+          return
+        }
       }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry: false,
