@@ -53,6 +53,28 @@ The commands were run from the isolated
   inheritance failure was an intermittent flake, not a regression caused by
   serialization. Serializing Windows shard 2 is safe.
 
+## Post-Rebase Root-Cause Update
+
+- PR #7678 failed CI twice before this rebase. Both failures occurred only in
+  `test (windows-latest, 2/2)` on
+  `omo setup credential inheritance > #given pinned omp and gjc databases #when accepted #then allow-listed rows import and unknown schema is noticed`.
+  In both runs, two `win32 EBUSY` teardown-failure lines preceded a
+  `beforeEach`/`afterEach` teardown hook timeout.
+- The failures were root-caused to leaked setup-import SQLite database
+  handles. The fix landed on `origin/dev` as commit `e54c7c18c` in PR #7681,
+  closing those handles deterministically through the existing
+  `withDatabase` helper.
+- `ci/windows-shard2-serial` was rebased cleanly onto the `origin/dev` tip at
+  `e54c7c18c`. The rebased workflow still removes only `--parallel` from the
+  telemetry-wrapped Windows shard-2 remainder invocation.
+- The required post-rebase regression command passed with `28 pass`,
+  `0 fail`, and `203 expect() calls`:
+  `bun test script/ci-root-test-partition.test.ts script/ci-job-summary-workflow.test.ts script/windows-flake-soak-workflow.test.ts`.
+- This rebase is the decisive serial-plus-fix validation configuration:
+  Windows shard 2 now runs serially while also containing the deterministic
+  setup-import database-handle fix. Per instruction, this update is pushed
+  without waiting for the resulting CI run.
+
 ## Known Defect
 
 The `.github/workflows/windows-flake-soak.yml` job summary reported
