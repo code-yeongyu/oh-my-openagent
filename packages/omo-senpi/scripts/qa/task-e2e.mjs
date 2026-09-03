@@ -147,7 +147,7 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   capture.mainEventSummary = summarizeEvents(second.events)
   checks.spawn_background = first.run.status === 0 && typeof taskId === "string" && existsSync(join(scenario.stateDir, "tasks", `${taskId}.json`)) ? "PASS" : "FAIL"
   checks.unconditional_wake = wake.ok ? "PASS" : "FAIL"
-  checks.task_output_peek = findTranscript(second.events, CHILD_FIRST) && findPeekTaskOutput(second.events) ? "PASS" : "FAIL"
+  checks.task_output_polling_guard = hasNoProgressAfterStatus(second.events) ? "PASS" : "FAIL"
   checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE.slice(0, 3)) ? "PASS" : "FAIL"
   checks.extension_suppression = markerCount(scenario.markerLog) === 2 ? "PASS" : "FAIL"
   capture.markerCount = markerCount(scenario.markerLog)
@@ -285,6 +285,13 @@ function findPeekTaskOutput(events) {
   })
 }
 
+function hasNoProgressAfterStatus(events) {
+  const kinds = events
+    .filter((event) => event?.type === "tool_execution_end" && event?.toolName === "task_output")
+    .map((event) => event.result?.details?.kind)
+  return kinds.some((kind, index) => kind === "no_progress" && kinds.slice(0, index).includes("status"))
+}
+
 function sessionIdFromEvents(events) {
   const header = events.find((event) => event?.type === "session" && typeof event?.id === "string")
   return header?.id
@@ -329,6 +336,12 @@ function runSelfTest() {
   if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { mode: "tail" } })))) throw new Error("self-test: non-blocking output peek must be detected")
   if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ toolName: "task_output", arguments: { mode: "tail" } })))) throw new Error("self-test: toolName output peek must be detected")
   if (findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } })))) throw new Error("self-test: legacy blocking output call must not count as a peek")
+  const pollingEvents = parseJsonEvents([
+    JSON.stringify({ type: "tool_execution_end", toolName: "task_output", result: { details: { kind: "status" } } }),
+    JSON.stringify({ type: "tool_execution_end", toolName: "task_output", result: { details: { kind: "no_progress" } } }),
+  ].join("\n"))
+  if (!hasNoProgressAfterStatus(pollingEvents)) throw new Error("self-test: second unchanged task-output status read must be no_progress")
+  if (hasNoProgressAfterStatus(pollingEvents.slice(0, 1))) throw new Error("self-test: one status read must not pass the polling guard")
   const taskOutputIndex = MAIN_FOLLOWUP_SCRIPT.parentSteps.findIndex((step) => step.type === "tool_call" && step.name === "task_output")
   if (taskOutputIndex !== 0) {
     throw new Error("self-test: scoped follow-up must begin with task_output")

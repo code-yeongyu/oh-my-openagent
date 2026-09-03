@@ -160,7 +160,7 @@ function invalidArguments(reason: string): TaskOutputToolResult {
 }
 
 function noProgress(record: TaskRecord): TaskOutputToolResult {
-  const reason = record.status === "cancelled" || record.status === "interrupted"
+  const reason = !record.notify_on_terminal
     ? `Task ${record.task_id} is ${record.status}. It will not send a completion notification; use mode:"tail" only for explicit transcript diagnosis.`
     : `Task ${record.task_id} has not changed since the last status read. Await its completion notification; use mode:"tail" only for explicit transcript diagnosis.`
   return toolResult(reason, {

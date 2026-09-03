@@ -17,6 +17,7 @@ export type RecordOverrides = {
   readonly updated_at?: string
   readonly final_response?: string
   readonly error_message?: string
+  readonly notify_on_terminal?: boolean
   readonly run_epoch?: number
   readonly notified_epoch?: number
   readonly residency_state?: TaskRecord["residency_state"]
@@ -38,7 +39,7 @@ export function makeRecord(overrides: RecordOverrides = {}): TaskRecord {
     model: overrides.model ?? "claude-sonnet-4-5",
     created_at: overrides.created_at ?? timestamp,
     updated_at: timestamp,
-    notify_on_terminal: false,
+    notify_on_terminal: overrides.notify_on_terminal ?? false,
     notification: {
       run_epoch: overrides.run_epoch ?? 0,
       notified_epoch: overrides.notified_epoch ?? -1,
