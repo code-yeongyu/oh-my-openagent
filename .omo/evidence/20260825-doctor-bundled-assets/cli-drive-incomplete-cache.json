@@ -1,0 +1,214 @@
+{
+  "results": [
+    {
+      "name": "System",
+      "status": "fail",
+      "message": "1 system issue(s) detected",
+      "details": [
+        "OpenCode: 1.18.22",
+        "Plugin expected: 9.9.9",
+        "Plugin loaded: 9.9.9",
+        "Bun: 1.3.14"
+      ],
+      "issues": [
+        {
+          "title": "oh-my-openagent is not registered",
+          "description": "Plugin entry is missing from OpenCode configuration.",
+          "fix": "Run: bunx oh-my-openagent install",
+          "severity": "error",
+          "affects": [
+            "all agents"
+          ]
+        }
+      ],
+      "duration": 3779
+    },
+    {
+      "name": "Bundled Assets",
+      "status": "fail",
+      "message": "1 of 3 required bundled assets are missing from /tmp/opencode/omo-doctor-qa-HmVV/cache/opencode/packages/oh-my-openagent@9.9.9/node_modules/oh-my-openagent. The plugin likely fails during initialization while OpenCode keeps running with stock agents.",
+      "details": [
+        "missing: /tmp/opencode/omo-doctor-qa-HmVV/cache/opencode/packages/oh-my-openagent@9.9.9/node_modules/oh-my-openagent/dist/skills/frontend/SKILL.md"
+      ],
+      "issues": [
+        {
+          "title": "Missing bundled plugin asset",
+          "description": "/tmp/opencode/omo-doctor-qa-HmVV/cache/opencode/packages/oh-my-openagent@9.9.9/node_modules/oh-my-openagent/dist/skills/frontend/SKILL.md is missing from the installed plugin package. OpenCode can load a partially installed package without registering any OMO agents, tools, or hooks.",
+          "fix": "Delete the version-tagged directory for this package under ~/.cache/opencode/packages (or the path reported below), then restart OpenCode so it reinstalls the plugin, and run `bunx oh-my-openagent doctor` again.",
+          "affects": [
+            "all OMO agents",
+            "tools",
+            "hooks"
+          ],
+          "severity": "error"
+        }
+      ],
+      "duration": 234
+    },
+    {
+      "name": "Configuration",
+      "status": "pass",
+      "message": "Configuration is valid",
+      "details": [
+        "Path: /home/fqwqf/.omo/omo.jsonc"
+      ],
+      "issues": [],
+      "duration": 229
+    },
+    {
+      "name": "TUI Plugin",
+      "status": "skip",
+      "message": "Plugin not registered (server or TUI)",
+      "details": [
+        "tui.json: /tmp/opencode/omo-doctor-qa-HmVV/config/tui.json"
+      ],
+      "issues": [],
+      "duration": 135
+    },
+    {
+      "name": "Configuration",
+      "status": "pass",
+      "message": "No deprecated config keys found",
+      "issues": [],
+      "duration": 133
+    },
+    {
+      "name": "Tools",
+      "status": "warn",
+      "message": "1 tools issue(s) detected",
+      "details": [
+        "AST-Grep CLI: yes",
+        "Comment checker: yes",
+        "LSP: 1 server(s)",
+        "GH CLI: installed",
+        "MCP: builtin=4, user=1"
+      ],
+      "issues": [
+        {
+          "title": "GitHub CLI not authenticated",
+          "description": "gh CLI is installed but not logged in.",
+          "fix": "Run: gh auth login",
+          "severity": "warning",
+          "affects": [
+            "GitHub automation"
+          ]
+        }
+      ],
+      "duration": 303
+    },
+    {
+      "name": "Models",
+      "status": "warn",
+      "message": "11 agents, 8 categories, 19 overrides",
+      "details": [
+        "═══ Available Models (from cache) ═══",
+        "",
+        "  ⚠ Cache not found. Run 'opencode' to populate.",
+        "",
+        "═══ Configured Models ═══",
+        "",
+        "Agents:",
+        "  ● sisyphus: kimi-for-coding/k2p6 (max) [capabilities: heuristic-backed]",
+        "  ● hephaestus: github-copilot/gpt-5.6-sol (medium) [capabilities: snapshot-backed]",
+        "  ● oracle: kimi-for-coding/k2p6 (xhigh) [capabilities: heuristic-backed]",
+        "  ● librarian: kimi-for-coding/k2p6 (low) [capabilities: heuristic-backed]",
+        "  ● explore: kimi-for-coding/k2p6 (low) [capabilities: heuristic-backed]",
+        "  ● multimodal-looker: kimi-for-coding/k2p6 (low) [capabilities: heuristic-backed]",
+        "  ● prometheus: kimi-for-coding/k2p6 (high) [capabilities: heuristic-backed]",
+        "  ● metis: kimi-for-coding/k2p6 (high) [capabilities: heuristic-backed]",
+        "  ● momus: kimi-for-coding/k2p6 (high) [capabilities: heuristic-backed]",
+        "  ● atlas: kimi-for-coding/k2p6 [capabilities: heuristic-backed]",
+        "  ● sisyphus-junior: github-copilot/claude-sonnet-5 [capabilities: snapshot-backed]",
+        "",
+        "Categories:",
+        "  ● visual-engineering: kimi-for-coding/k2p6 (max) [capabilities: heuristic-backed]",
+        "  ● ultrabrain: kimi-for-coding/k2p6 (high) [capabilities: heuristic-backed]",
+        "  ● deep: github-copilot/gpt-5.6-sol (medium) [capabilities: snapshot-backed]",
+        "  ● artistry: kimi-for-coding/k2p6 (high) [capabilities: heuristic-backed]",
+        "  ● quick: kimi-for-coding/k2p6 [capabilities: heuristic-backed]",
+        "  ● unspecified-low: kimi-for-coding/k2p6 (high) [capabilities: heuristic-backed]",
+        "  ● unspecified-high: kimi-for-coding/k2p6 (high) [capabilities: heuristic-backed]",
+        "  ● writing: kimi-for-coding/k2p6 (low) [capabilities: heuristic-backed]",
+        "",
+        "● = user override, ○ = provider fallback"
+      ],
+      "issues": [
+        {
+          "title": "Model cache not found",
+          "description": "OpenCode model cache is missing, so model availability cannot be validated.",
+          "fix": "Run: opencode models --refresh",
+          "severity": "warning",
+          "affects": [
+            "model resolution"
+          ]
+        }
+      ],
+      "duration": 110
+    },
+    {
+      "name": "Telemetry",
+      "status": "pass",
+      "message": "Telemetry: disabled",
+      "details": [
+        "PostHog host: https://us.i.posthog.com",
+        "Last daily active date: never",
+        "State file: /tmp/opencode/omo-doctor-qa-HmVV/home/.local/share/oh-my-opencode/posthog-activity.json"
+      ],
+      "issues": [],
+      "duration": 46
+    },
+    {
+      "name": "Team Mode",
+      "status": "skip",
+      "message": "team_mode: disabled",
+      "issues": [],
+      "duration": 24
+    }
+  ],
+  "systemInfo": {
+    "opencodeVersion": "1.18.22",
+    "opencodePath": "/home/fqwqf/.nvm/versions/node/v24.13.1/bin/opencode",
+    "pluginVersion": "9.9.9",
+    "loadedVersion": "9.9.9",
+    "bunVersion": "1.3.14",
+    "configPath": null,
+    "configValid": true,
+    "isLocalDev": false
+  },
+  "tools": {
+    "lspServers": [
+      {
+        "id": "lsp-tools-mcp",
+        "extensions": [
+          "*"
+        ]
+      }
+    ],
+    "astGrepCli": true,
+    "commentChecker": true,
+    "ghCli": {
+      "installed": true,
+      "authenticated": false,
+      "username": null
+    },
+    "mcpBuiltin": [
+      "websearch",
+      "context7",
+      "grep_app",
+      "lsp"
+    ],
+    "mcpUser": [
+      "codegraph"
+    ]
+  },
+  "summary": {
+    "total": 9,
+    "passed": 3,
+    "failed": 2,
+    "warnings": 2,
+    "skipped": 2,
+    "duration": 3779
+  },
+  "exitCode": 1,
+  "target": "opencode"
+}
