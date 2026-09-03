@@ -4,24 +4,26 @@ WHAT WAS TESTED
 - node packages/omo-senpi/scripts/qa/drive.mjs --self-test
 - node packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs --self-test
 - node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
-- Live task driver with the installed workspace Senpi binary: SENPI_BIN=node_modules/.bin/senpi TASK_E2E_OUT_DIR=<resolved evidence dir>/live-task-e2e node packages/omo-senpi/scripts/qa/task-e2e.mjs
+- Live two-turn task-output driver with the installed workspace Senpi binary: SENPI_BIN=node_modules/.bin/senpi TASK_E2E_SCOPE=task-output TASK_E2E_OUT_DIR=<resolved evidence dir>/live-task-e2e node packages/omo-senpi/scripts/qa/task-e2e.mjs
+- A minimal `task_output` library-surface driver that repeated a `cancelled` task status read and asserted that its guidance says it will not send a completion notification.
 
 WHAT WAS OBSERVED
 - TypeScript narrowing accepts the new no_progress TaskOutputDetails variant.
 - Focused tests passed, including a regression proving rejected compaction preserves the status-read cache while accepted compaction clears it.
 - Driver self-tests passed and the generated Senpi bundle was current.
-- The live driver executed in isolated sandboxes and reported realSenpiUntouched=true, no changed real-home paths, and no leaked child PIDs. Its aggregate result was FAIL because several broad resume/main-flow assertions did not match this local workspace Senpi runtime; the exact structured receipt is verdict.json.
+- The scoped live driver passed every assertion: background spawn, completion wake, a same-session `task_output` transcript peek, durable JSONL ordering, extension registration, zero leaked PIDs, and untouched real Senpi state. Its safe structured receipt is `live-task-e2e/verdict.json`.
+- The direct cancelled-task driver reported that repeated status reads do not instruct the caller to await a completion notification.
 - After the first fix commit, GitHub CI passed typecheck, all platform tests, and Senpi compatibility on Ubuntu, macOS, and Windows. The follow-up rejected-compaction fix requires a fresh CI run after push.
 
 WHY IT IS ENOUGH
 - The original compile failure is covered by typecheck and a focused RPC codec regression.
 - Polling suppression is covered by the six-case engine suite.
 - Rejected-versus-accepted compaction cache behavior is covered directly at the adapter event bridge.
-- The live harness was actually driven with isolation proof retained; its unrelated broad-flow mismatches are disclosed rather than represented as a pass. Repository CI remains the authoritative cross-platform compatibility gate.
+- The live harness actually drives the generated extension in a fresh sandbox, resumes the parent session explicitly for the output peek, and proves that the real Senpi agent directory was untouched. This scope deliberately tests `task_output`, not the separate task-revival suite. Repository CI remains the authoritative cross-platform compatibility gate.
 
 WHAT WAS OMITTED
-- Raw model/session transcripts and environment dumps were not committed because they can contain unrelated prompt material and machine-local paths.
-- Only the reviewer-readable summary and structured verdict are tracked.
+- Raw model/session transcripts, environment dumps, host paths, sandbox identifiers, task IDs, and PIDs were omitted.
+- The receipt contains only booleans, counts, fixed check names, and sanitized event kinds; no raw logs are written.
 
 PR #7662 REVIEW FOLLOW-UP
 - `review-followup.md` records the fresh failing-first regression receipt, the bounded `no_progress` fix, the accepted-only compaction cache gate, focused test results, and generated-bundle integrity checks.

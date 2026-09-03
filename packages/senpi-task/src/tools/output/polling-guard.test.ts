@@ -132,6 +132,31 @@ describe("task_output polling guard", () => {
     expect(JSON.stringify(second).length).toBeLessThan(4096)
   })
 
+  test("#given an unchanged cancelled or interrupted task #when status is polled again #then it does not promise a completion notification", async () => {
+    for (const status of ["cancelled", "interrupted"] as const) {
+      const record = makeRecord({ task_id: `st_${status}`, name: "worker", status })
+      const manager: OutputManager = {
+        get: () => record,
+        list: () => [{ record }],
+      }
+      const output = createTaskOutputTool({
+        manager,
+        stateDir: "/tmp/state",
+        transcriptReader: () => ({ entries: [], source: "none" }),
+      })
+      const execute = () =>
+        output.execute("call", { task_id: record.task_id }, undefined, undefined, context("session-a"))
+
+      expect((await execute()).details.kind).toBe("status")
+      const repeated = await execute()
+      expect(repeated.details.kind).toBe("no_progress")
+      if (repeated.details.kind === "no_progress") {
+        expect(repeated.details.reason).toContain(`Task ${record.task_id} is ${status}.`)
+        expect(repeated.details.reason).not.toContain("Await its completion notification")
+      }
+    }
+  })
+
   test("#given a lost task #when tail is read twice #then both peeks return the lost snapshot", async () => {
     const record = makeRecord({ task_id: "st_lost", name: "worker", status: "lost" })
     const manager: OutputManager = {
