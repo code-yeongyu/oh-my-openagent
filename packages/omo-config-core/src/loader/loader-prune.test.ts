@@ -167,4 +167,27 @@ describe("loadOmoConfig surgical pruning", () => {
       rmSync(fixture.root, { force: true, recursive: true })
     }
   })
+
+  test("#given a layer whose only issue is a malformed non-record value with no agents or categories keys #when loading #then the record-leaf gate rejects the layer instead of prune-attempting it", () => {
+    // given
+    const fixture = makeFixture()
+    writeProjectConfig(
+      fixture.homeDir,
+      `{
+        "task": { "default_concurrency": "not-a-number" }
+      }`,
+    )
+
+    try {
+      // when
+      const result = load(fixture)
+
+      // then
+      expect(result.config.task?.default_concurrency).toBe(5)
+      expect(result.sources.every((source) => !source.loaded)).toBe(true)
+      expect(result.diagnostics.some((d) => d.kind === "validation")).toBe(true)
+    } finally {
+      rmSync(fixture.root, { force: true, recursive: true })
+    }
+  })
 })
