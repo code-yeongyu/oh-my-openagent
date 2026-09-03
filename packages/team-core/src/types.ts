@@ -32,6 +32,7 @@ const MemberBaseSchema = z.object({
   backendType: z.enum(["in-process", "tmux"]).default("in-process"),
   color: z.string().optional(),
   isActive: z.boolean().default(true),
+  readOnly: z.union([z.boolean(), z.literal("strict")]).optional(),
 }).strict()
 
 export const CategoryMemberSchema = MemberBaseSchema.extend({
@@ -146,6 +147,7 @@ const RuntimeStateMemberSchema = z.object({
   worktreePath: z.string().optional(),
   lastInjectedTurnMarker: z.string().optional(),
   pendingInjectedMessageIds: z.array(z.string()).default([]),
+  lastActiveAt: z.number().int().positive().optional(),
 }).strict()
 
 const RuntimeBoundsSchema = z.object({

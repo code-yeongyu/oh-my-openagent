@@ -431,7 +431,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(promptAsyncCalls).toHaveLength(0)
     })
 
-    test("#when partial completion arrives while parent session is busy #then notification waits until idle without waking a reply", async () => {
+    test("#when partial completion arrives while parent session is busy #then notification waits for idle and wakes a reply", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "busy" },
@@ -457,7 +457,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
       expect(notificationPayload).toContain("BACKGROUND TASK RESULT READY")
       expect(notificationPayload).not.toContain("ALL BACKGROUND TASKS COMPLETE")

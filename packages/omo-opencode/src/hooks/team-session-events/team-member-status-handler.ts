@@ -38,7 +38,7 @@ async function transitionMemberStatus(
     ...currentRuntimeState,
     members: currentRuntimeState.members.map((member) => (
       member.name === runtimeMember.memberName
-        ? { ...member, status: nextStatus }
+        ? { ...member, status: nextStatus, lastActiveAt: Date.now() }
         : member
     )),
   }), config)

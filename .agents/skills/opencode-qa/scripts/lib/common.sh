@@ -111,9 +111,9 @@ oqa_wait_http() {
   deadline=$(( $(date +%s) + timeout ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if [ -n "$auth" ]; then
-      curl -s -o /dev/null -u "$auth" "$url" && return 0
+      curl -s --max-time 2 --connect-timeout 1 -o /dev/null -u "$auth" "$url" && return 0
     else
-      curl -s -o /dev/null "$url" && return 0
+      curl -s --max-time 2 --connect-timeout 1 -o /dev/null "$url" && return 0
     fi
     sleep 0.2
   done

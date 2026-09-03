@@ -225,6 +225,80 @@ describe("createTeamRun", () => {
     expect(firstPrompt).toContain("Lead-only tools you must NOT call")
   })
 
+  test("readOnly member gets edit-denied sessionPermission and read-only guidance", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-readonly-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: "task-1",
+      sessionId: "session-1",
+      status: "running",
+    } as BackgroundTask))
+    const spec: TeamSpec = {
+      ...createSpec(1),
+      members: [{ ...createSpec(1).members[0]!, readOnly: true }],
+    }
+
+    // when
+    await createTeamRun(spec, "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+    const firstLaunch = (launchMock.mock.calls as Array<[LaunchInput]>)[0]?.[0]
+
+    // then
+    expect(firstLaunch?.sessionPermission).toEqual([
+      { permission: "question", action: "deny", pattern: "*" },
+      { permission: "edit", action: "deny", pattern: "*" },
+    ])
+    expect(firstLaunch?.prompt).toContain("## Read-only mode")
+  })
+
+  test("strict readOnly member gets bash-denied sessionPermission and strict guidance", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-readonly-strict-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: "task-1",
+      sessionId: "session-1",
+      status: "running",
+    } as BackgroundTask))
+    const spec: TeamSpec = {
+      ...createSpec(1),
+      members: [{ ...createSpec(1).members[0]!, readOnly: "strict" }],
+    }
+
+    // when
+    await createTeamRun(spec, "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+    const firstLaunch = (launchMock.mock.calls as Array<[LaunchInput]>)[0]?.[0]
+
+    // then
+    expect(firstLaunch?.sessionPermission).toEqual([
+      { permission: "question", action: "deny", pattern: "*" },
+      { permission: "edit", action: "deny", pattern: "*" },
+      { permission: "bash", action: "deny", pattern: "*" },
+    ])
+    expect(firstLaunch?.prompt).toContain("bash is also denied in strict read-only mode")
+  })
+
+  test("non-readOnly member keeps question-denied sessionPermission", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-non-readonly-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: "task-1",
+      sessionId: "session-1",
+      status: "running",
+    } as BackgroundTask))
+
+    // when
+    await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+    const firstLaunch = (launchMock.mock.calls as Array<[LaunchInput]>)[0]?.[0]
+
+    // then
+    expect(firstLaunch?.sessionPermission).toEqual([
+      { permission: "question", action: "deny", pattern: "*" },
+    ])
+    expect(firstLaunch?.prompt).not.toContain("## Read-only mode")
+  })
+
   test("rolls back launched members in reverse order when a later spawn fails", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-rollback-"))

@@ -1,6 +1,9 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 
-export function buildTeammateCommunicationAddendum(_config: TeamModeConfig): string {
+export function buildTeammateCommunicationAddendum(
+  _config: TeamModeConfig,
+  readOnly?: boolean | "strict",
+): string {
   return `
 # Team Communication
 
@@ -35,7 +38,23 @@ Going idle after sending a message is the expected flow — it does NOT mean you
 - Do NOT send structured JSON status messages like \`{"type":"idle",...}\` or \`{"type":"task_completed",...}\`. Communicate in plain natural language when you message teammates.
 - Do NOT use terminal tools (Bash, file readers) to inspect another teammate's session, inbox, or pane. Send a \`team_send_message\` instead.
 - Always refer to teammates by their NAME (e.g., \`to: "lead"\`, \`to: "researcher"\`), never by internal session IDs.
+- Coordinate file ownership with teammates: each member should work within its own file/directory scope to avoid conflicts on the shared worktree. If you must touch a file another member owns, message them first.
 
+## Long-running commands
+
+Never run blocking services (dev servers, watch mode) in the foreground — the call will hang until timeout. Instead:
+1. Start in background with a log file: \`nohup pnpm dev > /tmp/dev-<name>.log 2>&1 & echo $!\`
+2. Poll readiness with a bounded loop: \`for i in $(seq 1 30); do curl -sf localhost:PORT && break || sleep 2; done\`
+3. Verify via the log: \`tail -50 /tmp/dev-<name>.log\`
+4. Kill by the recorded PID when done.
+${readOnly ? `
+
+## Read-only mode
+
+You are a read-only team member. File-editing tools (edit/write/multiedit) are HARDDENIED at the session permission level — attempts will be rejected. Do NOT try to write files, create directories, or modify anything on disk. Prepare your analysis and deliverables as message text, and send them to the lead via \`team_send_message\`. Do not attempt to work around the restriction with bash shell redirection (echo > file, sed -i) — that is a violation.${readOnly === "strict" ? `
+
+Additionally, bash is also denied in strict read-only mode — you cannot run shell commands at all. Do all work through read-only tools and message text.` : ""}
+` : ""}
 ## Wrap-up
 
 When you finish your assigned work, ALWAYS, in this order:

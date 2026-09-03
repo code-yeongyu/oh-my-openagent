@@ -23,6 +23,8 @@ export interface TeamStatus {
     worktreePath?: string
     unreadMessages: number
     paneId?: string
+    lastActiveAt?: number
+    idleDurationMs?: number
   }>
   tasks: {
     pending: number
@@ -144,6 +146,8 @@ export async function aggregateStatus(
       worktreePath: member.worktreePath,
       unreadMessages,
       paneId: member.tmuxPaneId,
+      lastActiveAt: member.lastActiveAt,
+      idleDurationMs: member.status === "idle" && member.lastActiveAt ? Date.now() - member.lastActiveAt : undefined,
     })),
     tasks: countTasks(tasks),
     shutdownRequests: runtimeState.shutdownRequests,
