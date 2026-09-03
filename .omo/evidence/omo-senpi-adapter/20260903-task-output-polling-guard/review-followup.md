@@ -82,7 +82,7 @@ Separately, a minimal executable `task_output` library-surface driver repeated t
 
 ## Current-head Codex follow-up
 
-The current-head review correctly identified further gaps. The scoped driver proves the actual generated bundle's second unchanged `status` read returns `no_progress`, rather than only exercising `mode:"tail"`. Guidance preserves notification intent while a task is pending or running; after it is terminal, it requires a notifying status and an unacknowledged notification epoch. The TUI renders the factual `no_progress` reason instead of unconditionally instructing the user to await a notification. The current bundle SHA and scoped receipt above bind this latest QA run to the shipped generated artifact.
+The current-head review correctly identified further gaps. The scoped driver proves the actual generated bundle's second unchanged `status` read returns `no_progress`, rather than only exercising `mode:"tail"`, and treats a nonzero follow-up Senpi process exit as a failed polling-guard check even if those events were emitted. Guidance preserves notification intent while a task is pending or running; after it is terminal, it requires a notifying status and an unacknowledged notification epoch. The TUI renders the factual `no_progress` reason instead of unconditionally instructing the user to await a notification. The current bundle SHA and scoped receipt above bind this latest QA run to the shipped generated artifact.
 
 ## Why this is enough
 

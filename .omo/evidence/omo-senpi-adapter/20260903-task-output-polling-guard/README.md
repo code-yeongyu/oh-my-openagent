@@ -11,7 +11,7 @@ WHAT WAS OBSERVED
 - TypeScript narrowing accepts the new no_progress TaskOutputDetails variant.
 - Focused tests passed, including a regression proving rejected compaction preserves the status-read cache while accepted compaction clears it.
 - Driver self-tests passed and the generated Senpi bundle was current.
-- The scoped live driver passed every assertion: background spawn, completion wake, two unchanged same-session `task_output` status reads with the second returning `no_progress`, durable JSONL ordering, extension registration, zero leaked PIDs, and untouched real Senpi state. Its safe structured receipt is `live-task-e2e/verdict.json`.
+- The scoped live driver passed every assertion: background spawn, completion wake, two unchanged same-session `task_output` status reads with the second returning `no_progress`, a successful follow-up Senpi process exit, durable JSONL ordering, extension registration, zero leaked PIDs, and untouched real Senpi state. Matching events from a nonzero or timed-out follow-up are a polling-guard failure. Its safe structured receipt is `live-task-e2e/verdict.json`.
 - The direct terminal-notification driver reported that repeated reads instruct callers to await an opted-in task's future notification while it is pending or running; once terminal, only completed/error/lost tasks with an unacknowledged notification epoch remain awaitable. The TUI renders that factual reason rather than assuming a notification will arrive.
 - After the first fix commit, GitHub CI passed typecheck, all platform tests, and Senpi compatibility on Ubuntu, macOS, and Windows. The follow-up rejected-compaction fix requires a fresh CI run after push.
 

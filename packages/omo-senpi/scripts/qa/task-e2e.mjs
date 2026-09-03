@@ -147,7 +147,7 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   capture.mainEventSummary = summarizeEvents(second.events)
   checks.spawn_background = first.run.status === 0 && typeof taskId === "string" && existsSync(join(scenario.stateDir, "tasks", `${taskId}.json`)) ? "PASS" : "FAIL"
   checks.unconditional_wake = wake.ok ? "PASS" : "FAIL"
-  checks.task_output_polling_guard = hasNoProgressAfterStatus(second.events) ? "PASS" : "FAIL"
+  checks.task_output_polling_guard = hasSuccessfulNoProgressFollowup(second.run.status, second.events) ? "PASS" : "FAIL"
   checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE.slice(0, 3)) ? "PASS" : "FAIL"
   checks.extension_suppression = markerCount(scenario.markerLog) === 2 ? "PASS" : "FAIL"
   capture.markerCount = markerCount(scenario.markerLog)
@@ -292,6 +292,10 @@ function hasNoProgressAfterStatus(events) {
   return kinds.some((kind, index) => kind === "no_progress" && kinds.slice(0, index).includes("status"))
 }
 
+function hasSuccessfulNoProgressFollowup(status, events) {
+  return status === 0 && hasNoProgressAfterStatus(events)
+}
+
 function sessionIdFromEvents(events) {
   const header = events.find((event) => event?.type === "session" && typeof event?.id === "string")
   return header?.id
@@ -342,6 +346,8 @@ function runSelfTest() {
   ].join("\n"))
   if (!hasNoProgressAfterStatus(pollingEvents)) throw new Error("self-test: second unchanged task-output status read must be no_progress")
   if (hasNoProgressAfterStatus(pollingEvents.slice(0, 1))) throw new Error("self-test: one status read must not pass the polling guard")
+  if (!hasSuccessfulNoProgressFollowup(0, pollingEvents)) throw new Error("self-test: successful follow-up with no_progress must pass")
+  if (hasSuccessfulNoProgressFollowup(1, pollingEvents)) throw new Error("self-test: failed follow-up must not pass the polling guard")
   const taskOutputIndex = MAIN_FOLLOWUP_SCRIPT.parentSteps.findIndex((step) => step.type === "tool_call" && step.name === "task_output")
   if (taskOutputIndex !== 0) {
     throw new Error("self-test: scoped follow-up must begin with task_output")
