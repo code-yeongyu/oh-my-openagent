@@ -112,6 +112,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_sub_123")
     expectFn(metadataCalls[0].metadata.taskId).toBe("ses_sub_123")
     expectFn(metadataCalls[0].metadata.backgroundTaskId).toBe("bg_resolved")
+    expectFn(metadataCalls[0].metadata.background).toBe(true)
   })
 
   testFn("keeps continuation taskId out of visible background metadata", async () => {
@@ -204,6 +205,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_late_123")
     expectFn(metadataCalls[0].metadata.taskId).toBe("ses_late_123")
     expectFn(metadataCalls[0].metadata.backgroundTaskId).toBe("bg_late")
+    expectFn(metadataCalls[0].metadata.background).toBe(true)
   })
 
   testFn("passes question-deny session permission when launching delegate task", async () => {

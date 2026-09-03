@@ -193,6 +193,7 @@ export async function executeBackgroundTask(
       load_skills: args.load_skills,
       description: args.description,
       run_in_background: args.run_in_background,
+      background: true,
       command: args.command,
       ...(sessionId ? { taskId: sessionId, sessionId } : {}),
       backgroundTaskId: task.id,
