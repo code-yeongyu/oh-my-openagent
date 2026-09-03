@@ -12,7 +12,7 @@ WHAT WAS OBSERVED
 - Focused tests passed, including a regression proving rejected compaction preserves the status-read cache while accepted compaction clears it.
 - Driver self-tests passed and the generated Senpi bundle was current.
 - The scoped live driver passed every assertion: background spawn, completion wake, two unchanged same-session `task_output` status reads with the second returning `no_progress`, durable JSONL ordering, extension registration, zero leaked PIDs, and untouched real Senpi state. Its safe structured receipt is `live-task-e2e/verdict.json`.
-- The direct terminal-notification driver reported that repeated reads of tasks without terminal notifications do not instruct the caller to await one, while notification-enabled tasks do.
+- The direct terminal-notification driver reported that repeated reads instruct callers to await only a deliverable notification: an opted-in completed/error/lost task with an unacknowledged notification epoch. The TUI renders that factual reason rather than assuming a notification will arrive.
 - After the first fix commit, GitHub CI passed typecheck, all platform tests, and Senpi compatibility on Ubuntu, macOS, and Windows. The follow-up rejected-compaction fix requires a fresh CI run after push.
 
 WHY IT IS ENOUGH
