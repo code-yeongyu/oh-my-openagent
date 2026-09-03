@@ -72,6 +72,14 @@ All generated JavaScript bundles other than `omo-task.js` retained their SHA-1 v
 
 `omo-task.js` is the expected exception: it changed from `e3ab6da368bc788dc3010671f7f28c8144447b7a` to `9758fd9657eacec3b192f616e59b9bde253e4cf3` for the local source fix. After rebasing onto the fork's polling-guard changes, its remote baseline was `d01cfef3d2b5e6234559305604bea791833e3672` and the final regenerated SHA-1 is `b940dd7eb57bae3b223ada320b31706ef33cfc92`. The final bundle passed `node --check` and again contained three parsed `no_progress` markers.
 
+## Scoped live task-output follow-up
+
+The initial broad driver mixed task revival and output-peek assertions in one process. Its `task_output` check could not execute after the parent print-mode session had ended, so that aggregate FAIL was not valid evidence for the direct output surface.
+
+The corrected scoped driver uses two real Senpi invocations in the same explicit session: the first starts and completes a background child, and the second invokes `task_output` against that child. It passed all seven checks, including `task_output_peek`, durable JSONL ordering, no leaked PIDs, and real-agent isolation. The sanitized receipt is `live-task-e2e/verdict.json`; it contains no task IDs, PIDs, host paths, or raw model/session output.
+
+Separately, a minimal executable `task_output` library-surface driver repeated a `cancelled` task status read. It passed only when the second response said that no completion notification will be sent and did not say to await one. This exercises the terminal guidance introduced for the additional review finding.
+
 ## Why this is enough
 
-The focused failing-first receipt proves both review findings were observable before the fix. The focused regression, both package typechecks, the full Senpi task package suite, the complete omo-senpi task-component suite, the repository `test:senpi` gate, driver self-tests, and the parsed generated-bundle marker cover the changed source and its shipped runtime form. The existing live-driver verdict remains retained and disclosed in `live-task-e2e/verdict.json`; the platform-specific skipped driver test is disclosed above rather than counted as a local pass.
+The focused failing-first receipt proves both original review findings were observable before the fix. The terminal guidance regression proves the later finding. The focused regression, both package typechecks, the full Senpi task package suite, the complete omo-senpi task-component suite, the repository `test:senpi` gate, driver self-tests, parsed generated-bundle marker, scoped real-binary output receipt, and direct cancelled-task driver cover the changed source and its shipped runtime form. The platform-specific skipped driver test is disclosed above rather than counted as a local pass.

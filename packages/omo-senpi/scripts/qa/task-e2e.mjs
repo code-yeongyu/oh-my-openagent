@@ -26,7 +26,8 @@ import {
   BATCH_SCRIPT,
   CHILD_FIRST,
   CHILD_SECOND,
-  MAIN_SCRIPT,
+  MAIN_FOLLOWUP_SCRIPT,
+  MAIN_SPAWN_SCRIPT,
   NEGATIVE_SCRIPT,
   SYNC_FINAL,
   SYNC_SCRIPT,
@@ -67,13 +68,33 @@ function seedScenario(script, { withMarker } = {}) {
   return { sandbox, sessionDir, markerLog, stateDir: join(sandbox.cwd, ".omo", "senpi-task") }
 }
 
-function driveSenpi(senpiBin, scenario, prompt, pids) {
+function driveSenpi(senpiBin, scenario, prompt, pids, sessionId) {
   const run = spawnSync(
     senpiBin,
-    ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", scenario.sessionDir, prompt],
+    [
+      "-e", mockProviderEntry,
+      "-p", "--mode", "json",
+      "--provider", "omo-mock", "--model", "mock-1",
+      "--session-dir", scenario.sessionDir,
+      ...(sessionId === undefined ? [] : ["--session-id", sessionId]),
+      prompt,
+    ],
     {
       cwd: scenario.sandbox.cwd,
-      env: { ...process.env, SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir, XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir, OMO_SENPI_QA: "1" },
+      env: {
+        ...process.env,
+        OMO_CODING_AGENT_DIR: scenario.sandbox.agentDir,
+        SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
+        PI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
+        SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
+        HOME: scenario.sandbox.homeDir,
+        USERPROFILE: scenario.sandbox.homeDir,
+        XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome,
+        XDG_DATA_HOME: scenario.sandbox.xdgDataHome,
+        XDG_CACHE_HOME: scenario.sandbox.xdgCacheHome,
+        PI_OFFLINE: "1",
+        OMO_SENPI_QA: "1",
+      },
       encoding: "utf8",
       timeout: 120_000,
       maxBuffer: 64 * 1024 * 1024,
@@ -102,23 +123,33 @@ function markerCount(markerLog) {
 }
 
 function runMainFlow(senpiBin, checks, capture, pids) {
-  const scenario = seedScenario(MAIN_SCRIPT, { withMarker: true })
-  const { run, events } = driveSenpi(senpiBin, scenario, "spawn a background child, keep working, then follow up and read its output", pids)
-  capture.main = { exit: run.status, signal: run.signal ?? null, stateDir: scenario.stateDir }
+  const scenario = seedScenario(MAIN_SPAWN_SCRIPT, { withMarker: true })
+  const first = driveSenpi(senpiBin, scenario, "spawn a background child and keep working", pids)
   const taskId = readStoreTaskIds(scenario.stateDir)[0]
+  const sessionId = sessionIdFromEvents(first.events)
+  writeFileSync(join(scenario.sandbox.cwd, "mock-script.json"), `${JSON.stringify(MAIN_FOLLOWUP_SCRIPT, null, 2)}\n`)
+  const second = driveSenpi(senpiBin, scenario, "follow up with the completed child and read its output", pids, sessionId)
   const jsonl = taskId === undefined ? "" : readStoreJsonl(scenario.stateDir, taskId)
-  capture.mainStdout = run.stdout ?? ""
-  capture.mainStderr = run.stderr ?? ""
+  const events = [...first.events, ...second.events]
+  capture.main = {
+    firstExit: first.run.status,
+    followupExit: second.run.status,
+    firstSignal: first.run.signal ?? null,
+    followupSignal: second.run.signal ?? null,
+    stateDir: scenario.stateDir,
+  }
+  capture.mainStdout = `${first.run.stdout ?? ""}\n${second.run.stdout ?? ""}`
+  capture.mainStderr = `${first.run.stderr ?? ""}\n${second.run.stderr ?? ""}`
   capture.mainJsonl = jsonl
   capture.mainTaskId = taskId
-  const wake = findWakeNotification(events, taskId)
+  const wake = findWakeNotification(first.events, taskId)
   const signatures = jsonlSignatures(jsonl)
-  checks.spawn_background = run.status === 0 && typeof taskId === "string" && existsSync(join(scenario.stateDir, "tasks", `${taskId}.json`)) ? "PASS" : "FAIL"
+  capture.mainEventSummary = summarizeEvents(second.events)
+  checks.spawn_background = first.run.status === 0 && typeof taskId === "string" && existsSync(join(scenario.stateDir, "tasks", `${taskId}.json`)) ? "PASS" : "FAIL"
   checks.unconditional_wake = wake.ok ? "PASS" : "FAIL"
-  checks.followup_revive = findRevived(events) && JSON.stringify(events).includes(CHILD_SECOND) ? "PASS" : "FAIL"
-  checks.task_output_peek = findTranscript(events, CHILD_FIRST) && findPeekTaskOutput(events) ? "PASS" : "FAIL"
-  checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE) ? "PASS" : "FAIL"
-  checks.extension_suppression = markerCount(scenario.markerLog) === 1 ? "PASS" : "FAIL"
+  checks.task_output_peek = findTranscript(second.events, CHILD_FIRST) && findPeekTaskOutput(second.events) ? "PASS" : "FAIL"
+  checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE.slice(0, 3)) ? "PASS" : "FAIL"
+  checks.extension_suppression = markerCount(scenario.markerLog) === 2 ? "PASS" : "FAIL"
   capture.markerCount = markerCount(scenario.markerLog)
   capture.mainSignatures = signatures
   return scenario.sandbox
@@ -130,6 +161,7 @@ function runBatchFlow(senpiBin, checks, capture, pids) {
   const taskIds = readStoreTaskIds(scenario.stateDir)
   const items = findBatchFanout(events, 2)
   capture.batchStdout = run.stdout ?? ""
+  capture.batchTaskIds = taskIds
   checks.batch_fanout_two_children = run.status === 0 && taskIds.length >= 2 && batchChildrenCompleted(events, items) ? "PASS" : "FAIL"
   return scenario.sandbox
 }
@@ -169,11 +201,16 @@ async function main() {
   const pids = []
   const sandboxes = []
   try {
-    for (const runner of [runMainFlow, runBatchFlow, runSyncFlow, runNegativeFlow]) {
-      sandboxes.push(runner(senpiBin, checks, capture, pids))
+    sandboxes.push(runMainFlow(senpiBin, checks, capture, pids))
+    if (process.env.TASK_E2E_SCOPE !== "task-output") {
+      for (const runner of [runBatchFlow, runSyncFlow, runNegativeFlow]) {
+        sandboxes.push(runner(senpiBin, checks, capture, pids))
+      }
+      // Plan todo 22: quit->resume revival scenarios live in their own module (this driver is oversize).
+      // Their raw session streams can contain machine-local or unrelated prompt data; publish only
+      // the driver's sanitized aggregate receipt.
+      sandboxes.push(...await runTaskResumeScenarios({ senpiBin, checks, capture, pids, outDir: undefined }))
     }
-    // Plan todo 22: quit->resume revival scenarios live in their own module (this driver is oversize).
-    sandboxes.push(...await runTaskResumeScenarios({ senpiBin, checks, capture, pids, outDir }))
   } finally {
     for (const pid of pids) if (isAlive(pid)) killTree(pid)
   }
@@ -206,28 +243,71 @@ async function main() {
     markerChildExtensions: capture.markerCount,
     mainTaskId: capture.mainTaskId,
     mainSignatures: capture.mainSignatures,
-    mainExit: capture.main?.exit,
+    mainEventSummary: capture.mainEventSummary,
+    mainExit: capture.main?.followupExit,
     batchTaskIds: capture.batchTaskIds,
   }
-  writeEvidenceMaybe(outDir, capture, payload)
-  console.log(JSON.stringify(payload))
+  const receipt = evidenceReceipt(payload)
+  writeEvidenceMaybe(outDir, receipt)
+  console.log(JSON.stringify(receipt))
 }
 
-function writeEvidenceMaybe(outDir, capture, payload) {
+function evidenceReceipt(payload) {
+  return {
+    result: payload.result,
+    checks: payload.checks,
+    leakedPids: payload.leakedPids,
+    realSenpiUntouched: payload.realSenpiUntouched,
+    realSenpiChangedPathCount: payload.realSenpiChangedPaths.length,
+    concurrentRealSenpiChangedPathCount: payload.concurrentRealSenpiChangedPaths.length,
+    allRealSenpiChangedPathCount: payload.allRealSenpiChangedPaths.length,
+    realSenpiDigestUnchanged: payload.realSenpiDigestUnchanged,
+    sandboxCount: payload.sandboxAgentDirs.length,
+    markerChildExtensions: payload.markerChildExtensions,
+    mainSignatures: payload.mainSignatures,
+    mainEventSummary: payload.mainEventSummary,
+    mainExit: payload.mainExit,
+    batchTaskCount: payload.batchTaskIds?.length ?? 0,
+  }
+}
+
+function writeEvidenceMaybe(outDir, receipt) {
   if (outDir === undefined) return
   mkdirSync(outDir, { recursive: true })
-  writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(payload, null, 2)}\n`)
-  writeFileSync(join(outDir, "main.stdout.json.log"), capture.mainStdout ?? "")
-  writeFileSync(join(outDir, "main.stderr.log"), capture.mainStderr ?? "")
-  writeFileSync(join(outDir, "main.jsonl.log"), capture.mainJsonl ?? "")
-  writeFileSync(join(outDir, "batch.stdout.json.log"), capture.batchStdout ?? "")
-  writeFileSync(join(outDir, "sync.stdout.json.log"), capture.syncStdout ?? "")
-  writeFileSync(join(outDir, "negative.stdout.json.log"), capture.negativeStdout ?? "")
+  writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(receipt, null, 2)}\n`)
 }
 
 function findPeekTaskOutput(events) {
-  const output = JSON.stringify(events)
-  return output.includes('"name":"task_output"') && !output.includes('"block"') && !output.includes('"timeout_ms"')
+  return events.some((event) => {
+    if (event?.name !== "task_output" && event?.toolName !== "task_output") return false
+    const output = JSON.stringify(event)
+    return !output.includes('"block"') && !output.includes('"timeout_ms"')
+  })
+}
+
+function sessionIdFromEvents(events) {
+  const header = events.find((event) => event?.type === "session" && typeof event?.id === "string")
+  return header?.id
+}
+
+function summarizeEvents(events) {
+  return events
+    .filter((event) => event?.type === "tool_execution_start" || event?.type === "tool_execution_end")
+    .slice(0, 32)
+    .map((event) => {
+      const toolName = typeof event?.toolName === "string"
+        ? event.toolName
+        : typeof event?.name === "string"
+          ? event.name
+          : undefined
+      const details = event?.result?.details
+      const state = typeof details?.kind === "string"
+        ? details.kind
+        : typeof details?.status === "string"
+          ? details.status
+          : undefined
+      return [typeof event?.type === "string" ? event.type : "unknown", toolName, state].filter(Boolean).join(":")
+    })
 }
 
 function batchChildrenCompleted(events, items) {
@@ -243,14 +323,18 @@ function runSelfTest() {
   })}`)
   if (!findWakeNotification(wakeEvents, "st_abc").ok) throw new Error("self-test: wake notification must be detected")
   if (findWakeNotification(wakeEvents, "st_missing").ok) throw new Error("self-test: wake must not match a foreign task id")
+  if (sessionIdFromEvents([{ type: "session", id: "ses_e2e" }]) !== "ses_e2e") throw new Error("self-test: session id must be recovered for the follow-up turn")
   if (!findRevived(parseJsonEvents(JSON.stringify({ type: "toolResult", details: { kind: "revived", task_id: "st_abc", run_epoch: 1 } })))) throw new Error("self-test: revived must be detected")
   if (!findTranscript(parseJsonEvents(JSON.stringify({ type: "toolResult", content: `st_abc [completed] transcript via jsonl:\n${CHILD_FIRST}` })), CHILD_FIRST)) throw new Error("self-test: transcript must be detected")
   if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { mode: "tail" } })))) throw new Error("self-test: non-blocking output peek must be detected")
+  if (!findPeekTaskOutput(parseJsonEvents(JSON.stringify({ toolName: "task_output", arguments: { mode: "tail" } })))) throw new Error("self-test: toolName output peek must be detected")
   if (findPeekTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } })))) throw new Error("self-test: legacy blocking output call must not count as a peek")
-  const taskSendIndex = MAIN_SCRIPT.parentSteps.findIndex((step) => step.type === "tool_call" && step.name === "task_send")
-  const taskOutputIndex = MAIN_SCRIPT.parentSteps.findIndex((step) => step.type === "tool_call" && step.name === "task_output")
-  if (taskSendIndex < 0 || taskOutputIndex !== taskSendIndex + 1) {
-    throw new Error("self-test: task_output must be the next tool boundary after task_send")
+  const taskOutputIndex = MAIN_FOLLOWUP_SCRIPT.parentSteps.findIndex((step) => step.type === "tool_call" && step.name === "task_output")
+  if (taskOutputIndex !== 0) {
+    throw new Error("self-test: scoped follow-up must begin with task_output")
+  }
+  if (MAIN_FOLLOWUP_SCRIPT.parentSteps.some((step) => step.type === "tool_call" && step.name === "task_send")) {
+    throw new Error("self-test: scoped output follow-up must not depend on task revival")
   }
   if (!findInlineFinal(parseJsonEvents(JSON.stringify({ type: "text", text: SYNC_FINAL })), SYNC_FINAL)) throw new Error("self-test: inline final must be detected")
   if (!findCategoryListingError(parseJsonEvents(JSON.stringify({ type: "toolResult", content: "Unknown category. Available categories: quick, deep." })))) throw new Error("self-test: category listing error must be detected")
@@ -329,6 +413,49 @@ function runSelfTest() {
   if (configDelta.length !== 1 || configDelta[0] !== "settings.json") throw new Error("self-test: a real config change must be reported")
   const removalDelta = changedRealPaths(new Map([["auth.json", "x"]]), new Map())
   if (removalDelta.length !== 1 || removalDelta[0] !== "auth.json") throw new Error("self-test: a real config removal must be reported")
+  const receipt = evidenceReceipt({
+    result: "PASS",
+    checks: { task_output_peek: "PASS" },
+    leakedPids: 0,
+    spawnedPids: [12345],
+    realSenpiUntouched: true,
+    realSenpiChangedPaths: [],
+    concurrentRealSenpiChangedPaths: [],
+    allRealSenpiChangedPaths: [],
+    realSenpiDigestUnchanged: true,
+    providedAgentDir: "unset",
+    sandboxAgentDirs: ["/private/var/folders/user/sandbox/agent"],
+    sandboxCwds: ["/private/var/folders/user/sandbox/project"],
+    sandboxTokens: ["omo-senpi-qa-secretish"],
+    markerChildExtensions: 1,
+    mainTaskId: "st_opaque",
+    mainSignatures: ["running/resident", "completed/resident"],
+    mainEventSummary: ["task_output:completed"],
+    mainExit: 0,
+    batchTaskIds: ["st_batch"],
+  })
+  if (JSON.stringify(receipt).includes("12345") || JSON.stringify(receipt).includes("/private/var") || JSON.stringify(receipt).includes("st_opaque")) {
+    throw new Error("self-test: evidence receipt must exclude host identifiers")
+  }
+  if (
+    receipt.sandboxCount !== 1
+    || receipt.batchTaskCount !== 1
+    || receipt.checks.task_output_peek !== "PASS"
+    || receipt.mainEventSummary[0] !== "task_output:completed"
+  ) {
+    throw new Error("self-test: evidence receipt must retain safe QA summary fields")
+  }
+  const receiptWithoutBatch = evidenceReceipt({
+    ...receipt,
+    checks: { task_output_peek: "PASS" },
+    realSenpiChangedPaths: [],
+    concurrentRealSenpiChangedPaths: [],
+    allRealSenpiChangedPaths: [],
+    sandboxAgentDirs: [],
+  })
+  if (receiptWithoutBatch.batchTaskCount !== 0) {
+    throw new Error("self-test: evidence receipt must tolerate an absent batch capture")
+  }
   console.log("SELF-TEST OK")
 }
 

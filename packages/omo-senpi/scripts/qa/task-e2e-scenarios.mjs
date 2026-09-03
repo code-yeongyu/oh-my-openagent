@@ -14,6 +14,22 @@ export const MAIN_SCRIPT = {
   ],
 }
 
+export const MAIN_SPAWN_SCRIPT = {
+  childSteps: [{ type: "text", text: CHILD_FIRST }],
+  parentSteps: [
+    { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: "do the first unit", run_in_background: true, name: "e2echild" } },
+    { type: "text", text: "parent turn one done, going idle" },
+  ],
+}
+
+export const MAIN_FOLLOWUP_SCRIPT = {
+  childSteps: [],
+  parentSteps: [
+    { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "tail" } },
+    { type: "text", text: "parent peeked the child tail, all done" },
+  ],
+}
+
 export const SYNC_SCRIPT = {
   childSteps: [{ type: "text", text: SYNC_FINAL }],
   parentSteps: [
