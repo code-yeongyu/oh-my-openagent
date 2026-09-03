@@ -1,0 +1,14 @@
+server up (pid 2058309)
+[match] session=ses_fc8382b4fffem5Ex0Oti7AnuCe attach_dir=/tmp/opencode/4035-qa/projA sess_dir=/tmp/opencode/4035-qa/projA
+[match] prompt1 http=500
+[match] prompt2 http=500
+[match] api msg count=2
+[match] FIRSTMSG rendered: 1
+[match] SECONDMSG rendered: 1
+[mismatch] session=ses_fc837e331ffejxjZY1e27X6pAm attach_dir=/tmp/opencode/4035-qa/wtB sess_dir=/tmp/opencode/4035-qa/projA
+[mismatch] prompt1 http=500
+[mismatch] prompt2 http=500
+[mismatch] api msg count=2
+[mismatch] FIRSTMSG rendered: 1
+[mismatch] SECONDMSG rendered: 1
+done
