@@ -70,7 +70,7 @@ All generated JavaScript bundles other than `omo-task.js` retained their SHA-1 v
 | `omo-memory-mcp.js` | `f38706996414e8e6477a52720624dc8d568ede23` | `f38706996414e8e6477a52720624dc8d568ede23` |
 | `omo.js` | `25697bee889a8565a5ded2a91232226a95acc885` | `25697bee889a8565a5ded2a91232226a95acc885` |
 
-`omo-task.js` is the expected exception: it changed from `e3ab6da368bc788dc3010671f7f28c8144447b7a` to `9758fd9657eacec3b192f616e59b9bde253e4cf3` for the local source fix. After rebasing onto the fork's polling-guard changes, its remote baseline was `d01cfef3d2b5e6234559305604bea791833e3672`; `b940dd7eb57bae3b223ada320b31706ef33cfc92` was the then-current regeneration. The current source was rebuilt and exercised before the final commit: its generated `omo-task.js` SHA-1 is `6999fb2f9c5e0bc45633d6966010e11e7ef23319`. That bundle passed `node --check`, contained the parsed `no_progress` markers, and produced the scoped real-Senpi receipt below.
+`omo-task.js` is the expected exception: it changed from `e3ab6da368bc788dc3010671f7f28c8144447b7a` to `9758fd9657eacec3b192f616e59b9bde253e4cf3` for the local source fix. After rebasing onto the fork's polling-guard changes, its remote baseline was `d01cfef3d2b5e6234559305604bea791833e3672`; `b940dd7eb57bae3b223ada320b31706ef33cfc92` was the then-current regeneration. The current source was rebuilt and exercised before the final commit: its generated `omo-task.js` SHA-1 is `b844f133680cdcce87ec578d894482e061afa9a0`. That bundle passed `node --check`, contained the parsed `no_progress` markers, and produced the scoped real-Senpi receipt below.
 
 ## Scoped live task-output follow-up
 
@@ -82,7 +82,7 @@ Separately, a minimal executable `task_output` library-surface driver repeated t
 
 ## Current-head Codex follow-up
 
-The current-head review correctly identified further gaps. The scoped driver proves the actual generated bundle's second unchanged `status` read returns `no_progress`, rather than only exercising `mode:"tail"`. Guidance now requires a deliverable notification: `notify_on_terminal`, a notifying terminal status, and an unacknowledged notification epoch. The TUI renders the factual `no_progress` reason instead of unconditionally instructing the user to await a notification. The current bundle SHA and scoped receipt above bind this latest QA run to the shipped generated artifact.
+The current-head review correctly identified further gaps. The scoped driver proves the actual generated bundle's second unchanged `status` read returns `no_progress`, rather than only exercising `mode:"tail"`. Guidance preserves notification intent while a task is pending or running; after it is terminal, it requires a notifying status and an unacknowledged notification epoch. The TUI renders the factual `no_progress` reason instead of unconditionally instructing the user to await a notification. The current bundle SHA and scoped receipt above bind this latest QA run to the shipped generated artifact.
 
 ## Why this is enough
 
