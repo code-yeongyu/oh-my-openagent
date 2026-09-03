@@ -1,0 +1,7 @@
+=== CLI boot smoke (isolated) ===
+{"type":"step_start","timestamp":1787623067460,"sessionID":"ses_fc95ccf10ffe7hqOUOmTiGU41W","part":{"id":"prt_036a34f3f001e5t87LH7gkZhOM","messageID":"msg_036a3326d001D4Szk7aJ0MzXj9","sessionID":"ses_fc95ccf10ffe7hqOUOmTiGU41W","snapshot":"47b32bd8d6d7435be41ab27d1157d80e5733e655","type":"step-start"}}
+{"type":"text","timestamp":1787623068079,"sessionID":"ses_fc95ccf10ffe7hqOUOmTiGU41W","part":{"id":"prt_036a3515d001bXf7pxf7OKoCAy","messageID":"msg_036a3326d001D4Szk7aJ0MzXj9","sessionID":"ses_fc95ccf10ffe7hqOUOmTiGU41W","type":"text","text":"Hi!","time":{"start":1787623067997,"end":1787623068075}}}
+{"type":"step_finish","timestamp":1787623068098,"sessionID":"ses_fc95ccf10ffe7hqOUOmTiGU41W","part":{"id":"prt_036a351bf0014NXHij33gcSLCy","reason":"stop","snapshot":"47b32bd8d6d7435be41ab27d1157d80e5733e655","messageID":"msg_036a3326d001D4Szk7aJ0MzXj9","sessionID":"ses_fc95ccf10ffe7hqOUOmTiGU41W","type":"step-finish","tokens":{"total":24320,"input":16997,"output":20,"reasoning":7,"cache":{"write":0,"read":7296}},"cost":0}}
+...
+EXIT=0
+stderr empty
