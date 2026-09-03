@@ -1,12 +1,18 @@
 import { execFile } from "node:child_process"
 
 import { parsePosixProcessTable, parseWindowsProcessTable, type ProcessInfo } from "./process-table"
+import { resolveWindowsSystemTool } from "../system-tool-paths"
 
 export interface ProcessKiller {
   readonly isAlive: (pid: number) => boolean | Promise<boolean>
   readonly kill: (pid: number) => Promise<void>
   readonly terminate: (pid: number) => Promise<void>
 }
+
+/** Backward-compatible aliases: the codegraph family was the first consumer. */
+export type CodegraphProcessKiller = ProcessKiller
+export const enumerateCodegraphProcesses = enumerateProcesses
+export const createDefaultCodegraphProcessKiller = createDefaultProcessKiller
 
 export function enumerateProcesses(platform: NodeJS.Platform = process.platform): Promise<ProcessInfo[]> {
   return platform === "win32" ? enumerateWindowsProcesses() : enumeratePosixProcesses()
@@ -36,7 +42,7 @@ function enumerateWindowsProcesses(): Promise<ProcessInfo[]> {
     "Select-Object ProcessId,ParentProcessId,CommandLine",
     "ConvertTo-Json -Compress -Depth 2",
   ].join(" | ")
-  return execFileText("powershell.exe", ["-NoProfile", "-Command", command]).then(parseWindowsProcessTable)
+  return execFileText(resolveWindowsSystemTool("WindowsPowerShell\\v1.0\\powershell.exe"), ["-NoProfile", "-Command", command]).then(parseWindowsProcessTable)
 }
 
 function createPosixKiller(): ProcessKiller {
@@ -56,8 +62,8 @@ function createPosixKiller(): ProcessKiller {
 function createWindowsKiller(): ProcessKiller {
   return {
     isAlive: defaultIsProcessAlive,
-    kill: (pid) => execFileVoid("taskkill.exe", ["/PID", String(pid), "/T", "/F"]),
-    terminate: (pid) => execFileVoid("taskkill.exe", ["/PID", String(pid), "/T"]),
+    kill: (pid) => execFileVoid(resolveWindowsSystemTool("taskkill.exe"), ["/PID", String(pid), "/T", "/F"]),
+    terminate: (pid) => execFileVoid(resolveWindowsSystemTool("taskkill.exe"), ["/PID", String(pid), "/T"]),
   }
 }
 
