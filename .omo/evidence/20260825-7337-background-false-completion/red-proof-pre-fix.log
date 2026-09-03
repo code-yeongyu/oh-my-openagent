@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:
+554 |       //#when
+555 |       const poll = manager["pollRunningTasks"]
+556 |       await poll.call(manager)
+557 |
+558 |       //#then
+559 |       expect(interruptedChild.status).toBe("error")
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: "error"
+Received: "completed"
+
+      at <anonymous> ($WORKTREE/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:559:39)
+(fail) BackgroundManager pollRunningTasks > #given an interrupted user-only child alongside a busy sibling > #when pollRunningTasks runs #then the outputless child errors explicitly while the busy sibling keeps running [0.78ms]
+
+ 16 pass
+ 1 fail
+ 39 expect() calls
+Ran 17 tests across 1 file. [918.00ms]

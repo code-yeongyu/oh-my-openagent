@@ -2235,10 +2235,12 @@ The task was re-queued on a fallback model after a retryable failure.
   /**
    * Validates that a session has actual assistant/tool output before marking complete.
    * Prevents premature completion when session.idle fires before agent responds.
+   * Returns "unknown" when session contents cannot be inspected (fetch error);
+   * callers must treat "unknown" as NOT verified output (#7337).
    */
-  private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
+  private async resolveSessionOutputState(sessionID: string): Promise<"output" | "no-output" | "unknown"> {
     if (this.observedOutputSessions.has(sessionID)) {
-      return true
+      return "output"
     }
 
     try {
@@ -2256,7 +2258,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
       if (!hasAssistantOrToolMessage) {
         log("[background-agent] No assistant/tool messages found in session:", sessionID)
-        return false
+        return "no-output"
       }
 
       // OpenCode API uses different part types than Anthropic's API:
@@ -2284,16 +2286,19 @@ The task was re-queued on a fallback model after a retryable failure.
 
       if (!hasContent) {
         log("[background-agent] Messages exist but no content found in session:", sessionID)
-        return false
+        return "no-output"
       }
 
       this.markSessionOutputObserved(sessionID)
-      return true
+      return "output"
     } catch (error) {
-      log("[background-agent] Error validating session output:", error)
-      // On error, allow completion to proceed (don't block indefinitely)
-      return true
+      log("[background-agent] Error validating session output, treating as indeterminate:", error)
+      return "unknown"
     }
+  }
+
+  private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
+    return (await this.resolveSessionOutputState(sessionID)) === "output"
   }
 
   private clearNotificationsForTask(taskId: string): void {
@@ -2949,6 +2954,11 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
+    // Guard: a concurrent completion during teardown awaits must not be overwritten (#7337)
+    if (task.status !== "running") {
+      log("[background-agent] Task already terminal, skipping crash failure:", { taskId: task.id, status: task.status })
+      return
+    }
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "error", errorMessage)
     } else {
@@ -3057,6 +3067,35 @@ The task was re-queued on a fallback model after a retryable failure.
           }
 
           if (sessionStatus && isTerminalSessionStatus(sessionStatus.type)) {
+            const outputState = await this.resolveSessionOutputState(sessionID)
+            // Re-check status after async operation
+            if (task.status === "running") {
+              if (outputState === "no-output") {
+                log("[background-agent] Terminal session without assistant/tool output, marking task as error:", {
+                  taskId: task.id,
+                  sessionID,
+                  sessionStatus: sessionStatus.type,
+                })
+                if (task.sessionId) {
+                  subagentSessions.delete(task.sessionId)
+                  clearSessionAgent(task.sessionId)
+                  await this.abortSessionWithLogging(task.sessionId, `task failure (terminal ${sessionStatus.type} without output)`)
+                  await this.onSubagentSessionDeleted?.({ sessionID: task.sessionId }).catch((error) => {
+                    log("[background-agent] onSubagentSessionDeleted callback failed:", { taskId: task.id, sessionID: task.sessionId, error: String(error) })
+                  })
+                }
+                await this.failCrashedTask(task, `Subagent session ${sessionID} ended with status "${sessionStatus.type}" without producing any assistant or tool output (startup failure; no assistant turn was ever recorded).`)
+                continue
+              }
+              if (outputState === "unknown") {
+                log("[background-agent] Terminal session output could not be verified, waiting under stale timeouts:", {
+                  taskId: task.id,
+                  sessionID,
+                  sessionStatus: sessionStatus.type,
+                })
+                continue
+              }
+            }
             await this.tryCompleteTask(task, `polling (terminal session status: ${sessionStatus.type})`)
             continue
           }
