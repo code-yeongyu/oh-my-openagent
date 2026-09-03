@@ -320,7 +320,7 @@ describe("resolveCategory", () => {
     expect(resolved.spec.variant).toBe("max")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["zai-coding-plan", "opencode-go"],
+      providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
       model: "glm-5.2",
       variant: "max",
     })
