@@ -3,6 +3,7 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { clearDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
+import { clearSessionProviderFailures } from "../../shared/provider-failure-state"
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
 
@@ -31,6 +32,7 @@ export function createStaleSessionCleanup(
         internallyAbortedSessions.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)
         clearDelegatedChildSessionBootstrap(sessionID)
+        clearSessionProviderFailures(sessionID)
         SessionCategoryRegistry.remove(sessionID)
         sessionStatusRetryKeys.delete(sessionID)
         cleanedCount++
