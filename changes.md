@@ -1,3 +1,17 @@
+## 2026-09-03 — Skip the desktop-backed thread-tool QA lanes without a desktop checkout
+
+`packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs` now plans its four lanes
+through `lib/plan-scenarios.mjs` before spawning any of them. The three lanes that
+import the private desktop checkout (`desktop-client`, `terminal-to-ui`,
+`desktop-to-cli`) are reported as `SKIP` and never spawned when
+`<THREAD_QA_DESKTOP_ROOT>/apps/server/package.json` is absent, so a contributor
+without that checkout gets `PASS run-all failed_scenarios=0 skipped_scenarios=3`
+instead of three module-resolution failures (one of which started a real socket
+host first). The summary always prints the skipped count so a green run can never
+read as full coverage, and `THREAD_QA_REQUIRE_DESKTOP=1` turns the skip into a
+`FAIL` on machines where the desktop lanes are expected to run. `harness.mjs`
+takes its default desktop root from the same module.
+
 ## 2026-09-03 — Add the credential-gated x_search tool and skill
 
 Senpi can now search X (Twitter) posts through xAI when an xAI account is connected, and stays silent when it is not.
