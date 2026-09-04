@@ -329,11 +329,11 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 				code: "FILE_REPLACED",
 			});
 		const descriptorRoot = directoryDescriptorPath(directoryFd);
-		if (descriptorRoot === null)
-			throw Object.assign(new Error("DIRECTORY_IDENTITY_UNAVAILABLE"), {
-				code: "DIRECTORY_IDENTITY_UNAVAILABLE",
-			});
-		directory = io.opendirSync(descriptorRoot);
+		// On platforms where the descriptor path is unavailable (macOS, Windows),
+		// fall back to the original path.  Identity is still verified via the fd
+		// opened above and the assertDirectoryPathIdentity call below.
+		const opendirRoot = descriptorRoot ?? boundRoot;
+		directory = io.opendirSync(opendirRoot);
 		assertDirectoryPathIdentity(currentRoot, beforeMetadata, io);
 	} catch (error) {
 		state.errors.push({
@@ -350,10 +350,7 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 	let traversalFailed = false;
 	try {
 		const descriptorRoot = directoryDescriptorPath(directoryFd);
-		if (descriptorRoot === null)
-			throw Object.assign(new Error("DIRECTORY_IDENTITY_UNAVAILABLE"), {
-				code: "DIRECTORY_IDENTITY_UNAVAILABLE",
-			});
+		const traversalRoot = descriptorRoot ?? boundRoot;
 		state.snapshot.set(currentRel, "directory");
 		const entries = [];
 		while (true) {
@@ -364,7 +361,7 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 				relative(state.root, path),
 				state.pathStyle,
 			);
-			const boundPath = join(descriptorRoot, entry.name);
+			const boundPath = join(traversalRoot, entry.name);
 			let pathStat;
 			try {
 				pathStat = io.lstatSync(boundPath, { bigint: true });
@@ -495,7 +492,9 @@ function assertDirectoryPathIdentity(path, expected, io) {
 
 function directoryDescriptorPath(fd) {
 	if (process.platform === "linux") return `/proc/self/fd/${fd}`;
-	if (process.platform === "darwin") return `/dev/fd/${fd}`;
+	// macOS /dev/fd/N is a character device — opendirSync("/dev/fd/N") fails
+	// with ENOTDIR.  Windows has no equivalent.  Return null so callers
+	// fall back to the original path with identity re-verification.
 	return null;
 }
 
