@@ -3,6 +3,7 @@ import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as sessionState from "../features/claude-code-session-state"
+import { MAX_OBJECTIVE_LENGTH, validateObjective } from "../hooks/goal/validation"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
@@ -63,6 +64,31 @@ describe("tool.execute.before goal command", () => {
     )
 
     expect(calls).toEqual([{ sessionID: "ses-main", objective: "Ship feature" }])
+
+    rmSync(directory, { recursive: true, force: true })
+  })
+
+  test("#given /goal skill user_message longer than the objective cap #when tool.execute.before runs #then goal.setGoal receives a truncated objective instead of throwing", async () => {
+    const directory = join(tmpdir(), `tool-before-goal-long-${Date.now()}`)
+    mkdirSync(directory, { recursive: true })
+    const calls: Array<{ sessionID: string; objective: string }> = []
+    const goalHook = createGoalHook(calls)
+    const originalSetGoal = goalHook.setGoal
+    goalHook.setGoal = (sessionID: string, objective: string) => {
+      validateObjective(objective)
+      return originalSetGoal(sessionID, objective)
+    }
+    const handler = createHandler(directory, goalHook)
+    const longUserMessage = "Ship the billing service. ".repeat(200)
+
+    await handler(
+      { tool: "skill", sessionID: "ses-main", callID: "call-goal-long" },
+      { args: { name: "/goal", user_message: longUserMessage } },
+    )
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.objective.length).toBe(MAX_OBJECTIVE_LENGTH)
+    expect(calls[0]?.objective.startsWith("Ship the billing service.")).toBe(true)
 
     rmSync(directory, { recursive: true, force: true })
   })
