@@ -58,7 +58,7 @@ export class LockRecoveryBlockedError extends Error {
   ) {
     super(
       `Lock recovery is blocked (${reason}): ${lockPath}. ` +
-        "Stop all processes using this memory home, remove the matching .recovery.claim-* files, and retry.",
+        "Shut down all processes using this memory home, remove the matching .recovery.claim-* files, and retry.",
     )
     this.name = "LockRecoveryBlockedError"
   }
