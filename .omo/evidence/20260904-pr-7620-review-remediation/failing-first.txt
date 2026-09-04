@@ -1,0 +1,14 @@
+COMMAND: bun test packages/omo-opencode/src/cli/doctor/checks/deprecated-reasoning-keys.test.ts
+EXIT: 1
+
+(fail) ignores plugin-supported reasoning keys inside opencode harness blocks
+Missing: [codex].categories.deep.fallback_models
+
+(fail) flags fallback_models only under category overrides
+Expected: warn
+Received: pass
+
+2 pass
+2 fail
+10 expect() calls
+Ran 4 tests across 1 file.

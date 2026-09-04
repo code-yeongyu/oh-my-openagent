@@ -1,0 +1,31 @@
+COMMAND: bun dist/cli/index.js doctor --help
+EXIT: 0
+OBSERVED: doctor usage, options, and examples rendered.
+
+COMMAND: bun dist/cli/index.js doctor --json
+ENVIRONMENT: isolated HOME, USERPROFILE, OPENCODE_CONFIG_DIR, and XDG roots
+OVERALL EXIT: 1
+OVERALL EXIT REASON: expected unrelated empty-installation checks
+
+RELEVANT CHECK:
+{
+  "name": "Configuration",
+  "status": "warn",
+  "message": "2 deprecated config key(s) found",
+  "issues": [
+    {
+      "affects": ["categories.deep.fallback_models"],
+      "fix": "Replace fallback_models with models, or run: oh-my-openagent config migrate"
+    },
+    {
+      "affects": ["[codex].categories.deep.fallback_models"],
+      "fix": "Replace fallback_models with models, or run: oh-my-openagent config migrate"
+    }
+  ]
+}
+
+OBSERVED: no agent fallback_models path appeared in the deprecated-key issues.
+
+COMMAND: bun dist/cli/index.js doctor --bogus
+EXIT: 1
+OUTPUT: error: unknown option '--bogus'

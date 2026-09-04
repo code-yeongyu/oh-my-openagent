@@ -32,6 +32,7 @@ function collectIssues(configPath: string, value: unknown, prefix: string): Doct
   for (const [key, child] of Object.entries(value)) {
     const path = prefix.length > 0 ? `${prefix}.${key}` : key
     const replacement = CANONICAL_REPLACEMENT.get(key)
+      ?? (key === "fallback_models" && prefix.split(".").includes("categories") ? "models" : undefined)
     if (replacement !== undefined) {
       issues.push({
         title: "Deprecated config key",

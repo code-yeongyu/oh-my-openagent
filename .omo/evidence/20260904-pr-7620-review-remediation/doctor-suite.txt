@@ -1,0 +1,7 @@
+COMMAND: bun test packages/omo-opencode/src/cli/doctor
+EXIT: 0
+
+175 pass
+0 fail
+466 expect() calls
+Ran 175 tests across 28 files.

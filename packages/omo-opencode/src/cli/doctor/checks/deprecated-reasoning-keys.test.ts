@@ -142,11 +142,12 @@ describe("deprecated reasoning keys check", () => {
       const { checkDeprecatedReasoningKeys } = await import("./deprecated-reasoning-keys")
       const result = await checkDeprecatedReasoningKeys()
 
-      //#then only canonical base keys are reported; fallback_models is valid and never flagged
+      //#then deprecated category fallback_models is reported while agent fallback_models remains valid
       expect(result.status).toBe("warn")
       expect(result.issues.map((issue) => issue.description)).toEqual([
         `${configPath}: categories.deep.variant`,
         `${configPath}: [senpi].agents.explore.variant`,
+        `${configPath}: [codex].categories.deep.fallback_models`,
       ])
     } finally {
       process.chdir(originalCwd)
@@ -164,8 +165,8 @@ describe("deprecated reasoning keys check", () => {
     }
   })
 
-  it("does not flag fallback_models as deprecated in base config or any harness block", async () => {
-    //#given a config with fallback_models in base, [opencode], [senpi], and [codex] blocks
+  it("flags fallback_models only under category overrides", async () => {
+    //#given fallback_models under agent and category overrides across harness blocks
     const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     const originalHome = process.env.HOME
     const originalCwd = process.cwd()
@@ -225,9 +226,16 @@ describe("deprecated reasoning keys check", () => {
       const { checkDeprecatedReasoningKeys } = await import("./deprecated-reasoning-keys")
       const result = await checkDeprecatedReasoningKeys()
 
-      //#then no issues are reported because fallback_models is a valid schema key
-      expect(result.status).toBe("pass")
-      expect(result.issues).toEqual([])
+      //#then only category fallback_models is deprecated in favor of models
+      expect(result.status).toBe("warn")
+      expect(result.issues.map((issue) => issue.description)).toEqual([
+        `${configPath}: categories.deep.fallback_models`,
+        `${configPath}: [codex].categories.deep.fallback_models`,
+      ])
+      expect(result.issues.map((issue) => issue.fix)).toEqual([
+        "Replace fallback_models with models, or run: oh-my-openagent config migrate",
+        "Replace fallback_models with models, or run: oh-my-openagent config migrate",
+      ])
     } finally {
       process.chdir(originalCwd)
       rmSync(testRootDir, { recursive: true, force: true })

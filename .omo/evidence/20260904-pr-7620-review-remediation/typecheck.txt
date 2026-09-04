@@ -1,0 +1,7 @@
+COMMAND: bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+EXIT: 0
+OUTPUT: none
+
+COMMAND: git diff --check -- packages/omo-opencode/src/cli/doctor/checks/deprecated-reasoning-keys.ts packages/omo-opencode/src/cli/doctor/checks/deprecated-reasoning-keys.test.ts
+EXIT: 0
+OUTPUT: none

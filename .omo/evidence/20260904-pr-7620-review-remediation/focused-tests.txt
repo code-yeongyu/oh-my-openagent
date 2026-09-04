@@ -1,0 +1,7 @@
+COMMAND: bun test packages/omo-opencode/src/cli/doctor/checks/deprecated-reasoning-keys.test.ts
+EXIT: 0
+
+4 pass
+0 fail
+12 expect() calls
+Ran 4 tests across 1 file.
