@@ -29,7 +29,15 @@ export async function resolveSubagentExecution(
     }
 
     agentToUse = agentMatch.agentToUse
-    const { categoryModel, fallbackChain } = await resolveSubagentModel(agentToUse, agentMatch.matchedAgent, executorCtx)
+    const { categoryModel, fallbackChain, error: modelError } = await resolveSubagentModel(agentToUse, agentMatch.matchedAgent, executorCtx)
+    if (modelError) {
+      log("[delegate-task] Subagent model resolution failed — failing fast before child-session creation", {
+        requestedAgent: agentToUse,
+        parentAgent,
+        error: modelError,
+      })
+      return { agentToUse: "", categoryModel: undefined, error: modelError }
+    }
     return { agentToUse, categoryModel, fallbackChain }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
