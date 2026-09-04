@@ -172,6 +172,12 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
     return false
   }
 
+  // Opaque provider catch-all after STOP text, so "UnknownError" + "quota exceeded"
+  // still terminates instead of advancing fallback.
+  if (error.name?.toLowerCase() === "unknownerror") {
+    return true
+  }
+
   if (hasProviderAutoRetrySignal(msg)) {
     return true
   }
