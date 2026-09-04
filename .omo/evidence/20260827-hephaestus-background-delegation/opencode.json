@@ -1,0 +1,6 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "file:///Users/blossom/WebstormProjects/oh-my-opencode-wt/feat/background-delegation-preference/packages/omo-opencode/src/index.ts"
+  ]
+}

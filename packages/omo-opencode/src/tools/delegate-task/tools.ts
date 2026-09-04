@@ -68,7 +68,7 @@ const delegateTaskArgsSchema = {
   run_in_background: tool.schema
     .boolean()
     .optional()
-    .describe("Optional; defaults to false (sync). true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Use true ONLY for parallel exploration; otherwise omit or pass false for task delegation."),
+    .describe("Optional; defaults to false (sync). true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Prefer true for independent parallel work that does not gate the caller's next step; use false when the caller needs the result before continuing. Give concurrent executors that write files disjoint ownership."),
   category: tool.schema.string().optional().describe("REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type."),
   subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
   task_id: tool.schema

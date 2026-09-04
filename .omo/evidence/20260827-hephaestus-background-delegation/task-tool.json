@@ -1,0 +1,50 @@
+[
+  {
+    "id": "task",
+    "description": "Spawn agent task with category-based or direct agent selection.\n\n  ⚠️  CRITICAL: You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL.\n\n  **COMMON MISTAKE (DO NOT DO THIS):**\n  ```\n  task(description=\"...\", prompt=\"...\")  // ❌ FAILS - missing category AND subagent_type\n  ```\n\n  **CORRECT - Using category:**\n  ```\n  task(category=\"quick\", description=\"Fix type error\", prompt=\"...\")\n  ```\n\n  **CORRECT - Using subagent_type with parallel exploration:**\n  ```\n  task(subagent_type=\"explore\", description=\"Find patterns\", prompt=\"...\", run_in_background=true)\n  ```\n\n  REQUIRED: Provide ONE of:\n  - category: For task delegation (uses Sisyphus-Junior with category-optimized model)\n  - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)\n\n  **DO NOT provide both.** If category is provided, subagent_type is ignored.\n\n  - load_skills: Optional. Defaults to [] when omitted. Pass [\"skill-1\", \"skill-2\"] for skill-specific tasks.\n  - category: Use predefined category → Spawns Sisyphus-Junior with category config\n    Available categories:\n    - visual-engineering: Frontend, UI/UX, design, styling, animation\n  - artistry: Complex problem-solving with unconventional, creative approaches - beyond standard patterns\n  - ultrabrain: Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.\n  - deep: Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.\n  - quick: Trivial tasks - single file changes, typo fixes, simple modifications\n    <Caller_Warning>Small/fast model: before delegating, write an explicit prompt with numbered must-do steps, forbidden deviations, and concrete success criteria.</Caller_Warning>\n  - unspecified-low: Tasks that don't fit other categories, low effort required\n    <Selection_Gate>Use only when no specialist category fits, effort is moderate, and scope stays within a few files/modules. Prefer any matching specialist category.</Selection_Gate>\n    <Caller_Warning>Provide explicit must-do steps, forbidden scope, and concrete success criteria.</Caller_Warning>\n  - unspecified-high: Tasks that don't fit other categories, high effort required\n    <Selection_Gate>Use only when no specialist category fits and substantial effort spans systems/modules with broad impact. Use unspecified-low for contained moderate work.</Selection_Gate>\n  - writing: Documentation, prose, technical writing\n  - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)\n  - run_in_background: Optional. Defaults to false (sync, waits). Set true=async (returns a background task ID like `bg_...` for `background_output`). Prefer true for independent parallel work that does not gate the caller's next step; use false when the caller needs the result before continuing. Give concurrent executors that write files disjoint ownership.\n    Sync waits use a 30-minute inactivity window: OpenCode busy/retry/running status resets the window, so this is not a total wall-clock limit.\n  - task_id: Continuation session id (`ses_...`) from task metadata. Continues the same subagent session with FULL CONTEXT PRESERVED; not the background task id (`bg_...`).\n  - command: The command that triggered this task (optional, for slash command tracking).\n\n  **WHEN TO USE task_id:**\n  - Task failed/incomplete → `task(task_id=\"ses_...\", prompt=\"fix: [specific issue]\")`\n  - Need follow-up on previous result → `task(task_id=\"ses_...\", prompt=\"Also: [question]\")`\n  - Multi-turn conversation with same agent → always `task(task_id=\"ses_...\")` instead of new task\n\n  Prompts MUST be in English.\nAvailable agent types and the tools they have access to:\n- build: The default agent. Executes tools based on configured permissions.\n- explore: Contextual grep for codebases. Answers \"Where is X?\", \"Which file has Y?\", \"Find the code that does Z\". Fire multiple in parallel for broad searches. Specify thoroughness: \"quick\" for basic, \"medium\" for moderate, \"very thorough\" for comprehensive analysis. (Explore - OhMyOpenCode)\n- general: General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.\n- librarian: Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source. (Librarian - OhMyOpenCode)\n- Metis - Plan Consultant: Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)\n- Momus - Plan Critic: Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards. (Momus - OhMyOpenCode)\n- multimodal-looker: Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents. (Multimodal-Looker - OhMyOpenCode)\n- oracle: Read-only consultation agent. High-IQ reasoning specialist for debugging hard problems and high-difficulty architecture design. (Oracle - OhMyOpenCode)\n- plan: Plan mode. Disallows all edit tools.\n- Sisyphus-Junior: Focused task executor. Same discipline, no delegation. (Sisyphus-Junior - OhMyOpenCode)",
+    "parameters": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "load_skills": {
+          "description": "Skill names to inject. Optional; defaults to [] when omitted. Pass an explicit array (e.g. [\"git-master\"]) for skill-specific tasks.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "description": "Short task description (3-5 words). Auto-generated from prompt if omitted.",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "Full detailed prompt for the agent",
+          "type": "string"
+        },
+        "run_in_background": {
+          "description": "Optional; defaults to false (sync). true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Prefer true for independent parallel work that does not gate the caller's next step; use false when the caller needs the result before continuing. Give concurrent executors that write files disjoint ownership.",
+          "type": "boolean"
+        },
+        "category": {
+          "description": "REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.",
+          "type": "string"
+        },
+        "subagent_type": {
+          "description": "REQUIRED if category not provided. Do NOT provide both category and subagent_type.",
+          "type": "string"
+        },
+        "task_id": {
+          "description": "Continuation session id (`ses_...`) from task metadata; not a background task id (`bg_...`).",
+          "type": "string"
+        },
+        "command": {
+          "description": "The command that triggered this task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ]
+    }
+  }
+]
