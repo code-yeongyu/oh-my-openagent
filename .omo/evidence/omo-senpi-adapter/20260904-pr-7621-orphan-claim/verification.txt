@@ -2,7 +2,7 @@ Base commit before the orphan-claim correction:
 aed41bc6342a940afa567384a4c06e1f7510d20e
 
 Tested source commit:
-baf667d576ec1d72adce0ae279b7db2526336e14
+d0c8cca95aa7f14c6af9e4dbda9e8f706e68ee5a
 
 Focused failing-first orphan regression:
 5 pass
@@ -29,6 +29,16 @@ exit 0
 
 omo-senpi typecheck:
 exit 0
+
+First pushed-head CI failure:
+run 33915155601
+test (ubuntu-latest, 2/2)
+shared-core extraction guard rejected the reserved harness token "Stop"
+
+Corrected shared-core extraction guard:
+3 pass
+0 fail
+4 assertions
 
 Senpi QA driver self-test:
 SELF-TEST OK

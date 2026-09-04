@@ -1,6 +1,6 @@
 # PR 7621 orphaned recovery-claim QA
 
-Tested source commit: `baf667d576ec1d72adce0ae279b7db2526336e14`
+Tested source commit: `d0c8cca95aa7f14c6af9e4dbda9e8f706e68ee5a`
 
 ## What was tested
 
@@ -36,6 +36,10 @@ Tested source commit: `baf667d576ec1d72adce0ae279b7db2526336e14`
   schedule.
 - The complete lock suite passed: 28 tests, 0 failures, 79 assertions.
 - Both package typechecks completed with exit code 0 and no diagnostics.
+- The first pushed head failed the shared-core extraction guard because the
+  repair diagnostic contained the reserved harness token `Stop`. Replacing it
+  with harness-neutral wording made
+  `script/shared-core-extraction-guard.test.ts` pass 3 tests with 0 failures.
 - The exact Senpi gate passed: 2677 tests passed, 32 skipped, 0 failed, 8503
   assertions across 352 files.
 - The live driver reported `result=PASS`, injected ultrawork correctly, and
