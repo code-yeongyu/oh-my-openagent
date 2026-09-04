@@ -449,7 +449,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+          echo "::group::Senpi bundle provenance"
+          echo "GITHUB_SHA=$GITHUB_SHA GITHUB_REF=$GITHUB_REF"
+          git show -s --format='checked=%H parents=%P subject=%s' HEAD
+          PR_HEAD="${{ github.event.pull_request.head.sha || '' }}"
+          echo "PR_HEAD=$PR_HEAD"
+          git fetch -q --depth 1 origin "$PR_HEAD" || true
+          echo "merge-only changes touching sidecar sources:"
+          git diff --name-status "$PR_HEAD" HEAD -- packages/senpi-task packages/omo-senpi/src packages/omo-senpi/package.json bun.lock || echo '<diff unavailable>'
+          printf 'committed task marker: '; grep -m1 '^// omo:' packages/omo-senpi/plugin/extensions/omo-task.js || echo '<missing>'
+          echo "bun=$(bun --revision) node=$(node --version) builtins=$(node -e 'console.log(require("node:module").builtinModules.length)')"
+          echo "arch=$(uname -m) nproc=$(nproc) runner=$RUNNER_NAME image=$ImageOS/$ImageVersion"
+          env | grep -E '^(BUN_|NODE_OPTIONS|NODE_ENV|CI=|GITHUB_ACTIONS)' | sort || true
+          echo "zod copies: $(find node_modules -maxdepth 3 -path '*node_modules/zod/package.json' | wc -l) jsonc copies: $(find node_modules -maxdepth 3 -path '*node_modules/jsonc-parser/package.json' | wc -l)"
+          echo "::endgroup::"
+          set +e
+          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check; CHECK_RC=$?
+          set -e
+          echo "::group::Rebuilt task artifact vs committed"
+          OUT=$RUNNER_TEMP/rebuilt; mkdir -p $OUT
+          OMO_SENPI_PLUGIN_OUTPUT=$OUT node packages/omo-senpi/plugin/scripts/build-extension.mjs 2>&1 | grep -E 'Bundled 6' || true
+          printf 'rebuilt task marker:   '; grep -m1 '^// omo:' $OUT/extensions/omo-task.js || echo '<missing>'
+          node -e '
+            const fs=require("fs");const c=fs.readFileSync("packages/omo-senpi/plugin/extensions/omo-task.js","utf8"),r=fs.readFileSync(process.argv[1],"utf8");
+            const body=t=>t.slice(t.indexOf("\n",t.indexOf("// omo:"))+1);const bc=body(c).split(";"),br=body(r).split(";");
+            let i=0;while(i<bc.length&&i<br.length&&bc[i]===br[i])i++;
+            console.log("bodyLen committed="+body(c).length+" rebuilt="+body(r).length+" stmts="+bc.length+"/"+br.length+" firstDivergent="+i);
+            console.log("C: "+(bc[i]||"").slice(0,500));console.log("R: "+(br[i]||"").slice(0,500));
+          ' $OUT/extensions/omo-task.js
+          echo "::endgroup::"
+          exit $CHECK_RC
 
       - name: Run Senpi compatibility tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
