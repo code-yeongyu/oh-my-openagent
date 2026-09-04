@@ -1,4 +1,5 @@
 import type { FallbackModelObject } from "../config/schema/fallback-models"
+import type { OpenAIPlan } from "./types"
 
 export interface ProviderAvailability {
 	native: {
@@ -16,6 +17,7 @@ export interface ProviderAvailability {
 	minimaxCodingPlan: boolean
 	vercelAiGateway: boolean
 	isMaxPlan: boolean
+	openaiPlan?: OpenAIPlan
 }
 
 export interface AgentConfig {

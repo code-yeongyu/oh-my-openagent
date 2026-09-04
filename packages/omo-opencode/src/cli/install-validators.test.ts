@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { argsToConfig, formatConfigSummary, validateNonTuiArgs } from "./install-validators"
-import type { InstallArgs } from "./types"
+import type { InstallArgs, InstallConfig } from "./types"
 
 function createArgs(overrides: Partial<InstallArgs> = {}): InstallArgs {
   return {
@@ -150,9 +150,42 @@ describe("argsToConfig", () => {
     // #then
     expect(config.hasBailianCodingPlan).toBe(true)
   })
+
+  test("#5187 maps --openai subscription tiers to openaiPlan", () => {
+    // #given each OpenAI answer variant
+    const cases: Array<[InstallArgs["openai"], InstallConfig["openaiPlan"], boolean]> = [
+      ["plus", "plus", true],
+      ["pro", "pro", true],
+      ["api", "api", true],
+      ["yes", "api", true],
+      ["no", "none", false],
+    ]
+
+    for (const [flag, expectedPlan, expectedHasOpenAI] of cases) {
+      // #when
+      const config = argsToConfig(createArgs({ platform: "opencode", openai: flag }))
+
+      // #then
+      expect(config.openaiPlan).toBe(expectedPlan)
+      expect(config.hasOpenAI).toBe(expectedHasOpenAI)
+    }
+  })
 })
 
 describe("validateNonTuiArgs", () => {
+  test("rejects invalid --openai values", () => {
+    // #given
+    const args = createArgs({ openai: "maybe" as InstallArgs["openai"] })
+
+    // #when
+    const result = validateNonTuiArgs(args)
+
+    // #then
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain(
+      "Invalid --openai value: maybe (expected: no, yes, api, plus, pro)"
+    )
+  })
   test("rejects invalid --opencode-go values", () => {
     // #given
     const args = createArgs({ opencodeGo: "maybe" as InstallArgs["opencodeGo"] })

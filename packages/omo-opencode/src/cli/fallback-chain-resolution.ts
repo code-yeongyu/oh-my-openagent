@@ -1,7 +1,7 @@
 import type { FallbackEntry } from "../shared/model-requirements"
 import type { ProviderAvailability } from "./model-fallback-types"
 import { CLI_AGENT_MODEL_REQUIREMENTS } from "./model-fallback-requirements"
-import { isProviderAvailable } from "./provider-availability"
+import { isModelAvailableOnProvider, isProviderAvailable } from "./provider-availability"
 import { transformModelForProvider } from "./provider-model-id-transform"
 
 export function resolveModelFromChain(
@@ -10,7 +10,7 @@ export function resolveModelFromChain(
 ): { model: string; variant?: string } | null {
 	for (const entry of fallbackChain) {
 		for (const provider of entry.providers) {
-			if (isProviderAvailable(provider, availability)) {
+			if (isModelAvailableOnProvider(provider, entry.model, availability)) {
 				const transformedModel = transformModelForProvider(provider, entry.model)
 				return {
 					model: `${provider}/${transformedModel}`,
@@ -31,7 +31,7 @@ export function isAnyFallbackEntryAvailable(
 	availability: ProviderAvailability
 ): boolean {
 	return fallbackChain.some((entry) =>
-		entry.providers.some((provider) => isProviderAvailable(provider, availability))
+		entry.providers.some((provider) => isModelAvailableOnProvider(provider, entry.model, availability))
 	)
 }
 
@@ -42,7 +42,9 @@ export function isRequiredModelAvailable(
 ): boolean {
 	const matchingEntry = fallbackChain.find((entry) => entry.model === requiresModel)
 	if (!matchingEntry) return false
-	return matchingEntry.providers.some((provider) => isProviderAvailable(provider, availability))
+	return matchingEntry.providers.some((provider) =>
+		isModelAvailableOnProvider(provider, matchingEntry.model, availability)
+	)
 }
 
 export function isRequiredProviderAvailable(

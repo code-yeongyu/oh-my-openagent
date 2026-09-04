@@ -294,7 +294,7 @@ describe("generateModelConfig", () => {
   describe("Momus agent model resolution", () => {
     test("Momus resolves to gpt-5.6-terra high when OpenAI is available", () => {
       // #given
-      const config = createConfig({ hasOpenAI: true })
+      const config = createConfig({ hasOpenAI: true, openaiPlan: "api" })
 
       // #when
       const result = generateModelConfig(config)
@@ -306,6 +306,55 @@ describe("generateModelConfig", () => {
         model: "openai/gpt-5.6-sol",
         variant: "xhigh",
       })
+    })
+  })
+
+  describe("#5187 ChatGPT subscription tier detection", () => {
+    test("Plus-tier OpenAI users never receive API-only openai models", () => {
+      // #given a ChatGPT Plus subscription without an OpenAI API key
+      const config = createConfig({ hasOpenAI: true, openaiPlan: "plus" })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then no agent, category, or fallback may target the API-only openai catalog
+      const apiOnlyEntries = flattenConfiguredModels(result).filter(
+        (entry) => entry.model === "openai/gpt-5.6-terra"
+      )
+      expect(apiOnlyEntries).toEqual([])
+      expect(result.categories?.["unspecified-low"]?.model).not.toBe("openai/gpt-5.6-terra")
+      expect(result.categories?.["unspecified-high"]?.model).not.toBe("openai/gpt-5.6-terra")
+
+      // #and subscription-verified openai models still resolve (momus terra rung skipped to sol)
+      expect(result.agents?.momus?.model).toBe("openai/gpt-5.6-sol")
+      expect(result.agents?.oracle?.model).toBe("openai/gpt-5.6-sol")
+    })
+
+    test("Pro tier is treated as a ChatGPT subscription for the API-only catalog", () => {
+      // #given a ChatGPT Pro subscription without an OpenAI API key
+      const config = createConfig({ hasOpenAI: true, openaiPlan: "pro" })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then the API-only openai catalog stays out of the generated config
+      const apiOnlyEntries = flattenConfiguredModels(result).filter(
+        (entry) => entry.model === "openai/gpt-5.6-terra"
+      )
+      expect(apiOnlyEntries).toEqual([])
+      expect(result.agents?.momus?.model).toBe("openai/gpt-5.6-sol")
+    })
+
+    test("legacy --openai=yes keeps the full API catalog", () => {
+      // #given the legacy boolean answer mapped to explicit API access
+      const config = createConfig({ hasOpenAI: true, openaiPlan: "api" })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then behavior is unchanged: momus keeps its API-tier primary and fallbacks
+      expect(result.agents?.momus?.model).toBe("openai/gpt-5.6-terra")
+      expect(result.categories?.["unspecified-low"]?.model).toBe("openai/gpt-5.6-terra")
     })
   })
 
