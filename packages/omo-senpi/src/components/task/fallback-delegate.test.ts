@@ -138,7 +138,7 @@ function settings(overrides: Record<string, unknown> = {}) {
 }
 
 describe("context fallback delegate", () => {
-  it("#given duplicate incompatible exhaustion #when both events dispatch #then exactly one fresh child keeps the ultrafast selector", async () => {
+  it("#given duplicate exhaustion and unresolved raw chain aliases #when both events dispatch #then exactly one fresh child keeps the canonical ultrafast selector", async () => {
     const pi = new FakeExtensionAPI()
     const childManager = manager()
     wireFallbackDelegate(pi, {
