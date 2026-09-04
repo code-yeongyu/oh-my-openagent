@@ -24,6 +24,13 @@
   and OMO changed-path lists were empty.
 - macOS reported `DIRECTORY_IDENTITY_UNAVAILABLE` and did not overclaim broad
   whole-directory certification.
+- After merging `upstream/dev@0a5dab201`, the complete lock suite still
+  passed with 24 tests and 64 assertions, memory-core and omo-senpi typechecks
+  exited zero, and the real isolated Senpi driver again returned
+  `result=PASS` with empty Senpi and OMO changed-path lists. Its exact JSON is
+  recorded in `post-merge-live-driver.json`.
+- The exact Bun 1.4.0 Senpi gate passed after the merge with 2677 tests,
+  32 platform/fixture skips, 0 failures, and 8503 assertions across 352 files.
 
 ## Why this is enough
 

@@ -3,3 +3,8 @@ Focused green: 5 pass, 0 fail, 9 assertions.
 Complete lock suite: 24 pass, 0 fail, 64 assertions.
 Memory-core typecheck: exit 0.
 Generated Senpi extensions: rebuilt with Bun 1.4.0.
+Post-merge lock suite: 24 pass, 0 fail, 64 assertions.
+Post-merge memory-core typecheck: exit 0.
+Post-merge omo-senpi typecheck: exit 0.
+Post-merge real Senpi driver: result=PASS, no attributed changed paths.
+Post-merge exact Bun 1.4.0 Senpi gate: 2677 pass, 32 skip, 0 fail, 8503 assertions.
