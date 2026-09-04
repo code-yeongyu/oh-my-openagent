@@ -1,3 +1,34 @@
+## 2026-09-04 — Delegate context-incompatible fallback exhaustion once
+
+Senpi can now report that every remaining retry-fallback rung is too small for
+the live conversation. The task component subscribes to that typed lifecycle
+event and starts one background child with the exact rejected selector, or an
+explicit `task.fallback_delegate.model` override.
+
+The handoff is deterministic JSON bounded by
+`task.fallback_delegate.max_handoff_bytes`; it carries the latest user request,
+latest compaction, latest `senpi.todo-state`, and a configurable recent message
+tail. A failed assistant entry is the dedupe key, so duplicate exhaustion
+notifications cannot start a second child for the same turn. The handler
+returns before child startup settles and fails closed for RPC child processes,
+visible partial output, missing requests, malformed context, ordinary
+exhaustion, and disabled configuration.
+
+Review hardening correlates the event to the latest failed assistant and its
+immediately preceding user message, rejects every non-empty assistant block
+(including provider-native and tool-call output), keeps dedupe state to one
+current turn, and scans old history in reverse without materializing message or
+todo trees outside the configured byte budget. The 1 KiB minimum handoff cap
+also shrinks source diagnostics instead of suppressing an otherwise valid
+delegation. A full-error SHA-256 from Senpi correlates bounded event diagnostics
+to the exact failed assistant instead of accepting same-prefix stale errors.
+Candidate admission trusts Senpi's canonical rejected-candidate projection
+rather than comparing it with unresolved family aliases in user settings.
+
+Expected conflict zones: the task settings schema, task component registration
+in `src/components/task/index.ts`, and the `task` table in
+`docs/reference/omo-json.md`.
+
 ## 2026-08-29 — Teach "mass ulw research" the mass path
 
 A combined mass + research invocation collected at team scale instead of mass

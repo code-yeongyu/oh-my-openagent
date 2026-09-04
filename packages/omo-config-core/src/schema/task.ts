@@ -27,6 +27,13 @@ export const OmoTaskWarningsSchema = z.object({
   unavailable_categories: z.boolean().default(true),
 }).strict()
 
+export const OmoTaskFallbackDelegateSchema = z.object({
+  enabled: z.boolean().default(true),
+  model: z.string().trim().min(1).optional(),
+  max_handoff_bytes: z.number().int().min(1024).max(65536).default(32768),
+  recent_tail_messages: z.number().int().min(0).max(32).default(8),
+}).strict()
+
 // Bounds for the dag orchestration subsystem. The whole block is optional, but once present every
 // key falls back to the engine default in senpi-task's DAG_SETTINGS_DEFAULTS.
 export const OmoTaskDagSettingsSchema = z.object({
@@ -52,6 +59,11 @@ export const OmoTaskSettingsSchema = z.object({
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
   resume_children: z.boolean().default(true),
+  fallback_delegate: OmoTaskFallbackDelegateSchema.default({
+    enabled: true,
+    max_handoff_bytes: 32768,
+    recent_tail_messages: 8,
+  }),
   warnings: OmoTaskWarningsSchema.default({ unavailable_categories: true }),
   wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),
   team: OmoTaskTeamSettingsSchema.default({
@@ -89,6 +101,13 @@ export const OmoTaskWarningsLayerSchema = z.object({
   unavailable_categories: z.boolean().optional(),
 }).strict()
 
+export const OmoTaskFallbackDelegateLayerSchema = z.object({
+  enabled: z.boolean().optional(),
+  model: z.string().trim().min(1).optional(),
+  max_handoff_bytes: z.number().int().min(1024).max(65536).optional(),
+  recent_tail_messages: z.number().int().min(0).max(32).optional(),
+}).strict()
+
 export const OmoTaskSettingsLayerSchema = z.object({
   default_execution_mode: z.enum(["in-process", "process"]).optional(),
   default_concurrency: z.number().int().nonnegative().optional(),
@@ -101,6 +120,7 @@ export const OmoTaskSettingsLayerSchema = z.object({
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
   resume_children: z.boolean().optional(),
+  fallback_delegate: OmoTaskFallbackDelegateLayerSchema.optional(),
   warnings: OmoTaskWarningsLayerSchema.optional(),
   wait: OmoTaskWaitLayerSchema.optional(),
   team: OmoTaskTeamSettingsLayerSchema.optional(),

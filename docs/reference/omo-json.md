@@ -270,6 +270,10 @@ Task engine settings. The whole object is optional, but `provider_concurrency`, 
 | `state_dir` | string | unset (runtime uses `<project>/.omo/senpi-task`) |
 | `reattach_on_reconcile` | boolean | unset |
 | `resume_children` | boolean | `true` |
+| `fallback_delegate.enabled` | boolean | `true` |
+| `fallback_delegate.model` | non-empty model selector | unset (first context-incompatible fallback candidate) |
+| `fallback_delegate.max_handoff_bytes` | int 1024..65536 | `32768` |
+| `fallback_delegate.recent_tail_messages` | int 0..32 | `8` |
 | `warnings.unavailable_categories` | boolean | `true` |
 | `wait.min_ms` | positive int | `5000` |
 | `wait.default_ms` | positive int | `60000` |
@@ -280,6 +284,16 @@ Task engine settings. The whole object is optional, but `provider_concurrency`, 
 | `dag` | object | unset |
 
 `task.dag` is an optional block bounding the DAG orchestration subsystem (`schema/task.ts`): `max_nodes_per_run` (`64`), `max_runs_per_session` (`16`), `subscriber_ring` (`1000`), `heartbeat_ms` (`15000`), `history_default_limit` (`256`), `history_max_limit` (`1000`), `retention_days` (`7`), `max_prompt_bytes` (`262144`).
+
+`task.fallback_delegate` is consumed only by the Senpi task component. When
+Senpi reports that every remaining fallback candidate is too small for the
+live conversation, the component starts one background child in a fresh
+context. The child uses `fallback_delegate.model` when set; otherwise it keeps
+the first rejected candidate selector exactly. Its deterministic JSON handoff
+contains bounded latest-user, compaction, todo, and recent-message sections.
+Duplicate events, RPC task children, failed turns with visible partial output,
+and turns without a correlated user request do not spawn a child. Set
+`fallback_delegate.enabled` to `false` to disable the behavior.
 
 `global_concurrency` caps how many tasks run at once per senpi process, across all model and provider lanes combined. It applies only to senpi; OpenCode `background_task` is unaffected (parity is a follow-up). The cap is per process, not cross-process or machine-wide: two senpi processes each get their own budget. A task spills to a later entry in its fallback chain whenever admission cannot seat it in the preferred model's lane — the per-model/provider/default lane limit is reached or its queue is occupied (the common case), or this global cap is full — even though the preferred model never failed. That later entry can be a DIFFERENT provider, with different pricing and different data handling. If that matters to you, remove cross-provider entries from your fallback chains or use single-model chains. No new storage or telemetry is introduced by this setting.
 

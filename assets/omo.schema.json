@@ -909,6 +909,42 @@
           "default": true,
           "type": "boolean"
         },
+        "fallback_delegate": {
+          "default": {
+            "enabled": true,
+            "max_handoff_bytes": 32768,
+            "recent_tail_messages": 8
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "max_handoff_bytes": {
+              "default": 32768,
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65536
+            },
+            "recent_tail_messages": {
+              "default": 8,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32
+            }
+          },
+          "required": [
+            "enabled",
+            "max_handoff_bytes",
+            "recent_tail_messages"
+          ],
+          "additionalProperties": false
+        },
         "warnings": {
           "default": {
             "unavailable_categories": true
@@ -1066,6 +1102,7 @@
         "residency_max_children",
         "ttl_ms",
         "resume_children",
+        "fallback_delegate",
         "warnings",
         "wait",
         "team"
@@ -12665,6 +12702,29 @@
             "resume_children": {
               "type": "boolean"
             },
+            "fallback_delegate": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "max_handoff_bytes": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65536
+                },
+                "recent_tail_messages": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 32
+                }
+              },
+              "additionalProperties": false
+            },
             "warnings": {
               "type": "object",
               "properties": {
@@ -14291,6 +14351,29 @@
             },
             "resume_children": {
               "type": "boolean"
+            },
+            "fallback_delegate": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "max_handoff_bytes": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65536
+                },
+                "recent_tail_messages": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 32
+                }
+              },
+              "additionalProperties": false
             },
             "warnings": {
               "type": "object",
@@ -15924,6 +16007,29 @@
               },
               "resume_children": {
                 "type": "boolean"
+              },
+              "fallback_delegate": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "max_handoff_bytes": {
+                    "type": "integer",
+                    "minimum": 1024,
+                    "maximum": 65536
+                  },
+                  "recent_tail_messages": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                  }
+                },
+                "additionalProperties": false
               },
               "warnings": {
                 "type": "object",
@@ -27458,6 +27564,29 @@
                   "resume_children": {
                     "type": "boolean"
                   },
+                  "fallback_delegate": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "max_handoff_bytes": {
+                        "type": "integer",
+                        "minimum": 1024,
+                        "maximum": 65536
+                      },
+                      "recent_tail_messages": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "warnings": {
                     "type": "object",
                     "properties": {
@@ -29084,6 +29213,29 @@
                   },
                   "resume_children": {
                     "type": "boolean"
+                  },
+                  "fallback_delegate": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "max_handoff_bytes": {
+                        "type": "integer",
+                        "minimum": 1024,
+                        "maximum": 65536
+                      },
+                      "recent_tail_messages": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "warnings": {
                     "type": "object",

@@ -1,6 +1,7 @@
 import { loadSenpiOmoConfig } from "../config-resolution"
 import {
   TEAM_LEAD_SENTINEL,
+  OMO_SENPI_TASK_RPC_CHILD,
   buildLeadTeamTools,
   createLeadDeliveryJournal,
   createTaskCancelTool,
@@ -29,6 +30,7 @@ import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { createDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
+import { wireFallbackDelegate } from "./fallback-delegate"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
@@ -93,6 +95,12 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         loadSkills,
         sharedParentTools: () => ctx.getCapturedTools?.() ?? [],
         ...(ctx.idleCoordinator !== undefined && { coordinator: ctx.idleCoordinator }),
+      })
+      wireFallbackDelegate(pi, {
+        manager: engine.manager,
+        settings: engine.settings.fallback_delegate,
+        logger: ctx.logger,
+        isRpcChild: () => process.env[OMO_SENPI_TASK_RPC_CHILD] === "1",
       })
 
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)

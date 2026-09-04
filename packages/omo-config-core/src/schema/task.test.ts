@@ -125,6 +125,48 @@ describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
   })
 })
 
+describe("OmoTaskSettingsSchema context fallback delegate", () => {
+  test("#given no override #when task settings parse #then bounded delegation defaults are enabled", () => {
+    const settings = OmoTaskSettingsSchema.parse({})
+
+    expect(settings.fallback_delegate).toEqual({
+      enabled: true,
+      max_handoff_bytes: 32768,
+      recent_tail_messages: 8,
+    })
+  })
+
+  test("#given an explicit override #when task settings parse #then selector and bounds are preserved", () => {
+    const settings = OmoTaskSettingsSchema.parse({
+      fallback_delegate: {
+        enabled: false,
+        model: "opengateway/moonshotai/kimi-k3-ultrafast",
+        max_handoff_bytes: 8192,
+        recent_tail_messages: 4,
+      },
+    })
+
+    expect(settings.fallback_delegate).toEqual({
+      enabled: false,
+      model: "opengateway/moonshotai/kimi-k3-ultrafast",
+      max_handoff_bytes: 8192,
+      recent_tail_messages: 4,
+    })
+  })
+
+  test("#given unsafe handoff bounds #when task settings parse #then the schema rejects them", () => {
+    expect(() => OmoTaskSettingsSchema.parse({
+      fallback_delegate: { max_handoff_bytes: 1023 },
+    })).toThrow()
+    expect(() => OmoTaskSettingsSchema.parse({
+      fallback_delegate: { recent_tail_messages: 33 },
+    })).toThrow()
+    expect(() => OmoTaskSettingsSchema.parse({
+      fallback_delegate: { model: "" },
+    })).toThrow()
+  })
+})
+
 describe("OmoTaskSettingsSchema warnings", () => {
   test("#given no warning suppression override #when task settings parse #then unavailable categories warnings default on", () => {
     // given
