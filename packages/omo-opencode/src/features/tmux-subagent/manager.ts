@@ -149,7 +149,7 @@ export class TmuxSessionManager {
       sweepIntervalMs: FAILED_READINESS_SWEEP_INTERVAL_MS,
       log: this.deps.log,
     })
-    const rawServerUrl = ctx.serverUrl?.toString()
+    const rawServerUrl = tmuxConfig.server_url_override || ctx.serverUrl?.toString()
     this.ctxServerUrl = rawServerUrl
     this.serverUrl = resolveServerUrl(rawServerUrl, process.env, this.deps.log)
     this.sourcePaneId = this.deps.getCurrentPaneId()
