@@ -1,0 +1,147 @@
+installing local omo build into /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex (this builds the plugin)...
+{
+  "ok": true,
+  "turnStatus": "completed",
+  "assistantText": "Hello from the codex-qa mock model.",
+  "threadId": "01a06a89-005d-7d11-b733-4bfcb54f4d01",
+  "turnId": "01a06a89-0120-7770-97ef-058a2d6c7a03",
+  "expectHook": [
+    "sessionStart",
+    "userPromptSubmit"
+  ],
+  "missingHooks": [],
+  "failedHooks": [],
+  "hooks": [
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:0:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/session-start-loading-project-rules.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:1:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/session-start-recording-session-telemetry.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:2:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/session-start-checking-auto-update.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:3:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/session-start-checking-bootstrap-provisioning.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:0:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/session-start-loading-project-rules.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:1:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/session-start-recording-session-telemetry.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:2:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/session-start-checking-auto-update.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:3:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/session-start-checking-bootstrap-provisioning.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:4:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/user-prompt-submit-loading-project-rules.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:5:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/user-prompt-submit-checking-ultrawork-trigger.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:6:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/user-prompt-submit-checking-ulw-loop-steering.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:4:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/user-prompt-submit-loading-project-rules.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:5:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/user-prompt-submit-checking-ultrawork-trigger.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:6:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/user-prompt-submit-checking-ulw-loop-steering.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "stop",
+      "status": "running",
+      "source": "plugin",
+      "runId": "stop:15:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/stop-checking-ulw-execute-continuation.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "stop",
+      "status": "running",
+      "source": "plugin",
+      "runId": "stop:16:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/stop-checking-ulw-loop-resume.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "stop",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "stop:15:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/stop-checking-ulw-execute-continuation.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "stop",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "stop:16:/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.39/hooks/stop-checking-ulw-loop-resume.json"
+    }
+  ],
+  "stderrTail": "2026-09-04T03:49:18.498849Z ERROR codex_app_server: Project-local config, hooks, and exec policies are disabled in the following folders until the project is trusted, but skills still load.\n    1. /Users/sungsoopark/Documents/GitHub/oh-my-openagent-7494/.codex\n       To load project-local config, hooks, and exec policies, add /Users/sungsoopark/Documents/GitHub/oh-my-openagent-7494 as a trusted project in /private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/cqa-home.XXXXXX.ueUrlYUOB0/codex/config.toml.\n\n"
+}
+PASS: real ~/.codex/config.toml unchanged (a67684873af99f39bd242bc93f3fda726cde9c83)
+PASS: app-server turn completed; assistant text: Hello from the codex-qa mock model.
+PASS: hooks fired: sessionStart, stop, userPromptSubmit
+/Users/sungsoopark/Documents/GitHub/oh-my-openagent-7494/.agents/skills/codex-qa/scripts/lib/common.sh: line 131: 65752 Terminated: 15          node "$lib_dir/mock-model.mjs" > "$log" 2>&1

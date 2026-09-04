@@ -1,0 +1,8 @@
+real_db=/Users/sungsoopark/.local/share/opencode/opencode.db
+before_sessions=8067
+PASS: GET /global/health healthy=true version=1.18.27 (http://127.0.0.1:62269)
+PASS: GET /doc lists 162 documented paths (>=100)
+PASS: unauthenticated GET /session rejected with HTTP 401
+PASS: server-smoke
+after_sessions=8067
+real_db_untouched=true

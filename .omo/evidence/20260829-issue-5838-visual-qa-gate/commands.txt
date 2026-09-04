@@ -1,0 +1,9 @@
+bun test packages/shared-skills
+bun test packages/skills-loader-core/src/features/builtin-skills/shared-skill-extraction.test.ts
+bun run build
+bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+bash .agents/skills/opencode-qa/scripts/server-smoke.sh --self-test
+bun run test:codex
+bash .agents/skills/codex-qa/scripts/lib/common.sh --self-check
+bash .agents/skills/codex-qa/scripts/install-verify.sh --self-test
+bash .agents/skills/codex-qa/scripts/app-server-drive.sh --plugin

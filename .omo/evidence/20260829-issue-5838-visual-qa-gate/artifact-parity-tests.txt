@@ -1,0 +1,11 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/skills-loader-core/src/features/builtin-skills/shared-skill-extraction.test.ts:
+(pass) shared builtin skill extraction > #given extracted builtin skill markdown #when compared to TS sources #then bodies and metadata stay byte-equivalent [7.46ms]
+(pass) shared builtin skill extraction > #given checked-in frontend builtin skill artifact #when compared to shared source #then it stays byte-equivalent [0.41ms]
+(pass) shared builtin skill extraction > #given shared skill frontmatter #when parsed for Codex #then metadata is valid and budgeted [6.70ms]
+
+ 3 pass
+ 0 fail
+ 20 expect() calls
+Ran 3 tests across 1 file. [623.00ms]
