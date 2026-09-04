@@ -31,6 +31,10 @@
   recorded in `post-merge-live-driver.json`.
 - The exact Bun 1.4.0 Senpi gate passed after the merge with 2677 tests,
   32 platform/fixture skips, 0 failures, and 8503 assertions across 352 files.
+- After `dev` advanced again to `07e30350b`, the lock suite, both typechecks,
+  exact Senpi gate, and real Senpi driver were repeated. Counts remained
+  unchanged and the final live result remained `PASS` with no attributed
+  Senpi or OMO changed paths. The final JSON is in `final-live-driver.json`.
 
 ## Why this is enough
 

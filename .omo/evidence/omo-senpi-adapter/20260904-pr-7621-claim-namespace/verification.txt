@@ -8,3 +8,7 @@ Post-merge memory-core typecheck: exit 0.
 Post-merge omo-senpi typecheck: exit 0.
 Post-merge real Senpi driver: result=PASS, no attributed changed paths.
 Post-merge exact Bun 1.4.0 Senpi gate: 2677 pass, 32 skip, 0 fail, 8503 assertions.
+Final dev@07e30350b lock suite: 24 pass, 0 fail, 64 assertions.
+Final dev@07e30350b typechecks: memory-core and omo-senpi exit 0.
+Final dev@07e30350b Senpi gate: 2677 pass, 32 skip, 0 fail, 8503 assertions.
+Final dev@07e30350b real Senpi driver: result=PASS, no attributed changed paths.
