@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { posix, win32 } from "node:path"
-import { findBunBinary, isUnderBunGlobalTree, probeBunVersion } from "../bin/lib/bun-runtime.js"
+import { findBunBinary, isUnderBunGlobalTree } from "../bin/lib/bun-runtime.js"
 
 type Options = {
   env?: Record<string, string | undefined>
@@ -225,53 +225,6 @@ describe("bun runtime detection", () => {
         // then
         expect(found).toBeUndefined()
       })
-    })
-  })
-
-  describe("#given a Windows PATH that only carries an npm-installed bun.cmd shim", () => {
-    test("#then the shim is not a bun the launcher can run and lookup reports absence", () => {
-      // given: npm's global prefix holds bun.cmd / bun (no bun.exe), and ~/.bun does not exist
-      const npmPrefix = String.raw`C:\Users\dev\AppData\Roaming\npm`
-      const found = findBunBinary({
-        env: { Path: npmPrefix, PATHEXT: ".COM;.EXE;.BAT;.CMD" },
-        homedir: () => WIN_HOME,
-        platform: "win32",
-        exists: existsOnly(win32.join(npmPrefix, "bun.CMD"), win32.join(npmPrefix, "bun.cmd"), win32.join(npmPrefix, "bun")),
-        realpath: identityRealpath,
-      })
-
-      // then: a .cmd shim cannot be probed or re-exec'd without a shell (Node rejects it with
-      // spawn EINVAL), so it must never be selected
-      expect(found).toBeUndefined()
-    })
-
-    test("#then a real bun.exe next to the shim is still found", () => {
-      const npmPrefix = String.raw`C:\Users\dev\AppData\Roaming\npm`
-      const found = findBunBinary({
-        env: { Path: npmPrefix, PATHEXT: ".COM;.EXE;.BAT;.CMD" },
-        homedir: () => WIN_HOME,
-        platform: "win32",
-        exists: existsOnly(win32.join(npmPrefix, "bun.cmd"), win32.join(npmPrefix, "bun.exe")),
-        realpath: identityRealpath,
-      })
-      expect(found).toBe(win32.join(npmPrefix, "bun.exe"))
-    })
-  })
-
-  describe("#given a bun probe whose spawn throws synchronously", () => {
-    test("#then the probe resolves undefined instead of rejecting", async () => {
-      // given: Node throws spawn EINVAL synchronously for batch files spawned without a shell
-      const execFile = () => {
-        const error = new Error("spawn EINVAL") as NodeJS.ErrnoException
-        error.code = "EINVAL"
-        throw error
-      }
-
-      // when
-      const version = await probeBunVersion(String.raw`C:\bun\bun.cmd`, { execFile: execFile as never })
-
-      // then
-      expect(version).toBeUndefined()
     })
   })
 })

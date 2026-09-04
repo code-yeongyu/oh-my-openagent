@@ -1,7 +1,6 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, jest, mock, spyOn, test } from "bun:test"
-import * as childProcess from "node:child_process"
 
 import {
   createInitDeepAdvisorComponent,
@@ -16,7 +15,6 @@ import {
   resetTestHome,
   setTestHome,
 } from "./component.test-support"
-import { makeTempDir } from "./fixtures.test-support"
 import { buildProposedData } from "./proposed-data"
 import type { EligibilityResult, OmoInitDeepProposedData } from "./proposed-data"
 import { runAdvisorAfterPreflight } from "./runtime"
@@ -237,26 +235,5 @@ describe("createInitDeepAdvisorComponent", () => {
     jest.advanceTimersByTime(0)
     await Promise.resolve()
     expect(select).toHaveBeenCalledTimes(1)
-  })
-
-  test("#given a non-git cwd #when startup preflight runs #then there is no --show-toplevel spawn beyond the single gitToplevel call", async () => {
-    // given
-    const dir = makeTempDir("omo-init-deep-nongit-")
-    const { pi, select, eventCtx } = createHarness(dir)
-    const originalExecFileSync = childProcess.execFileSync.bind(childProcess)
-    const execFileSync = spyOn(childProcess, "execFileSync").mockImplementation(
-      ((...args: Parameters<typeof childProcess.execFileSync>) => originalExecFileSync(...args)) as typeof childProcess.execFileSync,
-    )
-
-    // when
-    await runAdvisor(pi, componentContext, eventCtx)
-
-    // then
-    expect(select).not.toHaveBeenCalled()
-    const showToplevelCalls = execFileSync.mock.calls.filter((call) => {
-      const [file, argv] = call
-      return file === "git" && Array.isArray(argv) && argv.includes("--show-toplevel")
-    })
-    expect(showToplevelCalls).toHaveLength(1)
   })
 })

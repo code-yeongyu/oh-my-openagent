@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:80e794a7ee4705f54dc0c24f45fba696230284b0708f25cc7cb6351c4fc9efcb:5bbffbd8f066db46a8daf5c2417f1eef8bc67d7bc38f5924016cb8067747b0d4
+// omo-codex-install:bf30630dcec48b8664b1acaba5e6a7847f43752f32e969cb18dad06137b3dca6:dc5ee7f677619d308056bd20a2e85b35ce4506536685a46a4ed8dde3bae0f3e1
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -7977,7 +7977,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0-beta.37",
+    version: "5.0.0-beta.33",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -9855,15 +9855,6 @@ function replaceOrInsertRootSetting(config, key, value) {
 
 ${suffix.trimStart()}`;
 }
-function removeRootSetting(config, key) {
-  const sectionStart = findFirstTableStart(config);
-  const root = config.slice(0, sectionStart);
-  const suffix = config.slice(sectionStart);
-  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*(?:\\n|$)`, "m");
-  if (!linePattern.test(root))
-    return config;
-  return root.replace(linePattern, "") + suffix;
-}
 function replaceOrInsertRootDottedSetting(config, keyPath, value) {
   const targetPath = parseTomlDottedKey(keyPath);
   if (!targetPath)
@@ -10616,7 +10607,7 @@ var AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"];
 function ensureAutonomousPermissions(config) {
   let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"));
   next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"));
-  next = removeRootSetting(next, "network_access");
+  next = replaceOrInsertRootSetting(next, "network_access", JSON.stringify("enabled"));
   for (const featureName of AUTONOMOUS_FEATURES) {
     next = ensureFeatureEnabled(next, featureName);
   }

@@ -15,7 +15,6 @@ import { createTodoFanoutReminderComponent } from "../components/todo-fanout-rem
 import { createUltraworkComponent } from "../components/ultrawork"
 import { createUlwExecuteContinuationComponent } from "../components/ulw-execute-continuation"
 import { createUlwLoopComponent } from "../components/ulw-loop"
-import { createXSearchComponent } from "../components/x-search"
 import type { OmoSenpiComponent } from "./types"
 
 export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoSenpiComponent[] {
@@ -34,7 +33,6 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createFallbackArchitectComponent(),
     createAstGrepComponent(),
     createLspComponent(),
-    createXSearchComponent(),
     createCommentCheckerComponent(),
     taskComponent,
     createMemoryComponent(),

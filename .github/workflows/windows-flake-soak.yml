@@ -24,10 +24,6 @@ on:
         required: true
         default: 10
         type: number
-      test_ref:
-        description: Git ref whose repository contents should be tested
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -35,15 +31,11 @@ permissions:
 jobs:
   soak:
     runs-on: windows-latest
+    env:
+      SOAK_ITERATIONS_RAN: "0"
+      SOAK_FAILED_ITERATION: none
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.test_ref || github.ref }}
-
-      - uses: actions/setup-node@v7
-        if: inputs.target == 'full-shard-2'
-        with:
-          node-version: "24"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -52,27 +44,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Remove stale self-package test copies
-        if: inputs.target == 'full-shard-2'
-        run: bun run script/remove-stale-self-package-tests.ts
-
-      - name: Run vendored lsp-daemon tests
-        if: inputs.target == 'full-shard-2'
-        run: npm test
-        working-directory: packages/lsp-daemon
-
       - name: Run allowlisted target repeatedly
-        id: run-soak
         shell: pwsh
         env:
           SOAK_TARGET: ${{ inputs.target }}
           SOAK_ITERATIONS: ${{ inputs.iterations }}
-          WINDOWS_TEST_SHARD: ${{ inputs.target == 'full-shard-2' && '2/2' || 'flake-soak' }}
+          WINDOWS_TEST_SHARD: flake-soak
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = "Stop"
-          "iterations_ran=0" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "failed_iteration=none" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
           $targets = @{
             "reconciliation" = @(
@@ -162,24 +142,10 @@ jobs:
             exit 1
           }
 
-          if ($target -eq "full-shard-2") {
-            $ciWorkflow = Get-Content -Path ".github/workflows/ci.yml" -Raw
-            $serialRemainder = '-TestArguments @("--config=bunfig.win2.parallel.toml", "test")'
-            $parallelRemainder = '-TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")'
-            if ($ciWorkflow.Contains($parallelRemainder)) {
-              $targets[$target][1].Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test", "--parallel")
-            } elseif ($ciWorkflow.Contains($serialRemainder)) {
-              $targets[$target][1].Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test")
-            } else {
-              Write-Error "checked-out ci.yml has an unsupported Windows shard-2 remainder command"
-              exit 1
-            }
-          }
-
           $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-flake-soak-telemetry"
           $phases = @($targets[$target])
           for ($iteration = 1; $iteration -le $iterationCount; $iteration++) {
-            "iterations_ran=$iteration" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            "SOAK_ITERATIONS_RAN=$iteration" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
             foreach ($phase in $phases) {
               $invocation = "$target-iteration-$iteration-$($phase.Phase)"
               & .github/scripts/windows-ci-telemetry.ps1 `
@@ -188,7 +154,7 @@ jobs:
                 -TestArguments $phase.Arguments
               $iterationExitCode = $LASTEXITCODE
               if ($iterationExitCode -ne 0) {
-                "failed_iteration=$iteration" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+                "SOAK_FAILED_ITERATION=$iteration" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
                 Write-Error "Windows soak target '$target' failed at iteration $iteration (phase '$($phase.Phase)')."
                 exit $iterationExitCode
               }
@@ -211,10 +177,9 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Selected target: `${{ inputs.target }}`.
-            - Tested ref: `${{ inputs.test_ref || github.ref }}`.
             - Requested iterations: `${{ inputs.iterations }}`.
-            - Iterations actually run: `${{ steps.run-soak.outputs.iterations_ran || '0' }}`.
-            - Failed iteration: `${{ steps.run-soak.outputs.failed_iteration || 'none' }}`.
+            - Iterations actually run: `${{ env.SOAK_ITERATIONS_RAN }}`.
+            - Failed iteration: `${{ env.SOAK_FAILED_ITERATION }}`.
             - Telemetry artifact: `windows-flake-soak-${{ inputs.target }}-${{ github.run_id }}-${{ github.run_attempt }}` in this workflow run's **Artifacts** section.
           JOB_SUMMARY_NEXT: Download the telemetry artifact from this workflow run and inspect the JSON for the failed iteration.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

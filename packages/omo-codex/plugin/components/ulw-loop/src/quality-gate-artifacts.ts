@@ -11,49 +11,48 @@ import {
 } from "./quality-gate-fields.js";
 import type { UlwLoopManualQaArtifactKind, UlwLoopManualQaArtifactRef, UlwLoopManualQaSurface } from "./types.js";
 
-export const SUPPORTED_SURFACES: readonly UlwLoopManualQaSurface[] = ["cli", "http", "tmux", "browser", "gui", "data"];
-export const SUPPORTED_KINDS: readonly UlwLoopManualQaArtifactKind[] = [
-	"cli-transcript",
-	"log",
-	"screenshot",
-	"image",
-	"http-dump",
-	"data-diff",
-];
-const COMPATIBLE_KINDS: Readonly<Record<UlwLoopManualQaSurface, readonly UlwLoopManualQaArtifactKind[]>> = {
-	cli: ["cli-transcript", "log"],
-	tmux: ["cli-transcript", "log"],
-	http: ["http-dump"],
-	browser: ["screenshot", "image"],
-	gui: ["screenshot", "image"],
-	data: ["data-diff"],
-};
-
-function isSupportedSurface(value: unknown): value is UlwLoopManualQaSurface {
-	return SUPPORTED_SURFACES.some((surface) => surface === value);
-}
-function isSupportedKind(value: unknown): value is UlwLoopManualQaArtifactKind {
-	return SUPPORTED_KINDS.some((kind) => kind === value);
-}
-
 export function surfaceField(value: unknown, field: string): UlwLoopManualQaSurface {
-	if (isSupportedSurface(value)) return value;
-	invalid(`${field} must be a supported manual QA surface (${SUPPORTED_SURFACES.join(", ")}).`, field);
+	if (
+		value === "cli" ||
+		value === "http" ||
+		value === "tmux" ||
+		value === "browser" ||
+		value === "gui" ||
+		value === "data"
+	)
+		return value;
+	invalid(`${field} must be a supported manual QA surface.`, field);
 	return "cli";
 }
 export function kindField(value: unknown, field: string): UlwLoopManualQaArtifactKind {
-	if (isSupportedKind(value)) return value;
-	invalid(
-		`${field} must be a supported artifact kind (${SUPPORTED_KINDS.join(", ")}); review/QA reports belong in codeReview.reportPath or gateReview.reportPath, not artifactRefs.`,
-		field,
-	);
+	if (
+		value === "cli-transcript" ||
+		value === "log" ||
+		value === "screenshot" ||
+		value === "image" ||
+		value === "http-dump" ||
+		value === "data-diff"
+	)
+		return value;
+	invalid(`${field} must be a supported artifact kind.`, field);
 	return "log";
 }
-export function compatibleKindsFor(surface: UlwLoopManualQaSurface): readonly UlwLoopManualQaArtifactKind[] {
-	return COMPATIBLE_KINDS[surface];
-}
 export function artifactCompatible(surface: UlwLoopManualQaSurface, kind: UlwLoopManualQaArtifactKind): boolean {
-	return compatibleKindsFor(surface).includes(kind);
+	switch (surface) {
+		case "cli":
+		case "tmux":
+			return kind === "cli-transcript" || kind === "log";
+		case "http":
+			return kind === "http-dump";
+		case "browser":
+		case "gui":
+			return kind === "screenshot" || kind === "image";
+		case "data":
+			return kind === "data-diff";
+		default:
+			invalid("manualQa.surfaceEvidence has an unsupported surface.", "manualQa.surfaceEvidence.surface");
+			return false;
+	}
 }
 export function checkFile(path: string, field: string, opts?: ValidateQualityGateOptions): void {
 	if (opts?.repoRoot === undefined || opts.fs === undefined || isPoisoned(field)) return;

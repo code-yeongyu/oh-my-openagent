@@ -40,8 +40,7 @@ test("#given autonomous permissions requested #when script installer updates con
 	const config = await readFile(configPath, "utf8");
 	assert.match(config, /approval_policy = "never"/);
 	assert.match(config, /sandbox_mode = "danger-full-access"/);
-	assert.doesNotMatch(config, /^\s*network_access\s*=/m);
-	assert.doesNotMatch(config, /\[sandbox_workspace_write\]/);
+	assert.match(config, /network_access = "enabled"/);
 	assert.match(config, /\[notice\]/);
 	assert.match(config, /hide_full_access_warning = true/);
 	assert.match(config, /hide_world_writable_warning = true/);

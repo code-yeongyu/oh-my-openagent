@@ -1,6 +1,6 @@
 export type CompactionAgentConfigCheckpoint = {
   agent?: string
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: { providerID: string; modelID: string }
   tools?: Record<string, boolean>
 }
 
@@ -16,7 +16,6 @@ function cloneCheckpoint(
           model: {
             providerID: checkpoint.model.providerID,
             modelID: checkpoint.model.modelID,
-            ...(checkpoint.model.variant ? { variant: checkpoint.model.variant } : {}),
           },
         }
       : {}),

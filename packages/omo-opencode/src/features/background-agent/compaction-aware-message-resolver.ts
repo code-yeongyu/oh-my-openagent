@@ -21,7 +21,6 @@ type SessionMessage = {
     }
     providerID?: string
     modelID?: string
-    variant?: string
     tools?: StoredMessage["tools"]
   }
   parts?: Array<{ type?: string }>
@@ -52,7 +51,6 @@ function convertSessionMessageToStoredMessage(message: SessionMessage): StoredMe
 
   const providerID = info.model?.providerID ?? info.providerID
   const modelID = info.model?.modelID ?? info.modelID
-  const variant = info.model?.variant ?? info.variant
 
   return {
     ...(info.agent ? { agent: info.agent } : {}),
@@ -61,7 +59,7 @@ function convertSessionMessageToStoredMessage(message: SessionMessage): StoredMe
           model: {
             providerID,
             modelID,
-            ...(variant ? { variant } : {}),
+            ...(info.model?.variant ? { variant: info.model.variant } : {}),
           },
         }
       : {}),
@@ -124,7 +122,6 @@ function mergeStoredMessages(
     merged.model = {
       providerID: checkpoint.model.providerID,
       modelID: checkpoint.model.modelID,
-      ...(checkpoint.model.variant ? { variant: checkpoint.model.variant } : {}),
     }
   }
 

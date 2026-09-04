@@ -83,8 +83,6 @@ export async function pollSyncSession(
   let timedOut = false
   let assistantTurnCount = 0
   let lastSeenAssistantId: string | undefined
-  let lastObservedAssistantId: string | undefined
-  let lastObservedMessageCount: number | undefined
   const childSettleMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
   let childWaitAssistantId: string | undefined
   let childSettleStartedAt = 0
@@ -187,16 +185,14 @@ export async function pollSyncSession(
       })
     }
 
-    const isActive = isActiveSessionStatus(sessionStatus)
-    const statusRevision = sessionStatus && (sessionStatus.updatedAt ?? sessionStatus.revision ?? sessionStatus.messageCount ?? sessionStatus.type)
-    const statusChanged = statusRevision !== undefined && String(statusRevision) !== lastStatusRevision
-    if (statusChanged) inactiveStart = Date.now()
+    if (isActiveSessionStatus(sessionStatus)) {
+      inactiveStart = Date.now()
+      continue
+    }
 
-    // An active status (busy/retry/running) is not progress by itself: a child that hit a
-    // terminal provider error can sit in "busy" forever with an unchanged message set.
-    // Keep inspecting messages on the same staleness cadence so the error surfaces and the
-    // inactivity timer only resets on observable change.
     nonActivePollsSinceMessageFetch++
+    const statusRevision = sessionStatus && (sessionStatus.updatedAt ?? sessionStatus.revision ?? sessionStatus.messageCount)
+    const statusChanged = statusRevision !== undefined && String(statusRevision) !== lastStatusRevision
     if (hasFetchedNonActiveMessages && !statusChanged && nonActivePollsSinceMessageFetch < MAX_NON_ACTIVE_STATUS_STALENESS_POLLS) {
       continue
     }
@@ -215,23 +211,14 @@ export async function pollSyncSession(
 
     if (!hasMessagesAfterAnchor(messages, input.anchorMessageID, input.anchorMessageCount)) continue
 
-    const currentAssistantId = [...messages].reverse().find((m) => m.info?.role === "assistant")?.info?.id
-    const messageStateChanged =
-      lastObservedMessageCount !== undefined &&
-      (messages.length !== lastObservedMessageCount || currentAssistantId !== lastObservedAssistantId)
-    lastObservedMessageCount = messages.length
-    lastObservedAssistantId = currentAssistantId
-    if (messageStateChanged) inactiveStart = Date.now()
-
     const sessionError = getTerminalSessionError(messages)
     if (sessionError) {
       log("[task] Poll detected terminal session error", { sessionID: input.sessionID, sessionError })
       return sessionError
     }
 
-    // Completion is only judged once the session has left its active status; a busy child
-    // whose last assistant turn merely looks finished is still working.
-    if (!isActive && isSessionComplete(messages)) {
+    if (isSessionComplete(messages)) {
+      const currentAssistantId = [...messages].reverse().find((m) => m.info?.role === "assistant")?.info?.id
       if (isAwaitingChildContinuation(currentAssistantId)) {
         continue
       }
@@ -239,9 +226,7 @@ export async function pollSyncSession(
       break
     }
 
-    // Count new assistant turns to circuit-break infinite loops. This runs while the status
-    // is still active too: a child looping through tool calls never leaves "busy", and every
-    // new turn resets the inactivity timer above, so the turn budget is its only bound.
+    // Count new assistant turns to circuit-break infinite loops
     const lastAssistant = [...messages].reverse().find((m) => m.info?.role === "assistant")
     if (lastAssistant?.info?.id && lastAssistant.info.id !== lastSeenAssistantId) {
       lastSeenAssistantId = lastAssistant.info.id
@@ -257,8 +242,6 @@ export async function pollSyncSession(
         return `Task aborted: subagent exceeded ${maxTurns} assistant turns without completing. This usually indicates an infinite tool-call loop. Session ID: ${input.sessionID}`
       }
     }
-
-    if (isActive) continue
 
     const hasAssistantText = messages.some((m) => {
       if (m.info?.role !== "assistant") return false

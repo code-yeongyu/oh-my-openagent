@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { join } from "node:path"
 
 import type { ExtensionContext, SessionStartEvent } from "@code-yeongyu/senpi"
@@ -9,7 +10,7 @@ import {
 } from "../onboarding/component"
 import { getOnboardingMarkerMtime } from "../onboarding/state"
 import { getOmoNativeStateDir } from "../telemetry/product-identity"
-import { gitToplevel } from "./git-helpers"
+import { gitIsRepo } from "./git-helpers"
 import type { AdvisorPreflight } from "./runtime"
 
 declare const OMO_SENPI_BUNDLED: boolean
@@ -96,8 +97,11 @@ function advisorPreflight(
   const onboardingStateDir = getOmoNativeStateDir(process.env)
   const stateDir = join(onboardingStateDir, "init-deep-advisor-state")
   const cwd = eventCtx.cwd ?? process.cwd()
-  const root = gitToplevel(cwd)
-  if (root === null) return null
+  if (!gitIsRepo(cwd)) return null
+  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd,
+    encoding: "utf8",
+  }).trim()
   const markerMtime = getOnboardingMarkerMtime(onboardingStateDir)
   if (markerMtime === null || markerMtime >= processStartTime) return null
   return { root, stateDir }

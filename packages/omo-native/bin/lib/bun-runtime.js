@@ -70,25 +70,10 @@ export function isUnderBunGlobalTree(scriptRealPath, options = {}) {
   return normalize(scriptRealPath).startsWith(`${root}${GLOBAL_TREE_MARKER}`)
 }
 
-// Only real executables qualify on win32. npm installs bun as a `bun.cmd` shim next to the real
-// binary, and Node refuses to spawn .cmd/.bat files without a shell (spawn EINVAL, CVE-2024-27980),
-// so a shim can neither answer the version probe nor host the re-exec. PATHEXT still decides which
-// executable spellings exist; batch-file spellings are dropped. Lower-case first, so the path
-// returned matches how the file is spelled on disk.
-const WIN32_EXECUTABLE_EXTENSIONS = new Set([".exe", ".com"])
-
 function pathExtensions(env, platform) {
   if (platform !== "win32") return [""]
   const configured = env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD"
-  const spellings = []
-  for (const raw of configured.split(";")) {
-    const extension = raw.trim()
-    if (!WIN32_EXECUTABLE_EXTENSIONS.has(extension.toLowerCase())) continue
-    for (const spelling of [extension.toLowerCase(), extension]) {
-      if (!spellings.includes(spelling)) spellings.push(spelling)
-    }
-  }
-  return spellings.length > 0 ? spellings : [...WIN32_EXECUTABLE_EXTENSIONS]
+  return configured.split(";").filter(Boolean)
 }
 
 /**
@@ -144,25 +129,19 @@ export function probeBunVersion(bunPath, options = {}) {
   const execFile = options.execFile ?? nodeExecFile
   const env = options.env ?? process.env
   return new Promise((resolve) => {
-    try {
-      execFile(
-        bunPath,
-        ["--version"],
-        { encoding: "utf8", env, timeout: VERSION_PROBE_TIMEOUT_MS, windowsHide: true },
-        (error, stdout) => {
-          if (error) {
-            resolve(undefined)
-            return
-          }
-          const version = String(stdout).trim()
-          resolve(version === "" ? undefined : version)
-        },
-      )
-    } catch {
-      // Node throws synchronously for a batch file spawned without a shell (spawn EINVAL); that is
-      // "not a bun we can trust", never a launcher crash.
-      resolve(undefined)
-    }
+    execFile(
+      bunPath,
+      ["--version"],
+      { encoding: "utf8", env, timeout: VERSION_PROBE_TIMEOUT_MS, windowsHide: true },
+      (error, stdout) => {
+        if (error) {
+          resolve(undefined)
+          return
+        }
+        const version = String(stdout).trim()
+        resolve(version === "" ? undefined : version)
+      },
+    )
   })
 }
 

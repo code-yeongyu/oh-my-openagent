@@ -1,11 +1,3 @@
-## 2026-09-03 — Add the credential-gated x_search tool and skill
-
-Senpi can now search X (Twitter) posts through xAI when an xAI account is connected, and stays silent when it is not.
-
-`packages/omo-senpi` gained an `x-search` component that registers the `x_search` tool at extension load (so `tool_search` sees it in the same session) only if `<agentDir>/auth.json` has an `xai` `oauth`/`api_key` entry, or `XAI_API_KEY` when that file is absent. The matching `x-search` skill is staged into `plugin/skills-conditional/` rather than `plugin/skills/` and is contributed via `resources_discover` only when the same gate passes, so machines without xAI never pay for the skill in the index. There is no `omo.json` key.
-
-In-process task children inherit the tool with `exposure` remapped to `direct` (`CHILD_DIRECT_EXPOSURE_TOOL_NAMES`) because they have no `tool_search` builtin; curated `explore` stays on its existing allowlist (no `x_search`), while `librarian` documents the X/social lane. Query recipes and live QA live under `packages/omo-senpi/scripts/qa/x-search-backtest.mjs` and `x-search-live-e2e.mjs`.
-
 ## 2026-09-02 — Build missing prebuilt inputs in the omo-native release staging
 
 The omo-native plugin staging now builds `packages/lsp-daemon/dist` and

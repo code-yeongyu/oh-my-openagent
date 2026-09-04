@@ -5,15 +5,10 @@
 // of this session's directory. This module resolves the host's own session identity and hands it to the
 // toolkit explicitly as `--session-id`, using the toolkit's own normalization rules so both sides agree
 // on the directory name (`packages/omo-codex/plugin/components/ulw-loop/src/paths.ts`). The adapter
-// boundary forbids importing that package from here, so the rules — including the scoped `goals.json`
-// path the status probe gates on — are mirrored and pinned by a parity test.
-
-import { join } from "node:path"
+// boundary forbids importing that package from here, so the rules are mirrored and pinned by a parity test.
 
 const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
 const SESSION_ID_FLAG = "--session-id"
-const ULW_LOOP_DIR = ".omo/ulw-loop"
-const ULW_LOOP_GOALS = "goals.json"
 
 export function normalizeUlwLoopSessionId(sessionId: string | null | undefined): string | null {
   const trimmed = sessionId?.trim()
@@ -48,11 +43,6 @@ export function resolveUlwLoopSessionScope(eventCtx: unknown): string | null {
 
 export function ulwLoopStatusArgs(normalizedSessionId: string): readonly string[] {
   return [...STATUS_ARGS, SESSION_ID_FLAG, normalizedSessionId]
-}
-
-// Mirrors toolkit `ulwLoopGoalsPath(repoRoot, { sessionId })` once the id is already normalized.
-export function ulwLoopScopedGoalsPath(cwd: string, normalizedSessionId: string): string {
-  return join(cwd, ULW_LOOP_DIR, normalizedSessionId, ULW_LOOP_GOALS)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
