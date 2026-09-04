@@ -620,6 +620,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const createdSessions: string[] = []
     const attemptedModels: Array<{ providerID: string; modelID: string; variant?: string } | undefined> = []
     const polledSessions: string[] = []
+    const { getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
+    const observedBootstrapToolPolicies: Array<{ sessionID: string; callOmoAgent: boolean | undefined }> = []
 
     const deps = {
       createSyncSession: async () => {
@@ -627,8 +629,12 @@ describe("executeSyncTask - cleanup on error paths", () => {
         createdSessions.push(sessionID)
         return { ok: true as const, sessionID }
       },
-      sendSyncPrompt: async (_client: unknown, input: { categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
+      sendSyncPrompt: async (_client: unknown, input: { sessionID: string; categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
         attemptedModels.push(input.categoryModel)
+        observedBootstrapToolPolicies.push({
+          sessionID: input.sessionID,
+          callOmoAgent: getDelegatedChildSessionBootstrap(input.sessionID)?.tools?.call_omo_agent,
+        })
         return null
       },
       pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
@@ -673,7 +679,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
     const fallbackChain = [
       { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
-      { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
+      { providers: ["anthropic"], model: "claude-haiku-4-5" },
     ]
 
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
@@ -684,7 +690,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(polledSessions).toEqual(["ses_first", "ses_second"])
     expect(attemptedModels).toEqual([
       { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast", variant: undefined },
-      { providerID: "genai-proxy-aws", modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0", variant: undefined },
+      { providerID: "anthropic", modelID: "claude-haiku-4-5", variant: undefined },
+    ])
+    expect(observedBootstrapToolPolicies).toEqual([
+      { sessionID: "ses_first", callOmoAgent: true },
+      { sessionID: "ses_second", callOmoAgent: false },
     ])
     expect(result).toContain("Result from ses_second")
     expect(deleteCalls).toContain("ses_first")
@@ -693,8 +703,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(finalMetadata.metadata.sessionId).toBe("ses_second")
     expect(finalMetadata.metadata.taskId).toBe("ses_second")
     expect(finalMetadata.metadata.model).toEqual({
-      providerID: "genai-proxy-aws",
-      modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      providerID: "anthropic",
+      modelID: "claude-haiku-4-5",
       variant: undefined,
     })
   })

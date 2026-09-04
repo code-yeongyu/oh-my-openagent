@@ -64,7 +64,10 @@ export async function executeSyncTask(
     spawnReservation?.commit()
     syncSessionID = sessionID
 
-    const registerSyncSession = async (newSessionID: string): Promise<void> => {
+    const registerSyncSession = async (
+      newSessionID: string,
+      currentModel: DelegatedModelConfig | undefined = categoryModel,
+    ): Promise<void> => {
       syncSessionID = newSessionID
       await registerSyncSessionSideEffects({
         args,
@@ -72,7 +75,7 @@ export async function executeSyncTask(
         sessionID: newSessionID,
         parentContext,
         agentToUse,
-        categoryModel,
+        categoryModel: currentModel,
         fallbackChain,
         systemContent,
       })
