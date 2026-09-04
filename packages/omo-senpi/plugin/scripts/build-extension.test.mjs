@@ -93,6 +93,7 @@ describe("checkExtensionCurrent", () => {
       memoryMcpOutputPath: outputs.memoryMcpOutputPath,
       supervisorOutputPath: outputs.supervisorOutputPath,
     })
+    if (check.ok === false) await dumpSidecarDivergence(outputs)
     // Compare the whole result so a failure names the stale artifact instead of printing "false".
     expect(check).toMatchObject({ ok: true })
   })
@@ -134,6 +135,7 @@ describe("checkExtensionCurrent", () => {
 
     // when
     const result = await checkExtensionCurrent(outputs)
+    if (result.ok === false) await dumpSidecarDivergence(outputs)
 
     // then
     expect(result).toMatchObject({ ok: true })
@@ -231,3 +233,31 @@ describe("checkExtensionCurrent", () => {
     expect(manifest.imports).toEqual({ "#omo-task-runtime": "./extensions/omo-task.js" })
   })
 })
+
+// PROBE-ONLY: rebuild the sidecar into fresh directories and print how it diverges from the fixture copy.
+async function dumpSidecarDivergence(outputs) {
+  const { createHash } = await import("node:crypto")
+  const h = (s) => createHash("sha256").update(s).digest("hex").slice(0, 12)
+  const marker = (text) => (text.match(/\/\/ omo:[^\n]*/) ?? ["?"])[0]
+  const body = (text) => text.slice(text.indexOf("\n", text.indexOf("// omo:")) + 1)
+  const ids = (text) => new Set(text.match(/\b__[A-Za-z]+\b/g) ?? [])
+  const fresh = await mkdtemp(join(tmpdir(), "omo-senpi-probe-rebuild-"))
+  await buildExtension(outputPathsIn(fresh))
+  const fixture = await readFile(outputs.taskOutputPath, "utf8")
+  const rebuilt = await readFile(join(fresh, "omo-task.js"), "utf8")
+  const a = body(fixture).split(";"), b = body(rebuilt).split(";")
+  let i = 0
+  while (i < a.length && i < b.length && a[i] === b[i]) i += 1
+  console.log("PROBE fixture marker: " + marker(fixture))
+  console.log("PROBE rebuilt marker: " + marker(rebuilt))
+  console.log("PROBE bodyLen fixture=" + body(fixture).length + " rebuilt=" + body(rebuilt).length + " hash " + h(body(fixture)) + " vs " + h(body(rebuilt)) + " stmts=" + a.length + "/" + b.length + " firstDivergent=" + i)
+  console.log("PROBE A: " + (a[i] ?? "").slice(0, 900))
+  console.log("PROBE B: " + (b[i] ?? "").slice(0, 900))
+  const ia = ids(body(fixture)), ib = ids(body(rebuilt))
+  console.log("PROBE helpers only in fixture: " + ([...ia].filter((x) => !ib.has(x)).join(",") || "-"))
+  console.log("PROBE helpers only in rebuilt: " + ([...ib].filter((x) => !ia.has(x)).join(",") || "-"))
+  const fresh2 = await mkdtemp(join(tmpdir(), "omo-senpi-probe-rebuild2-"))
+  await buildExtension(outputPathsIn(fresh2))
+  const rebuilt2 = await readFile(join(fresh2, "omo-task.js"), "utf8")
+  console.log("PROBE rebuild#2 hash " + h(body(rebuilt2)) + " equalsRebuild1=" + (body(rebuilt2) === body(rebuilt)) + " equalsFixture=" + (body(rebuilt2) === body(fixture)))
+}
