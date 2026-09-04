@@ -479,6 +479,39 @@ runner timing rather than this diff.
 On `66f651f30` the full protected matrix is **25 pass / 0 fail**, including the `ubuntu-latest`
 shard that failed on the pre-rebase head, and `mergeable_state` is `clean`.
 
+## Review round 5 — merged current `dev` (504 commits) and re-verified
+
+`dev` moved 504 commits after the round-4 head, so the branch was brought up to date again. Merge
+rather than rebase, matching the merge the repository owner had already made onto this branch, so
+no published commit is rewritten.
+
+The merge was conflict-free, and no file this PR touches had drifted: `git log <head>..origin/dev`
+is empty for `cmux-detect.ts`, `cmux-detect.test.ts`, `cmux-cli.ts`, `runner.ts`, `index.ts`,
+`tools.ts`, the omo-opencode tmux barrel and the shim inventory.
+
+Re-verified on the merged tree rather than assumed inert:
+
+```
+packages/tmux-core                                  121 pass / 0 fail
+packages/omo-opencode/src/shared/tmux                89 pass / 0 fail
+packages/omo-opencode/src/tools/interactive-bash      3 pass / 0 fail
+packages/omo-opencode/src/features/tmux-subagent    168 pass / 0 fail
+packages/openclaw-core                               68 pass / 0 fail
+script/package-registration-audit.test.ts             6 pass / 0 fail
+script/agent-command-string-audit.test.ts             2 pass / 0 fail
+
+bunx tsgo --noEmit -p packages/tmux-core/tsconfig.json      exit 0
+bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json   exit 0
+bun run build                                               exit 0
+```
+
+Both repo-wide gates still hold: the shim inventory keeps `cmux-cli.ts` registered at 257 exact
+shims, and the agent command audit stays clean after the doc-comment fix.
+
+`live-cmux-driver.log` was re-recorded on the merged head — detection true, cmux CLI resolved to
+the real binary, pane spawned without the placeholder, `opencode attach` observed, pane closed,
+exit 0 — and the built `dist/index.js` still carries the reconciled detector verbatim.
+
 ## Residual
 
 `findTmuxPath()` still probes a bare `cmux` on `PATH` before falling back to a verified `tmux`

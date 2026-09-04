@@ -1,5 +1,5 @@
-Live cmux + OpenCode driver, re-run on the rebased head (b4e794e41), 2026-09-02
-Server: the cmux-launched OpenCode on port 64155 (`cmux omo --port 64155`).
+Live cmux + OpenCode driver, re-run after merging dev@724ad6f91, 2026-09-04
+Server: the cmux-launched OpenCode on port 64155 (cmux omo --port 64155).
 Imports spawnTmuxPane / closeTmuxPaneWithDependencies from this branch's source.
 
 $ OPENCODE_PORT=64155 bun run live-cmux-driver.ts <sessionId> $(which tmux)
@@ -11,7 +11,7 @@ $ OPENCODE_PORT=64155 bun run live-cmux-driver.ts <sessionId> $(which tmux)
   
   spawnTmuxPane -> {
     success: true,
-    paneId: "%242016313086136537",
+    paneId: "%8252019189373735142",
   }
   
   pane content contains placeholder text = false
@@ -23,6 +23,10 @@ $ OPENCODE_PORT=64155 bun run live-cmux-driver.ts <sessionId> $(which tmux)
   PASS: pane attached through the real cmux CLI and cleaned up
   exit 0
 
-The pane never showed the inert placeholder, an `opencode attach` process was
+The pane never showed the inert placeholder, an 'opencode attach' process was
 observed in the process table while it was open, and the pane was cleaned up -
 the end-to-end behaviour #5809 asked for, through the real code path.
+
+Re-run because dev moved 504 commits under this branch. The driver exercises the
+same source the merge produced, so it re-establishes the claim on the current
+head rather than carrying the earlier observation forward.
