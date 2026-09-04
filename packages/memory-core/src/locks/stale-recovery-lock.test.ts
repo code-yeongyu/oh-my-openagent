@@ -7,6 +7,7 @@ import {
   LockContentionError,
   acquireLock,
   createLockRecord,
+  releaseLock,
   setLockCandidateFsForTests,
 } from "./index"
 
@@ -141,7 +142,7 @@ describe("stale recovery lock deadlock (issue #7573)", () => {
       await writeFile(recoveryPath, `${JSON.stringify(deadRecoveryRecord())}\n`)
       const replacement = await createLockRecord("reflection-scheduler:recovery")
       const restore = setLockCandidateFsForTests({
-        beforeRecoveryRelease: async (pathToRelease) => {
+        afterRecoveryClaim: async (pathToRelease) => {
           await unlink(pathToRelease)
           await writeFile(pathToRelease, `${JSON.stringify(replacement)}\n`)
         },
@@ -157,6 +158,65 @@ describe("stale recovery lock deadlock (issue #7573)", () => {
         expect(JSON.parse(await readFile(recoveryPath, "utf8")).nonce).toBe(replacement.nonce)
       } finally {
         restore()
+      }
+    },
+  )
+
+  test(
+    "#given two contenders observe the same stale recovery owner" +
+      " #when the first contender pauses after winning reclamation" +
+      " #then the second contender cannot reclaim or acquire ahead of it",
+    async () => {
+      if (process.platform === "win32") return
+
+      // #given
+      const lockDir = await createLockDir()
+      const lockPath = path.join(lockDir, "reflection-scheduler.lock")
+      const recoveryPath = `${lockPath}.recovery`
+      await writeFile(lockPath, `${JSON.stringify(deadPrimaryRecord())}\n`)
+      await writeFile(recoveryPath, `${JSON.stringify(deadRecoveryRecord())}\n`)
+      const firstRecord = await createLockRecord("reflection-scheduler")
+      const secondRecord = await createLockRecord("reflection-scheduler")
+      const firstClaimed = Promise.withResolvers<void>()
+      const resumeFirst = Promise.withResolvers<void>()
+      let reclamationHooks = 0
+      const restore = setLockCandidateFsForTests({
+        afterRecoveryClaim: async () => {
+          reclamationHooks += 1
+          if (reclamationHooks !== 1) return
+          firstClaimed.resolve()
+          await resumeFirst.promise
+        },
+      })
+
+      try {
+        const firstAcquisition = acquireLock(lockPath, firstRecord, {
+          waitTimeoutMs: 0,
+        }).then(
+          () => undefined,
+          (cause: unknown) => cause,
+        )
+        await firstClaimed.promise
+
+        // #when
+        const secondError = await acquireLock(lockPath, secondRecord, {
+          waitTimeoutMs: 0,
+        }).then(
+          () => undefined,
+          (cause: unknown) => cause,
+        )
+        resumeFirst.resolve()
+        const firstError = await firstAcquisition
+
+        // #then
+        expect(secondError).toBeInstanceOf(LockContentionError)
+        expect(firstError).toBeUndefined()
+        expect(JSON.parse(await readFile(lockPath, "utf8")).nonce).toBe(firstRecord.nonce)
+      } finally {
+        resumeFirst.resolve()
+        restore()
+        await releaseLock(lockPath, firstRecord)
+        await releaseLock(lockPath, secondRecord)
       }
     },
   )

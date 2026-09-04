@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import {
   EINTR_RETRY_CAP,
   link,
@@ -166,7 +166,7 @@ const sweptLockDirectories = new Set<string>()
 export interface LockCandidateFs {
   readonly unlink?: (path: string) => Promise<void>
   readonly isSharingError?: (error: unknown) => boolean
-  readonly beforeRecoveryRelease?: (
+  readonly afterRecoveryClaim?: (
     path: string,
     expected: LockRecord,
   ) => Promise<void>
@@ -200,8 +200,37 @@ async function reclaimStaleRecoveryLock(recoveryPath: string): Promise<void> {
   const existing = await readOwner(recoveryPath)
   if (existing === null || existing.record === null) return
   if (!(await isProvenDead(existing.record))) return
-  await candidateFs.beforeRecoveryRelease?.(recoveryPath, existing.record)
-  await releaseLock(recoveryPath, existing.record)
+
+  const digest = createHash("sha256").update(existing.raw).digest("hex")
+  const claimId = [
+    digest.slice(0, 8),
+    digest.slice(8, 12),
+    digest.slice(12, 16),
+    digest.slice(16, 20),
+    digest.slice(20, 32),
+  ].join("-")
+  const claimPath = `${recoveryPath}.candidate-${claimId}`
+  let claimCreated = false
+  try {
+    try {
+      await link(recoveryPath, claimPath)
+    } catch (error) {
+      if (isCandidatePublishRace(error)) return
+      throw error
+    }
+    claimCreated = true
+
+    const claimed = await readOwner(claimPath)
+    if (claimed === null || claimed.raw !== existing.raw) return
+    await candidateFs.afterRecoveryClaim?.(recoveryPath, existing.record)
+    const current = await readOwner(recoveryPath)
+    if (current === null || current.raw !== claimed.raw) return
+    await unlink(recoveryPath)
+  } finally {
+    if (claimCreated && !(await unlinkCandidate(claimPath))) {
+      rearmCandidateSweep(path.dirname(recoveryPath))
+    }
+  }
 }
 
 async function recoverDeadOwner(
