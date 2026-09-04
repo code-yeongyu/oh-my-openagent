@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import { mkdtemp, readFile, rm, unlink, utimes, writeFile } from "node:fs/promises"
 import { hostname, tmpdir } from "node:os"
 import path from "node:path"
 
 import {
   LockContentionError,
+  LockRecoveryBlockedError,
   acquireLock,
   createLockRecord,
   releaseLock,
@@ -19,6 +21,7 @@ import {
 // wrong process_start still proves the seeded owner is not the current process.
 const DEAD_PID_PRIMARY = 23997
 const DEAD_PID_RECOVERY = 23813
+const DEAD_PID_CLAIM = 23717
 const DEAD_START_PRIMARY = "ps-lstart:Fri Aug 28 13:34:49 2026"
 const DEAD_START_RECOVERY = "ps-lstart:Fri Aug 28 13:34:46 2026"
 
@@ -58,6 +61,18 @@ function deadRecoveryRecord(): object {
     created_at: "2026-08-28T13:34:46.000Z",
     purpose: "reflection-scheduler:recovery",
   }
+}
+
+function recoveryClaimPath(recoveryPath: string, recoveryRaw: string): string {
+  const digest = createHash("sha256").update(recoveryRaw).digest("hex")
+  const claimId = [
+    digest.slice(0, 8),
+    digest.slice(8, 12),
+    digest.slice(12, 16),
+    digest.slice(16, 20),
+    digest.slice(20, 32),
+  ].join("-")
+  return `${recoveryPath}.claim-${claimId}`
 }
 
 describe("stale recovery lock deadlock (issue #7573)", () => {
@@ -164,6 +179,197 @@ describe("stale recovery lock deadlock (issue #7573)", () => {
         expect(JSON.parse(await readFile(recoveryPath, "utf8")).nonce).toBe(replacement.nonce)
       } finally {
         restore()
+      }
+    },
+  )
+
+  test(
+    "#given a dead reclaimer left its generation claim behind" +
+      " #when a new session attempts acquisition" +
+      " #then it advances through a successor claim and makes progress",
+    async () => {
+      if (process.platform === "win32") return
+
+      // #given
+      const lockDir = await createLockDir()
+      const lockPath = path.join(lockDir, "reflection-scheduler.lock")
+      const recoveryPath = `${lockPath}.recovery`
+      const recoveryRaw = `${JSON.stringify(deadRecoveryRecord())}\n`
+      const claimPath = recoveryClaimPath(recoveryPath, recoveryRaw)
+      const deadClaim = {
+        ...deadRecoveryRecord(),
+        pid: DEAD_PID_CLAIM,
+        nonce: "00000000-dead-dead-dead-000000000003",
+        purpose: "reflection-scheduler:recovery-claim",
+      }
+      const deadClaimRaw = `${JSON.stringify(deadClaim)}\n`
+      const successorPath = recoveryClaimPath(recoveryPath, deadClaimRaw)
+      await writeFile(lockPath, `${JSON.stringify(deadPrimaryRecord())}\n`)
+      await writeFile(recoveryPath, recoveryRaw)
+      await writeFile(claimPath, deadClaimRaw)
+      const contender = await createLockRecord("reflection-scheduler")
+
+      try {
+        // #when / #then
+        await expect(acquireLock(lockPath, contender, { waitTimeoutMs: 0 })).resolves.toBeUndefined()
+        expect(JSON.parse(await readFile(lockPath, "utf8")).nonce).toBe(contender.nonce)
+        expect(JSON.parse(await readFile(claimPath, "utf8")).nonce).toBe(deadClaim.nonce)
+        await expect(readFile(successorPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" })
+      } finally {
+        await releaseLock(lockPath, contender)
+      }
+    },
+  )
+
+  test(
+    "#given a legacy claim contains only the stale recovery owner" +
+      " #when a new session cannot identify the active claimant" +
+      " #then recovery fails closed during a rolling upgrade",
+    async () => {
+      if (process.platform === "win32") return
+
+      // #given
+      const lockDir = await createLockDir()
+      const lockPath = path.join(lockDir, "reflection-scheduler.lock")
+      const recoveryPath = `${lockPath}.recovery`
+      const recoveryRaw = `${JSON.stringify(deadRecoveryRecord())}\n`
+      const claimPath = recoveryClaimPath(recoveryPath, recoveryRaw)
+      await writeFile(lockPath, `${JSON.stringify(deadPrimaryRecord())}\n`)
+      await writeFile(recoveryPath, recoveryRaw)
+      await writeFile(claimPath, recoveryRaw)
+      const contender = await createLockRecord("reflection-scheduler")
+
+      // #when
+      const error = await acquireLock(lockPath, contender, { waitTimeoutMs: 0 }).catch(
+        (cause) => cause,
+      )
+
+      // #then
+      expect(error).toBeInstanceOf(LockRecoveryBlockedError)
+      expect(error.reason).toBe("legacy_claim")
+      expect(await readFile(recoveryPath, "utf8")).toBe(recoveryRaw)
+      expect(await readFile(claimPath, "utf8")).toBe(recoveryRaw)
+    },
+  )
+
+  test(
+    "#given every bounded successor slot belongs to a dead claimant" +
+      " #when another contender attempts recovery" +
+      " #then it receives a non-retriable repair diagnostic",
+    async () => {
+      if (process.platform === "win32") return
+
+      // #given
+      const lockDir = await createLockDir()
+      const lockPath = path.join(lockDir, "reflection-scheduler.lock")
+      const recoveryPath = `${lockPath}.recovery`
+      const recoveryRaw = `${JSON.stringify(deadRecoveryRecord())}\n`
+      await writeFile(lockPath, `${JSON.stringify(deadPrimaryRecord())}\n`)
+      await writeFile(recoveryPath, recoveryRaw)
+      let predecessorRaw = recoveryRaw
+      for (let depth = 0; depth < 64; depth += 1) {
+        const claimPath = recoveryClaimPath(recoveryPath, predecessorRaw)
+        const claim = {
+          ...deadRecoveryRecord(),
+          pid: DEAD_PID_CLAIM,
+          nonce: `00000000-dead-dead-dead-${String(depth).padStart(12, "0")}`,
+          purpose: "reflection-scheduler:recovery-claim",
+        }
+        predecessorRaw = `${JSON.stringify(claim)}\n`
+        await writeFile(claimPath, predecessorRaw)
+      }
+      const contender = await createLockRecord("reflection-scheduler")
+
+      // #when
+      const error = await acquireLock(lockPath, contender, { waitTimeoutMs: 0 }).catch(
+        (cause) => cause,
+      )
+
+      // #then
+      expect(error).toBeInstanceOf(LockRecoveryBlockedError)
+      expect(error.reason).toBe("claim_chain_exhausted")
+      expect(error.retriable).toBe(false)
+    },
+  )
+
+  test(
+    "#given two contenders observe the same dead generation claim" +
+      " #when one publishes its successor while the other is paused" +
+      " #then the paused contender cannot displace the elected claimant",
+    async () => {
+      if (process.platform === "win32") return
+
+      // #given
+      const lockDir = await createLockDir()
+      const lockPath = path.join(lockDir, "reflection-scheduler.lock")
+      const recoveryPath = `${lockPath}.recovery`
+      const recoveryRaw = `${JSON.stringify(deadRecoveryRecord())}\n`
+      const claimPath = recoveryClaimPath(recoveryPath, recoveryRaw)
+      const deadClaim = {
+        ...deadRecoveryRecord(),
+        pid: DEAD_PID_CLAIM,
+        nonce: "00000000-dead-dead-dead-000000000003",
+        purpose: "reflection-scheduler:recovery-claim",
+      }
+      await writeFile(lockPath, `${JSON.stringify(deadPrimaryRecord())}\n`)
+      await writeFile(recoveryPath, recoveryRaw)
+      await writeFile(claimPath, `${JSON.stringify(deadClaim)}\n`)
+      const pausedRecord = await createLockRecord("reflection-scheduler")
+      const electedRecord = await createLockRecord("reflection-scheduler")
+      const pausedReadDeadClaim = Promise.withResolvers<void>()
+      const resumePausedContender = Promise.withResolvers<void>()
+      const electedClaimPublished = Promise.withResolvers<void>()
+      const resumeElectedContender = Promise.withResolvers<void>()
+      let deadClaimReads = 0
+      let reclamationHooks = 0
+      const restore = setLockCandidateFsForTests({
+        afterDeadRecoveryClaimRead: async () => {
+          deadClaimReads += 1
+          if (deadClaimReads !== 1) return
+          pausedReadDeadClaim.resolve()
+          await resumePausedContender.promise
+        },
+        afterRecoveryClaim: async () => {
+          reclamationHooks += 1
+          if (reclamationHooks !== 1) return
+          electedClaimPublished.resolve()
+          await resumeElectedContender.promise
+        },
+      })
+
+      try {
+        const pausedAcquisition = acquireLock(lockPath, pausedRecord, {
+          waitTimeoutMs: 0,
+        }).then(
+          () => undefined,
+          (cause: unknown) => cause,
+        )
+        await pausedReadDeadClaim.promise
+        const electedAcquisition = acquireLock(lockPath, electedRecord, {
+          waitTimeoutMs: 0,
+        }).then(
+          () => undefined,
+          (cause: unknown) => cause,
+        )
+        await electedClaimPublished.promise
+
+        // #when
+        resumePausedContender.resolve()
+        const pausedError = await pausedAcquisition
+        resumeElectedContender.resolve()
+        const electedError = await electedAcquisition
+
+        // #then
+        expect(pausedError).toBeInstanceOf(LockContentionError)
+        expect(electedError).toBeUndefined()
+        expect(reclamationHooks).toBe(1)
+        expect(JSON.parse(await readFile(lockPath, "utf8")).nonce).toBe(electedRecord.nonce)
+      } finally {
+        resumePausedContender.resolve()
+        resumeElectedContender.resolve()
+        restore()
+        await releaseLock(lockPath, pausedRecord)
+        await releaseLock(lockPath, electedRecord)
       }
     },
   )

@@ -1,0 +1,34 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "isolationCertified": false,
+  "realHomeIsolationCertified": false,
+  "certificationLane": "controlled-environment-roots",
+  "certificationEnvironmentObserved": true,
+  "certificationRoots": [
+    "HOME_DEFAULT_SENPI_AGENT",
+    "HOME_DEFAULT_OMO_AGENT",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME"
+  ],
+  "certificationRootsComplete": false,
+  "certificationRootsTruncated": false,
+  "certificationChangedPaths": [],
+  "certificationErrorCode": "DIRECTORY_IDENTITY_UNAVAILABLE",
+  "realSenpiChangedPaths": [],
+  "realSenpiProtectedStateComplete": true,
+  "realSenpiProtectedErrors": [],
+  "realOmoChangedPaths": [],
+  "realOmoProtectedStateComplete": true,
+  "realOmoProtectedErrors": [],
+  "realSenpiObservedChangedPaths": [],
+  "realOmoObservedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "unset",
+  "sandboxAgentDir": "<sandbox>/agent",
+  "sandboxCwd": "<sandbox>/project",
+  "realHomesChecked": [
+    "<real-home>/.senpi/agent",
+    "<real-home>/.omo/agent"
+  ]
+}

@@ -47,6 +47,23 @@ export class LockContentionError extends Error {
   }
 }
 
+export type LockRecoveryBlockReason = "legacy_claim" | "claim_chain_exhausted"
+
+export class LockRecoveryBlockedError extends Error {
+  readonly retriable = false
+
+  constructor(
+    readonly lockPath: string,
+    readonly reason: LockRecoveryBlockReason,
+  ) {
+    super(
+      `Lock recovery is blocked (${reason}): ${lockPath}. ` +
+        "Stop all processes using this memory home, remove the matching .recovery.claim-* files, and retry.",
+    )
+    this.name = "LockRecoveryBlockedError"
+  }
+}
+
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined
   return typeof error.code === "string" ? error.code : undefined
@@ -166,6 +183,10 @@ const sweptLockDirectories = new Set<string>()
 export interface LockCandidateFs {
   readonly unlink?: (path: string) => Promise<void>
   readonly isSharingError?: (error: unknown) => boolean
+  readonly afterDeadRecoveryClaimRead?: (
+    path: string,
+    expected: LockRecord,
+  ) => Promise<void>
   readonly afterRecoveryClaim?: (
     path: string,
     expected: LockRecord,
@@ -196,12 +217,15 @@ async function isProvenDead(owner: LockRecord): Promise<boolean> {
   return actualStart !== owner.process_start
 }
 
-async function reclaimStaleRecoveryLock(recoveryPath: string): Promise<void> {
-  const existing = await readOwner(recoveryPath)
-  if (existing === null || existing.record === null) return
-  if (!(await isProvenDead(existing.record))) return
+const RECOVERY_CLAIM_CHAIN_LIMIT = 64
 
-  const digest = createHash("sha256").update(existing.raw).digest("hex")
+interface RecoveryClaim {
+  readonly path: string
+  readonly record: LockRecord
+}
+
+function recoveryClaimPath(recoveryPath: string, predecessorRaw: string): string {
+  const digest = createHash("sha256").update(predecessorRaw).digest("hex")
   const claimId = [
     digest.slice(0, 8),
     digest.slice(8, 12),
@@ -209,27 +233,62 @@ async function reclaimStaleRecoveryLock(recoveryPath: string): Promise<void> {
     digest.slice(16, 20),
     digest.slice(20, 32),
   ].join("-")
-  const claimPath = `${recoveryPath}.claim-${claimId}`
-  let claimCreated = false
-  try {
-    try {
-      await link(recoveryPath, claimPath)
-    } catch (error) {
-      if (isCandidatePublishRace(error)) return
-      throw error
-    }
-    claimCreated = true
+  return `${recoveryPath}.claim-${claimId}`
+}
 
-    const claimed = await readOwner(claimPath)
+async function acquireRecoveryClaim(
+  recoveryPath: string,
+  recoveryRaw: string,
+  contender: LockRecord,
+): Promise<RecoveryClaim | null> {
+  let predecessorRaw = recoveryRaw
+  let depth = 0
+  while (depth < RECOVERY_CLAIM_CHAIN_LIMIT) {
+    const claimPath = recoveryClaimPath(recoveryPath, predecessorRaw)
+    const existing = await readOwner(claimPath)
+    if (existing === null) {
+      const claimRecord: LockRecord = {
+        ...contender,
+        nonce: randomUUID(),
+        created_at: new Date().toISOString(),
+        purpose: `${contender.purpose}:recovery-claim`,
+      }
+      if (await publishExclusive(claimPath, claimRecord)) {
+        return { path: claimPath, record: claimRecord }
+      }
+      continue
+    }
+    if (existing.record === null) return null
+    if (depth === 0 && existing.raw === recoveryRaw) {
+      // A pre-successor implementation hard-linked the recovery inode here.
+      // Its current claimant identity is unknowable, so rolling upgrades fail closed.
+      throw new LockRecoveryBlockedError(recoveryPath, "legacy_claim")
+    }
+    if (!(await isProvenDead(existing.record))) return null
+    await candidateFs.afterDeadRecoveryClaimRead?.(claimPath, existing.record)
+    predecessorRaw = existing.raw
+    depth += 1
+  }
+  throw new LockRecoveryBlockedError(recoveryPath, "claim_chain_exhausted")
+}
+
+async function reclaimStaleRecoveryLock(recoveryPath: string, contender: LockRecord): Promise<void> {
+  const existing = await readOwner(recoveryPath)
+  if (existing === null || existing.record === null) return
+  if (!(await isProvenDead(existing.record))) return
+
+  const claim = await acquireRecoveryClaim(recoveryPath, existing.raw, contender)
+  if (claim === null) return
+
+  try {
+    const claimed = await readOwner(recoveryPath)
     if (claimed === null || claimed.raw !== existing.raw) return
     await candidateFs.afterRecoveryClaim?.(recoveryPath, existing.record)
     const current = await readOwner(recoveryPath)
     if (current === null || current.raw !== claimed.raw) return
     await unlink(recoveryPath)
   } finally {
-    if (claimCreated && !(await unlinkCandidate(claimPath))) {
-      rearmCandidateSweep(path.dirname(recoveryPath))
-    }
+    await releaseLock(claim.path, claim.record)
   }
 }
 
@@ -241,7 +300,7 @@ async function recoverDeadOwner(
   if (snapshot.record === null || !(await isProvenDead(snapshot.record))) return false
 
   const recoveryPath = `${lockPath}.recovery`
-  await reclaimStaleRecoveryLock(recoveryPath)
+  await reclaimStaleRecoveryLock(recoveryPath, contender)
   const recoveryRecord: LockRecord = {
     ...contender,
     nonce: randomUUID(),

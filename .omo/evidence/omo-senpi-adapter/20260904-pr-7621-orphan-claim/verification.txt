@@ -1,0 +1,45 @@
+Base commit before the orphan-claim correction:
+aed41bc6342a940afa567384a4c06e1f7510d20e
+
+Focused failing-first orphan regression:
+5 pass
+1 fail
+Expected failure: acquisition rejected while an orphaned deterministic claim existed.
+
+Adversarial failing-first ABA regression against the first repair:
+6 pass
+1 fail
+Expected failure: paused contender acquired instead of respecting the elected claimant.
+
+Final focused recovery suite:
+9 pass
+0 fail
+24 assertions
+
+Full memory-core lock suite:
+28 pass
+0 fail
+79 assertions
+
+memory-core typecheck:
+exit 0
+
+omo-senpi typecheck:
+exit 0
+
+Senpi QA driver self-test:
+SELF-TEST OK
+
+Exact Bun 1.4.0 Senpi gate:
+2677 pass
+32 skip
+0 fail
+8503 assertions
+2709 tests across 352 files
+
+Real isolated Senpi driver:
+result=PASS
+ultraworkInjected=true
+commentChecker=PASS
+changed protected or observed real-home paths=none
+macOS broad directory identity=DIRECTORY_IDENTITY_UNAVAILABLE

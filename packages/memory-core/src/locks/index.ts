@@ -1,5 +1,6 @@
 export {
   LockContentionError,
+  LockRecoveryBlockedError,
   acquireLock,
   isHeld,
   releaseLock,
@@ -7,6 +8,7 @@ export {
   setLockCandidateFsForTests,
 } from "./acquire"
 export type { AcquireLockOptions } from "./acquire"
+export type { LockRecoveryBlockReason } from "./acquire"
 export {
   LOCK_DOMAINS,
   factsQueueLockPath,
