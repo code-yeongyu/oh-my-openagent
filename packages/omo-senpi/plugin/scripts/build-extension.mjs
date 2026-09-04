@@ -141,12 +141,6 @@ async function buildEntry(entry, output, buildDefines) {
       buildScriptPath: fileURLToPath(import.meta.url),
     })
   } finally {
-    if (process.env.OMO_PROBE_INPUTS !== undefined && output.endsWith("omo-task.js")) {
-      const meta = JSON.parse(await readFile(metafile, "utf8"))
-      console.log("PROBE_INPUTS_BEGIN " + Object.keys(meta.inputs).length)
-      for (const input of Object.keys(meta.inputs).sort()) console.log("PROBE " + input)
-      console.log("PROBE_INPUTS_END")
-    }
     await rm(metafile, { force: true })
   }
 }
@@ -203,6 +197,18 @@ export async function checkExtensionCurrent(options = {}) {
       return { ok: false, reason: "stale-output", output }
     }
     if (!artifactsMatch(currentTask, await readFile(expectedTaskOutput, "utf8"))) {
+      const expectedTaskText = await readFile(expectedTaskOutput, "utf8")
+      const bodyOf = (text) => text.slice(text.indexOf("\n", text.indexOf("// omo:")) + 1)
+      const markerOf = (text) => (text.match(/\/\/ omo:[^\n]*/) ?? ["?"])[0]
+      const cur = bodyOf(currentTask).split(";")
+      const exp = bodyOf(expectedTaskText).split(";")
+      let i = 0
+      while (i < cur.length && i < exp.length && cur[i] === exp[i]) i += 1
+      console.log("PROBE2 committed-marker " + markerOf(currentTask))
+      console.log("PROBE2 rebuilt-marker   " + markerOf(expectedTaskText))
+      console.log("PROBE2 body-lengths committed=" + bodyOf(currentTask).length + " rebuilt=" + bodyOf(expectedTaskText).length + " stmts=" + cur.length + "/" + exp.length + " firstDivergent=" + i)
+      console.log("PROBE2 C: " + (cur[i] ?? "").slice(0, 600))
+      console.log("PROBE2 R: " + (exp[i] ?? "").slice(0, 600))
       return { ok: false, reason: "stale-output", output: taskOutput }
     }
     if (!artifactsMatch(currentMember, await readFile(expectedMemberOutput, "utf8"))) {
