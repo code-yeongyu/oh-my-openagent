@@ -22,6 +22,8 @@ todo trees outside the configured byte budget. The 1 KiB minimum handoff cap
 also shrinks source diagnostics instead of suppressing an otherwise valid
 delegation. A full-error SHA-256 from Senpi correlates bounded event diagnostics
 to the exact failed assistant instead of accepting same-prefix stale errors.
+Candidate admission trusts Senpi's canonical rejected-candidate projection
+rather than comparing it with unresolved family aliases in user settings.
 
 Expected conflict zones: the task settings schema, task component registration
 in `src/components/task/index.ts`, and the `task` table in

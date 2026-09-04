@@ -95,9 +95,6 @@ function context(values) {
       getSessionId: () => "qa-parent",
       getEntries: () => values,
     },
-    sessionSettings: {
-      getRetryFallbackSettings: () => ({ chains: { [ULTRAFAST]: [ULTRAFAST] } }),
-    },
   }
 }
 

@@ -114,11 +114,7 @@ function entries(options: {
   ]
 }
 
-function context(
-  sessionEntries: readonly unknown[],
-  chainKey = ULTRAFAST,
-  selectors: readonly string[] = [ULTRAFAST],
-): Record<string, unknown> {
+function context(sessionEntries: readonly unknown[]): Record<string, unknown> {
   return {
     sessionManager: {
       getSessionId: () => "parent-session",
@@ -126,7 +122,7 @@ function context(
     },
     sessionSettings: {
       getRetryFallbackSettings: () => ({
-        chains: { [chainKey]: selectors },
+        chains: { "kimi-k3": ["k3:max"] },
       }),
     },
   }
@@ -272,7 +268,7 @@ describe("context fallback delegate", () => {
     await pi.dispatch(
       "retry_fallback_exhausted",
       oversized,
-      context(entries({ errorMessage: oversized.lastError }), oversized.chainKey),
+      context(entries({ errorMessage: oversized.lastError })),
     )
     await Promise.resolve()
 
@@ -386,9 +382,16 @@ describe("context fallback delegate", () => {
         isRpcChild: false,
       },
       {
-        name: "candidate absent from configured chain",
+        name: "candidate projection mismatch",
         settings: settings(),
-        event: event("attacker/arbitrary-expensive-model"),
+        event: {
+          ...event(),
+          rejectedCandidates: [{
+            selector: "attacker/arbitrary-expensive-model",
+            reason: "context-unusable",
+            projection: { model: ULTRAFAST, usable: false },
+          }],
+        },
         entries: entries(),
         isRpcChild: false,
       },

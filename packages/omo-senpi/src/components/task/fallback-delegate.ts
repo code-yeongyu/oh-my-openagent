@@ -29,7 +29,6 @@ type FallbackEventContext = {
     getSessionId(): string
     getEntries(): readonly unknown[]
   }
-  readonly fallbackChains: Readonly<Record<string, readonly string[]>>
 }
 
 export type FallbackDelegateDeps = {
@@ -55,10 +54,6 @@ export function wireFallbackDelegate(pi: SenpiExtensionAPI, deps: FallbackDelega
         .find((candidate) => candidate.reason === "context-unusable")
         ?.selector
       if (model === undefined || model.length === 0) return
-      if (
-        deps.settings.model === undefined
-        && !context.fallbackChains[event.chainKey]?.includes(model)
-      ) return
       const handoff = buildFallbackHandoff({
         entries: context.sessionManager.getEntries(),
         maxBytes: deps.settings.max_handoff_bytes,
@@ -139,33 +134,17 @@ function parseExhaustion(value: unknown): RetryFallbackExhausted | undefined {
 function parseContext(value: unknown): FallbackEventContext | undefined {
   const context = asRecord(value)
   const sessionManager = asRecord(context?.["sessionManager"])
-  const sessionSettings = asRecord(context?.["sessionSettings"])
   const getSessionId = sessionManager?.["getSessionId"]
   const getEntries = sessionManager?.["getEntries"]
-  const getRetryFallbackSettings = sessionSettings?.["getRetryFallbackSettings"]
-  if (
-    typeof getSessionId !== "function"
-    || typeof getEntries !== "function"
-    || typeof getRetryFallbackSettings !== "function"
-  ) return undefined
+  if (typeof getSessionId !== "function" || typeof getEntries !== "function") return undefined
   const sessionId = Reflect.apply(getSessionId, sessionManager, [])
   const entries = Reflect.apply(getEntries, sessionManager, [])
-  const retrySettings = asRecord(Reflect.apply(getRetryFallbackSettings, sessionSettings, []))
-  const chains = asRecord(retrySettings?.["chains"])
-  if (typeof sessionId !== "string" || !Array.isArray(entries) || chains === undefined) return undefined
-  const fallbackChains = Object.fromEntries(
-    Object.entries(chains).flatMap(([key, value]) => (
-      Array.isArray(value) && value.every((selector) => typeof selector === "string")
-        ? [[key, value]]
-        : []
-    )),
-  )
+  if (typeof sessionId !== "string" || !Array.isArray(entries)) return undefined
   return {
     sessionManager: {
       getSessionId: () => sessionId,
       getEntries: () => entries,
     },
-    fallbackChains,
   }
 }
 
