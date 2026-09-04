@@ -137,15 +137,15 @@ describe("generateModelConfig", () => {
   })
 
   describe("explore agent special cases", () => {
-    test("explore uses gpt-5-nano when only Gemini available (no Claude)", () => {
+    test("explore uses a resolvable Gemini model when only Gemini available (no Claude)", () => {
       // #given only Gemini is available (no Claude)
       const config = createConfig({ hasGemini: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use gpt-5-nano (Claude haiku not available)
-      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
+      // #then explore should resolve through the installed Gemini provider instead of the dead ultimate fallback
+      expect(result.agents?.explore?.model).toBe("google/gemini-3.1-pro-preview")
     })
 
     test("explore uses Claude haiku when Claude available", () => {
@@ -271,8 +271,8 @@ describe("generateModelConfig", () => {
       // #when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.metis?.model).toBe("opencode/gpt-5-nano")
+      // #then Metis falls through to the installed OpenAI provider instead of the dead ultimate fallback
+      expect(result.agents?.metis?.model).toBe("openai/gpt-5.6-sol")
       expect(result.agents?.metis?.variant).toBeUndefined()
     })
 
@@ -306,6 +306,56 @@ describe("generateModelConfig", () => {
         model: "openai/gpt-5.6-sol",
         variant: "xhigh",
       })
+    })
+  })
+
+  describe("single-provider installs never emit the unresolvable ultimate fallback", () => {
+    test("zai-only install keeps a resolvable model for all 14 fallen-through agents and categories", () => {
+      // #given only ZAI coding plan is available (issue #6799 reproduction)
+      const config = createConfig({ hasZaiCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then no generated entry contains the unresolvable opencode/gpt-5-nano literal
+      expect(JSON.stringify(result)).not.toContain("opencode/gpt-5-nano")
+
+      // #then all 7 agents that fell through keep their own resolvable model
+      const brokenAgents = ["oracle", "explore", "prometheus", "metis", "momus", "atlas", "sisyphus-junior"]
+      for (const role of brokenAgents) {
+        expect(result.agents?.[role]?.model).toBe("zai-coding-plan/glm-5.2")
+      }
+
+      // #then all 7 categories that fell through keep their own resolvable model
+      const brokenCategories = [
+        "ultrabrain",
+        "deep",
+        "artistry",
+        "quick",
+        "unspecified-low",
+        "unspecified-high",
+        "writing",
+      ]
+      for (const cat of brokenCategories) {
+        expect(result.categories?.[cat]?.model).toBe("zai-coding-plan/glm-5.2")
+      }
+
+      // #then roles whose own chains already cover ZAI keep their own models
+      expect(result.agents?.sisyphus?.model).toBe("zai-coding-plan/glm-5.2")
+      expect(result.categories?.["visual-engineering"]?.model).toBe("zai-coding-plan/glm-5.2")
+      expect(result.agents?.["multimodal-looker"]?.model).toBe("zai-coding-plan/glm-4.6v")
+    })
+
+    test("minimax-only install binds fallen-through agents to a resolvable MiniMax model", () => {
+      // #given only MiniMax Coding Plan is available
+      const config = createConfig({ hasMinimaxCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then agents whose own chains lack MiniMax resolve through the installed provider
+      expect(JSON.stringify(result)).not.toContain("opencode/gpt-5-nano")
+      expect(result.agents?.momus?.model).toBe("minimax-coding-plan/MiniMax-M3")
     })
   })
 

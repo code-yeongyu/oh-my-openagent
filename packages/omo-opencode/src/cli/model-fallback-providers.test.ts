@@ -155,7 +155,7 @@ describe("generateModelConfig provider routes", () => {
       expect(result.agents?.explore?.fallback_models).toBeUndefined()
     })
 
-    test("explore uses current OpenCode Zen nano model when only OpenCode Zen is available", () => {
+    test("explore uses current OpenCode Zen big-pickle model when only OpenCode Zen is available", () => {
       // given only OpenCode Zen is available
       const config = createConfig({ hasOpencodeZen: true })
 
@@ -163,7 +163,7 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Explore avoids retired OpenCode identifiers
-      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
+      expect(result.agents?.explore?.model).toBe("opencode/big-pickle")
       expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
       expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
     })
