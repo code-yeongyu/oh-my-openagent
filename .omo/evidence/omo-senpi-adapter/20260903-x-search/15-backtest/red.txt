@@ -1,0 +1,2 @@
+Deterministic acceptance pre-check (RED): FAIL.
+Record command exceeded the bounded execution window before a final report was written; therefore live acceptance (complete record, final Grok status, and parity) was not proven.

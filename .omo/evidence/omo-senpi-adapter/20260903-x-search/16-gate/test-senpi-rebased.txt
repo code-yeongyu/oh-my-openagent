@@ -1,0 +1,26 @@
+# full gate on the rebased HEAD (2026-09-03T09:56:07.446Z)
+REMOTE_HEAD=1827a56bb
+mengmotaMac
+1827a56bb
+2045:error: expect(received).toHaveLength(expected)
+2484:error: subscriber exploded
+2503:error: subscriber exploded
+2520:error: subscriber exploded
+2536:error: subscriber exploded
+2552:error: subscriber exploded
+2569:error: subscriber exploded
+2585:error: subscriber exploded
+2601:error: subscriber exploded
+2617:error: subscriber exploded
+3781: 2629 pass
+3782: 1 skip
+3783: 1 fail
+3785:Ran 2631 tests across 346 files. [302.89s]
+3786:error: script "test:senpi" exited with code 1
+=== senpi-task
+ 1840 pass
+ 1 skip
+ 0 fail
+ 6004 expect() calls
+Ran 1841 tests across 257 files. [40.88s]
+exit=0

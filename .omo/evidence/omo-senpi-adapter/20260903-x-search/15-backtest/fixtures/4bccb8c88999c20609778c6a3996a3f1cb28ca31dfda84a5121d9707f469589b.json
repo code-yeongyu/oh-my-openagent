@@ -1,0 +1,255 @@
+{
+  "queryId": "q13",
+  "lane": "web",
+  "variant": "v2",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Grok latest release since:2026-08-19 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422530,
+    "completed_at": 1788422530,
+    "id": "11ff0110-cc77-9fc6-81f1-eef046cc5e2d",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_11ff0110-cc77-9fc6-81f1-eef046cc5e2d_call-71bdc8b1-2006-4e2c-b0f8-327640dab44f-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "Grok latest release",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://cryptorank.io/news/feed/db1bc-grok-4-7-release-spacex-data"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/build/changelog"
+            },
+            {
+              "type": "url",
+              "url": "https://tesorb.com/command/xai/"
+            },
+            {
+              "type": "url",
+              "url": "https://x.com/TheAIObserverX/status/2071526396552200366"
+            },
+            {
+              "type": "url",
+              "url": "https://mashable.com/tech/musk-grok-4-5-launch"
+            },
+            {
+              "type": "url",
+              "url": "https://m.economictimes.com/tech/artificial-intelligence/elon-musk-teases-grok-4-6-and-4-7-doubling-down-on-xais-rapid-fire-releases/articleshow/132693365.cms"
+            },
+            {
+              "type": "url",
+              "url": "https://r.jina.ai/https:/x.ai/blog"
+            },
+            {
+              "type": "url",
+              "url": "https://letsdatascience.com/news/topic/grok"
+            },
+            {
+              "type": "url",
+              "url": "https://grok.com/release-notes/mar-03-2026"
+            },
+            {
+              "type": "url",
+              "url": "https://updatealert.io/updates/x-ai"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_11ff0110-cc77-9fc6-81f1-eef046cc5e2d_call-71bdc8b1-2006-4e2c-b0f8-327640dab44f-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**The latest major release from xAI is Grok 4.6**, which launched on August 12, 2026.[[1]](https://r.jina.ai/https:/x.ai/blog)\n\n### Key Details on Grok 4.6\n- It focuses on improvements for long-running agents, coding, knowledge work, interactive and visual tasks, with a 500,000-token context window.[[2]](https://letsdatascience.com/news/topic/grok)\n- Benchmarks: It scores approximately 60.92–61 on the Artificial Analysis Intelligence Index, nearly tying OpenAI’s GPT-5.6 Sol Max (one of the top frontier models at the time).[[3]](https://tesorb.com/command/xai/)\n- Pricing (API): Around $2 per million input tokens and $6 per million output tokens.[[3]](https://tesorb.com/command/xai/)\n- It has been rolled out to various platforms, including GitHub Copilot (August 14), Amazon Bedrock, Microsoft Foundry, Google Gemini Enterprise Agent Platform, and others in the weeks following release.[[4]](https://updatealert.io/updates/x-ai)\n\n### Upcoming: Grok 4.7\nElon Musk announced on September 2, 2026, that **Grok 4.7 is expected in about 10 days** (around September 12, 2026).[[5]](https://cryptorank.io/news/feed/db1bc-grok-4-7-release-spacex-data)\n- It will scale up to 2.1 trillion parameters (from 1.5T in 4.6).\n- Training incorporates unique SpaceX data, with claims it will surpass all current models, especially in real-world engineering.\n- It is described as slightly slower but more token-efficient than 4.6.[[6]](https://m.economictimes.com/tech/artificial-intelligence/elon-musk-teases-grok-4-6-and-4-7-doubling-down-on-xais-rapid-fire-releases/articleshow/132693365.cms)\n\nOther recent updates include Grok Voice 2.0 (August 5), Grok Bot (agent features), image/video generation improvements, and various platform integrations, but the flagship model remains Grok 4.6 until 4.7 arrives.[[3]](https://tesorb.com/command/xai/)\n\nFor the most up-to-date information, check x.ai/blog or Elon Musk’s/X account, as xAI moves quickly.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://r.jina.ai/https:/x.ai/blog",
+                "start_index": 85,
+                "end_index": 126,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://letsdatascience.com/news/topic/grok",
+                "start_index": 300,
+                "end_index": 350,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://tesorb.com/command/xai/",
+                "start_index": 528,
+                "end_index": 566,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://tesorb.com/command/xai/",
+                "start_index": 652,
+                "end_index": 690,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://updatealert.io/updates/x-ai",
+                "start_index": 894,
+                "end_index": 936,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://cryptorank.io/news/feed/db1bc-grok-4-7-release-spacex-data",
+                "start_index": 1078,
+                "end_index": 1151,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://m.economictimes.com/tech/artificial-intelligence/elon-musk-teases-grok-4-6-and-4-7-doubling-down-on-xais-rapid-fire-releases/articleshow/132693365.cms",
+                "start_index": 1419,
+                "end_index": 1584,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://tesorb.com/command/xai/",
+                "start_index": 1799,
+                "end_index": 1837,
+                "title": "3"
+              }
+            ]
+          }
+        ],
+        "id": "msg_11ff0110-cc77-9fc6-81f1-eef046cc5e2d",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 136190500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 136190500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:02:06.800Z"
+}

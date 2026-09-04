@@ -1,0 +1,309 @@
+{
+  "queryId": "q04",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"삼성전자 주가 전망 외국인 기관 since:2026-08-20 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-20",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421738,
+    "completed_at": 1788421738,
+    "id": "b9fb4365-261d-95ea-a54c-1712a9875db5",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_b9fb4365-261d-95ea-a54c-1712a9875db5_call-6d425590-88ed-49a4-965a-8529f61e21bb-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "삼성전자 주가 전망 외국인 기관",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://comp.fnguide.com/SVO2/asp/SVD_Consensus.asp?gicode=A005930"
+            },
+            {
+              "type": "url",
+              "url": "https://biz.newdaily.co.kr/site/data/html/2025/09/23/2025092300167.html"
+            },
+            {
+              "type": "url",
+              "url": "https://news2day.co.kr/article/20251218500238"
+            },
+            {
+              "type": "url",
+              "url": "https://n.news.naver.com/mnews/article/022/0004154601"
+            },
+            {
+              "type": "url",
+              "url": "https://kbthink.com/securities-view.html?docId=20260327125552140K"
+            },
+            {
+              "type": "url",
+              "url": "https://en.fnnews.com/news/202608281614318215"
+            },
+            {
+              "type": "url",
+              "url": "https://simplywall.st/ko/stocks/kr/tech/kose-a005930/samsung-electronics-shares"
+            },
+            {
+              "type": "url",
+              "url": "https://v.daum.net/v/20260219173129133"
+            },
+            {
+              "type": "url",
+              "url": "https://news.nate.com/view/20251124n29767?mid=n0100"
+            },
+            {
+              "type": "url",
+              "url": "https://www.fnnews.com/news/202608281614318215"
+            },
+            {
+              "type": "url",
+              "url": "https://www.businesspost.co.kr/BP?command=article_view&num=422534"
+            },
+            {
+              "type": "url",
+              "url": "https://v.daum.net/v/20260117073128545?f=p"
+            },
+            {
+              "type": "url",
+              "url": "https://www.fnnews.com/news/202604230816309987"
+            },
+            {
+              "type": "url",
+              "url": "https://www.newsis.com/view/NISX20251226_0003456091"
+            },
+            {
+              "type": "url",
+              "url": "https://news.nate.com/view/20260212n09522"
+            },
+            {
+              "type": "url",
+              "url": "https://magazine.hankyung.com/business/article/202509116562b"
+            },
+            {
+              "type": "url",
+              "url": "https://www.thirdanglenews.com/news/articleView.html?idxno=4322"
+            },
+            {
+              "type": "url",
+              "url": "https://www.sisajournal-e.com/news/articleView.html?idxno=420726"
+            },
+            {
+              "type": "url",
+              "url": "https://www.hankyung.com/article/202511043266L"
+            },
+            {
+              "type": "url",
+              "url": "https://kr.tradingview.com/news/hankyung:ab4cbdbba65a7:0/"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_b9fb4365-261d-95ea-a54c-1712a9875db5_call-6d425590-88ed-49a4-965a-8529f61e21bb-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**삼성전자 주가 전망 및 외국인·기관 수급 동향 (2026년 9월 기준 검색 결과 요약)**\n\n삼성전자(A005930)의 주가는 최근 **25만~26만원대**에서 거래되고 있으며(최근 종가 약 250,500~257,000원 수준), AI·메모리 슈퍼사이클 지속 기대감으로 증권가 목표주가는 **30만~56만원**까지 다양하게 제시되고 있습니다. 평균적으로 **상승 여력 20~50%** 수준으로 보는 의견이 많습니다.[[1]](https://simplywall.st/ko/stocks/kr/tech/kose-a005930/samsung-electronics-shares)\n\n### 증권가 컨센서스 및 실적 전망\n- **Fnguide 컨센서스** (2026년 6월 기준): 2026년 매출액 약 696조원, 영업이익 약 360조원, EPS 44,197원, **적정주가 44.56만원** (투자의견 4.04, BUY 중심). 최근 1개월 전 대비 목표주가가 크게 상향(36.48만원 → 44.56만원)됐습니다.[[2]](https://comp.fnguide.com/SVO2/asp/SVD_Consensus.asp?gicode=A005930)\n- 주요 증권사 목표주가 예시 (최근 보고서):\n  - KB증권: **36만원** (AI 추론·에이전트 시대 최대 수혜, 메모리 생산 능력 강조).[[3]](https://kr.tradingview.com/news/hankyung:ab4cbdbba65a7:0/)\n  - 미래에셋증권: **37만원** 유지 (역대급 주주환원에도 매크로 우려로 주가 과민 반응).[[4]](https://n.news.naver.com/mnews/article/022/0004154601)\n  - DS투자증권, 하나증권 등: 48만~53만원대 (2Q26 영업이익 83~91조원 전망).[[2]](https://comp.fnguide.com/SVO2/asp/SVD_Consensus.asp?gicode=A005930)\n  - 중국 화타이증권 (최초 커버리지): **35.6만원**.[[5]](https://www.fnnews.com/news/202604230816309987)\n- 장기 전망: 2026년 영업이익 **100조~220조원** 수준으로 보는 증권사가 늘고 있으며, HBM·DRAM·NAND 가격 상승, AI 데이터센터 투자 확대(빅테크 1,000조원 규모), 공급 부족 구조가 핵심 동력입니다. 일부에서는 2027년까지 메모리 슈퍼사이클 지속을 예상합니다.[[6]](https://kbthink.com/securities-view.html?docId=20260327125552140K)\n\n### 외국인·기관 수급 동향\n- **긍정적 매수세**가 두드러진 시기가 많았습니다. 2025년 9월경 “11만전자” 장밋빛 전망에 외국인·기관이 **6조원** 규모 폭풍 매수(외국인 4조원 이상 순매수)를 보이며 주가를 끌어올렸습니다. 개인(개미)은 차익실현으로 순매도했습니다.[[7]](https://biz.newdaily.co.kr/site/data/html/2025/09/23/2025092300167.html)\n- 2025년 12월: 외국인·기관 **동반 매수** (외국인 약 1,084억원, 기관 3,740억원)로 실적 재평가 베팅.[[8]](https://news2day.co.kr/article/20251218500238)\n- 최근(2026년)에도 외국인 순매수 유턴이나 기관 연속 매수가 주가 상승을 뒷받침하는 경우가 자주 언급됩니다. 다만 AI 버블 우려나 매크로 변수(관세, 지정학 리스크)로 변동성이 크며, 외국인 매도세가 강할 때는 주가가 3~4% 하락하는 모습도 보입니다.[[9]](https://en.fnnews.com/news/202608281614318215)\n\n### 주요 리스크 및 변수\n- **긍정**: HBM 경쟁력 회복, 파운드리 흑자 전환 기대, 대규모 주주환원(현금배당 + 자사주 매입·소각, 총 110조원 규모 가능성).\n- **부정**: AI 투자 고점론, 관세·중국 리스크, 공급 확대에 따른 가격 변동성. 일부 증권사는 목표주가를 하향 조정하기도 했습니다.\n\n**종합 의견**: 증권가 대다수는 **매수(BUY)**를 유지하며, AI 메모리 수요 확대와 실적 서프라이즈를 이유로 추가 상승을 기대하고 있습니다. 다만 단기 변동성이 크기 때문에 최신 뉴스와 실적 발표(분기별)를 확인하는 것이 좋습니다. 투자 판단은 본인 책임이며, 위 내용은 2026년 9월 초 웹 검색 결과를 기반으로 한 요약입니다. 더 구체적인 특정 증권사 리포트가 필요하시면 추가로 말씀해주세요!",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://simplywall.st/ko/stocks/kr/tech/kose-a005930/samsung-electronics-shares",
+                "start_index": 234,
+                "end_index": 320,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://comp.fnguide.com/SVO2/asp/SVD_Consensus.asp?gicode=A005930",
+                "start_index": 508,
+                "end_index": 581,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://kr.tradingview.com/news/hankyung:ab4cbdbba65a7:0/",
+                "start_index": 664,
+                "end_index": 728,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://n.news.naver.com/mnews/article/022/0004154601",
+                "start_index": 783,
+                "end_index": 843,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://comp.fnguide.com/SVO2/asp/SVD_Consensus.asp?gicode=A005930",
+                "start_index": 897,
+                "end_index": 970,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.fnnews.com/news/202604230816309987",
+                "start_index": 1006,
+                "end_index": 1059,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://kbthink.com/securities-view.html?docId=20260327125552140K",
+                "start_index": 1223,
+                "end_index": 1295,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://biz.newdaily.co.kr/site/data/html/2025/09/23/2025092300167.html",
+                "start_index": 1453,
+                "end_index": 1531,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://news2day.co.kr/article/20251218500238",
+                "start_index": 1601,
+                "end_index": 1653,
+                "title": "8"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.fnnews.com/news/202608281614318215",
+                "start_index": 1799,
+                "end_index": 1851,
+                "title": "9"
+              }
+            ]
+          }
+        ],
+        "id": "msg_b9fb4365-261d-95ea-a54c-1712a9875db5",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 244065500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 244065500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:48:58.020Z"
+}

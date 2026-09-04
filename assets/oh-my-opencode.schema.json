@@ -90,7 +90,7 @@
       "type": "boolean"
     },
     "telemetry": {
-      "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry.",
+      "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable.",
       "type": "boolean"
     },
     "model_fallback": {
@@ -9546,50 +9546,6 @@
         "ring_max_lines",
         "line_max_bytes",
         "pattern_max_length"
-      ],
-      "additionalProperties": false
-    },
-    "codegraph": {
-      "type": "object",
-      "properties": {
-        "auto_init": {
-          "default": true,
-          "type": "boolean"
-        },
-        "auto_provision": {
-          "default": true,
-          "type": "boolean"
-        },
-        "daemon": {
-          "default": true,
-          "type": "boolean"
-        },
-        "enabled": {
-          "default": true,
-          "type": "boolean"
-        },
-        "excluded_roots": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "install_dir": {
-          "type": "string"
-        },
-        "telemetry": {
-          "type": "boolean"
-        },
-        "watch_debounce_ms": {
-          "type": "number",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "auto_init",
-        "auto_provision",
-        "daemon",
-        "enabled"
       ],
       "additionalProperties": false
     },

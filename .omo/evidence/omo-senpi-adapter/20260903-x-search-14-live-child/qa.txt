@@ -1,0 +1,3 @@
+Command: SENPI_BIN="$(command -v senpi)" bun packages/omo-senpi/scripts/qa/x-search-live-e2e.mjs --scenario {child,librarian,explore} --prompt "Spawn task for x_search child QA" --out .omo/evidence/omo-senpi-adapter/20260903-x-search-14-live-child
+Purpose: drive one isolated root task per lane, seed only xai OAuth into the sandbox, and prove child/librarian reach x_search while explore is allowlisted away from it.
+Observed: quick and librarian saved transcripts contain x_search results:; explore has zero such headers and reports unavailable. Secrets were scrubbed before persistence.

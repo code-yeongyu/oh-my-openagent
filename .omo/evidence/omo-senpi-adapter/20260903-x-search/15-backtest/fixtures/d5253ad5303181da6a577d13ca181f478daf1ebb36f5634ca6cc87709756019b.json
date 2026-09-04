@@ -1,0 +1,285 @@
+{
+  "queryId": "q15",
+  "lane": "web",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Bun JavaScript runtime news since:2026-08-18 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-18",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "bunjavascript"
+        ]
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788423212,
+    "completed_at": 1788423212,
+    "id": "43815ee5-d192-9477-a6f8-31215729e45b",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_43815ee5-d192-9477-a6f8-31215729e45b_call-a381d870-b9ee-4dc2-874f-4a6b38c636cd-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "Bun JavaScript runtime news",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=i38DgEuaJwM"
+            },
+            {
+              "type": "url",
+              "url": "https://en.wikipedia.org/wiki/Bun_(software)"
+            },
+            {
+              "type": "url",
+              "url": "https://libraries.io/npm/bun"
+            },
+            {
+              "type": "url",
+              "url": "https://r.jina.ai/https:/bun.com/"
+            },
+            {
+              "type": "url",
+              "url": "https://simonwillison.net/tags/bun/"
+            },
+            {
+              "type": "url",
+              "url": "https://appwrite.io/blog/post/announcing-bun-1-4-runtime"
+            },
+            {
+              "type": "url",
+              "url": "https://gihyo.jp/article/2026/08/bun-1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://shipkit.davrapps.dev/en/blog/bun-saas-backend-2026"
+            },
+            {
+              "type": "url",
+              "url": "https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/"
+            },
+            {
+              "type": "url",
+              "url": "https://thenewstack.io/bun-developers-complaints-anthropic/"
+            },
+            {
+              "type": "url",
+              "url": "https://daily.dev/posts/bun-1-4-nz2dmgftt"
+            },
+            {
+              "type": "url",
+              "url": "https://juejin.cn/post/7676105145394200610"
+            },
+            {
+              "type": "url",
+              "url": "https://github.com/oven-sh/bun"
+            },
+            {
+              "type": "url",
+              "url": "https://daily.dev/posts/bun-1-4-finally-ships-the-rust-rewrite-drama-isn-t-over--fdy7op2yl"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_43815ee5-d192-9477-a6f8-31215729e45b_call-a381d870-b9ee-4dc2-874f-4a6b38c636cd-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**Recent news about Bun, the fast all-in-one JavaScript runtime, package manager, test runner, and bundler, centers on its major v1.4 release in August 2026.**[[1]](https://bun.com/blog/bun-v1.4)\n\n### Major Release: Bun v1.4 (August 20, 2026)\n- **Rust Rewrite**: Bun's core was completely rewritten from Zig to Rust (roughly 780,000–1 million lines of code changed). This was done rapidly (in about 11 days) with heavy use of AI tools, specifically around 64 parallel Claude agents from Anthropic, resulting in over 6,000 commits. The goal was to eliminate entire classes of memory bugs at compile time for better long-term stability.[[2]](https://appwrite.io/blog/post/announcing-bun-1-4-runtime)\n- **Performance & Efficiency Gains**:\n  - Reduces idle CPU usage by ~5x.\n  - Lowers memory usage by up to 35–48% (e.g., for HTTP servers like Fastify or Express).\n  - Starts ~50% faster on Linux (hello-world from ~10.9 ms to 5.1 ms) and 2.5x faster on Windows.\n  - Smaller binary size (up to ~20% reduction).[[1]](https://bun.com/blog/bun-v1.4)\n- **Node.js Compatibility**: Passes +1,517 more tests from the Node.js test suite (biggest jump since v1.0). Now reports as Node.js 26-compatible. Many libraries now work better out-of-the-box, including Playwright, Next.js 16, Vitest, OpenTelemetry, Nuxt, and others. Specific modules like `node:http`, `node:fs`, and others reach 97–100% of Node's own tests.[[3]](https://daily.dev/posts/bun-1-4-nz2dmgftt)\n- **New Built-in APIs and Features** (replacing many external packages):\n  - `Bun.Image` (faster image processing than Sharp).\n  - `Bun.WebView` (headless browser automation, no need for Puppeteer/Playwright on some platforms).\n  - `Bun.markdown`, `Bun.cron()`, `Bun.Terminal` (PTY support).\n  - Native `ReadableStream`/`WritableStream`/`TransformStream`, compression streams.\n  - Faster `bun:ffi` (up to ~3–3.8x).\n  - CLI improvements: `bun run --parallel`, `bun test --parallel`, `bun audit fix`, `bun dedupe`, `bun prune`.\n  - Experimental HTTP/2 and HTTP/3 support in `Bun.serve()` and `fetch()`, better directory serving, Range/conditional requests, Windows on ARM64.[[4]](https://www.youtube.com/watch?v=i38DgEuaJwM)\n- **Production Impact**: Already used in Anthropic's Claude Code (shipping to millions). Early adopters like Scrydon and Appwrite reported significant CPU/memory drops (e.g., 50%+ CPU reduction, 60% memory savings in some cases) with no major issues.[[5]](https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/)\n\nThe official release post is at [bun.com/blog/bun-v1.4](https://bun.com/blog/bun-v1.4), and you can upgrade with `bun upgrade`. Canary builds (including early 1.4.0 versions) have been available on npm since early September 2026.[[6]](https://libraries.io/npm/bun)\n\n### Background Context\n- **Acquisition by Anthropic**: In December 2025, Anthropic acquired the Bun project (originally from Oven). It remains fully open-source under the MIT license. The acquisition has accelerated development and integrated Bun into tools like Claude Code and the Claude Agent SDK. Monthly downloads grew to over 20 million post-acquisition.[[7]](https://en.wikipedia.org/wiki/Bun_(software))\n- **Some Developer Concerns**: Earlier in 2026, there were discussions about maturity issues, memory leaks in pre-1.4 versions, a high number of open issues/PRs, and questions around the AI-assisted rewrite's long-term reliability. The v1.4 release and its benchmarks appear to have addressed many of these in practice.[[8]](https://thenewstack.io/bun-developers-complaints-anthropic/)\n\nBun continues to position itself as a faster, more batteries-included alternative to Node.js, with strong momentum in 2026 for both new projects and production use. For the latest, check the official blog, GitHub (oven-sh/bun), or the Bun YouTube channel.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 159,
+                "end_index": 195,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://appwrite.io/blog/post/announcing-bun-1-4-runtime",
+                "start_index": 634,
+                "end_index": 697,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 1006,
+                "end_index": 1042,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://daily.dev/posts/bun-1-4-nz2dmgftt",
+                "start_index": 1403,
+                "end_index": 1451,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.youtube.com/watch?v=i38DgEuaJwM",
+                "start_index": 2124,
+                "end_index": 2174,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/",
+                "start_index": 2425,
+                "end_index": 2491,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://libraries.io/npm/bun",
+                "start_index": 2722,
+                "end_index": 2757,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.wikipedia.org/wiki/Bun_(software)",
+                "start_index": 3119,
+                "end_index": 3170,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://thenewstack.io/bun-developers-complaints-anthropic/",
+                "start_index": 3490,
+                "end_index": 3556,
+                "title": "8"
+              }
+            ]
+          }
+        ],
+        "id": "msg_43815ee5-d192-9477-a6f8-31215729e45b",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 184528000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 184528000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:13:32.945Z"
+}

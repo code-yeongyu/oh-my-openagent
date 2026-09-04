@@ -1,5 +1,7 @@
 # memory component
 
+Memorian is a read-only recall judge; its only act is a nudge. User-visible traces are third-person act records ("Memorian nudged"), distinct from dori's memorian, which also writes memory, and from `memory.nudge`, the every-N-turns write reminder in `nudge-wiring.ts`.
+
 Letta-Code-style persistent agent memory for omo-senpi, backed by `@oh-my-opencode/memory-core` (harness-neutral; zero Senpi imports). Parity target: letta-code@a75f4d93e's local-capable matrix, executed per `.omo/plans/letta-memory-parity-port.md` with the research corpus at `.omo/ulw-research/20260809-224128/`.
 
 ## Attribution

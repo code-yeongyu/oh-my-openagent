@@ -1,0 +1,11 @@
+
+added 18 packages in 17s
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @sisyphuslabs/omo-codex-plugin@5.0.0-beta.33 sync:skills
+> node scripts/sync-skills.mjs
+
+Installed 1 plugin(s) from sisyphuslabs.

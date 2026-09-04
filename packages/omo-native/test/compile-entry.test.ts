@@ -60,6 +60,28 @@ describe("compiled omo entry launcher parity", () => {
     expect(shouldReexecAfterProvisioning("darwin")).toBe(true)
   })
 
+  test("strips Linux procfs deleted suffix but preserves it on other platforms", () => {
+    const deletedPath = "/runtime/omo (deleted)"
+    expect(runningExecutablePath("/runtime/omo", deletedPath, "linux")).toBe("/runtime/omo")
+    // Only Linux procfs produces this exact suffix; other platforms leave it untouched.
+    expect(runningExecutablePath("/runtime/omo", deletedPath, "darwin")).toBe(deletedPath)
+    expect(runningExecutablePath("/runtime/omo", deletedPath, "win32")).toBe(deletedPath)
+  })
+
+  test("recognizes a deleted Linux executable as the provisioned path", () => {
+    const root = temp()
+    const expected = join(root, "omo")
+    writeFileSync(expected, "binary")
+
+    expect(isProvisionedExecutable(runningExecutablePath(expected, `${expected} (deleted)`, "linux"), expected)).toBe(true)
+  })
+
+  test("re-exec source contract uses signal-aware child execution", () => {
+    const source = readFileSync(new URL("../compile-entry.ts", import.meta.url), "utf8")
+    expect(source).toContain('import { propagateResult, runChild } from "./bin/lib/child-process.js"')
+    expect(source).not.toContain("spawn(expected")
+  })
+
   test("pins the engine package dir to the provisioned root", () => {
     // Defence in depth alongside the re-exec: PACKAGE_DIR is consulted by
     // getPackageDir() ahead of dirname(process.execPath), so the engine stays
@@ -240,6 +262,26 @@ describe("embedded runtime provisioning", () => {
 
     expect(readFileSync(destination, "utf8")).toBe("compiled binary")
     expect(existsSync(`${destination}.tmp-${process.pid}`)).toBe(false)
+  })
+
+  test("keeps an existing destination when the deleted Linux source cannot be read", () => {
+    const root = temp()
+    const source = join(root, "missing-source (deleted)")
+    const destination = join(root, "runtime", "omo")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(destination, "already-provisioned")
+
+    expect(() => materializeProvisionedExecutable(source, destination, "linux")).not.toThrow()
+    expect(readFileSync(destination, "utf8")).toBe("already-provisioned")
+  })
+
+  test("still throws when the deleted Linux source and destination are both absent", () => {
+    const root = temp()
+    const source = join(root, "missing-source (deleted)")
+    const destination = join(root, "runtime", "omo")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+
+    expect(() => materializeProvisionedExecutable(source, destination, "linux")).toThrow()
   })
 
   test("selects the omo manifest when senpi also embeds an unrelated manifest", async () => {

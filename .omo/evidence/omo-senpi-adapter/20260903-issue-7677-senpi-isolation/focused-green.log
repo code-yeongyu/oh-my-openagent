@@ -1,0 +1,54 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/isolation-state-races.test.mjs:
+(pass) #given a same-size in-place overwrite after an observation read #when metadata is verified #then the snapshot fails closed [1.49ms]
+(pass) #given a same-size in-place overwrite after a protected read #when metadata is verified #then the snapshot fails closed [0.61ms]
+(pass) #given an existence probe would hide inaccessible protected state #when opened directly #then EACCES fails closed [0.27ms]
+(pass) #given only volatile settings stamps change #when bounded complete-tree snapshots are compared #then settings stay unchanged [0.49ms]
+(pass) #given an enumerated entry vanishes before stat #when the bounded complete-tree snapshot runs #then the transient entry is tolerated [0.46ms]
+(pass) #given replacement between initial stat and open #when snapshotted #then public paths preserve FILE_REPLACED [0.62ms]
+(pass) #given success or primary failure plus close failure #when reading #then primary-operation precedence is stable [0.59ms]
+(pass) #given ENOENT stat then open success and close failure #when absence races #then FILE_REPLACED remains primary [0.28ms]
+(pass) #given transient or primary complete-tree read errors #when digesting #then only ENOENT and ENOTDIR are tolerated [0.60ms]
+
+packages/omo-senpi/scripts/qa/isolation-state.test.mjs:
+(pass) #given protected and volatile files #when snapshots are compared #then only protected path changes affect isolation [0.44ms]
+(pass) #given nested files within the observation bounds #when scanned #then the full-tree observation is complete [0.77ms]
+(pass) #given a tree beyond the file bound #when observed #then truncation is explicit and never complete [0.30ms]
+(pass) #given identical protected read failures #when snapshots are compared #then isolation fails closed with structured relative errors [0.43ms]
+(pass) #given files exceed the byte budget #when observed #then descriptor reads never exceed maxBytes [0.31ms]
+(pass) #given a file shrinks after traversal #when observed #then short read is explicit and incomplete [0.31ms]
+(pass) #given a file grows while hashing #when observed #then growth is explicit and incomplete [0.33ms]
+(pass) #given a path is replaced after open #when observed #then replacement is explicit and incomplete [0.37ms]
+(pass) #given one file exceeds the byte budget #when observed #then truncation occurs without reading or BYTE_LIMIT errors [0.28ms]
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:
+(pass) task 13 senpi QA scripts > #given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup [0.14ms]
+(pass) task 13 senpi QA scripts > #given drive.mjs self-test #when executed #then sandbox helpers validate successfully [40.41ms]
+(pass) task 13 senpi QA scripts > #given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched [0.70ms]
+(pass) task 13 senpi QA scripts > #given probe-continuation self-test #when executed #then continuation helpers validate successfully [41.51ms]
+(pass) task 13 senpi QA scripts > #given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape [0.24ms]
+(pass) task 13 senpi QA scripts > #given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi [0.13ms]
+(pass) task 13 senpi QA scripts > #given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory [0.10ms]
+(pass) task 13 senpi QA scripts > #given mock provider self-test #when executed #then text and tool-call script steps validate [13.67ms]
+(pass) task 13 senpi QA scripts > #given a scripted tool call #when converted to an assistant message #then it stops with toolUse [0.13ms]
+(pass) task 13 senpi QA scripts > #given terminal stream events #when result is awaited #then done and error events settle the promise [0.37ms]
+(pass) task 13 senpi QA scripts > #given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result [0.59ms]
+(pass) task 13 senpi QA scripts > #given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox [37.23ms]
+(pass) task 13 senpi QA scripts > #given an isolated child home #when cross-platform variables are built #then HOME and USERPROFILE match [0.11ms]
+
+packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:
+(pass) #given direct, protected-observed, persistent-observed, and volatile changes #when the canonical verdict is built #then only volatile paths are excluded from the sorted union [0.56ms]
+(pass) #given only explicitly volatile observed writes #when the canonical verdict is built #then the protected home remains untouched [0.19ms]
+(pass) #given a protected change or incomplete protected snapshot #when the canonical verdict is built #then untouched fails closed [0.19ms]
+(pass) #given POSIX and Windows-shaped observed paths #when changes are classified #then volatile prefixes are canonical on both platforms [0.17ms]
+(pass) #given credential files are absent or inaccessible #when credentialDigest reads directly #then only ENOENT is treated as absent [1.01ms]
+(pass) #given bounded observation root enumeration fails #when snapshotDirectory runs #then inaccessible IO is structured and incomplete while absence is empty-complete [6.67ms]
+(pass) #given digest enumeration and reads fail through injected seams #when digestDirectory runs #then transient absence is tolerated and inaccessible IO propagates [0.35ms]
+(pass) #given pre-open metadata changed and current-path diagnostic stat fails #when public readers report the race #then the established replacement error wins [1.49ms]
+(pass) #given a primary read error and failing shrink diagnostic #when an observed file is hashed #then the primary read error is preserved [0.32ms]
+
+ 40 pass
+ 0 fail
+ 163 expect() calls
+Ran 40 tests across 4 files. [1161.00ms]

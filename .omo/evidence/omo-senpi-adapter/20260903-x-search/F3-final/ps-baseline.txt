@@ -1,0 +1,47 @@
+# ps baseline - scoped to this QA driver's sandboxes (omo-senpi-qa-*) and driver process
+2026-09-03T10:12:12Z
+## matching processes:
+(none)
+## leftover sandbox dirs in TMPDIR:
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-01UH5R
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-21gUSc
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-30dszk
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-4N399g
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-Ad7laB
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-axQuyI
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-Bdxs9q
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-CPAZvg
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-dEpGkn
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-DrIsyZ
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-dtYwHH
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-e9hzVm
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-EVAFsE
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-eYn93E
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-fyYpkO
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-gHEaMR
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-Gj3Kgx
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-hbezRe
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-kxpuZC
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-miYOd1
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-OuV6K6
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-pn21Oj
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-PvZd1x
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-PwdV58
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-pxAEyA
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-quABrj
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-Radwim
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-s3iIis
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-s8xtJm
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-srz9B2
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-sVpSlF
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-TcnVpt
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-TjkEOr
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-VTJvfu
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-Vwh2v5
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-VWJhF9
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-wDP5t1
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-yl2YuA
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-YpIOUf
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-senpi-qa-Z8amFe
+
+## host-wide senpi processes unrelated to this run (pre-existing, other worktrees): 104

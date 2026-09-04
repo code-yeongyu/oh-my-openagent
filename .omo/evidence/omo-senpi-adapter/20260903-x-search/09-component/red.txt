@@ -1,0 +1,23 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/index.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './index' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/index.test.ts'
+-------------------------------
+
+
+packages/omo-senpi/src/components/x-search/tool.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './tool' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/tool.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 2 fail
+ 2 errors
+Ran 2 tests across 2 files. [546.00ms]
+EXIT:1

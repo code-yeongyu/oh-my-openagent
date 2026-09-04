@@ -14,6 +14,7 @@ import {
   type EmbeddedFile,
   type EmbeddedManifest,
 } from "./compile-runtime"
+import { propagateResult, runChild } from "./bin/lib/child-process.js"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { nearestNodeBin, readJson } from "./bin/lib/package-paths.js"
@@ -201,8 +202,8 @@ async function main(): Promise<void> {
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
   if (needsProvisioning) {
     if (shouldReexecAfterProvisioning()) {
-      const child = spawn(expected, process.argv.slice(2), { env: process.env, stdio: "inherit" })
-      await new Promise<void>((resolvePromise) => child.on("close", (code) => { process.exitCode = code ?? 1; resolvePromise() }))
+      const result = await runChild(expected, process.argv.slice(2), { env: process.env })
+      propagateResult(result)
       return
     }
     execDir = dirname(expected)

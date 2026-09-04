@@ -109,7 +109,7 @@ describe("runSenpiStartupMigration", () => {
     // given
     const fileSystem = memoryFileSystem()
     fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
-    fileSystem.files.set("/home/alice/.omo/config.jsonc", '{"codegraph":{"daemon":false}}')
+    fileSystem.files.set("/home/alice/.omo/config.jsonc", '{"[opencode]":{"disabled_hooks":["startup-toast"]}}')
 
     // when
     const result = withProcessPlatform("win32", () => runSenpiStartupMigration(migrationOptions(fileSystem)))
@@ -123,7 +123,7 @@ describe("runSenpiStartupMigration", () => {
         "2026-07-codex-config-jsonc",
         "2026-08-reasoning-unification",
       ],
-      codegraph: { daemon: false },
+      "[opencode]": { disabled_hooks: ["startup-toast"] },
     })
   })
 

@@ -1,0 +1,258 @@
+{
+  "queryId": "q09",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"xAI Grok CLI since:2026-08-30 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-30",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421426,
+    "completed_at": 1788421426,
+    "id": "09a857a8-767d-9fc1-82c9-d3f130d9d6ac",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_09a857a8-767d-9fc1-82c9-d3f130d9d6ac_call-438a7b96-0258-44d9-9cf2-b436d7d38fee-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "xAI Grok CLI",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://x.ai/news/grok-build-cli"
+            },
+            {
+              "type": "url",
+              "url": "https://www.npmjs.com/package/@xai-official/grok"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/docs/build/cli/reference"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/docs/build/overview"
+            },
+            {
+              "type": "url",
+              "url": "https://grok.com/share/c2hhcmQtNA_f2e30f9c-d5af-4a08-b2a1-d36c7a392b59"
+            },
+            {
+              "type": "url",
+              "url": "https://raw.githubusercontent.com/xai-org/grok-build/main/crates/codegen/xai-grok-shell/README.md"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/cli"
+            },
+            {
+              "type": "url",
+              "url": "https://7minai.com/how-to-use-grok-build/"
+            },
+            {
+              "type": "url",
+              "url": "https://github.com/xai-org/grok-build/blob/main/README.md"
+            },
+            {
+              "type": "url",
+              "url": "https://cdn.jsdelivr.net/gh/xai-org/grok-build@main/README.md"
+            },
+            {
+              "type": "url",
+              "url": "https://grok.com/share/c2hhcmQtNA_58def094-cee5-4035-bc11-5f812e8bd7f4"
+            },
+            {
+              "type": "url",
+              "url": "https://continuumcode.ai/guides/grok-cli/"
+            },
+            {
+              "type": "url",
+              "url": "https://cdn.jsdelivr.net/gh/xai-org/grok-build@main/crates/codegen/xai-grok-pager/docs/user-guide/01-getting-started.md"
+            },
+            {
+              "type": "url",
+              "url": "https://www.npmjs.com/package/@xai-official/grok?activeTab=versions"
+            },
+            {
+              "type": "url",
+              "url": "https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/01-getting-started.md"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_09a857a8-767d-9fc1-82c9-d3f130d9d6ac_call-438a7b96-0258-44d9-9cf2-b436d7d38fee-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**xAI Grok CLI** (officially called **Grok Build**) is a powerful terminal-based AI coding agent from xAI (also referred to as SpaceXAI in some docs). It runs as a full-screen interactive TUI (with mouse support), supports headless mode for scripts/CI, and can be embedded in editors or apps via the Agent Client Protocol (ACP).[[1]](https://x.ai/news/grok-build-cli)\n\nIt is designed for complex software engineering tasks: it understands codebases, proposes plans (with review/approval), uses subagents in parallel, performs multi-file edits, runs shell commands/tests, searches the web, manages git, persists memory across sessions, and integrates with custom workflows via AGENTS.md, skills, plugins, hooks, and MCP servers (for tools like Linear or Sentry).[[2]](https://x.ai/cli)\n\nIt is powered by advanced Grok models (such as Grok 4.5) and is available to **SuperGrok** and **X Premium Plus** subscribers (with API key options for headless use). The project has been open-sourced under Apache 2.0, with the Rust source available on GitHub at xai-org/grok-build.[[3]](https://7minai.com/how-to-use-grok-build/)\n\n### Installation\nThe official one-command installer works on macOS (Apple Silicon), Linux, and Windows (x86_64). It places binaries in `~/.grok/bin/` (or equivalent) and sets up completions.\n\n- **macOS / Linux / WSL / Git Bash**:\n  ```\n  curl -fsSL https://x.ai/cli/install.sh | bash\n  ```\n\n- **Windows (PowerShell)**:\n  ```\n  irm https://x.ai/cli/install.ps1 | iex\n  ```\n\nVerify with `grok --version`. Update anytime with `grok update`. An npm package (`@xai-official/grok`) is also available for global install via `npm i -g @xai-official/grok`, though the curl/PowerShell method is recommended.[[4]](https://www.npmjs.com/package/@xai-official/grok)\n\nAfter installation, the first run opens a browser for authentication (or use `export XAI_API_KEY=\"xai-...\"` for headless/CI).\n\n### Basic Usage\n- **Interactive TUI** (recommended for most work): `grok` (run inside a project directory).\n- **Headless / single task** (for scripts): `grok -p \"Explain this codebase\"` or with structured output.\n- Other common commands: `grok login`, `grok models`, `grok inspect`, `grok mcp ...`, `grok plugin ...`, `grok update`.[[5]](https://x.ai/docs/build/cli/reference)\n\nRun `grok --help` or `grok <subcommand> --help` for full options. Flags include `--model`, `--worktree`, `--resume`, headless output formats, and more.\n\n### Documentation and Resources\n- Official page: https://x.ai/cli\n- Getting started & overview: https://x.ai/docs/build/overview\n- Full CLI reference: https://x.ai/docs/build/cli/reference\n- GitHub (source): https://github.com/xai-org/grok-build\n- Detailed user guide is included in the installed package or the repo's docs.\n\nIt is frequently compared to tools like Claude Code or other terminal agents, with strong emphasis on planning, parallel subagents, safety (plan review), and extensibility. As of mid-to-late 2026, it is out of early beta and actively updated.[[6]](https://continuumcode.ai/guides/grok-cli/)\n\nFor the latest details, visit the links above or run the installer and explore with `/feedback` inside the TUI.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.ai/news/grok-build-cli",
+                "start_index": 328,
+                "end_index": 367,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.ai/cli",
+                "start_index": 761,
+                "end_index": 784,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://7minai.com/how-to-use-grok-build/",
+                "start_index": 1068,
+                "end_index": 1116,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.npmjs.com/package/@xai-official/grok",
+                "start_index": 1715,
+                "end_index": 1770,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.ai/docs/build/cli/reference",
+                "start_index": 2231,
+                "end_index": 2275,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://continuumcode.ai/guides/grok-cli/",
+                "start_index": 2998,
+                "end_index": 3046,
+                "title": "6"
+              }
+            ]
+          }
+        ],
+        "id": "msg_09a857a8-767d-9fc1-82c9-d3f130d9d6ac",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 174490500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 174490500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:43:46.219Z"
+}

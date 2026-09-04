@@ -1,0 +1,24 @@
+$ bun test script/senpi-hooks-state.test.ts script/senpi-hooks-state-errors.test.ts
+bun test v1.3.14 (0d9b296a)
+
+ 12 pass
+ 0 fail
+ 20 expect() calls
+Ran 12 tests across 2 files. [762.00ms]
+
+Command exited with code 0.
+
+$ bun run typecheck:script
+$ tsgo --noEmit -p script/tsconfig.json
+
+Command exited with code 0.
+
+$ bun run /Users/sungsoopark/.config/opencode/node_modules/oh-my-openagent/packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts script/senpi-hooks-state.test.ts
+No violations in 1 file(s).
+
+Command exited with code 0.
+
+$ awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' script/senpi-hooks-state.test.ts | wc -l
+234
+
+The changed test file is in the programming skill's 200-250 warning band and remains below its 250 pure-line defect threshold.

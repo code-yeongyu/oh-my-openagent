@@ -1,0 +1,4 @@
+Verified source head: c42f893c953df103a38c42820568ccde34fcc215
+Fetched origin/dev: 65c55dc6b470e0b21f60ff3c16c8e9594d575cd8
+origin/dev was already an ancestor, so no merge was required.
+All receipts in this directory were generated fresh from this source tree before the evidence-only follow-up commit.

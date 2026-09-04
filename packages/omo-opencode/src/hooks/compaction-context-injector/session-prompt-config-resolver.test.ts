@@ -14,7 +14,11 @@ type SessionMessage = {
     model?: {
       providerID?: string
       modelID?: string
+      variant?: string
     }
+    providerID?: string
+    modelID?: string
+    variant?: string
     tools?: Record<string, boolean | "allow" | "deny" | "ask">
   }
 }
@@ -68,6 +72,31 @@ describe("session prompt config resolver", () => {
     expect(promptConfig).toEqual({
       agent: "atlas",
       model: { providerID: "openai", modelID: "gpt-5" },
+      tools: { bash: true },
+    })
+  })
+
+  it("captures a flat model variant into the checkpoint model", async () => {
+    // given: OpenCode assistant messages carry providerID/modelID/variant flat, not nested
+    const ctx = createMockContext([
+      {
+        info: {
+          agent: "sisyphus",
+          providerID: "openai",
+          modelID: "gpt-5",
+          variant: "max",
+          tools: { bash: true },
+        },
+      },
+    ])
+
+    // when
+    const promptConfig = await resolveSessionPromptConfig(ctx, sessionID)
+
+    // then
+    expect(promptConfig).toEqual({
+      agent: "sisyphus",
+      model: { providerID: "openai", modelID: "gpt-5", variant: "max" },
       tools: { bash: true },
     })
   })

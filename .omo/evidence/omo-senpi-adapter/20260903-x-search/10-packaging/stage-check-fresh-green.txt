@@ -1,0 +1,12 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs:
+(pass) x-search conditional skill staging > #given no staged copy #when --check runs #then it skips with a notice for a fresh checkout [3.12ms]
+(pass) x-search conditional skill staging > #given a staged copy #when --check runs #then it passes and the bytes match the source [2.48ms]
+(pass) x-search conditional skill staging > #given a stale staged copy #when --check runs #then it fails as stale [4.64ms]
+(pass) x-search conditional skill staging > #given a missing source skill #when staged #then it fails loudly instead of writing a partial copy [0.82ms]
+
+ 4 pass
+ 0 fail
+Ran 4 tests across 1 file. [627.00ms]
+exit=0

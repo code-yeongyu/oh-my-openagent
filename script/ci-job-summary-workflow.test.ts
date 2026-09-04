@@ -56,6 +56,8 @@ const workflowExpectations = [
   { path: ".github/workflows/stats.yml", jobs: ["stats"] },
   { path: ".github/workflows/web-ci.yml", jobs: ["format-lint-typecheck-build"] },
   { path: ".github/workflows/web-deploy.yml", jobs: ["deploy"] },
+  { path: ".github/workflows/windows-flake-soak.yml", jobs: ["soak"] },
+  { path: ".github/workflows/npm-dist-tag-rollback.yml", jobs: ["retag"] },
 ] as const satisfies readonly WorkflowExpectation[]
 
 function discoverWorkflowPaths(): readonly string[] {

@@ -362,33 +362,36 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(signals).toHaveLength(0)
   })
 
-  test(" w2reattach #given a completed resident daemon with a dead pid #when reconciled #then its process returns while the record stays terminal", async () => {
+  test(" w2reattach #given a completed resident daemon with a dead pid #when reconciled #then it detaches without respawn and preserves its result", async () => {
     // given
-    const { store, manager, lifecycle } = createHarness({ taskId: "st_00000007", status: "completed" })
+    const { store, respawnRunner, lifecycle } = createHarness({ taskId: "st_00000007", status: "completed" })
+    store.mutate("st_00000007", (record) => ({ ...record, final_response: "finished" }))
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
 
     // then
-    expect(result.outcomes[0]?.kind).toBe("resumed")
+    expect(result.outcomes[0]).toEqual({ task_id: "st_00000007", kind: "resumed", reason: "terminal resident detached" })
+    expect(respawnRunner.startedSpecs).toHaveLength(0)
     expect(store.load("st_00000007")?.status).toBe("completed")
+    expect(store.load("st_00000007")?.residency_state).toBe("rpc_detached")
+    expect(store.load("st_00000007")?.final_response).toBe("finished")
     expect(store.load("st_00000007")?.notification.run_epoch).toBe(0)
-    expect(manager.getResidentHandle("st_00000007")?.pid).toBe(1001)
   })
 
-  test(" w2reattach #given a completed resident daemon with a live foreign pid #when reconciled #then it is terminated before reattach", async () => {
+  test(" w2reattach #given a completed resident daemon with a live foreign pid #when reconciled #then it is terminated and detached without reattach", async () => {
     // given
-    const { store, manager, signals, lifecycle } = createHarness({ taskId: "st_0000000a", status: "completed", alive: true })
+    const { store, respawnRunner, signals, lifecycle } = createHarness({ taskId: "st_0000000a", status: "completed", alive: true })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
 
     // then
     expect(signals).toEqual([{ pid: 900, signal: "SIGTERM" }])
-    expect(result.outcomes[0]?.kind).toBe("resumed")
+    expect(respawnRunner.startedSpecs).toHaveLength(0)
+    expect(result.outcomes[0]).toEqual({ task_id: "st_0000000a", kind: "resumed", reason: "terminal resident detached" })
     expect(store.load("st_0000000a")?.status).toBe("completed")
-    expect(store.load("st_0000000a")?.residency_state).toBe("resident")
-    expect(manager.getResidentHandle("st_0000000a")?.pid).toBe(1001)
+    expect(store.load("st_0000000a")?.residency_state).toBe("rpc_detached")
   })
 
   test(" w2reattach #given overlapping reconcile sweeps #when ownership claims race #then exactly one child respawns and the loser defers", async () => {

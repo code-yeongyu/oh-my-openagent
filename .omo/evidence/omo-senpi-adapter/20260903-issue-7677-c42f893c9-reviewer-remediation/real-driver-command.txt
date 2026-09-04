@@ -1,0 +1,5 @@
+Command: SENPI_BIN="$(command -v senpi)" SENPI_CODING_AGENT_DIR=/tmp/issue-7677-ignored-agent node packages/omo-senpi/scripts/qa/drive.mjs
+Source head: c42f893c953df103a38c42820568ccde34fcc215
+JSON parse: PASS
+Operational result: PASS
+isolationCertified: false (fail-closed observation remained distinct from operational PASS)

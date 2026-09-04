@@ -230,7 +230,7 @@ describe("omo-senpi ulw-loop continuation", () => {
           calls.push({ bin, args, cwd: options.cwd })
           return { code: 0, stdout: outputs.shift() ?? activeStatus() }
         },
-        planDirExists: () => true,
+        planExists: () => true,
         footerStatus: {
           isGoalActive: () => true,
           timers: {

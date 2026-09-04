@@ -1,0 +1,213 @@
+{
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-29",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788418706,
+    "completed_at": 1788418706,
+    "id": "ccd64cd5-176b-9213-a6a1-50911e5feaa8",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-132440ee-d8a2-48fb-a625-c40f3bdf26bb-0",
+        "input": "{\"query\":\"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_ccd64cd5-176b-9213-a6a1-50911e5feaa8_call-132440ee-d8a2-48fb-a625-c40f3bdf26bb-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_ccd64cd5-176b-9213-a6a1-50911e5feaa8_call-132440ee-d8a2-48fb-a625-c40f3bdf26bb-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/PeterLeejoa/status/2095051682317275196 - 코스피 외국인 -1.9조 순매도, 개인 2.3조 순매수하며 지수 -3.99% 마감 (@PeterLeejoa, 2026-09-02)\nhttps://x.com/superrichj/status/2095043325741207962 - 코스피 외국인 -19094억 순매도, 개인 +23024억, 기관 -20433억 (@superrichj, 2026-09-02)\nhttps://x.com/Special_Ledger/status/2095040134546919487 - 코스피 외국인·기관 4조 순매도, 개인 2조 순매수에도 대형주 급락 (@Special_Ledger, 2026-09-02)\nhttps://x.com/young8e2/status/2094942106716717209 - 코스피 7060선 및 외국인 수급 관찰, 7000선 돌파 후 순매수 기조 지속 여부 (@young8e2, 2026-09-02)\nhttps://x.com/kkaoppa9671/status/2094800470460248348 - 코스피 외국인 누적 순매도 169조, 지분율은 상승 (@kkaoppa9671, 2026-09-01)\nhttps://x.com/Archive869/status/2094719619844227144 - 9/1 코스피 외국인 순매도, 기타법인 매수로 지수 +0.23% (@Archive869, 2026-09-01)\nhttps://x.com/korea_growth/status/2094704180984500565 - 8월 코스피 개인 순매수 3조 수준, 외국인 1.8조 순매도 (@korea_growth, 2026-09-01)\nhttps://x.com/gptkims11/status/2094656971903533305 - 외국인 코스피 올해 169조 순매도, 상승 동력 우려 (@gptkims11, 2026-09-01)\nhttps://x.com/gptkims11/status/2095094704589422989 - 2026년 8월 개인 자금 순유출, 외국인 7월까지 200조 순매도 (@gptkims11, 2026-09-02)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094942106716717209",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094942106716717209"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094800470460248348",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094800470460248348"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095040134546919487",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095040134546919487"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095043325741207962",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095043325741207962"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094704180984500565",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094704180984500565"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094719619844227144",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094719619844227144"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094656971903533305",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094656971903533305"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095051682317275196",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095051682317275196"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095094704589422989",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095094704589422989"
+              }
+            ]
+          }
+        ],
+        "id": "msg_ccd64cd5-176b-9213-a6a1-50911e5feaa8",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-29",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 90004000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 90004000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T06:58:26.798Z"
+}

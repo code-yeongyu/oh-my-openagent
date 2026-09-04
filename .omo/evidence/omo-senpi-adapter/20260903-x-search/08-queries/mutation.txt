@@ -1,0 +1,35 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest-queries.test.mjs:
+2 | import { validateQuerySet } from "./x-search-backtest-core.mjs";
+3 | import querySet from "./fixtures/x-search-backtest/queries.v1.json";
+4 | 
+5 | describe("x-search backtest query set v1", () => {
+6 |   test("ships a valid 20-query set with calibration and holdout splits", () => {
+7 |     expect(validateQuerySet(querySet)).toBe(true);
+                                           ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-backtest-queries.test.mjs:7:40)
+(fail) x-search backtest query set v1 > ships a valid 20-query set with calibration and holdout splits [1.06ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [612.00ms]
+
+mutation_exit=1 (expected failure)
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest-queries.test.mjs:
+(pass) x-search backtest query set v1 > ships a valid 20-query set with calibration and holdout splits [0.36ms]
+
+ 1 pass
+ 0 fail
+ 10 expect() calls
+Ran 1 test across 1 file. [485.00ms]
+
+restore_exit=0

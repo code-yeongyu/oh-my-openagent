@@ -1485,7 +1485,7 @@ const opencode = {
   permission: permissions,
 };
 const omo = {
-  disabled_mcps: ["websearch", "context7", "grep_app", "codegraph"],
+  disabled_mcps: ["websearch", "context7", "grep_app"],
   disabled_hooks: ["auto-update-checker"],
 };
 writeFileSync(opencodePath, `${JSON.stringify(opencode, null, 2)}\n`);

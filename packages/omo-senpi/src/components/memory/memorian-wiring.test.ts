@@ -56,8 +56,9 @@ function gate(input: {
   readonly identity?: MemoryIdentityContext
   readonly launch?: MemorianGatePort["launch"]
   readonly logs?: Array<{ message: string, details?: unknown }>
+  readonly entries?: Array<{ customType: string; data: unknown }>
 }) {
-  return createMemorianGateWiring({
+  const wiring = createMemorianGateWiring({
     snapshotSession: () => ({ id: SESSION_ID, entries: [] }),
     collectCandidatesFromSnapshot: input.collect,
     resolveContext: (sessionId) => (sessionId === SESSION_ID ? input.identity : undefined),
@@ -77,6 +78,8 @@ function gate(input: {
           },
         }),
   })
+  if (input.entries !== undefined) wiring.attachEntrySink((customType, data) => input.entries?.push({ customType, data }))
+  return wiring
 }
 
 describe("createMemorianGateWiring onSettled", () => {
@@ -148,6 +151,29 @@ describe("createMemorianGateWiring onSettled", () => {
     const launch = launches[0]
     expect(launch?.compactionEpoch).toBe(0)
     expect(launch?.currentCompactionEpoch?.()).toBe(0)
+  })
+
+  test("#given repeated skipped outcomes with one cause #when turns settle #then one gate entry is appended for the session", async () => {
+    const identity = await context()
+    const entries: Array<{ customType: string; data: unknown }> = []
+    const wiring = gate({
+      collect: async () => collected(identity),
+      launches: [],
+      entries,
+      launch: async () => ({ status: "skipped", cause: "quick_category_unavailable", candidateCount: 1 }),
+    })
+
+    wiring.onSettled({})
+    await wiring.whenIdle()
+    wiring.onSettled({})
+    await wiring.whenIdle()
+    wiring.onSettled({})
+    await wiring.whenIdle()
+
+    expect(entries).toEqual([{
+      customType: "omo-memorian:gate",
+      data: { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 1 },
+    }])
   })
 
   test("#given no collected candidates #when a turn settles #then no gate child launches", async () => {

@@ -59,7 +59,7 @@
     "typebox": "1.3.18"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.8.31",
+    "@code-yeongyu/senpi": "2026.9.3-3",
     "@earendil-works/pi-tui": "0.84.2",
     "typebox": "*"
   },
@@ -75,7 +75,7 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.8.31",
+    "@code-yeongyu/senpi": "2026.9.3-3",
     "@earendil-works/pi-tui": "0.84.2",
     "typebox": "1.3.18"
   },

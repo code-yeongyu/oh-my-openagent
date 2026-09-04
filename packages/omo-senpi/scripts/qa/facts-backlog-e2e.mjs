@@ -112,7 +112,7 @@ async function main() {
   const senpiBin = process.env.SENPI_BIN ?? findOnPath("senpi")
   if (senpiBin === null) throw new Error("senpi binary not found (set SENPI_BIN)")
   // Scoped isolation proof (memory-e2e.mjs philosophy): a busy host rewrites unrelated ~/.omo
-  // paths (codegraph stamps, backups, concurrent sessions' memory repos) throughout any run, so
+  // paths (backups, concurrent sessions' memory repos) throughout any run, so
   // whole-home equality is unattainable. What the facts pipeline could ever touch is the
   // credential/settings surface and the memory root - those must stay byte-identical, and the
   // driver's own identity must never appear under the real home.

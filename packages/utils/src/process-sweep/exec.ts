@@ -8,11 +8,6 @@ export interface ProcessKiller {
   readonly terminate: (pid: number) => Promise<void>
 }
 
-/** Backward-compatible aliases: the codegraph family was the first consumer. */
-export type CodegraphProcessKiller = ProcessKiller
-export const enumerateCodegraphProcesses = enumerateProcesses
-export const createDefaultCodegraphProcessKiller = createDefaultProcessKiller
-
 export function enumerateProcesses(platform: NodeJS.Platform = process.platform): Promise<ProcessInfo[]> {
   return platform === "win32" ? enumerateWindowsProcesses() : enumeratePosixProcesses()
 }
