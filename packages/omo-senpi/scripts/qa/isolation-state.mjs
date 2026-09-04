@@ -305,13 +305,16 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 	let directoryFd;
 	let directory;
 	try {
-		if (
-			constants.O_DIRECTORY === undefined ||
-			constants.O_NOFOLLOW === undefined
-		)
-			throw Object.assign(new Error("DIRECTORY_IDENTITY_UNAVAILABLE"), {
-				code: "DIRECTORY_IDENTITY_UNAVAILABLE",
-			});
+		if (process.platform === "win32") {
+			directory = io.opendirSync(boundRoot);
+		} else {
+			if (
+				constants.O_DIRECTORY === undefined ||
+				constants.O_NOFOLLOW === undefined
+			)
+				throw Object.assign(new Error("DIRECTORY_IDENTITY_UNAVAILABLE"), {
+					code: "DIRECTORY_IDENTITY_UNAVAILABLE",
+				});
 		directoryFd = (io.openDirectorySync ?? FILE_IO.openSync)(
 			boundRoot,
 			constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
@@ -332,7 +335,8 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 		// The descriptor still anchors identity checks, but some platforms do not
 		// expose a directory path for an open fd. Traverse the original path there
 		// and re-check its identity before and after traversal.
-		directory = io.opendirSync(descriptorRoot ?? boundRoot);
+			directory = io.opendirSync(descriptorRoot ?? boundRoot);
+		}
 		assertDirectoryPathIdentity(currentRoot, beforeMetadata, io);
 	} catch (error) {
 		state.errors.push({
@@ -348,7 +352,8 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 	const errorsBeforeTraversal = state.errors.length;
 	let traversalFailed = false;
 	try {
-		const descriptorRoot = directoryDescriptorPath(directoryFd);
+		const descriptorRoot =
+			directoryFd === undefined ? null : directoryDescriptorPath(directoryFd);
 		const traversalRoot = descriptorRoot ?? boundRoot;
 		state.snapshot.set(currentRel, "directory");
 		const entries = [];
@@ -433,18 +438,19 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 			}
 			state.snapshot.set(rel, result.digest);
 		}
-		const finished = (io.fstatDirectorySync ?? FILE_IO.fstatSync)(directoryFd, {
-			bigint: true,
-		});
-		const finishedMetadata = fileMetadata(finished);
+		const finishedMetadata =
+			directoryFd === undefined
+				? fileMetadata(io.lstatSync(currentRoot, { bigint: true }))
+				: fileMetadata(
+						(io.fstatDirectorySync ?? FILE_IO.fstatSync)(directoryFd, {
+							bigint: true,
+						}),
+					);
 		if (
-			!finished.isDirectory() ||
-			beforeMetadata.dev !== finishedMetadata.dev ||
-			beforeMetadata.ino !== finishedMetadata.ino
-		)
-			throw Object.assign(new Error("FILE_REPLACED"), {
-				code: "FILE_REPLACED",
-			});
+				finishedMetadata.dev !== beforeMetadata.dev ||
+				finishedMetadata.ino !== beforeMetadata.ino
+			)
+			throw Object.assign(new Error("FILE_REPLACED"), { code: "FILE_REPLACED" });
 		assertDirectoryPathIdentity(currentRoot, beforeMetadata, io);
 		if (
 			state.errors.length === errorsBeforeTraversal &&

@@ -13,10 +13,11 @@ import {
 } from "node:fs";
 
 const HASH_CHUNK_BYTES = 64 * 1024;
+// Windows does not expose O_NOFOLLOW. Opening after an lstat and checking the
+// opened handle's identity still rejects a link (or replacement).
 const NO_FOLLOW_READ_FLAGS =
-	constants.O_NOFOLLOW === undefined
-		? undefined
-		: constants.O_RDONLY | constants.O_NOFOLLOW;
+	constants.O_RDONLY |
+	(constants.O_NOFOLLOW === undefined ? 0 : constants.O_NOFOLLOW);
 
 export const FILE_IO = {
 	closeSync,
