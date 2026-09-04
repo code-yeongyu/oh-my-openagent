@@ -329,11 +329,10 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 				code: "FILE_REPLACED",
 			});
 		const descriptorRoot = directoryDescriptorPath(directoryFd);
-		if (descriptorRoot === null)
-			throw Object.assign(new Error("DIRECTORY_IDENTITY_UNAVAILABLE"), {
-				code: "DIRECTORY_IDENTITY_UNAVAILABLE",
-			});
-		directory = io.opendirSync(descriptorRoot);
+		// The descriptor still anchors identity checks, but some platforms do not
+		// expose a directory path for an open fd. Traverse the original path there
+		// and re-check its identity before and after traversal.
+		directory = io.opendirSync(descriptorRoot ?? boundRoot);
 		assertDirectoryPathIdentity(currentRoot, beforeMetadata, io);
 	} catch (error) {
 		state.errors.push({
@@ -350,10 +349,7 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 	let traversalFailed = false;
 	try {
 		const descriptorRoot = directoryDescriptorPath(directoryFd);
-		if (descriptorRoot === null)
-			throw Object.assign(new Error("DIRECTORY_IDENTITY_UNAVAILABLE"), {
-				code: "DIRECTORY_IDENTITY_UNAVAILABLE",
-			});
+		const traversalRoot = descriptorRoot ?? boundRoot;
 		state.snapshot.set(currentRel, "directory");
 		const entries = [];
 		while (true) {
@@ -364,7 +360,7 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
 				relative(state.root, path),
 				state.pathStyle,
 			);
-			const boundPath = join(descriptorRoot, entry.name);
+			const boundPath = join(traversalRoot, entry.name);
 			let pathStat;
 			try {
 				pathStat = io.lstatSync(boundPath, { bigint: true });
@@ -495,7 +491,6 @@ function assertDirectoryPathIdentity(path, expected, io) {
 
 function directoryDescriptorPath(fd) {
 	if (process.platform === "linux") return `/proc/self/fd/${fd}`;
-	if (process.platform === "darwin") return `/dev/fd/${fd}`;
 	return null;
 }
 
