@@ -52,6 +52,10 @@ type BabysitterOptions = {
 }
 
 
+function getTaskSessionId(task: { sessionId?: string | null; sessionID?: string | null }): string | undefined {
+  return task.sessionId ?? task.sessionID ?? undefined
+}
+
 async function resolveMainSessionTarget(
   ctx: BabysitterContext,
   sessionID: string
@@ -232,11 +236,22 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const lastReminderAt = reminderCooldowns.get(task.id)
       if (lastReminderAt && now - lastReminderAt < COOLDOWN_MS) continue
 
-      const summary = task.sessionId ? await getThinkingSummary(ctx, task.sessionId) : null
+      const taskSessionId = getTaskSessionId(task)
+      const summary = taskSessionId ? await getThinkingSummary(ctx, taskSessionId) : null
       const reminder = buildReminder(task, summary, idleMs)
       const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 
       try {
+        if (options.idleSettleMs !== undefined && options.idleSettleMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, options.idleSettleMs))
+          if (cancelledSessions.has(mainSessionID)) {
+            log(`[${HOOK_NAME}] Skipped reminder: session was cancelled during idle settle`, {
+              sessionID: mainSessionID,
+            })
+            continue
+          }
+        }
+
         const launchModel = model
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined
@@ -246,7 +261,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           client: ctx.client,
           sessionID: mainSessionID,
           source: HOOK_NAME,
-          settleMs: options.idleSettleMs,
+          settleMs: options.idleSettleMs === undefined ? undefined : 0,
           queueBehavior: "defer",
           input: {
             path: { id: mainSessionID },
@@ -271,6 +286,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           })
           continue
         }
+
         reminderCooldowns.set(task.id, now)
         log(`[${HOOK_NAME}] Reminder injected`, { taskId: task.id, sessionID: mainSessionID })
       } catch (error) {

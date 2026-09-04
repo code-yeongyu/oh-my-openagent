@@ -88,6 +88,19 @@ export function getAgentListDisplayName(
   return getAgentDisplayName(configKey, overrides)
 }
 
+const AGENT_RUNTIME_SORT_PREFIXES: Record<string, string> = {
+  sisyphus: "    ",
+  hephaestus: "   ",
+  prometheus: "  ",
+  atlas: " ",
+}
+
+export function getAgentRuntimeName(configKey: string): string {
+  const displayName = getAgentDisplayName(configKey)
+  const sortPrefix = AGENT_RUNTIME_SORT_PREFIXES[configKey.toLowerCase()]
+  return sortPrefix === undefined ? displayName : `${sortPrefix}${displayName}`
+}
+
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
   Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
 )

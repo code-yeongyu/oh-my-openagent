@@ -13,6 +13,7 @@ type SessionNotificationConfig = {
 export function createIdleNotificationScheduler(options: {
   ctx: PluginInput
   config: SessionNotificationConfig
+  getSoundPath?: () => string
   hasIncompleteTodos: (ctx: PluginInput, sessionID: string) => Promise<boolean>
   send: (ctx: PluginInput, sessionID: string) => Promise<void>
   playSound: (ctx: PluginInput, soundPath: string) => Promise<void>
@@ -25,6 +26,11 @@ export function createIdleNotificationScheduler(options: {
   const scheduledAt = new Map<string, number>()
 
   const activityGracePeriodMs = options.config.activityGracePeriodMs ?? 100
+
+
+  function getNotificationSoundPath(): string {
+    return options.getSoundPath?.() ?? options.config.soundPath
+  }
 
   function cleanupOldSessions(): void {
     const maxSessions = options.config.maxTrackedSessions
@@ -136,8 +142,9 @@ export function createIdleNotificationScheduler(options: {
 
       await options.send(options.ctx, sessionID)
 
-      if (options.config.playSound && options.config.soundPath) {
-        await options.playSound(options.ctx, options.config.soundPath)
+      const soundPath = getNotificationSoundPath()
+      if (options.config.playSound && soundPath) {
+        await options.playSound(options.ctx, soundPath)
       }
     } finally {
       executingNotifications.delete(sessionID)

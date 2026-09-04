@@ -37,7 +37,6 @@ let tuiMirrorStopCount = 0
 class MockBackgroundManager {
   constructor(config: {
     onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
-    onShutdown?: () => void | Promise<void>
   }) {
     backgroundManagerOptions = config
   }

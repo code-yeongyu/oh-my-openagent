@@ -120,7 +120,7 @@ Task ID: ${task.id}
 Description: ${task.description}
 Agent: ${agentName}
 Status: ${task.status}
-Session ID: ${task.sessionId ?? "N/A"}
+Session ID: ${task.sessionId ?? (task as { sessionID?: string }).sessionID ?? "N/A"}
 
 Thinking summary (first ${THINKING_SUMMARY_MAX_CHARS} chars):
 ${summaryText}
