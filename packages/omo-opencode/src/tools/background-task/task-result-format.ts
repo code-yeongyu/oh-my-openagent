@@ -93,7 +93,11 @@ Session ID: ${task.sessionId}
 
 ---
 
-(No new output since last check)`
+(No new output since last check)
+
+To retrieve the complete output, re-call this tool with:
+- background_output(task_id="${task.id}", full_session=true) — re-fetches all messages, bypassing the incremental cursor
+- Or use session_read(session_id="${task.sessionId}") to read the full child session transcript`
   }
 
   const extractedContent: string[] = []

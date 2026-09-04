@@ -1,296 +1,420 @@
+// allow: SIZE_OK - this existing task-13 executable-contract suite keeps its shared dynamic-import harness local.
 declare const process: {
-  cwd(): string
-  env: Record<string, string | undefined>
-  execPath: string
-}
+	cwd(): string;
+	env: Record<string, string | undefined>;
+	execPath: string;
+};
 
-import registerMockProvider, { createLocalAssistantMessageEventStream, stepToAssistantMessage } from "./mock-provider/index.ts"
+import registerMockProvider, {
+	createLocalAssistantMessageEventStream,
+	stepToAssistantMessage,
+} from "./mock-provider/index.ts";
 
 interface Matcher {
-  not: Matcher
-  toBe(expected: unknown): void
-  toContain(expected: unknown): void
-  toContainEqual(expected: unknown): void
-  toMatch(expected: RegExp): void
+	not: Matcher;
+	toBe(expected: unknown): void;
+	toContain(expected: unknown): void;
+	toContainEqual(expected: unknown): void;
+	toMatch(expected: RegExp): void;
 }
 
-declare function describe(name: string, fn: () => void): void
-declare function expect(value: unknown): Matcher
+declare function describe(name: string, fn: () => void): void;
+declare function expect(value: unknown): Matcher;
 declare namespace expect {
-  function objectContaining(value: Record<string, unknown>): unknown
+	function objectContaining(value: Record<string, unknown>): unknown;
 }
-declare function test(name: string, fn: () => void | Promise<void>): void
+declare function test(name: string, fn: () => void | Promise<void>): void;
 
 interface ChildProcessModule {
-  spawnSync(
-    command: string,
-    args: string[],
-    options: { cwd?: string; encoding?: string; env?: Record<string, string | undefined>; timeout?: number },
-  ): { status: number | null; stdout: string; stderr: string }
+	spawnSync(
+		command: string,
+		args: string[],
+		options: {
+			cwd?: string;
+			encoding?: string;
+			env?: Record<string, string | undefined>;
+			timeout?: number;
+		},
+	): { status: number | null; stdout: string; stderr: string };
 }
 
 interface FsModule {
-  mkdtempSync(prefix: string): string
-  readFileSync(path: string, encoding: "utf8"): string
-  rmSync(path: string, options?: { force?: boolean; recursive?: boolean }): void
-  writeFileSync(path: string, data: string): void
+	mkdtempSync(prefix: string): string;
+	readFileSync(path: string, encoding: "utf8"): string;
+	rmSync(
+		path: string,
+		options?: { force?: boolean; recursive?: boolean },
+	): void;
+	writeFileSync(path: string, data: string): void;
 }
 
 interface OsModule {
-  tmpdir(): string
+	tmpdir(): string;
 }
 
 interface PathModule {
-  join(...paths: string[]): string
+	join(...paths: string[]): string;
 }
 
-const loadModule = new Function("specifier", "return import(specifier)") as <T>(specifier: string) => Promise<T>
-const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await loadModule<FsModule>("node:fs")
-const { tmpdir } = await loadModule<OsModule>("node:os")
-const { join } = await loadModule<PathModule>("node:path")
-const { spawnSync } = await loadModule<ChildProcessModule>("node:child_process")
+const loadModule = new Function("specifier", "return import(specifier)") as <T>(
+	specifier: string,
+) => Promise<T>;
+const { mkdtempSync, readFileSync, rmSync, writeFileSync } =
+	await loadModule<FsModule>("node:fs");
+const { tmpdir } = await loadModule<OsModule>("node:os");
+const { join } = await loadModule<PathModule>("node:path");
+const { spawnSync } =
+	await loadModule<ChildProcessModule>("node:child_process");
 
-const repoRoot = process.cwd()
-const driveScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "drive.mjs")
-const { snapshotDirectory, digestDirectory, changedSnapshotPaths } = await loadModule<{
-  snapshotDirectory(root: string, options?: { readdir?: (path: string, options: { withFileTypes: true }) => Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>; readFile?: (path: string) => Buffer }): Map<string, string>
-  digestDirectory(root: string, options?: { readdir?: (path: string, options: { withFileTypes: true }) => Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>; readFile?: (path: string) => Buffer }): string
-  changedSnapshotPaths(before: Map<string, string>, after: Map<string, string>): string[]
-}>(driveScript)
-const probeScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "probe-continuation.mjs")
-const mockProviderScript = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "mock-provider", "index.ts")
+const repoRoot = process.cwd();
+const driveScript = join(
+	repoRoot,
+	"packages",
+	"omo-senpi",
+	"scripts",
+	"qa",
+	"drive.mjs",
+);
+const isolationScript = join(
+	repoRoot,
+	"packages",
+	"omo-senpi",
+	"scripts",
+	"qa",
+	"isolation-state.mjs",
+);
+const { snapshotDirectory, changedSnapshotPaths } = await loadModule<{
+	snapshotDirectory(root: string): {
+		snapshot: Map<string, string>;
+		complete: boolean;
+	};
+	changedSnapshotPaths(
+		before: Map<string, string>,
+		after: Map<string, string>,
+	): string[];
+}>(isolationScript);
+const probeScript = join(
+	repoRoot,
+	"packages",
+	"omo-senpi",
+	"scripts",
+	"qa",
+	"probe-continuation.mjs",
+);
+const mockProviderScript = join(
+	repoRoot,
+	"packages",
+	"omo-senpi",
+	"scripts",
+	"qa",
+	"mock-provider",
+	"index.ts",
+);
 
 interface CapturedProvider {
-  streamSimple(model: unknown, context: { cwd?: string }, options?: { signal?: AbortSignal }): AsyncIterable<unknown> & {
-    result?: () => Promise<{ stopReason?: string; content?: Array<{ type?: string }> }>
-  }
+	streamSimple(
+		model: unknown,
+		context: { cwd?: string },
+		options?: { signal?: AbortSignal },
+	): AsyncIterable<unknown> & {
+		result?: () => Promise<{
+			stopReason?: string;
+			content?: Array<{ type?: string }>;
+		}>;
+	};
 }
 
 function runNode(args: string[], env: Record<string, string | undefined> = {}) {
-  return spawnSync(process.execPath, args, {
-    cwd: repoRoot,
-    env: { ...process.env, ...env },
-    encoding: "utf8",
-    timeout: 30_000,
-  })
+	return spawnSync(process.execPath, args, {
+		cwd: repoRoot,
+		env: { ...process.env, ...env },
+		encoding: "utf8",
+		timeout: 30_000,
+	});
+}
+
+function isolatedHomeEnv(home: string) {
+	return { HOME: home, USERPROFILE: home };
 }
 
 function parseLastJsonLine(stdout: string): Record<string, unknown> {
-  const line = stdout
-    .trim()
-    .split(/\r?\n/)
-    .reverse()
-    .find((candidate) => candidate.trim().startsWith("{"))
+	const line = stdout
+		.trim()
+		.split(/\r?\n/)
+		.reverse()
+		.find((candidate) => candidate.trim().startsWith("{"));
 
-  if (line === undefined) {
-    throw new Error(`missing final JSON line in stdout:\n${stdout}`)
-  }
+	if (line === undefined) {
+		throw new Error(`missing final JSON line in stdout:\n${stdout}`);
+	}
 
-  return JSON.parse(line)
+	return JSON.parse(line);
 }
 
 describe("task 13 senpi QA scripts", () => {
-  test("#given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup", () => {
-    for (const script of [driveScript, probeScript]) {
-      const source = readFileSync(script, "utf8")
+	test("#given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup", () => {
+		for (const script of [driveScript, probeScript]) {
+			const source = readFileSync(script, "utf8");
 
-      expect(source).not.toContain("shell: true")
-      expect(source).not.toContain('spawnSync("command"')
-    }
-  })
+			expect(source).not.toContain("shell: true");
+			expect(source).not.toContain('spawnSync("command"');
+		}
+	});
 
-  test("#given drive.mjs self-test #when executed #then sandbox helpers validate successfully", () => {
-    const result = runNode([driveScript, "--self-test"])
+	test("#given drive.mjs self-test #when executed #then sandbox helpers validate successfully", () => {
+		const result = runNode([driveScript, "--self-test"]);
 
-    expect(result.stderr).toBe("")
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain("SELF-TEST OK")
-  })
+		expect(result.stderr).toBe("");
+		expect(result.status).toBe(0);
+		expect(result.stdout).toContain("SELF-TEST OK");
+	});
 
-  test("#given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched", () => {
-    const root = mkdtempSync(join(tmpdir(), "omo-senpi-settings-snapshot-"))
-    const settings = join(root, "settings.json")
-    try {
-      writeFileSync(settings, JSON.stringify({ theme: "dark", tipsHistory: { first: 1 }, lastChangelogVersion: "1.0.0", modelLastOnThinkingLevels: { model: "low" } }))
-      const before = snapshotDirectory(root)
-      writeFileSync(settings, JSON.stringify({ theme: "dark", tipsHistory: { second: 2 }, lastChangelogVersion: "2.0.0", modelLastOnThinkingLevels: { model: "high" } }))
-      const after = snapshotDirectory(root)
+	test("#given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched", () => {
+		const root = mkdtempSync(join(tmpdir(), "omo-senpi-settings-snapshot-"));
+		const settings = join(root, "settings.json");
+		try {
+			writeFileSync(
+				settings,
+				JSON.stringify({
+					theme: "dark",
+					tipsHistory: { first: 1 },
+					lastChangelogVersion: "1.0.0",
+					modelLastOnThinkingLevels: { model: "low" },
+				}),
+			);
+			const before = snapshotDirectory(root);
+			writeFileSync(
+				settings,
+				JSON.stringify({
+					theme: "dark",
+					tipsHistory: { second: 2 },
+					lastChangelogVersion: "2.0.0",
+					modelLastOnThinkingLevels: { model: "high" },
+				}),
+			);
+			const after = snapshotDirectory(root);
 
-      expect(changedSnapshotPaths(before, after)).toEqual([])
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
+			expect(changedSnapshotPaths(before.snapshot, after.snapshot)).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
-  test("#given entries vanish between enumeration and read #when the complete-tree snapshot runs #then transient entries are skipped", () => {
-    const root = mkdtempSync(join(tmpdir(), "omo-senpi-transient-snapshot-"))
-    const stable = join(root, "stable.txt")
-    const vanished = join(root, "vanished.tmp")
-    try {
-      writeFileSync(stable, "stable")
-      writeFileSync(vanished, "vanished")
-      const rootEntries = [
-        { name: "stable.txt", isDirectory: () => false, isFile: () => true },
-        { name: "vanished.tmp", isDirectory: () => false, isFile: () => true },
-        { name: "vanished-lock", isDirectory: () => true, isFile: () => false },
-      ]
-      const readdir = (path: string) => {
-        if (path === root) return rootEntries
-        const error = new Error("entry vanished") as Error & { code: string }
-        error.code = "ENOTDIR"
-        throw error
-      }
-      const readFile = (path: string) => {
-        if (path === vanished) {
-          const error = new Error("entry vanished") as Error & { code: string }
-          error.code = "ENOENT"
-          throw error
-        }
-        return Buffer.from("stable")
-      }
+	test("#given probe-continuation self-test #when executed #then continuation helpers validate successfully", () => {
+		const result = runNode([probeScript, "--self-test"]);
 
-      const snapshot = snapshotDirectory(root, { readdir, readFile })
+		expect(result.stderr).toBe("");
+		expect(result.status).toBe(0);
+		expect(result.stdout).toContain("SELF-TEST OK");
+	});
 
-      expect(snapshot.has("stable.txt")).toBe(true)
-      expect(snapshot.has("vanished.tmp")).toBe(false)
-      expect(snapshot.has("vanished-lock/anything")).toBe(false)
-      expect(snapshot.size).toBe(1)
-      expect(digestDirectory(root, { readdir, readFile })).toBe(digestDirectory(root, { readdir: () => [{ name: "stable.txt", isDirectory: () => false, isFile: () => true }], readFile: () => Buffer.from("stable") }))
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
+	test("#given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape", () => {
+		const source = readFileSync(probeScript, "utf8");
 
-  test("#given probe-continuation self-test #when executed #then continuation helpers validate successfully", () => {
-    const result = runNode([probeScript, "--self-test"])
+		expect(source).not.toContain('\\"active\\":true');
+		expect(source).not.toContain('"active":true');
+		expect(source).toContain('"ok":true');
+		expect(source).toContain('"plan"');
+		expect(source).toContain('"summary"');
+	});
 
-    expect(result.stderr).toBe("")
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain("SELF-TEST OK")
-  })
+	test("#given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi", () => {
+		const source = readFileSync(probeScript, "utf8");
+		const tmuxFallbackSource = source.slice(source.indexOf('"new-session"'));
 
-  test("#given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape", () => {
-    const source = readFileSync(probeScript, "utf8")
+		expect(tmuxFallbackSource).not.toContain('"-p"');
+	});
 
-    expect(source).not.toContain('\\"active\\":true')
-    expect(source).not.toContain('"active":true')
-    expect(source).toContain('"ok":true')
-    expect(source).toContain('"plan"')
-    expect(source).toContain('"summary"')
-  })
+	test("#given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory", () => {
+		const source = readFileSync(probeScript, "utf8");
 
-  test("#given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi", () => {
-    const source = readFileSync(probeScript, "utf8")
-    const tmuxFallbackSource = source.slice(source.indexOf('"new-session"'))
+		expect(source).toContain("SENPI_CODING_AGENT_SESSION_DIR");
+	});
 
-    expect(tmuxFallbackSource).not.toContain('"-p"')
-  })
+	test("#given mock provider self-test #when executed #then text and tool-call script steps validate", () => {
+		const result = runNode([mockProviderScript, "--self-test"]);
 
-  test("#given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory", () => {
-    const source = readFileSync(probeScript, "utf8")
+		expect(result.stderr).toBe("");
+		expect(result.status).toBe(0);
+		expect(result.stdout).toContain("SELF-TEST OK");
+	});
 
-    expect(source).toContain("SENPI_CODING_AGENT_SESSION_DIR")
-  })
+	test("#given a scripted tool call #when converted to an assistant message #then it stops with toolUse", () => {
+		const message = stepToAssistantMessage(
+			{ type: "tool_call", name: "write", arguments: { path: "x.ts" } },
+			7,
+		);
 
-  test("#given mock provider self-test #when executed #then text and tool-call script steps validate", () => {
-    const result = runNode([mockProviderScript, "--self-test"])
+		expect(message.stopReason).toBe("toolUse");
+	});
 
-    expect(result.stderr).toBe("")
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain("SELF-TEST OK")
-  })
+	test("#given terminal stream events #when result is awaited #then done and error events settle the promise", async () => {
+		const toolMessage = stepToAssistantMessage(
+			{ type: "tool_call", name: "write", arguments: { path: "x.ts" } },
+			1,
+		);
+		const doneStream = createLocalAssistantMessageEventStream();
 
-  test("#given a scripted tool call #when converted to an assistant message #then it stops with toolUse", () => {
-    const message = stepToAssistantMessage({ type: "tool_call", name: "write", arguments: { path: "x.ts" } }, 7)
+		doneStream.push({
+			type: "done",
+			reason: toolMessage.stopReason,
+			message: toolMessage,
+		});
+		const doneResult = await expectSettles(doneStream.result());
 
-    expect(message.stopReason).toBe("toolUse")
-  })
+		expect(doneResult.stopReason).toBe("toolUse");
 
-  test("#given terminal stream events #when result is awaited #then done and error events settle the promise", async () => {
-    const toolMessage = stepToAssistantMessage({ type: "tool_call", name: "write", arguments: { path: "x.ts" } }, 1)
-    const doneStream = createLocalAssistantMessageEventStream()
+		const errorMessage = { ...toolMessage, stopReason: "aborted" as const };
+		const errorStream = createLocalAssistantMessageEventStream();
 
-    doneStream.push({ type: "done", reason: toolMessage.stopReason, message: toolMessage })
-    const doneResult = await expectSettles(doneStream.result())
+		errorStream.push({ type: "error", reason: "aborted", error: errorMessage });
+		const errorResult = await expectSettles(errorStream.result());
 
-    expect(doneResult.stopReason).toBe("toolUse")
+		expect(errorResult.stopReason).toBe("aborted");
+	});
 
-    const errorMessage = { ...toolMessage, stopReason: "aborted" as const }
-    const errorStream = createLocalAssistantMessageEventStream()
+	test("#given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result", async () => {
+		let capturedProvider: CapturedProvider | undefined;
+		const fakePi: Parameters<typeof registerMockProvider>[0] = {
+			registerProvider(_id: string, provider: CapturedProvider) {
+				capturedProvider = provider;
+			},
+		};
+		const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-mock-provider-"));
 
-    errorStream.push({ type: "error", reason: "aborted", error: errorMessage })
-    const errorResult = await expectSettles(errorStream.result())
+		try {
+			writeFileSync(
+				join(cwd, "mock-script.json"),
+				JSON.stringify({
+					steps: [
+						{
+							type: "tool_call",
+							name: "write",
+							arguments: { path: "x.ts", content: "const x = 1\n" },
+						},
+					],
+				}),
+			);
+			registerMockProvider(fakePi);
+			if (capturedProvider === undefined)
+				throw new Error("mock provider was not registered");
 
-    expect(errorResult.stopReason).toBe("aborted")
-  })
+			const stream = capturedProvider.streamSimple({ id: "mock-1" }, { cwd });
+			expect(typeof stream.result).toBe("function");
 
-  test("#given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result", async () => {
-    let capturedProvider: CapturedProvider | undefined
-    const fakePi = {
-      registerProvider(_id: string, provider: CapturedProvider) {
-        capturedProvider = provider
-      },
-    } as unknown as Parameters<typeof registerMockProvider>[0]
-    const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-mock-provider-"))
+			const events = [];
+			for await (const event of stream) events.push(event);
+			const message = await stream.result?.();
 
-    try {
-      writeFileSync(
-        join(cwd, "mock-script.json"),
-        JSON.stringify({
-          steps: [{ type: "tool_call", name: "write", arguments: { path: "x.ts", content: "const x = 1\n" } }],
-        }),
-      )
-      registerMockProvider(fakePi)
-      if (capturedProvider === undefined) throw new Error("mock provider was not registered")
+			expect(message?.stopReason).toBe("toolUse");
+			expect(message?.content?.[0]?.type).toBe("toolCall");
+			expect(events).toContainEqual(
+				expect.objectContaining({ type: "done", reason: "toolUse" }),
+			);
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
 
-      const stream = capturedProvider.streamSimple({ id: "mock-1" }, { cwd })
-      expect(typeof stream.result).toBe("function")
+	test("#given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox", () => {
+		const callerAgentDir = mkdtempSync(
+			join(tmpdir(), "omo-senpi-caller-agent-"),
+		);
+		const callerHome = mkdtempSync(join(tmpdir(), "omo-senpi-caller-home-"));
 
-      const events = []
-      for await (const event of stream) events.push(event)
-      const message = await stream.result?.()
+		try {
+			const result = runNode([driveScript], {
+				...isolatedHomeEnv(callerHome),
+				SENPI_CODING_AGENT_DIR: callerAgentDir,
+				SENPI_BIN: "/nonexistent/senpi",
+			});
 
-      expect(message?.stopReason).toBe("toolUse")
-      expect(message?.content?.[0]?.type).toBe("toolCall")
-      expect(events).toContainEqual(expect.objectContaining({ type: "done", reason: "toolUse" }))
-    } finally {
-      rmSync(cwd, { recursive: true, force: true })
-    }
-  })
+			expect(result.status).toBe(0);
+			const payload = parseLastJsonLine(result.stdout);
+			expect(payload.providedSenpiCodingAgentDir).toBe("IGNORED");
+			expect(payload.sandboxAgentDir).not.toBe(callerAgentDir);
+			expect(String(payload.sandboxAgentDir)).toContain("omo-senpi-qa-");
+			expect(payload.isolationCertified).toBe(false);
+			expect(payload.realHomeIsolationCertified).toBe(true);
+			expect(payload.certificationEnvironmentObserved).toBe(false);
+			expect(payload.certificationRootsComplete).toBe(true);
+			expect(payload.certificationRootsTruncated).toBe(false);
+			expect(payload.certificationChangedPaths).toEqual([]);
+			expect(payload.certificationErrors).toEqual([]);
+			expect(payload.certificationLimits).toEqual({
+				maxFiles: 10_000,
+				maxBytes: 67_108_864,
+				maxEntries: 20_000,
+			});
+			expect(payload.realSenpiUntouched).toBe(true);
+			expect(payload.realSenpiChangedPaths).toEqual([]);
+			expect(payload.realSenpiProtectedStateComplete).toBe(true);
+			expect(payload.realSenpiProtectedErrors).toEqual([]);
+			expect(payload.realOmoUntouched).toBe(true);
+			expect(payload.realOmoChangedPaths).toEqual([]);
+			expect(payload.realOmoProtectedStateComplete).toBe(true);
+			expect(payload.realOmoProtectedErrors).toEqual([]);
+			expect(payload.realSenpiObservedChangedPaths).toEqual([]);
+			expect(payload.realOmoObservedChangedPaths).toEqual([]);
+			expect(payload.realSenpiObservationDomain).toBe("nonvolatile-home");
+			expect(typeof payload.realSenpiNonvolatileObservationComplete).toBe(
+				"boolean",
+			);
+			expect(typeof payload.realSenpiNonvolatileObservationTruncated).toBe(
+				"boolean",
+			);
+			expect(payload.realSenpiNonvolatileObservationErrors).toEqual([]);
+			expect(typeof payload.realSenpiNonvolatileObservationBytesRead).toBe(
+				"number",
+			);
+			expect(payload.realOmoObservationDomain).toBe("nonvolatile-home");
+			expect(typeof payload.realOmoNonvolatileObservationComplete).toBe(
+				"boolean",
+			);
+			expect(typeof payload.realOmoNonvolatileObservationTruncated).toBe(
+				"boolean",
+			);
+			expect(payload.realOmoNonvolatileObservationErrors).toEqual([]);
+			expect(typeof payload.realOmoNonvolatileObservationBytesRead).toBe(
+				"number",
+			);
+			expect(payload.protectedStateFiles).toEqual([
+				"auth.json",
+				"settings.json",
+				"models.json",
+				"models-store.json",
+				"trust.json",
+				"hooks-state.json",
+			]);
+			expect(payload.observationLimits).toEqual({
+				maxFiles: 10_000,
+				maxBytes: 67_108_864,
+				maxEntries: 20_000,
+			});
+			expect(payload.realHomesChecked).toEqual([
+				join(callerHome, ".senpi", "agent"),
+				join(callerHome, ".omo", "agent"),
+			]);
+			expect(String(payload.result)).toMatch(/^(SKIP|FAIL)$/);
+		} finally {
+			rmSync(callerAgentDir, { recursive: true, force: true });
+			rmSync(callerHome, { recursive: true, force: true });
+		}
+	});
 
-  test("#given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox", () => {
-    const callerAgentDir = mkdtempSync(join(tmpdir(), "omo-senpi-caller-agent-"))
-
-    try {
-      const result = runNode([driveScript], {
-        SENPI_CODING_AGENT_DIR: callerAgentDir,
-        SENPI_BIN: "/nonexistent/senpi",
-      })
-
-      expect(result.status).toBe(0)
-      const payload = parseLastJsonLine(result.stdout)
-      expect(payload["providedSenpiCodingAgentDir"]).toBe("IGNORED")
-      expect(payload["sandboxAgentDir"]).not.toBe(callerAgentDir)
-      expect(String(payload["sandboxAgentDir"])).toContain("omo-senpi-qa-")
-      expect(payload["realSenpiUntouched"]).toBe(true)
-      expect(payload["realSenpiChangedPaths"]).toEqual([])
-      expect(payload["realOmoUntouched"]).toBe(true)
-      expect(payload["realOmoChangedPaths"]).toEqual([])
-      expect(payload["protectedStateFiles"]).toContain("hooks-state.json")
-      expect(payload["realHomesChecked"]).toEqual([
-        join(process.env.HOME ?? "", ".senpi", "agent"),
-        join(process.env.HOME ?? "", ".omo", "agent"),
-      ])
-      expect(String(payload["result"])).toMatch(/^(SKIP|FAIL)$/)
-    } finally {
-      rmSync(callerAgentDir, { recursive: true, force: true })
-    }
-  })
-})
+	test("#given an isolated child home #when cross-platform variables are built #then HOME and USERPROFILE match", () => {
+		const home = join(tmpdir(), "omo-senpi-cross-platform-home");
+		expect(isolatedHomeEnv(home)).toEqual({ HOME: home, USERPROFILE: home });
+	});
+});
 
 async function expectSettles<T>(promise: Promise<T>): Promise<T> {
-  const timeout = new Promise<never>((_resolve, reject) => {
-    setTimeout(() => reject(new Error("stream result() did not settle from terminal event")), 50)
-  })
-  return Promise.race([promise, timeout])
+	const timeout = new Promise<never>((_resolve, reject) => {
+		setTimeout(
+			() =>
+				reject(new Error("stream result() did not settle from terminal event")),
+			50,
+		);
+	});
+	return Promise.race([promise, timeout]);
 }

@@ -106,6 +106,22 @@ Order matters:
 
 Machines already on a renamed release have no global `omo` and install cleanly in one step.
 
+## Runtime selection (bun wherever it exists)
+
+The launcher (`bin/lib/bun-runtime.js`) runs the product on bun whenever the machine has one, with
+no configuration. First match wins:
+
+1. already running on bun - stay (loop guard);
+2. `OMO_RUNTIME=node` - stay; the only way to keep a bun machine on node;
+3. no bun binary (`$BUN_INSTALL/bin`, `~/.bun/bin`, then PATH) - stay; npm-only machines never notice;
+4. `OMO_RUNTIME=bun` - re-exec under the discovered bun, no version check (explicit opt-in);
+5. the script lives in bun's global tree (`bun add -g`) - re-exec; the bun that installed omo runs it;
+6. any other install (npm, project-local, `bunx`) - probe `bun --version` once per node boot and
+   re-exec when it is >= `BUN_MIN_VERSION` (1.4.0, the engine's verified floor); an older bun, or one
+   that cannot answer within 3s, leaves the launch on node.
+
+The engine inherits the answer through `SENPI_RUNTIME`, so launcher and engine never disagree.
+
 ## Bun-global launcher shim (POSIX)
 
 A `bun add -g` install reaches `bin/omo.js` through a symlink in the bun bin dir, so node boots

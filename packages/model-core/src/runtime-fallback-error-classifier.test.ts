@@ -190,4 +190,166 @@ describe("runtime fallback error classifier", () => {
     //#then
     expect(signal).toEqual({ signal: retryInfo.summary })
   })
+
+  test("#given terminal quota in data detail #when classified #then aborts without retry", () => {
+    // given
+    const error = {
+      data: {
+        detail: {
+          error: {
+            type: "terminal_quota_exhausted",
+          },
+        },
+      },
+    }
+
+    // when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    // then
+    expect(type).toBe("abort")
+    expect(retryable).toBe(false)
+  })
+
+  test("#given a ModelNotFoundError terminal quota wrapper #when classified #then aborts without retry", () => {
+    // given
+    const error = {
+      name: "ModelNotFoundError",
+      message: "Terminal quota exceeded for the requested model",
+    }
+
+    // when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    // then
+    expect(type).toBe("abort")
+    expect(retryable).toBe(false)
+  })
+
+  test.each([
+    "non-terminal quota exceeded",
+    "non-terminal billing limit reached",
+  ])("#given %s #when classified #then remains retryable", (message) => {
+    // given
+    const error = {
+      name: "QuotaExceededError",
+      message,
+    }
+
+    // when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    // then
+    expect(type).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("#given a throwing detail getter #when classified #then property access failure is conservative", () => {
+    // given
+    const error = {
+      message: "Invalid request payload",
+      get detail(): unknown {
+        throw new Error("detail getter failed")
+      },
+    }
+
+    // when / then
+    expect(() => classifyRuntimeFallbackError(error)).not.toThrow()
+    expect(classifyRuntimeFallbackError(error)).toBeUndefined()
+    expect(isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)).toBe(false)
+  })
+
+  test("#given a root Proxy with a throwing get trap #when classified #then shared property access is conservative", () => {
+    // given
+    const error = new Proxy(
+      {},
+      {
+        get(): never {
+          throw new Error("root get trap failed")
+        },
+      },
+    )
+
+    // when / then
+    expect(() => classifyRuntimeFallbackError(error)).not.toThrow()
+    expect(() => isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)).not.toThrow()
+    expect(classifyRuntimeFallbackError(error)).toBeUndefined()
+    expect(isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)).toBe(false)
+  })
+
+  test("classifies terminal_quota_exhausted detail as abort (non-retryable)", () => {
+    const cases = [
+      {
+        label: "structured terminal_quota_exhausted detail with standard message",
+        error: {
+          detail: {
+            error: {
+              type: "terminal_quota_exhausted",
+              message: "Terminal quota or billing limit reached for the requested LiteLLM model handle.",
+              model: "big-pickle",
+              upstream_error: "insufficient balance on z.ai account",
+            },
+          },
+        },
+        expectedType: "abort",
+        expectedRetryable: false,
+      },
+      {
+        label: "structured terminal_quota_exhausted detail taking precedence over ModelNotFoundError wrapper",
+        error: {
+          name: "ModelNotFoundError",
+          detail: {
+            error: {
+              type: "terminal_quota_exhausted",
+              message: "Model not found due to exhausted account quota",
+            },
+          },
+        },
+        expectedType: "abort",
+        expectedRetryable: false,
+      },
+      {
+        label: "structured terminal_quota_exhausted detail with arbitrary message (e.g. Account locked)",
+        error: {
+          detail: {
+            error: {
+              type: "terminal_quota_exhausted",
+              message: "Account locked",
+            },
+          },
+        },
+        expectedType: "abort",
+        expectedRetryable: false,
+      },
+      {
+        label: "explicit terminal quota message inside quota error payload",
+        error: {
+          name: "QuotaExceededError",
+          message: "Terminal quota reached for provider model",
+        },
+        expectedType: "abort",
+        expectedRetryable: false,
+      },
+      {
+        label: "soft billing limit message without explicit terminal marker (treats as retryable quota_exceeded)",
+        error: {
+          name: "BillingError",
+          message: "Billing limit reached for this month, resets tomorrow",
+        },
+        expectedType: "quota_exceeded",
+        expectedRetryable: true,
+      },
+    ] as const
+
+    for (const c of cases) {
+      const type = classifyRuntimeFallbackError(c.error)
+      const retryable = isRuntimeFallbackRetryableError(c.error, [429, 500, 502, 503, 504])
+
+      expect(type, c.label).toBe(c.expectedType)
+      expect(retryable, c.label).toBe(c.expectedRetryable)
+    }
+  })
 })

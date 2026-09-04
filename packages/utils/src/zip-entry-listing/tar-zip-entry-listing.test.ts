@@ -52,6 +52,25 @@ describe("parseTarListingOutput", () => {
 		mock.restore()
 	})
 
+	describe("#given a tar listing line with trailing filename whitespace", () => {
+		it("#when parsing the line #then preserves the original trailing whitespace", async () => {
+			// given
+			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+			const listedOutput = createTarFileLine("trailing-space.txt ")
+
+			// when
+			const parsedEntries = parseTarListingOutput(listedOutput)
+
+			// then
+			expect(parsedEntries).toEqual([
+				{
+					path: "trailing-space.txt ",
+					type: "file",
+				},
+			])
+		})
+	})
+
 		describe("#given tar output with any unparsed lines", () => {
 		it("#when parsing the output #then throws immediately (fail-closed)", async () => {
 			// given

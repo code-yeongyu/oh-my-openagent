@@ -1,0 +1,58 @@
+Issue 7392 live PreToolUse spawn proof
+=====================================
+
+What was tested
+---------------
+- Installed the local PR build into a disposable CODEX_HOME.
+- Started the real `codex app-server` against a local Responses API mock.
+- Registered a synthetic `collaborationspawn_agent` dynamic tool.
+- Seeded goal g1 attempt 1 with three prior
+  `lazycodex-code-reviewer` spawns.
+- Asked the model to call the synthetic spawn tool once.
+
+Failing proof before the spawn-cap driver
+-----------------------------------------
+The generic app-server driver completed a turn but reported:
+
+  "missingHooks": ["preToolUse"]
+
+It exercised SessionStart, UserPromptSubmit, and Stop only, so it did not prove
+the changed hook.
+
+Observed after driving the spawn tool
+-------------------------------------
+- turnStatus: completed
+- assistantText: SPAWN_HOOK_QA_OK denialObserved=true
+- model requests: 3
+- dynamic tool client calls: 0
+- hook event: preToolUse
+- hook source: pre-tool-use-guarding-ulw-loop-spawns.json
+- hook/started status: running
+- hook/completed status: blocked
+- denial: ulw-loop reviewer no-progress cap reached
+  (lazycodex-code-reviewer 4/3) for g1 attempt 1
+- real ~/.codex/config.toml: unchanged
+
+Post-merge verification
+-----------------------
+- Merged current upstream/dev without conflicts.
+- Focused spawn-guard suite: 16 passed, 0 failed.
+- Component TypeScript, Biome, and build checks: passed.
+- Root typecheck: passed.
+- Root build: passed.
+- `bun run test:codex` again reached the documented third-party-notice
+  packaging gap, where npm's prepare build runs after workspace development
+  dependencies are removed. No changed-component assertion failed.
+
+Why it is enough
+----------------
+The first-party app-server notification stream proves Codex matched the
+flattened MultiAgentV2 tool token to the changed plugin hook. The blocked hook
+status, model-visible reason, and zero client-side tool calls prove the
+PreToolUse denial propagated before tool execution.
+
+What was omitted
+----------------
+- Temporary sandbox paths.
+- Raw environment, authentication, and user configuration values.
+- Full stderr; only the machine-relevant denial was summarized.

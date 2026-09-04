@@ -11,6 +11,7 @@ Source root of the Senpi adapter package. The package barrel (`index.ts`) export
 | Memory MCP server | `mcp/memory-server.ts` | Standalone stdio JSON-RPC server exposing the memory tools under exposure `"search"` (senpi `tool_search` catalog). Plain Node, no senpi runtime; the extension injects bound identity + accepted-turn provenance, cwd-based auto identity retained for standalone calls. |
 | Real host modules for tests | `senpi-test-runtime.ts` | Resolves the installed `@code-yeongyu/senpi` dist and imports real theme/ModelRegistry/ModelRuntime at load time. |
 | Deep components | `components/{task,memory,lsp,telemetry,init-deep-advisor}/` | Each has its own AGENTS.md; `memory/` additionally documents `worker/`, `commands/`, `palace/`. |
+| X search | `components/x-search/` | Credential-gated `x_search` tool and conditional skill (files, gating, contract, error codes, backtest pointer). Own AGENTS.md. |
 | Small components | `components/*` | Single-purpose factories (ulw-loop, config-watch, onboarding, fallback-architect, ...) documented in `../AGENTS.md`. |
 
 ## Root audit gates

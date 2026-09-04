@@ -1,0 +1,83 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:
+(pass) x-search backtest CLI > offline reports blocked and missing as NA, tunes, scores holdout, and never fetches [32.66ms]
+71 |     const queries = { version: 1, queries: [{ id: "q01", split: "calibration", query: "alpha", since_days_ago: 1, reference_urls: [], web_terms: ["alpha"] }] };
+72 |     const queryFile = join(base, "queries.json");
+73 |     await writeFile(queryFile, JSON.stringify(queries));
+74 |     const result = await run(["--queries", queryFile, "--mode", "record", "--variants", "v1", "--carriers", "fast", "--out", join(base, "out"), "--cap-usd", "1"], { OMO_X_SEARCH_BACKTEST_NO_NETWORK: "1" });
+75 |     expect(result.code).not.toBe(0);
+76 |     expect(result.stderr).toContain("network disabled");
+                               ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "network disabled"
+Received: ""
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:76:27)
+(fail) x-search backtest CLI > record mode under the no-network guard fails fast [484.00ms]
+
+ 1 pass
+ 1 fail
+ 10 expect() calls
+Ran 2 tests across 1 file. [1.99s]
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:
+(pass) x-search backtest CLI > offline reports blocked and missing as NA, tunes, scores holdout, and never fetches [23.34ms]
+71 |     const queries = { version: 1, queries: [{ id: "q01", split: "calibration", query: "alpha", since_days_ago: 1, reference_urls: [], web_terms: ["alpha"] }] };
+72 |     const queryFile = join(base, "queries.json");
+73 |     await writeFile(queryFile, JSON.stringify(queries));
+74 |     const result = await run(["--queries", queryFile, "--mode", "record", "--variants", "v1", "--carriers", "fast", "--out", join(base, "out"), "--cap-usd", "1"], { OMO_X_SEARCH_BACKTEST_NO_NETWORK: "1" });
+75 |     expect(result.code).not.toBe(0);
+76 |     expect(result.stderr).toContain("network disabled");
+                               ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "network disabled"
+Received: ""
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:76:27)
+(fail) x-search backtest CLI > record mode under the no-network guard fails fast [15.61ms]
+
+ 1 pass
+ 1 fail
+ 10 expect() calls
+Ran 2 tests across 1 file. [551.00ms]
+
+--- mutation guard removed ---
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:
+(pass) x-search backtest CLI > offline reports blocked and missing as NA, tunes, scores holdout, and never fetches [26.37ms]
+71 |     const queries = { version: 1, queries: [{ id: "q01", split: "calibration", query: "alpha", since_days_ago: 1, reference_urls: [], web_terms: ["alpha"] }] };
+72 |     const queryFile = join(base, "queries.json");
+73 |     await writeFile(queryFile, JSON.stringify(queries));
+74 |     const result = await run(["--queries", queryFile, "--mode", "record", "--variants", "v1", "--carriers", "fast", "--out", join(base, "out"), "--cap-usd", "1"], { OMO_X_SEARCH_BACKTEST_NO_NETWORK: "1" });
+75 |     expect(result.code).not.toBe(0);
+76 |     expect(result.stderr).toContain("network disabled");
+                               ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "network disabled"
+Received: ""
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:76:27)
+(fail) x-search backtest CLI > record mode under the no-network guard fails fast [458.06ms]
+
+ 1 pass
+ 1 fail
+ 10 expect() calls
+Ran 2 tests across 1 file. [952.00ms]
+
+--- restored guard ---
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:
+(pass) x-search backtest CLI > offline reports blocked and missing as NA, tunes, scores holdout, and never fetches [28.34ms]
+(pass) x-search backtest CLI > record mode under the no-network guard fails fast [14.92ms]
+
+ 2 pass
+ 0 fail
+ 10 expect() calls
+Ran 2 tests across 1 file. [586.00ms]

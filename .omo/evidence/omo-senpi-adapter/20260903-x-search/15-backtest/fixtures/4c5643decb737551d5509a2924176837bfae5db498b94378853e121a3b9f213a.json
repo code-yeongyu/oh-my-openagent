@@ -1,0 +1,282 @@
+{
+  "queryId": "q06",
+  "lane": "web",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"현대차 실적 주가 시장 반응 since:2026-08-25 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-25",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422898,
+    "completed_at": 1788422898,
+    "id": "6dca1f43-c4fd-99fd-83d9-8990558f32ee",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_6dca1f43-c4fd-99fd-83d9-8990558f32ee_call-0cae39a0-c3c9-4501-90b8-837c0aaaf60e-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "현대차 실적 주가 시장 반응",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.yna.co.kr/view/AKR20260901174200003"
+            },
+            {
+              "type": "url",
+              "url": "https://news.einfomax.co.kr/news/articleView.html?idxno=4396678"
+            },
+            {
+              "type": "url",
+              "url": "https://www.hankyung.com/article/2026082754716"
+            },
+            {
+              "type": "url",
+              "url": "https://finance.naver.com/item/main.naver?code=005380"
+            },
+            {
+              "type": "url",
+              "url": "https://www.khan.co.kr/article/202609011627001"
+            },
+            {
+              "type": "url",
+              "url": "https://www.asiae.co.kr/article/2025021501342264991"
+            },
+            {
+              "type": "url",
+              "url": "https://www.greenpostkorea.co.kr/news/articleView.html?idxno=306665"
+            },
+            {
+              "type": "url",
+              "url": "https://simplywall.st/ko/stocks/kr/automobiles/kose-a005380/hyundai-motor-shares"
+            },
+            {
+              "type": "url",
+              "url": "https://biz.heraldcorp.com/article/10658895"
+            },
+            {
+              "type": "url",
+              "url": "https://www.bizhankook.com/bk/article/31630"
+            },
+            {
+              "type": "url",
+              "url": "https://kr.investing.com/equities/hyundai-motor-earnings"
+            },
+            {
+              "type": "url",
+              "url": "https://v.daum.net/v/20260203112029124"
+            },
+            {
+              "type": "url",
+              "url": "https://www.imaeil.com/page/view/2026052009400327127"
+            },
+            {
+              "type": "url",
+              "url": "https://www.chosun.com/economy/auto/2026/01/20/K3Y4O674A5ETDIXWF5WDPCWC3U/"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mt.co.kr/stock/2026/02/06/2026020609091475535"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_6dca1f43-c4fd-99fd-83d9-8990558f32ee_call-0cae39a0-c3c9-4501-90b8-837c0aaaf60e-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**현대차(005380)의 최근 실적, 주가 및 시장 반응 요약** (2026년 9월 3일 기준)\n\n### 최신 주가 및 밸류에이션\n- **현재가**: 383,500원 (+5,500원, +1.46%)\n- **시가총액**: 약 78.5조 원 (코스피 7위)\n- **52주 범위**: 212,000원 ~ 783,000원\n- **PER**: 12.49배 (2026.06 기준), 추정 PER 약 10.00배\n- **PBR**: 0.82배\n- **배당수익률**: 약 2.61%\n- **투자의견**: 매수 (목표주가 평균 약 70만 원대, 일부 증권사 80~95만 원 상향 조정 사례 있음)[[1]](https://finance.naver.com/item/main.naver?code=005380)\n\n증권사들은 로봇·AI·자율주행 등 미래 사업(피지컬 AI) 재평가로 목표가를 지속 상향하고 있으나, 단기적으로는 파업·관세·전기차 수요 둔화 리스크가 부담으로 작용하고 있습니다.\n\n### 최근 실적 동향 (주요 포인트)\n- **2026년 8월 글로벌 판매**: 28만8,574대 (**-14.2%** YoY). 국내 판매 3만4,333대 (**-41.1%**), 해외 25만4,241대 (**-8.5%**). 30만 대 아래로 떨어진 것은 2022년 1월 이후 4년 7개월 만.[[2]](https://www.yna.co.kr/view/AKR20260901174200003)\n- **원인**: 노조 파업 여파로 국내 생산 차질이 컸습니다. 내수 시장 전체도 28.2% 급감.\n- **기아와 비교**: 기아는 같은 달 +5.0% 성장 (26만6,675대), 해외 중심 전략이 효과를 봤습니다. 7~8월 연속으로 내수 판매에서 현대차를 앞서는 역전 현상.[[3]](https://www.khan.co.kr/article/202609011627001)\n- **누적 (1~8월)**: 현대차 글로벌 판매 **-6.0%** (국내 -15.0%, 해외 -4.1%).\n\n과거 실적 추이 (연간, 억 원 기준, IFRS 연결):\n- 매출: 2023년 162.7조 → 2024년 175.2조 → 2025년 186.3조 → 2026년(E) 193.9조\n- 영업이익: 과거 고점 대비 둔화 추세 (2025년 11.5조 수준). 2026년 2Q EPS는 전년 대비 소폭 증가했으나, 전체적으로 관세·비용 영향으로 변동성 큼.[[1]](https://finance.naver.com/item/main.naver?code=005380)\n\n### 시장 및 주가 반응\n- **긍정적 측면**: \n  - 로봇 사업 (보스턴다이내믹스, 아틀라스 휴머노이드 등)과 AI·SDV(소프트웨어 정의 차량) 기대감으로 2026년 초 주가가 급등. 1월 한 달 60%↑, 시총 3위 탈환 (98조 원) 사례.[[4]](https://biz.heraldcorp.com/article/10658895)\n  - 하이브리드 판매 호조, 미국 시장 점유율 확대, 주주환원 (자사주 소각·매입) 정책.\n  - 일부 분석: “전통 자동차가 아닌 피지컬 AI 성장주로 재평가” (PER 12배대까지 확대).[[5]](https://news.einfomax.co.kr/news/articleView.html?idxno=4396678)\n\n- **부정적 측면**:\n  - **파업 여파**: 2026년 8월 실적 급감 직후 시장에서 부정적. 완성차 5개사 전체 판매도 -5.9%.\n  - **자사주 소각 발표 후 주가 하락**: 2026년 8월 말 7891억 원 규모 소각에도 3%↓. 로보틱스 사업 기대 미달 + 별도 자회사 IPO 우려.[[6]](https://www.hankyung.com/article/2026082754716)\n  - **관세·전기차 둔화**: 미국 관세 리스크 반복 등장 시 5%대 급락 사례 다수. EV 수요 정체에도 불구하고 실적은 양호하나 주가는 저평가 지속 논란.[[7]](https://www.mt.co.kr/stock/2026/02/06/2026020609091475535)\n  - 2026년 들어 변동성 극심: 한 달 70% 상승 후 실적 부진·리스크로 조정 받는 패턴 반복.\n\n### 종합 시장 평가\n증권가에서는 **장기적으로 매수** 의견이 우세하나, 단기적으로는 **파업 해결 여부**와 **로봇 사업 구체화**가 주가 방향성을 좌우할 전망입니다. Simply Wall St 등 일부 모델은 현재 주가를 17~42% 저평가로 보고 있으며, 내재가치 53~66만 원대 추정치도 있습니다.[[8]](https://simplywall.st/ko/stocks/kr/automobiles/kose-a005380/hyundai-motor-shares)\n\n실적 발표 시 시장은 “실적보다 미래 먹거리(로봇·AI)”에 더 민감하게 반응하는 경향이 강합니다. 최신 뉴스는 파업 관련 판매 감소가 핵심 이슈로 부각되고 있어, 9월 이후 생산 정상화가 중요한 변수입니다.\n\n더 구체적인 분기 실적표, 특정 증권사 리포트, 또는 차트 분석이 필요하시면 추가로 말씀해주세요! (자료 출처: 연합뉴스, 네이버증권, 한국경제, Investing.com 등 2026년 9월 초 기준 검색 결과)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://finance.naver.com/item/main.naver?code=005380",
+                "start_index": 325,
+                "end_index": 385,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.yna.co.kr/view/AKR20260901174200003",
+                "start_index": 654,
+                "end_index": 708,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.khan.co.kr/article/202609011627001",
+                "start_index": 863,
+                "end_index": 916,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://finance.naver.com/item/main.naver?code=005380",
+                "start_index": 1172,
+                "end_index": 1232,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://biz.heraldcorp.com/article/10658895",
+                "start_index": 1375,
+                "end_index": 1425,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://news.einfomax.co.kr/news/articleView.html?idxno=4396678",
+                "start_index": 1534,
+                "end_index": 1604,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.hankyung.com/article/2026082754716",
+                "start_index": 1774,
+                "end_index": 1827,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.mt.co.kr/stock/2026/02/06/2026020609091475535",
+                "start_index": 1918,
+                "end_index": 1982,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://simplywall.st/ko/stocks/kr/automobiles/kose-a005380/hyundai-motor-shares",
+                "start_index": 2216,
+                "end_index": 2303,
+                "title": "8"
+              }
+            ]
+          }
+        ],
+        "id": "msg_6dca1f43-c4fd-99fd-83d9-8990558f32ee",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 204388000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 204388000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:08:14.691Z"
+}

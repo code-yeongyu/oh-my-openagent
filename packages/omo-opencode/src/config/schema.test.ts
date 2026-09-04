@@ -511,9 +511,9 @@ describe("BuiltinCategoryNameSchema", () => {
 })
 
 describe("HookNameSchema", () => {
-  test("accepts codegraph bootstrap hook name", () => {
+  test("accepts ast-grep sg provision hook name", () => {
     //#given
-    const input = "codegraph-bootstrap"
+    const input = "ast-grep-sg-provision"
 
     //#when
     const result = HookNameSchema.safeParse(input)

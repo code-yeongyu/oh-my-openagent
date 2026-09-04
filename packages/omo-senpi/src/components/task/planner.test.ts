@@ -506,3 +506,75 @@ describe("createTaskChildPlanner plan variant", () => {
     expect(resolved.plan.variant).toBe("xhigh")
   })
 })
+
+describe("createTaskChildPlanner reviewer category routing", () => {
+  test("#given omo.json overrides categories.deep.model #when the gate reviewer is planned #then the override reaches the agent-sourced model", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      { categories: { deep: { model: "openai/gpt-5.6-terra" } } },
+      BUILTIN_AGENTS,
+      () => registry([model("openai", "gpt-5.6-terra")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Review the gate.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "omo-senpi-gate-reviewer",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("openai/gpt-5.6-terra")
+    expect(resolved.plan.resolved_model?.source).toBe("agent")
+    expect(resolved.plan.agentType).toBe("omo-senpi-gate-reviewer")
+  })
+
+  test("#given a registry serving deep and unspecified-high #when the gate reviewer is planned #then the deep model wins and unspecified-high extends the runtime chain", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("openai", "gpt-5.6-sol"), model("anthropic", "claude-opus-5")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Review the gate.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "omo-senpi-gate-reviewer",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("openai/gpt-5.6-sol")
+    expect(resolved.plan.variant).toBe("medium")
+    expect(resolved.plan.fallback_models?.map((record) => record.display)).toContain("anthropic/claude-opus-5")
+    expect(resolved.plan.instructions).toBe(BUILTIN_AGENTS["omo-senpi-gate-reviewer"]?.prompt)
+    expect(resolved.plan.agentExecutionMode).toBe("in-process")
+  })
+
+  test("#given a registry without the deep gate model #when the gate reviewer is planned #then unspecified-high supplies the model", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("anthropic", "claude-opus-5")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Review the gate.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "omo-senpi-gate-reviewer",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("anthropic/claude-opus-5")
+    expect(resolved.plan.variant).toBe("xhigh")
+  })
+})

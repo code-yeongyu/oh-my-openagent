@@ -78,9 +78,9 @@ describe("getCodexOmoConfig", () => {
 		writeOmoConfig(
 			homeDir,
 			JSON.stringify({
-				codegraph: { enabled: true, install_dir: "/base" },
-				"[codex]": { codegraph: { enabled: false } },
-				"[opencode]": { codegraph: { install_dir: "/opencode-only" } },
+				telemetry: { enabled: true },
+				"[codex]": { telemetry: { enabled: false } },
+				"[opencode]": { telemetry: { enabled: true } },
 			}),
 		)
 
@@ -88,120 +88,36 @@ describe("getCodexOmoConfig", () => {
 		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
 
 		// then
-		expect(result.codegraph).toEqual({
-			auto_provision: true,
-			daemon: true,
-			enabled: false,
-			install_dir: "/base",
-			telemetry: false,
-		})
-		expect(result.trustedCodegraphInstallDir).toBe("/base")
-	})
-
-	it("#given project SOT sets install_dir #when loading config #then only the effective value changes while trusted install root stays global", () => {
-		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-trusted-home-")
-		const cwd = createTemporaryDirectory("omo-codex-shared-trusted-project-")
-		writeOmoConfig(homeDir, JSON.stringify({ codegraph: { enabled: true, install_dir: "/global-codegraph" } }))
-		writeOmoConfig(cwd, JSON.stringify({ codegraph: { install_dir: "/project-codegraph" } }))
-
-		// when
-		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
-
-		// then
-		expect(result.codegraph?.install_dir).toBe("/project-codegraph")
-		expect(result.trustedCodegraphInstallDir).toBe("/global-codegraph")
-	})
-
-	it("#given codex SOT sets CodeGraph excluded roots #when loading config #then roots are returned to hooks", () => {
-		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-excluded-home-")
-		const cwd = createTemporaryDirectory("omo-codex-shared-excluded-project-")
-		writeOmoConfig(
-			homeDir,
-			JSON.stringify({
-				"[codex]": { codegraph: { excluded_roots: ["/tmp/omo-research", "/private/tmp/omo-research"] } },
-			}),
-		)
-
-		// when
-		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
-
-		// then
-		expect(result.codegraph?.excluded_roots).toEqual(["/tmp/omo-research", "/private/tmp/omo-research"])
-	})
-
-	it("#given codex SOT sets the SessionStart cooldown #when loading config #then the configured base interval is returned", () => {
-		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-cooldown-home-")
-		const cwd = createTemporaryDirectory("omo-codex-shared-cooldown-project-")
-		writeOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { session_start_cooldown_ms: 900_000 } } }))
-
-		// when
-		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
-
-		// then
-		expect(result.codegraph?.session_start_cooldown_ms).toBe(900_000)
+		expect(result.telemetry?.enabled).toBe(false)
 		expect(result.warnings).toEqual([])
 	})
 
-	it("#given no codegraph.daemon key #when loading config #then daemon defaults to on", () => {
+	it("#given a project SOT layer #when loading config #then the project value overrides the user layer", () => {
 		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-daemon-default-home-")
-		const cwd = createTemporaryDirectory("omo-codex-shared-daemon-default-project-")
-		writeOmoConfig(homeDir, JSON.stringify({ codegraph: { enabled: true } }))
+		const homeDir = createTemporaryDirectory("omo-codex-shared-project-home-")
+		const cwd = createTemporaryDirectory("omo-codex-shared-project-project-")
+		writeOmoConfig(homeDir, JSON.stringify({ task: { default_concurrency: 3 } }))
+		writeOmoConfig(cwd, JSON.stringify({ task: { default_concurrency: 7 } }))
 
 		// when
 		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
 
 		// then
-		expect(result.codegraph?.daemon).toBe(true)
-		expect(result.warnings).toEqual([])
+		expect(result.task?.default_concurrency).toBe(7)
 	})
 
-	it("#given codex SOT sets codegraph.daemon=false #when loading config #then daemon opt-out is returned", () => {
+	it("#given a codex SOT setting with the wrong type #when loading config #then the value is rejected with a warning", () => {
 		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-daemon-off-home-")
-		const cwd = createTemporaryDirectory("omo-codex-shared-daemon-off-project-")
-		writeOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { daemon: false } } }))
+		const homeDir = createTemporaryDirectory("omo-codex-shared-invalid-home-")
+		const cwd = createTemporaryDirectory("omo-codex-shared-invalid-project-")
+		writeOmoConfig(homeDir, JSON.stringify({ telemetry: { enabled: true }, "[codex]": { telemetry: { enabled: "yes" } } }))
 
 		// when
 		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
 
 		// then
-		expect(result.codegraph?.daemon).toBe(false)
-		expect(result.warnings).toEqual([])
-	})
-
-	it("#given codex SOT sets codegraph.daemon to a non-boolean #when loading config #then the value is rejected with a warning", () => {
-		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-daemon-invalid-home-")
-		const cwd = createTemporaryDirectory("omo-codex-shared-daemon-invalid-project-")
-		writeOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { daemon: "yes" } } }))
-
-		// when
-		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
-
-		// then
-		expect(result.codegraph?.daemon).toBe(true)
-		expect(result.warnings).toContain(`Invalid omo config at ${join(homeDir, ".omo", "omo.jsonc")}: [codex].codegraph.daemon`)
-	})
-
-	it("#given legacy env override and SOT value #when loading config #then env wins over the SOT", () => {
-		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-env-")
-		const cwd = createTemporaryDirectory("omo-codex-project-env-")
-		writeOmoConfig(homeDir, JSON.stringify({ codegraph: { enabled: false } }))
-
-		// when
-		const result = getCodexOmoConfig({
-			cwd,
-			homeDir,
-			env: { CODEX_CODEGRAPH_ENABLED: "1" },
-		})
-
-		// then
-		expect(result.codegraph?.enabled).toBe(true)
+		expect(result.telemetry).toBeUndefined()
+		expect(result.warnings).toContain(`Invalid omo config at ${join(homeDir, ".omo", "omo.jsonc")}: [codex].telemetry.enabled`)
 	})
 
 	it("#given no SOT files #when loading config #then returns built-in defaults and missing global source", () => {
@@ -213,12 +129,8 @@ describe("getCodexOmoConfig", () => {
 		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
 
 		// then
-		expect(result.codegraph).toEqual({
-			auto_provision: true,
-			daemon: true,
-			enabled: true,
-			telemetry: false,
-		})
+		expect(result.telemetry).toBeUndefined()
+		expect(result.warnings).toEqual([])
 		expect(result.sources).toContainEqual({
 			exists: false,
 			loaded: false,
@@ -227,23 +139,10 @@ describe("getCodexOmoConfig", () => {
 		})
 	})
 
-	it("#given codex-unsupported codegraph setting #when loading config #then returns loader warnings", () => {
-		// given
-		const homeDir = createTemporaryDirectory("omo-codex-shared-warnings-")
-		const cwd = createTemporaryDirectory("omo-codex-project-warnings-")
-		writeOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { watch_debounce_ms: 42 } } }))
-
-		// when
-		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
-
-		// then
-		expect(result.warnings).toContain("codegraph.watch_debounce_ms is not supported for harness codex")
-	})
-
 	it("#given only legacy config.jsonc #when codex starts #then migrates once with a backup before loading the unified codex view", () => {
 		// given
 		const homeDir = createTemporaryDirectory("omo-codex-legacy-upgrade-")
-		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { daemon: false } } }))
+		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { telemetry: { enabled: false } } }))
 		const legacyPath = join(homeDir, ".omo", "config.jsonc")
 
 		// when
@@ -252,7 +151,7 @@ describe("getCodexOmoConfig", () => {
 		const second = getCodexOmoConfig({ cwd: homeDir, homeDir, env: {} })
 
 		// then
-		expect(first.codegraph?.daemon).toBe(false)
+		expect(first.telemetry?.enabled).toBe(false)
 		expect(first.warnings.some((warning) => warning.startsWith("omo-codex: migrated legacy configuration from ")
 			&& warning.endsWith("/.omo/config.jsonc"))).toBe(true)
 		expect(readOmoJson(homeDir)["_migrations"]).toEqual(["2026-07-codex-config-jsonc"])
@@ -266,8 +165,8 @@ describe("getCodexOmoConfig", () => {
 	it("#given a legacy migration conflict #when codex starts #then exposes the migration summary and conflict through loader warnings", () => {
 		// given
 		const homeDir = createTemporaryDirectory("omo-codex-legacy-conflict-")
-		writeOmoConfig(homeDir, JSON.stringify({ codegraph: { enabled: true } }))
-		writeLegacyOmoConfig(homeDir, JSON.stringify({ codegraph: { enabled: false } }))
+		writeOmoConfig(homeDir, JSON.stringify({ "[codex]": { telemetry: { enabled: true } } }))
+		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { telemetry: { enabled: false } } }))
 
 		// when
 		const result = getCodexOmoConfig({ cwd: homeDir, homeDir, env: {} })
@@ -275,7 +174,7 @@ describe("getCodexOmoConfig", () => {
 		// then
 		expect(result.warnings.some((warning) => warning.startsWith("omo-codex: migrated legacy configuration from ")
 			&& warning.endsWith("/.omo/config.jsonc"))).toBe(true)
-		expect(result.warnings).toContain("omo-codex: configuration migration: skipped: codegraph.enabled legacy=false kept=true")
+		expect(result.warnings).toContain("omo-codex: configuration migration: skipped: [codex].telemetry.enabled legacy=false kept=true")
 	})
 
 	it("#given overlapping [omo] and [senpi] blocks in legacy config #when Codex migrates #then the transform conflict is reported", () => {
@@ -310,7 +209,7 @@ describe("getCodexOmoConfig", () => {
 	it("#given codex starts before opencode #when both legacy source groups exist #then each distinct migration id is applied once", () => {
 		// given
 		const homeDir = createTemporaryDirectory("omo-codex-order-codex-first-")
-		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { daemon: false } } }))
+		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { telemetry: { enabled: false } } }))
 		writeOpenCodeConfig(homeDir)
 		const openCodeSource = join(homeDir, ".config", "opencode", "oh-my-openagent.jsonc")
 
@@ -322,13 +221,17 @@ describe("getCodexOmoConfig", () => {
 		// then
 		expect(remainsAfterCodexStartup).toBe(true)
 		expect(existsSync(openCodeSource)).toBe(false)
-		expect(migrationIds(homeDir)).toEqual(["2026-07-codex-config-jsonc", "2026-07-opencode-config-unification"])
+		expect(migrationIds(homeDir)).toEqual([
+			"2026-07-codex-config-jsonc",
+			"2026-07-opencode-config-unification",
+			"2026-08-reasoning-unification",
+		])
 	})
 
 	it("#given opencode starts before codex #when both legacy source groups exist #then each distinct migration id is applied once", () => {
 		// given
 		const homeDir = createTemporaryDirectory("omo-codex-order-opencode-first-")
-		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { daemon: false } } }))
+		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { telemetry: { enabled: false } } }))
 		writeOpenCodeConfig(homeDir)
 
 		// when
@@ -336,13 +239,17 @@ describe("getCodexOmoConfig", () => {
 		getCodexOmoConfig({ cwd: homeDir, homeDir, env: {} })
 
 		// then
-		expect(migrationIds(homeDir)).toEqual(["2026-07-opencode-config-unification", "2026-07-codex-config-jsonc"])
+		expect(migrationIds(homeDir)).toEqual([
+			"2026-07-opencode-config-unification",
+			"2026-07-codex-config-jsonc",
+			"2026-08-reasoning-unification",
+		])
 	})
 
 	it("#given concurrent codex and opencode starts #when opencode owns the shared lock #then both migration ids are applied exactly once", () => {
 		// given
 		const homeDir = createTemporaryDirectory("omo-codex-order-concurrent-")
-		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { codegraph: { daemon: false } } }))
+		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { telemetry: { enabled: false } } }))
 		writeOpenCodeConfig(homeDir)
 		let codexResult: ReturnType<typeof runCodexStartupMigration> | undefined
 
@@ -355,6 +262,10 @@ describe("getCodexOmoConfig", () => {
 		// then
 		if (codexResult === undefined) throw new Error("Expected concurrent Codex migration attempt")
 		expect(codexResult.error).toBe("Configuration migration is already running")
-		expect(migrationIds(homeDir)).toEqual(["2026-07-opencode-config-unification", "2026-07-codex-config-jsonc"])
+		expect(migrationIds(homeDir)).toEqual([
+			"2026-07-opencode-config-unification",
+			"2026-07-codex-config-jsonc",
+			"2026-08-reasoning-unification",
+		])
 	})
 })

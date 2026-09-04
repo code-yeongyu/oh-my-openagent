@@ -1,0 +1,35 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/skill.test.ts:
+37 | 
+38 | describe("x-search skill front matter", () => {
+39 |   const frontMatter = parseFrontMatter(readFileSync(SKILL_PATH, "utf8"))
+40 | 
+41 |   it("#given the skill file #when parsing front matter #then name is pinned to x-search", () => {
+42 |     expect(frontMatter.name).toBe("x-search")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "x-search"
+Received: "x_search"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/skill.test.ts:42:30)
+(fail) x-search skill front matter > #given the skill file #when parsing front matter #then name is pinned to x-search [2.54ms]
+(pass) x-search skill front matter > #given the skill file #when reading description #then it stays under 1024 chars [0.08ms]
+(pass) x-search skill front matter > #given the skill file #when reading description #then it is ASCII only [0.09ms]
+
+ 2 pass
+ 1 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [495.00ms]
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/skill.test.ts:
+(pass) x-search skill front matter > #given the skill file #when parsing front matter #then name is pinned to x-search [0.43ms]
+(pass) x-search skill front matter > #given the skill file #when reading description #then it stays under 1024 chars [0.11ms]
+(pass) x-search skill front matter > #given the skill file #when reading description #then it is ASCII only [1.84ms]
+
+ 3 pass
+ 0 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [484.00ms]

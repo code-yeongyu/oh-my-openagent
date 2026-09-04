@@ -6,7 +6,6 @@ import { join } from "node:path"
 import {
   attestLspDaemonCliProcess,
   selectOrphanedLspDaemonProxies,
-  selectZombieCodegraphProcesses,
   sweepOrphanedLspDaemonProxies,
   sweepStaleLspDaemonVersions,
   type ProcessInfo,
@@ -28,20 +27,9 @@ function writeOwner(versionDir: string, pid: number): void {
 
 describe("process sweep family matrix", () => {
   const omoRoot = "/tmp/omo-plugin"
-  const installDir = "/tmp/omo-install"
 
   const posixTable: readonly ProcessInfo[] = [
     { command: "codex app-server", pid: 200, ppid: 1 },
-    // codegraph bridge (serve wrapper)
-    { command: `node ${omoRoot}/components/codegraph/dist/serve.js`, pid: 301, ppid: 1 },
-    // codegraph direct upstream
-    {
-      command: `node ${omoRoot}/node_modules/@colbymchenry/codegraph/bin/codegraph.js serve --mcp`,
-      pid: 302,
-      ppid: 9999,
-    },
-    // codegraph detached upstream daemon
-    { command: `${installDir}/bin/codegraph serve --mcp --path /tmp/proj`, pid: 303, ppid: 1 },
     // lsp-daemon mcp proxy, orphaned (ppid 1)
     { command: `node ${omoRoot}/components/lsp-daemon/dist/cli.js mcp`, pid: 304, ppid: 1 },
     // lsp-daemon mcp proxy, live parent
@@ -54,20 +42,11 @@ describe("process sweep family matrix", () => {
     { command: `node /tmp/other-plugin/components/lsp-daemon/dist/cli.js mcp`, pid: 308, ppid: 1 },
   ]
 
-  it("#given a posix process table spanning every family #when classifying #then each family selects exactly its own zombies", () => {
+  it("#given a posix process table spanning every family #when classifying #then the proxy family selects exactly its own zombies", () => {
     // given / when
-    const codegraph = selectZombieCodegraphProcesses(posixTable, {
-      ownedRoots: [omoRoot, installDir],
-      platform: "linux",
-    })
     const proxies = selectOrphanedLspDaemonProxies(posixTable, { ownedRoots: [omoRoot], platform: "linux" })
 
     // then
-    expect(codegraph.map((processInfo) => [processInfo.pid, processInfo.matchKind])).toEqual([
-      [301, "serve-wrapper"],
-      [302, "upstream-codegraph"],
-      [303, "upstream-daemon"],
-    ])
     expect(proxies.map((processInfo) => [processInfo.pid, processInfo.matchKind])).toEqual([
       [304, "lsp-daemon-proxy"],
       [307, "lsp-daemon-proxy"],
@@ -79,18 +58,15 @@ describe("process sweep family matrix", () => {
     const winRoot = "C:\\Users\\runner\\.codex\\plugins\\cache\\sisyphuslabs\\omo\\4.15.1"
     const table: readonly ProcessInfo[] = [
       { command: "codex.exe app-server", pid: 200, ppid: 4 },
-      { command: `node ${winRoot}\\components\\codegraph\\dist\\serve.js`, pid: 311, ppid: 1 },
       { command: `node.exe ${winRoot}\\components\\lsp-daemon\\dist\\cli.js mcp`, pid: 312, ppid: 1 },
       { command: `node.exe ${winRoot}\\components\\lsp-daemon\\dist\\cli.js mcp`, pid: 313, ppid: 200 },
       { command: `node.exe ${winRoot}\\components\\lsp-daemon\\dist\\cli.js daemon`, pid: 314, ppid: 1 },
     ]
 
     // when
-    const codegraph = selectZombieCodegraphProcesses(table, { ownedRoots: [winRoot], platform: "win32" })
     const proxies = selectOrphanedLspDaemonProxies(table, { ownedRoots: [winRoot], platform: "win32" })
 
     // then
-    expect(codegraph.map((processInfo) => processInfo.pid)).toEqual([311])
     expect(proxies.map((processInfo) => processInfo.pid)).toEqual([312])
   })
 
@@ -162,7 +138,6 @@ describe("orphaned lsp-daemon proxy sweep", () => {
       expect(calls).toEqual(["term:401"])
       expect(result.stampFile).toBe(join(homeDir, ".omo", "lsp-daemon", "lsp-proxy-sweep.stamp"))
       expect(existsSync(result.stampFile)).toBe(true)
-      expect(existsSync(join(homeDir, ".omo", "codegraph", "zombie-sweep.stamp"))).toBe(false)
     } finally {
       rmSync(homeDir, { force: true, recursive: true })
     }
@@ -423,23 +398,7 @@ describe("lsp-daemon cli attestation", () => {
   })
 })
 
-describe("backward-compatible codegraph process-sweep module", () => {
-  it("#given the legacy codegraph/process-sweep import path #when importing #then every legacy export is still available", async () => {
-    // given / when
-    const legacy = await import("./codegraph/process-sweep")
-
-    // then
-    expect(typeof legacy.sweepCodegraphZombies).toBe("function")
-    expect(typeof legacy.selectZombieCodegraphProcesses).toBe("function")
-    expect(typeof legacy.parsePosixProcessTable).toBe("function")
-    expect(typeof legacy.parseWindowsProcessTable).toBe("function")
-    expect(typeof legacy.discoverCodegraphOwnedRoots).toBe("function")
-    expect(typeof legacy.enumerateCodegraphProcesses).toBe("function")
-    expect(typeof legacy.createDefaultCodegraphProcessKiller).toBe("function")
-    expect(typeof legacy.evaluateDaemonStaleness).toBe("function")
-    expect(typeof legacy.parseDaemonLock).toBe("function")
-    expect(typeof legacy.daemonLockCandidates).toBe("function")
-  })
+describe("stale lsp-daemon version sweep pid reuse", () => {
   it("#given daemon identity changes after TERM #when escalation runs #then replacement PID is never killed", async () => {
     const homeDir = mkdtempSync(join(tmpdir(), "omo-lsp-pid-reuse-"))
     const baseDir = join(homeDir, ".omo", "lsp-daemon")

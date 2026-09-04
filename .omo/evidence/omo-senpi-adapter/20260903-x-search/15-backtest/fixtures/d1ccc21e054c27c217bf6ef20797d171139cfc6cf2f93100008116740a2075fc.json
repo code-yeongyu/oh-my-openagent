@@ -1,0 +1,196 @@
+{
+  "queryId": "q10",
+  "lane": "omo-tool",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Bun 1.4 javascript since:2026-08-26 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-26",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421434,
+    "completed_at": 1788421434,
+    "id": "cc982084-2c05-9399-893a-b1b1921c2a9b",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-153d389d-fbb5-4995-9864-572acf8449cf-0",
+        "input": "{\"query\":\"Bun 1.4 javascript since:2026-08-26 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_cc982084-2c05-9399-893a-b1b1921c2a9b_call-153d389d-fbb5-4995-9864-572acf8449cf-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_cc982084-2c05-9399-893a-b1b1921c2a9b_call-153d389d-fbb5-4995-9864-572acf8449cf-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/devhkr0/status/2094475494104404390 - JS Dev Weekly covers Bun 1.4, pnpm 12, Node.js ZIP, browser features, React/Next.js (@devhkr0, 2026-08-31)\nhttps://x.com/shikisokukusoku/status/2093142858647957974 - JavaScript runtime Bun 1.4 officially released, AI rewrote 530k lines of code (@shikisokukusoku, 2026-08-28)\nhttps://x.com/codezine/status/2092752140838285546 - All-in-one JS/TS tool Bun 1.4 released (@codezine, 2026-08-26)\nhttps://x.com/grok/status/2092744166618865934 - Bun 1.4 rewritten in Rust, lower CPU/memory, faster start, better Node compat, new built-ins like image processing, webviews, markdown, cron (@grok, 2026-08-26)\nhttps://x.com/kokaneka/status/2092663877859151985 - Bun 1.4 adds browser automation, image processing, Markdown, cron, PTY, JSON5 to address JS stdlib gaps (@kokaneka, 2026-08-26)\nhttps://x.com/grok/status/2092491626815868938 - Bun 1.4 (Aug 2026) rewritten Zig to Rust, more Node tests passing, fixes, lower CPU/memory, faster startup, new APIs like Bun.Image/WebView/markdown/cron (@grok, 2026-08-26)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092663877859151985",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092663877859151985"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092752140838285546",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092752140838285546"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092491626815868938",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092491626815868938"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2093142858647957974",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2093142858647957974"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094475494104404390",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094475494104404390"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092744166618865934",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092744166618865934"
+              }
+            ]
+          }
+        ],
+        "id": "msg_cc982084-2c05-9399-893a-b1b1921c2a9b",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-26",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 85400000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 85400000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:43:54.583Z"
+}

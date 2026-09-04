@@ -1,0 +1,347 @@
+{
+  "queryId": "q15",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Bun JavaScript runtime news since:2026-08-18 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-18",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "bunjavascript"
+        ]
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422105,
+    "completed_at": 1788422105,
+    "id": "e350dad1-6585-9e01-81be-68476671ce28",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_e350dad1-6585-9e01-81be-68476671ce28_call-ed57ad46-7bc3-4678-91e6-c4be8723f92b-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "Bun JavaScript runtime news",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=i38DgEuaJwM"
+            },
+            {
+              "type": "url",
+              "url": "https://en.wikipedia.org/wiki/Bun_(software)"
+            },
+            {
+              "type": "url",
+              "url": "https://libraries.io/npm/bun"
+            },
+            {
+              "type": "url",
+              "url": "https://r.jina.ai/https:/bun.com/"
+            },
+            {
+              "type": "url",
+              "url": "https://simonwillison.net/tags/bun/"
+            },
+            {
+              "type": "url",
+              "url": "https://appwrite.io/blog/post/announcing-bun-1-4-runtime"
+            },
+            {
+              "type": "url",
+              "url": "https://gihyo.jp/article/2026/08/bun-1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://shipkit.davrapps.dev/en/blog/bun-saas-backend-2026"
+            },
+            {
+              "type": "url",
+              "url": "https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/"
+            },
+            {
+              "type": "url",
+              "url": "https://thenewstack.io/bun-developers-complaints-anthropic/"
+            },
+            {
+              "type": "url",
+              "url": "https://daily.dev/posts/bun-1-4-nz2dmgftt"
+            },
+            {
+              "type": "url",
+              "url": "https://juejin.cn/post/7676105145394200610"
+            },
+            {
+              "type": "url",
+              "url": "https://github.com/oven-sh/bun"
+            },
+            {
+              "type": "url",
+              "url": "https://daily.dev/posts/bun-1-4-finally-ships-the-rust-rewrite-drama-isn-t-over--fdy7op2yl"
+            },
+            {
+              "type": "url",
+              "url": "https://www.cosmicjs.com/blog/bun-rust-rewrite-javascript-runtime"
+            },
+            {
+              "type": "url",
+              "url": "https://www.theregister.com/devops/2026/07/14/zig-creator-calls-buns-claude-rust-rewrite-unreviewed-slop/5270743"
+            },
+            {
+              "type": "url",
+              "url": "https://medium.com/@onix_react/whats-new-in-bun-v1-4-c9f2d85923db"
+            },
+            {
+              "type": "url",
+              "url": "https://x.com/jarredsumner/status/2075063654291223007"
+            },
+            {
+              "type": "url",
+              "url": "https://redmonk.com/sogrady/2026/06/04/bun-two-lessons/"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_e350dad1-6585-9e01-81be-68476671ce28_call-ed57ad46-7bc3-4678-91e6-c4be8723f92b-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**Recent news on Bun JavaScript runtime (as of September 2026) focuses heavily on the major Bun v1.4 release.**[[1]](https://bun.com/blog/bun-v1.4)\n\n### Bun v1.4 Release (August 20, 2026)\nThe standout story is the stable launch of **Bun v1.4**, which includes a complete rewrite of Bun's core from Zig to Rust (roughly 1 million lines of code changed). This was largely driven by AI tools (parallel Claude agents over ~11 days), aiming to eliminate classes of memory bugs at compile time.[[2]](https://www.youtube.com/watch?v=i38DgEuaJwM)[[3]](https://appwrite.io/blog/post/announcing-bun-1-4-runtime)\n\n**Key improvements in v1.4:**\n- **Node.js compatibility**: Passes +1,517 more tests from the Node.js test suite (biggest jump since v1.0). Many packages now work out-of-the-box, including Playwright, Next.js 16, Vitest, OpenTelemetry, and others. It reports as Node.js 26 in several areas.[[1]](https://bun.com/blog/bun-v1.4)\n- **Performance & efficiency**: Up to 5x lower idle CPU, 35–48% less memory for HTTP servers (e.g., Fastify from 233 MB to 120 MB), and ~50% faster startup on Linux (hello-world ~5.1 ms vs. 10.9 ms previously). Binary size is also smaller.[[4]](https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/)\n- **New built-in APIs**: Replaces several common dependencies with native support, including `Bun.Image` (faster than Sharp), `Bun.WebView` (headless browser automation, no Puppeteer/Playwright needed), `Bun.markdown`, `Bun.cron()`, `Bun.Terminal` (PTY), native streams, and improved `bun:ffi` (up to ~3–4x faster).[[5]](https://daily.dev/posts/bun-1-4-nz2dmgftt)\n- **CLI & tooling enhancements**: `bun run --parallel`, `bun test --parallel`, `bun audit fix`, `bun dedupe`, `bun prune`, better package management (faster installs, isolated linker), React Compiler integration in `bun build`, experimental HTTP/2 & HTTP/3 support, Windows on ARM64, and more.[[6]](https://r.jina.ai/https:/bun.com/)\n- **Fixes**: Over 2,900 GitHub issues addressed.[[1]](https://bun.com/blog/bun-v1.4)\n\nThe release notes emphasize production gains; for example, Anthropic's Claude Code (which uses Bun) saw significant CPU reductions in real workloads.[[7]](https://medium.com/@onix_react/whats-new-in-bun-v1-4-c9f2d85923db)\n\nYou can upgrade with `bun upgrade` or install via the usual methods (curl script, npm, Homebrew, etc.). Canary builds (including early 1.4.0 versions) have been available since around early September 2026.[[8]](https://libraries.io/npm/bun)\n\n### Background Context\n- **Acquisition by Anthropic**: Bun was acquired by Anthropic in December 2025. The project remains fully open-source under the MIT license, with the same team continuing development. This has accelerated progress and integrated Bun into tools like Claude Code and the Claude Agent SDK. Monthly downloads reportedly grew significantly post-acquisition (to over 20 million).[[9]](https://en.wikipedia.org/wiki/Bun_(software))\n- **The Rust Rewrite Controversy**: While the rewrite delivered strong results, it sparked debate. Critics (including Zig's creator) called parts of the AI-generated code \"unreviewed slop.\" There were also earlier concerns about memory leaks, open issues, and project maturity in mid-2026. Some developers questioned the necessity or long-term trust in an AI-heavy port, though production benchmarks from users (e.g., on Appwrite, Scrydon) have been positive.[[10]](https://www.theregister.com/devops/2026/07/14/zig-creator-calls-buns-claude-rust-rewrite-unreviewed-slop/5270743)[[11]](https://thenewstack.io/bun-developers-complaints-anthropic/)\n\n### Other Notes\n- Stable version before v1.4 was 1.3.14 (May 2026). The Rust version is now the default in v1.4.[[9]](https://en.wikipedia.org/wiki/Bun_(software))\n- Bun continues to position itself as a fast, all-in-one alternative to Node.js (runtime + package manager + test runner + bundler), powered by JavaScriptCore.[[12]](https://github.com/oven-sh/bun)\n\nFor the full details, check the official release post: https://bun.com/blog/bun-v1.4. The project is active on GitHub (oven-sh/bun), X (@bunjavascript), and Discord.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 111,
+                "end_index": 147,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.youtube.com/watch?v=i38DgEuaJwM",
+                "start_index": 488,
+                "end_index": 538,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://appwrite.io/blog/post/announcing-bun-1-4-runtime",
+                "start_index": 538,
+                "end_index": 601,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 892,
+                "end_index": 928,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/",
+                "start_index": 1168,
+                "end_index": 1234,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://daily.dev/posts/bun-1-4-nz2dmgftt",
+                "start_index": 1550,
+                "end_index": 1598,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://r.jina.ai/https:/bun.com/",
+                "start_index": 1892,
+                "end_index": 1932,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 1981,
+                "end_index": 2017,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://medium.com/@onix_react/whats-new-in-bun-v1-4-c9f2d85923db",
+                "start_index": 2168,
+                "end_index": 2240,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://libraries.io/npm/bun",
+                "start_index": 2447,
+                "end_index": 2482,
+                "title": "8"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.wikipedia.org/wiki/Bun_(software)",
+                "start_index": 2880,
+                "end_index": 2931,
+                "title": "9"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.theregister.com/devops/2026/07/14/zig-creator-calls-buns-claude-rust-rewrite-unreviewed-slop/5270743",
+                "start_index": 3391,
+                "end_index": 3511,
+                "title": "10"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://thenewstack.io/bun-developers-complaints-anthropic/",
+                "start_index": 3511,
+                "end_index": 3578,
+                "title": "11"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.wikipedia.org/wiki/Bun_(software)",
+                "start_index": 3692,
+                "end_index": 3743,
+                "title": "9"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://github.com/oven-sh/bun",
+                "start_index": 3903,
+                "end_index": 3941,
+                "title": "12"
+              }
+            ]
+          }
+        ],
+        "id": "msg_e350dad1-6585-9e01-81be-68476671ce28",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 214740500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 214740500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:55:01.134Z"
+}

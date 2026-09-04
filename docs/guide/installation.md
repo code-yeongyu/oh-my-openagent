@@ -3,7 +3,7 @@
 oh-my-openagent ships in **three editions** of the same product: two plugins that load into a host you already run, plus one standalone edition.
 
 - **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. 11 discipline agents, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ulw-loop, hashline edits, the works.
-- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** - the portable components that fit Codex's plugin system: `codegraph`, `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `rules`, `lsp`, `telemetry`, `teammode`, `ulw-execute-continuation`, `ulw-loop`, and `ultrawork`, plus plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It has no OpenCode agent registry or `team_*` tool family, but ships Codex-native agent roles and the script-and-skill-driven `teammode` component.
+- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** - the portable components that fit Codex's plugin system: `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `rules`, `lsp`, `telemetry`, `teammode`, `ulw-execute-continuation`, `ulw-loop`, and `ultrawork`, plus plugin-scoped MCPs for `grep_app`, `context7`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It has no OpenCode agent registry or `team_*` tool family, but ships Codex-native agent roles and the script-and-skill-driven `teammode` component.
 - **Senpi Edition (standalone, beta)** — the native `omo` command with the OMO extension built in. It installs from `omo-ai@beta` instead of loading as a plugin into OpenCode or Codex.
 
 Most users want **Ultimate**. Pick **Light** if you are already invested in Codex CLI. Pick **both** if you want OMO available wherever you happen to be working that day.
@@ -41,7 +41,7 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 
 ### Light (Codex CLI) — one line, no agent needed
 
-The Light edition installer asks whether to configure Codex for autonomous full-permissions mode. This is recommended for agent-style use: `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and notice warnings hidden. Use `--codex-autonomous` or `--no-codex-autonomous` to choose non-interactively:
+The Light edition installer asks whether to configure Codex for autonomous full-permissions mode. This is recommended for agent-style use: `approval_policy = "never"`, `sandbox_mode = "danger-full-access"` (which already implies unrestricted network access), and notice warnings hidden. A legacy top-level `network_access` key left by older installers is removed, because Codex rejects it under `--strict-config`. Use `--codex-autonomous` or `--no-codex-autonomous` to choose non-interactively:
 
 ```bash
 npx lazycodex-ai install
@@ -221,7 +221,7 @@ Map their answer to the `--platform` flag:
 
 If the user picked Codex or Both, ask:
 
-> "Codex works best for autonomous agent installs when it can run without repeated permission prompts: `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"`. This is recommended for OMO/LazyCodex. Should I configure Codex that way?"
+> "Codex works best for autonomous agent installs when it can run without repeated permission prompts: `approval_policy = "never"` and `sandbox_mode = "danger-full-access"`. This is recommended for OMO/LazyCodex. Should I configure Codex that way?"
 
 Map their answer to:
 
@@ -394,7 +394,7 @@ bunx oh-my-openagent install \
 | Platform | Writes |
 |----------|--------|
 | `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into the `[opencode]` block of `~/.omo/omo.jsonc` (legacy config files are migrated into the unified file first). |
-| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm ci --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If a legacy `[features] multi_agent_v2 = false` shorthand exists, the installer converts it to `[features.multi_agent_v2] enabled = false` to keep the file valid while preserving the user's explicit disable. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and the matching `[notice]` warning suppressions. |
+| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm ci --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If a legacy `[features] multi_agent_v2 = false` shorthand exists, the installer converts it to `[features.multi_agent_v2] enabled = false` to keep the file valid while preserving the user's explicit disable. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and the matching `[notice]` warning suppressions, and removes a legacy top-level `network_access` key. |
 
 Both halves are independent and idempotent — re-running is safe.
 
@@ -424,10 +424,10 @@ grep -A4 'marketplaces.sisyphuslabs' ~/.codex/config.toml
 grep -A2 'omo@sisyphuslabs' ~/.codex/config.toml
 
 # If the user accepted autonomous mode, permission settings are present?
-grep -E 'approval_policy|sandbox_mode|network_access' ~/.codex/config.toml
+grep -E 'approval_policy|sandbox_mode' ~/.codex/config.toml
 
 # Component binaries linked?
-ls ~/.local/bin/ | grep -E '^(omo-agent-toolkit|lazycodex-executor-verify|ulw|ulw-loop|omo-(codegraph|comment-checker|git-bash-hook|lsp|rules|ulw-execute-continuation|telemetry|ultrawork|ulw-loop))$'
+ls ~/.local/bin/ | grep -E '^(omo-agent-toolkit|lazycodex-executor-verify|ulw|ulw-loop|omo-(comment-checker|git-bash-hook|lsp|rules|ulw-execute-continuation|telemetry|ultrawork|ulw-loop))$'
 
 # Codex CLI sees the plugin?
 codex --help
@@ -785,9 +785,9 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 
 - **Plugin cache:** `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`
 - **Codex marketplace snapshot:** `~/.codex/.tmp/marketplaces/sisyphuslabs/` (local marketplace metadata and bundled source snapshot)
-- **User-linked component binaries:** `lazycodex-executor-verify`, `omo-codegraph`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-ulw-execute-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork`, `ulw`, and `ulw-loop` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). `teammode` runs through skill, hook, and script surfaces rather than a user-linked executable. The top-level `omo-agent-toolkit` command belongs to the shared oh-my-openagent launcher, not a Codex component.
+- **User-linked component binaries:** `lazycodex-executor-verify`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-ulw-execute-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork`, `ulw`, and `ulw-loop` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). `teammode` runs through skill, hook, and script surfaces rather than a user-linked executable. The top-level `omo-agent-toolkit` command belongs to the shared oh-my-openagent launcher, not a Codex component.
 - **Codex agent roles:** `~/.codex/agents/{lazycodex-clone-fidelity-reviewer,lazycodex-code-reviewer,lazycodex-gate-reviewer,lazycodex-qa-executor,lazycodex-worker-low,lazycodex-worker-medium,lazycodex-worker-high,explorer,librarian,metis,momus,plan}.toml` (there is no `lazycodex-executor` agent TOML; executor completion is handled by the `lazycodex-executor-verify` hook/bin), copied from the bundled plugin snapshot, so they keep resolving when Codex prunes old plugin-cache versions or temporary marketplace state
-- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), `[marketplaces.sisyphuslabs]` pointing at `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, plugin MCP policy blocks, SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries, and optionally autonomous permission settings if accepted. If the installer cannot resolve a CodeGraph-compatible Node runtime, it writes the `codegraph` MCP policy as disabled while leaving `omo@sisyphuslabs` enabled.
+- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 16` (and, when MultiAgentV2 is not preferred, `[agents] max_threads = 1000`), `[marketplaces.sisyphuslabs]` pointing at `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, plugin MCP policy blocks, SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries, and optionally autonomous permission settings if accepted.
 
 #### The components
 
@@ -796,7 +796,6 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 | `rules` | TypeScript | `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostCompact` | Injects `AGENTS.md`, `CLAUDE.md`, and `.omo/rules/**` into Codex's context |
 | `comment-checker` | TypeScript | `PostToolUse` (`apply_patch`, `edit`, `write`) | Blocks AI-slop comment patterns in generated code |
 | `git-bash` | TypeScript + MCP | `PreToolUse` (`Bash`), `PostCompact`, MCP server | On Windows, exposes `git_bash`; reminds Codex before the first shell-like call and again after compaction |
-| `codegraph` | TypeScript + MCP | `SessionStart`, `PostToolUse`, MCP server | Provisions and wraps CodeGraph, initializes project indexes, and exposes its MCP tools |
 | `lazycodex-executor-verify` | TypeScript | `SubagentStop` | Requires evidence receipts from LazyCodex implementation workers before accepting completion |
 | `lsp` | TypeScript + MCP | MCP server + post-edit hooks | Exposes LSP diagnostics, navigation, symbols, rename via MCP |
 | `teammode` | TypeScript + skill | `PostToolUse` plus script-driven skill | Coordinates Codex-native agents or app threads with durable team state and thread-title guidance |
@@ -819,7 +818,6 @@ Compatibility note: LazyCodex is the Codex-platform OmO install path for `oh-my-
 | `command not found: omo-rules` or `command not found: omo-agent-toolkit` | Add `~/.local/bin` to `PATH`, or set `$CODEX_LOCAL_BIN_DIR` to a directory already on `PATH` |
 | `npm install` fails mid-install | `rm -rf ~/.codex/plugins/cache/sisyphuslabs` and retry |
 | Plugin block is present but hooks do not fire | Verify `~/.codex/config.toml` contains `[features]\nplugins = true\nplugin_hooks = true` and `[plugins."omo@sisyphuslabs"]` |
-| `MCP client for codegraph failed to start` | Re-run `npx lazycodex-ai install` with a CodeGraph-compatible Node runtime on `PATH`, or set `CODEGRAPH_NODE_BIN` to one. The installer disables only the `codegraph` MCP policy when the local runtime is unsupported; the rest of OMO remains enabled. |
 | `Ignoring malformed agent role definition: agents.*.config_file must point to an existing file` | Re-run `npx lazycodex-ai install`. The installer repairs stale managed `[agents.*]` entries and recreates `~/.codex/agents/*.toml`. |
 | `agents.max_threads cannot be set when multi_agent_v2 is enabled` in one project | Re-run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers, creates `.backup-<timestamp>` files for changed configs, and leaves user-authored `.codex` artifacts in place. |
 | `SessionStart hook (failed)` / `UserPromptSubmit hook (failed)` with `MODULE_NOT_FOUND` for `components/*/dist/cli.js` | Re-run the installer so the cached plugin is rebuilt with component `dist/` files. If the cache was manually edited, remove `~/.codex/plugins/cache/sisyphuslabs` first. |

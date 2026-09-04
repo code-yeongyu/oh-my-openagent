@@ -1,0 +1,9 @@
+$ bun test script/senpi-hooks-state.test.ts
+bun test v1.3.14 (0d9b296a)
+
+ 9 pass
+ 0 fail
+ 14 expect() calls
+Ran 9 tests across 1 file. [689.00ms]
+
+Command exited with code 0.

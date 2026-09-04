@@ -155,7 +155,7 @@ describe("reconcileOnSessionStart scoped revival", () => {
 
     // then
     expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" })
-    expect(harness.store.load(record.task_id)).toEqual(record)
+    expect(harness.store.load(record.task_id)).toEqual({ ...record, terminal_at: record.updated_at })
     expect(harness.signals).toHaveLength(0)
   })
 

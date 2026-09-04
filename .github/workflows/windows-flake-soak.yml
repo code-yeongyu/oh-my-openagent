@@ -1,0 +1,220 @@
+name: Windows flake soak
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Focused Windows test target to repeat
+        required: true
+        type: choice
+        options:
+          - reconciliation
+          - hooks-state
+          - mailbox
+          - team-message
+          - memory-supervisor
+          - facts-lock
+          - reply-listener
+          - dag-race
+          - memfs-restore
+          - senpi-overflow
+          - full-shard-2
+      iterations:
+        description: Number of identical iterations to run
+        required: true
+        default: 10
+        type: number
+      test_ref:
+        description: Git ref whose repository contents should be tested
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.test_ref || github.ref }}
+
+      - uses: actions/setup-node@v7
+        if: inputs.target == 'full-shard-2'
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Remove stale self-package test copies
+        if: inputs.target == 'full-shard-2'
+        run: bun run script/remove-stale-self-package-tests.ts
+
+      - name: Run vendored lsp-daemon tests
+        if: inputs.target == 'full-shard-2'
+        run: npm test
+        working-directory: packages/lsp-daemon
+
+      - name: Run allowlisted target repeatedly
+        id: run-soak
+        shell: pwsh
+        env:
+          SOAK_TARGET: ${{ inputs.target }}
+          SOAK_ITERATIONS: ${{ inputs.iterations }}
+          WINDOWS_TEST_SHARD: ${{ inputs.target == 'full-shard-2' && '2/2' || 'flake-soak' }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          "iterations_ran=0" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "failed_iteration=none" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+          $targets = @{
+            "reconciliation" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts")
+              }
+            )
+            "hooks-state" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "script/senpi-hooks-state.test.ts")
+              }
+            )
+            "mailbox" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/omo-senpi/src/components/thread/mailbox.test.ts")
+              }
+            )
+            "team-message" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts")
+              }
+            )
+            "memory-supervisor" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.integration.test.ts")
+              }
+            )
+            "facts-lock" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/memory-core/src/locks", "packages/omo-senpi/src/components/memory/commands/facts.test.ts")
+              }
+            )
+            "reply-listener" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/openclaw-core/src/__tests__/reply-listener-startup.test.ts")
+              }
+            )
+            "dag-race" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/senpi-task/src/dag")
+              }
+            )
+            "memfs-restore" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/omo-senpi/src/components/memory/commands/memfs-extra.test.ts")
+              }
+            )
+            "senpi-overflow" = @()
+            "full-shard-2" = @(
+              [ordered]@{
+                Phase = "quarantine"
+                Arguments = [string[]]@("test", "packages/senpi-task/src/runners/rpc-process.windows.test.ts", "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts", "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts", "script/codex-installer-version.test.ts", "packages/shared-skills/provenance-gate.test.ts", "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts", "packages/senpi-task/src/dag/scheduler.test.ts", "packages/omo-native/test/payload.test.ts", "script/build-omo-binary.test.ts")
+              }
+              [ordered]@{
+                Phase = "remainder"
+                Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test", "--parallel")
+              }
+            )
+          }
+
+          $target = $env:SOAK_TARGET
+          if (-not $targets.ContainsKey($target)) {
+            Write-Error "windows soak target is not allowlisted"
+            exit 1
+          }
+
+          $iterationCount = 0
+          if (
+            -not [int]::TryParse($env:SOAK_ITERATIONS, [ref]$iterationCount) -or
+            $iterationCount -lt 1 -or $iterationCount -gt 50
+          ) {
+            Write-Error "windows soak iterations must be an integer from 1 to 50"
+            exit 1
+          }
+
+          if ($target -eq "senpi-overflow") {
+            Write-Error "target not yet implemented: senpi-overflow"
+            exit 1
+          }
+
+          if ($target -eq "full-shard-2") {
+            $ciWorkflow = Get-Content -Path ".github/workflows/ci.yml" -Raw
+            $serialRemainder = '-TestArguments @("--config=bunfig.win2.parallel.toml", "test")'
+            $parallelRemainder = '-TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")'
+            if ($ciWorkflow.Contains($parallelRemainder)) {
+              $targets[$target][1].Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test", "--parallel")
+            } elseif ($ciWorkflow.Contains($serialRemainder)) {
+              $targets[$target][1].Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test")
+            } else {
+              Write-Error "checked-out ci.yml has an unsupported Windows shard-2 remainder command"
+              exit 1
+            }
+          }
+
+          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-flake-soak-telemetry"
+          $phases = @($targets[$target])
+          for ($iteration = 1; $iteration -le $iterationCount; $iteration++) {
+            "iterations_ran=$iteration" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            foreach ($phase in $phases) {
+              $invocation = "$target-iteration-$iteration-$($phase.Phase)"
+              & .github/scripts/windows-ci-telemetry.ps1 `
+                -ArtifactDirectory $telemetryDirectory `
+                -Invocation $invocation `
+                -TestArguments $phase.Arguments
+              $iterationExitCode = $LASTEXITCODE
+              if ($iterationExitCode -ne 0) {
+                "failed_iteration=$iteration" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+                Write-Error "Windows soak target '$target' failed at iteration $iteration (phase '$($phase.Phase)')."
+                exit $iterationExitCode
+              }
+            }
+          }
+
+      - name: Upload Windows soak telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-flake-soak-${{ inputs.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-flake-soak-telemetry/*.json
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Windows flake soak (${{ inputs.target }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Selected target: `${{ inputs.target }}`.
+            - Tested ref: `${{ inputs.test_ref || github.ref }}`.
+            - Requested iterations: `${{ inputs.iterations }}`.
+            - Iterations actually run: `${{ steps.run-soak.outputs.iterations_ran || '0' }}`.
+            - Failed iteration: `${{ steps.run-soak.outputs.failed_iteration || 'none' }}`.
+            - Telemetry artifact: `windows-flake-soak-${{ inputs.target }}-${{ github.run_id }}-${{ github.run_attempt }}` in this workflow run's **Artifacts** section.
+          JOB_SUMMARY_NEXT: Download the telemetry artifact from this workflow run and inspect the JSON for the failed iteration.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

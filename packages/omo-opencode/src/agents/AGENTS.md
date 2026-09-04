@@ -93,11 +93,17 @@ agents/
 const createXXXAgent: AgentFactory = (model: string) => ({
   instructions: "...",
   model,
-  temperature: 0.1,
+  // Set temperature only when this agent pins a role-specific default.
   // ...config
 })
 createXXXAgent.mode = "subagent" // or "primary" or "all"
 ```
+
+Temperature is opt-in per agent. Most consultant and helper agents pin
+`0.1`, Metis pins `0.3`, and coordinator / role agents intentionally
+leave temperature unset when they should use the selected model's
+default. Sisyphus, Hephaestus, and Prometheus leave temperature unset
+unless an override or category config supplies one.
 
 Model resolution: 4-step pipeline → override → category-default → provider-fallback → system-default. Defined in [`shared/model-resolution-pipeline.ts`](../shared/model-resolution-pipeline.ts).
 

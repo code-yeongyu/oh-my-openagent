@@ -207,13 +207,25 @@ jobs:
       # preload per file and OOM-kills the 7 GB runners, and --no-isolate leaks
       # module state between files. Job-level sharding is the parallelism.
       - name: Run tests
-        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun test packages/omo-opencode packages/memory-core
+
+      - name: Run tests with Windows telemetry
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        shell: pwsh
+        env:
+          WINDOWS_TEST_SHARD: ${{ matrix.shard }}
+        run: |
+          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-1" `
+            -TestArguments @("test", "packages/omo-opencode", "packages/memory-core")
 
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: |
-          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
+          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
           bun --config=bunfig.win2.parallel.toml test
 
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
@@ -221,10 +233,30 @@ jobs:
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
+        env:
+          WINDOWS_TEST_SHARD: ${{ matrix.shard }}
         run: |
-          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/utils/src/codegraph-provision-upgrade.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
+          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-2-quarantine" `
+            -TestArguments @("test", "packages/senpi-task/src/runners/rpc-process.windows.test.ts", "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts", "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts", "script/codex-installer-version.test.ts", "packages/shared-skills/provenance-gate.test.ts", "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts", "packages/senpi-task/src/dag/scheduler.test.ts", "packages/omo-native/test/payload.test.ts", "script/build-omo-binary.test.ts")
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          bun --config=bunfig.win2.parallel.toml test --parallel
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-2-remainder" `
+            -TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")
+          exit $LASTEXITCODE
+
+      - name: Upload Windows post-test telemetry
+        if: always() && runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/2' && 'shard-1' || 'shard-2' }}
+          path: ${{ runner.temp }}/windows-root-test-telemetry/*.json
+          if-no-files-found: warn
+          overwrite: false
 
       - name: Write job summary
         if: always()
@@ -420,7 +452,7 @@ jobs:
           node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
 
       - name: Run Senpi compatibility tests
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: bash
         run: |
           set -euo pipefail
@@ -432,6 +464,41 @@ jobs:
           bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
           bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
           bun test packages/omo-senpi
+
+      - name: Run Senpi compatibility tests with Windows telemetry
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        shell: pwsh
+        env:
+          WINDOWS_TEST_SHARD: senpi-compatibility
+        run: |
+          bun run build:senpi-plugin
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packDirectory = Join-Path $env:RUNNER_TEMP "omo-senpi-pack"
+          New-Item -ItemType Directory -Path $packDirectory -Force | Out-Null
+          npm pack --pack-destination $packDirectory packages/omo-senpi/plugin
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-senpi-compatibility-telemetry"
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "senpi-compatibility" `
+            -TestArguments @("test", "packages/omo-senpi")
+          exit $LASTEXITCODE
+
+      - name: Upload Windows Senpi telemetry
+        if: always() && runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-senpi-compatibility-telemetry-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
+          if-no-files-found: warn
+          overwrite: false
 
       - name: Write job summary
         if: always()

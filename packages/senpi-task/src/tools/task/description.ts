@@ -57,6 +57,7 @@ ${renderCategoryList(categories)}
 
 Blank provider padding is normalized automatically; do not add filler values.
 load_skills prepends named skills. run_in_background=true returns task ids for parallel work; false waits for results.
+run_in_background is batch-wide: set it once at the top level. An item-level copy must agree with the top-level value and every other item, or the call fails with invalid_arguments.
 name is an optional stable handle. model is an explicit override for subagent_type spawns ONLY.
 NEVER combine model with category: a category-routed task always takes its model from omo.json (categories.<name>.models), so passing both fails with invalid_arguments.
   CORRECT: task(subagent_type="momus", model="openai/gpt-5.6-sol", prompt="...")

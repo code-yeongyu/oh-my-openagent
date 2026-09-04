@@ -1,0 +1,20 @@
+MUTATION: replace 'X / social (`x_search`' with 'X / social (`xsearch`' in packages/omo-senpi/plugin/skills/ulw-research/SKILL.md
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/skills-sync.test.ts:177:116)
+(fail) OMO Senpi scoped skill sync > #given ulw-research skill #when synced #then the X / social lane bullet is shipped [2.29ms]
+
+ 0 pass
+ 11 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1.94s]
+
+RESTORE from backup
+
+ 12 pass
+ 0 fail
+ 201 expect() calls
+Ran 12 tests across 1 file. [689.00ms]

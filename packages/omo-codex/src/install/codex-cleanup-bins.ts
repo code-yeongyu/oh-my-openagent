@@ -17,7 +17,6 @@ const ROOT_RUNTIME_BIN_NAME = "omo"
 // component adds a bin that is missing here, so this list cannot silently drift.
 export const MANAGED_CODEX_BIN_NAMES: ReadonlySet<string> = new Set([
   ROOT_RUNTIME_BIN_NAME,
-  "omo-codegraph",
   "omo-comment-checker",
   "omo-git-bash-hook",
   "omo-lsp",

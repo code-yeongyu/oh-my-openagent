@@ -1,0 +1,8 @@
+Reviewed exact head: d2489baeeb51973d456d0f6ea06b758a75961a81
+Original source fix commit: a0aff6422546ac1267b88dd1b0ff8144421e5483
+Certified source head: 509929c8266467ce1a8a07f4ea5a027461436149
+Reviewed-head source identity: d2489baeeb51973d456d0f6ea06b758a75961a81 is evidence-only relative to a0aff6422546ac1267b88dd1b0ff8144421e5483 for all source-bearing paths.
+
+Command: bun run packages/omo-senpi/plugin/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-senpi/scripts/qa/task-13.test.ts
+No violations in 1 file(s). Changed .mjs files are outside the checker input contract.
+Exit: 0

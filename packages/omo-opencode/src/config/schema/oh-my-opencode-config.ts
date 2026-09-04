@@ -7,7 +7,6 @@ import { BackgroundTaskConfigSchema } from "./background-task"
 import { BrowserAutomationConfigSchema } from "./browser-automation"
 import { CategoriesConfigSchema } from "./categories"
 import { ClaudeCodeConfigSchema } from "./claude-code"
-import { CodegraphConfigSchema } from "./codegraph"
 import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
 import { DefaultModeConfigSchema } from "./default-mode"
@@ -58,8 +57,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   mcp_env_allowlist: z.array(z.string()).optional(),
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
-  /** Enable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry. */
-  telemetry: z.boolean().optional().describe("Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry."),
+  /** Enable anonymous telemetry. Default: enabled when omitted. Set to false to disable. */
+  telemetry: z.boolean().optional().describe("Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable."),
   /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */
   model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
@@ -86,7 +85,6 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /** Plugin i18n settings */
   i18n: I18nConfigSchema.optional(),
   monitor: MonitorConfigSchema.optional(),
-  codegraph: CodegraphConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),

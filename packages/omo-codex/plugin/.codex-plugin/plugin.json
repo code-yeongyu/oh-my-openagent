@@ -1,6 +1,6 @@
 {
 	"name": "omo",
-	"version": "5.0.0-beta.31",
+	"version": "5.0.0-beta.39",
 	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
 	"author": {
 		"name": "Yeongyu Kim",
@@ -24,7 +24,6 @@
 		"./hooks/session-start-recording-session-telemetry.json",
 		"./hooks/session-start-checking-auto-update.json",
 		"./hooks/session-start-checking-bootstrap-provisioning.json",
-		"./hooks/session-start-checking-codegraph-bootstrap.json",
 		"./hooks/user-prompt-submit-loading-project-rules.json",
 		"./hooks/user-prompt-submit-checking-ultrawork-trigger.json",
 		"./hooks/user-prompt-submit-checking-ulw-loop-steering.json",
@@ -33,7 +32,6 @@
 		"./hooks/pre-tool-use-guarding-ulw-loop-spawns.json",
 		"./hooks/post-tool-use-checking-comments.json",
 		"./hooks/post-tool-use-checking-lsp-diagnostics.json",
-		"./hooks/post-tool-use-checking-codegraph-init-guidance.json",
 		"./hooks/post-tool-use-matching-project-rules.json",
 		"./hooks/post-tool-use-checking-thread-title-hygiene.json",
 		"./hooks/post-compact-resetting-git-bash-mcp-reminder.json",

@@ -1,0 +1,26 @@
+BUILD_RC=0
+
+  memory-run-supervisor.mjs  36.41 KB  (entry point)
+
+Bundled 118 modules in 84ms
+
+  omo-init-deep-advisor.js  78.0 KB  (entry point)
+
+Built omo-senpi extensions: /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/extensions/omo.js, /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/extensions/omo-task.js, /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/extensions/omo-member.js, /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/skills
+generated directive is current: /tmp/omo-taskrib-20260903/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 6 modules in 72ms
+
+  install.mjs  19.93 KB  (entry point)
+
+Built omo-senpi installer: /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/scripts/install.mjs
+=== check ===
+CHECK_RC=0
+
+  omo-init-deep-advisor.js  78.0 KB  (entry point)
+
+omo-senpi extension build is current: /tmp/omo-taskrib-20260903/packages/omo-senpi/plugin/extensions/omo.js
+=== git status ===
+ M packages/omo-senpi/plugin/extensions/omo-task.js
+=== ignored artifacts ===
+ M packages/omo-senpi/plugin/extensions/omo-task.js

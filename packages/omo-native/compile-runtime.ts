@@ -55,6 +55,13 @@ export function materializeProvisionedExecutable(
     return
   }
   if (provisionedExecutableMatches(sourcePath, destinationPath)) return
+  if (existsSync(destinationPath)) {
+    try {
+      statSync(sourcePath)
+    } catch {
+      return
+    }
+  }
   const temporaryPath = `${destinationPath}.tmp-${process.pid}`
   try {
     rmSync(temporaryPath, { force: true })
@@ -66,11 +73,16 @@ export function materializeProvisionedExecutable(
   }
 }
 
+export function stripDeletedExecSuffix(execPath: string): string {
+  return execPath.endsWith(" (deleted)") ? execPath.slice(0, -" (deleted)".length) : execPath
+}
+
 export function runningExecutablePath(
   argv0 = process.argv[0],
   execPath = process.execPath,
   platform = process.platform,
 ): string {
+  if (platform === "linux") return stripDeletedExecSuffix(execPath)
   return platform === "win32" && argv0.toLowerCase().endsWith(".exe") ? argv0 : execPath
 }
 

@@ -1,0 +1,10 @@
+$ git grep -n 'spawnSync("kill"'
+script/senpi-hooks-state.test.ts:56:        if (writerPid !== undefined) spawnSync("kill", ["-TERM", `-${writerPid}`])
+
+Baseline result: this was the only `spawnSync("kill"` site in the repository.
+
+$ git grep -n 'skipIf(process.platform === "win32")' -- script/senpi-hooks-state.test.ts
+script/senpi-hooks-state.test.ts:101:  test.skipIf(process.platform === "win32")("preserves an existing POSIX snapshot mode under a restrictive umask", () => {
+script/senpi-hooks-state.test.ts:109:  test.skipIf(process.platform === "win32")("creates a new POSIX snapshot with mode 0600 under a permissive umask", () => {
+
+Baseline result: the two POSIX mode tests skipped Windows, but the legacy truncate/write recovery test at line 49 did not.

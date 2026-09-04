@@ -2,6 +2,8 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 
 // Source of truth mirrored from packages/model-core/src/agent-model-requirements.ts.
 // senpi-task cannot import model-core here without adding a package dependency outside this task's scope.
+// The ulw reviewer agents are absent by design: they resolve their model through the `categories`
+// field on their definition (see resolve-agent-categories.ts), not through a hand-mirrored chain.
 export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
   explore: [
     { providers: ["openai", "openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
@@ -35,27 +37,6 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       model: "gpt-5.6-sol",
       variant: "medium",
     },
-    { providers: ["opencode-go"], model: "glm-5.2" },
-    { providers: ["kimi-for-coding"], model: "kimi-k3" }
-  ],
-  "omo-senpi-code-reviewer": [
-    { providers: ["openai", "openai-codex"], model: "gpt-5.6-terra", variant: "medium" },
-    { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "medium" },
-    { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
-    { providers: ["opencode-go"], model: "glm-5.2" },
-    { providers: ["kimi-for-coding"], model: "kimi-k3" }
-  ],
-  "omo-senpi-qa-executor": [
-    { providers: ["openai", "openai-codex"], model: "gpt-5.6-luna", variant: "high" },
-    { providers: ["github-copilot"], model: "gpt-5.6-luna", variant: "high" },
-    { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
-    { providers: ["opencode-go"], model: "glm-5.2" },
-    { providers: ["kimi-for-coding"], model: "kimi-k3" }
-  ],
-  "omo-senpi-gate-reviewer": [
-    { providers: ["openai", "openai-codex"], model: "gpt-5.6-sol", variant: "low" },
-    { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "low" },
-    { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
     { providers: ["opencode-go"], model: "glm-5.2" },
     { providers: ["kimi-for-coding"], model: "kimi-k3" }
   ],

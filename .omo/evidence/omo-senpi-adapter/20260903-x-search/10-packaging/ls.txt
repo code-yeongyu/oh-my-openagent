@@ -1,0 +1,45 @@
+### ls proof - todo 10 (2026-09-03T06:01:12Z)
+$ ls -la packages/omo-senpi/plugin/skills-conditional/x-search
+total 16
+drwxr-xr-x  3 yeongyu  staff    96 Sep  3 15:00 .
+drwxr-xr-x  3 yeongyu  staff    96 Sep  3 15:00 ..
+-rw-r--r--  1 yeongyu  staff  5466 Sep  3 15:00 SKILL.md
+
+$ diff -q source vs staged SKILL.md
+identical
+
+$ ls packages/omo-senpi/plugin/skills | grep -c x-search (expect 0)
+0
+
+$ ls packages/omo-senpi/plugin/skills
+ast-grep
+coding-agent-sessions
+dag-library
+data-scientist
+debugging
+frontend
+git-master
+give-me-tips
+hyperplan
+init-deep
+lsp-setup
+mass-ulw
+onboarding
+programming
+refactor
+remove-ai-slops
+review-work
+ultimate-browsing
+ultrawork
+ulw-execute
+ulw-loop
+ulw-plan
+ulw-research
+visual-qa
+
+$ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check (includes stage-x-search-skill --check)
+x-search conditional skill is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+check-exit=0
+
+$ git status --short packages/omo-senpi/plugin/skills-conditional (expect ignored/empty)
+packages/omo-senpi/.gitignore:3:/plugin/skills-conditional/	packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md

@@ -1,0 +1,54 @@
+Contract GREEN
+==============
+Command:
+bun test script/ci-root-test-partition.test.ts
+
+Result:
+15 pass
+0 fail
+81 expect() calls
+
+Required combined gate after telemetry hardening
+================================================
+Command:
+bun test script/ci-root-test-partition.test.ts script/ci-fast-path.full-matrix.test.ts
+
+Result:
+36 pass
+0 fail
+139 expect() calls
+
+Workflow lint
+=============
+Command:
+actionlint -shellcheck= .github/workflows/ci.yml
+
+Result:
+exit 0, no diagnostics
+
+TypeScript checks
+=================
+LSP diagnostics before the final two assertion-only lines:
+No diagnostics found.
+
+Programming no-excuse audit:
+No violations in 1 file(s).
+
+Senpi package gate
+==================
+Commands:
+tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+bun run test:senpi
+
+Result:
+Typecheck exited 0.
+2537 pass
+1 skip
+0 fail
+8094 expect() calls
+Ran 2538 tests across 334 files.
+
+Evidence resolver tests:
+10 pass
+0 fail
+31 expect() calls

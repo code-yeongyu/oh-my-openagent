@@ -42,17 +42,17 @@ $ulw-execute [plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]
 ```
 
 - `plan-name` (optional): a full or partial file stem under `.omo/plans/`.
-- `--worktree` (required for PR/branch work; otherwise optional): the task-owned git worktree path.
-- `--make-pr` (optional): deliver the work as a pull request. IMPLIES worktree mode: when `--worktree` is absent, create a task-owned worktree (`git worktree add <absolute-path> <base-branch>`) before implementation and record it as `worktree_path`. On completion, push the branch and open a reviewer-readable PR, then hand off with the PR URL - merge only if the user asks.
+- `--worktree` (optional): reuse an existing task-owned worktree for the first phase instead of creating one; every phase runs in a task-owned worktree regardless.
+- `--make-pr` (optional): deliver each phase's worktree as a pull request — push the branch, open a reviewer-readable PR, hand off with the URL, and merge only if the user asks.
 - `--ship` (optional): full delivery lifecycle; implies `--make-pr`. After the PR opens, stay on the job until it is MERGED: watch CI and review gates, fix failures and address feedback from the worktree (fresh QA evidence for behavior changes), merge per the repository's merge policy, then remove the worktree and sync `.omo/` state back.
 
 ## Goal and todo discipline (MANDATORY)
 
 Do ALL of this immediately after the plan is selected, BEFORE the first implementation dispatch. Skipping any step is a defect.
 
-1. **Set the goal, in detail.** When a goal tool is available (`create_goal`), call it with a DETAILED objective: the plan name and path, the concrete end state, the phase and task counts, the delivery mode (direct, `--make-pr`, or `--ship`), and how completion will be verified. One work session = one goal. No goal tool -> record the same objective as the first ledger entry.
+1. **Set the goal, in detail.** When a goal tool is available (`create_goal`), call it with a DETAILED objective: the plan name and path, the concrete end state, the phase and task counts, the delivery mode (direct, `--make-pr`, or `--ship`), and how completion will be verified. One work session = one registered goal (the goal tool holds one active goal); each phase then carries its own concrete goal — the ledger entry Phase 2 records before the wave's first dispatch, defined from the previous phase's landed and verified evidence. No goal tool -> record the same objective as the first ledger entry.
 2. **Register every phase and task as todos.** Mirror the plan into the todo/plan tool of your harness: one phase per plan wave, one todo per column-zero checkbox (including the final verification wave). Register ALL of them up front - never keep tasks in memory only.
-3. **Keep them current at every moment.** Mark a todo in_progress when its work dispatches and done immediately after its verification passes. Never batch-complete at the end, never execute work that is not a registered todo; discovered work is appended as a todo before it runs. The todo list, Boulder state, and plan checkboxes must always tell the same story.
+3. **Keep them current at every moment.** Mark a todo in_progress when its work dispatches and done immediately after its verification passes. Never batch-complete at the end, never execute work that is not a registered todo; discovered work — a pre-existing bug, failing test, stale doc, or wrong guidance — is appended to the plan as a checkbox, mirrored as a todo before it runs, and fixed to the ideal state, never deferred as a follow-up. A worker that meets a defect outside its assigned files reports it instead of fixing it; only the orchestrator appends the checkbox and dispatches it to a correctly scoped unit. The todo list, Boulder state, and plan checkboxes must always tell the same story.
 
 ## Phase 1: Select the plan
 
@@ -95,14 +95,14 @@ Write `.omo/boulder.json` before implementation starts. Prefix session ids with 
 }
 ```
 
-For PR/branch work, a task-owned worktree is mandatory before implementation starts: pass `--worktree`, or use `--make-pr`/`--ship`, which auto-create one. Verify the path with `git worktree list --porcelain` or create it with `git worktree add <path> <branch-or-HEAD>`, then store the absolute path as `worktree_path`. All edits, commands, tests, and evidence capture must run inside that worktree.
+Every phase (plan wave) runs in its own task-owned worktree with its own goal: before the wave's first dispatch, record the wave's goal — its checkboxes and their acceptance criteria — as a ledger entry, then `git worktree add <repo>-wt/<plan>-<wave> <branch off the integration base>` (or verify a `--worktree` path with `git worktree list --porcelain`), store the absolute path as `worktree_path`, run every edit, command, test, and evidence capture inside it; the wave lands on the integration base once its checkboxes are verified (direct merge, or the PR under `--make-pr`/`--ship`), and the next wave branches from that landed base.
 
 ## Parallel delivery lanes (teams and worktrees)
 
 Solo orchestration with parallel background workers is the default topology. Decide once, when the wave's lanes are known, and record the verdict in the ledger:
 
 - **Independent lanes -> parallel workers.** Separate files, no shared contract: one parallel spawn burst; no team.
-- **Dependency-ordered lanes -> a dag run.** Sub-tasks with real ordering between them (C needs A and B finished first) and a harness with a native `dag` tool: dispatch the wave as ONE dag run — one producer node per lane plus a verification node — instead of a spawn burst, and watch the run's lifecycle instead of arming per-lane watchers. Read the `mass-ulw` skill's `SKILL.md` and `references/planning.md` IN FULL before defining any graph.
+- **Dependency-ordered lanes -> one `workflow` run per wave.** Sub-tasks with real ordering between them (C needs A and B finished first) and a harness with a native `workflow` tool: dispatch the wave as ONE run (one producer node per lane plus a verification node); recover inside it with `retry`/`amend`/`send`; let node completions wake you instead of arming per-lane watchers; the next wave is a NEW run (or `amend` when only the definition changed) — never one graph for the whole plan. Read the `mass-ulw` skill's `SKILL.md` and `references/planning.md` IN FULL before defining any graph.
 - **Overlapping lanes -> a team.** The lanes touch the same module or contract AND running them concurrently actually finishes sooner: stand up a team (where the harness has one) so one lane's discoveries relay through you mid-flight.
 - **PR-mode independent lanes -> a worktree per lane.** Under `--make-pr`/`--ship`, when a wave holds independent checkboxes, give each lane its own branch and task-owned worktree, delivered as its own PR.
 
@@ -162,7 +162,7 @@ Each sub-task message must include:
    - Terminal / TUI: drive a real pty; `tmux send-keys` is fine for a boot/behavior smoke, but color/layout/CJK evidence goes through the xterm.js web terminal below, NEVER `tmux capture-pane`.
    - Browser use: prefer the harness's in-app browser control when available and the scenario does not need an authenticated or persistent user browser profile; otherwise drive the real page with Chrome, or agent-browser (https://github.com/vercel-labs/agent-browser) when Chrome is unavailable.
    - Computer use: OS-level GUI automation against the running desktop app when the surface is not a page.
-   - TUI visual evidence: when a TUI claim needs visual QA or PR proof, run `node script/qa/web-terminal-visual-qa.mjs --command "<cmd>" --input "{Enter}" --evidence-dir <dir>` (real pty rendered through xterm.js in Chrome) and attach `terminal.png` plus `metadata.json`.
+   - TUI visual evidence: when a TUI claim needs visual QA or PR proof, run `bun script/qa/web-terminal-visual-qa.mjs --command "<cmd>" --input "{Enter}" --evidence-dir <dir>` (real pty rendered through xterm.js in Chrome) and attach `terminal.png` plus `metadata.json`.
 6. The adversarial classes that apply to this sub-task (from the 9 ultraqa classes) and how each is probed.
 7. Required artifact path and cleanup receipt.
 8. Tool-use expectations: batch independent tool calls in parallel; when the harness exposes a code-execution surface (eval), use it for multi-call steps instead of one-by-one calls.
@@ -225,7 +225,7 @@ Only after verification passes:
 When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:
 
 1. Run the plan's final verification commands.
-2. For PR/branch work, finish the lifecycle from the task-owned worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.
+2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.
 3. Remove or mark the Boulder work as completed.
 4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.
 
@@ -236,6 +236,6 @@ When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are
 - No tests-only completion claim. A Manual-QA artifact is required.
 - **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
-- No PR/branch implementation, review, or merge in the main worktree; use the task-owned git worktree.
+- No implementation, review, or merge in the main checkout; every phase works in its task-owned worktree.
 - No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.
 - No stale-memory execution. The plan and ledger are the durable source of truth.

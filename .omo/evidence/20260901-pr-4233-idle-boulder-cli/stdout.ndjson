@@ -1,0 +1,8 @@
+Starting server on port 4096
+Server listening at http://127.0.0.1:4096
+Session: ses_fa4ccb554ffetVMAcvKFM7VryW
+Model: openai/gpt-fake
+
+
+All tasks completed.
+{"sessionId":"ses_fa4ccb554ffetVMAcvKFM7VryW","success":true,"durationMs":8884,"messageCount":1,"summary":"fake response 1"}

@@ -1,4 +1,4 @@
-import { appendBlock, findTomlSection, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-section-editor"
+import { appendBlock, findTomlSection, removeRootSetting, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-section-editor"
 import { ensureFeatureEnabled } from "./codex-config-features"
 
 const AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"] as const
@@ -6,7 +6,7 @@ const AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"] as const
 export function ensureAutonomousPermissions(config: string): string {
   let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"))
   next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"))
-  next = replaceOrInsertRootSetting(next, "network_access", JSON.stringify("enabled"))
+  next = removeRootSetting(next, "network_access")
   for (const featureName of AUTONOMOUS_FEATURES) {
     next = ensureFeatureEnabled(next, featureName)
   }

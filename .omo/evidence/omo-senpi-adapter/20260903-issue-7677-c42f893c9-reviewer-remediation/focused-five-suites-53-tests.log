@@ -1,0 +1,71 @@
+Command: bun test packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/isolation-state-races.test.mjs packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs packages/omo-senpi/scripts/qa/isolation-ultrabrain-blockers.test.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
+Source head: c42f893c953df103a38c42820568ccde34fcc215
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/isolation-state-races.test.mjs:
+(pass) #given a same-size in-place overwrite after an observation read #when metadata is verified #then the snapshot fails closed [2.50ms]
+(pass) #given a same-size in-place overwrite after a protected read #when metadata is verified #then the snapshot fails closed [0.64ms]
+(pass) #given an existence probe would hide inaccessible protected state #when opened directly #then EACCES fails closed [0.31ms]
+(pass) #given only volatile settings stamps change #when bounded complete-tree snapshots are compared #then settings stay unchanged [1.17ms]
+(pass) #given an enumerated entry vanishes before stat #when the bounded complete-tree snapshot runs #then the transient entry is tolerated [0.43ms]
+(pass) #given replacement between initial stat and open #when snapshotted #then public paths preserve FILE_REPLACED [9.79ms]
+(pass) #given success or primary failure plus close failure #when reading #then primary-operation precedence is stable [0.77ms]
+(pass) #given ENOENT stat then open success and close failure #when absence races #then FILE_REPLACED remains primary [0.24ms]
+(pass) #given transient or primary complete-tree read errors #when digesting #then only ENOENT and ENOTDIR are tolerated [0.64ms]
+
+packages/omo-senpi/scripts/qa/isolation-ultrabrain-blockers.test.mjs:
+(pass) #given an observation I/O error #when the canonical verdict is built #then untouched fails closed [0.18ms]
+(pass) #given a truncated bounded observation #when the canonical verdict is built #then untouched fails closed [0.08ms]
+(pass) #given a persistent symlink is created and retargeted #when snapshots are compared #then both changes are observed without following targets [0.55ms]
+(pass) #given a symlink escapes the observation root #when its target contents change #then the link digest stays stable [0.37ms]
+(pass) #given an enumerated directory is replaced by an external symlink before recursive open #when observed #then traversal fails closed without dereferencing [0.53ms]
+(pass) #given protected state is an external symlink #when its target changes #then protected reads never follow it and fail closed [0.38ms]
+(pass) #given POSIX and Windows path styles #when observed paths are classified #then only the producing style treats backslash as a separator [0.15ms]
+
+packages/omo-senpi/scripts/qa/isolation-state.test.mjs:
+(pass) #given protected and volatile files #when snapshots are compared #then only protected path changes affect isolation [0.82ms]
+(pass) #given nested nonvolatile files within bounds #when scanned #then the relevant observation domain is complete [0.47ms]
+(pass) #given volatile root entries precede one persistent file #when scanned at exact budgets #then volatility consumes no budget [0.34ms]
+(pass) #given a missing root and empty directories #when snapshots are compared #then persistent directory creation and deletion are observed [0.35ms]
+(pass) #given a tree beyond the file bound #when observed #then truncation is explicit and never complete [0.32ms]
+(pass) #given identical protected read failures #when snapshots are compared #then isolation fails closed with structured relative errors [0.51ms]
+(pass) #given files exceed the byte budget #when observed #then descriptor reads never exceed maxBytes [0.46ms]
+(pass) #given a file shrinks after traversal #when observed #then short read is explicit and incomplete [0.33ms]
+(pass) #given a file grows while hashing #when observed #then growth is explicit and incomplete [0.27ms]
+(pass) #given a path is replaced after open #when observed #then replacement is explicit and incomplete [0.40ms]
+(pass) #given one file exceeds the byte budget #when observed #then truncation occurs without reading or BYTE_LIMIT errors [0.27ms]
+
+packages/omo-senpi/scripts/qa/task-13.test.ts:
+(pass) task 13 senpi QA scripts > #given QA scripts resolve PATH binaries #when source is inspected #then they do not shell out through command lookup [0.19ms]
+(pass) task 13 senpi QA scripts > #given drive.mjs self-test #when executed #then sandbox helpers validate successfully [56.48ms]
+(pass) task 13 senpi QA scripts > #given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched [0.94ms]
+(pass) task 13 senpi QA scripts > #given probe-continuation self-test #when executed #then continuation helpers validate successfully [41.73ms]
+(pass) task 13 senpi QA scripts > #given fake omo status #when continuation probe is inspected #then it uses the current ulw-loop JSON shape [0.17ms]
+(pass) task 13 senpi QA scripts > #given print mode exits before follow-up #when tmux fallback is inspected #then it drives interactive Senpi [0.12ms]
+(pass) task 13 senpi QA scripts > #given continuation probe runs Senpi #when source is inspected #then it forces a sandbox session directory [0.18ms]
+(pass) task 13 senpi QA scripts > #given mock provider self-test #when executed #then text and tool-call script steps validate [15.23ms]
+(pass) task 13 senpi QA scripts > #given a scripted tool call #when converted to an assistant message #then it stops with toolUse [0.15ms]
+(pass) task 13 senpi QA scripts > #given terminal stream events #when result is awaited #then done and error events settle the promise [0.36ms]
+(pass) task 13 senpi QA scripts > #given a tool-use mock script #when streamSimple runs #then it returns a Senpi-compatible result [0.50ms]
+(pass) task 13 senpi QA scripts > #given caller SENPI_CODING_AGENT_DIR #when drive.mjs runs #then it self-creates an isolated sandbox [39.77ms]
+(pass) task 13 senpi QA scripts > #given an isolated child home #when cross-platform variables are built #then HOME and USERPROFILE match [0.07ms]
+
+packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs:
+(pass) #given missing or arbitrary observation domains #when the canonical verdict is built #then untouched fails closed [0.20ms]
+(pass) #given direct, protected-observed, persistent-observed, and volatile changes #when the canonical verdict is built #then only volatile paths are excluded from the sorted union [0.10ms]
+(pass) #given only explicitly volatile observed writes #when the canonical verdict is built #then the protected home remains untouched [0.05ms]
+(pass) #given a protected change or incomplete protected snapshot #when the canonical verdict is built #then untouched fails closed [0.08ms]
+(pass) #given POSIX and Windows-shaped observed paths #when changes are classified #then volatile prefixes are canonical on both platforms [0.07ms]
+(pass) #given credential files are absent or inaccessible #when credentialDigest reads directly #then only ENOENT is treated as absent [0.34ms]
+(pass) #given bounded observation root enumeration fails #when snapshotDirectory runs #then inaccessible IO is structured and incomplete while absence is empty-complete [0.24ms]
+(pass) #given digest enumeration and reads fail through injected seams #when digestDirectory runs #then transient absence is tolerated and inaccessible IO propagates [0.20ms]
+(pass) #given pre-open metadata changed and current-path diagnostic stat fails #when public readers report the race #then the established replacement error wins [1.58ms]
+(pass) #given a primary read error and failing shrink diagnostic #when an observed file is hashed #then the primary read error is preserved [0.24ms]
+(pass) #given a primary read error and a successful shrink diagnostic #when an observed file is hashed #then the primary read error is preserved [0.27ms]
+(pass) #given directory traversal and close both fail #when the tree is snapshotted #then the traversal error remains primary [0.19ms]
+(pass) #given successful directory traversal and close failure #when the tree is snapshotted #then the close error surfaces [0.17ms]
+
+ 53 pass
+ 0 fail
+ 212 expect() calls
+Ran 53 tests across 5 files. [1304.00ms]

@@ -1,0 +1,24 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs:
+36 |   let targetStat
+37 |   try {
+38 |     targetStat = await stat(targetSkill)
+39 |   } catch (error) {
+40 |     if (isErrno(error, "ENOENT")) {
+41 |       throw new Error(`x-search conditional skill stale: staged SKILL.md is missing: ${targetSkill}`)
+                     ^
+error: x-search conditional skill stale: staged SKILL.md is missing: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-x-search-skill-stage-test-1ndhMq/plugin/skills-conditional/x-search/SKILL.md
+      at checkXSearchSkillStaged (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs:41:17)
+      at /Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs:30:26
+      at node:test:1445:26
+      at executeTestNode (node:test:1448:63)
+(fail) x-search conditional skill staging > #given no staged copy #when --check runs #then it skips with a notice for a fresh checkout [8.48ms]
+(pass) x-search conditional skill staging > #given a staged copy #when --check runs #then it passes and the bytes match the source [2.10ms]
+(pass) x-search conditional skill staging > #given a stale staged copy #when --check runs #then it fails as stale [1.64ms]
+(pass) x-search conditional skill staging > #given a missing source skill #when staged #then it fails loudly instead of writing a partial copy [0.97ms]
+
+ 3 pass
+ 1 fail
+Ran 4 tests across 1 file. [1.90s]
+exit=1

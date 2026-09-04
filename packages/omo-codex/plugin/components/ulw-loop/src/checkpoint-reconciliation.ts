@@ -16,6 +16,12 @@ export interface CodexSnapshotMismatchInput {
 	readonly taskScopedHint?: { readonly goal: UlwLoopItem; readonly aggregate: boolean; readonly final: boolean };
 }
 
+export function combineCheckpointValidationErrors(codexError: UlwLoopError, gateError: UlwLoopError): UlwLoopError {
+	return new UlwLoopError(`${codexError.message}\n${gateError.message}`, "ULW_LOOP_QUALITY_GATE_INVALID", {
+		details: { ...(codexError.details ?? {}), ...(gateError.details ?? {}) },
+	});
+}
+
 export function codexSnapshotMismatchError(input: CodexSnapshotMismatchInput): UlwLoopError {
 	const { reconciliation, snapshot, taskScopedHint } = input;
 	const hint =

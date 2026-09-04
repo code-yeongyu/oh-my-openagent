@@ -170,6 +170,13 @@ describe("OMO Senpi scoped skill sync", () => {
     }
   })
 
+  test("#given ulw-research skill #when synced #then the X / social lane bullet is shipped", () => {
+    const skillFile = join(skillsRoot, "ulw-research", "SKILL.md")
+    const content = readFileSync(skillFile, "utf8")
+
+    expect(content.includes("X / social (`x_search`"), "ulw-research must ship the X / social lane role protocol").toBe(true)
+  })
+
   test("#given ulw-execute skill #when inspected #then session ids reference senpi, not codex", () => {
     const skillFile = join(skillsRoot, "ulw-execute", "SKILL.md")
     const content = readFileSync(skillFile, "utf8")

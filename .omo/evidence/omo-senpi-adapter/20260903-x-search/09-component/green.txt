@@ -1,0 +1,31 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/index.test.ts:
+(pass) createXSearchComponent registration gate > #given a stored xai oauth entry #when registering #then x_search registers once and contributes the x-search skill path [1.18ms]
+(pass) createXSearchComponent registration gate > #given a packaged plugin layout #when resolving the skill path #then the conditional skills-conditional copy wins [2.34ms]
+(pass) createXSearchComponent registration gate > #given no xai entry and no XAI_API_KEY #when registering #then nothing is registered [0.37ms]
+(pass) createXSearchComponent registration gate > #given no stored entry but XAI_API_KEY #when registering #then the tool registers [0.21ms]
+(pass) createXSearchComponent registration gate > #given a malformed stored xai entry plus XAI_API_KEY #when registering #then the stored entry owns the decision and nothing registers [0.28ms]
+(pass) createXSearchComponent registration gate > #given an invalid auth.json #when registering #then nothing registers [0.30ms]
+(pass) createXSearchComponent registration gate > #given no agentDir option #when registering #then the agent home is resolved from the environment [0.27ms]
+(pass) createXSearchComponent registered tool execution > #given the probe fixture #when the registered tool executes #then it formats results and reports the server queries [1.07ms]
+(pass) createXSearchComponent registered tool execution > #given no resolvable bearer #when the registered tool executes #then it returns the AUTH error [0.31ms]
+
+packages/omo-senpi/src/components/x-search/tool.test.ts:
+(pass) createXSearchTool definition > #given the definition #when reading discovery metadata #then it is a lazily activatable search-exposed x-search tool [0.07ms]
+(pass) createXSearchTool definition > #given the definition #when reading prompt fields #then no prompt tokens are carried before promotion [0.06ms]
+(pass) createXSearchTool definition > #given the definition #when reading the description #then it condenses the four rules into four sentences [0.07ms]
+(pass) createXSearchTool execute > #given a stored credential and the probe fixture #when executing #then the formatted text and details carry the server queries [0.25ms]
+(pass) createXSearchTool execute > #given OMO_X_SEARCH_MODEL #when executing #then the carrier model is overridden [0.20ms]
+(pass) createXSearchTool execute > #given no credential #when executing #then it returns the AUTH error without calling xAI [0.10ms]
+(pass) createXSearchTool execute > #given invalid parameters #when executing #then validation short-circuits before any request [0.07ms]
+(pass) createXSearchTool execute > #given an upstream rate limit #when executing #then the error code is surfaced in text and details [0.13ms]
+(pass) createXSearchTool execute > #given a resolveBearer override #when executing #then the injected bearer is used [0.19ms]
+
+ 18 pass
+ 0 fail
+ 52 expect() calls
+Ran 18 tests across 2 files. [648.00ms]
+EXIT:0
+$ tsgo --noEmit -p packages/omo-senpi/tsconfig.json | rg x-search
+(no x-search diagnostics)

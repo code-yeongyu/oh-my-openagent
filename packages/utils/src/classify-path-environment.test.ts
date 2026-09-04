@@ -41,6 +41,14 @@ describe("classifyPathEnvironment", () => {
   it("matches OneDrive case-insensitively", () => {
     expect(classifyPathEnvironment("/Users/x/oNeDrIvE/foo")).toBe("onedrive")
   })
+
+  it("classifies organization OneDrive folders as onedrive", () => {
+    expect(classifyPathEnvironment("/Users/x/OneDrive - Contoso/foo")).toBe("onedrive")
+  })
+
+  it("does not classify arbitrary onedrive-prefixed folders as onedrive", () => {
+    expect(classifyPathEnvironment("/tmp/onedrive-backups/foo")).toBe("unknown")
+  })
 })
 
 describe("describePathClassification", () => {

@@ -249,6 +249,28 @@ describe("resolveAgent", () => {
     })
   })
 
+  test("#given curated tool rules #when resolved #then explicit denies become child exclusions while librarian keeps x_search", () => {
+    const explore = expectResolved(resolveAgent("explore", roster({
+      name: "explore",
+      tools: [
+        { pattern: "read", allow: true },
+        { pattern: "x_search", allow: false },
+      ],
+    }), undefined, { modelOverride: "openai/explicit" }))
+    const librarian = expectResolved(resolveAgent("librarian", roster({
+      name: "librarian",
+      tools: [
+        { pattern: "read", allow: true },
+        { pattern: "x_search", allow: true },
+      ],
+    }), undefined, { modelOverride: "openai/explicit" }))
+
+    expect(explore.toolAllowlist).toEqual(["read"])
+    expect(explore.toolDenylist).toEqual(["x_search"])
+    expect(librarian.toolAllowlist).toEqual(["read", "x_search"])
+    expect(librarian.toolDenylist).toBeUndefined()
+  })
+
   test("#given a model override without a registry #when resolved #then it returns persona fields and filters the tool allowlist", () => {
     // given
     const agents = roster({

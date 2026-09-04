@@ -166,6 +166,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     subscribe: (listener: ChildEventListener) => client.onEvent(listener),
     waitForIdle: () =>
       reachedIdle || outcome ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve)),
+    hasExited: () => client.exited,
     waitForOutcome: () =>
       turnOutcome !== undefined
         ? Promise.resolve(turnOutcome)

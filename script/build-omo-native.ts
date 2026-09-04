@@ -90,7 +90,42 @@ function parseArgs(argv: readonly string[]): BuildOptions {
   return { outputDir, checkOnly }
 }
 
+// The native staging chain (build:senpi-plugin:native) consumes prebuilt package
+// artifacts instead of rebuilding them, unlike build:senpi-plugin which always
+// runs build:lsp-daemon and build:ast-grep-mcp first. Callers such as the
+// publish-platform workflow install with --ignore-scripts, so the root prepare
+// build never produced these inputs there; build any missing one through the
+// same root scripts the full chain uses.
+const PREBUILT_NATIVE_INPUTS = [
+  { artifactPath: join("packages", "lsp-daemon", "dist"), buildScript: "build:lsp-daemon" },
+  { artifactPath: join("packages", "ast-grep-mcp", "dist", "cli.js"), buildScript: "build:ast-grep-mcp" },
+] as const
+
+export interface PrebuiltInputDependencies {
+  readonly artifactExists: (absolutePath: string) => boolean
+  readonly runRootScript: (script: string) => { readonly error?: Error | undefined; readonly status: number | null }
+}
+
+const defaultPrebuiltInputDependencies: PrebuiltInputDependencies = {
+  artifactExists: existsSync,
+  runRootScript: (script) => spawnSync("bun", ["run", script], { cwd: repoRoot, stdio: "inherit" }),
+}
+
+export function ensurePrebuiltNativeInputs(
+  dependencies: PrebuiltInputDependencies = defaultPrebuiltInputDependencies,
+): void {
+  for (const input of PREBUILT_NATIVE_INPUTS) {
+    if (dependencies.artifactExists(join(repoRoot, input.artifactPath))) continue
+    const result = dependencies.runRootScript(input.buildScript)
+    if (result.error !== undefined) throw result.error
+    if (result.status !== 0) {
+      throw new Error(`${input.buildScript} failed with exit code ${result.status ?? 1}`)
+    }
+  }
+}
+
 function runSenpiPluginBuild(outputDir: string): void {
+  ensurePrebuiltNativeInputs()
   const buildRoot = mkdtempSync(join(tmpdir(), "omo-native-build-"))
   const lspSource = join(buildRoot, "lsp-daemon", "dist")
   const astSource = join(buildRoot, "ast-grep-mcp", "cli.js")
@@ -195,7 +230,9 @@ function main(argv: readonly string[]): number {
 }
 
 try {
+  if (import.meta.main) {
   process.exit(main(process.argv.slice(2)))
+}
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)

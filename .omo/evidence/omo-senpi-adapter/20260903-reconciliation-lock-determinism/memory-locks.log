@@ -1,0 +1,9 @@
+$ bun test packages/memory-core/src/locks
+bun test v1.3.14 (0d9b296a)
+
+ 19 pass
+ 0 fail
+ 55 expect() calls
+Ran 19 tests across 4 files. [726.00ms]
+
+Command exited with code 0

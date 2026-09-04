@@ -1,8 +1,8 @@
-import { aggregateQualityGateDefects } from "./quality-gate-aggregate.js";
 import {
 	artifactCompatible,
 	artifactMap,
 	checkFile,
+	compatibleKindsFor,
 	parseArtifactRefs,
 	referencedArtifacts,
 	surfaceField,
@@ -10,14 +10,17 @@ import {
 import {
 	emptyBlockers,
 	invalid,
+	isPoisoned,
+	isPoisonedArtifactKind,
 	literal,
 	numberField,
 	section,
 	stringArray,
 	textField,
+	withQualityGateCollector,
 } from "./quality-gate-fields.js";
 import { adversarialVerdict, codeQualityStatusField, passedVerdict } from "./quality-gate-verdicts.js";
-import { GATE_SECTION_BY_ACCEPTOR, REQUIRED_GATE_SECTIONS_BY_SURFACE, type UlwLoopToolkitSurface } from "./surface.js";
+import { GATE_SECTION_BY_ACCEPTOR, type UlwLoopToolkitSurface } from "./surface.js";
 import type { UlwLoopManualQaArtifactRef, UlwLoopQualityGate } from "./types.js";
 
 export {
@@ -40,6 +43,10 @@ export interface ValidateQualityGateOptions {
 }
 
 function reviewerRoleField(value: unknown, expected: string, field: string): string {
+	if (typeof value !== "string" || value.trim() === "") {
+		textField(value, field);
+		return expected;
+	}
 	const actual = textField(value, field);
 	if (actual !== expected) invalid(`${field} must be ${expected}.`, field);
 	return expected;
@@ -51,44 +58,51 @@ function reviewerAcceptorField(
 	sectionName: "manualQa" | "gateReview",
 ): string {
 	const field = `${sectionName}.by`;
-	const actual = textField(value, field);
 	const accepted = GATE_SECTION_BY_ACCEPTOR[surface][sectionName];
+	if (typeof value !== "string" || value.trim() === "") {
+		textField(value, field);
+		return accepted?.[0] ?? "";
+	}
+	const actual = textField(value, field);
 	if (accepted === undefined || !accepted.includes(actual))
 		invalid(`${field} must be one of ${accepted?.join(", ") ?? "the configured reviewers"}.`, field);
 	return actual;
 }
 
 export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOptions): UlwLoopQualityGate {
+	return withQualityGateCollector(() => validateQualityGateUncollected(input, opts));
+}
+
+function validateQualityGateUncollected(input: unknown, opts?: ValidateQualityGateOptions): UlwLoopQualityGate {
 	const surface = opts?.reviewerSurface ?? "lazycodex";
-	aggregateQualityGateDefects(input, opts);
 	const gate = section(input, "qualityGate");
-	const requiredSections = REQUIRED_GATE_SECTIONS_BY_SURFACE[surface];
-	for (const sectionName of requiredSections) section(gate[sectionName], sectionName);
 	if (surface === "omo-senpi" && gate["codeReview"] !== undefined)
 		invalid("omo-senpi gate has no codeReview lane.", "codeReview");
 	const manualQa = section(gate["manualQa"], "manualQa");
 	const gateReview = section(gate["gateReview"], "gateReview");
 	const iteration = section(gate["iteration"], "iteration");
 	const coverage = section(gate["criteriaCoverage"], "criteriaCoverage");
+	const codeReview = surface === "lazycodex" ? section(gate["codeReview"], "codeReview") : {};
 	const manualQaBy = reviewerAcceptorField(manualQa["by"], surface, "manualQa");
 	const gateReviewBy = reviewerAcceptorField(gateReview["by"], surface, "gateReview");
-	if (surface === "lazycodex")
-		reviewerRoleField(section(gate["codeReview"], "codeReview")["by"], "lazycodex-code-reviewer", "codeReview.by");
+	const manualQaEvidence = textField(manualQa["evidence"], "manualQa.evidence");
+	const gateReviewEvidence = textField(gateReview["evidence"], "gateReview.evidence");
+	if (surface === "lazycodex") reviewerRoleField(codeReview?.["by"], "lazycodex-code-reviewer", "codeReview.by");
 	const totalCriteria = numberField(coverage["totalCriteria"], "criteriaCoverage.totalCriteria");
 	const passCount = numberField(coverage["passCount"], "criteriaCoverage.passCount");
-	if (passCount < totalCriteria)
+	if (!isPoisoned("criteriaCoverage.passCount") && passCount < totalCriteria)
 		invalid("criteriaCoverage.passCount must cover totalCriteria.", "criteriaCoverage.passCount");
 	const artifactRefs = parseArtifactRefs(manualQa["artifactRefs"], opts);
 	const byId = artifactMap(artifactRefs);
 	const surfaceEvidence = parseSurfaceEvidence(manualQa["surfaceEvidence"], byId);
 	const adversarialCases = parseAdversarialCases(manualQa["adversarialCases"], byId);
 	const gateReportPath = textField(gateReview["reportPath"], "gateReview.reportPath");
-	checkFile(gateReportPath, "gateReview.reportPath", opts);
+	if (!isPoisoned("gateReview.reportPath")) checkFile(gateReportPath, "gateReview.reportPath", opts);
 	const common = {
 		manualQa: {
 			by: manualQaBy,
 			status: literal(manualQa["status"], "passed", "manualQa.status"),
-			evidence: textField(manualQa["evidence"], "manualQa.evidence"),
+			evidence: manualQaEvidence,
 			surfaceEvidence,
 			adversarialCases,
 			artifactRefs,
@@ -97,7 +111,7 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 			by: gateReviewBy,
 			recommendation: literal(gateReview["recommendation"], "APPROVE", "gateReview.recommendation"),
 			reportPath: gateReportPath,
-			evidence: textField(gateReview["evidence"], "gateReview.evidence"),
+			evidence: gateReviewEvidence,
 			blockers: emptyBlockers(gateReview["blockers"], "gateReview.blockers"),
 		},
 		iteration: {
@@ -119,7 +133,6 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 		},
 	};
 	if (surface === "omo-senpi") return { surface, ...common };
-	const codeReview = section(gate["codeReview"], "codeReview");
 	const codeReportPath = textField(codeReview["reportPath"], "codeReview.reportPath");
 	checkFile(codeReportPath, "codeReview.reportPath", opts);
 	return {
@@ -140,10 +153,13 @@ function parseSurfaceEvidence(
 	value: unknown,
 	byId: ReadonlyMap<string, UlwLoopManualQaArtifactRef>,
 ): UlwLoopQualityGate["manualQa"]["surfaceEvidence"] {
-	if (!Array.isArray(value) || value.length === 0)
+	if (!Array.isArray(value) || value.length === 0) {
 		invalid("manualQa.surfaceEvidence must not be empty.", "manualQa.surfaceEvidence");
-	return value.map((item, index) => {
+		return [];
+	}
+	return value.flatMap((item, index) => {
 		const row = section(item, `manualQa.surfaceEvidence[${index}]`);
+		if (isPoisoned(`manualQa.surfaceEvidence[${index}]`)) return [];
 		const surface = surfaceField(row["surface"], `manualQa.surfaceEvidence[${index}].surface`);
 		const artifacts = referencedArtifacts(
 			row["artifactRefs"],
@@ -151,9 +167,10 @@ function parseSurfaceEvidence(
 			byId,
 		);
 		for (const artifact of artifacts) {
+			if (isPoisoned(`manualQa.surfaceEvidence[${index}].surface`) || isPoisonedArtifactKind(artifact.id)) continue;
 			if (!artifactCompatible(surface, artifact.kind)) {
 				invalid(
-					`manualQa.surfaceEvidence ${surface} artifact ${artifact.kind} is incompatible.`,
+					`manualQa.surfaceEvidence ${surface} artifact ${artifact.kind} is incompatible; surface "${surface}" accepts artifact kinds: ${compatibleKindsFor(surface).join(", ")}.`,
 					"manualQa.surfaceEvidence",
 				);
 			}
@@ -173,10 +190,13 @@ function parseAdversarialCases(
 	value: unknown,
 	byId: ReadonlyMap<string, UlwLoopManualQaArtifactRef>,
 ): UlwLoopQualityGate["manualQa"]["adversarialCases"] {
-	if (!Array.isArray(value) || value.length === 0)
+	if (!Array.isArray(value) || value.length === 0) {
 		invalid("manualQa.adversarialCases must not be empty.", "manualQa.adversarialCases");
-	return value.map((item, index) => {
+		return [];
+	}
+	return value.flatMap((item, index) => {
 		const row = section(item, `manualQa.adversarialCases[${index}]`);
+		if (isPoisoned(`manualQa.adversarialCases[${index}]`)) return [];
 		const artifacts = referencedArtifacts(
 			row["artifactRefs"],
 			`manualQa.adversarialCases[${index}].artifactRefs`,

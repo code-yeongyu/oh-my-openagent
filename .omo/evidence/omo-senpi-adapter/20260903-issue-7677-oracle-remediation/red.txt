@@ -1,0 +1,3 @@
+Command: bun test packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/isolation-state-races.test.mjs packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs packages/omo-senpi/scripts/qa/isolation-ultrabrain-blockers.test.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
+Result before production fixes: 41 pass, 7 fail.
+The seven intended failures were: primary EIO replaced by SHORT_READ; directory EIO accompanied by ECLOSE; observation EIO and truncation still certified untouched; symlink creation/retarget omitted; symlink no-dereference contract absent; POSIX literal backslash misclassified as a Windows separator.
