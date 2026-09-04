@@ -206,3 +206,88 @@ describe("session-manager tools", () => {
     expect(typeof result).toBe("string")
   })
 })
+
+describe("session-manager tools — session_read offset", () => {
+  // given — 10 messages: msg-0 through msg-9
+  const tenMessages: SessionMessage[] = Array.from({ length: 10 }, (_, i) => ({
+    id: `msg-${i}`,
+    role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+    time: { created: 1000 + i * 100 },
+    parts: [{ id: `part-${i}`, type: "text", text: `message ${i}` }],
+  }))
+
+  function createOffsetTestTools() {
+    const capturedMessages: SessionMessage[][] = []
+    return {
+      capturedMessages,
+      tools: createSessionManagerTools(mockCtx, {
+        setStorageClient: () => {},
+        sessionExists: async (id: string) => id === "ses_offset",
+        readSessionMessages: async (): Promise<SessionMessage[]> => tenMessages,
+        readSessionTodos: async (): Promise<TodoItem[]> => [],
+        formatSessionMessages: (messages: SessionMessage[]) => {
+          capturedMessages.push([...messages])
+          return `count:${messages.length}`
+        },
+        getMainSessions: async () => [],
+        filterSessionsByDate: async (ids: string[]) => ids,
+        formatSessionList: async () => "",
+        getAllSessions: async () => [],
+        searchInSession: async () => [],
+        formatSearchResults: () => "",
+        getSessionInfo: async () => null,
+        formatSessionInfo: () => "",
+      }),
+    }
+  }
+
+  test("offset handles positive, negative, zero, beyond-count, and combined with limit", async () => {
+    //#given
+    const { tools, capturedMessages } = createOffsetTestTools()
+
+    //#when — no offset
+    await tools.session_read.execute({ session_id: "ses_offset" }, mockContext)
+    //#then — returns all 10
+    expect(capturedMessages).toHaveLength(1)
+    expect(capturedMessages[0]).toHaveLength(10)
+
+    //#when — positive offset 3 (skip first 3)
+    await tools.session_read.execute({ session_id: "ses_offset", offset: 3 }, mockContext)
+    //#then
+    expect(capturedMessages[1][0].id).toBe("msg-3")
+    expect(capturedMessages[1]).toHaveLength(7)
+
+    //#when — negative offset -3 (last 3)
+    await tools.session_read.execute({ session_id: "ses_offset", offset: -3 }, mockContext)
+    //#then
+    expect(capturedMessages[2][0].id).toBe("msg-7")
+    expect(capturedMessages[2][2].id).toBe("msg-9")
+
+    //#when — offset 0 treated as no offset
+    await tools.session_read.execute({ session_id: "ses_offset", offset: 0 }, mockContext)
+    //#then
+    expect(capturedMessages[3]).toHaveLength(10)
+
+    //#when — offset beyond count
+    await tools.session_read.execute({ session_id: "ses_offset", offset: 99 }, mockContext)
+    //#then
+    expect(capturedMessages[4]).toHaveLength(0)
+
+    //#when — negative offset larger than count returns all
+    await tools.session_read.execute({ session_id: "ses_offset", offset: -50 }, mockContext)
+    //#then
+    expect(capturedMessages[5]).toHaveLength(10)
+
+    //#when — positive offset + limit
+    await tools.session_read.execute({ session_id: "ses_offset", offset: 2, limit: 3 }, mockContext)
+    //#then
+    expect(capturedMessages[6][0].id).toBe("msg-2")
+    expect(capturedMessages[6][2].id).toBe("msg-4")
+
+    //#when — negative offset + limit
+    await tools.session_read.execute({ session_id: "ses_offset", offset: -5, limit: 2 }, mockContext)
+    //#then
+    expect(capturedMessages[7][0].id).toBe("msg-5")
+    expect(capturedMessages[7][1].id).toBe("msg-6")
+  })
+})
