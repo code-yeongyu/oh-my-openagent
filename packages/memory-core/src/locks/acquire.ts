@@ -209,7 +209,7 @@ async function reclaimStaleRecoveryLock(recoveryPath: string): Promise<void> {
     digest.slice(16, 20),
     digest.slice(20, 32),
   ].join("-")
-  const claimPath = `${recoveryPath}.candidate-${claimId}`
+  const claimPath = `${recoveryPath}.claim-${claimId}`
   let claimCreated = false
   try {
     try {

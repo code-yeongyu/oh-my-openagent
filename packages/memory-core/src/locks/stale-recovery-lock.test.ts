@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, unlink, utimes, writeFile } from "node:fs/promises"
 import { hostname, tmpdir } from "node:os"
 import path from "node:path"
 
@@ -10,6 +10,10 @@ import {
   releaseLock,
   setLockCandidateFsForTests,
 } from "./index"
+import {
+  CANDIDATE_STALE_AGE_MS,
+  sweepStaleLockCandidates,
+} from "./candidate-sweep"
 
 // These PIDs are likely absent on POSIX CI. If a slot is reused, the deliberately
 // wrong process_start still proves the seeded owner is not the current process.
@@ -140,6 +144,8 @@ describe("stale recovery lock deadlock (issue #7573)", () => {
       const recoveryPath = `${lockPath}.recovery`
       await writeFile(lockPath, `${JSON.stringify(deadPrimaryRecord())}\n`)
       await writeFile(recoveryPath, `${JSON.stringify(deadRecoveryRecord())}\n`)
+      const staleAt = new Date(Date.now() - CANDIDATE_STALE_AGE_MS - 1_000)
+      await utimes(recoveryPath, staleAt, staleAt)
       const replacement = await createLockRecord("reflection-scheduler:recovery")
       const restore = setLockCandidateFsForTests({
         afterRecoveryClaim: async (pathToRelease) => {
@@ -197,6 +203,10 @@ describe("stale recovery lock deadlock (issue #7573)", () => {
           (cause: unknown) => cause,
         )
         await firstClaimed.promise
+        const sweptClaims = await sweepStaleLockCandidates(
+          lockDir,
+          () => Date.now() + CANDIDATE_STALE_AGE_MS + 1_000,
+        )
 
         // #when
         const secondError = await acquireLock(lockPath, secondRecord, {
@@ -209,6 +219,7 @@ describe("stale recovery lock deadlock (issue #7573)", () => {
         const firstError = await firstAcquisition
 
         // #then
+        expect(sweptClaims).toBe(0)
         expect(secondError).toBeInstanceOf(LockContentionError)
         expect(firstError).toBeUndefined()
         expect(JSON.parse(await readFile(lockPath, "utf8")).nonce).toBe(firstRecord.nonce)

@@ -1,0 +1,5 @@
+Focused red: 4 pass, 1 fail; active recovery claim swept=1.
+Focused green: 5 pass, 0 fail, 9 assertions.
+Complete lock suite: 24 pass, 0 fail, 64 assertions.
+Memory-core typecheck: exit 0.
+Generated Senpi extensions: rebuilt with Bun 1.4.0.
