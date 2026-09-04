@@ -1,12 +1,11 @@
 {
 	"name": "@sisyphuslabs/omo-codex-plugin",
-	"version": "5.0.0-beta.31",
+	"version": "5.0.0-beta.42",
 	"description": "Aggregate Codex plugin root for OMO components.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
 	"private": true,
 	"workspaces": [
-		"components/codegraph",
 		"components/comment-checker",
 		"components/git-bash",
 		"components/lazycodex-executor-verify",

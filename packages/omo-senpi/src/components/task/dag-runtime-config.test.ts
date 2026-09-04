@@ -23,17 +23,31 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, _label: string, _ms = 300): Promise<T> {
-  return promise
+function within<T>(promise: Promise<T>, label: string, ms = 300): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    void promise.then(
+      (value) => {
+        clearTimeout(timeout)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timeout)
+        reject(error)
+      },
+    )
+  })
 }
 
 class ControlledRunner implements ManagedRunner {
   readonly started = deferred<void>()
+  readonly startReleased = deferred<void>()
   readonly outcome = deferred<RunnerOutcome>()
 
-  start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
+  async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     this.started.resolve()
-    return Promise.resolve({
+    await this.startReleased.promise
+    return {
       task_id: spec.taskId,
       sessionId: `child-${spec.taskId}`,
       pid: undefined,
@@ -44,7 +58,7 @@ class ControlledRunner implements ManagedRunner {
       waitForOutcome: () => this.outcome.promise,
       lastAssistantText: () => undefined,
       dispose: () => Promise.resolve(),
-    })
+    }
   }
 }
 
@@ -98,16 +112,21 @@ describe("assembled DAG runtime configuration", () => {
       definition: {
         key: "configured-ring",
         name: "configured ring",
-        nodes: [{ id: "overflow", prompt: "overflow", subagent_type: "explore", model: "omo-mock/mock-1" }],
+        nodes: [
+          { id: "overflow-a", prompt: "overflow a", subagent_type: "explore", model: "omo-mock/mock-1" },
+          { id: "overflow-b", prompt: "overflow b", subagent_type: "explore", model: "omo-mock/mock-1" },
+        ],
       },
     })
+    const completion = runtime.wait(started.snapshot.runId, sessionId)
     await within(runner.started.promise, "node start")
-    // The ring-1 subscriber may drop the task-attached event itself, but its durable overflow is
-    // appended only after that admission burst is journaled. Use the shipped overflow as the
-    // admission barrier before allowing the child to settle.
+    // Both nodes become scheduled before admission awaits either controlled child. This creates a
+    // test-owned journal burst, while the start gate keeps the scheduler at that boundary until
+    // the shipped RPC subscriber has observed its durable overflow.
     const overflow = await within(overflowDelivered.promise, "configured subscriber overflow")
+    runner.startReleased.resolve()
     runner.outcome.resolve({ status: "completed", finalResponse: "done" })
-    await within(runtime.wait(started.snapshot.runId, sessionId), "run completion")
+    await within(completion, "run completion")
 
     // then
     expect(overflow.droppedCount).toBeGreaterThan(0)

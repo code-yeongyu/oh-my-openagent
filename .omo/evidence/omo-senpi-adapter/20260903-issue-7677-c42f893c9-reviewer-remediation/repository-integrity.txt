@@ -1,0 +1,9 @@
+Source head checked: c42f893c953df103a38c42820568ccde34fcc215
+Fetched origin/dev: 65c55dc6b470e0b21f60ff3c16c8e9594d575cd8 (already an ancestor; no merge required)
+JSONL parse: PASS
+Secret-like assignment scan: PASS
+Unsanitized absolute/random sandbox path scan: PASS
+git diff --check: PASS
+Follow-up source paths: exactly the six intended packages/omo-senpi/scripts/qa files
+script/**, native packages/manifests, manifests, lock/pins/patches, OAuth, CI, generated bundles/runtime candidate diff: 0 paths
+Operational PASS versus isolationCertified:false assertion: PASS

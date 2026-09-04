@@ -139,7 +139,7 @@ See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spe
 - **Feature modules**: `packages/omo-opencode/src/features/` has 23 modules.
 - **Tool system**: `packages/omo-opencode/src/tools/` has 14 tool-producing directories plus a shared helper directory. The registry exposes **12 to 38 tools** depending on config gates. The 8 LSP aliases are served by the built-in `lsp` MCP, not by the tool registry.
 - **Hook system**: the 5-tier composers define **58 slots** (Session 24 + Tool Guard 18 + Transform 7 + Continuation 7 + Skill 2). Default config activates about 50-51; the maximum is 62 when the 4 direct Team Mode event handlers are included.
-- **MCP system**: 3 tiers: built-in MCPs with 3 remote servers (`websearch`, `context7`, `grep_app`) plus local stdio `lsp` and `codegraph`, `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter. `codegraph` can be disabled with `codegraph.enabled: false`.
+- **MCP system**: 3 tiers: built-in MCPs with 3 remote servers (`websearch`, `context7`, `grep_app`) plus local stdio `lsp`, `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
 - **Managers and controllers**: startup creates TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler, and ModelFallbackControllerAccessor fields, plus optional TuiStateMirror and MonitorManager fields.
 - **Config pipeline**: 6 phases in order: provider, plugin-components, agents, tools, MCPs, commands.
 - **Canonical core agent order**: Sisyphus, Hephaestus, Prometheus, Atlas.
@@ -463,7 +463,7 @@ The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`
 | **agent-browser**      | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
 | **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
 | **frontend**           | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts strong UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                     |
-| **review-work**        | "review work", "review my work", "QA my work"          | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                     |
+| **review-work**        | "review work", "review my work", "QA my work"          | Post-implementation gate review. The orchestrator runs manual QA on the real surface, then one gate reviewer audits goal, code quality, security, missed context, and the QA evidence. Passes only on a clean QA matrix plus APPROVE.                                                                                                                     |
 | **ulw-research**       | `ulw-research`, deep research requests | Maximum-saturation research. Runs parallel explore/librarian swarms across code, docs, web, and OSS repos; recursively follows `EXPAND` leads until convergence; proves contested claims by running code; and returns cited synthesis. Epistemic instrumentation covers intent-vs-reality diffing, claim graph, observation manifest, independent-observation convergence, temporal evidence, verification economics, and cause-disappearance records. |
 | **remove-ai-slops** | "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Invoke as `skill(name="remove-ai-slops")`. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                           |
 
@@ -1017,7 +1017,7 @@ The three tiers of MCP servers and where they come from:
 
 | Tier | Source | Visible in `opencode mcp list`? |
 | ---- | ------ | ------------------------------- |
-| 1 — Built-in | Injected at runtime by oh-my-openagent (`websearch`, `context7`, `grep_app`, `lsp`, `codegraph`) | No |
+| 1 — Built-in | Injected at runtime by oh-my-openagent (`websearch`, `context7`, `grep_app`, `lsp`) | No |
 | 2 — Claude Code `.mcp.json` | Loaded from `.mcp.json` files and merged in by oh-my-openagent at runtime | No |
 | 3 — Skill-embedded | Declared in `SKILL.md` frontmatter, spun up on demand per session | No |
 | — Native OpenCode | Configured directly in `opencode.json` under the `mcp` key, without the plugin | Yes |
@@ -1038,7 +1038,6 @@ The three tiers of MCP servers and where they come from:
 | **context7**  | Official documentation lookup for any library/framework                                       |
 | **grep_app**  | Ultra-fast code search across public GitHub repos. Great for finding implementation examples. |
 | **lsp**       | Local LSP tools for diagnostics, symbols, references, and renames                             |
-| **codegraph** | Local code graph stdio server; enabled unless `codegraph.enabled` is `false`                  |
 
 ### Skill-Embedded MCPs
 

@@ -417,20 +417,33 @@ jobs:
 
           git fetch origin "${BASE_REF}" --tags
 
+          BASE_HEAD="$(git rev-parse "origin/${BASE_REF}")"
+
+          # A release commit may only be REUSED when it is the current base head. A stamp that
+          # sits behind the head belongs to an earlier, abandoned attempt: its tree predates every
+          # merge since, so publishing it would ship a version whose contents nobody reviewed under
+          # that number (2026-09-04: a beta.41 retry re-selected the first attempt's stamp, whose
+          # tree lacked the senpi engine bump; only gate-reuse's CI check kept it off npm). Fail
+          # closed and ask for a fresh version number instead of restamping over a live one.
+          reuse_or_refuse() {
+            local candidate="$1" origin_desc="$2"
+            if [ "$candidate" = "$BASE_HEAD" ]; then
+              echo "release_sha=${candidate}" >> "$GITHUB_OUTPUT"
+              echo "needs_push=false" >> "$GITHUB_OUTPUT"
+              echo "${origin_desc} is the current origin/${BASE_REF} head: ${candidate}"
+              exit 0
+            fi
+            echo "::error::${origin_desc} (${candidate}) is stale: origin/${BASE_REF} has moved to ${BASE_HEAD}. Refusing to publish a tree that predates the base head. Bump to an unused version so a fresh release commit is stamped on the current head."
+            exit 1
+          }
+
           if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
-            RELEASE_SHA="$(git rev-list --max-count=1 "refs/tags/v${VERSION}")"
-            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
-            echo "needs_push=false" >> "$GITHUB_OUTPUT"
-            echo "Release tag v${VERSION} already exists locally at ${RELEASE_SHA}"
-            exit 0
+            reuse_or_refuse "$(git rev-list --max-count=1 "refs/tags/v${VERSION}")" "Release tag v${VERSION}"
           fi
 
           RELEASE_SHA="$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
           if [ -n "$RELEASE_SHA" ]; then
-            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
-            echo "needs_push=false" >> "$GITHUB_OUTPUT"
-            echo "Release commit already exists on origin/${BASE_REF}: ${RELEASE_SHA}"
-            exit 0
+            reuse_or_refuse "$RELEASE_SHA" "Release commit for v${VERSION}"
           fi
 
           git checkout -B "$RELEASE_BRANCH" "origin/${BASE_REF}"
@@ -929,7 +942,7 @@ jobs:
             .name = "lazycodex-ai" |
             .version = $omo_version |
             .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
-            .files = ["dist/cli", "dist/cli-node", "script/qa/strip-ansi.mjs", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-visual-qa.mjs", "script/qa/xterm-live-terminal.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/bootstrap/dist/cli.js", "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1", "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1", "packages/omo-codex/plugin/components/codegraph/dist/cli.js", "packages/omo-codex/plugin/components/codegraph/dist/serve.js", "packages/omo-codex/plugin/components/comment-checker/dist/cli.js", "packages/omo-codex/plugin/components/git-bash/dist/cli.js", "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "packages/omo-codex/plugin/components/lsp/dist/cli.js", "packages/omo-codex/plugin/components/rules/dist/cli.js", "packages/omo-codex/plugin/components/ulw-execute-continuation/dist/cli.js", "packages/omo-codex/plugin/components/teammode/dist/cli.js", "packages/omo-codex/plugin/components/telemetry/dist/cli.js", "packages/omo-codex/plugin/components/ultrawork/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills", "!packages/omo-codex/plugin/node_modules", "!packages/omo-codex/plugin/**/node_modules", "!packages/omo-codex/plugin/components/workflow-selector"] |
+            .files = ["dist/cli", "dist/cli-node", "script/qa/strip-ansi.mjs", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-visual-qa.mjs", "script/qa/xterm-live-terminal.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/bootstrap/dist/cli.js", "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1", "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1", "packages/omo-codex/plugin/components/comment-checker/dist/cli.js", "packages/omo-codex/plugin/components/git-bash/dist/cli.js", "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "packages/omo-codex/plugin/components/lsp/dist/cli.js", "packages/omo-codex/plugin/components/rules/dist/cli.js", "packages/omo-codex/plugin/components/ulw-execute-continuation/dist/cli.js", "packages/omo-codex/plugin/components/teammode/dist/cli.js", "packages/omo-codex/plugin/components/telemetry/dist/cli.js", "packages/omo-codex/plugin/components/ultrawork/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/prompts-core/prompts/ultrawork/codex.md", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills", "!packages/omo-codex/plugin/node_modules", "!packages/omo-codex/plugin/**/node_modules", "!packages/omo-codex/plugin/components/workflow-selector"] |
             .scripts = {} |
             .dependencies = {} |
             .devDependencies = {} |
@@ -1116,26 +1129,45 @@ jobs:
           PREVIOUS_LAZYCODEX_VERSION: ${{ steps.lazycodex-release-state.outputs.previous_lazycodex_version }}
           GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
         run: |
+          # pipefail matters: an empty tag list is indistinguishable from "no releases
+          # exist yet" and would resolve to --latest, so a failed `gh release list`
+          # must fail the step instead of silently mis-assigning the badge.
+          set -euo pipefail
+
           {
             printf '%s\n' "Synced Codex Light marketplace payload from oh-my-openagent v${VERSION}."
             printf '%s\n' ""
             printf '%s\n' "Compared against: lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
           } > /tmp/lazycodex-release-notes.md
 
+          LATEST_FLAG="$(gh release list --repo code-yeongyu/lazycodex --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
           gh release view "v${VERSION}" --repo code-yeongyu/lazycodex >/dev/null 2>&1 || \
-            gh release create "v${VERSION}" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
+            gh release create "v${VERSION}" "$LATEST_FLAG" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
 
       - name: Create GitHub release
+        # Always a full release, never `--prerelease`, on every channel: the npm
+        # dist-tag (beta/next) already carries the channel semantics, and every
+        # shipping version is `5.0.0-beta.N`.
+        #
+        # The Latest badge is decided by `script/release-latest-flag.ts` from the
+        # highest ALREADY PUBLISHED semver, not by creation order. `gh release
+        # create` can only send make_latest true/false, so a bare `--latest`
+        # would hand the badge to an older-line hotfix dispatched after a newer
+        # release. That badge is load-bearing: `releases/latest/download/<asset>`
+        # is the URL the compiled omo binary's self-update hint resolves against
+        # (packages/omo-native/compile-entry.ts).
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_FLAGS=()
-          if [[ "$VERSION" == *"-"* ]]; then
-            RELEASE_FLAGS+=(--prerelease)
-          fi
+          # pipefail matters: an empty tag list is indistinguishable from "no releases
+          # exist yet" and would resolve to --latest, so a failed `gh release list`
+          # must fail the step instead of silently mis-assigning the badge.
+          set -euo pipefail
+
+          LATEST_FLAG="$(gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
           gh release view "v${VERSION}" >/dev/null 2>&1 || \
-            gh release create "v${VERSION}" "${RELEASE_FLAGS[@]}" --title "v${VERSION}" --notes-file /tmp/changelog.md
+            gh release create "v${VERSION}" "$LATEST_FLAG" --title "v${VERSION}" --notes-file /tmp/changelog.md
 
       - name: Download release-binary artifacts
         if: inputs.skip_platform != true
@@ -1253,25 +1285,32 @@ jobs:
         run: |
           set -euo pipefail
 
-          for attempt in $(seq 1 5); do
-            IMMUTABLE_VERSION=$(npm view omo-ai@$OMO_AI_VERSION version 2>/dev/null || true)
+          # npm publish returns before the registry serves the new version: its own output says
+          # "Your package is being processed and may take a few minutes to become available", and
+          # omo-ai 5.0.0-0.beta.42 (2026-09-04) took ~5 minutes. The previous 5 x 15 s = 60 s budget
+          # therefore failed the run AFTER a successful publish. Size the wait to the registry's stated
+          # contract and read with --prefer-online so a cached "not found" cannot mask a landed version.
+          READINESS_INTERVAL_SECONDS=15
+          READINESS_ATTEMPTS=60   # 60 x 15 s = 15 minutes
+          for attempt in $(seq 1 "$READINESS_ATTEMPTS"); do
+            IMMUTABLE_VERSION=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version 2>/dev/null || true)
             BETA_READY=true
             if [ "$ALREADY_PUBLISHED" != "true" ]; then
-              BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
+              BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
               [ "$BETA_VERSION" = "$OMO_AI_VERSION" ] || BETA_READY=false
             fi
 
             if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$BETA_READY" = "true" ]; then
-              echo "omo-ai@$OMO_AI_VERSION is ready"
+              echo "omo-ai@$OMO_AI_VERSION is ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
               break
             fi
 
-            if [ "$attempt" = "5" ]; then
-              echo "::error::omo-ai@$OMO_AI_VERSION was not ready after 5 attempts"
+            if [ "$attempt" = "$READINESS_ATTEMPTS" ]; then
+              echo "::error::omo-ai@$OMO_AI_VERSION did not become visible within $((READINESS_ATTEMPTS * READINESS_INTERVAL_SECONDS)) s. The publish-main job already reported '+ omo-ai@$OMO_AI_VERSION', so this is a registry propagation timeout, not a publish failure: check 'npm view omo-ai@$OMO_AI_VERSION version' before re-running anything."
               exit 1
             fi
-            echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/5)"
-            sleep 15
+            echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/${READINESS_ATTEMPTS}, ${READINESS_INTERVAL_SECONDS}s)"
+            sleep "$READINESS_INTERVAL_SECONDS"
           done
 
       - name: Guard omo-ai dist-tags

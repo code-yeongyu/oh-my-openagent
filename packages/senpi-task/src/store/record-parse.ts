@@ -25,9 +25,13 @@ import {
   readString,
 } from "./scalar-read"
 
+const TERMINAL_STATUSES = new Set(["completed", "error", "cancelled", "interrupted", "lost"])
+
 export function parseTaskRecord(value: unknown, path: string, warnings?: string[]): TaskRecord {
   if (!isRecord(value)) throw new Error(`JSON record at ${path} is not an object`)
 
+  const status = readTaskStatus(value)
+  const updatedAt = readString(value, "updated_at")
   const name = readOptionalString(value, "name")
   const taskSummary = readOptionalString(value, "task_summary")
   const description = readOptionalString(value, "description")
@@ -40,6 +44,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const childSessionId = readOptionalString(value, "child_session_id")
   const finalResponse = readOptionalString(value, "final_response")
   const errorMessage = readOptionalString(value, "error_message")
+  const terminalAt = readOptionalString(value, "terminal_at")
   const killed = readOptionalBoolean(value, "killed")
   // Legacy records predate the field: they never asked for a terminal notification, so false.
   const notifyOnTerminal = readOptionalBoolean(value, "notify_on_terminal") ?? false
@@ -54,10 +59,11 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const taskSeq = readOptionalNumber(value, "task_seq")
   const configGeneration = readOptionalNumber(value, "config_generation")
   const backgroundMode = readOptionalBackgroundMode(value)
+  const reviveDeliveryUncertain = parseOptionalReviveDeliveryUncertainty(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
-    status: readTaskStatus(value),
+    status,
     residency_state: readResidencyState(value),
     parent_session_id: readString(value, "parent_session_id"),
     root_session_id: readString(value, "root_session_id"),
@@ -66,8 +72,11 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     model: readString(value, "model"),
     notify_on_terminal: notifyOnTerminal,
     created_at: readString(value, "created_at"),
-    updated_at: readString(value, "updated_at"),
+    updated_at: updatedAt,
     notification: parseNotification(value),
+    ...(terminalAt === undefined && !TERMINAL_STATUSES.has(status)
+      ? {}
+      : { terminal_at: terminalAt ?? updatedAt }),
     ...(name === undefined ? {} : { name }),
     ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
@@ -92,6 +101,17 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(taskSeq === undefined ? {} : { task_seq: taskSeq }),
     ...(configGeneration === undefined ? {} : { config_generation: configGeneration }),
     ...(backgroundMode === undefined ? {} : { background_mode: backgroundMode }),
+    ...(reviveDeliveryUncertain === undefined ? {} : { revive_delivery_uncertain: reviveDeliveryUncertain }),
+  }
+}
+
+function parseOptionalReviveDeliveryUncertainty(record: Record<string, unknown>): TaskRecord["revive_delivery_uncertain"] {
+  const value = record["revive_delivery_uncertain"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("revive_delivery_uncertain is not an object")
+  return {
+    run_epoch: readNumber(value, "run_epoch"),
+    message_sha256: readString(value, "message_sha256"),
   }
 }
 

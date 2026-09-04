@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test"
+import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "./index"
-import { normalizeUlwLoopSessionId, ulwLoopStatusArgs } from "./session-scope"
+import { normalizeUlwLoopSessionId, ulwLoopScopedGoalsPath, ulwLoopStatusArgs } from "./session-scope"
 import { activeStatus, createLogger, type RecordedLog } from "./ulw-loop.test-support"
 import type { ComponentLogger } from "../../extension/types"
 
@@ -13,7 +14,7 @@ interface RunnerCall {
 }
 
 async function registerScoped(
-  options: { planDirExists?: (cwd: string) => boolean; stdout?: string } = {},
+  options: { planExists?: (cwd: string, sessionId: string) => boolean; stdout?: string } = {},
 ): Promise<{
   pi: FakeExtensionAPI
   calls: RunnerCall[]
@@ -24,7 +25,7 @@ async function registerScoped(
   const logger = createLogger()
   await createUlwLoopComponent({
     resolveOmoBin: () => "/tmp/omo",
-    planDirExists: options.planDirExists ?? (() => true),
+    planExists: options.planExists ?? (() => true),
     runCommand: async (bin, args, runOptions) => {
       calls.push({ bin, args, cwd: runOptions.cwd })
       return { code: 0, stdout: options.stdout ?? activeStatus() }
@@ -85,7 +86,7 @@ describe("omo-senpi ulw-loop status probe session scope", () => {
   })
 
   it("#given a session id but no .omo/ulw-loop directory #when agent_end fires #then the perf guard short-circuits with no spawn", async () => {
-    const { pi, calls } = await registerScoped({ planDirExists: () => false })
+    const { pi, calls } = await registerScoped({ planExists: () => false })
 
     await pi.dispatch("agent_end", { type: "agent_end" }, sessionCtx("/repo", "sess-guard"))
 
@@ -110,6 +111,12 @@ function toolkitNormalize(sessionId: string | null | undefined): string | null {
     .replace(/^\.+/, "")
     .replace(/^[.-]+|[.-]+$/g, "")
   return candidate.length > 0 ? candidate : null
+}
+
+// Mirrors packages/omo-codex/plugin/components/ulw-loop/src/paths.ts `ulwLoopGoalsPath` for a
+// normalized session id (`ulwLoopRelativeDir` + `ULW_LOOP_GOALS`).
+function toolkitGoalsPath(repoRoot: string, sessionId: string): string {
+  return join(repoRoot, `.omo/ulw-loop/${sessionId}`, "goals.json")
 }
 
 describe("omo-senpi ulw-loop session id normalization parity", () => {
@@ -145,5 +152,12 @@ describe("omo-senpi ulw-loop session id normalization parity", () => {
 
   it("#given a normalized session id #when building status args #then the toolkit flag order is stable", () => {
     expect(ulwLoopStatusArgs("sess-A")).toEqual(["ulw-loop", "status", "--json", "--session-id", "sess-A"])
+  })
+
+  it("#given a cwd and normalized session id #when resolving the scoped goals.json path #then it matches the toolkit session-scoped goals path", () => {
+    const cwd = "/repo"
+    const sessionId = "sess-A-weird"
+    expect(ulwLoopScopedGoalsPath(cwd, sessionId)).toEqual(toolkitGoalsPath(cwd, sessionId))
+    expect(ulwLoopScopedGoalsPath(cwd, sessionId)).toEqual(join(cwd, ".omo", "ulw-loop", sessionId, "goals.json"))
   })
 })

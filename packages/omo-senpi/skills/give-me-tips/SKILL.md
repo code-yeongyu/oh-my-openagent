@@ -1,6 +1,6 @@
 ---
 name: give-me-tips
-description: "Explains any senpi tip in depth - startup tips, working tips, and any Tip: line shown in the TUI (including the Fable-5-refusal fallback tip). Use when the user asks about a Tip: line, says give-me-tips, asks what a tip means, how a tipped feature works, or which tips they can see. Queries the live tip list (senpi --list-tips) first, checks what THIS user can actually see, then verifies the real feature code before explaining."
+description: "Explains any senpi tip in depth, including Tip: lines in the TUI. Use when the user asks about a tip, what a tipped feature does, or which tips they can see."
 metadata:
   short-description: Deep, verified, brag-worthy explanations of any senpi tip
 ---

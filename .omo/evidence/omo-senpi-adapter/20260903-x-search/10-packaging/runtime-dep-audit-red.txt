@@ -1,0 +1,27 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/runtime-dependency-resolution.test.ts:
+33 |     const manifest = readPackageManifest()
+34 |     const runtimePackages = collectPackageNames(manifest.dependencies)
+35 |     const peerPackages = collectPackageNames(manifest.peerDependencies)
+36 |     const runtimeImports = externalImports.filter((specifier) => !peerPackages.has(specifier))
+37 | 
+38 |     expect(runtimeImports.filter((specifier) => !runtimePackages.has(specifier))).toEqual([])
+                                                                                       ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "typebox/value",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/runtime-dependency-resolution.test.ts:38:83)
+(fail) omo-senpi local-path runtime dependencies > #given a symlinked plugin without host hoisting #when Node imports its runtime dependencies #then each resolves from the real path [8.42ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1.55s]

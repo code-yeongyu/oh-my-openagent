@@ -1,6 +1,6 @@
 ---
 name: refactor
-description: "Intelligent refactor command. Triggers: refactor, refactoring, cleanup, restructure, extract, simplify, modernize."
+description: "Guides a refactor, cleanup, or restructure with the right decomposition. Use when the user asks to refactor, simplify, extract, or modernize code."
 ---
 
 export const REFACTOR_TEMPLATE = `# Intelligent Refactor Command

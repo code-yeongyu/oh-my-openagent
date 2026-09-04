@@ -14,7 +14,7 @@ Harness-neutral model resolution core (`@oh-my-opencode/model-core`). Resolves w
 | `model-resolution-pipeline.ts` | `resolveModelPipeline()` - 6-step resolution with logging hooks for testing |
 | `provider-cache.ts` | `ProviderCache` DI interface: `readConnectedProvidersCache()`, `findProviderModelMetadata()` |
 | `model-availability.ts` | `fuzzyMatchModel()` - exact, then exact model-ID, then shortest **substring** match against `availableModels` (not prefix) |
-| `agent-model-requirements.ts` | Hardcoded `AGENT_MODEL_REQUIREMENTS` fallback chains (14 agents) |
+| `agent-model-requirements.ts` | Hardcoded `AGENT_MODEL_REQUIREMENTS` fallback chains (11 agents) |
 | `category-model-requirements.ts` | Hardcoded `CATEGORY_MODEL_REQUIREMENTS` fallback chains (8 categories) |
 | `provider-model-id-transform.ts` | Provider-specific ID transforms (Vercel sub-provider inference, Claude version dots, Gemini preview suffixes) |
 | `model-capabilities/index.ts` | `getModelCapabilities()` - 4-source priority: runtime metadata -> runtime snapshot -> bundled snapshot -> heuristic family; alias canonicalization, suffix/prefix-tolerant lookup candidates, `resolutionMode` diagnostics |

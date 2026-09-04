@@ -70,7 +70,7 @@ describe("session_start component ordering", () => {
         runCommand: async () => ({ code: 0, stdout: activeStatus() }),
         // This fixture asserts handler ordering; seeding a real `.omo` ledger would also flip the
         // onboarding/advisor state the test pins, so the plan lookup is stubbed active instead.
-        planDirExists: () => true,
+        planExists: () => true,
       }),
     ]
     for (const component of components) await component.register(pi, componentContext)

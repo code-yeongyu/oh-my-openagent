@@ -66,7 +66,7 @@ describe("runOpenCodeStartupMigration", () => {
     // given
     const fileSystem = createFileSystem()
     fileSystem.files.set(rootSourcePath, JSON.stringify({ agents: { oracle: { model: "anthropic/legacy" } } }))
-    fileSystem.files.set(configJsoncPath, JSON.stringify({ codegraph: { excluded_roots: ["/generated"] } }))
+    fileSystem.files.set(configJsoncPath, JSON.stringify({ "[codex]": { telemetry: { enabled: false } } }))
 
     // when
     const result = run(fileSystem)
@@ -75,7 +75,7 @@ describe("runOpenCodeStartupMigration", () => {
     expect(result.reloadRequired).toBe(true)
     expect(result.migratedFrom).toEqual([rootSourcePath, configJsoncPath])
     expect(parseFile(fileSystem, targetPath)).toMatchObject({
-      codegraph: { excluded_roots: ["/generated"] },
+      "[codex]": { telemetry: { enabled: false } },
     })
     expect(fileSystem.existsSync(rootSourcePath)).toBe(false)
     expect(fileSystem.existsSync(configJsoncPath)).toBe(false)
@@ -132,7 +132,7 @@ describe("runOpenCodeStartupMigration", () => {
   test("#given an invalid transformed document #when startup migration runs #then validation aborts before target and source changes", () => {
     // given
     const fileSystem = createFileSystem()
-    fileSystem.files.set(configJsoncPath, JSON.stringify({ codegraph: { excluded_roots: [42] } }))
+    fileSystem.files.set(configJsoncPath, JSON.stringify({ "[codex]": { telemetry: { enabled: "yes" } } }))
 
     // when
     const result = run(fileSystem)

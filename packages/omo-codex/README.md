@@ -53,76 +53,15 @@ This sets `LAZYCODEX_DEV_VERSION` (default `dev`), which threads through `resolv
 
 
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
-The same plugin-scoped MCP manifest also bundles `grep_app`, `git_bash`, `lsp`, and `codegraph`. The ast-grep capability ships as the `ast-grep` skill and provisions `sg` into the Codex runtime. `git_bash` is enabled only on Windows by default. `codegraph` is enabled only when the installer can resolve a supported local Node runtime for CodeGraph; unsupported runtimes disable that MCP policy while keeping `omo@sisyphuslabs` enabled.
+The same plugin-scoped MCP manifest also bundles `grep_app`, `git_bash`, and `lsp`. The ast-grep capability ships as the `ast-grep` skill and provisions `sg` into the Codex runtime. `git_bash` is enabled only on Windows by default.
 
-### CodeGraph exclusions
-
-CodeGraph is skipped for project roots under default ephemeral/state locations: POSIX `/tmp`, POSIX `/private/tmp`, the current OS temp directory on every platform, and any path containing a `.omo` segment. Skipped projects do not run the `SessionStart` bootstrap worker and the MCP exposes an unavailable stub instead of starting CodeGraph.
-
-Add extra exclude-only roots with `codegraph.excluded_roots`:
-
-```jsonc
-{
-  "codegraph": {
-    "excluded_roots": ["~/scratch/codegraph", "relative-cache-root"]
-  }
-}
-```
-
-Entries may be absolute, `~`-relative, or relative to the configured home directory. OMO expands `~`, realpath-canonicalizes each configured root when possible, and compares descendants after platform-aware normalization. There is no include override.
-
-CodeGraph runs with `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment. The shared daemon is enabled by default; setting `codegraph.daemon` to `false` adds `CODEGRAPH_NO_DAEMON=1`. OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
-
-### CodeGraph SessionStart bootstrap
-
-The Codex `SessionStart` hook never runs `codegraph status`. It judges a project initialized only when `<projectRoot>/.codegraph/codegraph.db` exists. If an ancestor directory has that database, the nested project is treated as covered and no duplicate child index is initialized.
-
-Only a definitively uninitialized project may spawn the background initializer. OMO serializes attempts with an atomic per-project lock under `~/.omo/codegraph/session-start/locks/`, recovers stale locks, and records worker failures in an exponential cooldown stamp. The default cooldown starts at 15 minutes, doubles after consecutive failures, and caps at 24 hours. Configure the base interval for Codex with `codegraph.session_start_cooldown_ms` (minimum 60000):
-
-```jsonc
-{
-  "[codex]": {
-    "codegraph": {
-      "session_start_cooldown_ms": 900000
-    }
-  }
-}
-```
-
-Suppressed attempts are auditable in `~/.omo/codegraph/session-start.jsonl` through actions such as `skipped-cooldown`, `skipped-locked`, and `skipped-nested-root`. The worker invokes only bounded `codegraph init` and records success only when the exact project database appears afterward; probe errors and timeouts never mean "uninitialized".
-
-### CodeGraph daemon
-
-By default CodeGraph uses the upstream shared daemon. Set `codegraph.daemon` to `false` in the unified OMO config (`~/.omo/omo.jsonc`, or `.omo/omo.jsonc` in a project) to keep each MCP process in-process:
-
-```jsonc
-{
-  "codegraph": {
-    // Default true. Set false to keep the index inside each MCP client.
-    "daemon": false
-  }
-}
-```
-
-With the daemon enabled, upstream CodeGraph spawns one detached daemon per project, rooted at the nearest ancestor holding `.codegraph/codegraph.db`, and every client for that project talks to it over a local socket. The daemon records itself in `.codegraph/daemon.pid`, exits after about five minutes idle, and runs under an upstream PPID watchdog. The default trades a detached background process for lower first-query latency once any client has warmed the daemon, plus one shared index across concurrent clients. Set `daemon: false` when strict client-scoped process lifetime is preferred.
-
-Inspect or stop running daemons with the upstream manager:
-
-```bash
-codegraph daemon   # interactive list of running daemons; pick one and press enter to stop it
-```
-
-An ambient `CODEGRAPH_NO_DAEMON=1` in the environment still forces daemon-off when `codegraph.daemon` is `true`.
-
-### Process hygiene and the CodeGraph 1.5.0 upgrade
-
-CodeGraph is pinned to 1.5.0. Managed installs provisioned at 1.0.1 or 1.4.1 upgrade automatically, and project stores built by older versions remain compatible without a manual re-index.
+### Process hygiene
 
 Process lifecycle is self-cleaning and always on (no config keys):
 
-- MCP server processes (`codegraph`, `lsp`, `git_bash`) run a parent-liveness watchdog and exit when their parent process dies, so a crashed harness does not leave servers behind.
+- MCP server processes (`lsp`, `git_bash`) run a parent-liveness watchdog and exit when their parent process dies, so a crashed harness does not leave servers behind.
 - A newly started lsp daemon reaps running daemons left over from older versions at startup.
-- A best-effort family sweep removes orphaned codegraph and lsp processes at startup on every adapter (the Codex `SessionStart` hook, OpenCode plugin startup, and Senpi session start) and self-throttles via stamp files.
+- A best-effort family sweep removes orphaned lsp processes at startup on every adapter (the Codex `SessionStart` hook, OpenCode plugin startup, and Senpi session start) and self-throttles via stamp files.
 
 Native Windows installs discover Git Bash before the installer mutates `~/.codex/`. The installer checks `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations such as `C:\Program Files\Git\bin\bash.exe`, and then PATH. If Git Bash is still missing, it prints the install guidance shown here and stops without running `winget` or changing system dependencies:
 

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "correlation": {
+    "runId": "33701704942",
+    "runAttempt": "1",
+    "job": "test",
+    "shard": "2/2",
+    "invocation": "shard-2-quarantine"
+  },
+  "timing": {
+    "stopwatchFrequency": "10000000",
+    "preTest": {
+      "utc": "2026-09-03T01:01:41.2761579Z",
+      "stopwatchTimestamp": "4222155690"
+    },
+    "postTest": {
+      "utc": "2026-09-03T01:03:47.5875293Z",
+      "stopwatchTimestamp": "5485221707"
+    }
+  },
+  "temporaryPaths": {
+    "runnerTemp": "D:\\a\\_temp",
+    "processTemp": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\",
+    "temp": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp",
+    "tmp": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp"
+  },
+  "telemetryProcess": {
+    "name": "pwsh.exe",
+    "pid": 7712,
+    "parentPid": 1264,
+    "creationTimeUtc": "2026-09-03T01:01:40.9516360Z"
+  },
+  "testProcess": {
+    "name": "bun.exe",
+    "pid": 6396,
+    "parentPid": 7712,
+    "creationTimeUtc": "2026-09-03T01:01:41.3672260Z"
+  },
+  "testExitCode": 0,
+  "testLaunchErrorType": null,
+  "survivingDescendants": [],
+  "telemetryErrors": []
+}

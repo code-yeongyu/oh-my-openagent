@@ -1,0 +1,4 @@
+$ bun run --cwd packages/omo-senpi typecheck
+$ tsgo --noEmit -p tsconfig.json
+
+Command exited with code 0

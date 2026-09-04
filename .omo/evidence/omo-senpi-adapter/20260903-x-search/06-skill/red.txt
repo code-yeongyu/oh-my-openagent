@@ -1,0 +1,22 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/skill.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+34 |   }
+35 |   return fields
+36 | }
+37 | 
+38 | describe("x-search skill front matter", () => {
+39 |   const frontMatter = parseFrontMatter(readFileSync(SKILL_PATH, "utf8"))
+                                            ^
+error: ENOENT: no such file or directory, open '/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/skill/SKILL.md'
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/skill.test.ts:39:40)
+-------------------------------
+
+
+ 0 pass
+ 0 fail
+ 1 error
+Ran 0 tests across 1 file. [592.00ms]

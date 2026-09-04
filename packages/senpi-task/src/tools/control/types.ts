@@ -22,6 +22,13 @@ export type CancelManager = Pick<TaskManager, "cancelTask" | "get">
 export type SendResultDetails =
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: "steer" }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
+  | {
+      readonly kind: "delivery_uncertain"
+      readonly task_id: string
+      readonly run_epoch: number
+      readonly reason: string
+      readonly suggestion: string
+    }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }

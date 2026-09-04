@@ -1,0 +1,224 @@
+{
+  "queryId": "q09",
+  "lane": "omo-tool",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"xAI Grok CLI since:2026-08-30 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-30",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788423002,
+    "completed_at": 1788423002,
+    "id": "f912d742-ead1-9b1a-aa5b-61404b4ddc5f",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.6",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_f912d742-ead1-9b1a-aa5b-61404b4ddc5f",
+        "summary": [
+          {
+            "text": "The user wants me to use the x_search tool with x_keyword_search only, mode=Latest. The exact query is: \"xAI Grok CLI since:2026-08-30 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL ...",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-ce0d1f54-eb4c-4478-8902-2eec934ad674-0",
+        "input": "{\"query\":\"xAI Grok CLI since:2026-08-30 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_f912d742-ead1-9b1a-aa5b-61404b4ddc5f_call-ce0d1f54-eb4c-4478-8902-2eec934ad674-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_f912d742-ead1-9b1a-aa5b-61404b4ddc5f_call-ce0d1f54-eb4c-4478-8902-2eec934ad674-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/grok/status/2095246132909625411 - Grok Build CLI authenticates with SuperGrok or X Premium+ (or XAI_API_KEY); Cursor subs do not unlock standalone CLI. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2095161786462855169 - Grok 4.6 for long-running agents is in official Grok Build CLI with plan/act modes; Cline supports xAI via provider settings. (@grok, 2026-09-02)\nhttps://x.com/aloft_ai/status/2095152666330505612 - Grok Build CLI still has no Fast Mode while Cursor Pro+ has the speed flag. (@aloft_ai, 2026-09-02)\nhttps://x.com/cgnot996/status/2094831268785791080 - Grok App is an open-source desktop workbench for local Grok Build CLI with sessions, plugins, MCP. (@cgnot996, 2026-09-01)\nhttps://x.com/grok/status/2094777884137209977 - Grok Build CLI sessions save locally under ~/.grok/sessions/; use grok sessions list or export. (@grok, 2026-09-01)\nhttps://x.com/showmybrain/status/2094774420921549215 - How to use grok CLI with multiple accounts via CPA and custom XAI_API_KEY / GROK_XAI_API_BASE_URL. (@showmybrain, 2026-09-01)\nhttps://x.com/russwyte/status/2094754181500346596 - Grok's Beard is a VS Code/Cursor client for Grok CLI with sidebar chat and TUI sidecar. (@russwyte, 2026-09-01)\nhttps://x.com/posterly_/status/2094712559408722048 - Grok Imagine joins AI Images and Video in Posterly with same CLI workflow. (@posterly_, 2026-09-01)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095161786462855169",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095161786462855169"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094754181500346596",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094754181500346596"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094774420921549215",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094774420921549215"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095246132909625411",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095246132909625411"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094831268785791080",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094831268785791080"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094777884137209977",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094777884137209977"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095152666330505612",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095152666330505612"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094712559408722048",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094712559408722048"
+              }
+            ]
+          }
+        ],
+        "id": "msg_f912d742-ead1-9b1a-aa5b-61404b4ddc5f",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-30",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 84986000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e41c6060b2628547"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 84986000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:10:02.002Z"
+}

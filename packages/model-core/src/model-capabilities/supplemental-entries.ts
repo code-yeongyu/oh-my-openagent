@@ -111,4 +111,109 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 128000,
 		},
 	},
+	"grok-4.5": {
+		id: "grok-4.5",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"xai/grok-4.5": {
+		id: "xai/grok-4.5",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"x-ai/grok-4.5": {
+		id: "x-ai/grok-4.5",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"grok-4.6": {
+		id: "grok-4.6",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"xai/grok-4.6": {
+		id: "xai/grok-4.6",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"xai/grok-build-0.1": {
+		id: "xai/grok-build-0.1",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 256000,
+			output: 32768,
+		},
+	},
+	"x-ai/grok-build-0.1": {
+		id: "x-ai/grok-build-0.1",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 256000,
+			output: 32768,
+		},
+	},
 }

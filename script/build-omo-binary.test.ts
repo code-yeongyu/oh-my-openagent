@@ -23,6 +23,8 @@ import {
   ENGINE_MINIMUM_MODULES,
   MAX_BINARY_BYTES,
   parseBundledModuleCount,
+  PLUGIN_PAYLOAD_DIRECTORIES,
+  PLUGIN_PAYLOAD_FILES,
   RELEASE_BINARY_TARGETS,
   buildRuntimeManifest,
   collectStagedFiles,
@@ -33,6 +35,7 @@ import {
   resolveExpectedSidecarRelPaths,
   RUNTIME_MANIFEST_REL_PATH,
 } from "./build-omo-binary"
+import { PAYLOAD_DIRECTORIES, PAYLOAD_FILES } from "./build-omo-native"
 import ptyFixture from "./release-binary-pty-fixture.json"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -437,6 +440,16 @@ describe("engine graph bundling", () => {
   })
 })
 
+// Regression: this list mirrors build-omo-native's payload allowlist by hand, so a directory added
+// there (skills-conditional) silently stayed out of the compiled binary's embedded plugin.
+describe("plugin payload mirror", () => {
+  test("#given the native payload lists #when compared with the binary's copies #then both stay identical", () => {
+    // when / then
+    expect(PLUGIN_PAYLOAD_DIRECTORIES).toEqual(PAYLOAD_DIRECTORIES)
+    expect(PLUGIN_PAYLOAD_FILES).toEqual(PAYLOAD_FILES)
+  })
+})
+
 describe("staged file collection", () => {
   test("#given a nested stage directory #when collected #then relative POSIX paths are returned sorted", () => {
     // given
@@ -452,5 +465,44 @@ describe("staged file collection", () => {
     expect(collected).toEqual(["a.txt", "b/c/two.txt"])
     expect(readdirSync(stageDir).length).toBe(2)
     rmSync(stageDir, { recursive: true, force: true })
+  })
+})
+
+describe("omob build info stamping", () => {
+  const buildInfo = {
+    command: "omob",
+    omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
+    engine: { commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7", committedAt: "2026-09-04T10:49:12+09:00", branch: "main" },
+  }
+
+  test("#given build info #when the sidecar package.json is stamped #then it carries omoBuild", () => {
+    const stamped = JSON.parse(createStampedPackageJson("0.0.0-omob.c6e7dd7.7fd18df", buildInfo)) as Record<string, unknown>
+    expect(stamped.omoBuild).toEqual(buildInfo)
+  })
+
+  test("#given no build info #when stamped #then the release shape stays byte-identical", () => {
+    expect(createStampedPackageJson("9.9.9-0.test")).toBe(`${JSON.stringify({ name: "omo", version: "9.9.9-0.test" }, null, 2)}\n`)
+  })
+
+  test("#given build info #when the runtime manifest is built #then it records build info and changes the digest", async () => {
+    const stageDir = makeTempDir("omo-manifest-buildinfo-")
+    mkdirSync(join(stageDir, "theme"), { recursive: true })
+    writeFileSync(join(stageDir, "theme", "dark.json"), "{}\n")
+    const bare = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+    const stamped = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24", buildInfo })
+    expect(stamped.buildInfo).toEqual(buildInfo)
+    expect(stamped.manifestSha).not.toBe(bare.manifestSha)
+  })
+
+  test("#given no build info #when the runtime manifest is built #then its key order matches the release contract", async () => {
+    const stageDir = makeTempDir("omo-manifest-keyorder-")
+    mkdirSync(join(stageDir, "theme"), { recursive: true })
+    writeFileSync(join(stageDir, "theme", "dark.json"), "{}\n")
+
+    const bare = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+
+    // release manifest key order — a reordering would change the embedded JSON bytes
+    expect(Object.keys(bare)).toEqual(["omoAiVersion", "enginePin", "manifestSha", "entries"])
+    expect("buildInfo" in bare).toBe(false)
   })
 })

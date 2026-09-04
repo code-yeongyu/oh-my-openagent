@@ -43,3 +43,28 @@ runtime behavior.
 Dependency installation progress, full test progress, credentials, auth
 headers, private configuration, and unrelated session contents are omitted.
 Only result counts and non-secret isolation fields are retained.
+
+## Current-dev merge refresh
+
+After merging `upstream/dev@928aa8571`, the only conflicts were the four
+generated Senpi bundles already changed by this PR. All four were regenerated
+with official Bun 1.4.0.
+
+Post-merge results:
+
+- complete memory lock suite: 23 pass, 0 fail;
+- memory-core typecheck: exit 0;
+- all staged runtimes and all six Senpi bundles: current;
+- exact Bun 1.4.0 `test:senpi`: 2677 pass, 32 platform/fixture skips, 0 fail,
+  8503 assertions across 352 files;
+- evidence resolver: 10 pass, 0 fail, 31 assertions;
+- real isolated Senpi behavior: `result=PASS`, ultrawork and comment-checker
+  passed, environment receipt matched, protected snapshots were complete, and
+  Senpi/OMO changed-path lists were empty.
+
+Current `dev` intentionally disables recursive directory-identity certification
+outside Linux. The final macOS driver therefore reports
+`DIRECTORY_IDENTITY_UNAVAILABLE` and does not claim whole-tree certification.
+The pre-merge driver result above retains the last full
+`realSenpiUntouched=true` and `realOmoUntouched=true` proof, while the post-merge
+run records complete protected snapshots and no observed changed path.

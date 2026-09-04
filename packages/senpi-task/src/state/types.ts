@@ -100,6 +100,11 @@ export type TaskNotification = {
   readonly liveness_notified_epoch?: number
 }
 
+export type ReviveDeliveryUncertainty = {
+  readonly run_epoch: number
+  readonly message_sha256: string
+}
+
 // The shape persisted today: process-mode children respawn over RPC from cwd alone, with
 // extensions/member_env carried as untrusted launch inputs (the store parser discards them).
 // RPC respawn may keep consuming this shape; in-process rebuild must NOT (see SpawnSpecV1).
@@ -179,6 +184,9 @@ export type TaskRecord = TaskRecordInput & {
   readonly residency_state: ResidencyState
   readonly created_at: string
   readonly updated_at: string
+  // Stable timestamp for the terminal run. Residency claims may refresh updated_at, but must not
+  // extend the retention window of a completed run.
+  readonly terminal_at?: string
   readonly pid?: number
   // Pid of the host process that spawned (and owns) this child. Lets a sibling process in the same
   // project distinguish "previous process died" from "a live process still owns this child" during
@@ -193,6 +201,7 @@ export type TaskRecord = TaskRecordInput & {
   readonly killed?: boolean
   readonly run_stats?: TaskRunStats
   readonly notification: TaskNotification
+  readonly revive_delivery_uncertain?: ReviveDeliveryUncertainty
 }
 
 export type TaskTransition =

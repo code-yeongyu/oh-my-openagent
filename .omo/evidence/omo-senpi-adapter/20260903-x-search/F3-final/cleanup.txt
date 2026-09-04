@@ -1,0 +1,57 @@
+# F3-final cleanup receipts
+Date (UTC): 2026-09-03T10:13:39Z
+Tree: /Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search @ 9e7a5aaa16aea177d521724de391ceaa8febebd4
+
+## 1. Sandboxes removed
+Each scenario allocates its own mkdtemp sandbox under $TMPDIR/omo-senpi-qa-* and the driver
+removes the root with rmSync(recursive) at the end of runScenario().
+
+  positive  omo-senpi-qa-hgVBr9   REMOVED
+  child     omo-senpi-qa-xgtP9u   REMOVED
+  explore   omo-senpi-qa-u26x4C   REMOVED
+
+Directory census (the omo-senpi-qa-* prefix is shared with other QA drivers on this host,
+so attribution is by set difference, not by raw count):
+  before this run: 40 dirs
+  after  this run: 40 dirs
+  new dirs still present that this run created: (none)
+
+The 40 pre-existing dirs are leftovers from unrelated QA drivers. Spot-checked three of
+their agent/auth.json files: sizes 65/2/65 bytes, valid JSON, no "xai" key present. They
+carry no xAI credential material.
+
+## 2. Seeded credential copies shredded
+seedXaiCredential() writes a sandbox-local auth.json (mode 0600) holding only the xai oauth
+entry; shredSeededCredential() overwrites it with crypto random bytes of equal length and
+unlinks it. Receipts recorded by the driver:
+
+  positive  .../omo-senpi-qa-hgVBr9/agent/auth.json  overwrittenBytes=946  removed=true
+  child     .../omo-senpi-qa-xgtP9u/agent/auth.json  overwrittenBytes=946  removed=true
+  explore   .../omo-senpi-qa-u26x4C/agent/auth.json  overwrittenBytes=946  removed=true
+
+## 3. Real credential storage untouched
+For all three scenarios:
+  realSenpiUntouched                     = true   (~/.senpi/agent snapshot diff empty)
+  realSenpiChangedPaths                  = []
+  realSenpiCredentialDigestUntouched     = true   (digest identical before/after)
+  spawnedEnvHasXai                       = false  (XAI_*/GROK_* scrubbed from child env)
+
+## 4. No token material in the evidence
+Scanned every file in this directory for the first 24 chars of the live access and refresh
+tokens from /Users/yeongyu/.omo/agent/auth.json:
+  access  fragment: 0 hits
+  refresh fragment: 0 hits
+Transcripts contain [REDACTED] markers from scrubSecrets(), confirming the scrubber ran.
+No token was printed to stdout/stderr or persisted at any point.
+
+## 5. Process hygiene (ps clean before/after)
+See ps-baseline.txt and ps-after.txt. Scoped to this driver's sandboxes and driver process:
+  before: (none)
+  after:  (none)
+No orphaned senpi child process was left behind by this run. The host-wide count of 104
+"senpi" matches is pre-existing background work from unrelated worktrees; it was present in
+the baseline, is unchanged after, and is out of scope for this verification.
+
+## 6. Billable usage
+Live x_search calls billed: 2 (positive 1, child 1). The explore scenario was denied before
+any network call, so it billed 0. Budget was <= 3.

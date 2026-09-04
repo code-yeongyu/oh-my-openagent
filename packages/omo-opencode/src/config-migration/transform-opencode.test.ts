@@ -81,9 +81,8 @@ describe("OpenCode config migration transform", () => {
         discovered: configJsoncGroup.sources,
         sources: [loaded(configJsonc, {
           $schema: "https://legacy.example/config.schema.json",
-          codegraph: { excluded_roots: ["/generated", "/vendor"] },
           "[opencode]": { background_task: { enabled: true } },
-          "[codex]": { codegraph: { daemon: false } },
+          "[codex]": { telemetry: { enabled: false } },
           "[omo]": { agents: { oracle: { model: "senpi-model" } } },
         })],
       })
@@ -110,11 +109,10 @@ describe("OpenCode config migration transform", () => {
       expect(projectResult.success).toBe(true)
       expect(userDocument).toEqual({
         $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
-        codegraph: { excluded_roots: ["/generated", "/vendor"] },
         "[opencode]": {
           background_task: { enabled: true },
         },
-        "[codex]": { codegraph: { daemon: false } },
+        "[codex]": { telemetry: { enabled: false } },
         "[senpi]": { agents: { oracle: { model: "senpi-model" } } },
       })
       expect(projectDocument.document).toEqual({

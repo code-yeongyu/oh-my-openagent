@@ -120,7 +120,7 @@ export class GitMemoryRepo {
   async status(paths: readonly string[] = []): Promise<string> {
     const normalized = normalizePathspecs(paths)
     const suffix = normalized.length > 0 ? ["--", ...normalized] : []
-    return (await this.git(["status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
+    return (await this.git(["-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
   }
 
   async head(): Promise<string | null> {

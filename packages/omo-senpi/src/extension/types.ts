@@ -38,6 +38,8 @@ export interface SenpiExtensionAPI {
 }
 
 export interface ComponentLogger {
+  /** Optional: hosts without a debug channel simply drop expected-state diagnostics. */
+  debug?(message: string, details?: unknown): void
   info(message: string, details?: unknown): void
   warn(message: string, details?: unknown): void
   error(message: string, details?: unknown): void

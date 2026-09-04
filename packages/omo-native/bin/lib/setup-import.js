@@ -6,6 +6,7 @@ import { dirname, join } from "node:path"
 import { createInterface } from "node:readline/promises"
 import { canonicalAgentDir } from "./agent-dir.js"
 import { detectHarnesses } from "./setup-detect.js"
+import { readRow, readRows } from "./sqlite-rows.js"
 import { printModelReport } from "./setup-models.js"
 import { printSetupReport } from "./setup-report.js"
 
@@ -57,14 +58,16 @@ function readSqliteStore(id, path, expectedVersion, DatabaseSync, providerMap, p
   let database
   try {
     database = new DatabaseSync(path, { readOnly: true })
-    const version = database.prepare("SELECT version FROM auth_schema_version").get()?.version
+    const version = readRow(database, ["version"], "SELECT version FROM auth_schema_version")?.version
     if (version !== expectedVersion) {
       plan.notices.push(`NOTICE ${id}: auth schema version ${String(version)} is unknown; credentials not imported`)
       return
     }
-    const rows = database.prepare(
+    const rows = readRows(
+      database,
+      ["provider", "credential_type", "data"],
       "SELECT provider, credential_type, data FROM auth_credentials WHERE disabled_cause IS NULL ORDER BY id ASC",
-    ).all()
+    )
     for (const row of rows) {
       if (row.credential_type === "oauth") {
         plan.oauth.push(row.provider)

@@ -1,0 +1,231 @@
+{
+  "queryId": "q02",
+  "lane": "omo-tool",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-29",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422730,
+    "completed_at": 1788422730,
+    "id": "0602ac68-f570-9c7a-a035-76733b179310",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.6",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_0602ac68-f570-9c7a-a035-76733b179310",
+        "summary": [
+          {
+            "text": "The user wants me to use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\". Return up to 10 X posts, one per line as \"U...",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-bb3d364e-8695-4c7a-ae46-eae0b41a8df1-0",
+        "input": "{\"query\":\"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_0602ac68-f570-9c7a-a035-76733b179310_call-bb3d364e-8695-4c7a-ae46-eae0b41a8df1-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_0602ac68-f570-9c7a-a035-76733b179310_call-bb3d364e-8695-4c7a-ae46-eae0b41a8df1-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/gptkims11/status/2095094704589422989 - 외국인 유가증권 매도 vs 개인 순매수 및 8월 개인 자금 유출 언급 (@gptkims11, 2026-09-02)\nhttps://x.com/PeterLeejoa/status/2095051682317275196 - 9/2 코스피 마감 브리핑, 외국인 -1.9조 순매도 등 수급 상세 (@PeterLeejoa, 2026-09-02)\nhttps://x.com/superrichj/status/2095043325741207962 - 삼성증권 9/2 마감지수, 코스피 외국인 -19,094억 순매도 (@superrichj, 2026-09-02)\nhttps://x.com/Special_Ledger/status/2095040134546919487 - 9/2 코스피 하락, 외국인·기관 4조 순매도 vs 개인 2조 순매수 (@Special_Ledger, 2026-09-02)\nhttps://x.com/young8e2/status/2094942106716717209 - 9/2 시장 관전 지표, 코스피 외국인 수급 지속 여부 (@young8e2, 2026-09-02)\nhttps://x.com/kkaoppa9671/status/2094800470460248348 - 외국인 코스피 누적 순매도 169조 vs 지분율 상승 (@kkaoppa9671, 2026-09-01)\nhttps://x.com/Archive869/status/2094719619844227144 - 9/1 투자자별 수급, 외국인 순매수 종목 등 (@Archive869, 2026-09-01)\nhttps://x.com/korea_growth/status/2094704180984500565 - 코스피 떠난 개미, 코스닥 8월 개인 순매수 2조 (@korea_growth, 2026-09-01)\nhttps://x.com/gptkims11/status/2094656971903533305 - 외국인 코스피 순매수 단 두달, 올해 169조 순매도 (@gptkims11, 2026-09-01)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094719619844227144",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094719619844227144"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094656971903533305",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094656971903533305"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095040134546919487",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095040134546919487"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095051682317275196",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095051682317275196"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095043325741207962",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095043325741207962"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094704180984500565",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094704180984500565"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095094704589422989",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095094704589422989"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094942106716717209",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094942106716717209"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094800470460248348",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094800470460248348"
+              }
+            ]
+          }
+        ],
+        "id": "msg_0602ac68-f570-9c7a-a035-76733b179310",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-29",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 102077800,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e41c6060b2628547"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 102077800,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:05:26.132Z"
+}

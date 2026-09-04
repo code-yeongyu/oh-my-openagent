@@ -49,10 +49,15 @@ export const TaskToolParams = Type.Object({
         name: Type.Optional(Type.String({ description: "Optional stable name for this task." })),
         model: Type.Optional(Type.String({ description: "Model override for this task. Only valid when the item's effective target is subagent_type; rejected with a category target." })),
         load_skills: Type.Optional(Type.Array(Type.String(), { description: "Skills loaded for this task." })),
+        run_in_background: Type.Optional(
+          Type.Boolean({
+            description: "Mirror of the batch-wide run_in_background flag. Every item that sets it must agree with the top-level value and with each other; prefer setting run_in_background once at the top level.",
+          }),
+        ),
       }),
       {
         maxItems: MAX_TASK_BATCH_ITEMS,
-        description: "Batch of up to 16 child tasks to spawn in one call. Empty provider padding is normalized before validation. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them. An item whose effective target is a category must not carry a model (own or inherited).",
+        description: "Batch of up to 16 child tasks to spawn in one call. Empty provider padding is normalized before validation. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them. An item whose effective target is a category must not carry a model (own or inherited). run_in_background is batch-wide: set it once at the top level; item-level copies must agree.",
       },
     ),
   ),

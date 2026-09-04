@@ -1,0 +1,5 @@
+Command: lsp_diagnostics packages/omo-senpi/scripts/qa severity=all
+Source head: c42f893c953df103a38c42820568ccde34fcc215
+Files scanned: 50 (tool cap)
+Files with errors: 0
+Total diagnostics: 0

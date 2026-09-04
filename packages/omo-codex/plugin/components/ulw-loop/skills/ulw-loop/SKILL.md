@@ -1,6 +1,6 @@
 ---
 name: ulw-loop
-description: Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps.
+description: "A goal-like loop that decomposes work into systematic, evidence-bound ultrawork steps. Use when the user wants a goal loop or durable, checkpointed execution."
 metadata:
   short-description: Goal-like ultrawork loop for systematic decomposition
 ---

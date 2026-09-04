@@ -1,0 +1,12 @@
+# bun test packages/senpi-task on mengmotaMac (via remote-test.mjs) 2026-09-03T09:04:04.639Z
+REMOTE_HEAD=9dc1e4b4c
+mengmotaMac
+9dc1e4b4c
+1 tests skipped:
+(skip) #given a console-less parent #when the default RPC child starts #then windowsHide suppresses its console
+
+ 1839 pass
+ 1 skip
+ 0 fail
+ 5999 expect() calls
+Ran 1840 tests across 257 files. [40.53s]

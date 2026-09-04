@@ -1,0 +1,34 @@
+# Why the resolve step needs `set -euo pipefail`, proven with stubs on mengmotaMac (bunshin).
+#
+# The hole: `LATEST_FLAG="$(gh release list ... | bun script/release-latest-flag.ts "$VERSION")"`.
+# If `gh release list` fails (auth/network), the pipeline still yields an EMPTY tag list, which
+# resolveLatestFlag legitimately answers `--latest` for (the "first release ever" case its unit
+# test pins). The step would then create the release with the WRONG badge and still exit 0 -
+# silently restoring the behaviour this PR exists to remove. The resolver cannot tell a failed
+# query from an empty repo, so the SHELL must fail loudly instead.
+#
+# Under test here is the SHELL GUARD, not the resolver, so the resolver is replaced by an awk
+# stand-in reproducing its empty-list branch (`NR==0 -> --latest`). Env isolated with `env -u`.
+
+leak_check GH_LIST_FAILS=[1]        <- see NOTE below
+healthy pipeline, env isolated:     healthy_flag=[--latest=false]
+CASE C2 healthy upstream + guard:   PROCEEDED_TO_CREATE flag=[--latest=false]   C2_EXIT=0
+CASE A2 failing upstream, NO guard: PROCEEDED_TO_CREATE flag=[--latest]         A2_EXIT=0   <- the hole
+CASE B2 failing upstream + guard:   (no PROCEEDED line)                          B2_EXIT=1   <- closed
+workspace swept: CLEANED=yes
+
+# Conclusion: the guard aborts the step on a failed upstream query (B2) and does not disturb the
+# healthy path (C2). Without it the step ships a wrong Latest badge and reports success (A2).
+
+# NOTE - discarded attempts, recorded because they were confidently wrong:
+# 1) Two earlier runs of this proof were INVALID: every case died at exit 127 because the mesh
+#    shell had no `bun` on its PATH, and Case A's "CREATED" line was an artifact of an empty flag
+#    rather than of the failure being simulated.
+# 2) A third run was contaminated: `GH_LIST_FAILS=1` from an earlier cell was still set, because
+#    the bunshin `shell()` session PERSISTS across eval cells. Its "healthy" leg was therefore
+#    also a failing leg (healthy_flag read [--latest] instead of [--latest=false]).
+# 3) Cause of the missing bun was my own pollution of that persistent session: an earlier
+#    `export PATH="$R/bin:$PATH"` left two stale /tmp dirs on PATH and no ~/.bun/bin. Fixed by
+#    restoring PATH, unsetting the leaked vars, and invoking bun by absolute path.
+# CI is unaffected by any of this: the release job installs bun via oven-sh/setup-bun@v2
+# (publish.yml:1022) and each `run:` starts in $GITHUB_WORKSPACE.

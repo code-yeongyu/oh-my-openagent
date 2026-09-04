@@ -74,12 +74,13 @@ export type MemorianGateLaunchResult =
   /** Another gate run holds the latch; this trigger is dropped. */
   | { readonly status: "active" }
   /** No candidates, or the quick category could not resolve. */
-  | { readonly status: "skipped" }
+  | { readonly status: "skipped"; readonly cause?: string; readonly model?: string; readonly candidateCount?: number }
   /** The child ran and said nothing the parent accepted. */
   | { readonly status: "empty" }
   /** The child crashed or outran its deadline. */
-  | { readonly status: "failed" }
-  | { readonly status: "nudged"; readonly nudges: readonly RecallNudge[] }
+  | { readonly status: "failed"; readonly cause?: string; readonly model?: string; readonly candidateCount?: number }
+  | { readonly status: "dropped"; readonly cause?: string; readonly model?: string; readonly candidateCount?: number }
+  | { readonly status: "nudged"; readonly nudges: readonly RecallNudge[]; readonly model?: string }
 
 export class MemorianGateRunner {
   private activeLaunch: Promise<MemorianGateLaunchResult> | undefined
@@ -94,7 +95,7 @@ export class MemorianGateRunner {
     if (this.activeLaunch !== undefined) return { status: "active" }
     const operation = this.launchOnce(input).catch((error: unknown) => {
       this.options.logger?.warn("memorian gate launch failed", { error: describe(error) })
-      return { status: "failed" } as const
+      return { status: "failed", cause: "child_failed" } as const
     })
     this.activeLaunch = operation
     try {
@@ -105,13 +106,13 @@ export class MemorianGateRunner {
   }
 
   private async launchOnce(input: MemorianGateLaunchInput): Promise<MemorianGateLaunchResult> {
-    if (input.candidates.length === 0 || input.maxItems <= 0) return { status: "skipped" }
+    if (input.candidates.length === 0 || input.maxItems <= 0) return { status: "skipped", cause: "no_candidates", candidateCount: input.candidates.length }
     // The settle handler's snapshot is authoritative. There is deliberately NO resolver fallback:
     // this task runs after the host disposed the senpi ctx, so any late read throws the stale-ctx
     // error and the only honest answer to a missing snapshot is to skip the advisory run.
     if (input.modelRegistry === undefined) {
       this.options.logger?.warn("memorian gate registry snapshot unavailable", { sessionId: input.sessionId })
-      return { status: "skipped" }
+      return { status: "skipped", cause: "registry_snapshot_unavailable", candidateCount: input.candidates.length }
     }
     const loaded = this.options.loadConfig()
     const resolution = resolveReflectionModel(QUICK_CATEGORY, loaded.config, input.modelRegistry)
@@ -126,7 +127,7 @@ export class MemorianGateRunner {
       this.options.logger?.warn("memorian gate quick category unavailable", {
         cause: resolution.kind === "category_unavailable" ? resolution.cause : resolution.source,
       })
-      return { status: "skipped" }
+      return { status: "skipped", cause: "quick_category_unavailable", candidateCount: input.candidates.length }
     }
 
     const runDir = join(this.options.identityPaths.recall, "runs", randomUUID())
@@ -147,7 +148,7 @@ export class MemorianGateRunner {
       })
       const prepared = await (this.options.sandbox ?? passthrough)(spawnArgs)
       const completed = await runMemorianChild(prepared)
-      if (!completed) return { status: "failed" }
+      if (!completed) return { status: "failed", cause: "child_failed", model: resolution.model, candidateCount: input.candidates.length }
       const nudges = validateNudges(parseNudgeLines(await readNudges(prepared.paths.nudges)), {
         candidates: new Set(input.candidates.map((candidate) => candidate.path)),
         surfaced: input.surfaced,
@@ -172,7 +173,7 @@ export class MemorianGateRunner {
         await pending.delete(input.sessionId)
         return this.dropAfterCompaction(input)
       }
-      return { status: "nudged", nudges }
+      return { status: "nudged", nudges, model: resolution.model }
     } finally {
       // Scratch only: the NDJSON has been read, so nothing here survives the run.
       await rm(runDir, { recursive: true, force: true }).catch(() => undefined)
@@ -184,7 +185,7 @@ export class MemorianGateRunner {
       sessionId: input.sessionId,
       launchedAtEpoch: input.compactionEpoch,
     })
-    return { status: "skipped" }
+    return { status: "dropped", cause: "compaction", candidateCount: input.candidates.length }
   }
 }
 

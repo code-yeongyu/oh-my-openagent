@@ -1,7 +1,9 @@
-import type { AgentToolResult } from "@code-yeongyu/senpi"
+import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 
-import type { PlanResolutionError, StartResult, TaskManager } from "../../manager"
+import type { StartResult, TaskManager } from "../../manager"
 import type { TaskRecord } from "../../state"
+import { failedStartDetail, itemError, startedDetail, type StartedResult } from "./batch-item-details"
+import { trackBatchProgress } from "./batch-progress"
 import type { ForegroundWaitOptions, ForegroundWaitResult } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
 import { MAX_TASK_BATCH_ITEMS } from "./params"
@@ -9,12 +11,11 @@ import { appendMissingSkills } from "./skill-result"
 import { backgroundConversionText } from "./start-presentation"
 import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDetails, TaskToolItemDetail } from "./types"
 
-type StartedResult = Extract<StartResult, { kind: "started" }>
-type FailedStartResult = Exclude<StartResult, StartedResult>
-
 type BatchStart =
   | { readonly kind: "started"; readonly item: ResolvedSpawnItem; readonly result: StartedResult; readonly skills?: TaskSkillSummary }
   | { readonly kind: "failed"; readonly item: ResolvedSpawnItem; readonly detail: TaskToolItemDetail; readonly skills?: TaskSkillSummary }
+
+type LiveStart = Extract<BatchStart, { kind: "started" }>
 
 type BatchItemOutput = {
   readonly detail: TaskToolItemDetail
@@ -28,6 +29,7 @@ export type ExecuteBatchInput = ForegroundWaitOptions & {
   readonly signal: AbortSignal | undefined
   readonly ctx: TaskToolContext
   readonly runInBackground: boolean
+  readonly onUpdate?: AgentToolUpdateCallback<TaskToolDetails>
   readonly startItem: (item: ResolvedSpawnItem) => Promise<StartResult>
   readonly skillSummaryFor?: (item: ResolvedSpawnItem) => TaskSkillSummary | undefined
 }
@@ -38,55 +40,6 @@ function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToo
 
 function continuationFooter(taskId: string): string {
   return `\n\n[task_id: ${taskId} - continue with task_send(to="${taskId}", message="...")]`
-}
-
-function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult, skills?: TaskSkillSummary): TaskToolItemDetail {
-  switch (start.kind) {
-    case "plan_unresolved": {
-      return itemError(item, "", start.error.message + categoryListSuffix(start.error), skills)
-    }
-    case "depth_denied":
-      return itemError(item, "", start.reason, skills)
-    case "start_failed":
-      return {
-        task_id: start.task_id,
-        name: start.name,
-        status: "error",
-        error_message: start.error_message,
-        ...(skills === undefined ? {} : { skills }),
-      }
-    case "residency_denied":
-      return itemError(item, "", start.reason, skills)
-  }
-}
-
-function itemError(
-  item: ResolvedSpawnItem,
-  taskId: string,
-  message: string,
-  skills?: TaskSkillSummary,
-): TaskToolItemDetail {
-  return {
-    task_id: taskId,
-    ...(item.name !== undefined && { name: item.name }),
-    status: "error",
-    error_message: message,
-    ...(skills === undefined ? {} : { skills }),
-  }
-}
-
-function startedDetail(item: ResolvedSpawnItem, start: StartedResult, skills?: TaskSkillSummary): TaskToolItemDetail {
-  return {
-    task_id: start.task_id,
-    name: start.name,
-    ...(item.task_summary === undefined ? {} : { task_summary: item.task_summary }),
-    ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
-    ...(item.model === undefined ? {} : { model: item.model }),
-    ...(start.resolved_model === undefined ? {} : { resolved_model: start.resolved_model }),
-    status: start.status,
-    ...(start.queue_position !== undefined && { queue_position: start.queue_position }),
-    ...(skills === undefined ? {} : { skills }),
-  }
 }
 
 async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]> {
@@ -108,18 +61,6 @@ async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]
   return starts
 }
 
-function categoryListSuffix(error: PlanResolutionError): string {
-  const available = error.availableCategories
-  if (available === undefined || available.length === 0) return ""
-  // A model_unavailable failure means the category name IS valid; listing it under "Available
-  // categories" told models to retry the same broken binding. Name the vocabulary honestly and
-  // point at the omo.json config escape hatch.
-  if (error.code === "model_unavailable") {
-    return ` Valid category names: ${available.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
-  }
-  return ` Available categories: ${available.join(", ")}.`
-}
-
 function oversizedBatchResult(): AgentToolResult<TaskToolDetails> {
   const reason = `tasks supports at most ${MAX_TASK_BATCH_ITEMS} items.`
   return result(reason, { task_id: "", status: "invalid_arguments", mode: "spawn", reason })
@@ -137,7 +78,7 @@ function backgroundText(starts: readonly BatchStart[], status: "running" | "erro
 }
 
 function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskToolDetails> {
-  const live = starts.filter((start): start is Extract<BatchStart, { kind: "started" }> => start.kind === "started")
+  const live = starts.filter((start): start is LiveStart => start.kind === "started")
   const status = live.length > 0 ? "running" : "error"
   const taskId = live[0]?.result.task_id ?? ""
   const items = starts.map((start) => start.kind === "started" ? startedDetail(start.item, start.result, start.skills) : start.detail)
@@ -164,7 +105,7 @@ function recordOutput(record: TaskRecord, start: StartedResult, skills?: TaskSki
   }
 }
 
-function promotedOutput(start: Extract<BatchStart, { kind: "started" }>, budgetSeconds: number): BatchItemOutput {
+function promotedOutput(start: LiveStart, budgetSeconds: number): BatchItemOutput {
   return {
     detail: {
       ...startedDetail(start.item, start.result, start.skills),
@@ -179,7 +120,7 @@ function rejectionMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
 }
 
-function rejectedOutput(start: Extract<BatchStart, { kind: "started" }>, aborted: boolean, reason: unknown): BatchItemOutput {
+function rejectedOutput(start: LiveStart, aborted: boolean, reason: unknown): BatchItemOutput {
   const message = aborted ? "parent turn aborted" : rejectionMessage(reason)
   return {
     detail: {
@@ -210,16 +151,38 @@ function syncText(status: "running" | "error" | "cancelled" | "completed", outpu
   return [`Batch ${status}.`, ...lines].join("\n")
 }
 
+function settledStatus(waited: ForegroundWaitResult): string {
+  return waited.kind === "completed" ? waited.record.status : "background"
+}
+
+async function waitForAll(input: ExecuteBatchInput, live: readonly LiveStart[]): Promise<readonly PromiseSettledResult<ForegroundWaitResult>[]> {
+  const progress = trackBatchProgress({ manager: input.manager, live, onUpdate: input.onUpdate })
+  try {
+    return await Promise.allSettled(live.map((start) => waitForForegroundTask({
+      manager: input.manager,
+      taskId: start.result.task_id,
+      signal: input.signal,
+      ctx: input.ctx,
+      ...(input.env !== undefined && { env: input.env }),
+      ...(input.scheduleDeadline !== undefined && { scheduleDeadline: input.scheduleDeadline }),
+    }).then(
+      (waited) => {
+        progress.settle(start.result.task_id, settledStatus(waited))
+        return waited
+      },
+      (reason: unknown) => {
+        progress.settle(start.result.task_id, "error")
+        throw reason
+      },
+    )))
+  } finally {
+    progress.stop()
+  }
+}
+
 async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[]): Promise<AgentToolResult<TaskToolDetails>> {
-  const live = starts.filter((start): start is Extract<BatchStart, { kind: "started" }> => start.kind === "started")
-  const settled = await Promise.allSettled(live.map((start) => waitForForegroundTask({
-    manager: input.manager,
-    taskId: start.result.task_id,
-    signal: input.signal,
-    ctx: input.ctx,
-    ...(input.env !== undefined && { env: input.env }),
-    ...(input.scheduleDeadline !== undefined && { scheduleDeadline: input.scheduleDeadline }),
-  })))
+  const live = starts.filter((start): start is LiveStart => start.kind === "started")
+  const settled = await waitForAll(input, live)
   const batchAborted = settled.some(
     (entry) => entry.status === "rejected" && input.signal?.aborted === true && entry.reason === input.signal.reason,
   )

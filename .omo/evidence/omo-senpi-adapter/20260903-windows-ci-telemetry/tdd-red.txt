@@ -1,0 +1,71 @@
+Command:
+bun test script/ci-root-test-partition.test.ts
+
+Observed:
+error: windows telemetry contract: missing post-test capture
+(fail) root test CI partition > #given Windows root-test telemetry #when the matrix is rendered #then post-test state is captured
+
+Result:
+10 pass
+1 fail
+42 expect() calls
+
+This is the required failing-first contract signal. An earlier bootstrap
+attempt stopped before test execution because the fresh worktree had no
+dependencies; it is not counted as RED evidence.
+
+---
+
+Senpi coverage extension RED
+
+Command:
+bun test script/ci-root-test-partition.test.ts
+
+Observed:
+217 |     const windowsStepStart = job.indexOf(windowsStepName)
+218 |
+219 |     expect(
+220 |       windowsStepStart,
+221 |       "Windows Senpi compatibility tests must be telemetry-wrapped",
+222 |     ).toBeGreaterThanOrEqual(0)
+            ^
+error: Windows Senpi compatibility tests must be telemetry-wrapped
+
+Expected: >= 0
+Received: -1
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/windows-ci-telemetry/script/ci-root-test-partition.test.ts:222:7)
+(fail) root test CI partition > #given Windows Senpi compatibility tests #when the package gate runs #then telemetry wraps the flaky test invocation [0.22ms]
+
+15 pass
+1 fail
+84 expect() calls
+Ran 16 tests across 1 file. [616.00ms]
+
+Command exited with code 1.
+
+This is the required failing-first signal: the new workflow contract found no
+Windows-specific Senpi telemetry step before `.github/workflows/ci.yml` was
+changed.
+
+---
+
+Senpi coverage extension GREEN
+
+Command:
+bun test script/ci-root-test-partition.test.ts
+
+Observed:
+bun test v1.3.14 (0d9b296a)
+
+16 pass
+0 fail
+93 expect() calls
+Ran 16 tests across 1 file. [519.00ms]
+
+Command exited with code 0.
+
+The same focused contract now proves the Windows Senpi package gate uses the
+existing telemetry harness with invocation `senpi-compatibility`, preserves the
+wrapped Bun test exit code, and uploads telemetry from a non-gating
+`if: always()` step.

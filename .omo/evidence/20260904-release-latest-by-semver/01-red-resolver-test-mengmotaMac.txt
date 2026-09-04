@@ -1,0 +1,20 @@
+# RED: script/release-latest-flag.test.ts with NO implementation module (mengmotaMac, bun 1.4.0, hermetic)
+# remote exit=0
+cwd=/tmp/omo-rls-20260904/red-resolver
+./script/release-latest-flag.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+script/release-latest-flag.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './release-latest-flag' from '/private/tmp/omo-rls-20260904/red-resolver/script/release-latest-flag.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [3.00ms]
+EXIT=1
+

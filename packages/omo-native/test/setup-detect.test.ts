@@ -7,6 +7,10 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { detectHarnesses, needsSetupSuggestion } from "../bin/lib/setup-detect.js"
 import { formatSetupReport } from "../bin/lib/setup-report.js"
+
+function sqlLiteral(value: string | null): string {
+  return value === null ? "NULL" : `'${value.replace(/'/g, "''")}'`
+}
 import { teardownRoots, withDatabase } from "./teardown.test-support"
 
 // Older Bun runtimes ship no node:sqlite at all, so the module loads lazily and the fixtures that
@@ -54,8 +58,12 @@ async function createDatabase(path: string, version: number, rows: Array<[string
         data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
       );
     `)
-    const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
-    for (const [provider, type, disabled] of rows) insert.run(provider, type, "SQLITE-SECRET", disabled)
+    // exec() with literal values: a prepared INSERT would leave this writer's handle open past
+    // close() under Bun 1.4 (oven-sh/bun#40001), and the reader that opens the same file next
+    // would then block on the Windows file lock.
+    for (const [provider, type, disabled] of rows) {
+      db.exec(`INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (${sqlLiteral(provider)}, ${sqlLiteral(type)}, 'SQLITE-SECRET', ${sqlLiteral(disabled)})`)
+    }
   })
 }
 

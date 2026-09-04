@@ -314,7 +314,7 @@ describe("install-codex", () => {
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
     expect(configContent).toContain('approval_policy = "never"')
     expect(configContent).toContain('sandbox_mode = "danger-full-access"')
-    expect(configContent).toContain('network_access = "enabled"')
+    expect(configContent).not.toMatch(/^\s*network_access\s*=/m)
     expect(configContent).toContain("hide_full_access_warning = true")
     expect(configContent).toContain("hide_world_writable_warning = true")
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })

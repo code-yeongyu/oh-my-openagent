@@ -16,7 +16,7 @@ Loaded alongside `.opencode/` by [`packages/omo-opencode/src/features/opencode-s
 | `work-with-pr-workspace/` | yes | Iteration workspace + benchmark inputs |
 | `github-triage/` | yes | Read-only issue/PR triage with evidence reports |
 | `hyperplan/` | yes | Adversarial multi-agent planning |
-| `pre-publish-review/` | yes | 16-agent pre-publish release gate |
+| `pre-publish-review/` | yes | 12-agent pre-publish release gate |
 | `get-unpublished-changes/` | NEW | Skill form of the `/get-unpublished-changes` command |
 | `omomomo/` | NEW | Skill form of the `/omomomo` easter egg |
 | `publish/` | NEW | Skill form of the `/publish` command |
@@ -25,7 +25,7 @@ Loaded alongside `.opencode/` by [`packages/omo-opencode/src/features/opencode-s
 | `codex-qa/` | no | Isolated Codex Light QA: real `codex app-server` against an isolated `CODEX_HOME` + local mock model, hook-fired assertions; helper scripts each ship `--self-test` |
 | `opencode-qa/` | no | opencode CLI/TUI/event-stream QA: hook-fired assertions via SSE, session DB inspection, tmux TUI smoke; helper scripts each ship `--self-test` |
 | `senpi-qa/` | no | Live Senpi adapter + task-engine QA against the real `senpi` binary in an isolated `SENPI_CODING_AGENT_DIR`; `scripts/resolve-evidence-dir.mjs` pins every artifact to `.omo/evidence/omo-senpi-adapter/<slug>/` |
-| `tech-debt-audit/` | no | Technical-debt audit across 9 dimensions via AST-grep/grep + optional CodeGraph MCP; emits `TECH_DEBT_AUDIT.md` |
+| `tech-debt-audit/` | no | Technical-debt audit across 9 dimensions via AST-grep/grep; emits `TECH_DEBT_AUDIT.md` |
 
 The 5 "NEW" skills here are skill-format equivalents of slash commands that exist in BOTH `.opencode/command/` and `.agents/command/`. They allow the same instructions to be triggered either by an explicit `/command` invocation OR by skill auto-loading on matching prompts. The `codex-qa`, `opencode-qa`, `senpi-qa`, and `tech-debt-audit` skills are `.agents/`-only with no `.opencode/` counterpart and are not command-forms.
 

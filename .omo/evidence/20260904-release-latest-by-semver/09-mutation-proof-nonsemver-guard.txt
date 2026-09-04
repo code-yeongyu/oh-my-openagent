@@ -1,0 +1,33 @@
+# MUTATION PROOF 2: remove the non-semver tag guard in resolveLatestFlag so every tag reaches Bun.semver.order
+# The live release list contains "_pr-attachments", which Bun.semver.order throws on, so this guard is load-bearing.
+# mengmotaMac via bunshin, hermetic /tmp/omo-rls-20260904/mutation2 (exit codes not piped)
+# remote exit=0
+### MUTATION 2: drop the non-semver guard (published !== null &&) so every tag reaches Bun.semver.order
+    throw new TypeError(`Not a release version: ${version}`)
+  }
+  const outranked = releasedTags.some((tag) => {
+    const published = toReleaseVersion(tag)
+    return Bun.semver.order(published ?? tag, target) > 0
+  })
+  return outranked ? "--latest=false" : "--latest"
+MUTATED_EXIT=1
+      at <anonymous> (/private/tmp/omo-rls-20260904/mutation2/script/release-latest-flag.ts:19:23)
+      at some (1:11)
+      at resolveLatestFlag (/private/tmp/omo-rls-20260904/mutation2/script/release-latest-flag.ts:17:34)
+      at <anonymous> (/private/tmp/omo-rls-20260904/mutation2/script/release-latest-flag.test.ts:59:12)
+(fail) resolveLatestFlag > #given a leading v on the candidate #when resolved #then it is tolerated like the tag list [0.16ms]
+(pass) resolveLatestFlag > #given no published releases yet #when resolved #then the first release is Latest [0.02ms]
+(pass) resolveLatestFlag > #given a candidate that is not a release version #when resolved #then it throws instead of guessing [0.07ms]
+
+ 4 pass
+ 5 fail
+ 7 expect() calls
+Ran 9 tests across 1 file. [25.00ms]
+### RESTORE
+RESTORED_EXIT=0
+
+ 9 pass
+ 0 fail
+ 14 expect() calls
+Ran 9 tests across 1 file. [57.00ms]
+

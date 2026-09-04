@@ -23,8 +23,6 @@ const lazycodexRuntimePayloadPaths = [
   "packages/omo-codex/plugin/components/bootstrap/dist/cli.js",
   "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1",
   "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1",
-  "packages/omo-codex/plugin/components/codegraph/dist/cli.js",
-  "packages/omo-codex/plugin/components/codegraph/dist/serve.js",
   "packages/omo-codex/plugin/components/comment-checker/dist/cli.js",
   "packages/omo-codex/plugin/components/git-bash/dist/cli.js",
   "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js",
@@ -143,7 +141,8 @@ describe("LazyCodex publish workflow", () => {
         "if: needs.release-metadata.outputs.dist_tag == '' && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'",
       ) &&
       lazycodexReleaseStep.includes("GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
-      lazycodexReleaseStep.includes('gh release create "v${VERSION}" --repo code-yeongyu/lazycodex') &&
+      lazycodexReleaseStep.includes('gh release create "v${VERSION}"') &&
+      lazycodexReleaseStep.includes("--repo code-yeongyu/lazycodex") &&
       lazycodexReleaseStep.includes("--notes-file /tmp/lazycodex-release-notes.md")
 
     // #then

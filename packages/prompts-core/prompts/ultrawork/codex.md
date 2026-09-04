@@ -229,8 +229,8 @@ and utility functions to batch commands and reduce output. Keep direct calls
 when one result chooses the next action, outputs are already small, semantic
 judgment is required between calls, approval or side effects are involved,
 or native artifacts / citations must be preserved.
-- Architecture / flow / blast radius → `codegraph_explore` first when
-  `codegraph_*` exists; if unavailable, continue with repo tools and LSP.
+- Architecture / flow / blast radius → explore agents plus LSP references
+  and impact; do not guess from conventions.
 - **SYMBOLS REQUIRE LSP** — definitions, references, rename impact,
   workspace symbols, and diagnostics use the available `lsp_*` tools, not
   text search. Run diagnostics after edits and treat errors as blocking.

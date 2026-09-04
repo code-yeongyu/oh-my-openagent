@@ -1,5 +1,7 @@
 # memory component
 
+Memorian is a read-only recall judge; its only act is a nudge. User-visible traces are third-person act records ("Memorian nudged"), distinct from dori's memorian, which also writes memory, and from `memory.nudge`, the every-N-turns write reminder in `nudge-wiring.ts`.
+
 Letta-Code-style persistent agent memory for omo-senpi, backed by `@oh-my-opencode/memory-core` (harness-neutral; zero Senpi imports). Parity target: letta-code@a75f4d93e's local-capable matrix, executed per `.omo/plans/letta-memory-parity-port.md` with the research corpus at `.omo/ulw-research/20260809-224128/`.
 
 ## Attribution
@@ -30,7 +32,7 @@ The memory architecture - the git-backed memory filesystem, the memory tool sema
 | `soul-notice.ts` | Soul-edit notice entry type + renderer: commits touching `system/persona.md` or `system/identity.md` emit a non-model-facing `appendEntry` notice, gated by `soul.edit_notice`. |
 | `memory-notice-wiring.ts` | Shared commit-notice consumer. Reads each MCP tool receipt EXACTLY ONCE per `tool_result` (receipts are read-and-delete, so a second read finds nothing) and fans that one read out to the soul notice (`soul.edit_notice`) and the `omo-memory:write-updated` entry (`write_notice.enabled`), which reuses the direct surface's renderer. The direct surface emits no write entry: its `renderResult` already draws that row. |
 | `shutdown-drain.ts` | Session-shutdown journal drain under a hard budget. |
-| `sandbox.ts` | Seatbelt/bwrap sandbox transform for reflection children (`required|auto|off`, default `auto`). |
+| `sandbox.ts` | Seatbelt/bwrap sandbox transforms (`memory.reflection.sandbox`: `required|auto|off`, default `auto`). Reflection children get the whole agent directory writable through `runtimeWrites`; the memorian and facts transforms keep the agent directory read-only and grant only senpi's lock directories via `SENPI_AGENT_LOCK_FILES` (settings.json.lock, auth.json.lock, hooks-state.json.lock — the builtin hooks extension takes the last one on every tool call). |
 | `commands/` | Thirteen slash commands (`MEMORY_COMMAND_NAMES`: `/memory`, `/memfs`, `/remember`, `/init`, `/doctor`, `/recompile`, `/memory-repository`, `/sleeptime`, `/reflect`, `/dream`, `/search`, `/people`, `/facts`); read-only output never enters model context. `/facts retry [--conversation <id>]` is the ONLY unpark path; it never touches queue files or either watermark. See `commands/AGENTS.md`. |
 | `palace/` | Self-contained HTML memory viewer. See `palace/AGENTS.md`. |
 | `guard.ts` | Soft cross-identity guard via `tool_call` (file tools only; bash advisory-only). |

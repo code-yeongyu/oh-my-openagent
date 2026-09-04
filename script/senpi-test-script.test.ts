@@ -59,6 +59,7 @@ describe("Senpi compatibility test script", () => {
       "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
       "node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs",
       "node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs",
+      "node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs",
       "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
       "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
       "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
@@ -115,6 +116,9 @@ describe("Senpi compatibility test script", () => {
         await mkdir(join(pluginRoot, "skills", skillName), { recursive: true })
         await writeFile(join(pluginRoot, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
       }
+      // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
+      await mkdir(join(pluginRoot, "skills-conditional", "x-search"), { recursive: true })
+      await writeFile(join(pluginRoot, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
       await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
       await writeFile(join(pluginRoot, "extensions", "omo.js"), "export default {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")

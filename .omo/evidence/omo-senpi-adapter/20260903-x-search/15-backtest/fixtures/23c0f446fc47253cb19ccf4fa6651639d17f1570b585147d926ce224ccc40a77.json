@@ -1,0 +1,296 @@
+{
+  "queryId": "q03",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"SK하이닉스 HBM 반응 since:2026-08-24 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-24",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421710,
+    "completed_at": 1788421710,
+    "id": "ba355ab8-60fe-9689-aac1-1441c1a8c075",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_ba355ab8-60fe-9689-aac1-1441c1a8c075_call-757dffa5-f1d2-4dc8-8f15-2dc7296405fa-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "SK하이닉스 HBM 반응",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.ajunews.com/view/20260624140307956"
+            },
+            {
+              "type": "url",
+              "url": "https://news.skhynix.co.kr/groundbreaking-ceremony-in-indiana/"
+            },
+            {
+              "type": "url",
+              "url": "https://www.yna.co.kr/amp/view/AKR20250912025751003"
+            },
+            {
+              "type": "url",
+              "url": "https://www.fnnews.com/news/202608241826096311"
+            },
+            {
+              "type": "url",
+              "url": "https://simplywall.st/ko/stocks/lu/semiconductors/bdl-hynse/sk-hynix-shares"
+            },
+            {
+              "type": "url",
+              "url": "https://n.news.naver.com/article/016/0002690803"
+            },
+            {
+              "type": "url",
+              "url": "https://www.ytn.co.kr/_ln/0104_202608281054095292"
+            },
+            {
+              "type": "url",
+              "url": "https://news.skhynix.co.kr/skhynix-hbm3e-interview/"
+            },
+            {
+              "type": "url",
+              "url": "https://www.itdaily.kr/news/articleView.html?idxno=240662"
+            },
+            {
+              "type": "url",
+              "url": "https://news.tf.co.kr/read/economy/2360979.htm"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/news/business/11474062"
+            },
+            {
+              "type": "url",
+              "url": "https://www.thepublic.kr/news/articleView.html?idxno=293181"
+            },
+            {
+              "type": "url",
+              "url": "https://www.joongang.co.kr/article/25366401"
+            },
+            {
+              "type": "url",
+              "url": "https://news.skhynix.co.kr/sk-hynix-12-layer-hbm3-sample/"
+            },
+            {
+              "type": "url",
+              "url": "https://www.choicestock.co.kr/stock/news_view/77712?bu=/search/summary/SLAB"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_ba355ab8-60fe-9689-aac1-1441c1a8c075_call-757dffa5-f1d2-4dc8-8f15-2dc7296405fa-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**SK하이닉스 HBM 관련 최신 반응 및 시장 동향** (2025~2026년 기준 검색 결과 요약)\n\nSK하이닉스는 **HBM(High Bandwidth Memory)** 분야에서 세계적인 선두 주자로 평가받고 있습니다. 특히 AI 붐(챗GPT 이후)으로 엔비디아의 주요 공급사로 자리 잡으면서 실적 반전과 주가 상승의 핵심 동력이 됐다는 반응이 지배적입니다.[[1]](https://www.ajunews.com/view/20260624140307956)\n\n### 1. HBM4 및 차세대 제품 개발·양산 상황\n- **세계 최초 HBM4 양산 체제 구축** (2025년 9월): HBM3E 대비 대역폭 2배, 전력 효율 40% 이상 개선, 동작 속도 10Gbps 이상( JEDEC 표준 8Gbps 초과). 자체 MR-MUF 공정과 1bnm D램 기술 적용으로 리스크 최소화.[[2]](https://www.yna.co.kr/amp/view/AKR20250912025751003)\n- **HBM4E**: 12단 적층 기준 최대 48GB, 속도 최대 16Gbps/pin, 전력 효율 20%↑, 내열성 17% 개선. 주요 고객사에 샘플 공급 완료, 2027년 양산 목표.[[3]](https://simplywall.st/ko/stocks/lu/semiconductors/bdl-hynse/sk-hynix-shares)\n- **12단·16단 양산 및 20단 초고적층 준비**: HBM4 12단은 현재 양산 중, 16단은 고객 인증 단계. 하이브리드 본딩, iHBM(발열 저항 30%↓) 등 차세대 패키징 기술 공개. 엔비디아 ‘베라 루빈’ 등 차세대 AI 가속기에 공급 확대.[[4]](https://www.fnnews.com/news/202608241826096311)\n\n### 2. 사업 성과 및 시장 지위\n- **HBM 선점 효과**: 10년 이상 투자 끝에 엔비디아 공급망 진입 → 2023년 대규모 적자(-7.7조 원)에서 2024~2025년 사상 최대 영업이익 및 D램 1위 등극. 국내 증시 시총 1위(삼성전자 추월) 배경으로 꼽힘.[[1]](https://www.ajunews.com/view/20260624140307956)\n- **점유율**: 2025년 2분기 기준 SK하이닉스 64%, 마이크론 21%, 삼성전자 15% 수준으로 추정.[[5]](https://www.choicestock.co.kr/stock/news_view/77712?bu=/search/summary/SLAB)\n- **미국 생산 기지**: 2026년 8월 인디애나주에 40억 달러(약 5.4조 원) 투자, 2029년 하반기 ‘Made in USA’ HBM 양산 시작. 트럼프 행정부의 반도체 관세 압박에 대응하는 전략으로 해석됨.[[6]](https://news.skhynix.co.kr/groundbreaking-ceremony-in-indiana/)\n\n### 3. 시장·증권가 반응 및 경쟁 구도\n- **긍정적 평가**: AI 인프라 투자 지속 전망, HBM4·HBM4E 장기 공급 계약(LTA) 체결, 수율이 이전 세대에 근접한다는 점에서 중장기 성장 기대감 높음.[[7]](https://www.itdaily.kr/news/articleView.html?idxno=240662)\n- **경쟁 압력**: 삼성전자가 HBM4 12단 개발 완료 및 샘플 출하, 베이스다이 연산(Processing-in-Memory) 기술로 차별화. 증권사(LS증권 등)에서는 삼성 추격으로 SK하이닉스 HBM 초과 수익성(영업이익률 80%→60% 수준)이 줄어들 수 있다며 목표주가를 하향 조정(330만→240만 원)하기도 함.[[8]](https://n.news.naver.com/article/016/0002690803)\n- **중국 추격**: CXMT가 HBM3E 소량 생산 시작했으나, 기술 격차는 여전히 3~5년 정도로 평가.[[9]](https://news.tf.co.kr/read/economy/2360979.htm)\n- **보완 전략**: HBM 용량 한계를 넘어 HBF(High Bandwidth Flash) 개발(샌디스크와 협력)도 진행 중.[[10]](https://www.mk.co.kr/news/business/11474062)\n\n### 종합 평가\nSK하이닉스는 **HBM 선점과 엔비디아 중심 공급망** 덕분에 AI 메모리 시장에서 강력한 위치를 유지하고 있으며, 미국 생산 기지 구축으로 지정학적 리스크도 완화하는 모습입니다. 다만 삼성전자의 빠른 추격과 HBM 수익성 정상화로 인해 단기적으로는 주가 변동성이 있을 수 있다는 분석이 나오고 있습니다.\n\n더 구체적인 기사(예: 특정 날짜 보도, 실적 컨퍼런스콜 세부 내용)나 추가 주제(HBM3E 과거 성과, 주가 전망 등)가 필요하시면 말씀해주세요!",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://www.ajunews.com/view/20260624140307956",
+                "start_index": 202,
+                "end_index": 255,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.yna.co.kr/amp/view/AKR20250912025751003",
+                "start_index": 434,
+                "end_index": 492,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://simplywall.st/ko/stocks/lu/semiconductors/bdl-hynse/sk-hynix-shares",
+                "start_index": 597,
+                "end_index": 679,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.fnnews.com/news/202608241826096311",
+                "start_index": 823,
+                "end_index": 876,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.ajunews.com/view/20260624140307956",
+                "start_index": 1030,
+                "end_index": 1083,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.choicestock.co.kr/stock/news_view/77712?bu=/search/summary/SLAB",
+                "start_index": 1147,
+                "end_index": 1229,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://news.skhynix.co.kr/groundbreaking-ceremony-in-indiana/",
+                "start_index": 1352,
+                "end_index": 1421,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.itdaily.kr/news/articleView.html?idxno=240662",
+                "start_index": 1543,
+                "end_index": 1607,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://n.news.naver.com/article/016/0002690803",
+                "start_index": 1791,
+                "end_index": 1845,
+                "title": "8"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://news.tf.co.kr/read/economy/2360979.htm",
+                "start_index": 1907,
+                "end_index": 1960,
+                "title": "9"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.mk.co.kr/news/business/11474062",
+                "start_index": 2033,
+                "end_index": 2084,
+                "title": "10"
+              }
+            ]
+          }
+        ],
+        "id": "msg_ba355ab8-60fe-9689-aac1-1441c1a8c075",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 211995000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 211995000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:48:30.968Z"
+}

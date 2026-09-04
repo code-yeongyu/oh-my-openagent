@@ -1,0 +1,24 @@
+# C4 re-verification against the CURRENT live release list, using the resolver read from git HEAD
+# (git show HEAD:script/release-latest-flag.ts) rather than the worktree copy, so what is proven is
+# exactly what the PR ships. Re-run because the first live capture predated the non-semver guard
+# mutation proof and the pipefail hardening.
+
+tag_count=264
+nonsemver_present=1
+newest_3=v5.0.0-beta.40 v5.0.0-beta.39 v5.0.0-beta.38 
+resolver=from git HEAD
+
+5.0.0-beta.41 -> --latest
+5.0.0-beta.40 -> --latest
+4.19.5 -> --latest=false
+4.19.4 -> --latest=false
+5.0.0 -> --latest
+6.0.0 -> --latest
+--- invalid/no-arg (exit codes, unpiped) ---
+invalid_exit=1
+noarg_exit=2
+usage: gh release list --exclude-drafts --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts <version>
+
+# 4.19.5 and 4.19.4 resolve to --latest=false: an older-line hotfix cannot take the badge from the
+# published 5.0.0-beta.x line. 6.0.0 resolves to --latest as the highest. The list contains the
+# non-semver tag _pr-attachments, which is ignored rather than throwing.

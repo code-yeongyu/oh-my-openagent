@@ -1,0 +1,6 @@
+Deterministic checks (GREEN where applicable):
+- bun test packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs packages/omo-senpi/src/components/x-search/client.test.ts packages/omo-senpi/src/components/x-search/index.test.ts -> 43 pass, 0 fail.
+- Offline command -> exit 0.
+- EV/15-backtest/report.json -> 20 query entries (14 calibration, 6 holdout).
+- cost.within_cap -> true; cap $6.00; spent_usd 0 in the incomplete replay.
+- recursive secret scan -> clean (see EV/15-backtest/cleanup.txt).

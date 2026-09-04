@@ -1,0 +1,6 @@
+record_exit=0
+record_stdout_bytes=0
+record_stderr_bytes=0
+offline_exit=0
+offline_stdout_bytes=0
+offline_stderr_bytes=0

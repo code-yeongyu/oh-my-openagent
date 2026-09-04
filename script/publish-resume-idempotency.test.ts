@@ -8,6 +8,7 @@ const publishWorkflowPath = new URL("../.github/workflows/publish.yml", import.m
 export const resumeGuardFindings = {
   prepareExistingTagReuse: "prepare-release-state must reuse an existing release tag",
   prepareExistingCommitReuse: "prepare-release-state must reuse an existing release commit",
+  prepareStaleStampRefusal: "prepare-release-state must reuse a release commit only when it is the current base head and refuse a stale one",
   dispatchTagShaMismatchRefusal: "dispatch-provenance-safe-publish must reject an existing tag at a different SHA",
   ohMyOpencodePublishedProbe: "publish-main must skip an already-published oh-my-opencode version",
   ohMyOpenagentPublishedProbe: "publish-main must skip an already-published oh-my-openagent version",
@@ -56,20 +57,28 @@ export function assertResumeGuards(workflowText: string): string[] {
   const release = section(workflowText, "  release:")
   const marketplaceSync = section(release, "      - name: Sync LazyCodex Codex marketplace", "      - name: Resolve LazyCodex release payload")
 
+  // Both reuse paths must route through the head-equality guard: a stamp that IS the base head is
+  // reused without a push (resume), a stamp behind the head is refused (2026-09-04 beta.41 would
+  // otherwise have shipped a tree without its engine bump).
   if (!hasAll(prepareTagReuse, [
     'git rev-parse -q --verify "refs/tags/v${VERSION}"',
-    'RELEASE_SHA="$(git rev-list --max-count=1 "refs/tags/v${VERSION}")"',
-    'echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"',
-    'echo "Release tag v${VERSION} already exists locally at ${RELEASE_SHA}"',
-    "exit 0",
+    'reuse_or_refuse "$(git rev-list --max-count=1 "refs/tags/v${VERSION}")" "Release tag v${VERSION}"',
   ])) findings.push(resumeGuardFindings.prepareExistingTagReuse)
 
   if (!hasAll(prepareCommitReuse, [
     'git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}"',
-    'echo "Release commit already exists on origin/${BASE_REF}: ${RELEASE_SHA}"',
     "if [ -n \"$RELEASE_SHA\" ]; then",
-    "exit 0",
+    'reuse_or_refuse "$RELEASE_SHA" "Release commit for v${VERSION}"',
   ])) findings.push(resumeGuardFindings.prepareExistingCommitReuse)
+
+  if (!hasAll(prepareReleaseState, [
+    'BASE_HEAD="$(git rev-parse "origin/${BASE_REF}")"',
+    'if [ "$candidate" = "$BASE_HEAD" ]; then',
+    'echo "release_sha=${candidate}" >> "$GITHUB_OUTPUT"',
+    'echo "needs_push=false" >> "$GITHUB_OUTPUT"',
+    "is stale: origin/${BASE_REF} has moved to ${BASE_HEAD}",
+    "exit 1",
+  ])) findings.push(resumeGuardFindings.prepareStaleStampRefusal)
 
   if (!hasAll(dispatchExistingTag, [
     'if [ "$TAG_SHA" != "$RELEASE_SHA" ]; then',
@@ -132,6 +141,19 @@ describe("publish resume idempotency", () => {
     expect(mutatedWorkflow).not.toBe(workflowText)
     expect(assertResumeGuards(mutatedWorkflow)).toEqual([
       resumeGuardFindings.dispatchTagShaMismatchRefusal,
+    ])
+  })
+
+  test("reports the stale-stamp refusal when the head-equality guard is neutralised", () => {
+    const workflowText = readFileSync(publishWorkflowPath, "utf8")
+    const mutatedWorkflow = workflowText.replace(
+      'if [ "$candidate" = "$BASE_HEAD" ]; then',
+      'if true; then # mutation: every stamp is reused, stale or not',
+    )
+
+    expect(mutatedWorkflow).not.toBe(workflowText)
+    expect(assertResumeGuards(mutatedWorkflow)).toEqual([
+      resumeGuardFindings.prepareStaleStampRefusal,
     ])
   })
 })

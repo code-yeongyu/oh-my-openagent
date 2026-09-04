@@ -1,0 +1,31 @@
+# `set -u` negative case: what happens if a declared env var is MISSING (2026-09-04)
+#
+# Adding `set -euo pipefail` introduced one risk I had argued was safe but never exercised: with
+# `set -u`, an unset variable now ABORTS a release step where the old body would have expanded it
+# to empty. This measures that failure mode instead of assuming it.
+#
+# Both step bodies were extracted from the COMMITTED workflow with
+# Bun.YAML.parse(git show HEAD:.github/workflows/publish.yml).jobs.release.steps and run under
+# `bash` against a stubbed `gh` plus the committed resolver.
+#
+# RUNNER NOTE: mengmotaMac went offline mid-run (hub reported machine_unavailable - expected for the
+# portable laptop, recorded as a skip per the fleet policy), so this ran on gorky with bun pinned to
+# the absolute /home/box/.bun/bin/bun 1.4.0 (the box also has 1.3.14 at /usr/local/bin, which would
+# otherwise have made the version nondeterministic). bun_used=1.4.0 was echoed to prove it.
+
+omo step, VERSION unset:
+  OMO_NOVER_EXIT=1   MARKER=[]   stderr: "VERSION: unbound variable"
+
+lazycodex step, PREVIOUS_LAZYCODEX_VERSION unset:
+  LAZY_NOPREV_EXIT=1   MARKER=[]   stderr: "PREVIOUS_LAZYCODEX_VERSION: unbound variable"
+
+control, full declared env:
+  OMO_OK_EXIT=0, LAZY_OK_EXIT=0
+  CREATED release create v5.0.0-beta.41 --latest --title v5.0.0-beta.41 --notes-file /tmp/changelog.md
+  CREATED release create v5.0.0 --latest --repo code-yeongyu/lazycodex --target main --title v5.0.0 --notes-file /tmp/lazycodex-release-notes.md
+
+# Conclusion: the guard is FAIL-CLOSED. A missing variable aborts loudly and creates nothing, rather
+# than creating a release named `v` or carrying an empty flag. That is the correct direction for a
+# release step. In practice the case cannot arise - both steps receive these values from workflow
+# expressions in their own `env:` blocks - so this documents the safe failure mode, not a live risk.
+workspace swept: CLEANED=yes

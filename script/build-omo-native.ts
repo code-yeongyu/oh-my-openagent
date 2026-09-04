@@ -21,8 +21,8 @@ const packageDir = join(repoRoot, "packages", "omo-native")
 const sourcePluginDir = join(repoRoot, "packages", "omo-senpi", "plugin")
 const defaultOutputDir = join(packageDir, "plugin")
 
-// Mirrors REQUIRED_PLUGIN_ARTIFACTS in packages/omo-senpi/src/install/install-senpi.ts.
-const REQUIRED_PLUGIN_ARTIFACTS = [
+// Mirrors REQUIRED_PLUGIN_ARTIFACTS in packages/omo-senpi/src/install/plugin-artifacts.ts.
+export const REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
   join("extensions", "memory-run-supervisor.mjs"),
   join("extensions", "reflection-persona.md"),
@@ -46,6 +46,7 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("skills", "ulw-plan", "SKILL.md"),
   join("skills", "ulw-research", "SKILL.md"),
   join("skills", "visual-qa", "SKILL.md"),
+  join("skills-conditional", "x-search", "SKILL.md"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "agent-toolkit", "cli.js"),
   join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
@@ -61,10 +62,10 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("scripts", "install.mjs"),
 ] as const
 
-// Mirrors the files allowlist in packages/omo-senpi/plugin/package.json.
-const PAYLOAD_DIRECTORIES = ["extensions", "skills", "runtime"] as const
-const PAYLOAD_FILES = ["package.json", "README.md", "NOTICE", "LICENSE"] as const
-const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
+// Mirrors the files allowlist in packages/omo-senpi/plugin/package.json (locked by build-omo-native.test.ts).
+export const PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
+export const PAYLOAD_FILES = ["package.json", "README.md", "NOTICE", "LICENSE"] as const
+export const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
 
 interface BuildOptions {
   readonly outputDir: string
@@ -90,7 +91,42 @@ function parseArgs(argv: readonly string[]): BuildOptions {
   return { outputDir, checkOnly }
 }
 
+// The native staging chain (build:senpi-plugin:native) consumes prebuilt package
+// artifacts instead of rebuilding them, unlike build:senpi-plugin which always
+// runs build:lsp-daemon and build:ast-grep-mcp first. Callers such as the
+// publish-platform workflow install with --ignore-scripts, so the root prepare
+// build never produced these inputs there; build any missing one through the
+// same root scripts the full chain uses.
+const PREBUILT_NATIVE_INPUTS = [
+  { artifactPath: join("packages", "lsp-daemon", "dist"), buildScript: "build:lsp-daemon" },
+  { artifactPath: join("packages", "ast-grep-mcp", "dist", "cli.js"), buildScript: "build:ast-grep-mcp" },
+] as const
+
+export interface PrebuiltInputDependencies {
+  readonly artifactExists: (absolutePath: string) => boolean
+  readonly runRootScript: (script: string) => { readonly error?: Error | undefined; readonly status: number | null }
+}
+
+const defaultPrebuiltInputDependencies: PrebuiltInputDependencies = {
+  artifactExists: existsSync,
+  runRootScript: (script) => spawnSync("bun", ["run", script], { cwd: repoRoot, stdio: "inherit" }),
+}
+
+export function ensurePrebuiltNativeInputs(
+  dependencies: PrebuiltInputDependencies = defaultPrebuiltInputDependencies,
+): void {
+  for (const input of PREBUILT_NATIVE_INPUTS) {
+    if (dependencies.artifactExists(join(repoRoot, input.artifactPath))) continue
+    const result = dependencies.runRootScript(input.buildScript)
+    if (result.error !== undefined) throw result.error
+    if (result.status !== 0) {
+      throw new Error(`${input.buildScript} failed with exit code ${result.status ?? 1}`)
+    }
+  }
+}
+
 function runSenpiPluginBuild(outputDir: string): void {
+  ensurePrebuiltNativeInputs()
   const buildRoot = mkdtempSync(join(tmpdir(), "omo-native-build-"))
   const lspSource = join(buildRoot, "lsp-daemon", "dist")
   const astSource = join(buildRoot, "ast-grep-mcp", "cli.js")
@@ -195,7 +231,9 @@ function main(argv: readonly string[]): number {
 }
 
 try {
+  if (import.meta.main) {
   process.exit(main(process.argv.slice(2)))
+}
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)

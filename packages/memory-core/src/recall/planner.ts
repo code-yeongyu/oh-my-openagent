@@ -5,12 +5,20 @@
 // phrases of adjacent kept terms (verbatim adjacency, never spanning a
 // stopword). Pure and deterministic; the same input always yields the same
 // queries.
+//
+// Tokenization is Unicode-aware (`\p{L}\p{N}`), matching the letta-derived
+// scorer's language-neutral substring semantics: Hangul and other non-ASCII
+// scripts plan recall exactly like English. ASCII terms keep the legacy 3-char
+// noise floor; non-ASCII terms keep a 2-char floor because scripts like Korean
+// pack a full content word into two syllables (e.g. 리콜, 검색).
 
 export const MAX_RECALL_QUERIES = 4
 
 const MAX_SINGLE_TERMS = 2
 const MAX_PHRASES = 2
-const MIN_TERM_LENGTH = 3
+const MIN_ASCII_TERM_LENGTH = 3
+const MIN_NON_ASCII_TERM_LENGTH = 2
+const ASCII_ONLY = /^[\x00-\x7f]+$/
 
 const STOPWORDS: ReadonlySet<string> = new Set([
   "about", "after", "again", "all", "also", "always", "and", "any", "are", "arent",
@@ -32,12 +40,24 @@ const STOPWORDS: ReadonlySet<string> = new Set([
   "your", "youre", "youve",
 ])
 
+// Korean conversational fillers and function words. Particles/endings attached
+// to a stem (메모리를, 플래너는) are NOT split off — that would need real
+// morphology — so this list only covers tokens that appear standalone.
+const KOREAN_STOPWORDS: ReadonlySet<string> = new Set([
+  "거기", "거야", "그거", "그게", "그냥", "그러니까", "그러면", "그런데",
+  "그래서", "그리고", "네", "누가", "뭐", "보자", "아니", "아니야", "어디",
+  "어떻게", "왜", "응", "이거", "이게", "이제", "있어요", "저거", "저게",
+  "저기", "정말", "좀", "진짜", "합니다", "하고", "했어", "했어요", "해줘",
+  "해주세요",
+])
+
 function tokenize(text: string): string[] {
-  return text.toLowerCase().match(/[a-z0-9]+/g) ?? []
+  return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []
 }
 
 function isKeptTerm(term: string): boolean {
-  return term.length >= MIN_TERM_LENGTH && !STOPWORDS.has(term)
+  const minLength = ASCII_ONLY.test(term) ? MIN_ASCII_TERM_LENGTH : MIN_NON_ASCII_TERM_LENGTH
+  return term.length >= minLength && !STOPWORDS.has(term) && !KOREAN_STOPWORDS.has(term)
 }
 
 interface TermRank {

@@ -1,0 +1,87 @@
+### GREEN capture - todo 10 packaging (2026-09-03T06:00:33Z)
+
+$ bun test packages/omo-senpi/src/extension/component-list.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/extension/component-list.test.ts:
+(pass) createOmoSenpiComponents > #given the production registration array #when x-search is looked up #then it is present exactly once [2.48ms]
+(pass) createOmoSenpiComponents > #given the production registration array #when ordering is inspected #then x-search registers after lsp and before task tool capture [0.10ms]
+
+ 2 pass
+ 0 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [2.16s]
+exit=0
+
+$ bun test packages/omo-senpi/src/components/task/task-skill-loader.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/task/task-skill-loader.test.ts:
+(pass) packagedSkillDirs > #given the source-tree layout #when packaged dirs resolve #then load_skills ["x-search"] resolves from plugin/skills-conditional [5.86ms]
+(pass) packagedSkillDirs > #given the bundled runtime layout #when packaged dirs resolve #then load_skills ["x-search"] resolves from ../skills-conditional [1.18ms]
+(pass) createTaskSkillLoader > #given canonical and packaged skill roots #when the loader resolves a collision #then canonical wins [1.21ms]
+(pass) createTaskSkillLoader > #given default attribution settings #when the git-master skill is loaded #then the co-author directive rides the skill block [1.10ms]
+(pass) createTaskSkillLoader > #given attribution disabled #when the git-master skill is loaded #then the skill block stays untouched [0.76ms]
+(pass) createTaskSkillLoader > #given default attribution settings #when a non-git-master skill is loaded #then no directive is injected [0.83ms]
+
+ 6 pass
+ 0 fail
+ 17 expect() calls
+Ran 6 tests across 1 file. [662.00ms]
+exit=0
+
+$ bun test packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs:
+(pass) x-search conditional skill staging > #given no staged copy #when --check runs #then it fails as missing [2.49ms]
+(pass) x-search conditional skill staging > #given a staged copy #when --check runs #then it passes and the bytes match the source [1.77ms]
+(pass) x-search conditional skill staging > #given a stale staged copy #when --check runs #then it fails as stale [1.70ms]
+(pass) x-search conditional skill staging > #given a missing source skill #when staged #then it fails loudly instead of writing a partial copy [0.83ms]
+
+ 4 pass
+ 0 fail
+Ran 4 tests across 1 file. [547.00ms]
+exit=0
+
+$ bun test packages/omo-senpi/src/plugin-manifest.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/plugin-manifest.test.ts:
+(pass) OMO Senpi plugin manifest > #given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory [0.38ms]
+(pass) OMO Senpi plugin manifest > #given the Senpi package is one generated runtime unit #when loaded #then npm dependency and workspace surfaces stay absent [0.09ms]
+(pass) OMO Senpi plugin manifest > #given package metadata #when loaded #then Pi discoverability and shipped files are pinned [0.09ms]
+(pass) OMO Senpi plugin manifest > #given root and adapter versions #when compared #then the plugin manifest stays in lockstep [0.19ms]
+
+ 4 pass
+ 0 fail
+ 16 expect() calls
+Ran 4 tests across 1 file. [591.00ms]
+exit=0
+
+$ bun test packages/omo-senpi/src/extension/session-start-ordering.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/extension/session-start-ordering.test.ts:
+(pass) session_start component ordering > #given the production component list #when startup handlers are ordered #then onboarding immediately precedes the advisor after native badge [0.40ms]
+(pass) session_start component ordering > #given real onboarding state and an active ulw loop #when startup then agent_end fire #then onboarding is preserved and the first-session advisor stays detached and suppressed [86.27ms]
+
+ 2 pass
+ 0 fail
+ 10 expect() calls
+Ran 2 tests across 1 file. [802.00ms]
+exit=0
+
+$ bun test packages/omo-senpi/src/package-shape.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/package-shape.test.ts:
+(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [2.63ms]
+(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.18ms]
+(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.16ms]
+
+ 3 pass
+ 0 fail
+ 23 expect() calls
+Ran 3 tests across 1 file. [506.00ms]
+exit=0

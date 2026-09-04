@@ -1,3 +1,50 @@
+## 2026-09-04 — Ship the conditional x-search skill and stop the startup log line
+
+The published omo-ai payload never contained `plugin/skills-conditional/x-search/SKILL.md`. The
+plugin's own `files` allowlist shipped that directory, but the payload copy lists in
+`script/build-omo-native.ts` and `script/build-omo-binary.ts` did not, and
+`stage-x-search-skill.mjs` wrote its copy into the source plugin dir even when the staging build
+redirected every other artifact through `OMO_SENPI_PLUGIN_OUTPUT`. With no packaged copy, the
+bundled component advertised `plugin/extensions/skill/SKILL.md`, and senpi reported a startup skill
+conflict: "skill path does not exist". The staged skill is now copied into the staging plugin root,
+is part of both payload allowlists, and is required by the native, installer, and npm payload
+checks; `resolveXSearchSkillPath` returns nothing when neither copy exists, so a broken payload
+keeps `x_search` working, contributes no skill path, and warns once instead of tripping the
+conflict banner.
+
+The `x-search registered` and `x-search skipped: no xAI credential` lines also no longer greet
+every startup. Components register before the TUI takes over stdout and the default component
+logger writes `info` to `console.info`, so both expected outcomes moved to the optional `debug`
+channel.
+
+## 2026-09-03 — Add the credential-gated x_search tool and skill
+
+Senpi can now search X (Twitter) posts through xAI when an xAI account is connected, and stays silent when it is not.
+
+`packages/omo-senpi` gained an `x-search` component that registers the `x_search` tool at extension load (so `tool_search` sees it in the same session) only if `<agentDir>/auth.json` has an `xai` `oauth`/`api_key` entry, or `XAI_API_KEY` when that file is absent. The matching `x-search` skill is staged into `plugin/skills-conditional/` rather than `plugin/skills/` and is contributed via `resources_discover` only when the same gate passes, so machines without xAI never pay for the skill in the index. There is no `omo.json` key.
+
+In-process task children inherit the tool with `exposure` remapped to `direct` (`CHILD_DIRECT_EXPOSURE_TOOL_NAMES`) because they have no `tool_search` builtin; curated `explore` stays on its existing allowlist (no `x_search`), while `librarian` documents the X/social lane. Query recipes and live QA live under `packages/omo-senpi/scripts/qa/x-search-backtest.mjs` and `x-search-live-e2e.mjs`.
+
+## 2026-09-02 — Build missing prebuilt inputs in the omo-native release staging
+
+The omo-native plugin staging now builds `packages/lsp-daemon/dist` and
+`packages/ast-grep-mcp/dist/cli.js` through the canonical root scripts
+(`build:lsp-daemon`, `build:ast-grep-mcp`) whenever they are absent before
+consuming them. The publish-platform workflow installs dependencies with
+`--ignore-scripts`, so the root prepare build never produced these artifacts
+there and every beta.32 platform build failed with ENOENT on the lsp-daemon
+dist. Prebuilt artifacts are still reused untouched when present, and the
+staged payload checks are unchanged.
+
+## 2026-09-02 — Give the legacy daemon fixture a cold-Windows readiness budget
+
+The Codex installer test fixture's event-driven readiness wait now allows 30
+seconds on Windows, matching the platform-specific execution budgets the
+installer integration tests already use. Assertions and event-driven behavior
+remain unchanged; only the fixture's failure deadline is widened past the flat
+5-second bound that a cold Windows runner exceeded while spawning the fixture
+daemon.
+
 ## 2026-09-01 — Defer bind-time reflection reconciliation on scheduler contention
 
 Session-start reflection reconciliation now uses a zero-wait scheduler lock and defers when a sibling session is already scheduling the same memory identity. Normal reflection reservation and completion paths retain their existing serialized wait budget.

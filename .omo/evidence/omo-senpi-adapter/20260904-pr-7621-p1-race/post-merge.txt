@@ -1,0 +1,56 @@
+Current-dev merge: upstream/dev 928aa8571cfd54722c6aacdcd64b340fca664bf8
+
+Conflicts:
+  packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+  packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+  packages/omo-senpi/plugin/extensions/omo-task.js
+  packages/omo-senpi/plugin/extensions/omo.js
+
+Resolution:
+  Regenerated all six Senpi extensions with official Bun 1.4.0.
+
+Memory lock suite:
+  23 pass
+  0 fail
+  60 expect() calls
+  5 files
+
+Memory-core typecheck:
+  exit 0
+
+Senpi package gate:
+  2677 pass
+  32 skip
+  0 fail
+  8503 expect() calls
+  352 files
+
+Evidence resolver:
+  10 pass
+  0 fail
+  31 expect() calls
+
+Bundle freshness:
+  lsp-daemon runtime current
+  ast-grep-mcp runtime current
+  agent-toolkit runtime current
+  x-search conditional skill current
+  all six extension bundles current
+
+Real isolated Senpi:
+  result: PASS
+  ultraworkInjected: true
+  commentChecker: PASS
+  certificationEnvironmentObserved: true
+  realSenpiProtectedStateComplete: true
+  realOmoProtectedStateComplete: true
+  realSenpiChangedPaths: []
+  realOmoChangedPaths: []
+  sandboxAgentDir: $TMPDIR/omo-senpi-qa-pTJ0kq/agent
+  sandbox cleanup: removed-on-exit
+
+Platform limitation:
+  The merged current-dev driver reports DIRECTORY_IDENTITY_UNAVAILABLE for
+  recursive identity checks on non-Linux hosts, so the final macOS run does not
+  claim whole-tree isolation certification. The earlier pre-merge run in this
+  evidence directory recorded realSenpiUntouched=true and realOmoUntouched=true.

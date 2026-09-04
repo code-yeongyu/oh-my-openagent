@@ -3,10 +3,11 @@ import { join } from "node:path"
 
 const senpiRoot = join(import.meta.dir, "..", "node_modules", "@code-yeongyu", "senpi", "dist", "core", "extensions", "builtin", "claude-sdk-oauth")
 
-// This imports the installed Senpi runtime so the committed Bun patch is exercised after CI install.
+// This imports the installed Senpi runtime so the pinned release keeps surfacing a pre-replay SDK
+// result as the failure it reports (senpi 2026.9.3-2 ships this natively; omo used to patch it in).
 describe("claude-sdk-oauth result-before-replay", () => {
   test("surfaces the SDK result cause and classifies it as a query failure", async () => {
-    const [{ ClaudeSdkOauthSessionRegistry, overrideSessionRegistryBoundary, resetSessionRegistryBoundary }, { submitSessionTurn }, { sanitizeCloseCause }] = await Promise.all([
+    const [{ ClaudeSdkOauthSessionRegistry, overrideSessionRegistryBoundary, resetSessionRegistryBoundary }, { submitSessionTurn }, { sanitizeTerminalFailure }] = await Promise.all([
       import(`${senpiRoot}/session-registry.js`),
       import(`${senpiRoot}/session-registry-pump.js`),
       import(`${senpiRoot}/session-observability.js`),
@@ -46,7 +47,7 @@ describe("claude-sdk-oauth result-before-replay", () => {
       const error = await turn.then(() => undefined, (value: Error) => value)
       expect(error).toBeInstanceOf(Error)
       expect(error?.message).toContain("All Claude accounts are exhausted")
-      expect(sanitizeCloseCause(error)).toBe("query_failed")
+      expect(sanitizeTerminalFailure(error)).toBe("query_failed")
       expect(entry.activeTurn).toBeNull()
     } finally {
       resetSessionRegistryBoundary()

@@ -15,16 +15,11 @@ function tempDir(prefix: string): string {
 }
 
 describe("sweepOmoFamiliesBestEffort()", () => {
-  it("#given all three family sweeps #when the sweep runs #then every family is invoked with a plugin root", async () => {
+  it("#given every family sweep #when the sweep runs #then every family is invoked with a plugin root", async () => {
     // given
     const calls: string[] = []
     const pluginRoots: Array<string | undefined> = []
     const sweeps: OmoFamilySweeps = {
-      sweepCodegraph: mock(async (options: { pluginRoot?: string }) => {
-        calls.push("codegraph")
-        pluginRoots.push(options.pluginRoot)
-        return {}
-      }) as unknown as OmoFamilySweeps["sweepCodegraph"],
       sweepLspProxies: mock(async (options: { pluginRoot?: string }) => {
         calls.push("lsp-proxies")
         pluginRoots.push(options.pluginRoot)
@@ -40,9 +35,9 @@ describe("sweepOmoFamiliesBestEffort()", () => {
     await sweepOmoFamiliesBestEffort({}, sweeps)
 
     // then
-    expect(calls.sort()).toEqual(["codegraph", "lsp-proxies", "stale-lsp-daemons"])
-    // codegraph + proxy families receive the opencode plugin root as an owned root
-    expect(pluginRoots).toHaveLength(2)
+    expect(calls.sort()).toEqual(["lsp-proxies", "stale-lsp-daemons"])
+    // the proxy family receives the opencode plugin root as an owned root
+    expect(pluginRoots).toHaveLength(1)
     for (const root of pluginRoots) expect(root?.replace(/\\/g, "/").replace(/\/$/, "").endsWith("packages/omo-opencode")).toBe(true)
   })
 
@@ -51,13 +46,9 @@ describe("sweepOmoFamiliesBestEffort()", () => {
     const calls: string[] = []
     const logged: string[] = []
     const sweeps: OmoFamilySweeps = {
-      sweepCodegraph: mock(async () => {
-        calls.push("codegraph")
-        throw new Error("codegraph boom")
-      }) as unknown as OmoFamilySweeps["sweepCodegraph"],
       sweepLspProxies: mock(async () => {
         calls.push("lsp-proxies")
-        return {}
+        throw new Error("lsp-proxies boom")
       }) as unknown as OmoFamilySweeps["sweepLspProxies"],
       sweepStaleLspDaemons: mock(async () => {
         calls.push("stale-lsp-daemons")
@@ -69,8 +60,8 @@ describe("sweepOmoFamiliesBestEffort()", () => {
     await sweepOmoFamiliesBestEffort({ log: (message) => logged.push(message) }, sweeps)
 
     // then
-    expect(calls.sort()).toEqual(["codegraph", "lsp-proxies", "stale-lsp-daemons"])
-    expect(logged.some((message) => message.includes("codegraph boom"))).toBe(true)
+    expect(calls.sort()).toEqual(["lsp-proxies", "stale-lsp-daemons"])
+    expect(logged.some((message) => message.includes("lsp-proxies boom"))).toBe(true)
   })
 })
 

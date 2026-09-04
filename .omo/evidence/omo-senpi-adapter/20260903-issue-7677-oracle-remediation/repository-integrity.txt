@@ -1,0 +1,9 @@
+Verified source head: ba455bc1c9a60acc354915f909d89fd2cb338dc4
+Fetched origin/dev: 65c55dc6b470e0b21f60ff3c16c8e9594d575cd8 (no advance; no merge required)
+git diff --check origin/dev...HEAD: PASS
+git diff --check working tree: PASS
+script/** candidate diff: 0 bytes
+Package manifests, lockfile, Senpi pins/patches, CI, OAuth/compile runtime, generated plugin/runtime, omo-senpi production source, and generated Codex installer candidate diff: 0 paths
+Driver JSON validation and result/isolation separation: PASS
+Secret assignment scan: PASS
+Driver sandbox cleanup: PASS

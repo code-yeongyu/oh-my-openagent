@@ -1,0 +1,42 @@
+$ cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search && bun test packages/omo-senpi/src/components/x-search/client.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/client.test.ts:
+(pass) buildXSearchRequest > #given dates and allowed handles #when building the request #then the x_search tool carries only the set filters under the bounded envelope [0.54ms]
+(pass) buildXSearchRequest > #given top mode with no filters #when building the request #then the tool has no filter keys and the prompt asks for Top [0.13ms]
+(pass) buildXSearchRequest > #given excluded handles plus understanding flags on the reasoning carrier #when building the request #then flags and reasoning ride along [0.17ms]
+(pass) buildXSearchRequest > #given the shipped defaults #when reading the frozen knobs #then v1 is the default variant on the fast carrier and v2 extends v1 [2.31ms]
+(pass) performXSearch > #given a 200 JSON response #when performing the search #then the raw payload comes back with the bearer and JSON headers set [0.44ms]
+(pass) performXSearch > #given HTTP 401 #when performing the search #then it fails closed as AUTH with no retry [0.16ms]
+(pass) performXSearch > #given HTTP 403 #when performing the search #then it fails closed as AUTH with no retry [0.08ms]
+(pass) performXSearch > #given HTTP 500 #when performing the search #then it fails closed as UPSTREAM with no retry [0.07ms]
+(pass) performXSearch > #given HTTP 503 #when performing the search #then it fails closed as UPSTREAM with no retry [0.08ms]
+(pass) performXSearch > #given HTTP 429 with Retry-After #when performing the search #then RATE_LIMITED carries the retryAfter seconds [0.12ms]
+(pass) performXSearch > #given an aborted request #when performing the search #then it reports TIMEOUT [0.20ms]
+(pass) performXSearch > #given a deadline shorter than the response #when performing the search #then the request is aborted as TIMEOUT [9.90ms]
+(pass) performXSearch > #given a 200 body that is not JSON #when performing the search #then it reports PROTOCOL [0.19ms]
+(pass) normalizeXSearchResponse > #given the probe fixture #when normalized #then unique tweet ids, the server queries, and usage are recovered [0.48ms]
+(pass) normalizeXSearchResponse > #given max_results 2 on the probe fixture #when normalized #then exactly two results survive the cap [0.13ms]
+(pass) normalizeXSearchResponse > #given the fast-carrier fixture #when normalized #then annotation ids dedupe against the message-text URLs [0.12ms]
+(pass) normalizeXSearchResponse > #given a citation that appears only in annotations #when normalized #then the annotations pass still recovers its id [0.10ms]
+(pass) normalizeXSearchResponse > #given a payload with only top-level citations #when normalized #then the citation URLs become results with url titles [0.08ms]
+(pass) normalizeXSearchResponse > #given citation titles that are bare indices or the URL itself #when normalized #then the URL is the title and a descriptive title survives [0.10ms]
+(pass) normalizeXSearchResponse > #given a response with no X posts #when normalized #then results and queries are empty [0.07ms]
+(pass) formatXSearchResult > #given two results #when formatted #then the text contract renders header, blocks, and the queries line [0.09ms]
+(pass) formatXSearchResult > #given zero results #when formatted #then the empty contract renders [0.06ms]
+(pass) formatXSearchError > #given the INVALID_PARAMS code #when formatted #then the single-line error contract renders [0.07ms]
+(pass) formatXSearchError > #given the INVALID_FILTERS code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the TOO_MANY_HANDLES code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the INVALID_DATE code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the INVALID_DATE_RANGE code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the AUTH code #when formatted #then the single-line error contract renders [0.04ms]
+(pass) formatXSearchError > #given the RATE_LIMITED code #when formatted #then the single-line error contract renders [0.04ms]
+(pass) formatXSearchError > #given the UPSTREAM code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the TIMEOUT code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the PROTOCOL code #when formatted #then the single-line error contract renders [0.04ms]
+
+ 32 pass
+ 0 fail
+ 99 expect() calls
+Ran 32 tests across 1 file. [1378.00ms]
+exit=0

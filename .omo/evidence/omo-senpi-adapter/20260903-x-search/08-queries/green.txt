@@ -1,0 +1,9 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest-queries.test.mjs:
+(pass) x-search backtest query set v1 > ships a valid 20-query set with calibration and holdout splits [0.36ms]
+
+ 1 pass
+ 0 fail
+ 10 expect() calls
+Ran 1 test across 1 file. [485.00ms]
