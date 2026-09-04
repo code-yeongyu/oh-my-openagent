@@ -1,0 +1,18 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realSenpiVolatileChangedPaths": [
+    "sessions/<concurrent-session>.jsonl"
+  ],
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoChangedPaths": [],
+  "realOmoProtectedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "unset",
+  "sandboxAgentDir": "$TMPDIR/omo-senpi-qa-qJCWyg/agent",
+  "sandboxCleanup": "removed-on-exit"
+}

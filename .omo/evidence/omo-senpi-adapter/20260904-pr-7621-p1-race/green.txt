@@ -1,0 +1,20 @@
+bun test v1.4.0
+
+packages/memory-core/src/locks/stale-recovery-lock.test.ts
+
+4 pass
+0 fail
+5 expect() calls
+Ran 4 tests across 1 file.
+
+packages/memory-core/src/locks
+
+23 pass
+0 fail
+60 expect() calls
+Ran 23 tests across 5 files.
+
+packages/memory-core typecheck
+
+tsgo --noEmit -p tsconfig.json
+exit 0

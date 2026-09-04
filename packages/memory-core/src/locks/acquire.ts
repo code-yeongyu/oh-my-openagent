@@ -166,6 +166,10 @@ const sweptLockDirectories = new Set<string>()
 export interface LockCandidateFs {
   readonly unlink?: (path: string) => Promise<void>
   readonly isSharingError?: (error: unknown) => boolean
+  readonly beforeRecoveryRelease?: (
+    path: string,
+    expected: LockRecord,
+  ) => Promise<void>
 }
 
 let candidateFs: LockCandidateFs = {}
@@ -196,11 +200,8 @@ async function reclaimStaleRecoveryLock(recoveryPath: string): Promise<void> {
   const existing = await readOwner(recoveryPath)
   if (existing === null || existing.record === null) return
   if (!(await isProvenDead(existing.record))) return
-  try {
-    await unlink(recoveryPath)
-  } catch (error) {
-    if (errorCode(error) !== "ENOENT") throw error
-  }
+  await candidateFs.beforeRecoveryRelease?.(recoveryPath, existing.record)
+  await releaseLock(recoveryPath, existing.record)
 }
 
 async function recoverDeadOwner(

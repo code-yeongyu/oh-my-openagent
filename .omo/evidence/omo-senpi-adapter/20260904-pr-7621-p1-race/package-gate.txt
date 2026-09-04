@@ -1,0 +1,14 @@
+Official Bun 1.4.0: bun run test:senpi
+
+2527 pass
+1 skip
+0 fail
+8053 expect() calls
+Ran 2528 tests across 334 files.
+
+Evidence resolver:
+
+10 pass
+0 fail
+31 expect() calls
+Ran 10 tests across 1 file.

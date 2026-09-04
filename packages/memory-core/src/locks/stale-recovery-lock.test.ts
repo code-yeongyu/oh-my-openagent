@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises"
 import { hostname, tmpdir } from "node:os"
 import path from "node:path"
 
-import { LockContentionError, acquireLock, createLockRecord } from "./index"
+import {
+  LockContentionError,
+  acquireLock,
+  createLockRecord,
+  setLockCandidateFsForTests,
+} from "./index"
 
-// Dead PIDs: guaranteed absent on any POSIX system running this test suite.
-// The process_start values are deliberately wrong so isProvenDead returns true
-// even if the PID slot happens to be reused.
+// These PIDs are likely absent on POSIX CI. If a slot is reused, the deliberately
+// wrong process_start still proves the seeded owner is not the current process.
 const DEAD_PID_PRIMARY = 23997
 const DEAD_PID_RECOVERY = 23813
 const DEAD_START_PRIMARY = "ps-lstart:Fri Aug 28 13:34:49 2026"
@@ -119,6 +123,41 @@ describe("stale recovery lock deadlock (issue #7573)", () => {
 
       // #then — live recovery holder must block the contender
       expect(error).toBeInstanceOf(LockContentionError)
+    },
+  )
+
+  test(
+    "#given a stale recovery observation is replaced before cleanup" +
+      " #when the contender resumes stale reclamation" +
+      " #then it preserves the replacement owner and fails closed",
+    async () => {
+      if (process.platform === "win32") return
+
+      // #given
+      const lockDir = await createLockDir()
+      const lockPath = path.join(lockDir, "reflection-scheduler.lock")
+      const recoveryPath = `${lockPath}.recovery`
+      await writeFile(lockPath, `${JSON.stringify(deadPrimaryRecord())}\n`)
+      await writeFile(recoveryPath, `${JSON.stringify(deadRecoveryRecord())}\n`)
+      const replacement = await createLockRecord("reflection-scheduler:recovery")
+      const restore = setLockCandidateFsForTests({
+        beforeRecoveryRelease: async (pathToRelease) => {
+          await unlink(pathToRelease)
+          await writeFile(pathToRelease, `${JSON.stringify(replacement)}\n`)
+        },
+      })
+
+      try {
+        // #when
+        const contender = await createLockRecord("reflection-scheduler")
+        const error = await acquireLock(lockPath, contender, { waitTimeoutMs: 0 }).catch((cause) => cause)
+
+        // #then
+        expect(error).toBeInstanceOf(LockContentionError)
+        expect(JSON.parse(await readFile(recoveryPath, "utf8")).nonce).toBe(replacement.nonce)
+      } finally {
+        restore()
+      }
     },
   )
 })

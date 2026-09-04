@@ -1,0 +1,14 @@
+bun test v1.4.0
+
+stale recovery lock deadlock (issue #7573)
+FAIL: given a stale recovery observation is replaced before cleanup, when the
+contender resumes stale reclamation, then it preserves the replacement owner
+and fails closed.
+
+Expected constructor: LockContentionError
+Received value: undefined
+
+3 pass
+1 fail
+4 expect() calls
+Ran 4 tests across 1 file.
