@@ -10,6 +10,7 @@ type FallbackSource = {
   readonly chainKey: string
   readonly from: string
   readonly lastError: string
+  readonly lastErrorSha256: string
 }
 
 type RecentMessage = {
@@ -29,7 +30,10 @@ export function buildFallbackHandoff(input: {
   readonly source: FallbackSource
 }): FallbackHandoff | undefined {
   const failedIndex = latestMessageIndex(input.entries)
-  if (failedIndex < 0 || !isFailedAssistantEntry(input.entries[failedIndex], input.source.lastError)) {
+  if (
+    failedIndex < 0
+    || !isFailedAssistantEntry(input.entries[failedIndex], input.source.lastErrorSha256)
+  ) {
     return undefined
   }
   const failedMessage = field(input.entries[failedIndex], "message")
@@ -104,14 +108,18 @@ function collectContext(input: {
 }): { readonly compaction: string; readonly todo: string; readonly recentTail: RecentMessage[] } {
   let compaction = ""
   let todo = ""
-  for (let index = input.entries.length - 1; index >= 0 && (compaction.length === 0 || todo.length === 0); index -= 1) {
+  let foundCompaction = false
+  let foundTodo = false
+  for (let index = input.entries.length - 1; index >= 0 && (!foundCompaction || !foundTodo); index -= 1) {
     const entry = input.entries[index]
     const type = field(entry, "type")
-    if (compaction.length === 0 && type === "compaction") {
+    if (!foundCompaction && type === "compaction") {
+      foundCompaction = true
       const summary = field(entry, "summary")
       if (typeof summary === "string") compaction = truncateUtf8(summary, input.compactionBytes)
     }
-    if (todo.length === 0 && type === "custom" && field(entry, "customType") === "senpi.todo-state") {
+    if (!foundTodo && type === "custom" && field(entry, "customType") === "senpi.todo-state") {
+      foundTodo = true
       todo = todoText(field(entry, "data"), input.todoBytes)
     }
   }
@@ -147,7 +155,7 @@ function previousMessageIndex(entries: readonly unknown[], before: number): numb
   return -1
 }
 
-function isFailedAssistantEntry(value: unknown, expectedError: string): boolean {
+function isFailedAssistantEntry(value: unknown, expectedErrorSha256: string): boolean {
   if (field(value, "type") !== "message") return false
   const message = field(value, "message")
   const error = field(message, "errorMessage")
@@ -155,7 +163,7 @@ function isFailedAssistantEntry(value: unknown, expectedError: string): boolean 
     field(message, "role") === "assistant"
     && (field(message, "stopReason") === "error" || field(message, "stopReason") === "aborted")
     && typeof error === "string"
-    && error.startsWith(expectedError)
+    && createHash("sha256").update(error).digest("hex") === expectedErrorSha256
   )
 }
 
@@ -236,3 +244,5 @@ function truncateUtf8(value: string, maxBytes: number): string {
   }
   return output
 }
+import { createHash } from "node:crypto"
+

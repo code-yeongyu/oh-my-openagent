@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { describe, expect, it } from "bun:test"
 
 import type { ManagerStartSpec, StartResult } from "@oh-my-opencode/senpi-task"
@@ -44,6 +45,7 @@ function event(selector = ULTRAFAST): Record<string, unknown> {
     chainKey: "opengateway/moonshotai/kimi-k3-ultrafast",
     from: "opengateway/moonshotai/kimi-k3-ultrafast",
     lastError: "provider request failed",
+    lastErrorSha256: createHash("sha256").update("provider request failed").digest("hex"),
     exhaustionReason: "no-context-compatible-candidate",
     rejectedCandidates: [
       {
@@ -112,11 +114,20 @@ function entries(options: {
   ]
 }
 
-function context(sessionEntries: readonly unknown[]): Record<string, unknown> {
+function context(
+  sessionEntries: readonly unknown[],
+  chainKey = ULTRAFAST,
+  selectors: readonly string[] = [ULTRAFAST],
+): Record<string, unknown> {
   return {
     sessionManager: {
       getSessionId: () => "parent-session",
       getEntries: () => sessionEntries,
+    },
+    sessionSettings: {
+      getRetryFallbackSettings: () => ({
+        chains: { [chainKey]: selectors },
+      }),
     },
   }
 }
@@ -246,9 +257,10 @@ describe("context fallback delegate", () => {
     const childManager = manager()
     const oversized = {
       ...event(),
-      chainKey: "체인".repeat(2_000),
-      from: "모델".repeat(2_000),
-      lastError: "오류".repeat(10_000),
+      chainKey: "c".repeat(512),
+      from: "f".repeat(512),
+      lastError: "e".repeat(8_192),
+      lastErrorSha256: createHash("sha256").update("e".repeat(8_192)).digest("hex"),
     }
     wireFallbackDelegate(pi, {
       manager: childManager,
@@ -260,7 +272,7 @@ describe("context fallback delegate", () => {
     await pi.dispatch(
       "retry_fallback_exhausted",
       oversized,
-      context(entries({ errorMessage: oversized.lastError })),
+      context(entries({ errorMessage: oversized.lastError }), oversized.chainKey),
     )
     await Promise.resolve()
 
@@ -301,6 +313,34 @@ describe("context fallback delegate", () => {
     expect(childManager.specs).toHaveLength(1)
   })
 
+  it("#given empty latest state snapshots #when exhaustion dispatches #then stale older state is not resurrected", async () => {
+    const pi = new FakeExtensionAPI()
+    const childManager = manager()
+    const source = entries()
+    source.splice(-2, 0,
+      { type: "compaction", id: "compact-empty", summary: "" },
+      {
+        type: "custom",
+        id: "todo-empty",
+        customType: "senpi.todo-state",
+        data: { schema: "v2", phases: [] },
+      },
+    )
+    wireFallbackDelegate(pi, {
+      manager: childManager,
+      settings: settings(),
+      logger: logger(),
+      isRpcChild: () => false,
+    })
+
+    await pi.dispatch("retry_fallback_exhausted", event(), context(source))
+    await Promise.resolve()
+    const handoff = JSON.parse(childManager.specs[0]?.prompt ?? "{}")
+
+    expect(handoff.compaction).toBe("")
+    expect(handoff.todo).toBe("")
+  })
+
   it("#given guarded contexts #when exhaustion dispatches #then no child starts", async () => {
     const cases = [
       {
@@ -336,6 +376,33 @@ describe("context fallback delegate", () => {
         settings: settings(),
         event: event(),
         entries: entries({ assistantContent: [{ type: "toolCall", id: "call-1", name: "write", arguments: {} }] }),
+        isRpcChild: false,
+      },
+      {
+        name: "stale error with matching prefix",
+        settings: settings(),
+        event: event(),
+        entries: entries({ errorMessage: "provider request failed: newer turn" }),
+        isRpcChild: false,
+      },
+      {
+        name: "candidate absent from configured chain",
+        settings: settings(),
+        event: event("attacker/arbitrary-expensive-model"),
+        entries: entries(),
+        isRpcChild: false,
+      },
+      {
+        name: "empty correlation fields",
+        settings: settings(),
+        event: {
+          ...event(),
+          chainKey: "",
+          from: "",
+          lastError: "",
+          lastErrorSha256: createHash("sha256").update("").digest("hex"),
+        },
+        entries: entries({ errorMessage: "" }),
         isRpcChild: false,
       },
       {

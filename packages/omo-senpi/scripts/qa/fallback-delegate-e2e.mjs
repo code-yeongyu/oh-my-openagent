@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -36,8 +37,13 @@ function exhaustion() {
     chainKey: ULTRAFAST,
     from: ULTRAFAST,
     lastError: "provider request failed",
+    lastErrorSha256: createHash("sha256").update("provider request failed").digest("hex"),
     exhaustionReason: "no-context-compatible-candidate",
-    rejectedCandidates: [{ selector: ULTRAFAST, reason: "context-unusable" }],
+    rejectedCandidates: [{
+      selector: ULTRAFAST,
+      reason: "context-unusable",
+      projection: { model: ULTRAFAST, usable: false },
+    }],
     responseModel: "moonshotai/kimi-k3",
   }
 }
@@ -88,6 +94,9 @@ function context(values) {
     sessionManager: {
       getSessionId: () => "qa-parent",
       getEntries: () => values,
+    },
+    sessionSettings: {
+      getRetryFallbackSettings: () => ({ chains: { [ULTRAFAST]: [ULTRAFAST] } }),
     },
   }
 }
