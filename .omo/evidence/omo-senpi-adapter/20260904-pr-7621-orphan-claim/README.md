@@ -1,5 +1,7 @@
 # PR 7621 orphaned recovery-claim QA
 
+Tested source commit: `baf667d576ec1d72adce0ae279b7db2526336e14`
+
 ## What was tested
 
 - Failing-first orphan regression:

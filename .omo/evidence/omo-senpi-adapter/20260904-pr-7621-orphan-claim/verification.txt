@@ -1,6 +1,9 @@
 Base commit before the orphan-claim correction:
 aed41bc6342a940afa567384a4c06e1f7510d20e
 
+Tested source commit:
+baf667d576ec1d72adce0ae279b7db2526336e14
+
 Focused failing-first orphan regression:
 5 pass
 1 fail
