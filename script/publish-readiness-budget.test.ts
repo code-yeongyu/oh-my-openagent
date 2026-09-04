@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -33,30 +33,38 @@ interface Outcome { readonly status: number; readonly stdout: string; readonly s
  * npm stub: reports the version/dist-tag as absent for the first `readyAfterViews` `npm view`
  * calls, then as present. sleep stub: records the call and returns immediately.
  */
+/**
+ * npm stub: reports the version/dist-tag as absent for the first `readyAfterViews` `npm view`
+ * calls, then as present. sleep stub: records the call and returns immediately.
+ *
+ * Both stubs are bash FUNCTIONS prepended to the extracted block, not executables on PATH. bash
+ * resolves a function before any PATH lookup on every OS, whereas a `#!/usr/bin/env bash` script
+ * on PATH is not executable on windows-latest (no shebang support, `;` PATH separator, `.cmd`
+ * shims) - the first version of this harness did that and both cases hung to the 30 s budget on
+ * Windows while passing on POSIX. The workflow text itself stays untouched.
+ */
 function runReadiness(readyAfterViews: number): Outcome {
   const root = mkdtempSync(join(tmpdir(), "publish-readiness-"))
   try {
-    const bin = join(root, "bin")
     const counter = join(root, "npm-views")
     const sleeps = join(root, "sleeps")
-    Bun.spawnSync(["mkdir", "-p", bin])
     writeFileSync(counter, "0")
     writeFileSync(sleeps, "")
-    writeFileSync(join(bin, "npm"), [
-      "#!/usr/bin/env bash",
-      'n=$(cat "$COUNTER"); n=$((n+1)); echo "$n" > "$COUNTER"',
-      'if [ "$n" -gt "$READY_AFTER" ]; then echo "$OMO_AI_VERSION"; fi',
-      "exit 0",
+    const preamble = [
+      "npm() {",
+      '  local n; n=$(cat "$COUNTER"); n=$((n+1)); printf "%s" "$n" > "$COUNTER"',
+      '  if [ "$n" -gt "$READY_AFTER" ]; then printf "%s\\n" "$OMO_AI_VERSION"; fi',
+      "  return 0",
+      "}",
+      'sleep() { printf "%s\\n" "$1" >> "$SLEEPS"; }',
+      "export -f npm sleep",
       "",
-    ].join("\n"))
-    writeFileSync(join(bin, "sleep"), ["#!/usr/bin/env bash", 'echo "$1" >> "$SLEEPS"', ""].join("\n"))
-    chmodSync(join(bin, "npm"), 0o755)
-    chmodSync(join(bin, "sleep"), 0o755)
+    ].join("\n")
     const script = join(root, "readiness.sh")
-    writeFileSync(script, readinessRunBlock())
+    writeFileSync(script, preamble + readinessRunBlock())
     const result = spawnSync("bash", [script], {
       encoding: "utf8",
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}`, COUNTER: counter, SLEEPS: sleeps, READY_AFTER: String(readyAfterViews), OMO_AI_VERSION: "5.0.0-0.beta.42", ALREADY_PUBLISHED: "false" },
+      env: { ...process.env, COUNTER: counter, SLEEPS: sleeps, READY_AFTER: String(readyAfterViews), OMO_AI_VERSION: "5.0.0-0.beta.42", ALREADY_PUBLISHED: "false" },
     })
     return {
       status: result.status ?? -1,
