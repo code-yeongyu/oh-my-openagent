@@ -2,8 +2,8 @@ import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { mergeCategories } from "../../shared/merge-categories"
-import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { BUILTIN_CATEGORY_REQUIRES_MODEL, CATEGORY_PROMPT_APPEND_RESOLVERS } from "./constants"
 import { parseModelString } from "../../shared/model-string-parser"
@@ -275,7 +275,7 @@ Available categories: ${categoryNames.join(", ")}`)
   }
 
   return {
-    agentToUse: SISYPHUS_JUNIOR_AGENT,
+    agentToUse: getAgentDisplayName("sisyphus-junior", executorCtx.agentOverrides),
     categoryModel,
     categoryPromptAppend,
     maxPromptTokens: resolved.config.max_prompt_tokens,

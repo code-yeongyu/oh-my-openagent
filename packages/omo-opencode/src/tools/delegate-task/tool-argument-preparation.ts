@@ -1,5 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 
 export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx: ToolContextWithMetadata): Promise<DelegateTaskArgs> {
@@ -7,8 +8,9 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   const prompt = typeof args.prompt === "string" ? args.prompt : ""
   const originalSubagentType = typeof args.subagent_type === "string" ? args.subagent_type : undefined
   let subagentType = originalSubagentType
+  const sisyphusJuniorConfigKey = getAgentConfigKey(SISYPHUS_JUNIOR_AGENT)
 
-  if (category && subagentType && subagentType !== SISYPHUS_JUNIOR_AGENT) {
+  if (category && subagentType && getAgentConfigKey(subagentType) !== sisyphusJuniorConfigKey) {
     log("[task] category provided - overriding subagent_type to sisyphus-junior", {
       category,
       subagent_type: subagentType,
@@ -16,7 +18,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   }
 
   if (category) {
-    subagentType = SISYPHUS_JUNIOR_AGENT
+    subagentType = sisyphusJuniorConfigKey
   }
 
   let description = typeof args.description === "string" ? args.description : undefined

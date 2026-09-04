@@ -96,6 +96,54 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toContain("definitely-not-a-real-category-xyz123")
 	})
 
+	test("uses the Worker displayName override for category workers", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = { deep: {} }
+		executorCtx.agentOverrides = {
+			"sisyphus-junior": { displayName: "Worker" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined)
+
+		//#then
+		expect(result.agentToUse).toBe("Worker")
+	})
+
+	test("uses the sisyphus-junior displayName override for category workers", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = { deep: {} }
+		executorCtx.agentOverrides = {
+			"sisyphus-junior": { displayName: "sisyphus-junior" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined)
+
+		//#then
+		expect(result.agentToUse).toBe("sisyphus-junior")
+	})
+
 	test("uses category fallback_models for background/runtime fallback chain", async () => {
 		//#given
 		const args = {
