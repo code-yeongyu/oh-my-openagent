@@ -137,6 +137,8 @@ export interface BuildSystemContentInput {
   planAgentPrepend?: string
   maxPromptTokens?: number
   model?: DelegatedModelConfig
+  /** Configured endpoint for the model's provider (opencode config `provider.<id>.options.baseURL`). */
+  providerBaseURL?: string
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]

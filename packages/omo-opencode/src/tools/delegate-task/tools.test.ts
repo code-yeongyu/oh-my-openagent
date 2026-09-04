@@ -4863,3 +4863,144 @@ describe("buildSyncPromptTools (issue #5182)", () => {
     expect(storedTools!.read).toBeUndefined()
   })
 })
+
+describe("free/local prompt cap via provider baseURL (end-to-end)", () => {
+  const OVERSIZED_APPEND = "Category context payload line for truncation testing.\n".repeat(4000)
+
+  test("caps injected system content when the resolved custom provider baseURL is loopback", async () => {
+    // given - user category on custom provider 'omlx' whose configured endpoint is loopback
+    const { createDelegateTask } = require("./tools")
+
+    let promptBody: CapturedPromptBody = {}
+    const promptMock = async (input: CapturedPromptInput) => {
+      promptBody = input.body
+      return { data: {} }
+    }
+
+    const mockManager = { launch: async () => ({}) }
+    const mockClient = {
+      app: { agents: async () => ({ data: [] }) },
+      config: {
+        get: async () => ({
+          data: {
+            model: SYSTEM_DEFAULT_MODEL,
+            provider: {
+              omlx: { options: { baseURL: "http://127.0.0.1:8000/v1" } },
+            },
+          },
+        }),
+      },
+      session: {
+        get: async () => ({ data: { directory: "/project" } }),
+        create: async () => ({ data: { id: "ses_omlx_local_cap" } }),
+        prompt: promptMock,
+        promptAsync: promptMock,
+        messages: async () => ({
+          data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+        }),
+        status: async () => ({ data: {} }),
+      },
+    }
+
+    const tool = createDelegateTask({
+      manager: mockManager,
+      client: mockClient,
+      userCategories: {
+        omlxlocal: { model: "omlx/qwen3", prompt_append: OVERSIZED_APPEND },
+      },
+      availableModelsOverride: new Set(["omlx/qwen3"]),
+    })
+
+    const toolContext = {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "sisyphus",
+      abort: new AbortController().signal,
+    }
+
+    // when
+    await tool.execute(
+      {
+        description: "Local cap check",
+        prompt: "Do something",
+        category: "omlxlocal",
+        run_in_background: false,
+        load_skills: [],
+      },
+      toolContext
+    )
+
+    // then - injected system content is truncated to the free/local budget
+    expect(promptBody.system).toBeDefined()
+    expect(String(promptBody.system).includes("[TRUNCATED]")).toBe(true)
+  }, { timeout: 20000 })
+
+  test("leaves injected system content uncapped when the resolved provider baseURL is remote", async () => {
+    // given - same category shape but the provider endpoint is a remote host
+    const { createDelegateTask } = require("./tools")
+
+    let promptBody: CapturedPromptBody = {}
+    const promptMock = async (input: CapturedPromptInput) => {
+      promptBody = input.body
+      return { data: {} }
+    }
+
+    const mockManager = { launch: async () => ({}) }
+    const mockClient = {
+      app: { agents: async () => ({ data: [] }) },
+      config: {
+        get: async () => ({
+          data: {
+            model: SYSTEM_DEFAULT_MODEL,
+            provider: {
+              omlx: { options: { baseURL: "https://api.omlx-cloud.example.com/v1" } },
+            },
+          },
+        }),
+      },
+      session: {
+        get: async () => ({ data: { directory: "/project" } }),
+        create: async () => ({ data: { id: "ses_omlx_remote_uncapped" } }),
+        prompt: promptMock,
+        promptAsync: promptMock,
+        messages: async () => ({
+          data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+        }),
+        status: async () => ({ data: {} }),
+      },
+    }
+
+    const tool = createDelegateTask({
+      manager: mockManager,
+      client: mockClient,
+      userCategories: {
+        omlxlocal: { model: "omlx/qwen3", prompt_append: OVERSIZED_APPEND },
+      },
+      availableModelsOverride: new Set(["omlx/qwen3"]),
+    })
+
+    const toolContext = {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "sisyphus",
+      abort: new AbortController().signal,
+    }
+
+    // when
+    await tool.execute(
+      {
+        description: "Remote uncapped check",
+        prompt: "Do something",
+        category: "omlxlocal",
+        run_in_background: false,
+        load_skills: [],
+      },
+      toolContext
+    )
+
+    // then - cloud endpoints keep full injection, no truncation marker
+    expect(promptBody.system).toBeDefined()
+    expect(String(promptBody.system).includes("[TRUNCATED]")).toBe(false)
+    expect(String(promptBody.system).includes(OVERSIZED_APPEND)).toBe(true)
+  }, { timeout: 20000 })
+})
