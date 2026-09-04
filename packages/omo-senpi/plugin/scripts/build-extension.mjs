@@ -141,6 +141,12 @@ async function buildEntry(entry, output, buildDefines) {
       buildScriptPath: fileURLToPath(import.meta.url),
     })
   } finally {
+    if (process.env.OMO_PROBE_INPUTS !== undefined && output.endsWith("omo-task.js")) {
+      const meta = JSON.parse(await readFile(metafile, "utf8"))
+      console.log("PROBE_INPUTS_BEGIN " + Object.keys(meta.inputs).length)
+      for (const input of Object.keys(meta.inputs).sort()) console.log("PROBE " + input)
+      console.log("PROBE_INPUTS_END")
+    }
     await rm(metafile, { force: true })
   }
 }

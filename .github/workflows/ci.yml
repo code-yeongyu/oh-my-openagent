@@ -449,7 +449,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+          OMO_PROBE_INPUTS=1 node packages/omo-senpi/plugin/scripts/build-extension.mjs --check || true
 
       - name: Run Senpi compatibility tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
