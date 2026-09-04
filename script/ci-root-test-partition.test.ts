@@ -69,7 +69,7 @@ describe("root test CI partition", () => {
   test("#given global zauc mocks #when Windows root tests are partitioned #then omo-opencode stays in one process", () => {
     const job = rootTestJob()
 
-    expect(job).toContain("bun test packages/omo-opencode packages/memory-core")
+    expect(job).toContain("bun test --timeout 20000 packages/omo-opencode packages/memory-core")
     expect(job).toContain(
       '-TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")',
     )
@@ -121,10 +121,10 @@ describe("root test CI partition", () => {
     // sharding is the parallelism; each shard is one serial process, the shape
     // this suite passed with for years.
     expect(posixStep).toContain(serialQuarantineCommand())
-    expect(posixStep).toContain("bun --config=bunfig.win2.parallel.toml test\n")
+    expect(posixStep).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000\n")
     expect(posixStep).not.toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
     expect(posixStep.indexOf(serialQuarantineCommand())).toBeLessThan(
-      posixStep.indexOf("bun --config=bunfig.win2.parallel.toml test"),
+      posixStep.indexOf("bun --config=bunfig.win2.parallel.toml test --timeout 20000"),
     )
   })
 

@@ -61,7 +61,14 @@ export const ROOT_TEST_SERIAL_QUARANTINE: readonly SerialQuarantineEntry[] = [
 export const ROOT_TEST_SERIAL_QUARANTINE_PATHS: readonly string[] =
   ROOT_TEST_SERIAL_QUARANTINE.map((entry) => entry.path)
 
+/**
+ * Per-file test budget for the sequential POSIX legs. Bun applies a preload's setDefaultTimeout to
+ * the first file only, so every multi-file `bun test` in CI passes the flag explicitly; this is the
+ * POSIX value, matched by test-setup.ts (20s) and the Windows wrapper (30s).
+ */
+export const POSIX_TEST_TIMEOUT_MS = 20_000
+
 /** The serial `bun test` argument list each parallel leg runs before its parallel pass. */
 export function serialQuarantineCommand(): string {
-  return `bun test ${ROOT_TEST_SERIAL_QUARANTINE_PATHS.join(" ")}`
+  return `bun test --timeout ${POSIX_TEST_TIMEOUT_MS} ${ROOT_TEST_SERIAL_QUARANTINE_PATHS.join(" ")}`
 }

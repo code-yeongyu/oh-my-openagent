@@ -66,6 +66,9 @@ function checkpoint(input: {
   }
 }
 
+// Mirrors LOCK_WAIT_TIMEOUT_MS in store.ts; the handoff test asserts the wait exceeded it in total.
+const LOCK_WAIT_TIMEOUT_MS_FOR_TEST = 1_000
+
 describe("createDagFileStore event WAL", () => {
   test("#given five durable events #when reading two at a time #then sinceSeq is exclusive and hasMore flips", () => {
     // given
@@ -617,6 +620,89 @@ describe("createDagFileStore locks and retention", () => {
       ownerlessSentinelObserved: false,
       publishedSentinelHadOwnerRecord: true,
     })
+  })
+
+  test("#given a nested reclaimer wins and releases while the first is paused #when the first's reclaim finds the lock already free after the contention budget elapsed #then it acquires instead of timing out", () => {
+    // given - the exact shape that failed on windows-latest under --parallel: the first reclaimer is
+    // preempted mid-reclaim, a second reclaimer takes and releases the lock, and by the time the first
+    // resumes, more than LOCK_WAIT_TIMEOUT_MS of wall clock has passed on its own reclaim I/O. The lock
+    // is FREE at that point; finding it free is progress, not contention, so it must not be a timeout.
+    const project = tempProject()
+    let clock = 1_000_000
+    const now = () => clock
+    const isProcessAlive = (pid: number) => pid === process.pid
+    const first = createDagFileStore({ project_dir: project }, { isProcessAlive, now })
+    const second = createDagFileStore({ project_dir: project }, { isProcessAlive, now })
+    const canonical = first.paths.runLock(runId)
+    const reclaimSentinel = `${canonical}.reclaim`
+    fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
+    const realOpen = fs.openSync
+    let preempted = false
+    let secondReclaimerEntered = false
+    spyOn(fs, "openSync").mockImplementation((path, flags, mode) => {
+      const fd = realOpen(path, flags, mode)
+      if (preempted || flags !== "wx" || typeof path !== "string" || !path.startsWith(reclaimSentinel)) return fd
+      preempted = true
+      second.withRunLock(runId, () => {
+        secondReclaimerEntered = true
+      })
+      // the first reclaimer's remaining I/O is slow on the loaded host
+      clock += 1_500
+      return fd
+    })
+
+    // when
+    let firstEntered = false
+    first.withRunLock(runId, () => {
+      firstEntered = true
+    })
+
+    // then
+    expect({ preempted, secondReclaimerEntered, firstEntered }).toEqual({
+      preempted: true,
+      secondReclaimerEntered: true,
+      firstEntered: true,
+    })
+    expect(fs.existsSync(canonical)).toBe(false)
+  })
+
+  test("#given two live holders hand the lock over back to back #when each holds for less than the budget but together they exceed it #then the waiter acquires because the budget restarts per holder", () => {
+    // given - the deadline must bound time stalled behind ONE holder. Holder A (alive) keeps us out
+    // for 800ms, then hands off to holder B (alive) for another 800ms. Neither stalls us past the
+    // 1000ms budget on its own; a wall-clock deadline would throw at B's second poll.
+    const project = tempProject()
+    let clock = 5_000_000
+    const now = () => clock
+    const holderA = { hostPid: 4001, token: "holder-a" }
+    const holderB = { hostPid: 4002, token: "holder-b" }
+    const alive = new Set([process.pid, holderA.hostPid, holderB.hostPid])
+    const store = createDagFileStore({ project_dir: project }, { isProcessAlive: (pid) => alive.has(pid), now })
+    const canonical = store.paths.runLock(runId)
+    fs.writeFileSync(canonical, JSON.stringify(holderA))
+    const realRead = fs.readFileSync
+    let polls = 0
+    spyOn(fs, "readFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, options?: unknown) => {
+      const content = realRead(path, options as never)
+      if (path !== canonical) return content
+      polls += 1
+      // each poll of the canonical lock costs 400ms on this slow host
+      clock += 400
+      // after two polls (800ms) A releases and B takes over; after two more, B releases
+      if (polls === 2) fs.writeFileSync(canonical, JSON.stringify(holderB))
+      if (polls === 4) fs.rmSync(canonical, { force: true })
+      return content
+    }) as typeof fs.readFileSync)
+
+    // when
+    let entered = false
+    store.withRunLock(runId, () => {
+      entered = true
+    })
+
+    // then
+    expect(entered).toBe(true)
+    expect(polls).toBeGreaterThanOrEqual(4)
+    expect(clock - 5_000_000).toBeGreaterThanOrEqual(LOCK_WAIT_TIMEOUT_MS_FOR_TEST + 400)
   })
 
   test("#given a crashed reclaimer left its sentinel #when another process reclaims the stale holder #then the sentinel cannot wedge acquisition", () => {

@@ -537,7 +537,11 @@ function withLock<T>(
   fsyncWrites: boolean,
 ): T {
   assertSafeSegment(basename(path), "lock name")
-  const startedAt = now()
+  // LOCK_WAIT_TIMEOUT_MS bounds how long we sit behind ONE unchanged holder, not wall clock: a holder
+  // that changes or vanishes is the system making progress, and our own reclaim I/O on a slow host is
+  // work, not waiting. Charging either to the deadline made a free lock look like a timeout.
+  let stalledSince = now()
+  let stalledBehind: LockHolder | undefined
   let acquiredHolder: LockHolder | undefined
   for (;;) {
     const content = JSON.stringify({
@@ -552,17 +556,19 @@ function withLock<T>(
     }
     const observedHolder = readLockHolder(path)
     if (observedHolder === undefined) continue
+    if (stalledBehind === undefined || !sameLockHolder(stalledBehind, observedHolder)) {
+      stalledBehind = observedHolder
+      stalledSince = now()
+    }
     if (observedHolder.pid === undefined || !isProcessAlive(observedHolder.pid)) {
-      const reclaimedHolder = reclaimObservedLock(path, observedHolder, isProcessAlive, runId, now, fsyncWrites)
-      if (reclaimedHolder !== undefined) {
-        acquiredHolder = reclaimedHolder
+      const outcome = reclaimObservedLock(path, observedHolder, isProcessAlive, runId, now, fsyncWrites)
+      if (outcome.kind === "acquired") {
+        acquiredHolder = outcome.holder
         break
       }
-      if (now() - startedAt >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
-      Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
-      continue
+      if (outcome.kind === "holder_changed") continue
     }
-    if (now() - startedAt >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
+    if (now() - stalledSince >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
     Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
   }
   if (acquiredHolder === undefined) throw new Error(`Failed to acquire DAG lock: ${path}`)
@@ -642,6 +648,16 @@ function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boo
   }
 }
 
+/**
+ * Why a dead-holder reclaim did not hand us the lock. `reclaim_busy`: a live peer holds the reclaim
+ * mutex, so we are genuinely waiting on it. `holder_changed`: the canonical lock was released or
+ * taken by someone else while we worked, so the next attempt should start over immediately.
+ */
+type ReclaimOutcome =
+  | { readonly kind: "acquired"; readonly holder: LockHolder }
+  | { readonly kind: "reclaim_busy" }
+  | { readonly kind: "holder_changed" }
+
 function reclaimObservedLock(
   path: string,
   observedHolder: LockHolder,
@@ -649,10 +665,10 @@ function reclaimObservedLock(
   runId: DagRunId | undefined,
   now: () => number,
   fsyncWrites: boolean,
-): LockHolder | undefined {
+): ReclaimOutcome {
   const reclaimPath = `${path}.reclaim`
   const reclaimHolder = tryAcquireReclaimMutex(reclaimPath, isProcessAlive, now, fsyncWrites)
-  if (reclaimHolder === undefined) return undefined
+  if (reclaimHolder === undefined) return { kind: "reclaim_busy" }
   const content = JSON.stringify({
     hostPid: process.pid,
     runId,
@@ -670,10 +686,10 @@ function reclaimObservedLock(
     const currentHolder = readLockHolder(path)
     if (currentHolder === undefined || !sameLockHolder(observedHolder, currentHolder) ||
       (currentHolder.pid !== undefined && isProcessAlive(currentHolder.pid))) {
-      return undefined
+      return { kind: "holder_changed" }
     }
     fs.renameSync(successorPath, path)
-    return { pid: process.pid, content }
+    return { kind: "acquired", holder: { pid: process.pid, content } }
   } finally {
     if (fd !== undefined) fs.closeSync(fd)
     fs.rmSync(successorPath, { force: true })

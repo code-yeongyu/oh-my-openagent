@@ -208,7 +208,7 @@ jobs:
       # module state between files. Job-level sharding is the parallelism.
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: bun test packages/omo-opencode packages/memory-core
+        run: bun test --timeout 20000 packages/omo-opencode packages/memory-core
 
       - name: Run tests with Windows telemetry
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -225,8 +225,8 @@ jobs:
       - name: Run tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: |
-          bun test packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
-          bun --config=bunfig.win2.parallel.toml test
+          bun test --timeout 20000 packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts
+          bun --config=bunfig.win2.parallel.toml test --timeout 20000
 
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
       # tests observe sh instead of the native PowerShell/cmd execution path.
@@ -463,7 +463,7 @@ jobs:
           npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
           bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
           bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
-          bun test packages/omo-senpi
+          bun test --timeout 20000 packages/omo-senpi
 
       - name: Run Senpi compatibility tests with Windows telemetry
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -618,7 +618,7 @@ jobs:
 
       - name: Verify dist bundle tests
         if: needs.ci-mode.outputs.run_heavy == 'true'
-        run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts
+        run: bun test --timeout 20000 packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts
 
       - name: Write job summary
         if: always()

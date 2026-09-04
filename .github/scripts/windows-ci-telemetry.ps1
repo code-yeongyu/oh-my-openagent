@@ -15,6 +15,20 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Bun applies a preload's setDefaultTimeout only to the first test file of a sequential run;
+# every later file falls back to the built-in 5000ms (reproduced on bun 1.4.0/1.4.1, all OSes).
+# Only the CLI flag reaches every file, so pin the Windows budget here for every job that
+# goes through this wrapper. Keep in step with test-setup.ts.
+$WindowsTestTimeoutMs = "30000"
+if (($TestArguments -contains "test") -and -not ($TestArguments -contains "--timeout")) {
+  $withTimeout = @()
+  foreach ($argument in $TestArguments) {
+    $withTimeout += $argument
+    if ($argument -eq "test") { $withTimeout += @("--timeout", $WindowsTestTimeoutMs) }
+  }
+  $TestArguments = $withTimeout
+}
+
 $telemetryErrors = [System.Collections.Generic.List[object]]::new()
 
 function Add-TelemetryError {

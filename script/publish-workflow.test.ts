@@ -17,7 +17,7 @@ const workflowChecks = [
     path: ciWorkflowPath,
     testRuns: [
       "run: bun test",
-      "run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts",
+      "run: bun test --timeout 20000 packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts",
     ],
   },
 ]

@@ -192,7 +192,7 @@ describe("Senpi compatibility test script", () => {
     const expectedCommands = [
       "bun run build:senpi-plugin",
       "tsgo --noEmit -p packages/omo-senpi/tsconfig.json",
-      "bun test packages/omo-senpi",
+      "bun test --timeout 20000 packages/omo-senpi",
     ]
     const commandIndexes = expectedCommands.map((command) => script.indexOf(command))
     let isOrdered = true
@@ -223,7 +223,7 @@ describe("Senpi compatibility test script", () => {
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
     expect(senpiJob).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
-    expect(senpiJob).toContain("bun test packages/omo-senpi")
+    expect(senpiJob).toContain("bun test --timeout 20000 packages/omo-senpi")
     expect(senpiJob).not.toContain("senpi install")
     expect(needsReferences.length, "senpi-compatibility must be included in both downstream needs lists").toBeGreaterThanOrEqual(2)
   })
