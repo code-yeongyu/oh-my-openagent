@@ -39,7 +39,7 @@ export type FallbackDelegateDeps = {
 
 export function wireFallbackDelegate(pi: SenpiExtensionAPI, deps: FallbackDelegateDeps): void {
   if (!deps.settings.enabled) return
-  const claimedTurns = new Set<string>()
+  let claimedTurn: string | undefined
   const isRpcChild = deps.isRpcChild ?? (() => process.env[OMO_SENPI_TASK_RPC_CHILD] === "1")
 
   pi.on("retry_fallback_exhausted", (payload, eventContext) => {
@@ -65,8 +65,8 @@ export function wireFallbackDelegate(pi: SenpiExtensionAPI, deps: FallbackDelega
       })
       if (handoff === undefined) return
       const claimKey = `${event.sessionId}\0${handoff.requestId}`
-      if (claimedTurns.has(claimKey)) return
-      claimedTurns.add(claimKey)
+      if (claimedTurn === claimKey) return
+      claimedTurn = claimKey
 
       const spec: ManagerStartSpec = {
         prompt: handoff.prompt,

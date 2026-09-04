@@ -35,7 +35,7 @@ function exhaustion() {
     sessionId: "qa-parent",
     chainKey: ULTRAFAST,
     from: ULTRAFAST,
-    lastError: "요청실패".repeat(2_000),
+    lastError: "provider request failed",
     exhaustionReason: "no-context-compatible-candidate",
     rejectedCandidates: [{ selector: ULTRAFAST, reason: "context-unusable" }],
     responseModel: "moonshotai/kimi-k3",

@@ -4,13 +4,17 @@ const TODO_MAX_BYTES = 8192
 const TAIL_MESSAGE_MAX_BYTES = 4096
 const SOURCE_SELECTOR_MAX_BYTES = 512
 const SOURCE_ERROR_MAX_BYTES = 2048
-
-type RecordValue = Readonly<Record<string, unknown>>
+const REQUEST_ID_MAX_BYTES = 256
 
 type FallbackSource = {
   readonly chainKey: string
   readonly from: string
   readonly lastError: string
+}
+
+type RecentMessage = {
+  readonly role: "user" | "assistant" | "toolResult"
+  readonly content: string
 }
 
 export type FallbackHandoff = {
@@ -24,41 +28,41 @@ export function buildFallbackHandoff(input: {
   readonly recentTailMessages: number
   readonly source: FallbackSource
 }): FallbackHandoff | undefined {
-  const failedIndex = input.entries.findLastIndex(isFailedAssistantEntry)
-  if (failedIndex < 0) return undefined
-  const failed = asRecord(input.entries[failedIndex])
-  const failedMessage = asRecord(failed?.["message"])
-  if (failed === undefined || failedMessage === undefined) return undefined
-  if (textContent(failedMessage["content"]).trim().length > 0) return undefined
+  const failedIndex = latestMessageIndex(input.entries)
+  if (failedIndex < 0 || !isFailedAssistantEntry(input.entries[failedIndex], input.source.lastError)) {
+    return undefined
+  }
+  const failedMessage = field(input.entries[failedIndex], "message")
+  if (hasAssistantOutput(field(failedMessage, "content"))) return undefined
 
-  const userIndex = input.entries
-    .slice(0, failedIndex)
-    .findLastIndex(isUserMessageEntry)
-  if (userIndex < 0) return undefined
-  const user = asRecord(input.entries[userIndex])
-  const userMessage = asRecord(user?.["message"])
-  const requestId = stringValue(failed["id"])
-  const latestUser = textContent(userMessage?.["content"]).trim()
-  if (user === undefined || requestId === undefined || latestUser.length === 0) return undefined
+  const userIndex = previousMessageIndex(input.entries, failedIndex)
+  if (userIndex < 0 || field(field(input.entries[userIndex], "message"), "role") !== "user") {
+    return undefined
+  }
+  const requestId = stringValue(field(input.entries[failedIndex], "id"))
+  const latestUser = textContent(field(field(input.entries[userIndex], "message"), "content"), LATEST_USER_MAX_BYTES).trim()
+  if (requestId === undefined || latestUser.length === 0) return undefined
 
-  const priorEntries = input.entries.slice(0, failedIndex)
-  const sectionBudget = Math.floor(input.maxBytes * 0.2)
+  const sectionBudget = Math.max(1, Math.floor(input.maxBytes * 0.2))
   const tailMessageBudget = Math.max(
     1,
     Math.floor(sectionBudget / Math.max(1, input.recentTailMessages)),
   )
+  const context = collectContext({
+    entries: input.entries,
+    userIndex,
+    recentTailMessages: input.recentTailMessages,
+    tailMessageBytes: Math.min(TAIL_MESSAGE_MAX_BYTES, tailMessageBudget),
+    compactionBytes: Math.min(COMPACTION_MAX_BYTES, sectionBudget),
+    todoBytes: Math.min(TODO_MAX_BYTES, sectionBudget),
+  })
   const payload = {
     schema: "omo.fallback-delegate.v1",
-    request_id: requestId,
+    request_id: truncateUtf8(requestId, REQUEST_ID_MAX_BYTES),
     latest_user: truncateUtf8(latestUser, Math.min(LATEST_USER_MAX_BYTES, sectionBudget)),
-    compaction: truncateUtf8(latestCompaction(priorEntries), Math.min(COMPACTION_MAX_BYTES, sectionBudget)),
-    todo: truncateUtf8(latestTodo(priorEntries), Math.min(TODO_MAX_BYTES, sectionBudget)),
-    recent_tail: recentTail(
-      priorEntries,
-      stringValue(user["id"]),
-      input.recentTailMessages,
-      Math.min(TAIL_MESSAGE_MAX_BYTES, tailMessageBudget),
-    ),
+    compaction: context.compaction,
+    todo: context.todo,
+    recent_tail: context.recentTail,
     source: {
       chain_key: truncateUtf8(input.source.chainKey, SOURCE_SELECTOR_MAX_BYTES),
       from: truncateUtf8(input.source.from, SOURCE_SELECTOR_MAX_BYTES),
@@ -74,6 +78,12 @@ export function buildFallbackHandoff(input: {
       payload.todo = shrink(payload.todo)
     } else if (payload.compaction.length > 0) {
       payload.compaction = shrink(payload.compaction)
+    } else if (payload.source.last_error.length > 0) {
+      payload.source.last_error = shrink(payload.source.last_error)
+    } else if (payload.source.chain_key.length > 0) {
+      payload.source.chain_key = shrink(payload.source.chain_key)
+    } else if (payload.source.from.length > 0) {
+      payload.source.from = shrink(payload.source.from)
     } else if (payload.latest_user.length > 0) {
       payload.latest_user = shrink(payload.latest_user)
     } else {
@@ -84,9 +94,120 @@ export function buildFallbackHandoff(input: {
   return { requestId, prompt }
 }
 
-function asRecord(value: unknown): RecordValue | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? Object.fromEntries(Object.entries(value))
+function collectContext(input: {
+  readonly entries: readonly unknown[]
+  readonly userIndex: number
+  readonly recentTailMessages: number
+  readonly tailMessageBytes: number
+  readonly compactionBytes: number
+  readonly todoBytes: number
+}): { readonly compaction: string; readonly todo: string; readonly recentTail: RecentMessage[] } {
+  let compaction = ""
+  let todo = ""
+  for (let index = input.entries.length - 1; index >= 0 && (compaction.length === 0 || todo.length === 0); index -= 1) {
+    const entry = input.entries[index]
+    const type = field(entry, "type")
+    if (compaction.length === 0 && type === "compaction") {
+      const summary = field(entry, "summary")
+      if (typeof summary === "string") compaction = truncateUtf8(summary, input.compactionBytes)
+    }
+    if (todo.length === 0 && type === "custom" && field(entry, "customType") === "senpi.todo-state") {
+      todo = todoText(field(entry, "data"), input.todoBytes)
+    }
+  }
+
+  const recentTail: RecentMessage[] = []
+  for (
+    let index = input.userIndex - 1;
+    index >= 0 && recentTail.length < input.recentTailMessages;
+    index -= 1
+  ) {
+    const entry = input.entries[index]
+    if (field(entry, "type") !== "message") continue
+    const message = field(entry, "message")
+    const role = field(message, "role")
+    if (role !== "user" && role !== "assistant" && role !== "toolResult") continue
+    const content = textContent(field(message, "content"), input.tailMessageBytes).trim()
+    if (content.length > 0) recentTail.unshift({ role, content })
+  }
+  return { compaction, todo, recentTail }
+}
+
+function latestMessageIndex(entries: readonly unknown[]): number {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (field(entries[index], "type") === "message") return index
+  }
+  return -1
+}
+
+function previousMessageIndex(entries: readonly unknown[], before: number): number {
+  for (let index = before - 1; index >= 0; index -= 1) {
+    if (field(entries[index], "type") === "message") return index
+  }
+  return -1
+}
+
+function isFailedAssistantEntry(value: unknown, expectedError: string): boolean {
+  if (field(value, "type") !== "message") return false
+  const message = field(value, "message")
+  const error = field(message, "errorMessage")
+  return (
+    field(message, "role") === "assistant"
+    && (field(message, "stopReason") === "error" || field(message, "stopReason") === "aborted")
+    && typeof error === "string"
+    && error.startsWith(expectedError)
+  )
+}
+
+function hasAssistantOutput(value: unknown): boolean {
+  if (typeof value === "string") return value.trim().length > 0
+  if (!Array.isArray(value)) return value !== undefined && value !== null
+  return value.some((part) => {
+    if (field(part, "type") !== "text") return true
+    const text = field(part, "text")
+    return typeof text !== "string" || text.trim().length > 0
+  })
+}
+
+function textContent(value: unknown, maxBytes: number): string {
+  if (typeof value === "string") return truncateUtf8(value, maxBytes)
+  if (!Array.isArray(value)) return ""
+  let output = ""
+  for (const part of value) {
+    if (field(part, "type") !== "text") continue
+    const text = field(part, "text")
+    if (typeof text !== "string" || text.length === 0) continue
+    const separator = output.length === 0 ? "" : "\n"
+    output = appendBounded(output, `${separator}${text}`, maxBytes)
+    if (Buffer.byteLength(output) >= maxBytes) break
+  }
+  return output
+}
+
+function todoText(value: unknown, maxBytes: number): string {
+  if (field(value, "schema") !== "v2") return ""
+  const phases = field(value, "phases")
+  if (!Array.isArray(phases)) return ""
+  let output = ""
+  outer: for (const phase of phases) {
+    const name = field(phase, "name")
+    const tasks = field(phase, "tasks")
+    if (typeof name !== "string" || !Array.isArray(tasks)) continue
+    output = appendBounded(output, `${output.length === 0 ? "" : "\n"}[${name}]\n`, maxBytes)
+    for (const task of tasks) {
+      const content = field(task, "content")
+      const status = field(task, "status")
+      if (typeof content !== "string" || typeof status !== "string") continue
+      output = appendBounded(output, `- ${status}: ${content}\n`, maxBytes)
+      if (Buffer.byteLength(output) >= maxBytes) break outer
+    }
+  }
+  return output
+}
+
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null
+    ? Reflect.get(value, key)
     : undefined
 }
 
@@ -94,90 +215,9 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined
 }
 
-function isMessageEntry(value: unknown, role: string): boolean {
-  const entry = asRecord(value)
-  const message = asRecord(entry?.["message"])
-  return entry?.["type"] === "message" && message?.["role"] === role
-}
-
-function isUserMessageEntry(value: unknown): boolean {
-  return isMessageEntry(value, "user")
-}
-
-function isFailedAssistantEntry(value: unknown): boolean {
-  if (!isMessageEntry(value, "assistant")) return false
-  const message = asRecord(asRecord(value)?.["message"])
-  return (
-    (message?.["stopReason"] === "error" || message?.["stopReason"] === "aborted")
-    && typeof message["errorMessage"] === "string"
-  )
-}
-
-function textContent(value: unknown): string {
-  if (typeof value === "string") return value
-  if (!Array.isArray(value)) return ""
-  return value
-    .map((part) => {
-      const block = asRecord(part)
-      return block?.["type"] === "text" && typeof block["text"] === "string"
-        ? block["text"]
-        : ""
-    })
-    .filter((text) => text.length > 0)
-    .join("\n")
-}
-
-function latestCompaction(entries: readonly unknown[]): string {
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = asRecord(entries[index])
-    if (entry?.["type"] === "compaction" && typeof entry["summary"] === "string") {
-      return entry["summary"]
-    }
-  }
-  return ""
-}
-
-function latestTodo(entries: readonly unknown[]): string {
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = asRecord(entries[index])
-    if (entry?.["type"] !== "custom" || entry["customType"] !== "senpi.todo-state") continue
-    const data = asRecord(entry["data"])
-    if (data?.["schema"] !== "v2" || !Array.isArray(data["phases"])) return ""
-    const phases = data["phases"].flatMap((phase) => {
-      const value = asRecord(phase)
-      if (typeof value?.["name"] !== "string" || !Array.isArray(value["tasks"])) return []
-      const tasks = value["tasks"].flatMap((task) => {
-        const item = asRecord(task)
-        return typeof item?.["content"] === "string" && typeof item["status"] === "string"
-          ? [{ content: item["content"], status: item["status"] }]
-          : []
-      })
-      return [{ name: value["name"], tasks }]
-    })
-    return JSON.stringify({ schema: "v2", phases })
-  }
-  return ""
-}
-
-function recentTail(
-  entries: readonly unknown[],
-  latestUserId: string | undefined,
-  limit: number,
-  messageMaxBytes: number,
-): Array<{ role: string; content: string }> {
-  if (limit === 0) return []
-  return entries
-    .flatMap((entry) => {
-      const value = asRecord(entry)
-      const message = asRecord(value?.["message"])
-      if (value?.["type"] !== "message" || value["id"] === latestUserId || message === undefined) return []
-      if (message["role"] !== "user" && message["role"] !== "assistant" && message["role"] !== "toolResult") return []
-      const content = textContent(message["content"]).trim()
-      return content.length === 0
-        ? []
-        : [{ role: message["role"], content: truncateUtf8(content, messageMaxBytes) }]
-    })
-    .slice(-limit)
+function appendBounded(current: string, addition: string, maxBytes: number): string {
+  const remaining = maxBytes - Buffer.byteLength(current)
+  return remaining <= 0 ? current : current + truncateUtf8(addition, remaining)
 }
 
 function shrink(value: string): string {

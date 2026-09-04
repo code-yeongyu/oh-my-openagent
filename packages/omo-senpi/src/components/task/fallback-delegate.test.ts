@@ -59,16 +59,19 @@ function event(selector = ULTRAFAST): Record<string, unknown> {
   }
 }
 
-function entries(options: { readonly partialOutput?: boolean; readonly includeRequest?: boolean } = {}): unknown[] {
+function entries(options: {
+  readonly partialOutput?: boolean
+  readonly includeRequest?: boolean
+  readonly assistantContent?: readonly unknown[]
+  readonly errorMessage?: string
+} = {}): unknown[] {
   const includeRequest = options.includeRequest ?? true
   return [
-    ...(includeRequest
-      ? [{
-          type: "message",
-          id: "user-old",
-          message: { role: "user", content: [{ type: "text", text: "earlier request" }] },
-        }]
-      : []),
+    {
+      type: "message",
+      id: "user-old",
+      message: { role: "user", content: [{ type: "text", text: "earlier request" }] },
+    },
     {
       type: "message",
       id: "assistant-old",
@@ -100,9 +103,10 @@ function entries(options: { readonly partialOutput?: boolean; readonly includeRe
       id: "assistant-failed",
       message: {
         role: "assistant",
-        content: options.partialOutput ? [{ type: "text", text: "visible partial answer" }] : [],
+        content: options.assistantContent
+          ?? (options.partialOutput ? [{ type: "text", text: "visible partial answer" }] : []),
         stopReason: "error",
-        errorMessage: "provider request failed",
+        errorMessage: options.errorMessage ?? "provider request failed",
       },
     },
   ]
@@ -237,6 +241,66 @@ describe("context fallback delegate", () => {
     expect(Buffer.byteLength(prompt)).toBeLessThanOrEqual(8192)
   })
 
+  it("#given the minimum valid handoff cap and oversized source diagnostics #when exhaustion dispatches #then one bounded child still starts", async () => {
+    const pi = new FakeExtensionAPI()
+    const childManager = manager()
+    const oversized = {
+      ...event(),
+      chainKey: "체인".repeat(2_000),
+      from: "모델".repeat(2_000),
+      lastError: "오류".repeat(10_000),
+    }
+    wireFallbackDelegate(pi, {
+      manager: childManager,
+      settings: settings({ max_handoff_bytes: 1024 }),
+      logger: logger(),
+      isRpcChild: () => false,
+    })
+
+    await pi.dispatch(
+      "retry_fallback_exhausted",
+      oversized,
+      context(entries({ errorMessage: oversized.lastError })),
+    )
+    await Promise.resolve()
+
+    expect(childManager.specs).toHaveLength(1)
+    expect(Buffer.byteLength(childManager.specs[0]?.prompt ?? "")).toBeLessThanOrEqual(1024)
+  })
+
+  it("#given a huge old history #when a one-message tail is requested #then old message bodies are never materialized", async () => {
+    const pi = new FakeExtensionAPI()
+    const childManager = manager()
+    const inaccessible = {
+      type: "message",
+      id: "assistant-too-old",
+      message: {
+        role: "assistant",
+        get content(): never {
+          throw new Error("old history content was materialized")
+        },
+      },
+    }
+    const source = entries()
+    source.splice(1, 0, inaccessible, ...Array.from({ length: 100_000 }, (_, index) => ({
+      type: "custom",
+      id: `old-${index}`,
+      customType: "old-state",
+      data: index,
+    })))
+    wireFallbackDelegate(pi, {
+      manager: childManager,
+      settings: settings({ recent_tail_messages: 1 }),
+      logger: logger(),
+      isRpcChild: () => false,
+    })
+
+    await pi.dispatch("retry_fallback_exhausted", event(), context(source))
+    await Promise.resolve()
+
+    expect(childManager.specs).toHaveLength(1)
+  })
+
   it("#given guarded contexts #when exhaustion dispatches #then no child starts", async () => {
     const cases = [
       {
@@ -258,6 +322,20 @@ describe("context fallback delegate", () => {
         settings: settings(),
         event: event(),
         entries: entries({ partialOutput: true }),
+        isRpcChild: false,
+      },
+      {
+        name: "provider-native partial output",
+        settings: settings(),
+        event: event(),
+        entries: entries({ assistantContent: [{ type: "providerNative", value: { id: "response-1" } }] }),
+        isRpcChild: false,
+      },
+      {
+        name: "tool-call partial output",
+        settings: settings(),
+        event: event(),
+        entries: entries({ assistantContent: [{ type: "toolCall", id: "call-1", name: "write", arguments: {} }] }),
         isRpcChild: false,
       },
       {
