@@ -463,6 +463,14 @@ jobs:
           npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
           bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
           bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
+          echo "::group::Fixture-vs-rebuild diagnostic"
+          set +e
+          bun test --timeout 20000 --preload ./script/ci-keep-build-temps.preload.ts packages/omo-senpi/plugin/scripts/build-extension.test.mjs 2>&1 | grep -E '^\s*[0-9]+ (pass|fail)|\(fail\)'
+          set -e
+          ls -d .build-check-* .build-extension-test-* 2>/dev/null || echo '<no kept trees>'
+          node script/ci-fixture-diff.cjs
+          rm -rf .build-check-* .build-extension-test-*
+          echo "::endgroup::"
           bun test --timeout 20000 packages/omo-senpi
 
       - name: Run Senpi compatibility tests with Windows telemetry
