@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "./index"
-import { activeStatus, createLogger, isTransformResult, sessionEventCtx, statusArgsFor } from "./ulw-loop.test-support"
+import { activeStatus, createLogger, sessionEventCtx, statusArgsFor, TEST_SESSION_ID } from "./ulw-loop.test-support"
 
 describe("omo-senpi ulw-loop plan directory guard", () => {
   function withTempCwd(run: (cwd: string) => Promise<void>): Promise<void> {
@@ -42,7 +42,7 @@ describe("omo-senpi ulw-loop plan directory guard", () => {
     })
   })
 
-  it("#given an unscoped plan in .omo/ulw-loop #when queued user input arrives #then the steering reminder is still injected", async () => {
+  it("#given an unscoped plan in .omo/ulw-loop #when queued user input arrives #then no toolkit process is spawned", async () => {
     await withTempCwd(async (cwd) => {
       mkdirSync(join(cwd, ".omo", "ulw-loop"), { recursive: true })
       writeFileSync(join(cwd, ".omo", "ulw-loop", "goals.json"), activeStatus())
@@ -50,17 +50,27 @@ describe("omo-senpi ulw-loop plan directory guard", () => {
 
       const results = await pi.dispatch("input", steeringInput, sessionEventCtx(cwd))
 
-      expect(calls).toEqual([{ bin: "/tmp/omo", args: statusArgsFor(), cwd }])
-      const transformed = results[0]
-      if (!isTransformResult(transformed)) throw new Error("expected transform result")
-      expect(transformed.text).toContain("<omo-senpi-ulw-loop>")
+      expect(calls).toEqual([])
+      expect(results).toEqual([{ action: "continue" }])
+    })
+  })
+
+  it("#given .omo/ulw-loop exists but <sessionId>/goals.json does not #when queued user input arrives #then no toolkit process is spawned", async () => {
+    await withTempCwd(async (cwd) => {
+      mkdirSync(join(cwd, ".omo", "ulw-loop"), { recursive: true })
+      const { pi, calls } = await registerWithRealPlanLookup(cwd)
+
+      const results = await pi.dispatch("input", steeringInput, sessionEventCtx(cwd))
+
+      expect(calls).toEqual([])
+      expect(results).toEqual([{ action: "continue" }])
     })
   })
 
   it("#given only a session-scoped plan under .omo/ulw-loop #when queued user input arrives #then the toolkit is still consulted", async () => {
     await withTempCwd(async (cwd) => {
-      mkdirSync(join(cwd, ".omo", "ulw-loop", "session-abc"), { recursive: true })
-      writeFileSync(join(cwd, ".omo", "ulw-loop", "session-abc", "goals.json"), activeStatus())
+      mkdirSync(join(cwd, ".omo", "ulw-loop", TEST_SESSION_ID), { recursive: true })
+      writeFileSync(join(cwd, ".omo", "ulw-loop", TEST_SESSION_ID, "goals.json"), activeStatus())
       const { pi, calls } = await registerWithRealPlanLookup(cwd)
 
       await pi.dispatch("input", steeringInput, sessionEventCtx(cwd))

@@ -39,6 +39,9 @@ const secrets = [
 ]
 
 type Fixture = { root: string; home: string; agentDir: string; xdg: string; launcher: string }
+type DatabaseHandle = { readonly isOpen: boolean }
+
+const databaseHandles: DatabaseHandle[] = []
 
 function write(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -48,10 +51,12 @@ function write(path: string, content: string): void {
 async function database(path: string, version: number, rows: Array<[string, string, string, string | null]>): Promise<void> {
   mkdirSync(dirname(path), { recursive: true })
   const DatabaseSync = await loadDatabaseSync()
+  const db = new DatabaseSync(path)
+  databaseHandles.push(db)
   // withDatabase closes the handle on every exit path (including a throwing exec/run) and tracks it
   // for teardown, so no Windows file handle inside the temp root can outlive the fixture.
-  withDatabase(new DatabaseSync(path), (db) => {
-    db.exec(`
+  withDatabase(db, (database) => {
+    database.exec(`
       CREATE TABLE auth_schema_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL);
       INSERT INTO auth_schema_version VALUES (1, ${version});
       CREATE TABLE auth_credentials (
@@ -59,7 +64,7 @@ async function database(path: string, version: number, rows: Array<[string, stri
         data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
       );
     `)
-    const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
+    const insert = database.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
     for (const [provider, type, key, disabled] of rows) {
       insert.run(provider, type, JSON.stringify({ key }), disabled)
     }
@@ -131,6 +136,7 @@ afterEach(() => {
   } finally {
     // A leaking-secret assertion must not also leak the temp roots for the rest of the run.
     transcripts.length = 0
+    databaseHandles.length = 0
     teardownRoots(roots)
   }
 })
@@ -187,6 +193,7 @@ describe("omo setup credential inheritance", () => {
     expect(unknownResult.status).toBe(0)
     expect(unknownResult.stdout).toContain("auth schema version 99 is unknown")
     expect(existsSync(join(unknown.agentDir, "auth.json"))).toBe(false)
+    expect(databaseHandles.map((database) => database.isOpen)).toEqual([false, false, false])
   })
 
   test("#given an existing senpi provider #when other keys import #then its entry stays structurally byte-identical", () => {

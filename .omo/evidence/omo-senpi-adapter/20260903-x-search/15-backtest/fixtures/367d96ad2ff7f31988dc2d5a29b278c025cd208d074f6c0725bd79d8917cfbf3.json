@@ -1,0 +1,349 @@
+{
+  "queryId": "q19",
+  "lane": "web",
+  "variant": "v2",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Bun runtime performance since:2026-08-10 until:2026-08-24\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-10",
+        "to_date": "2026-08-24"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422650,
+    "completed_at": 1788422650,
+    "id": "ae00d815-966e-9487-b5d4-d09da577a407",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_ae00d815-966e-9487-b5d4-d09da577a407_call-9c04a49c-debb-4037-956e-e32faa9ffe92-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "Bun runtime performance",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://bun.com/docs/project/benchmarking"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/docs/runtime"
+            },
+            {
+              "type": "url",
+              "url": "https://blog.platformatic.dev/bun-is-fast-until-latency-matters-for-nextjs-workloads"
+            },
+            {
+              "type": "url",
+              "url": "https://daily.dev/posts/bun-1-4-nz2dmgftt"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.0"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://dev.to/fbio_reis_355b87b508598e/bun-http-server-1-in-mixed-workloads-41-in-pipelining-the-full-picture-httparena-deep-dive-4h6e"
+            },
+            {
+              "type": "url",
+              "url": "https://www.bunjs.com.cn/runtime/"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.sh/docs/runtime.md"
+            },
+            {
+              "type": "url",
+              "url": "https://raw.githubusercontent.com/renxqoo/TokenLens/main/docs/benchmark-2026-08-21-bun-vs-node.md"
+            },
+            {
+              "type": "url",
+              "url": "https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=i38DgEuaJwM"
+            },
+            {
+              "type": "url",
+              "url": "https://r.jina.ai/https:/bun.com/"
+            },
+            {
+              "type": "url",
+              "url": "https://appwrite.io/blog/post/announcing-bun-1-4-runtime"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_ae00d815-966e-9487-b5d4-d09da577a407_call-9c04a49c-debb-4037-956e-e32faa9ffe92-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**Bun** is a fast all-in-one JavaScript/TypeScript runtime, bundler, package manager, and test runner. It uses Apple's **JavaScriptCore** engine (instead of V8 like Node.js) and has its transpiler/runtime written in Rust (as of Bun 1.4, rewritten from Zig). This design prioritizes **fast startup**, low overhead, and high throughput, especially for scripts, HTTP servers, and developer workflows.[[1]](https://bun.com/docs/runtime)\n\n### Startup Performance\nBun consistently starts significantly faster than Node.js:\n- On Linux: A simple `hello.js` starts in **~5.1–5.2 ms** with Bun vs. **~25–27 ms** with Node.js (roughly **4–5x faster**).[[2]](https://bun.com/docs/project/benchmarking)\n- On Windows (Bun 1.4): **15.5 ms** vs. Node.js **40.1 ms** (2.5x faster).[[3]](https://bun.com/blog/bun-v1.4)\n- `bun run` for package scripts: Often **~6–7 ms** vs. **~170–260 ms** for `npm run`, `yarn`, or `pnpm` (up to **25–40x faster** in some cases).[[4]](https://bun.com/blog/bun-v1.0)\n\nBun 1.4 further improved startup by ~50% on Linux and 2.5x on Windows compared to 1.3, with lower peak memory (e.g., ~14–17 MB for hello world vs. higher for Node).[[3]](https://bun.com/blog/bun-v1.4)\n\n### Runtime & Memory Improvements (Bun 1.4)\nThe 1.4 release (August 2026) rewrote the runtime in Rust, delivering major gains:\n- **Idle CPU usage**: Reduced by up to **5x**.\n- **HTTP server memory**: **13–48% lower** peak usage under load (e.g., Fastify: 233 MB → 120 MB; Express: 169 MB → 92 MB; Next.js: 397 MB → 285 MB). Bun often beats Node.js in memory efficiency.[[3]](https://bun.com/blog/bun-v1.4)\n- **Production gains**: In real deployments (e.g., Claude Code or Scrydon services), CPU dropped ~50% and memory ~60% in some cases, with better stability and no memory leaks.[[5]](https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/)\n\nThe `--smol` flag trades some performance for even lower memory in constrained environments by running the GC more frequently.[[1]](https://bun.com/docs/runtime)\n\n### HTTP Server & Throughput Benchmarks\nBun's `Bun.serve()` (and frameworks like Elysia/Hono on Bun) excels in many scenarios:\n- **Express over HTTPS**: ~48k req/s (Bun 1.4) vs. ~25k (Node 26) and ~19k (Deno) — nearly 2x Node, with lower memory (~105 MB vs. 142 MB).[[6]](https://r.jina.ai/https:/bun.com/)\n- **Mixed workloads** (JSON, compression, static files, DB queries): Ranked **#1** in HttpArena benchmarks, beating even some Rust servers like go-fasthttp while using far less memory (e.g., 6.1 GiB vs. 80+ GiB). Also **#2 in compression** and top 10 in JSON.[[7]](https://dev.to/fbio_reis_355b87b508598e/bun-http-server-1-in-mixed-workloads-41-in-pipelining-the-full-picture-httparena-deep-dive-4h6e)\n- **Database queries** (Postgres): ~20k queries/s with Bun.sql vs. ~10k for Node/Deno.[[6]](https://r.jina.ai/https:/bun.com/)\n- **WebSockets**: Extremely high throughput (millions of messages/sec in some tests).[[6]](https://r.jina.ai/https:/bun.com/)\n\n**Caveats**: Performance varies by workload. One benchmark on Next.js-like latency-sensitive loads showed Bun with higher average latency (~246 ms) and worse tail latency (p99 ~974 ms) compared to Deno (~11–14 ms) and Node (~20 ms), suggesting it may not always win in high-latency or certain pipelined/ upload scenarios.[[8]](https://blog.platformatic.dev/bun-is-fast-until-latency-matters-for-nextjs-workloads) It ranked lower (#41) in pure pipelining tests.[[7]](https://dev.to/fbio_reis_355b87b508598e/bun-http-server-1-in-mixed-workloads-41-in-pipelining-the-full-picture-httparena-deep-dive-4h6e)\n\n### Other Areas\n- **Bundling**: Bun's bundler is often 1.75x faster than esbuild and orders of magnitude faster than Webpack/Rollup/Parcel.[[4]](https://bun.com/blog/bun-v1.0)\n- **Testing**: `bun test` can be 8–13x faster than Jest/Vitest in some suites.[[4]](https://bun.com/blog/bun-v1.0)\n- **FFI & Streams**: Major gains in Bun 1.4 (e.g., FFI up to ~3–4x faster; native streams and compression with high throughput and low memory).[[9]](https://daily.dev/posts/bun-1-4-nz2dmgftt)\n- **Real-world**: In production services and build pipelines (e.g., Next.js apps), Bun 1.4 reduces build times, CPU, and memory significantly vs. prior versions or Node.[[10]](https://appwrite.io/blog/post/announcing-bun-1-4-runtime)\n\n### Summary\nBun shines in **startup speed**, **developer tooling**, **memory efficiency**, and **high-throughput HTTP/mixed workloads**, often outperforming Node.js and Deno in these areas (especially post-1.4). It may trail in specific latency-sensitive or niche scenarios. Benchmarks are workload-dependent—check the official `/bench` directory or tools like mitata, hyperfine, or bombardier for your use case. The project continues rapid iteration on compatibility (now passing thousands more Node tests) and performance.[[2]](https://bun.com/docs/project/benchmarking)\n\nFor the latest numbers, see the Bun blog, docs, or independent benchmarks, as results evolve with releases.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/docs/runtime",
+                "start_index": 397,
+                "end_index": 432,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/docs/project/benchmarking",
+                "start_index": 641,
+                "end_index": 689,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 764,
+                "end_index": 800,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.0",
+                "start_index": 945,
+                "end_index": 981,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 1147,
+                "end_index": 1183,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 1554,
+                "end_index": 1590,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://scrydon.com/insights/2026/08/21/bun-1-4-at-scrydon/",
+                "start_index": 1766,
+                "end_index": 1832,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/docs/runtime",
+                "start_index": 1960,
+                "end_index": 1995,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://r.jina.ai/https:/bun.com/",
+                "start_index": 2263,
+                "end_index": 2303,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://dev.to/fbio_reis_355b87b508598e/bun-http-server-1-in-mixed-workloads-41-in-pipelining-the-full-picture-httparena-deep-dive-4h6e",
+                "start_index": 2563,
+                "end_index": 2705,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://r.jina.ai/https:/bun.com/",
+                "start_index": 2792,
+                "end_index": 2832,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://r.jina.ai/https:/bun.com/",
+                "start_index": 2918,
+                "end_index": 2958,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://blog.platformatic.dev/bun-is-fast-until-latency-matters-for-nextjs-workloads",
+                "start_index": 3281,
+                "end_index": 3372,
+                "title": "8"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://dev.to/fbio_reis_355b87b508598e/bun-http-server-1-in-mixed-workloads-41-in-pipelining-the-full-picture-httparena-deep-dive-4h6e",
+                "start_index": 3420,
+                "end_index": 3562,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.0",
+                "start_index": 3703,
+                "end_index": 3739,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.0",
+                "start_index": 3818,
+                "end_index": 3854,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://daily.dev/posts/bun-1-4-nz2dmgftt",
+                "start_index": 3998,
+                "end_index": 4046,
+                "title": "9"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://appwrite.io/blog/post/announcing-bun-1-4-runtime",
+                "start_index": 4216,
+                "end_index": 4280,
+                "title": "10"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/docs/project/benchmarking",
+                "start_index": 4806,
+                "end_index": 4854,
+                "title": "2"
+              }
+            ]
+          }
+        ],
+        "id": "msg_ae00d815-966e-9487-b5d4-d09da577a407",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 152061500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 152061500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:04:06.612Z"
+}

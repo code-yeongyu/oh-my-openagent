@@ -1,0 +1,41 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/runtime-dependency-resolution.test.ts:
+27 |   }
+28 | })
+29 | 
+30 | describe("omo-senpi local-path runtime dependencies", () => {
+31 |   test("packageNameOf resolves package names from subpath imports", () => {
+32 |     expect(packageNameOf("typebox/value")).toBe("typebox")
+                                                ^
+error: expect(received).toBe(expected)
+
+Expected: "typebox"
+Received: "typebox/value"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/runtime-dependency-resolution.test.ts:32:44)
+(fail) omo-senpi local-path runtime dependencies > packageNameOf resolves package names from subpath imports [2.85ms]
+38 |     const manifest = readPackageManifest()
+39 |     const runtimePackages = collectPackageNames(manifest.dependencies)
+40 |     const peerPackages = collectPackageNames(manifest.peerDependencies)
+41 |     const runtimeImports = externalImports.filter((specifier) => !peerPackages.has(packageNameOf(specifier)))
+42 | 
+43 |     expect(runtimeImports.filter((specifier) => !runtimePackages.has(packageNameOf(specifier)))).toEqual([])
+                                                                                                      ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "typebox/value",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/runtime-dependency-resolution.test.ts:43:98)
+(fail) omo-senpi local-path runtime dependencies > #given a symlinked plugin without host hoisting #when Node imports its runtime dependencies #then each resolves from the real path [6.52ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [1.53s]

@@ -433,6 +433,12 @@ describe("omo-senpi ultrawork component", () => {
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("team_create")
   })
 
+  it("#given the eval guidance #when the shipped directive is inspected #then it defers Bun skill availability to the runtime signal", () => {
+    expect(SENPI_ULTRAWORK_DIRECTIVE).not.toContain("kernel is Bun 1.4")
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/If the\s+eval tool reports a Bun kernel/)
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/the `bun-1-4` skill is listed/)
+  })
+
   it("#given generated directive #when embed script runs check #then passes without drift", () => {
     // given
     const command = ["node", "packages/omo-senpi/plugin/scripts/embed-directive.mjs", "--check"]

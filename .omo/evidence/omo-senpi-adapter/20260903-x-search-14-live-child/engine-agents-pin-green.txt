@@ -1,0 +1,17 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/task/engine-agents.test.ts:
+(pass) task engine builtin agent overlay > #given no omo.json agents #when the engine resolves agents #then the builtin curated agents are present [4.82ms]
+(pass) task engine builtin agent overlay > #given an omo.json model override for a builtin agent #when the engine resolves agents #then the model wins and the builtin prompt and allowlist survive [3.17ms]
+(pass) task engine builtin agent overlay > #given an omo.json-only agent #when the engine resolves agents #then it is appended alongside the builtins [1.51ms]
+(pass) task engine builtin agent overlay > #given a process override for a curated agent #when the engine resolves agents #then in-process execution remains pinned [1.67ms]
+(pass) task engine builtin agent overlay > #given a process override for a reviewer agent #when the engine resolves agents #then in-process execution remains pinned [1.28ms]
+(pass) task engine builtin agent overlay > #given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable [1.66ms]
+(pass) task engine builtin agent overlay > #given the default engine agents #when the task tool description renders #then plain builtins are advertised and the plan-gated tier is classified separately [1.21ms]
+(pass) task engine builtin agent overlay > #given agents.momus.disable in omo.json #when the description renders #then momus is hidden and the other three stay listed [1.59ms]
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [2.87s]
+[captured bun exit: 0]

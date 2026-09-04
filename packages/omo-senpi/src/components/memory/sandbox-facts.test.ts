@@ -108,6 +108,7 @@ describe("facts sandbox agent lockfile grants", () => {
     const setup = fixture()
     const settingsLock = join(setup.agentDirReal, "settings.json.lock")
     const authLock = join(setup.agentDirReal, "auth.json.lock")
+    const hooksStateLock = join(setup.agentDirReal, "hooks-state.json.lock")
     expect(existsSync(settingsLock)).toBe(false)
     expect(existsSync(authLock)).toBe(false)
 
@@ -119,6 +120,7 @@ describe("facts sandbox agent lockfile grants", () => {
     // neither path exists before the child runs, so neither may be realpath-canonicalized.
     expect(profile).toContain(`(allow file-write* (literal ${JSON.stringify(settingsLock)}) (subpath ${JSON.stringify(settingsLock)}))`)
     expect(profile).toContain(`(allow file-write* (literal ${JSON.stringify(authLock)}) (subpath ${JSON.stringify(authLock)}))`)
+    expect(profile).toContain(`(allow file-write* (literal ${JSON.stringify(hooksStateLock)}) (subpath ${JSON.stringify(hooksStateLock)}))`)
     expect(existsSync(settingsLock)).toBe(false)
     expect(existsSync(authLock)).toBe(false)
   }, 30_000)

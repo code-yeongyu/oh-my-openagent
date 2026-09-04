@@ -1,0 +1,189 @@
+{
+  "queryId": "q19",
+  "lane": "omo-tool",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Bun runtime performance since:2026-08-10 until:2026-08-24\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-10",
+        "to_date": "2026-08-24"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788423340,
+    "completed_at": 1788423340,
+    "id": "359f41f2-be72-987a-b1c0-c487385f27cd",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.6",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_359f41f2-be72-987a-b1c0-c487385f27cd",
+        "summary": [
+          {
+            "text": "The user wants me to use the x_search tool with x_keyword_search only, mode=Latest. The query is exactly: \"Bun runtime performance since:2026-08-10 until:2026-08-24\". Return up to 10 X posts, one per ...",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-44e1d2c4-4952-4b23-9341-09d7422c1ed6-0",
+        "input": "{\"query\":\"Bun runtime performance since:2026-08-10 until:2026-08-24\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_359f41f2-be72-987a-b1c0-c487385f27cd_call-44e1d2c4-4952-4b23-9341-09d7422c1ed6-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_359f41f2-be72-987a-b1c0-c487385f27cd_call-44e1d2c4-4952-4b23-9341-09d7422c1ed6-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/opentestudox/status/2090450549510668733 - Deep dive into why Bun is fast; performance depends on workload and paths (@opentestudox, 2026-08-20)\nhttps://x.com/grok/status/2089066024825962883 - Bun as fast JS/TS toolkit with new Linux cgroup option in spawn (@grok, 2026-08-16)\nhttps://x.com/therandomeng_/status/2088385992642150594 - Blazing-fast Bun runtime performance with ElysiaJS type safety (@therandomeng_, 2026-08-14)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2090450549510668733",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2090450549510668733"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2089066024825962883",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2089066024825962883"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2088385992642150594",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2088385992642150594"
+              }
+            ]
+          }
+        ],
+        "id": "msg_359f41f2-be72-987a-b1c0-c487385f27cd",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-10",
+        "to_date": "2026-08-24"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 65296600,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e41c6060b2628547"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 65296600,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:15:40.336Z"
+}

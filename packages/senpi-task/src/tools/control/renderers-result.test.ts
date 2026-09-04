@@ -24,6 +24,7 @@ type SendResultRenderCase = readonly [name: string, details: SendResultDetails, 
 const SEND_RESULT_RENDER_CASES = [
   ["steered", { kind: "steered", task_id: "st_1", status: "running", delivered: "steer" }, "[accent]task_send delivered st_1 as steer (running)[/accent]"],
   ["revived", { kind: "revived", task_id: "st_1", run_epoch: 2 }, "[success]task_send revived st_1 epoch 2[/success]"],
+  ["delivery_uncertain", { kind: "delivery_uncertain", task_id: "st_1", run_epoch: 2, reason: "Child exited.", suggestion: "Inspect output." }, "[warning]task_send delivery uncertain st_1 epoch 2: Child exited. Inspect output.[/warning]"],
   ["queued", { kind: "queued", task_id: "st_1", queue_position: 3 }, "[muted]task_send queued st_1 position 3[/muted]"],
   ["not_continuable", { kind: "not_continuable", task_id: "st_1", reason: "Task is cancelled.", suggestion: "Start a new task." }, "[warning]task_send not continuable st_1: Task is cancelled. Start a new task.[/warning]"],
   ["scope_denied", { kind: "scope_denied", task_id: "st_1", owning_session_id: "owner", reason: "Denied." }, "[error]task_send denied st_1 owner:owner[/error]"],

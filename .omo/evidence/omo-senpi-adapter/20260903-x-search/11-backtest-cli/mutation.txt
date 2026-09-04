@@ -1,0 +1,36 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:
+58 |     expect(result.code).toBe(0);
+59 |     expect(result.stderr).toBe("");
+60 |     const report = await Bun.file(join(out, "report.json")).json();
+61 |     expect(report.queries.find((q) => q.id === "q01").lanes["grok-cli"].status).toBe("blocked_auth");
+62 |     expect(report.queries.find((q) => q.id === "q03").lanes["api-direct"].status).toBe("missing_fixture");
+63 |     expect(report.queries.find((q) => q.id === "q01").lanes["grok-cli"].jaccard).toBe(null);
+                                                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: null
+Received: 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:63:82)
+(fail) x-search backtest CLI > offline reports blocked and missing as NA, tunes, scores holdout, and never fetches [25.81ms]
+
+ 0 pass
+ 1 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [519.00ms]
+
+MUTATED_EXIT_CODE=1
+RESTORED=1
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:
+(pass) x-search backtest CLI > offline reports blocked and missing as NA, tunes, scores holdout, and never fetches [26.48ms]
+
+ 1 pass
+ 0 fail
+ 8 expect() calls
+Ran 1 test across 1 file. [498.00ms]
+
+RESTORED_EXIT_CODE=0

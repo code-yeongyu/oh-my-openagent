@@ -803,51 +803,6 @@
         "additionalProperties": false
       }
     },
-    "codegraph": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "default": true,
-          "type": "boolean"
-        },
-        "auto_provision": {
-          "default": true,
-          "type": "boolean"
-        },
-        "daemon": {
-          "default": true,
-          "type": "boolean"
-        },
-        "telemetry": {
-          "default": false,
-          "type": "boolean"
-        },
-        "install_dir": {
-          "type": "string"
-        },
-        "watch_debounce_ms": {
-          "type": "number",
-          "minimum": 0
-        },
-        "excluded_roots": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "session_start_cooldown_ms": {
-          "type": "number",
-          "minimum": 60000
-        }
-      },
-      "required": [
-        "enabled",
-        "auto_provision",
-        "daemon",
-        "telemetry"
-      ],
-      "additionalProperties": false
-    },
     "git_master": {
       "type": "object",
       "properties": {
@@ -2010,7 +1965,7 @@
           "type": "boolean"
         },
         "telemetry": {
-          "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry.",
+          "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable.",
           "type": "boolean"
         },
         "model_fallback": {
@@ -11469,50 +11424,6 @@
           ],
           "additionalProperties": false
         },
-        "codegraph": {
-          "type": "object",
-          "properties": {
-            "auto_init": {
-              "default": true,
-              "type": "boolean"
-            },
-            "auto_provision": {
-              "default": true,
-              "type": "boolean"
-            },
-            "daemon": {
-              "default": true,
-              "type": "boolean"
-            },
-            "enabled": {
-              "default": true,
-              "type": "boolean"
-            },
-            "excluded_roots": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "install_dir": {
-              "type": "string"
-            },
-            "telemetry": {
-              "type": "boolean"
-            },
-            "watch_debounce_ms": {
-              "type": "number",
-              "minimum": 0
-            }
-          },
-          "required": [
-            "auto_init",
-            "auto_provision",
-            "daemon",
-            "enabled"
-          ],
-          "additionalProperties": false
-        },
         "team_mode": {
           "type": "object",
           "properties": {
@@ -12660,41 +12571,6 @@
             },
             "additionalProperties": false
           }
-        },
-        "codegraph": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "auto_provision": {
-              "type": "boolean"
-            },
-            "daemon": {
-              "type": "boolean"
-            },
-            "telemetry": {
-              "type": "boolean"
-            },
-            "install_dir": {
-              "type": "string"
-            },
-            "watch_debounce_ms": {
-              "type": "number",
-              "minimum": 0
-            },
-            "excluded_roots": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "session_start_cooldown_ms": {
-              "type": "number",
-              "minimum": 60000
-            }
-          },
-          "additionalProperties": false
         },
         "git_master": {
           "type": "object",
@@ -14322,41 +14198,6 @@
             },
             "additionalProperties": false
           }
-        },
-        "codegraph": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "auto_provision": {
-              "type": "boolean"
-            },
-            "daemon": {
-              "type": "boolean"
-            },
-            "telemetry": {
-              "type": "boolean"
-            },
-            "install_dir": {
-              "type": "string"
-            },
-            "watch_debounce_ms": {
-              "type": "number",
-              "minimum": 0
-            },
-            "excluded_roots": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "session_start_cooldown_ms": {
-              "type": "number",
-              "minimum": 60000
-            }
-          },
-          "additionalProperties": false
         },
         "git_master": {
           "type": "object",
@@ -15991,41 +15832,6 @@
               "additionalProperties": false
             }
           },
-          "codegraph": {
-            "type": "object",
-            "properties": {
-              "enabled": {
-                "type": "boolean"
-              },
-              "auto_provision": {
-                "type": "boolean"
-              },
-              "daemon": {
-                "type": "boolean"
-              },
-              "telemetry": {
-                "type": "boolean"
-              },
-              "install_dir": {
-                "type": "string"
-              },
-              "watch_debounce_ms": {
-                "type": "number",
-                "minimum": 0
-              },
-              "excluded_roots": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "session_start_cooldown_ms": {
-                "type": "number",
-                "minimum": 60000
-              }
-            },
-            "additionalProperties": false
-          },
           "git_master": {
             "type": "object",
             "properties": {
@@ -16952,7 +16758,7 @@
                 "type": "boolean"
               },
               "telemetry": {
-                "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry.",
+                "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable.",
                 "type": "boolean"
               },
               "model_fallback": {
@@ -26411,50 +26217,6 @@
                 ],
                 "additionalProperties": false
               },
-              "codegraph": {
-                "type": "object",
-                "properties": {
-                  "auto_init": {
-                    "default": true,
-                    "type": "boolean"
-                  },
-                  "auto_provision": {
-                    "default": true,
-                    "type": "boolean"
-                  },
-                  "daemon": {
-                    "default": true,
-                    "type": "boolean"
-                  },
-                  "enabled": {
-                    "default": true,
-                    "type": "boolean"
-                  },
-                  "excluded_roots": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "install_dir": {
-                    "type": "string"
-                  },
-                  "telemetry": {
-                    "type": "boolean"
-                  },
-                  "watch_debounce_ms": {
-                    "type": "number",
-                    "minimum": 0
-                  }
-                },
-                "required": [
-                  "auto_init",
-                  "auto_provision",
-                  "daemon",
-                  "enabled"
-                ],
-                "additionalProperties": false
-              },
               "team_mode": {
                 "type": "object",
                 "properties": {
@@ -27602,41 +27364,6 @@
                   },
                   "additionalProperties": false
                 }
-              },
-              "codegraph": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean"
-                  },
-                  "auto_provision": {
-                    "type": "boolean"
-                  },
-                  "daemon": {
-                    "type": "boolean"
-                  },
-                  "telemetry": {
-                    "type": "boolean"
-                  },
-                  "install_dir": {
-                    "type": "string"
-                  },
-                  "watch_debounce_ms": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "excluded_roots": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "session_start_cooldown_ms": {
-                    "type": "number",
-                    "minimum": 60000
-                  }
-                },
-                "additionalProperties": false
               },
               "git_master": {
                 "type": "object",
@@ -29264,41 +28991,6 @@
                   },
                   "additionalProperties": false
                 }
-              },
-              "codegraph": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean"
-                  },
-                  "auto_provision": {
-                    "type": "boolean"
-                  },
-                  "daemon": {
-                    "type": "boolean"
-                  },
-                  "telemetry": {
-                    "type": "boolean"
-                  },
-                  "install_dir": {
-                    "type": "string"
-                  },
-                  "watch_debounce_ms": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "excluded_roots": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "session_start_cooldown_ms": {
-                    "type": "number",
-                    "minimum": 60000
-                  }
-                },
-                "additionalProperties": false
               },
               "git_master": {
                 "type": "object",

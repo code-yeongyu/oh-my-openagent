@@ -1,0 +1,5 @@
+Command: bun run test:senpi
+Verified source head: ba455bc1c9a60acc354915f909d89fd2cb338dc4
+Exit: 0
+Package suite: 2567 pass, 7 platform-specific skips, 0 fail; 8219 assertions across 338 files.
+Evidence resolver suite: 10 pass, 0 fail; 31 assertions.

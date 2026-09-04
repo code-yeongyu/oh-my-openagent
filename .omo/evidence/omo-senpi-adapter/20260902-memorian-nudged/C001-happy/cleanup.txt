@@ -1,0 +1,6 @@
+route=live-two-turn-interactive (lead recapture 2026-09-02, replaces the child's blank resume attempt)
+command: node script/qa/web-terminal-visual-qa.mjs --command <wrapper: senpi -e task-e2e-mock-provider.ts -e plugin/extensions/omo.js --provider omo-mock --model mock-1 --session-dir <sandbox>/agent/sessions --session-id 01a05b6d-0000-7000-8000-00000000000b> --cols 140 --rows 44 --key-delay-ms 1500 --input <PROMPT_SEEDED> --input {Enter} --input {End} x6 --input <PROMPT_FOLLOWUP> --input {Enter} --dwell-ms 9000
+env: SENPI_CODING_AGENT_DIR/XDG_CONFIG_HOME/OMO_MEMORY_HOME isolated under the sandbox root; SENPI_BIN=<sandbox>/stub-senpi (production seam; stub wrote {path:reference/project/test-note.md, hint} NDJSON)
+harness pty: pid 27773 killed by the harness (see xterm-metadata.json "cleanup")
+pre-existing pids matching sandbox root before sweep: 0
+sandbox_root_removed=yes resume_sandbox_removed=yes harness_tmp_removed=yes sandbox_procs_alive=0

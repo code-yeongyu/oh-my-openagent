@@ -1,0 +1,42 @@
+{
+  "scenario": "child",
+  "result": "PASS",
+  "senpiBin": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/node_modules/.bin/senpi",
+  "senpiVersion": "2026.9.2-4",
+  "prompt": "run the quick child x_search scenario",
+  "yesterday": "2026-09-02",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "isolatedAgentDir": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-CySrzv/agent",
+  "isolatedCwd": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-CySrzv/project",
+  "envScrubbed": [],
+  "spawnedEnvHasXai": false,
+  "toolCalls": [
+    "tool_search",
+    "x_search"
+  ],
+  "agentType": null,
+  "toolResults": {
+    "noToolsMatched": false,
+    "controlMatched": false,
+    "tool_searchExecuted": false,
+    "xSearchExecutions": 0,
+    "xSearchResults": 1,
+    "xComUrls": 28,
+    "unavailable": false
+  },
+  "registrationCount": 1,
+  "observedOutcome": "success",
+  "verdict": {
+    "positive": true
+  },
+  "senpiExit": 0,
+  "senpiSignal": null,
+  "transcript": "transcript-child.txt",
+  "cleanup": {
+    "path": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-CySrzv/agent/auth.json",
+    "overwrittenBytes": 946,
+    "removed": true
+  }
+}

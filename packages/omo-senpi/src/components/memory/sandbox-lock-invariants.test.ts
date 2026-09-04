@@ -131,15 +131,17 @@ describe("facts sandbox lock-grant invariants (real seatbelt)", () => {
     const setup = scratchFixture()
     const settingsLock = join(setup.agentDirReal, "settings.json.lock")
     const authLock = join(setup.agentDirReal, "auth.json.lock")
+    const hooksStateLock = join(setup.agentDirReal, "hooks-state.json.lock")
     const lifecycle = (lock: string) => `mkdir '${lock}' && touch '${lock}/owner' && rm '${lock}/owner' && rmdir '${lock}'`
 
     // when
-    const exitCode = await runUnderFactsSandbox(setup, `${lifecycle(settingsLock)} && ${lifecycle(authLock)}`)
+    const exitCode = await runUnderFactsSandbox(setup, `${lifecycle(settingsLock)} && ${lifecycle(authLock)} && ${lifecycle(hooksStateLock)}`)
 
     // then
     expect(exitCode).toBe(0)
     expect(existsSync(settingsLock)).toBe(false)
     expect(existsSync(authLock)).toBe(false)
+    expect(existsSync(hooksStateLock)).toBe(false)
   }, 30_000)
 
   seatbeltTest("#given the same profile #when a child mkdirs a THIRD lock path (models.json.lock) #then the deny-by-default wall rejects it", async () => {

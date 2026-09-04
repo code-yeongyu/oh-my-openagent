@@ -32,6 +32,7 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("skills", "ulw-plan", "SKILL.md"),
   join("skills", "ulw-research", "SKILL.md"),
   join("skills", "visual-qa", "SKILL.md"),
+  join("skills-conditional", "x-search", "SKILL.md"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "agent-toolkit", "cli.js"),
   join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
@@ -62,6 +63,7 @@ export async function ensurePluginArtifacts(context: {
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
     await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-x-search-skill.mjs")], { cwd: context.repoRoot })
   }
 
   if (await hasMissingPluginArtifact(context.pluginPath)) {

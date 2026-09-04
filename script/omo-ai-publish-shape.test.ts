@@ -86,14 +86,36 @@ describe("omo-ai publish workflow shape", () => {
     expect(versionRun).toContain('DIST_TAG=$(printf \'%s\' "$VERSION" | cut -d\'-\' -f2 | cut -d\'.\' -f1)')
   })
 
-  test("marks GitHub releases as prereleases exactly when the version has a prerelease suffix", () => {
-    // given
-    const releaseRun = namedStep("release", "Create GitHub release").run ?? ""
+  test("decides the Latest badge from the highest published semver, never from a pre-release flag", () => {
+    // given: `releases/latest` is what the compiled binary's update hint downloads from, so the
+    // badge must follow the highest published version rather than whichever release was created
+    // last. `gh release create --latest` alone would hand it to an older-line hotfix.
+    const steps = ["Create GitHub release", "Create LazyCodex GitHub release"]
+      .map((name) => namedStep("release", name).run ?? "")
 
-    // when / then
-    expect(releaseRun).toContain('if [[ "$VERSION" == *"-"* ]]; then')
-    expect(releaseRun).toContain("RELEASE_FLAGS+=(--prerelease)")
-    expect(releaseRun).toContain('gh release create "v${VERSION}" "${RELEASE_FLAGS[@]}"')
+    // when
+    const releaseCommands = steps.flatMap((run) =>
+      run.split("\n").map((line) => line.trim()).filter((line) => line.startsWith("gh release create ")),
+    )
+
+    // then
+    expect(releaseCommands).toHaveLength(2)
+    for (const command of releaseCommands) {
+      expect(command).toContain('"$LATEST_FLAG"')
+      expect(command).not.toContain("--prerelease")
+      expect(command).not.toContain("--latest ")
+    }
+    for (const run of steps) {
+      const resolveLine = run
+        .split("\n")
+        .map((line) => line.trim())
+        .find((line) => line.startsWith("LATEST_FLAG="))
+      expect(resolveLine).toBeDefined()
+      expect(resolveLine).toContain("gh release list")
+      expect(resolveLine).toContain("--exclude-drafts")
+      expect(resolveLine).toContain('bun script/release-latest-flag.ts "$VERSION"')
+      expect(run).toContain("set -euo pipefail")
+    }
   })
 
   test("maps every root release to a unique ordered prerelease", () => {

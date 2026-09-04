@@ -103,7 +103,7 @@ SOFTWARE.
 ## 4. agent-browser (vercel-labs) — Tier-2 CDP automation CLI (runtime dependency)
 
 The Tier-2 automation CLI is **agent-browser**, installed at runtime via `npm`
-(`npm i -g agent-browser`). No agent-browser source is vendored in this repository.
+(`bun add -g agent-browser`). No agent-browser source is vendored in this repository.
 
 - Source: https://github.com/vercel-labs/agent-browser
 - Pinned runtime version: **0.34.0** (documented in `references/chrome-stealth.md`;

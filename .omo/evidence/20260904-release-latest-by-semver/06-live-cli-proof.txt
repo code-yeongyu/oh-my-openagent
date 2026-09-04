@@ -1,0 +1,14 @@
+# C4 real-surface proof: script/release-latest-flag.ts against the LIVE release list of code-yeongyu/oh-my-openagent (264 tags, --exclude-drafts --limit 1000)
+5.0.0-beta.41 -> --latest
+4.19.5 -> --latest=false
+5.0.0-beta.40 -> --latest
+5.0.0 -> --latest
+4.19.4 -> --latest=false
+
+# failure modes measured WITHOUT a pipe swallowing the exit code
+INVALID_EXIT=1
+      at main (/Volumes/mengmotaStorage/local-workspaces/omo-wt/release-latest-semver/script/release-latest-flag.ts:31:15)
+
+Bun v1.4.0 (macOS arm64)
+NOARG_EXIT=2
+usage: gh release list --exclude-drafts --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts <version>

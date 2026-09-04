@@ -283,13 +283,16 @@ export type {
 export {
   AgentLimitReached,
   createTaskLifecycle,
+  getLifecycleDetachedRevivalRollback,
   getLifecycleReattachPorts,
+  registerLifecycleDetachedRevivalRollback,
   registerLifecycleReattachPorts,
 } from "./lifecycle"
 export type {
   AdmissionResult,
   CleanupResult,
   DestroyCause,
+  DetachedRevivalRollbackResult,
   LifecycleDeps,
   LifecycleReattachPorts,
   ProcessSignaller,

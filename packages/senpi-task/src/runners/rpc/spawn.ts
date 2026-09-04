@@ -38,6 +38,11 @@ export type RpcSpawnRuntime = {
   readonly resolveRpcEntry: () => string
   // Injectable so tests can pin the executable-vs-fallback branch; defaults to resolveSenpiExecutable.
   readonly resolveSenpiExecutable?: (runtime: RpcSpawnRuntime) => string | null
+  // Running @code-yeongyu/senpi version used to reject PATH/sibling candidates of a different version.
+  // When omitted or unreadable, the parity check is skipped (candidates are accepted).
+  readonly engineVersion?: string
+  // Optional diagnostics for rejected PATH/sibling candidates. Defaults to a no-op.
+  readonly onWarning?: (message: string) => void
 }
 
 /**
@@ -61,11 +66,17 @@ function senpiBinaryName(platform: NodeJS.Platform): string {
   return platform === "win32" ? "senpi.exe" : "senpi"
 }
 
-function scanPathForExecutable(name: string, pathValue: string | undefined): string | null {
+function scanPathForExecutable(
+  name: string,
+  pathValue: string | undefined,
+  isAcceptable?: (canonical: string) => boolean,
+): string | null {
   for (const dir of (pathValue ?? "").split(delimiter)) {
     if (dir.length === 0) continue
     const candidate = canonicalExecutable(join(dir, name))
-    if (candidate !== null) return candidate
+    if (candidate === null) continue
+    if (isAcceptable !== undefined && !isAcceptable(candidate)) continue
+    return candidate
   }
   return null
 }
@@ -79,12 +90,77 @@ function canonicalExecutable(candidate: string): string | null {
   }
 }
 
+const SENPI_PACKAGE_NAME = "@code-yeongyu/senpi"
+const MANIFEST_WALK_MAX_LEVELS = 3
+
+export function readEngineVersionFromResolvePaths(paths: readonly string[]): string | undefined {
+  for (const dir of paths) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, "@code-yeongyu", "senpi", "package.json"), "utf8")) as {
+        name?: unknown
+        version?: unknown
+      }
+      if (pkg.name === SENPI_PACKAGE_NAME && typeof pkg.version === "string" && pkg.version.length > 0) {
+        return pkg.version
+      }
+    } catch {
+      // Missing or invalid manifest at this resolution path; keep scanning.
+    }
+  }
+  return undefined
+}
+
+export function readRunningEngineVersion(): string | undefined {
+  const fromPaths = readEngineVersionFromResolvePaths(require.resolve.paths(SENPI_PACKAGE_NAME) ?? [])
+  if (fromPaths !== undefined) return fromPaths
+  try {
+    return readCandidateSenpiVersion(require.resolve(SENPI_PACKAGE_NAME))
+  } catch {
+    return undefined
+  }
+}
+
+function readCandidateSenpiVersion(executable: string): string | undefined {
+  let dir = dirname(executable)
+  for (let depth = 0; depth <= MANIFEST_WALK_MAX_LEVELS; depth += 1) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+        name?: unknown
+        version?: unknown
+      }
+      if (pkg.name === SENPI_PACKAGE_NAME && typeof pkg.version === "string" && pkg.version.length > 0) {
+        return pkg.version
+      }
+    } catch {
+      // Missing or invalid manifest at this level; keep walking.
+    }
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return undefined
+}
+
+function passesEngineParity(candidate: string, runtime: RpcSpawnRuntime): boolean {
+  const engineVersion = runtime.engineVersion
+  if (engineVersion === undefined || engineVersion.length === 0) return true
+  const candidateVersion = readCandidateSenpiVersion(candidate)
+  if (candidateVersion === undefined) return true
+  if (candidateVersion === engineVersion) return true
+  runtime.onWarning?.(
+    `Skipping senpi executable ${candidate} version ${candidateVersion}; running engine is ${engineVersion}`,
+  )
+  return false
+}
+
 /**
  * Resolve the senpi EXECUTABLE to spawn the rpc child with (`<exe> --mode rpc`). Spawning the binary
  * directly bypasses module resolution, which senpi's own loader alias HIJACKS when omo runs as a senpi
  * extension: `require.resolve("@code-yeongyu/senpi/rpc-entry")` then resolves to the running dist entry
  * instead of the child rpc entry and the child never boots. Preference order: an explicit `SENPI_BIN`
- * override, the sibling binary next to a Bun-compiled senpi, then a PATH scan. Returns null when no
+ * override (used even when its package version differs), the sibling binary next to a Bun-compiled senpi,
+ * then a PATH scan. Sibling and PATH candidates whose @code-yeongyu/senpi manifest version differs from
+ * the running engine are skipped; a candidate with no readable manifest is kept. Returns null when no
  * executable is found so buildRpcSpawn can fall back to the documented `execPath + rpc-entry` path.
  */
 export function resolveSenpiExecutable(runtime: RpcSpawnRuntime): string | null {
@@ -96,10 +172,12 @@ export function resolveSenpiExecutable(runtime: RpcSpawnRuntime): string | null 
     }
     return scanPathForExecutable(override, runtime.parentEnv.PATH)
   }
+  const acceptParity = (candidate: string) => passesEngineParity(candidate, runtime)
   if (runtime.isBunBinary) {
-    return canonicalExecutable(join(dirname(runtime.execPath), binaryName))
+    const sibling = canonicalExecutable(join(dirname(runtime.execPath), binaryName))
+    return sibling !== null && acceptParity(sibling) ? sibling : null
   }
-  return scanPathForExecutable(binaryName, runtime.parentEnv.PATH)
+  return scanPathForExecutable(binaryName, runtime.parentEnv.PATH, acceptParity)
 }
 
 function normalizeSenpiLauncher(executable: string, runtime: RpcSpawnRuntime): SenpiLauncher | null {
@@ -191,6 +269,7 @@ function defaultRuntime(): RpcSpawnRuntime {
     platform: process.platform,
     parentEnv: process.env,
     resolveRpcEntry: resolveRpcEntrySpecifier,
+    engineVersion: readRunningEngineVersion(),
   }
 }
 

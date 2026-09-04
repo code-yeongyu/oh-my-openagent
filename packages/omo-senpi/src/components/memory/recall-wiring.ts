@@ -30,7 +30,8 @@ import type { ComponentLogger } from "../../extension/types"
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
-import { renderRecallEntry, type MemoryRecallRecord } from "./recall-notice"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, renderMemorianGateEntry, renderMemorianNudgedEntry, type MemorianNudgedRecord } from "./memorian-notice"
+import { renderRecallEntry } from "./recall-notice"
 import { resolveMemorySettings } from "./identity-runtime"
 
 export interface ResolvedMemoryRecallSettings {
@@ -216,6 +217,7 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
         },
       },
       paths: nudges.map((nudge) => nudge.path),
+      nudges,
     }
 
     try {
@@ -236,6 +238,8 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
   return {
     register(pi): void {
       pi.registerEntryRenderer(RECALL_CUSTOM_TYPE, renderRecallEntry)
+      pi.registerEntryRenderer(NUDGED_ENTRY_TYPE, renderMemorianNudgedEntry)
+      pi.registerEntryRenderer(GATE_ENTRY_TYPE, renderMemorianGateEntry)
       pi.on("before_agent_start", async (payload, eventCtx) => {
         try {
           const injection = await inject(payload, eventCtx)
@@ -243,7 +247,10 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
           try {
             // Visible half: the model-facing message is display:false, so without this entry the
             // user would see a memory-shaped answer with no trace of where it came from.
-            pi.appendEntry(RECALL_CUSTOM_TYPE, { paths: injection.paths } satisfies MemoryRecallRecord)
+            pi.appendEntry(NUDGED_ENTRY_TYPE, {
+              version: 1,
+              nudges: injection.nudges.map(({ path, hint }) => ({ path, hint })),
+            } satisfies MemorianNudgedRecord)
           } catch (error) {
             // Fail-open: the visible trace is bookkeeping - its failure must never suppress a
             // nudge the ledger already recorded as delivered.
@@ -295,6 +302,7 @@ interface RecallInjection {
     }
   }
   readonly paths: readonly string[]
+  readonly nudges: readonly RecallNudge[]
 }
 
 interface RecallSession {

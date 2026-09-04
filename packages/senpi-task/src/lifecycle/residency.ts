@@ -83,7 +83,10 @@ export async function reclaimIdleResidents(context: LifecycleContext): Promise<r
       await destroyResidentTask(context, fresh.task_id, "evict")
       evicted.push(fresh.task_id)
     } catch (error) {
-      log("senpi-task idle resident eviction failed", { taskId: fresh.task_id, error: String(error) })
+      log("senpi-task idle resident eviction failed", {
+        taskId: fresh.task_id,
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
   return evicted
@@ -125,7 +128,7 @@ function lruEvictable(context: LifecycleContext, residents: readonly TaskRecord[
 // deletion, no process spawning - so it stays short by construction.
 
 const SUSPENDED_RESIDENCIES = new Set(["persisted_only", "rpc_detached"])
-const REVIVABLE_STATUSES = new Set(["pending", "running", "completed", "error", "interrupted"])
+const REVIVABLE_STATUSES = new Set(["pending", "running", "interrupted"])
 
 export type BatchAdmissionDeferral = "capacity" | "lock_contended" | "foreign_live_owner" | "lease_lost"
 

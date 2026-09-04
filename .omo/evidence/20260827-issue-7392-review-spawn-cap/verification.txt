@@ -1,0 +1,200 @@
+Issue 7392 verification
+=======================
+
+Failing first
+-------------
+Command:
+  bunx vitest run test/spawn-guard.test.ts
+
+Observed before implementation:
+  Test Files  1 failed (1)
+  Tests       1 failed | 12 passed (13)
+  AssertionError: expected '' not to be ''
+  The fourth reviewer spawn was still allowed.
+
+Focused and component gates
+---------------------------
+Focused after implementation:
+  Test Files  1 passed (1)
+  Tests       13 passed (13)
+
+Full component:
+  npm test
+  Test Files  40 passed (40)
+  Tests       426 passed (426)
+
+Component check:
+  npm run check
+  tsc --noEmit: pass
+  biome check .: pass, 82 files
+  tsc -p tsconfig.build.json: pass
+
+Repository gates
+----------------
+  bun run typecheck: pass
+  bun run build: pass
+  git diff --check: pass
+
+Post-creation P1
+----------------
+Finding:
+  MultiAgentV2 omits agent_type and names code-reviewer and QA roles in message.
+
+Failing first:
+  Test Files  1 failed (1)
+  Tests       2 failed | 13 passed (15)
+  Both message-only roles allowed the fourth spawn.
+
+After fix:
+  Test Files  40 passed (40)
+  Tests       428 passed (428)
+  component typecheck + Biome + build: pass
+  bun run typecheck: pass
+  bun run build: pass
+
+Mixed-role P1
+-------------
+Finding:
+  A gate prompt that also names the code-review report matched the code-reviewer
+  pattern first and bypassed the gate artifact prerequisite.
+
+Failing first:
+  Test Files  1 failed (1)
+  Tests       1 failed | 15 passed (16)
+  The mixed-role gate prompt was allowed.
+
+After fix:
+  Test Files  40 passed (40)
+  Tests       429 passed (429)
+  component typecheck + Biome + build: pass
+  bun run typecheck: pass
+  bun run build: pass
+
+Canonical Codex gate
+--------------------
+  bun run test:codex: attempted three times
+  Changed component tests and plugin build passed before the ship check.
+  Ship check failure:
+    npm pack --dry-run invoked root prepare after workspace dev dependency
+    pruning.
+    TS2688: Cannot find type definition file for 'node'.
+  This was a setup failure in unrelated component packaging, not a changed
+  component assertion.
+
+Article-bearing role P1
+-----------------------
+Finding:
+  Typical MultiAgentV2 prompts say `Act as a lazycodex-qa-executor`.
+  Explicit-role parsing recognized only the article-free form, so a mixed
+  prompt fell back to the earlier code-reviewer mention and charged 4/3.
+
+Identical failing-first command:
+  npm test -- test/spawn-guard.test.ts
+
+Observed before implementation:
+  Test Files  1 failed (1)
+  Tests       1 failed | 18 passed (19)
+  The explicit QA spawn was denied as lazycodex-code-reviewer 4/3.
+
+After fix:
+  Focused suite: 19 passed, 0 failed.
+  Full component: 41 files passed, 447 tests passed.
+  Component check: TypeScript, Biome (84 files), and build passed.
+
+Latest real Codex surface:
+  app-server driver self-test: pass.
+  Isolated local-plugin app-server turn: pass.
+  Hooks fired: sessionStart, userPromptSubmit, stop.
+  Real ~/.codex/config.toml: unchanged.
+
+The canonical Codex gate was retried twice after restoring the plugin
+workspace install. Both attempts reproduced the already-documented
+third-party packaging setup failure: an aggregate build lost `@types/node`
+before the ulw-loop build. Running the aggregate plugin build directly after
+the install passed. No changed component test, typecheck, lint, or build
+failed.
+
+Latest current-dev merge:
+  upstream/dev: 00fc6bdb8
+  component: 41 files passed, 447 tests passed.
+  component check: TypeScript, Biome (84 files), and build passed.
+  app-server self-test: pass.
+  isolated local-plugin app-server: pass.
+  hooks fired: sessionStart, userPromptSubmit, stop.
+  real ~/.codex/config.toml: unchanged.
+
+Surface-aware generic gate P2
+-----------------------------
+Finding:
+  The generic `final gate review` form always used the LazyCodex gate identity,
+  so the staged Senpi generic and explicit forms split one quota.
+
+Failing first:
+  npm test -- test/spawn-guard.test.ts -t 'staged Senpi surface'
+  1 failed, 19 skipped.
+  The fourth alternating spawn returned no denial.
+
+After fix:
+  Identical focused test: 1 pass, 0 fail.
+  Spawn-guard file: 20 pass, 0 fail.
+  Full component: 41 files passed, 448 tests passed.
+  Component TypeScript, Biome, and build: pass.
+  Root Bun 1.4.0 typecheck and build: pass.
+  Senpi gate: 2461 pass, one Windows skip, 0 fail, 7906 assertions.
+  Built staged surface: first three allowed; fourth denied as
+  omo-senpi-gate-reviewer 4/3; no LazyCodex counter.
+  Isolated Codex app-server and real Senpi adapter: pass; protected host state
+  unchanged.
+
+Cross-surface explicit alias P2
+-------------------------------
+Finding:
+  Explicit LazyCodex and Senpi spellings for one reviewer lane persisted
+  separate counters on the staged Senpi surface.
+
+Failing first:
+  npm test -- test/spawn-guard.test.ts -t 'LazyCodex and Senpi aliases alternate'
+  1 failed, 20 skipped; attempt 4 returned no denial.
+
+After fix:
+  Identical focused test: 1 pass, 0 fail.
+  Spawn-guard file: 21 pass, 0 fail.
+  Full component: 41 files passed, 449 tests passed.
+  Component TypeScript, Biome, and build: pass.
+  Root Bun 1.4.0 typecheck and build: pass.
+  Exact detached Senpi gate: exit 0; Bun 1.4.0 bundle freshness passed.
+  Built staged surface: first three allowed; fourth denied as
+  omo-senpi-code-reviewer 4/3; no LazyCodex counter.
+  Isolated Codex app-server and real Senpi adapter: pass; protected host state
+  unchanged.
+
+Newest-upstream re-verification
+-------------------------------
+Exact integrated upstream:
+  b5cbae3fb8778a06f70aa7aada35c8be72f0dba0
+
+Aggregate Codex plugin:
+  335 pass, 0 fail.
+
+Root gates:
+  bun run typecheck: pass.
+  bun run build: pass.
+
+Bun 1.4 Senpi gate:
+  all staged runtimes and six extensions current.
+  2464 pass, one Windows-only skip, 0 fail, 7914 assertions.
+  evidence resolver: 10 pass, 0 fail.
+
+Live surfaces from the exact tree:
+  Codex app-server driver self-test: pass.
+  Isolated local-plugin app-server: pass.
+  Completed hooks: sessionStart, userPromptSubmit, stop.
+  Real ~/.codex/config.toml digest unchanged:
+    6f9a9998e39f4f8c47e225e81801ecb2c183136a
+  Senpi driver self-test: pass.
+  Real Senpi adapter: result=PASS; ultrawork injected; comment checker passed.
+  Senpi protected paths: unchanged.
+  Senpi credential digest: unchanged.
+  Real OMO protected paths: unchanged.
+  One unrelated OpenClaw session log was observed as volatile background
+  activity and was not attributed to the adapter run.

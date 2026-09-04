@@ -1,0 +1,131 @@
+MUTATION PROOF - todo 2 (COMP/client.ts normalizeXSearchResponse)
+
+Seam broken: the url_citation annotations pass in normalizeXSearchResponse() was deleted
+(client.ts, the loop over texts[].annotations that feeds add(url, title)).
+
+NOTE / plan drift: the plan named 'the id-count assertion' on the probe fixture. Both probe
+fixtures echo EVERY cited URL inline in the message text (verified: 0 annotation-only ids in
+api-x_search-response.json and api-x_search-grok420-nonreasoning.json), so the probe id count
+alone cannot observe the loss. The id-count assertion that DOES depend on the annotations pass
+is the annotations-only citation case; the fast-fixture URL-form assertion fails with it.
+
+$ bun test packages/omo-senpi/src/components/x-search/client.test.ts   # MUTATED
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/client.test.ts:
+(pass) buildXSearchRequest > #given dates and allowed handles #when building the request #then the x_search tool carries only the set filters under the bounded envelope [0.47ms]
+(pass) buildXSearchRequest > #given top mode with no filters #when building the request #then the tool has no filter keys and the prompt asks for Top [0.08ms]
+(pass) buildXSearchRequest > #given excluded handles plus understanding flags on the reasoning carrier #when building the request #then flags and reasoning ride along [0.09ms]
+(pass) buildXSearchRequest > #given the shipped defaults #when reading the frozen knobs #then v1 is the default variant on the fast carrier and v2 extends v1 [0.08ms]
+(pass) performXSearch > #given a 200 JSON response #when performing the search #then the raw payload comes back with the bearer and JSON headers set [0.29ms]
+(pass) performXSearch > #given HTTP 401 #when performing the search #then it fails closed as AUTH with no retry [0.10ms]
+(pass) performXSearch > #given HTTP 403 #when performing the search #then it fails closed as AUTH with no retry [0.06ms]
+(pass) performXSearch > #given HTTP 500 #when performing the search #then it fails closed as UPSTREAM with no retry [0.06ms]
+(pass) performXSearch > #given HTTP 503 #when performing the search #then it fails closed as UPSTREAM with no retry [0.06ms]
+(pass) performXSearch > #given HTTP 429 with Retry-After #when performing the search #then RATE_LIMITED carries the retryAfter seconds [0.08ms]
+(pass) performXSearch > #given an aborted request #when performing the search #then it reports TIMEOUT [0.15ms]
+(pass) performXSearch > #given a deadline shorter than the response #when performing the search #then the request is aborted as TIMEOUT [6.60ms]
+(pass) performXSearch > #given a 200 body that is not JSON #when performing the search #then it reports PROTOCOL [0.11ms]
+(pass) normalizeXSearchResponse > #given the probe fixture #when normalized #then unique tweet ids, the server queries, and usage are recovered [0.43ms]
+(pass) normalizeXSearchResponse > #given max_results 2 on the probe fixture #when normalized #then exactly two results survive the cap [0.12ms]
+259 |       "2095307098238128218",
+260 |       "2095344199851798606",
+261 |     ])
+262 |     // The annotations pass runs first, so the citation form (/i/status/) wins over the
+263 |     // handle URL echoed in the message text for the same tweet id.
+264 |     expect(normalized.results.map((entry) => entry.url)).toEqual([
+                                                               ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "https://x.com/i/status/2095344199851798606",
+-   "https://x.com/i/status/2095307098238128218",
+-   "https://x.com/i/status/2095271947169055077",
++   "https://x.com/Vegi_steam_bun/status/2095271947169055077",
++   "https://x.com/Radios4Freedom/status/2095307098238128218",
++   "https://x.com/latenitecaptain/status/2095344199851798606",
+  ]
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/client.test.ts:264:58)
+(fail) normalizeXSearchResponse > #given the fast-carrier fixture #when normalized #then annotation ids dedupe against the message-text URLs [0.27ms]
+287 |           ],
+288 |         },
+289 |       ],
+290 |     })
+291 | 
+292 |     expect(normalized.results.map((entry) => entry.id)).toEqual(["2095333026204971141", "2095332141047431453"])
+                                                              ^
+error: expect(received).toEqual(expected)
+
+  [
+    "2095333026204971141",
+-   "2095332141047431453",
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/client.test.ts:292:57)
+(fail) normalizeXSearchResponse > #given a citation that appears only in annotations #when normalized #then the annotations pass still recovers its id [0.11ms]
+(pass) normalizeXSearchResponse > #given a payload with only top-level citations #when normalized #then the citation URLs become results with url titles [0.07ms]
+328 |           ],
+329 |         },
+330 |       ],
+331 |     })
+332 | 
+333 |     expect(normalized.results.map((entry) => entry.title)).toEqual([
+                                                                 ^
+error: expect(received).toEqual(expected)
+
+  [
+    "https://x.com/a/status/11",
+    "https://x.com/b/status/22",
+-   "Real headline",
++   "https://x.com/c/status/33",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/x-search/client.test.ts:333:60)
+(fail) normalizeXSearchResponse > #given citation titles that are bare indices or the URL itself #when normalized #then the URL is the title and a descriptive title survives [0.11ms]
+(pass) normalizeXSearchResponse > #given a response with no X posts #when normalized #then results and queries are empty [0.06ms]
+(pass) formatXSearchResult > #given two results #when formatted #then the text contract renders header, blocks, and the queries line [0.06ms]
+(pass) formatXSearchResult > #given zero results #when formatted #then the empty contract renders [0.05ms]
+(pass) formatXSearchError > #given the INVALID_PARAMS code #when formatted #then the single-line error contract renders [0.07ms]
+(pass) formatXSearchError > #given the INVALID_FILTERS code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the TOO_MANY_HANDLES code #when formatted #then the single-line error contract renders [0.04ms]
+(pass) formatXSearchError > #given the INVALID_DATE code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the INVALID_DATE_RANGE code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the AUTH code #when formatted #then the single-line error contract renders [0.04ms]
+(pass) formatXSearchError > #given the RATE_LIMITED code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the UPSTREAM code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the TIMEOUT code #when formatted #then the single-line error contract renders [0.05ms]
+(pass) formatXSearchError > #given the PROTOCOL code #when formatted #then the single-line error contract renders [0.05ms]
+
+3 tests failed:
+(fail) normalizeXSearchResponse > #given the fast-carrier fixture #when normalized #then annotation ids dedupe against the message-text URLs [0.27ms]
+(fail) normalizeXSearchResponse > #given a citation that appears only in annotations #when normalized #then the annotations pass still recovers its id [0.11ms]
+(fail) normalizeXSearchResponse > #given citation titles that are bare indices or the URL itself #when normalized #then the URL is the title and a descriptive title survives [0.11ms]
+
+ 29 pass
+ 3 fail
+ 96 expect() calls
+Ran 32 tests across 1 file. [516.00ms]
+exit=1
+
+RESTORED (annotations pass re-added; file identical to pre-mutation copy)
+$ diff /tmp/x-search-client.orig.ts packages/omo-senpi/src/components/x-search/client.ts
+(no diff)
+
+$ bun test packages/omo-senpi/src/components/x-search/client.test.ts   # RESTORED
+(pass) formatXSearchError > #given the PROTOCOL code #when formatted #then the single-line error contract renders [0.04ms]
+
+ 32 pass
+ 0 fail
+ 99 expect() calls
+Ran 32 tests across 1 file. [516.00ms]
+exit=0

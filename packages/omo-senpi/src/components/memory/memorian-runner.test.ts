@@ -299,7 +299,7 @@ appendFileSync(process.env.MEMORIAN_NUDGE_PATH, JSON.stringify({ path: "notes/ne
     }))
 
     // then
-    expect(result.status).toBe("skipped")
+    expect(result.status).toBe("dropped")
     expect(warnings).toEqual(["memorian gate nudges dropped after compaction"])
     expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
   }, 30_000)
@@ -359,7 +359,7 @@ appendFileSync(process.env.MEMORIAN_NUDGE_PATH, JSON.stringify({ path: "notes/ne
     }))
 
     // then
-    expect(result.status).toBe("skipped")
+    expect(result.status).toBe("dropped")
     expect(warnings).toEqual(["memorian gate nudges dropped after compaction"])
     expect(existsSync(join(identityPaths.recallPending, `${SESSION_ID}.json`))).toBe(false)
     expect(await real.take(SESSION_ID, { currentEpoch: epoch })).toEqual([])

@@ -1,0 +1,37 @@
+Todo 16 GREEN - prose/data deterministic checks
+host=mengmotaHost
+date=2026-09-03T07:27:45Z
+
+=== 1. named files ===
+OK packages/omo-senpi/src/components/x-search/AGENTS.md
+OK packages/omo-senpi/AGENTS.md
+OK packages/omo-senpi/src/AGENTS.md
+OK packages/omo-senpi/plugin/AGENTS.md
+OK packages/senpi-task/AGENTS.md
+OK changes.md
+OK .omo/evidence/omo-senpi-adapter/20260903-x-search/README.md
+
+=== 2. EV todo dirs (16 expected, 14 is sibling) ===
+under slug: 01-params, 02-client, 03-auth, 04-child-exposure, 05-librarian, 06-skill, 07-backtest-core, 08-queries, 09-component, 10-packaging, 11-backtest-cli, 12-ulw-research, 13-live-root-qa, 15-backtest, 16-docs
+14 sibling exists: True files: 12
+README headings missing: none
+README lists 16 todo headings: 16 / 16
+
+=== 3. changes.md H2 present ===
+1:## 2026-09-03 — Add the credential-gated x_search tool and skill
+OK changes.md H2
+
+=== 4. CHANGELOG skip ===
+release-process.md does not require a per-feature CHANGELOG.md entry; Unreleased left untouched.
+
+=== 5. build:senpi-plugin ===
+exit=0 host=mengmotaHost start=2026-09-03T07:25:50Z end=2026-09-03T07:25:56Z
+Staged x-search conditional skill: plugin/skills-conditional/x-search/SKILL.md
+Tracked plugin/extensions/*.js sha256 unchanged vs pre-build (already included x-search from a76863f75).
+omo.js sha256 0db5b8966fe45cd6760ca52f89cc01272ddcdce5185cdb9d9c8f0b6db7f58e68
+Committed bundle blob last written by a76863f75c4640b5cacf8f4afb95dd3c3b5a2988
+
+=== 6. 16-gate omitted here ===
+Orchestrator runs bun run test:senpi and bun test packages/senpi-task on mengmotaMac into EV/16-gate/.
+
+ALL_NAMED_CHECKS_PASS

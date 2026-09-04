@@ -1,0 +1,21 @@
+# gh release edit receipts (2026-09-04, ascending order)
+v5.0.0-beta.20 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.20 | EXIT=0
+v5.0.0-beta.21 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.21 | EXIT=0
+v5.0.0-beta.22 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.22 | EXIT=0
+v5.0.0-beta.23 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.23 | EXIT=0
+v5.0.0-beta.24 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.24 | EXIT=0
+v5.0.0-beta.25 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.25 | EXIT=0
+v5.0.0-beta.26 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.26 | EXIT=0
+v5.0.0-beta.28 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.28 | EXIT=0
+v5.0.0-beta.29 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.29 | EXIT=0
+v5.0.0-beta.30 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.30 | EXIT=0
+v5.0.0-beta.31 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.31 | EXIT=0
+v5.0.0-beta.32 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.32 | EXIT=0
+v5.0.0-beta.33 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.33 | EXIT=0
+v5.0.0-beta.34 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.34 | EXIT=0
+v5.0.0-beta.35 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.35 | EXIT=0
+v5.0.0-beta.36 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.36 | EXIT=0
+v5.0.0-beta.37 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.37 | EXIT=0
+v5.0.0-beta.38 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.38 | EXIT=0
+v5.0.0-beta.39 --prerelease=false --latest=false -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.39 | EXIT=0
+v5.0.0-beta.40 --prerelease=false --latest -> https://github.com/code-yeongyu/oh-my-openagent/releases/tag/v5.0.0-beta.40 | EXIT=0

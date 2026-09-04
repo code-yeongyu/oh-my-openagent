@@ -1,0 +1,21 @@
+# Closing the last uncovered path in this PR: script/publish.ts (2026-09-04)
+
+publish.ts is the SECOND release-creation path (local multi-package publish alternative). It was
+wired to resolveLatestFlag in the first commit, but nothing tested it - omo-ai-publish-shape.test.ts
+only covers the workflow. A future edit could drop the flag there and every test would stay green.
+publish.ts has no importable seam (top-level side effects on import), so the machine-consumed facts
+are pinned from source: the import, the `gh release list --exclude-drafts` query, and the presence of
+${latestFlag} in the `gh release create` line, plus the absence of --prerelease and a bare --latest.
+
+mengmotaMac via bunshin, bun by absolute path, hermetic dir swept.
+
+GREEN - publish.ts wired to resolveLatestFlag:
+  10 pass / 0 fail, 19 expect() calls, GREEN_EXIT=0
+
+RED - mutation: the resolved flag removed from the publish.ts create line
+  (line 388 becomes: gh release create v${newVersion} --title "v${newVersion}" --notes ${releaseNotes}):
+  9 pass / 1 fail, RED_EXIT=1
+  failing assertion: expect(createLine).toContain("${latestFlag}")
+
+# Both release-creation paths (publish.yml x2 steps, publish.ts) are now pinned by tests that fail
+# for the regression they name.

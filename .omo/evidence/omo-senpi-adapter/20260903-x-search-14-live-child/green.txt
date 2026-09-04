@@ -1,0 +1,3 @@
+Command: bun test packages/senpi-task/src/runners/in-process/shared-tool-filter.test.ts packages/senpi-task/src/agents/builtin/builtin-agents.test.ts packages/omo-senpi/scripts/qa/x-search-live-e2e.test.mjs
+Observed: 18 pass / 0 fail / 177 expect() calls
+Live acceptance: quick x_search results headers=1; librarian attempts=2 (attempt 1: PASS, xSearchResults=1; attempt 2: PASS, xSearchResults=1); explore x_search results headers=0.

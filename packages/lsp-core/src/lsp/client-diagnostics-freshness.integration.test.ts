@@ -90,6 +90,7 @@ describe("LspClient diagnostics freshness", () => {
 	});
 
 	it("#given stale and future publish versions #when diagnostics target the current version #then neither stale nor future diagnostics satisfy the request", async () => {
+		const staleClock = new ControlledClock();
 		const stale = await harness.makeClient(
 			{
 				publishDiagnostics: [
@@ -101,7 +102,7 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5, timerProvider: staleClock },
 		);
 		await stale.client.openFile(stale.source);
 		const staleDelivery = waitForEventCount(
@@ -113,13 +114,17 @@ describe("LspClient diagnostics freshness", () => {
 		await stale.client.openFile(stale.source);
 		expect(await staleDelivery).toHaveLength(1);
 
-		const staleResult = await stale.client.diagnostics(stale.source);
+		const stalePending = stale.client.diagnostics(stale.source);
+		await staleClock.waitForTimer(100);
+		staleClock.advanceBy(100);
+		const staleResult = await stalePending;
 
 		expect(staleResult.items).toEqual([]);
 		expect(staleResult.transientError?.kind).toBe("freshness_timeout");
 
 		await harness.cleanup();
 
+		const futureClock = new ControlledClock();
 		const future = await harness.makeClient(
 			{
 				publishDiagnostics: [
@@ -131,7 +136,7 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5, timerProvider: futureClock },
 		);
 		await future.client.openFile(future.source);
 		const futureDelivery = waitForEventCount(
@@ -143,7 +148,10 @@ describe("LspClient diagnostics freshness", () => {
 		await future.client.openFile(future.source);
 		expect(await futureDelivery).toHaveLength(1);
 
-		const futureResult = await future.client.diagnostics(future.source);
+		const futurePending = future.client.diagnostics(future.source);
+		await futureClock.waitForTimer(100);
+		futureClock.advanceBy(100);
+		const futureResult = await futurePending;
 
 		expect(futureResult.items).toEqual([]);
 		expect(futureResult.transientError?.kind).toBe("freshness_timeout");
@@ -155,7 +163,7 @@ describe("LspClient diagnostics freshness", () => {
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
 				diagnosticResponses: [
 					{
-						delayMs: 200,
+						releaseOnDidChange: true,
 						report: { kind: "full", resultId: "v1", items: [diagnostic("pull-stale")] },
 					},
 					{

@@ -59,6 +59,8 @@ async function makePluginFixture(options: { readonly runtime?: boolean } = { run
   for (const skillName of requiredSkillNames) {
     await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
   }
+  // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
+  await writeFixtureFile(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
   await writeFixtureFile(join(pluginPath, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
   if (options.runtime !== false) {
     const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
@@ -322,6 +324,19 @@ describe("runSenpiInstaller", () => {
     const agentDir = await makeAgentDir()
     const pluginPath = await makePluginFixture()
     await rm(join(pluginPath, "extensions", "omo-task.js"))
+
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    await expect(install).rejects.toThrow("missing required runtime artifacts")
+    await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
+  })
+
+  // Regression: beta.40 shipped without plugin/skills-conditional, so the bundled x-search component
+  // advertised a nonexistent skill path and senpi warned "skill path does not exist" at startup.
+  test("#given a packed plugin missing the conditional x-search skill #when installing #then artifact validation fails before settings change", async () => {
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"))
 
     const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 

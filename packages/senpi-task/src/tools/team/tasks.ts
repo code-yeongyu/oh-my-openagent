@@ -129,24 +129,58 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
   }
 }
 
+// The four lead tasklist tools only matter once a team exists, so they ride the
+// tool-search catalog (exposure "search") instead of the resident tool list:
+// zero prompt tokens until a tasklist operation is actually searched for. Each
+// description leads with the situation that selects the tool.
+const TEAM_TASK_SEARCH_GROUP = "team-tasklist" as const
+
+type TaskSearchMeta = Pick<ToolDefinition, "exposure" | "searchText" | "searchKeywords" | "searchGroup" | "allowLazyActivation">
+
+function taskSearchMeta(searchText: string, searchKeywords: readonly string[]): TaskSearchMeta {
+  return { exposure: "search", searchText, searchKeywords, searchGroup: TEAM_TASK_SEARCH_GROUP, allowLazyActivation: true }
+}
+
 export function createTeamTaskCreateTool(deps: TeamToolDeps): ToolDefinition {
   return {
     name: "task_create",
     label: "Task Create",
-    description: "Create an entry on the team tasklist (starts pending). Does NOT spawn an agent; use the 'task' tool to spawn child work.",
+    description: "Adds a pending entry to a running team's shared tasklist so members can claim it, for when the user wants to break work into claimable items without spawning an agent yet. Spawning child work itself goes through task.",
     parameters: TeamTaskCreateParams,
     execute: (_toolCallId: string, params: TeamTaskCreateInput) => runTeamTaskCreate(deps.service, params),
+    ...taskSearchMeta("add a task to the team board, register a work item for the team to claim, break work into claimable team tasks", ["add team task", "claimable work item", "team tasklist entry"]),
   }
 }
 
 export function createTeamTaskListTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "task_list", label: "Task List", description: "Team tasklist: list entries, optionally filtered by status (pending, claimed, in_progress, completed, deleted) or owner. Child-agent state lives in task_output, not here.", parameters: TeamTaskListParams, execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params) }
+  return {
+    name: "task_list",
+    label: "Task List",
+    description: "Lists the entries on a running team's shared tasklist, optionally filtered by status or owner, for when the user wants to see what work items exist and who holds them. Child-agent run state is read through task_output, not here.",
+    parameters: TeamTaskListParams,
+    execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params),
+    ...taskSearchMeta("see the team task board, what work items are pending or claimed, who owns which team task", ["team task list", "task board", "who owns a task", "pending team tasks"]),
+  }
 }
 
 export function createTeamTaskGetTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "task_get", label: "Task Get", description: "Read one team tasklist entry by id; returns not_found if absent. The task_id is a tasklist id, not a child st_... id; use task_output for child agents.", parameters: TeamTaskGetParams, execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params) }
+  return {
+    name: "task_get",
+    label: "Task Get",
+    description: "Reads one entry from a running team's shared tasklist by its tasklist id, for when the user needs a single item's details or status. A child agent's output is read through task_output with its st_... id, not here.",
+    parameters: TeamTaskGetParams,
+    execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params),
+    ...taskSearchMeta("read one team task, check a work item's status or description by id", ["read team task", "task details", "task by id"]),
+  }
 }
 
 export function createTeamTaskUpdateTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "task_update", label: "Task Update", description: "Update a team tasklist entry's status. Transitions run pending -> claimed -> in_progress -> completed, with deleted allowed from any state; status='claimed' claims it for owner (defaults to the lead). Illegal moves return already_claimed, blocked_by, invalid_transition, or cross_owner.", parameters: TeamTaskUpdateParams, execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params) }
+  return {
+    name: "task_update",
+    label: "Task Update",
+    description: "Moves one entry on a running team's shared tasklist between pending, claimed, in_progress, completed, and deleted, for when the user or a member marks work started, finished, or abandoned. The transition rules and claim owner are enforced by the service.",
+    parameters: TeamTaskUpdateParams,
+    execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params),
+    ...taskSearchMeta("mark a team task done or in progress, claim or release a work item, change a task's status on the team board", ["mark task done", "claim task", "update task status", "task progress"]),
+  }
 }

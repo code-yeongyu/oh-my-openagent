@@ -37,7 +37,7 @@ describe("admitSuspendedBatch two-OS-process race", () => {
   test(
     "#given two OS processes over one store with 8 suspended and cap 5 #when both admit from a shared barrier #then total claims never exceed the cap and never duplicate",
     async () => {
-      // given: one store, 8 suspended candidates, cap 5, zero current residents
+      // given: one store, 4 in-flight and 4 terminal candidates, cap 5, zero current residents
       const store = tempStore()
       const ids = ["st_00000090", "st_00000091", "st_00000092", "st_00000093", "st_00000094", "st_00000095", "st_00000096", "st_00000097"]
       ids.forEach((id, index) => {
@@ -72,22 +72,24 @@ describe("admitSuspendedBatch two-OS-process race", () => {
         Promise.all(stderr),
       ])
 
-      // then: both batches completed and their COMBINED claims respect the cap exactly
+      // then: both batches completed and their COMBINED in-flight claims respect the cap exactly
       for (const [index, exitCode] of exitCodes.entries()) {
         expect(exitCode, `stdout:\n${outputs[index]}\nstderr:\n${errors[index]}`).toBe(0)
       }
       const results = outputs.map(parseRaceResult)
       const claimed = results.flatMap((result) => result.claimed)
+      const nonTerminalIds = ids.filter((_, index) => index % 2 === 0)
+      const terminalIds = ids.filter((_, index) => index % 2 === 1)
       expect(new Set(claimed).size).toBe(claimed.length)
-      expect(claimed).toHaveLength(5)
+      expect(new Set(claimed)).toEqual(new Set(nonTerminalIds))
 
-      // and the persisted state agrees: exactly 5 residents, 3 still suspended, none lost
+      // and the persisted state agrees: exactly 4 residents, 4 terminal records still suspended, none lost
       const fresh = createTaskRecordStore({ project_dir: store.stateDir, task: { state_dir: store.stateDir } })
       const records = fresh.list().records.filter((record) => record.parent_session_id === "parent-1")
-      expect(records.filter((record) => record.residency_state === "resident")).toHaveLength(5)
-      expect(
-        records.filter((record) => record.residency_state === "persisted_only" || record.residency_state === "rpc_detached"),
-      ).toHaveLength(3)
+      expect(new Set(records.filter((record) => record.residency_state === "resident").map((record) => record.task_id))).toEqual(new Set(nonTerminalIds))
+      expect(new Set(records
+        .filter((record) => record.residency_state === "persisted_only" || record.residency_state === "rpc_detached")
+        .map((record) => record.task_id))).toEqual(new Set(terminalIds))
 
       // and every claim is stamped with one of the two CHILD pids - proof the claims crossed processes
       const childPids = new Set(results.map((result) => result.pid))

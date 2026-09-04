@@ -1,6 +1,6 @@
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"])
 
-function isUnsafeObjectKey(key: string): boolean {
+export function isUnsafeObjectKey(key: string): boolean {
   return DANGEROUS_KEYS.has(key)
 }
 
@@ -23,14 +23,9 @@ function sanitizeOmoConfigValue(value: unknown): unknown {
   return sanitized
 }
 
-function mergeCodegraphExcludedRoots(base: readonly unknown[], override: readonly unknown[]): unknown[] {
-  return [...new Set([...base, ...override])]
-}
-
 export function mergeOmoConfigRecords(
   base: Readonly<Record<string, unknown>>,
   override: Readonly<Record<string, unknown>>,
-  parentKey?: string,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...base }
 
@@ -38,11 +33,9 @@ export function mergeOmoConfigRecords(
     if (isUnsafeObjectKey(key)) continue
     const safeValue = sanitizeOmoConfigValue(value)
     const baseValue = result[key]
-    result[key] = key === "excluded_roots" && parentKey === "codegraph" && Array.isArray(baseValue) && Array.isArray(safeValue)
-      ? mergeCodegraphExcludedRoots(baseValue, safeValue)
-      : isPlainObject(baseValue) && isPlainObject(safeValue)
-        ? mergeOmoConfigRecords(baseValue, safeValue, key)
-        : safeValue
+    result[key] = isPlainObject(baseValue) && isPlainObject(safeValue)
+      ? mergeOmoConfigRecords(baseValue, safeValue)
+      : safeValue
   }
 
   return result

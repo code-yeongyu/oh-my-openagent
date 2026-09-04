@@ -175,7 +175,7 @@ oh-my-opencode/
 │   │       ├── agents/          # agent factories (Sisyphus, Hephaestus, Oracle, ...)
 │   │       ├── hooks/           # lifecycle hooks, 5-tier composition (see AGENTS.md for current counts)
 │   │       ├── tools/           # native tool dirs, config-gated (LSP via MCP, ast-grep via skill)
-│   │       ├── mcp/             # built-in MCPs: remote (websearch, context7, grep_app) + local stdio (lsp, codegraph)
+│   │       ├── mcp/             # built-in MCPs: remote (websearch, context7, grep_app) + local stdio (lsp)
 │   │       ├── features/        # feature modules (background-agent, skill-loader, tmux, MCP-OAuth, boulder-state, monitor, ...)
 │   │       ├── config/          # Zod v4 schema system
 │   │       ├── shared/          # Cross-cutting utilities

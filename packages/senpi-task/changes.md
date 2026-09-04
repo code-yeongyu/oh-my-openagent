@@ -1,3 +1,9 @@
+
+## 2026-09-04 — Defer the lead tasklist tools to tool_search
+
+The four lead tasklist tools (`task_create`, `task_get`, `task_list`, `task_update`) register with `exposure: "search"` (plus `searchText`/`searchKeywords`/`searchGroup: "team-tasklist"`/`allowLazyActivation`) instead of the resident tool list. They only matter once a team exists, so they cost no prompt tokens until a tasklist operation is searched for and promote through `tool_search` on demand. Descriptions now lead with the selecting situation. `src/tools/team/tasklist-exposure.test.ts` pins the exposure on all four.
+
+
 ## 2026-08-28 — Align the task engine with Senpi 2026.8.28
 
 `packages/senpi-task/package.json` now carries the exact published

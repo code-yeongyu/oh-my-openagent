@@ -31,7 +31,7 @@ Installing works only with an explicit opt-in:
 npm i -g omo-ai@beta
 ```
 
-Repository beta releases are dispatched with `/publish <explicit-semver>`, for example `/publish 5.0.0-beta.9`. The command sends that exact value through the workflow's `version` input, records the returned workflow run ID, and follows only that run. Release notes compare a beta against the preceding beta in the same channel, and the GitHub release is created with prerelease metadata explicitly set.
+Repository beta releases are dispatched with `/publish <explicit-semver>`, for example `/publish 5.0.0-beta.9`. The command sends that exact value through the workflow's `version` input, records the returned workflow run ID, and follows only that run. Release notes compare a beta against the preceding beta in the same channel. The GitHub release itself is always a full release, never a GitHub pre-release: the npm dist-tag carries the channel semantics. The **Latest** badge is decided by [`script/release-latest-flag.ts`](../../script/release-latest-flag.ts) from the highest already published semver (`Bun.semver` ordering, non-semver tags such as `_pr-attachments` ignored), not by creation order, so a hotfix dispatched for an older line gets `--latest=false` and does not steal the badge. That badge is load-bearing: the compiled `omo` binary's update hint downloads from `releases/latest/download/<asset>`.
 
 ## Trusted Publisher (MERGE GATE, currently UNVERIFIED)
 
@@ -105,6 +105,22 @@ Order matters:
 2. Then `npm i -g omo-ai@beta`.
 
 Machines already on a renamed release have no global `omo` and install cleanly in one step.
+
+## Runtime selection (bun wherever it exists)
+
+The launcher (`bin/lib/bun-runtime.js`) runs the product on bun whenever the machine has one, with
+no configuration. First match wins:
+
+1. already running on bun - stay (loop guard);
+2. `OMO_RUNTIME=node` - stay; the only way to keep a bun machine on node;
+3. no bun binary (`$BUN_INSTALL/bin`, `~/.bun/bin`, then PATH) - stay; npm-only machines never notice;
+4. `OMO_RUNTIME=bun` - re-exec under the discovered bun, no version check (explicit opt-in);
+5. the script lives in bun's global tree (`bun add -g`) - re-exec; the bun that installed omo runs it;
+6. any other install (npm, project-local, `bunx`) - probe `bun --version` once per node boot and
+   re-exec when it is >= `BUN_MIN_VERSION` (1.4.0, the engine's verified floor); an older bun, or one
+   that cannot answer within 3s, leaves the launch on node.
+
+The engine inherits the answer through `SENPI_RUNTIME`, so launcher and engine never disagree.
 
 ## Bun-global launcher shim (POSIX)
 

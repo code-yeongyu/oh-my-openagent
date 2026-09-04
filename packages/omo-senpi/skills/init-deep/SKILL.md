@@ -1,6 +1,6 @@
 ---
 name: init-deep
-description: "(builtin) Initialize hierarchical AGENTS.md knowledge base"
+description: "Initializes a hierarchical AGENTS.md knowledge base for a project. Use when a repo needs its structure, commands, and conventions documented for agents."
 ---
 # /init-deep
 

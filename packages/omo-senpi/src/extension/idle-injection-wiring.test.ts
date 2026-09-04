@@ -25,7 +25,7 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
       resolveOmoBin: () => "/tmp/omo",
-      planDirExists: () => true,
+      planExists: () => true,
       runCommand: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator: coordinator })
 

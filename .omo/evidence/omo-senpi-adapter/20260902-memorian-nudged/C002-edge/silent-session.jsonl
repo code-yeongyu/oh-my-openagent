@@ -1,0 +1,5 @@
+{"type":"session","version":3,"id":"qa-silent-20260902","cwd":"/tmp/memorian-nudged-silent"}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"turn one"}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"turn two"}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}

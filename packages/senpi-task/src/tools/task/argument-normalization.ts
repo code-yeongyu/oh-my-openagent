@@ -44,6 +44,7 @@ function taskItem(value: unknown): TaskItem | undefined {
   const name = identifier(value.name)
   const model = identifier(value.model)
   const loadSkills = stringList(value.load_skills)
+  const runInBackground = booleanFlag(value.run_in_background)
 
   return {
     prompt,
@@ -54,7 +55,12 @@ function taskItem(value: unknown): TaskItem | undefined {
     ...(name === undefined ? {} : { name }),
     ...(model === undefined ? {} : { model }),
     ...(loadSkills === undefined ? {} : { load_skills: loadSkills }),
+    ...(runInBackground === undefined ? {} : { run_in_background: runInBackground }),
   }
+}
+
+function booleanFlag(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined
 }
 
 function taskItems(value: unknown): TaskItem[] | undefined {
@@ -87,7 +93,7 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
   const name = identifier(raw.name)
   const model = identifier(raw.model)
   const loadSkills = stringList(raw.load_skills)
-  const runInBackground = typeof raw.run_in_background === "boolean" ? raw.run_in_background : undefined
+  const runInBackground = booleanFlag(raw.run_in_background)
 
   return {
     ...(prompt === undefined ? {} : { prompt }),

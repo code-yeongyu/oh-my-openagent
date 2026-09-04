@@ -1,0 +1,316 @@
+{
+  "queryId": "q17",
+  "lane": "web",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"삼성전자 HBM 시장 반응 since:2026-08-14 until:2026-08-27\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-14",
+        "to_date": "2026-08-27"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788423273,
+    "completed_at": 1788423273,
+    "id": "f961b507-f2fc-9cf8-ab39-9597f935012f",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_f961b507-f2fc-9cf8-ab39-9597f935012f_call-3431abf0-f3a3-461b-9790-1f326733a795-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "삼성전자 HBM 시장 반응",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.mt.co.kr/industry/2026/07/15/2026071515184935358"
+            },
+            {
+              "type": "url",
+              "url": "https://www.cna.com.tw/news/afe/202605290140.aspx"
+            },
+            {
+              "type": "url",
+              "url": "https://www.segye.com/newsView/20260623504144"
+            },
+            {
+              "type": "url",
+              "url": "https://www.businesspost.co.kr/BP?command=article_view&num=440632"
+            },
+            {
+              "type": "url",
+              "url": "https://www.chaincatcher.com/zh-tw/article/2279143"
+            },
+            {
+              "type": "url",
+              "url": "https://www.theblockbeats.info/news/63474"
+            },
+            {
+              "type": "url",
+              "url": "https://en.fnnews.com/news/202608310944394777"
+            },
+            {
+              "type": "url",
+              "url": "https://www.ajunews.com/view/20260824144015652"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mt.co.kr/industry/2025/12/14/2025121413485892165"
+            },
+            {
+              "type": "url",
+              "url": "https://www.junggi.co.kr/news/articleView.html?idxno=36755"
+            },
+            {
+              "type": "url",
+              "url": "https://n.news.naver.com/article/016/0002690803"
+            },
+            {
+              "type": "url",
+              "url": "https://n.news.naver.com/article/421/0009136402"
+            },
+            {
+              "type": "url",
+              "url": "https://www.donga.com/news/Economy/article/all/20260623/134164302/1"
+            },
+            {
+              "type": "url",
+              "url": "https://www.eet-china.com/news/202609012788.html"
+            },
+            {
+              "type": "url",
+              "url": "https://news.futunn.com/en/post/78039564/bernstein-analysis-samsung-accelerates-hbm4-volume-ramp-up-q3-revenue"
+            },
+            {
+              "type": "url",
+              "url": "https://www.joongang.co.kr/article/25432519"
+            },
+            {
+              "type": "url",
+              "url": "https://www.choicestock.co.kr/stock/news_view/136414?bu="
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/en/stock/12140044"
+            },
+            {
+              "type": "url",
+              "url": "https://biz.heraldcorp.com/article/10665257"
+            },
+            {
+              "type": "url",
+              "url": "https://www.sedaily.com/article/14164537"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_f961b507-f2fc-9cf8-ab39-9597f935012f_call-3431abf0-f3a3-461b-9790-1f326733a795-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**삼성전자 HBM 시장 반응(2026년 기준)**은 대체로 **매우 긍정적**이며, “삼성이 돌아왔다”는 평가가 지배적입니다. SK하이닉스에 뒤처졌던 HBM 사업에서 HBM4(6세대)를 세계 최초 양산하며 빠르게 추격·역전할 것이라는 전망이 나오고 있습니다.\n\n### 주요 시장·증권사 전망 요약\n- **2027년 HBM 시장 점유율 1위 예상**:\n  - Bernstein(번스타인): 2027년 삼성 46%, SK하이닉스 37%, Micron 18%.[[1]](https://www.businesspost.co.kr/BP?command=article_view&num=440632)\n  - UBS: 2027년 삼성 41%, SK하이닉스 39%.[[2]](https://www.mt.co.kr/industry/2026/07/15/2026071515184935358)\n\n- **HBM4 실적 폭발적 성장**:\n  - 양산 4개월 만에 **매출 10억 달러(약 1.5조 원)** 돌파 (2026년 6월 기준, 6월 말 12억 달러 예상).[[3]](https://www.segye.com/newsView/20260623504144)\n  - 연간 HBM4 매출 **100억 달러(약 15조 원)** 이상 전망.[[4]](https://www.donga.com/news/Economy/article/all/20260623/134164302/1)\n  - 2026년 하반기 HBM 매출 중 HBM4 비중 **60% 초과** 예상.[[5]](https://www.chaincatcher.com/zh-tw/article/2279143)\n  - 3분기 HBM 매출은 전분기 대비 3배 이상 증가할 가능성 (Bernstein 분석: 120억 달러 수준 가능).[[6]](https://www.theblockbeats.info/news/63474)\n\n- **고객 기반 다변화**:\n  - 기존 엔비디아 중심에서 구글·AMD·브로드컴·아마존·MS·메타 등 **ASIC(주문형반도체) 고객**이 크게 확대.[[2]](https://www.mt.co.kr/industry/2026/07/15/2026071515184935358)\n  - HBM4E(7세대) 샘플을 경쟁사보다 먼저 출하하며 시장 선점 움직임.[[7]](https://www.cna.com.tw/news/afe/202605290140.aspx)\n\n### 증권사 목표주가 및 평가 변화\n- LS증권: 삼성전자 목표주가 **40만원 → 45만원** 상향 (HBM4 혼합 비율 35%, 수율 개선). SK하이닉스 목표주가는 **330만원 → 240만원** 대폭 하향.[[8]](https://en.fnnews.com/news/202608310944394777)\n- HBM4 양산 안정성·수율 개선으로 “HBM 사업이 삼성전자 밸류에이션 할인 요인에서 벗어나고 있다”는 평가.[[9]](https://www.mk.co.kr/en/stock/12140044)\n\n### 시장 반응 요약\n- **긍정적**: HBM4의 기술 우위(속도 11.7Gbps, 전력 효율 개선), 빠른 양산·매출 달성, 고객 다변화, 2027년 점유율 1위 전망 등으로 **반도체 사업 부활** 기대감이 높음.\n- **일부 신중론**: 아직 SK하이닉스가 HBM3E 등에서 강세를 유지하고 있으며, 엔비디아 공급망에서는 SK하이닉스가 여전히 앞선다는 분석도 존재.[[10]](https://www.junggi.co.kr/news/articleView.html?idxno=36755)\n\n전반적으로 2026년 들어 **삼성전자의 HBM 사업이 급반전**하고 있다는 것이 시장 컨센서스입니다. HBM4의 본격 양산 확대와 HBM4E 출시가 2026~2027년 실적과 주가에 중요한 촉매로 작용할 전망입니다.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://www.businesspost.co.kr/BP?command=article_view&num=440632",
+                "start_index": 255,
+                "end_index": 327,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.mt.co.kr/industry/2026/07/15/2026071515184935358",
+                "start_index": 362,
+                "end_index": 429,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.segye.com/newsView/20260623504144",
+                "start_index": 524,
+                "end_index": 576,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.donga.com/news/Economy/article/all/20260623/134164302/1",
+                "start_index": 619,
+                "end_index": 693,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.chaincatcher.com/zh-tw/article/2279143",
+                "start_index": 739,
+                "end_index": 796,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.theblockbeats.info/news/63474",
+                "start_index": 864,
+                "end_index": 912,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.mt.co.kr/industry/2026/07/15/2026071515184935358",
+                "start_index": 999,
+                "end_index": 1066,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.cna.com.tw/news/afe/202605290140.aspx",
+                "start_index": 1110,
+                "end_index": 1166,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://en.fnnews.com/news/202608310944394777",
+                "start_index": 1288,
+                "end_index": 1340,
+                "title": "8"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.mk.co.kr/en/stock/12140044",
+                "start_index": 1404,
+                "end_index": 1449,
+                "title": "9"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.junggi.co.kr/news/articleView.html?idxno=36755",
+                "start_index": 1660,
+                "end_index": 1726,
+                "title": "10"
+              }
+            ]
+          }
+        ],
+        "id": "msg_f961b507-f2fc-9cf8-ab39-9597f935012f",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 221943500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 221943500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:14:33.158Z"
+}

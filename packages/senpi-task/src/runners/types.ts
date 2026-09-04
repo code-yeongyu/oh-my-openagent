@@ -46,6 +46,7 @@ export type ChildHandle = {
   subscribe(listener: ChildEventListener): () => void
   waitForIdle(): Promise<void>
   waitForOutcome?(): Promise<RunnerOutcome>
+  hasExited?(): boolean
   lastAssistantText(): string | undefined
   dispose(): Promise<void>
 }

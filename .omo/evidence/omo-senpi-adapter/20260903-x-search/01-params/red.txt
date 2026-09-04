@@ -1,0 +1,4 @@
+Command: cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search && bun test packages/omo-senpi/src/components/thread/params.test.ts
+RED result: 0 pass, 1 fail, 1 error
+error: Cannot find module './params' from 'packages/omo-senpi/src/components/thread/params.test.ts'
+This is the expected pre-implementation module-missing failure.

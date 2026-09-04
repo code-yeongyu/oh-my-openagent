@@ -1,0 +1,118 @@
+### RED capture - todo 10 packaging (2026-09-03T05:58:37Z)
+
+$ bun test packages/omo-senpi/src/extension/component-list.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/extension/component-list.test.ts:
+19 | 
+20 |     // when
+21 |     const occurrences = names.filter((name) => name === "x-search")
+22 | 
+23 |     // then
+24 |     expect(occurrences).toEqual(["x-search"])
+                             ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "x-search",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/extension/component-list.test.ts:24:25)
+(fail) createOmoSenpiComponents > #given the production registration array #when x-search is looked up #then it is present exactly once [3.13ms]
+32 |     const lspIndex = names.indexOf("lsp")
+33 |     const xSearchIndex = names.indexOf("x-search")
+34 |     const taskIndex = names.indexOf("task")
+35 | 
+36 |     // then
+37 |     expect(xSearchIndex).toBe(lspIndex + 1)
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: 14
+Received: -1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/extension/component-list.test.ts:37:26)
+(fail) createOmoSenpiComponents > #given the production registration array #when ordering is inspected #then x-search registers after lsp and before task tool capture [0.15ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [1.84s]
+exit=1
+
+$ bun test packages/omo-senpi/src/components/task/task-skill-loader.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/task/task-skill-loader.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'packagedSkillDirs' not found in module '/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/task/task-skill-loader.ts'.
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [551.00ms]
+exit=1
+
+$ bun test packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './stage-x-search-skill.mjs' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [473.00ms]
+exit=1
+
+$ bun test packages/omo-senpi/src/plugin-manifest.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/plugin-manifest.test.ts:
+(pass) OMO Senpi plugin manifest > #given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory [1.02ms]
+(pass) OMO Senpi plugin manifest > #given the Senpi package is one generated runtime unit #when loaded #then npm dependency and workspace surfaces stay absent [2.05ms]
+77 |     expect(manifest.keywords).toContain("pi-package")
+78 |     expect(manifest.keywords).toContain("senpi")
+79 |     expect(manifest.keywords).toContain("omo")
+80 |     expect(manifest.keywords).toContain("oh-my-openagent")
+81 |     expect(manifest.keywords).toContain("pi")
+82 |     expect(manifest.files).toEqual([
+                                ^
+error: expect(received).toEqual(expected)
+
+  [
+    "extensions",
+    "skills",
+-   "skills-conditional",
+    "runtime",
+    "scripts/install.mjs",
+    "README.md",
+    "NOTICE",
+    "LICENSE",
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/plugin-manifest.test.ts:82:28)
+(fail) OMO Senpi plugin manifest > #given package metadata #when loaded #then Pi discoverability and shipped files are pinned [0.44ms]
+(pass) OMO Senpi plugin manifest > #given root and adapter versions #when compared #then the plugin manifest stays in lockstep [0.27ms]
+
+ 3 pass
+ 1 fail
+ 16 expect() calls
+Ran 4 tests across 1 file. [506.00ms]
+exit=1

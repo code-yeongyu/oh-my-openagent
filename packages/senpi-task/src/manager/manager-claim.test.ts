@@ -130,17 +130,22 @@ describe("TaskManager claim characterization", () => {
     }
     const nowSnapshot = Date.now()
     const clock = () => (Math.floor(nowSnapshot / 65_536) + 10_000_000) * 65_536
-    const firstTaskId = `st_${Math.floor(clock() / 65_536).toString(16).padStart(8, "0")}`
+    // The process-wide id floor (syncTaskIdFloor) may already exceed the clock-derived candidate
+    // when sibling test files seeded higher fixture ids (e.g. st_deadbeef) in this process, so the
+    // first id cannot be pinned to the clock. Probe the allocator, then assert the RELATIONSHIP the
+    // test is about: an id-shaped requested name forces the unnamed sibling past it, names unique.
+    const probe = await managerWithStore(createTaskRecordStore({ project_dir: tempProject() }), new FakeRunner(), new FakeRunner(), clock).manager.start(baseSpec())
+    if (probe.kind !== "started") throw new Error("expected probe to start")
+    const firstTaskId = bumpTaskId(probe.task_id as `st_${string}`)
     const { manager } = managerWithStore(invariantStore, new FakeRunner(), new FakeRunner(), clock)
 
     // when
-    const first = await manager.start(baseSpec({ name: bumpTaskId(firstTaskId as `st_${string}`) }))
+    const first = await manager.start(baseSpec({ name: bumpTaskId(firstTaskId) }))
     const second = await manager.start(baseSpec())
 
     // then
     if (first.kind !== "started" || second.kind !== "started") throw new Error("expected both tasks to start")
-    expect(first.task_id).toBe(firstTaskId)
-    expect(first.name).toBe(bumpTaskId(firstTaskId as `st_${string}`))
+    expect(first.name).toBe(bumpTaskId(firstTaskId))
     expect(second.task_id).toBe(bumpTaskId(first.name as `st_${string}`))
     expect(second.name).toBe(second.task_id)
   })

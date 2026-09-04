@@ -21,8 +21,8 @@
 //
 // Scenarios:
 //   a HAPPY          two-turn session; turn 1 names a seeded token, stub child nudges the seeded
-//                    note, turn 2's JSONL carries the omo-memorian:recall entry with
-//                    <recalled-memory source="[[reference/project/test-note.md]]" and the stub hint.
+//                    note, turn 2's JSONL carries the omo-memorian:nudged entry with the stub hint
+//                    while the hidden omo-memorian:recall message remains unchanged.
 //   b DISABLED       memory.recall.enabled=false -> zero entries, and the stub child never runs.
 //   c NO-CANDIDATES  unrelated prompts -> the runner never spawns (stub never runs).
 //   d INVALID-NUDGE  stub emits an out-of-candidate path AND a >200-char hint -> zero injection.
@@ -67,6 +67,7 @@ const OUT_OF_CANDIDATE_PATH = "reference/project/not-a-candidate.md"
 const OVERLONG_HINT = `x${"y".repeat(220)}`
 
 const RECALL_CUSTOM_TYPE = "omo-memorian:recall"
+const NUDGED_ENTRY_TYPE = "omo-memorian:nudged"
 const outDir = process.env.MEMORIAN_GATE_OUT_DIR ?? join(scriptDir, "live-gate")
 
 const results = []
@@ -250,7 +251,8 @@ function stubInvocations(logPath) {
   for (const line of readFileSync(logPath, "utf8").split("\n")) {
     if (line.trim() === "") continue
     try {
-      out.push(JSON.parse(line))
+      const invocation = JSON.parse(line)
+      if (invocation.memorianSentinel === "1" && typeof invocation.nudgePath === "string" && invocation.argv?.includes("--tools") && invocation.argv?.[invocation.argv.indexOf("--tools") + 1] === "nudge,read") out.push(invocation)
     } catch {
       // A truncated tail line is not an invocation record.
     }
@@ -529,11 +531,13 @@ async function scenarioHappy() {
   }
   const snapshot2 = sessionFileEntries(sessionFiles(sandbox), SESSION_IDS.HAPPY)
   const recall2 = recallEntries(snapshot2.entries)
+  const nudged2 = snapshot2.entries.filter((entry) => entry.type === "custom" && entry.customType === NUDGED_ENTRY_TYPE)
   const joined2 = recall2.map((entry) => entry.content).join("\n")
   const pending2 = pendingState(memoryHome)
   const ledger2 = ledgerState(memoryHome)
 
-  record(`${name} turn 2 JSONL contains an ${RECALL_CUSTOM_TYPE} entry`, recall2.length >= 1, `count=${recall2.length} shapes=${recall2.map((entry) => entry.shape).join(",")}`)
+  record(`${name} turn 2 JSONL contains an ${NUDGED_ENTRY_TYPE} entry`, nudged2.length >= 1, `count=${nudged2.length}`)
+  record(`${name} turn 2 JSONL still carries the hidden ${RECALL_CUSTOM_TYPE} message`, recall2.length >= 1, `count=${recall2.length} shapes=${recall2.map((entry) => entry.shape).join(",")}`)
   record(`${name} turn 2 content carries <recalled-memory source="[[${NOTE_PATH}]]"`, joined2.includes(`<recalled-memory source="[[${NOTE_PATH}]]"`), joined2.slice(0, 400))
   record(`${name} turn 2 content carries the stub judge's hint verbatim`, joined2.includes(STUB_HINT), joined2.slice(0, 400))
   record(`${name} the pending file was consumed by the injection`, !pending2.files.some((file) => (file.payload?.nudges ?? []).some((nudge) => nudge.path === NOTE_PATH)), JSON.stringify(pending2).slice(0, 400))
@@ -543,6 +547,7 @@ async function scenarioHappy() {
   writeArtifact("happy-final-state.json", {
     sessionFiles: snapshot2.matched.map(basename),
     recall: recall2,
+    nudged: nudged2,
     stubInvocations: stubInvocations(stub.logPath),
     pending: pending2,
     ledger: ledger2,

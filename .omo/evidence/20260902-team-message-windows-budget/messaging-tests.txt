@@ -1,0 +1,8 @@
+Command:
+bun test ./packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts
+
+Observed:
+41 pass
+0 fail
+138 expect() calls
+Ran 41 tests across 1 file. [22.80s]

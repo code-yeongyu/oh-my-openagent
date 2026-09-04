@@ -34,6 +34,9 @@ export type ManagedChildHandle = {
   abort(): Promise<void>
   subscribe(listener: ManagedChildListener): () => void
   waitForOutcome(): Promise<RunnerOutcome>
+  // RPC handles expose a settled process signal; in-process handles omit it because their session
+  // lifecycle has no separate child process to observe.
+  hasExited?(): boolean
   switchSession?(sessionPath: string): Promise<RpcSwitchSessionResult>
   getEntries?(since?: string): Promise<RpcEntriesResult>
   // Partial assistant text captured so far (used by interrupt to preserve work-in-progress).
@@ -77,6 +80,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
     abort: () => handle.abort(),
     subscribe: (listener) => handle.subscribe(listener),
     waitForOutcome: () => handle.waitForOutcome === undefined ? rpcOutcome(handle) : handle.waitForOutcome(),
+    hasExited: () => handle.hasExited?.() ?? handle.exitOutcome() !== undefined,
     ...(switchSession === undefined ? {} : { switchSession: (sessionPath: string) => switchSession(sessionPath) }),
     ...(getEntries === undefined ? {} : { getEntries: (since?: string) => getEntries(since) }),
     lastAssistantText: () => handle.lastAssistantText(),

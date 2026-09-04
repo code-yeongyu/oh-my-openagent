@@ -1,0 +1,8 @@
+{"type":"session","version":3,"id":"qa-skipped-20260902","cwd":"/tmp/memorian-nudged-skipped"}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"turn one lexical candidate"}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"turn two lexical candidate"}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"turn three lexical candidate"}]}}
+{"type":"custom","customType":"omo-memorian:gate","data":{"version":1,"status":"skipped","cause":"category_unavailable: quick"}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}

@@ -1,26 +1,27 @@
 # omo.json Configuration Reference
 
-`omo.json` (or `omo.jsonc`) is the single harness-spanning configuration surface owned by [`@oh-my-opencode/omo-config-core`](../../packages/omo-config-core/AGENTS.md). It is the only config file read by the OpenCode plugin, by the Senpi adapter (task, codegraph, config-watch), and by the Codex codegraph loader. The legacy OpenCode-family files (`oh-my-openagent.json[c]` / `oh-my-opencode.json[c]`) and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration from legacy files](#migration-from-legacy-files)).
+`omo.json` (or `omo.jsonc`) is the single harness-spanning configuration surface owned by [`@oh-my-opencode/omo-config-core`](../../packages/omo-config-core/AGENTS.md). It is the only config file read by the OpenCode plugin, by the Senpi adapter (task, config-watch), and by Codex. The legacy OpenCode-family files (`oh-my-openagent.json[c]` / `oh-my-opencode.json[c]`) and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration from legacy files](#migration-from-legacy-files)).
 
-Files may be JSONC: `//` comments and trailing commas are allowed. Strict typed blocks reject unknown keys and report a diagnostic rather than silently ignoring them. The `[opencode]` block is intentionally a freeform record so it can carry the full plugin configuration.
+Files may be JSONC: `//` comments and trailing commas are allowed. Strict typed blocks reject malformed values and report a diagnostic rather than silently accepting them; unknown keys are ignored with an `unknown-keys` diagnostic (see [Safety and failure handling](#file-locations-and-precedence)) so a retired or mistyped key never costs you the rest of the layer. The `[opencode]` block is intentionally a freeform record so it can carry the full plugin configuration.
 
 ## File locations and precedence
 
 The loader resolves layers in `resolveOmoConfigPaths` and folds them lowest-to-highest, so the **last** layer merged wins (`packages/omo-config-core/src/loader/paths.ts`, `loader.ts`).
 
-1. **User layer (lowest precedence).** `omo.jsonc`, falling back to `omo.json`, under `~/.omo` on every platform. This is the same root that already holds omo runtime state (`teams/`, `rules/`, `plans/`, `codegraph/`, `lsp-daemon/`), so there is one user-scope omo directory and one only.
+1. **User layer (lowest precedence).** `omo.jsonc`, falling back to `omo.json`, under `~/.omo` on every platform. This is the same root that already holds omo runtime state (`teams/`, `rules/`, `plans/`, `lsp-daemon/`), so there is one user-scope omo directory and one only.
 2. **Project layers.** `.omo/omo.jsonc` (then `.omo/omo.json`) in every directory from the current working directory up to `$HOME`. Farther ancestors are merged first; the **nearest** project file has the highest precedence and beats the user layer. `$HOME` itself is skipped by this walk, because `~/.omo` is already the user layer and must not be counted twice.
 
 Merge rules (`loader/merge.ts`):
 
 - Plain objects deep-merge recursively.
-- Scalars and arrays replace the lower layer wholesale, except `codegraph.excluded_roots`, which unions and deduplicates entries across layers.
+- Scalars and arrays replace the lower layer wholesale.
 - `__proto__`, `prototype`, and `constructor` keys are stripped from both merge keys and nested values (prototype-pollution guard).
 
 Safety and failure handling:
 
 - A symlinked project `.omo` directory or a symlinked project config file is skipped as a load source (`loader/paths.ts`).
 - A missing, unreadable, or invalid layer becomes an entry in the result's `diagnostics` and is skipped; loading continues.
+- Unrecognized keys anywhere in a layer are ignored and reported through an `unknown-keys` diagnostic that names each dotted key path (for example `profiles.opus.retired_key`), while malformed values still reject that layer.
 - If the merged config fails final validation, the loader returns the all-default config plus one `validation` diagnostic instead of throwing (`loader/loader.ts`).
 
 ## `$schema`
@@ -96,7 +97,6 @@ No default profiles ship. A profile exists only when you write one under `profil
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json", // optional editor pointer
   "categories": {},     // record<string, CategoryConfig>
   "agents": {},         // record<string, AgentDef>
-  "codegraph": {},      // CodeGraph MCP settings
   "task": {},           // task engine settings
   "teams": {},          // record<string, TeamSpec>
   "models": {},         // record<string, ModelCatalogEntry>, shared model catalog
@@ -116,13 +116,13 @@ Source: `packages/omo-config-core/src/schema/config.ts`.
 
 ### Harness blocks
 
-`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[senpi]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `codegraph`, `git_master`, `task`, `teams`, `models`, `memory`, `telemetry`), so a harness-specific override stays schema-checked.
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[senpi]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `memory`, `telemetry`), so a harness-specific override stays schema-checked.
 
 Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
 
 ### `telemetry` (Senpi harness)
 
-The optional `telemetry` block controls OmO Native product telemetry in Senpi. `telemetry.enabled` is a boolean and defaults to `true`, so telemetry ships enabled. Set it to `false` to turn telemetry off. This setting applies only to Senpi and is separate from `codegraph.telemetry`.
+The optional `telemetry` block controls OmO Native product telemetry in Senpi. `telemetry.enabled` is a boolean and defaults to `true`, so telemetry ships enabled. Set it to `false` to turn telemetry off. This setting applies only to Senpi.
 
 ```jsonc
 {
@@ -253,24 +253,6 @@ curated read-only agent "momus" cannot be a team member; delegate via the task t
 
 Team members always spawn in `process` mode, which cannot carry the curated persona or tool policy, so delegate to these agents through the task tool instead of naming them as team members.
 
-### `codegraph`
-
-CodeGraph MCP settings (`schema/codegraph.ts`), read by all three harnesses. Defaults: `enabled`, `auto_provision`, and `daemon` default to `true`; `telemetry` defaults to `false`; `install_dir`, `watch_debounce_ms`, `excluded_roots`, and `session_start_cooldown_ms` (minimum 60000) are optional. Not every key applies to every harness (`schema/codegraph.ts` `SETTING_HARNESS_SUPPORT`): `daemon` and `excluded_roots` apply to Codex and OpenCode, `session_start_cooldown_ms` is Codex-only, and `watch_debounce_ms` applies to OpenCode and the legacy `omo` harness id; unsupported keys surface as diagnostics.
-
-| Field | Type | Default | Notes |
-|-------|------|---------|-------|
-| `daemon` | boolean | `true` | Applies to Codex and OpenCode. When `true`, the pin is omitted so upstream CodeGraph may use its shared daemon. When `false`, the managed MCP environment pins `CODEGRAPH_NO_DAEMON=1`. Senpi does not support this setting. |
-
-There is no environment override for this setting. `codegraph.daemon` (default `true`) controls whether the managed MCP environment omits `CODEGRAPH_NO_DAEMON` or pins `CODEGRAPH_NO_DAEMON=1`. An ambient `CODEGRAPH_NO_DAEMON=1` can still force daemon-off when config leaves daemon enabled.
-
-```jsonc
-{
-  "codegraph": {
-    "daemon": false
-  }
-}
-```
-
 ### `task`
 
 Task engine settings. The whole object is optional, but `provider_concurrency`, `model_concurrency`, `state_dir`, and `reattach_on_reconcile` are optional and remain unset when omitted (`schema/task.ts`).
@@ -325,7 +307,7 @@ Each member shares a base (`name` matching `^[a-z0-9-]+$`, optional `cwd`, `work
 
 ### `profiles`
 
-A record of profile name to a partial view (`schema/config.ts` `OmoConfigProfileSchema`). Each profile accepts the shared base keys (`categories`, `agents`, `codegraph`, `task`, `teams`, `models`, `memory`, `telemetry`) plus `[opencode]`, `[senpi]`, and `[codex]` blocks of its own:
+A record of profile name to a partial view (`schema/config.ts` `OmoConfigProfileSchema`). Each profile accepts the shared base keys (`categories`, `agents`, `task`, `teams`, `models`, `memory`, `telemetry`) plus `[opencode]`, `[senpi]`, and `[codex]` blocks of its own:
 
 ```jsonc
 {
@@ -403,10 +385,10 @@ The migration engine rewrites the persisted config in place, and doctor reports 
 
 ## Migration from legacy files
 
-Before the unification, the OpenCode plugin read a walked `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` chain and the Codex/Senpi codegraph surface read `~/.omo/config.jsonc`. Those files are history: a lock-and-journal migration engine imports them into `omo.jsonc` once, and nothing reads them at runtime afterward.
+Before the unification, the OpenCode plugin read a walked `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` chain and the Codex/Senpi harnesses read `~/.omo/config.jsonc`. Those files are history: a lock-and-journal migration engine imports them into `omo.jsonc` once, and nothing reads them at runtime afterward.
 
 - The legacy OpenCode user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy `profiles/<name>/` directory becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; project `.opencode/` files import into that project's `.omo/omo.jsonc`.
-- `~/.omo/config.jsonc` imports its shared `codegraph` settings and its `[opencode]` / `[codex]` blocks; a legacy `[omo]` block maps to `[senpi]`.
+- `~/.omo/config.jsonc` imports its `[opencode]` / `[codex]` blocks; a legacy `[omo]` block maps to `[senpi]`.
 - No-clobber: a value already present in the target wins, and skipped legacy values surface as diagnostics. Legacy migration history is preserved under `legacy_migrations`, and applied migrations are marked in the target's `_migrations` array (`2026-07-opencode-config-unification` for the `oh-my-*` files, `2026-07-codex-config-jsonc` for `~/.omo/config.jsonc`, and `2026-08-reasoning-unification` for persisted model and reasoning fields).
 - Sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`).
 - Triggers: OpenCode plugin startup, Senpi startup, and install run both migration groups; Codex startup runs only the `config.jsonc` group; `oh-my-openagent config migrate` runs both on demand (`--dry-run`, `--json`).
@@ -415,7 +397,7 @@ Full user-facing detail: [`docs/reference/configuration.md`](./configuration.md#
 
 ## Mixed-version compatibility
 
-The unified file is read starting with oh-my-openagent 5.0.0 (current `5.0.0-beta.13`): the OpenCode plugin, the Senpi adapter, and the Codex codegraph loader at 5.0.0 or later all load `~/.omo/omo.jsonc` plus walked project `.omo/omo.jsonc` and nothing else. Harnesses from 4.x still read the legacy files, which the migration has moved into the backup directory.
+The unified file is read starting with oh-my-openagent 5.0.0 (current `5.0.0-beta.13`): the OpenCode plugin, the Senpi adapter, and the Codex plugin at 5.0.0 or later all load `~/.omo/omo.jsonc` plus walked project `.omo/omo.jsonc` and nothing else. Harnesses from 4.x still read the legacy files, which the migration has moved into the backup directory.
 
 One sharp edge when mixing versions: every schema object is `.strict()`. A pre-unification copy of `@oh-my-opencode/omo-config-core` rejects an `omo.jsonc` that contains keys it does not know, which includes `models`, `profiles`, and the `[opencode]` / `[senpi]` / `[codex]` harness blocks. An older strict core handed a newer unified file fails validation on those keys instead of ignoring them.
 

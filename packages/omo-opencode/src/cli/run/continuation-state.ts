@@ -45,7 +45,7 @@ async function hasActiveBoulderContinuation(
   client?: RunContext["client"],
 ): Promise<boolean> {
   const boulder = readBoulderState(directory)
-  if (!boulder) return false
+  if (!boulder || !boulder.active_plan) return false
 
   const progress = getPlanProgress(resolveBoulderPlanPath(directory, boulder))
   if (progress.isComplete) return false
