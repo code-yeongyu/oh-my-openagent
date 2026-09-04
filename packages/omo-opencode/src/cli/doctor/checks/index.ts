@@ -1,6 +1,7 @@
 import type { CheckDefinition } from "../framework/types"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import { checkSystem, gatherSystemInfo } from "./system"
+import { checkInstallShadowing } from "./install-shadowing"
 import { checkConfig } from "./config"
 import { checkDeprecatedReasoningKeys } from "./deprecated-reasoning-keys"
 import { checkTools, gatherToolsSummary } from "./tools"
@@ -24,6 +25,11 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
       name: CHECK_NAMES[CHECK_IDS.SYSTEM],
       check: checkSystem,
       critical: true,
+    },
+    {
+      id: CHECK_IDS.INSTALL_SHADOWING,
+      name: CHECK_NAMES[CHECK_IDS.INSTALL_SHADOWING],
+      check: checkInstallShadowing,
     },
     {
       id: CHECK_IDS.CONFIG,
