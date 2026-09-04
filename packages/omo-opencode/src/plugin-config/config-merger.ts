@@ -11,6 +11,7 @@ export function mergeConfigs(
     agents: deepMerge(base.agents, override.agents),
     categories: deepMerge(base.categories, override.categories),
     team_mode: deepMerge(base.team_mode, override.team_mode),
+    tui: deepMerge(base.tui, override.tui),
     agent_definitions: mergeUniqueStrings(base.agent_definitions, override.agent_definitions),
     disabled_agents: mergeUniqueStrings(base.disabled_agents, override.disabled_agents),
     disabled_mcps: mergeUniqueStrings(base.disabled_mcps, override.disabled_mcps),
