@@ -202,6 +202,12 @@ export async function checkExtensionCurrent(options = {}) {
       return { ok: false, reason: "stale-output", output }
     }
     if (!artifactsMatch(currentTask, await readFile(expectedTaskOutput, "utf8"))) {
+      if (process.env.OMO_KEEP_STALE_REBUILD !== undefined) {
+        const keep = process.env.OMO_KEEP_STALE_REBUILD
+        await mkdir(keep, { recursive: true })
+        await writeFile(join(keep, "committed-omo-task.js"), currentTask)
+        await writeFile(join(keep, "rebuilt-omo-task.js"), await readFile(expectedTaskOutput, "utf8"))
+      }
       return { ok: false, reason: "stale-output", output: taskOutput }
     }
     if (!artifactsMatch(currentMember, await readFile(expectedMemberOutput, "utf8"))) {

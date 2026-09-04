@@ -445,11 +445,19 @@ jobs:
       # which are backslash-separated on Windows, so the source digest is platform-dependent and
       # a committed artifact can never match on every OS. One platform is enough to catch drift.
       - name: Verify committed Senpi plugin bundle is current
+        id: bundle-check
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
         shell: bash
+        env:
+          OMO_KEEP_STALE_REBUILD: ${{ runner.temp }}/stale-sidecar
         run: |
           set -euo pipefail
           node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+
+      - name: Diff the stale sidecar (probe)
+        if: failure() && steps.bundle-check.outcome == 'failure'
+        shell: bash
+        run: node script/ci-stale-sidecar-diff.cjs "${{ runner.temp }}/stale-sidecar"
 
       - name: Run Senpi compatibility tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
