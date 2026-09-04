@@ -23,11 +23,13 @@ import { createConnection } from "node:net"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { resolveDesktopRoot } from "./plan-scenarios.mjs"
+
 const here = dirname(fileURLToPath(import.meta.url))
 
 export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
 export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? "/Users/yeongyu/local-workspaces/senpi-thread-tools"
-export const DESKTOP_ROOT = process.env.THREAD_QA_DESKTOP_ROOT ?? "/Users/yeongyu/local-workspaces/omo-desktop-thread-tools"
+export const DESKTOP_ROOT = resolveDesktopRoot(process.env)
 
 const SENPI_QA_LIB = join(SENPI_ROOT, "packages", "coding-agent", "scripts", "qa-app-server", "lib")
 const SENPI_CLI = join(SENPI_ROOT, "packages", "coding-agent", "src", "cli.ts")
