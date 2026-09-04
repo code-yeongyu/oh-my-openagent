@@ -80,6 +80,11 @@ const EXPECTED_CONFIG = {
     max_depth: 1,
     residency_max_children: Math.min(16, Math.max(8, availableParallelism() * 2)),
     resume_children: true,
+    fallback_delegate: {
+      enabled: true,
+      max_handoff_bytes: 32_768,
+      recent_tail_messages: 8,
+    },
     team: {
       max_members: 8,
       max_parallel_members: 4,

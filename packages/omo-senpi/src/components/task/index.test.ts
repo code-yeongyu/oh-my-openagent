@@ -41,6 +41,7 @@ const TASK_EVENTS = [
   "model_select",
   "before_agent_start",
   "agent_end",
+  "retry_fallback_exhausted",
 ]
 const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_shutdown"]
 const DAG_LIFECYCLE_EVENTS = ["session_start", "session_before_switch", "session_shutdown", "session_shutdown"]
@@ -294,6 +295,22 @@ describe("omo-senpi task component wiring", () => {
     expect(pi.handlers.map((handler) => handler.event)).toEqual(["session_start"])
     expect(pi.messageRenderers).toEqual([])
     expect(logger.entries).toContainEqual({ level: "info", message: "omo-senpi task component disabled by flag" })
+  })
+
+  it("#given fallback delegation disabled in omo.json #when the task component registers #then no exhaustion handler is wired", async () => {
+    const project = tempProject()
+    mkdirSync(join(project, ".omo"), { recursive: true })
+    writeFileSync(
+      join(project, ".omo", "omo.json"),
+      JSON.stringify({ task: { fallback_delegate: { enabled: false } } }),
+      "utf8",
+    )
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+
+    await createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
+
+    expect(pi.handlers.map((handler) => handler.event)).not.toContain("retry_fallback_exhausted")
   })
 
   it("#given a malformed omo.json #when the component registers #then it boots with defaults and still wires the tools", async () => {

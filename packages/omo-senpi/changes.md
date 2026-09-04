@@ -1,3 +1,23 @@
+## 2026-09-04 — Delegate context-incompatible fallback exhaustion once
+
+Senpi can now report that every remaining retry-fallback rung is too small for
+the live conversation. The task component subscribes to that typed lifecycle
+event and starts one background child with the exact rejected selector, or an
+explicit `task.fallback_delegate.model` override.
+
+The handoff is deterministic JSON bounded by
+`task.fallback_delegate.max_handoff_bytes`; it carries the latest user request,
+latest compaction, latest `senpi.todo-state`, and a configurable recent message
+tail. A failed assistant entry is the dedupe key, so duplicate exhaustion
+notifications cannot start a second child for the same turn. The handler
+returns before child startup settles and fails closed for RPC child processes,
+visible partial output, missing requests, malformed context, ordinary
+exhaustion, and disabled configuration.
+
+Expected conflict zones: the task settings schema, task component registration
+in `src/components/task/index.ts`, and the `task` table in
+`docs/reference/omo-json.md`.
+
 ## 2026-08-29 — Teach "mass ulw research" the mass path
 
 A combined mass + research invocation collected at team scale instead of mass

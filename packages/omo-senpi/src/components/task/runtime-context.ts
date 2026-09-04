@@ -15,6 +15,7 @@ export interface LiveTaskContext {
   readonly sessionManager?: {
     getSessionId(): string
     getSessionFile?(): string | undefined
+    getEntries?(): readonly unknown[]
   }
   isIdle?(): boolean
 }

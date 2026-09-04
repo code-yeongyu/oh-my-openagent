@@ -96,12 +96,24 @@ All defaults live in `omo.json` under `task` and `teams`. A minimal project conf
   "task": {
     "default_execution_mode": "in-process",
     "reattach_on_reconcile": true,
+    "fallback_delegate": {
+      "enabled": true,
+      "max_handoff_bytes": 32768,
+      "recent_tail_messages": 8
+    },
     "wait": { "default_ms": 90000 }
   }
 }
 ```
 
 The schema default for `task.wait.default_ms` is 60,000 ms; the 90,000 ms value above is only a sample override. Full field reference, defaults, layer precedence, harness blocks, and profile resolution are in [`docs/reference/omo-json.md`](../reference/omo-json.md).
+
+Fallback delegation applies only when Senpi has no context-compatible fallback
+rung. It replaces that failed fallback attempt with one fresh background child;
+it does not add calls to successful turns and does not recurse from RPC task
+children. Set `task.fallback_delegate.enabled` to `false` to turn it off, or set
+`task.fallback_delegate.model` to an exact selector that should override the
+rejected candidate.
 
 `packages/omo-opencode` is a separate build that still uses its prior task/team names; cross-edition parity is a deliberate follow-up outside this Senpi guide.
 
