@@ -90,4 +90,41 @@ describe("dispatchFallbackRetry", () => {
     expect(state.pendingFallbackModel).toBe(undefined)
     expect(state.failedModels.size).toBe(0)
   })
+
+  test("#given fallback dispatch is accepted #when fallback retry runs #then the watchdog acceptance callback receives the fallback generation", async () => {
+    // given
+    const toastMessages: string[] = []
+    const deps = createDeps(toastMessages)
+    const acceptedFallbacks: Array<{ sessionID: string; model: string; agent: string | undefined }> = []
+    deps.onFallbackAccepted = (sessionID, model, agent) => {
+      acceptedFallbacks.push({ sessionID, model, agent })
+    }
+    const sessionID = "session-accepted-fallback-watchdog"
+    const state = createFallbackState("openai/gpt-5.4")
+    deps.sessionStates.set(sessionID, state)
+    const helpers: AutoRetryHelpers = {
+      abortSessionRequest: async () => {},
+      clearSessionFallbackTimeout: () => {},
+      scheduleSessionFallbackTimeout: () => {},
+      autoRetryWithFallback: async () => ({ accepted: true, status: "dispatched" }),
+      resolveAgentForSessionFromContext: async () => undefined,
+      cleanupStaleSessions: () => {},
+    }
+
+    // when
+    await dispatchFallbackRetry(deps, helpers, {
+      sessionID,
+      state,
+      fallbackModels: ["litellm/openai.eu.gpt-5.5"],
+      resolvedAgent: "sisyphus-junior",
+      source: "session.error",
+    })
+
+    // then
+    expect(acceptedFallbacks).toEqual([{
+      sessionID,
+      model: "litellm/openai.eu.gpt-5.5",
+      agent: "sisyphus-junior",
+    }])
+  })
 })

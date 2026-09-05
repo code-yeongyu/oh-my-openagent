@@ -3,6 +3,7 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { createFirstPromptWatchdog, observeEventForWatchdog, type FirstPromptWatchdog } from "./first-prompt-watchdog"
+import { createFallbackState } from "./fallback-state"
 
 const WATCHDOG_MS = 100
 const SAFE_WAIT_BEFORE_FIRE_MS = 40
@@ -196,6 +197,30 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given a parent session stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model", async () => {
+    // given
+    const sessionID = "session-silent-parent"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toEqual([{
+      sessionID,
+      newModel: FALLBACK_MODEL,
+      resolvedAgent: AGENT,
+      source: "first-prompt-watchdog",
+    }])
+
+    watchdog.dispose()
+  })
+
   it("#given a subagent produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched", async () => {
     // given
     const sessionID = "session-makes-progress"
@@ -214,6 +239,34 @@ describe("first-prompt-watchdog", () => {
     // then
     expect(calls.abort).toEqual([])
     expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given a fallback prompt is accepted after the original user event #when the watchdog is re-armed #then the fallback generation receives a fresh silence window", async () => {
+    // given
+    const sessionID = "session-fallback-watchdog-rearm"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+    deps.sessionStates.set(sessionID, createFallbackState(PRIMARY_MODEL))
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
+
+    // when
+    watchdog.onFallbackAccepted(sessionID, FALLBACK_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS * 2)
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toHaveLength(1)
 
     watchdog.dispose()
   })
@@ -282,11 +335,11 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
-  it("#given the session is not a subagent #when a user message is observed #then the watchdog never arms and nothing fires", async () => {
+  it("#given a parent session has no fallback configured #when a user message is observed #then the watchdog does not abort or dispatch", async () => {
     // given
     const sessionID = "session-not-a-subagent"
     // NOT added to subagentSessions
-    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const deps = createDeps()
     const calls: RecordedCalls = { abort: [], autoRetry: [] }
     const helpers = createHelpers(calls, AGENT)
     const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
@@ -356,6 +409,7 @@ function createRecordingWatchdog(calls: RecordedWatchdogCalls): FirstPromptWatch
     onUserMessage(sessionID, model, agent) {
       calls.user.push({ sessionID, model, agent })
     },
+    onFallbackAccepted() {},
     onAssistantProgress(sessionID) {
       calls.progress.push(sessionID)
     },

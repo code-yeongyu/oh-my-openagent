@@ -15,6 +15,7 @@ function createRecordingWatchdog(calls: RecordedWatchdogCalls): FirstPromptWatch
     onUserMessage(sessionID) {
       calls.user.push(sessionID)
     },
+    onFallbackAccepted() {},
     onAssistantProgress(sessionID) {
       calls.progress.push(sessionID)
     },

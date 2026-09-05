@@ -96,4 +96,5 @@ export interface HookDeps {
    * loop (every cycle started over at attempt:1). See issue #4006.
    */
   internallyAbortedSessions: Set<string>
+  onFallbackAccepted?: (sessionID: string, model: string, agent?: string) => void
 }
