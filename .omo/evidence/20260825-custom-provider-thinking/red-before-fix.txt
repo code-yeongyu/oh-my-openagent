@@ -1,0 +1,3 @@
+(fail) createChatParamsHandler > injects anthropic thinking when variant cannot resolve on a metadata-less custom provider [5.76ms]
+ 6 pass
+ 1 fail
