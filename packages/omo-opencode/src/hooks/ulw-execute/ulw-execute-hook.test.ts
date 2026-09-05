@@ -9,7 +9,7 @@ import { readBoulderState, clearBoulderState } from "../../features/boulder-stat
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createUlwExecuteHook } from "./ulw-execute-hook"
 import { ULW_EXECUTE_TEMPLATE } from "../../features/builtin-commands/templates/ulw-execute"
-import { createPrDeliveryBlock } from "./worktree-block"
+import { createPrDeliveryBlock, INTEGRATION_HOLD_MARKER } from "./worktree-block"
 
 describe("ulw-execute hook platform session ids", () => {
   let testDir: string
@@ -200,5 +200,88 @@ describe("ulw-execute template label matches the activated agent (#5499)", () =>
     // hook only fires on messages containing this marker, so the shipped
     // template must keep it (#5499).
     expect(ULW_EXECUTE_TEMPLATE).toContain("You are starting an Atlas work session.")
+  })
+})
+
+describe("ulw-execute hook integration hold routing", () => {
+  let testDir: string
+
+  function createUlwExecutePromptWithArgs(args: string): string {
+    return `<command-instruction>
+You are starting an Atlas work session.
+</command-instruction>
+
+<session-context>
+Session ID: $SESSION_ID
+</session-context>
+
+<user-request>
+${args}
+</user-request>`
+  }
+
+  function createHookWithAutoMerge(dir: string, autoMerge: boolean | undefined) {
+    return createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
+      directory: dir,
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }), autoMerge === undefined ? undefined : { ulwExecute: { auto_merge: autoMerge } })
+  }
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `ulw-execute-hook-integration-hold-${randomUUID()}`)
+    mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
+    writeFileSync(join(testDir, ".omo", "plans", "work.md"), "# Work\n- [ ] First task\n")
+    clearBoulderState(testDir)
+  })
+
+  afterEach(() => {
+    clearBoulderState(testDir)
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given auto_merge false #when processing #then the integration hold block is injected", async () => {
+    // given
+    const hook = createHookWithAutoMerge(testDir, false)
+    const output = { parts: [{ type: "text", text: createUlwExecutePromptWithArgs("work") }] }
+
+    // when
+    await hook["chat.message"]({ sessionID: "hold-sess" }, output)
+
+    // then
+    expect(output.parts[0].text).toContain(INTEGRATION_HOLD_MARKER)
+  })
+
+  test.each([
+    { label: "auto_merge true", autoMerge: true },
+    { label: "auto_merge unset", autoMerge: undefined },
+  ])("#given $label #when processing #then no integration hold block is injected", async ({ autoMerge }) => {
+    // given
+    const hook = createHookWithAutoMerge(testDir, autoMerge)
+    const output = { parts: [{ type: "text", text: createUlwExecutePromptWithArgs("work") }] }
+
+    // when
+    await hook["chat.message"]({ sessionID: "no-hold-sess" }, output)
+
+    // then
+    expect(output.parts[0].text).not.toContain(INTEGRATION_HOLD_MARKER)
+  })
+
+  test("#given auto_merge false with --make-pr #when processing #then PR delivery wins and no hold block is injected", async () => {
+    // given
+    const hook = createHookWithAutoMerge(testDir, false)
+    const output = { parts: [{ type: "text", text: createUlwExecutePromptWithArgs("work --make-pr") }] }
+
+    // when
+    await hook["chat.message"]({ sessionID: "pr-wins-sess" }, output)
+
+    // then
+    expect(output.parts[0].text).toContain(createPrDeliveryBlock({ makePr: true, ship: false }, undefined))
+    expect(output.parts[0].text).not.toContain(INTEGRATION_HOLD_MARKER)
   })
 })

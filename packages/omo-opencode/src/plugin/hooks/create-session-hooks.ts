@@ -178,7 +178,7 @@ export function createSessionHooks(args: {
     : null
 
   const ulwExecute = isHookEnabled("ulw-execute")
-    ? safeHook("ulw-execute", () => createUlwExecuteHook(ctx))
+    ? safeHook("ulw-execute", () => createUlwExecuteHook(ctx, { ulwExecute: pluginConfig.ulw_execute }))
     : null
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")

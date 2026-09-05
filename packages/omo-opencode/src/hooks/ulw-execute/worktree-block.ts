@@ -30,3 +30,20 @@ export function createPrDeliveryBlock(flags: PrDeliveryFlags, worktreePath: stri
 
   return `\n${heading}\n\nDeliver this work as a pull request.\n${worktreeInstruction}\n- On completion: commit, push the branch, and open a reviewer-readable PR (plain-language summary, changes grouped by area, QA evidence with artifact paths, risks).\n${completionInstruction}`
 }
+
+export const INTEGRATION_HOLD_MARKER = "## Integration Hold (ulw_execute.auto_merge: false)"
+
+export function createIntegrationHoldBlock(): string {
+  return `
+${INTEGRATION_HOLD_MARKER}
+
+The user disabled automatic integration for /ulw-execute. This OVERRIDES the WORKTREE COMPLETION section of the command template. When ALL plan tasks are complete:
+- Do NOT merge the feature branch into any branch.
+- Do NOT remove the feature worktree.
+- Honor the auto_commit setting for committing verified changes; committing stays independent of integration.
+- Stop the boulder after the final verification wave completes: do not start new continuation work for this plan.
+- Keep boulder.json on disk so the work can be resumed for integration later.
+- Report the branch name and worktree path to the user and state that the work awaits user integration approval.
+
+Explicit user instructions in this session take precedence over this hold.`
+}
