@@ -135,4 +135,48 @@ describe("keyword-detector ultrawork edge trigger", () => {
     expect(startLoopCalls).toHaveLength(0)
     expect(output.parts[0]?.text).toContain("what is ultrawork")
   })
+
+  test("#given ulw-plan and ulw-research skill names #when chat.message fires #then ultrawork stays inactive", async () => {
+    // given
+    const prompts = [
+      "ulw-plan",
+      "please run ulw-plan for this",
+      "ulw-research",
+      "please run ULW-RESEARCH for this",
+    ]
+
+    for (const prompt of prompts) {
+      const toastCalls: string[] = []
+      const hook = createKeywordDetectorHook(createMockPluginInput(toastCalls))
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: prompt }],
+      }
+
+      // when
+      await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
+
+      // then
+      expect(toastCalls).toHaveLength(0)
+      expect(output.parts[0]?.text).toBe(prompt)
+    }
+  })
+
+  test("#given ulw-loop skill name #when chat.message fires #then the distinct ultrawork loop boundary still activates", async () => {
+    // given
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput(toastCalls))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "use ulw-loop for this task" }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
+
+    // then
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+    expect(output.parts[0]?.text).toContain("<ultrawork-mode>")
+    expect(output.parts[0]?.text).toContain("use ulw-loop for this task")
+  })
 })

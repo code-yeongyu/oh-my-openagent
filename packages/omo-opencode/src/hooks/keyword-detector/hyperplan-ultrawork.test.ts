@@ -259,4 +259,62 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     expect(text).toContain("<hyperplan-ultrawork-mode>")
     expect(text).toContain("<output_verbosity_spec>")
   })
+
+  test("should NOT trigger combo on 'hpp ulw-research'", async () => {
+    // given - ulw-research is a skill name, not the ultrawork combo keyword
+    const sessionID = "combo-ulw-research-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "hpp ulw-research investigate auth" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - no combo, no ultrawork banner; hyperplan standalone may still fire
+    const text = textOf(output)
+    expect(text).not.toContain("<hyperplan-ultrawork-mode>")
+    expect(text).not.toContain("<ultrawork-mode>")
+  })
+
+  test("should NOT trigger combo on 'hpp ulw-plan'", async () => {
+    // given - ulw-plan is a skill name, not the ultrawork combo keyword
+    const sessionID = "combo-ulw-plan-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "hpp ulw-plan outline the roadmap" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - no combo, no ultrawork banner; hyperplan standalone may still fire
+    const text = textOf(output)
+    expect(text).not.toContain("<hyperplan-ultrawork-mode>")
+    expect(text).not.toContain("<ultrawork-mode>")
+  })
+
+  test("should still trigger combo on 'hpp ulw-loop'", async () => {
+    // given - ulw-loop is a valid ultrawork combo keyword
+    const sessionID = "combo-ulw-loop-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "hpp ulw-loop iterate on design" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - combo fires and suppresses standalone hyperplan
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-ultrawork-mode>")
+    expect(text).toContain("<ultrawork-mode>")
+    expect(text).not.toContain("<hyperplan-mode>")
+  })
 })
