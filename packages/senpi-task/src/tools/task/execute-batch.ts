@@ -171,7 +171,8 @@ async function waitForAll(input: ExecuteBatchInput, live: readonly LiveStart[]):
         return waited
       },
       (reason: unknown) => {
-        progress.settle(start.result.task_id, "error")
+        const aborted = input.signal?.aborted === true && reason === input.signal.reason
+        progress.settle(start.result.task_id, aborted ? "cancelled" : "error")
         throw reason
       },
     )))

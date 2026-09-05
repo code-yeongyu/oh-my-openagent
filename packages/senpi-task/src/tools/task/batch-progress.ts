@@ -1,7 +1,7 @@
 import type { AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 
 import type { TaskManager } from "../../manager"
-import { createChildProgress, type ChildProgressTarget } from "../../progress"
+import { createChildProgress, type ChildProgressTarget, type ToolProgressDetails } from "../../progress"
 import { composeStatusLine, formatStatusTarget, taskIdentityLabel } from "../../status-line"
 import { startedDetail, type StartedResult } from "./batch-item-details"
 import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolDetails } from "./types"
@@ -22,7 +22,7 @@ export type BatchProgressTracker = {
 type BatchProgressInput = {
   readonly manager: TaskManager
   readonly live: readonly LiveBatchStart[]
-  readonly onUpdate: AgentToolUpdateCallback<TaskToolDetails> | undefined
+  readonly onUpdate: AgentToolUpdateCallback<TaskToolDetails & Pick<ToolProgressDetails, "progress">> | undefined
 }
 
 const NO_PROGRESS: BatchProgressTracker = { settle: () => {}, stop: () => {} }
@@ -54,7 +54,17 @@ export function trackBatchProgress(input: BatchProgressInput): BatchProgressTrac
         status: "running",
         mode: "spawn",
         run_in_background: false,
-        items: input.live.map((start) => startedDetail(start.item, start.result, start.skills)),
+        progress: {
+          activity: rows.map((row) => rowText(row, settled)).join("\n"),
+          startedAt,
+        },
+        items: input.live.map((start) => {
+          const status = settled.get(start.result.task_id)
+          return {
+            ...startedDetail(start.item, start.result, start.skills),
+            ...(status === undefined ? {} : { status }),
+          }
+        }),
       },
     })
   }

@@ -143,6 +143,7 @@ describe("buildTaskExecute batch fanout", () => {
     let startIndex = 0
     let waitCalls = 0
     const cancelled: string[] = []
+    const updates: Array<Awaited<ReturnType<ReturnType<typeof buildTaskExecute>>>> = []
     const manager = createFakeManager({
       start: async (): Promise<StartResult> => {
         const taskId = IDS[startIndex]
@@ -174,7 +175,7 @@ describe("buildTaskExecute batch fanout", () => {
       "batch-abort",
       { category: "quick", tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] },
       controller.signal,
-      undefined,
+      (update) => { updates.push(update) },
       CTX,
     )
     // then
@@ -182,6 +183,7 @@ describe("buildTaskExecute batch fanout", () => {
     expect(cancelled).toEqual(IDS)
     expect(output.details.status).toBe("cancelled")
     expect(output.details.items?.map((item) => item.status)).toEqual(["cancelled", "cancelled", "cancelled"])
+    expect(updates.at(-1)?.details.items?.map((item) => item.status)).toEqual(["cancelled", "cancelled", "cancelled"])
   })
 
   test(" w2batch #given one tasks item #when compared with a legacy prompt #then the single-spawn result is identical", async () => {

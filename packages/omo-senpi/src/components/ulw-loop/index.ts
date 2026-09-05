@@ -267,6 +267,7 @@ function shouldRefreshFooterAfterToolResult(value: unknown): boolean {
     || toolName === "update_goal"
     || toolName === "bash"
     || toolName === "interactive_bash"
+    || toolName === "eval"
 }
 
 function cwdFromContext(value: unknown): string {

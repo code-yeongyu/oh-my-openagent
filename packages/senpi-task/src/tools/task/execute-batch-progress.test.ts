@@ -3,7 +3,15 @@ import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/sen
 
 import type { ManagedChildListener, StartResult } from "../../manager"
 import type { TaskRecord } from "../../state"
+import type { ToolProgressDetails } from "../../progress"
 import type { TaskToolDetails } from "./types"
+
+type BatchTaskToolDetails = TaskToolDetails & Pick<ToolProgressDetails, "progress">
+
+function progress(details: TaskToolDetails): ToolProgressDetails["progress"] {
+  if (!Object.hasOwn(details, "progress")) throw new Error("missing batch progress")
+  return (details as TaskToolDetails & Pick<ToolProgressDetails, "progress">).progress
+}
 import { CTX, createFakeManager, makeDeps, makeRecord } from "./__fixtures__/task-tool-fakes"
 import { buildTaskExecute } from "./execute"
 
@@ -73,7 +81,8 @@ describe("foreground batch progress", () => {
     expect(text(initial)).toContain("child-2")
     expect(initial.details).toMatchObject({ task_id: IDS[0], status: "running", run_in_background: false })
     expect(initial.details.items?.map((item) => item.task_id)).toEqual([...IDS])
-    expect("progress" in initial.details).toBe(false)
+    expect(progress(initial.details)).toMatchObject({ startedAt: expect.any(Number) })
+    expect(progress(initial.details).activity).toContain("child-1")
 
     // when: one child reports a tool call
     listeners.get(IDS[0])?.({ type: "tool_execution_start", toolName: "read", args: { path: "src/foo.ts" } })
@@ -97,6 +106,8 @@ describe("foreground batch progress", () => {
     const lastPartial = updates[updates.length - 1]
     if (lastPartial === undefined) throw new Error("no partial update before the final result")
     expect(text(lastPartial).match(/completed/g)?.length).toBe(2)
+    expect(lastPartial.details.items?.map((item) => item.status)).toEqual(["completed", "completed"])
+    expect(progress(lastPartial.details).activity.match(/completed/g)?.length).toBe(2)
   })
 
   test("#given a foreground batch without an update sink #when it runs #then no child subscription is opened", async () => {

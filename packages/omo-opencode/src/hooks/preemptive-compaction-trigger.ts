@@ -94,12 +94,18 @@ export async function runPreemptiveCompactionIfNeeded(args: {
       cached.modelID,
     )
 
+    const summarizePromise = ctx.client.session.summarize({
+      path: { id: sessionID },
+      body: { providerID: targetProviderID, modelID: targetModelID, auto: true },
+      query: { directory: ctx.directory },
+    })
+    void summarizePromise.then(
+      () => compactionInProgress.delete(sessionID),
+      () => compactionInProgress.delete(sessionID),
+    )
+
     await withTimeout(
-      ctx.client.session.summarize({
-        path: { id: sessionID },
-        body: { providerID: targetProviderID, modelID: targetModelID, auto: true },
-        query: { directory: ctx.directory },
-      }),
+      summarizePromise,
       PREEMPTIVE_COMPACTION_TIMEOUT_MS,
       `Compaction summarize timed out after ${PREEMPTIVE_COMPACTION_TIMEOUT_MS}ms`,
     )
@@ -128,7 +134,5 @@ export async function runPreemptiveCompactionIfNeeded(args: {
       })
       if (toastError instanceof Error) return
     })
-  } finally {
-    compactionInProgress.delete(sessionID)
   }
 }

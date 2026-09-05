@@ -179,7 +179,7 @@ describe("performXSearch", () => {
     expect(outcome.retryAfter).toBe(42)
   })
 
-  it("#given an aborted request #when performing the search #then it reports TIMEOUT", async () => {
+  it("#given a caller-aborted request before the deadline #when performing the search #then it does not report TIMEOUT", async () => {
     const controller = new AbortController()
     const fetchImpl: XSearchFetch = async (_url, init) => {
       controller.abort()
@@ -194,7 +194,29 @@ describe("performXSearch", () => {
 
     expect(outcome.ok).toBe(false)
     if (outcome.ok) throw new Error("expected failure")
-    expect(outcome.code).toBe("TIMEOUT")
+    expect(outcome.code).not.toBe("TIMEOUT")
+  })
+
+  it("#given caller abort happens before deadline expiry #when both abort causes race #then the caller classification wins", async () => {
+    const controller = new AbortController()
+    const fetchImpl: XSearchFetch = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        const signal = init?.signal
+        signal?.addEventListener("abort", () => {
+          setTimeout(() => {
+            const error = new Error("aborted")
+            error.name = "AbortError"
+            reject(error)
+          }, 15)
+        })
+        controller.abort()
+      })
+
+    const outcome = await performXSearch({ fetch: fetchImpl, bearer: "b", body: {}, signal: controller.signal, deadlineMs: 5 })
+
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) throw new Error("expected failure")
+    expect(outcome.code).toBe("UPSTREAM")
   })
 
   it("#given a deadline shorter than the response #when performing the search #then the request is aborted as TIMEOUT", async () => {

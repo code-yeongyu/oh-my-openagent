@@ -168,7 +168,7 @@ You don't need every provider. You need the right two.
 
 ### What if you already have a Claude subscription?
 
-Add `--claude=max20` (or `yes`) on install. The Claude chain default (Opus 5) activates for Sisyphus/Metis and you still get the OpenCode Go fallbacks for free. Pin `claude-opus-5` or `claude-fable-5` to run the current top Claude with Sisyphus/Atlas tuned prompts, or pin `opencode-go/kimi-k3` to run the top Kimi; Prometheus uses Fable 5 before its Kimi K3 fallback. Best-in-class orchestration + budget safety net.
+Add `--claude=max20` (or `yes`) on install. The Claude chain default (Opus 5) activates for Sisyphus/Metis and you still get the OpenCode Go fallbacks for free. Pin `claude-opus-5` or `claude-fable-5` to run the current top Claude with Sisyphus/Atlas tuned prompts, or pin `opencode-go/kimi-k3` to run the top Kimi; Prometheus uses Fable 5.1 before its Kimi K3 fallback. Best-in-class orchestration + budget safety net.
 
 ### What if you have zero subscriptions?
 
@@ -237,7 +237,7 @@ The priorities below include manual model choices. They are not a literal copy o
 
 | Priority | Model | Provider | Why |
 |---|---|---|---|
-| 1 | `claude-fable-5` / `claude-opus-5` | `anthropic`, `github-copilot`, `opencode` | Best overall compliance with the ~1,100-line Sisyphus prompt. Prometheus uses Fable 5 xhigh before Kimi K3 max; Metis uses Opus 5 high before Kimi K3 low. |
+| 1 | `claude-fable-5` / `claude-opus-5` | `anthropic`, `github-copilot`, `opencode` | Best overall compliance with the ~1,100-line Sisyphus prompt. Prometheus uses Fable 5.1 xhigh before Kimi K3 max; Metis uses Opus 5 high before Kimi K3 low. |
 | 2 | `claude-sonnet-5` | same | Faster, cheaper, still Claude. |
 | 3 | **`kimi-k3` - RECOMMENDED ALTERNATIVE (newest Kimi)** | `opencode-go`, `kimi-for-coding`, `moonshotai`, `opencode` | Strongest Kimi for Sisyphus. Use when you can accept the thinking-token cost; the prompt is calibrated to stop overthinking and keep work moving. |
 | 4 | **`kimi-k2.7` - RECOMMENDED ALTERNATIVE** | same as K3 | Restrained, outcome-first, and the top Kimi when Anthropic isn't connected. Agents with Kimi-specific prompt paths use their K2.7 tuning; Prometheus keeps its `ulw-plan`-backed prompt. |
@@ -270,7 +270,6 @@ The built-in `visual-engineering` category starts with Claude Fable 5.1:
 
 | Priority | Model | Provider | Why |
 |---|---|---|---|
-| 1 | `claude-opus-5` (`max`) | `anthropic`, `anthropic-api`, `github-copilot`, `opencode` | Primary UI/UX, CSS, design-token, and layout model. |
 | 1 | `claude-fable-5-1` (`max`) | `anthropic`, `anthropic-api`, `github-copilot`, `opencode` | Primary visual model. |
 | 2 | `claude-opus-5` (`max`) | `anthropic`, `anthropic-api`, `github-copilot`, `opencode` | Visual fallback when Fable 5.1 is unavailable. |
 | 3 | `kimi-k3` (`max`) | `opencode-go`, `kimi-for-coding`, `moonshotai`, `opencode` | Final built-in visual fallback. |
@@ -285,7 +284,7 @@ Gemini 3.1 Pro remains a visual-capable explicit override where a provider expos
 |---|---|---|
 | Claude Opus/Sonnet for Sisyphus | Kimi K3 → GPT-5.6 Sol (medium) → GLM 5.2 → Big Pickle | Kimi K2.7 is not an automatic rung |
 | GPT-5.6 Sol | Hephaestus: no automatic fallback. Oracle: Gemini 3.1 Pro → Claude Opus 5 → GLM 5.2 | DeepSeek v3.2 is not in these built-in chains |
-| `visual-engineering` primary | Claude Opus 5 → Kimi K3 → GLM 5.2 → GPT-6 Astra (high) → GPT-5.6 Sol (medium) | Qwen is not in the built-in chain |
+| `visual-engineering` primary | Claude Fable 5.1 → Claude Opus 5 → Kimi K3 | Qwen is not in the built-in chain |
 | GPT-6 Astra (`ultrabrain` / `deep` / `unspecified-high`) | `ultrabrain` and `deep`: GPT-5.6 Sol. `unspecified-high`: Claude Opus 5 → GLM 5.3 → Kimi K3 | Astra is not an automatic rung for any agent |
 | GPT 5.6 Luna Fast (Explore/Librarian) | DeepSeek v4 Flash (max) → Qwen 3.7 Plus → MiniMax M3 → MiniMax M3 plan aliases → MiniMax M2.7 → Claude Haiku 4.5 → GPT-5.4 Nano | Opus (massive cost waste) |
 
@@ -305,7 +304,7 @@ Exact current runtime chains from [`agent-model-requirements.ts`](../../packages
 | **librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
 | **explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
 | **multimodal-looker** | `gpt-5.6-sol` | `openai\|openai-codex\|opencode/gpt-5.6-sol (low)` → `opencode-go/kimi-k3` → `zai-coding-plan/glm-4.6v` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5-nano`
-| **prometheus** | `claude-fable-5` | `anthropic\|github-copilot\|opencode/claude-fable-5 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
+| **prometheus** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
 | **metis** | `claude-opus-5` | `anthropic\|github-copilot\|opencode/claude-opus-5 (high)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (low)`
 | **momus** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|openai-codex\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 | **atlas** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7`
@@ -552,7 +551,7 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
 - **Oracle → MiniMax**: Same reason. Oracle needs sustained reasoning; MiniMax drifts.
 - **Explore → Opus**: Massive cost waste. Explore needs speed, not intelligence.
 - **Librarian → Opus**: Same. Doc search doesn't need Opus-level reasoning.
-- **`visual-engineering` → utility/search models**: Keep this category on its approved Claude Opus 5 → Kimi K3 → GLM 5.2 → GPT-6 Astra (high) → GPT-5.6 Sol (medium) chain; MiniMax, Haiku, and search-oriented Qwen tiers are poor substitutes for visual implementation work.
+- **`visual-engineering` → utility/search models**: Keep this category on its approved Claude Fable 5.1 → Claude Opus 5 → Kimi K3 chain; MiniMax, Haiku, and search-oriented Qwen tiers are poor substitutes for visual implementation work.
 
 ---
 

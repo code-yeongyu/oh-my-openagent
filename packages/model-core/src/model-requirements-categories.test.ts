@@ -233,7 +233,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
-        variant: "xhigh",
+        variant: "max",
       },
       {
         providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],

@@ -17,6 +17,10 @@ describe("validateXSearchParams", () => {
     })
   })
 
+  test("rejects a blank query as INVALID_PARAMS", () => {
+    expect(validateXSearchParams({ query: "   " })).toMatchObject({ ok: false, code: "INVALID_PARAMS" })
+  })
+
   test("rejects both handle lists as INVALID_FILTERS", () => {
     expect(validateXSearchParams({ query: "x", allowed_x_handles: ["alice"], excluded_x_handles: ["bob"] })).toMatchObject({
       ok: false,

@@ -219,7 +219,7 @@ describe("omo-senpi ulw-loop continuation", () => {
   })
 
   it("#given goal active before ulw-loop #when a shell tool result activates the run #then the footer starts immediately", async () => {
-    for (const toolName of ["bash", "interactive_bash"]) {
+    for (const toolName of ["bash", "interactive_bash", "eval"]) {
       const pi = new FakeExtensionAPI()
       const outputs = [completeStatus(), activeStatus()]
       const calls: Array<{ bin: string; args: readonly string[]; cwd: string }> = []
