@@ -17,10 +17,11 @@ test("#given aggregate plugin manifest #when inspected #then it owns the omo nam
 	// then
 	assert.equal(manifest.name, "omo");
 	assert(Array.isArray(hookPaths));
-	assert.equal(hookPaths.length, 21);
+	assert.equal(hookPaths.length, 20);
 	assert(hookPaths.every((hookPath) => typeof hookPath === "string" && hookPath.startsWith("./hooks/")));
 	assert(!hookPaths.includes("./hooks/hooks.json"));
 	assert(!hookPaths.includes("./hooks/user-prompt-submit-selecting-lazycodex-workflow.json"));
+	assert(!hookPaths.includes("./hooks/subagent-stop-checking-ulw-execute-continuation.json"));
 	assert.equal(skillsPath, "./skills/");
 	assert.equal(mcpPath, "./.mcp.json");
 });
