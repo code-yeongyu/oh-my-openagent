@@ -29,7 +29,10 @@ export class CapturedCompletionApi implements ReflectionCompletionApi {
     renderer: EntryRenderer<unknown>
   }> = []
 
+  constructor(private readonly appendEntryFailureFor?: string) {}
+
   appendEntry<T = unknown>(customType: string, data?: T): void {
+    if (customType === this.appendEntryFailureFor) throw new Error(`append failed: ${customType}`)
     this.entries.push({ customType, data })
   }
 
@@ -81,6 +84,7 @@ export async function createRunnerHarness(options: {
   readonly resolveParentContextTokens?: () => number | undefined
   readonly resolveParentSessionFile?: () => string | undefined
   readonly resolveParentCacheReusable?: () => boolean
+  readonly appendEntryFailureFor?: string
 }): Promise<RunnerHarness> {
   const root = await mkdtemp(join(tmpdir(), "memory-reflection-worker-"))
   const identity: MemoryIdentity = {
@@ -150,7 +154,7 @@ export async function createRunnerHarness(options: {
     `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(preflightProbeLog)}, "probe\\n")\nprocess.stdout.write(${JSON.stringify(`${(options.preflightModels ?? models).map((candidate) => `${candidate.provider}/${candidate.id}`).join("\n")}\n`)})\n`,
     "utf8",
   )
-  const api = new CapturedCompletionApi()
+  const api = new CapturedCompletionApi(options.appendEntryFailureFor)
   const notifications: Array<{ message: string; level: string }> = []
   const spawnCalls: ReflectionSpawnArgs[] = []
   const runner = new SenpiSubprocessRunner({

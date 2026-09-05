@@ -78,6 +78,26 @@ describe("resolveSenpiLaunch", () => {
     expect(launch).toEqual({ command: process.execPath, prefixArgs: [entry] })
   }, 30_000)
 
+  // Regression: https://github.com/code-yeongyu/oh-my-openagent/issues/7815
+  test("#given stale install paths and a current PATH Senpi #when resolved #then the current executable is used", async () => {
+    // given
+    const root = await tempRoot()
+    const executable = join(root, "senpi")
+    await writeFile(executable, "console.log('senpi')\n")
+
+    // when
+    const launch = resolveSenpiLaunch({
+      SENPI_BIN: join(root, "deleted-senpi"),
+      PATH: root,
+    }, runtime({
+      argv: [process.execPath, join(root, "deleted-cli.js")],
+      resolveInstalledCli: () => null,
+    }))
+
+    // then
+    expect(launch).toEqual({ command: realpathSync.native(executable), prefixArgs: [] })
+  }, 30_000)
+
   test("#given no executable installed CLI or current entry #when resolved #then it fails instead of launching a bare interpreter", () => {
     // given
     const resolve = () => resolveSenpiLaunch({ PATH: "" }, runtime({

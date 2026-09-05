@@ -167,10 +167,10 @@ export function resolveSenpiExecutable(runtime: RpcSpawnRuntime): string | null 
   const binaryName = senpiBinaryName(runtime.platform)
   const override = runtime.parentEnv[SENPI_BIN_ENV]?.trim()
   if (override !== undefined && override.length > 0) {
-    if (override.includes("/") || override.includes(sep) || isAbsolute(override)) {
-      return canonicalExecutable(override)
-    }
-    return scanPathForExecutable(override, runtime.parentEnv.PATH)
+    const explicit = override.includes("/") || override.includes(sep) || isAbsolute(override)
+      ? canonicalExecutable(override)
+      : scanPathForExecutable(override, runtime.parentEnv.PATH)
+    if (explicit !== null) return explicit
   }
   const acceptParity = (candidate: string) => passesEngineParity(candidate, runtime)
   if (runtime.isBunBinary) {

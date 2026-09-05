@@ -170,6 +170,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     async afterBind(pi, sessionId, identity, eventCtx): Promise<void> {
       activeSession.current = sessionId
       lastEventCtx.current = eventCtx
+      runtimeWiring.captureSessionContext(eventCtx)
       reflectionLive.attach(sessionId)
       registerMemoryFilesystemPolicy(pi, identity)
       await runtimeFor(identity).reconcile()

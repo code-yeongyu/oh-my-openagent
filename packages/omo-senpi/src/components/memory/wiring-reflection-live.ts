@@ -126,6 +126,7 @@ export function createMemoryReflectionLiveWiring(
     },
     shutdown(identity): void {
       if (identity !== undefined) activeRuns.clear(identity)
+      liveSession.current = undefined
       footerLive.dispose()
       rpcBridge.current?.detach()
     },

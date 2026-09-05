@@ -15,7 +15,10 @@ import {
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
 import { MemorianGateRunner } from "./memorian-runner"
 import type { MemorianGatePort } from "./memorian-wiring"
-import { resolveMemoryModelRegistry } from "./model-registry-resolver"
+import {
+  resolveMemoryModelRegistry,
+  snapshotMemoryModelRegistry,
+} from "./model-registry-resolver"
 import { resolveMemorySessionModel } from "./session-model-resolver"
 import {
   resolveParentCacheReusable as resolveParentCacheReusableFromCtx,
@@ -23,11 +26,12 @@ import {
   resolveParentSessionFile as resolveParentSessionFileFromCtx,
 } from "./session-context-resolver"
 import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from "./trigger-wiring"
-import { isRecord, sessionIdFrom } from "./wiring-context"
+import { sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { ReflectionLiveSession, ReflectionSessionModel } from "./worker"
 
 export interface MemoryRuntimeWiring {
+  captureSessionContext(eventCtx: unknown): void
   resolveContext(sessionId: string): MemoryIdentityContext | undefined
   resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]>
   journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring
@@ -56,28 +60,48 @@ export function createMemoryRuntimeWiring(
   const journals = new Map<string, MemoryJournalWiring>()
   const factsWirings = new Map<string, MemoryFactsWiring>()
   const memorianRunners = new Map<string, MemorianGatePort>()
+  let sessionSnapshot: {
+    readonly modelRegistry: ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]>
+    readonly liveModelRegistry: ReturnType<typeof resolveMemoryModelRegistry>
+    readonly sessionModel: ReflectionSessionModel | undefined
+    readonly parentContextTokens: number | undefined
+    readonly parentSessionFile: string | undefined
+    readonly parentCacheReusable: boolean
+  } | undefined
 
   const resolveContext = (sessionId: string): MemoryIdentityContext | undefined =>
     options.sessions.get(sessionId)?.context
 
+  function captureSessionContext(eventCtx: unknown): void {
+    const liveModelRegistry = resolveMemoryModelRegistry(eventCtx)
+    sessionSnapshot = {
+      modelRegistry: snapshotMemoryModelRegistry(liveModelRegistry),
+      liveModelRegistry,
+      sessionModel: resolveMemorySessionModel(eventCtx),
+      parentContextTokens: resolveParentContextTokensFromCtx(eventCtx),
+      parentSessionFile: resolveParentSessionFileFromCtx(eventCtx),
+      parentCacheReusable: resolveParentCacheReusableFromCtx(eventCtx),
+    }
+  }
+
   function resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]> {
-    return resolveMemoryModelRegistry(lastEventCtx.current)
+    return sessionSnapshot?.modelRegistry
   }
 
   function resolveSessionModel(): ReflectionSessionModel | undefined {
-    return resolveMemorySessionModel(lastEventCtx.current)
+    return sessionSnapshot?.sessionModel
   }
 
   function resolveParentContextTokens(): number | undefined {
-    return resolveParentContextTokensFromCtx(lastEventCtx.current)
+    return sessionSnapshot?.parentContextTokens
   }
 
   function resolveParentSessionFile(): string | undefined {
-    return resolveParentSessionFileFromCtx(lastEventCtx.current)
+    return sessionSnapshot?.parentSessionFile
   }
 
   function resolveParentCacheReusable(): boolean {
-    return resolveParentCacheReusableFromCtx(lastEventCtx.current)
+    return sessionSnapshot?.parentCacheReusable ?? false
   }
 
   function journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring {
@@ -94,7 +118,6 @@ export function createMemoryRuntimeWiring(
   function factsWiringFor(identity: MemoryIdentityContext): MemoryFactsWiring {
     const cached = factsWirings.get(identity.identity)
     if (cached !== undefined) return cached
-    const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
     const createExtractor = options.createFactsExtractor
       ?? ((extractorOptions) => new FactsExtractorRunner(extractorOptions))
     const extractor = createExtractor({
@@ -105,7 +128,7 @@ export function createMemoryRuntimeWiring(
       },
       cwd: options.cwd(),
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
-      resolveModelRegistry,
+      resolveModelRegistry: () => sessionSnapshot?.liveModelRegistry,
       env: options.env,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
@@ -181,6 +204,7 @@ export function createMemoryRuntimeWiring(
   function triggerSessionFor(eventCtx: unknown): ReflectionTriggerSession | undefined {
     const sessionId = sessionIdFrom(eventCtx)
     if (sessionId === undefined) return undefined
+    captureSessionContext(eventCtx)
     const identity = resolveContext(sessionId)
     if (identity === undefined) return undefined
     const runtime = runtimeFor(identity)
@@ -220,10 +244,12 @@ export function createMemoryRuntimeWiring(
 
   function dreamSessionFor(eventCtx: unknown): DreamTriggerSession | undefined {
     const sessionId = sessionIdFrom(eventCtx)
+    if (sessionId !== undefined) captureSessionContext(eventCtx)
     return sessionId === undefined ? undefined : dreamSessionById(sessionId)
   }
 
   return {
+    captureSessionContext,
     resolveContext,
     resolveModelRegistry,
     journalWiringFor,
