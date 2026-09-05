@@ -1,0 +1,10 @@
+TARGET: bun.lock bun total_vulns= 21 fast-uri_vulns= 0
+TARGET: packages/omo-codex/plugin/package-lock.json npm total_vulns= 0 fast-uri_vulns= 0
+TARGET: packages/shared-skills/upstreams/open-design/pnpm-lock.yaml pnpm total_vulns= 102 fast-uri_vulns= 3
+    CVE-2026-13676 fast-uri@3.1.2
+    CVE-2026-16221 fast-uri@3.1.2
+    CVE-2026-18446 fast-uri@3.1.2
+TARGET: packages/shared-skills/upstreams/ui-ux-pro-max/cli/bun.lock bun total_vulns= 0 fast-uri_vulns= 0
+TARGET: packages/shared-skills/upstreams/ui-ux-pro-max/cli/package-lock.json npm total_vulns= 0 fast-uri_vulns= 0
+TARGET: packages/web/bun.lock bun total_vulns= 4 fast-uri_vulns= 0
+TARGET: tests/hashline/bun.lock bun total_vulns= 0 fast-uri_vulns= 0

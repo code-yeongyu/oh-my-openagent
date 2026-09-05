@@ -1,0 +1,7 @@
+trivy version: 0.74.0
+Version: 0.74.0
+Vulnerability DB:
+  Version: 2
+  UpdatedAt: 2026-09-01 01:14:10.330329814 +0000 UTC
+  NextUpdate: 2026-09-02 01:14:10.330329443 +0000 UTC
+  DownloadedAt: 2026-09-01 03:12:52.28634 +0000 UTC

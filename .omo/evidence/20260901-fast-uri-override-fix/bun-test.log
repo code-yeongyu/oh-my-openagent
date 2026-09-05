@@ -1,0 +1,477 @@
+bun test v1.4.0 (34cbb9a40)
+
+script/test-fast.test.ts:
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi
+$ bun run build:lsp-daemon && bun run build:ast-grep-mcp && bun run build:senpi-plugin:stage
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 52 packages, and audited 55 packages in 4s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm notice
+npm notice New minor version of npm available! 11.12.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && bun build src/cli.ts src/index.ts src/client.ts --outdir dist --target node --format esm && node scripts/stamp-dist-version.mjs
+
+Bundled 80 modules in 6ms
+
+  cli.js     235.46 KB  (entry point)
+  index.js   216.25 KB  (entry point)
+  client.js  213.80 KB  (entry point)
+
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 254 modules in 11ms
+
+  cli.js  84.65 KB  (entry point)
+
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] wrote 148 frontend reference files from submodules
+Staged Senpi LSP runtime: /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+
+added 75 packages, and audited 95 packages in 10s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.20 build
+> tsc -p tsconfig.build.json
+
+Bundled 38 modules in 5ms
+
+  cli.js  154.82 KB  (entry point)
+
+Usage:
+  omo-agent-toolkit ulw-loop <subcommand> [args]
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+
+Run `omo-agent-toolkit ulw-loop help` for ulw-loop subcommands.
+Staged Senpi agent-toolkit runtime: /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/runtime/agent-toolkit
+Bundled 796 modules in 31ms
+
+  omo.js  1.29 MB  (entry point)
+
+Bundled 671 modules in 26ms
+
+  omo-task.js  0.92 MB  (entry point)
+
+Bundled 284 modules in 12ms
+
+  omo-member.js  175.36 KB  (entry point)
+
+Bundled 94 modules in 6ms
+
+  omo-memory-mcp.js  97.19 KB  (entry point)
+
+Bundled 125 modules in 6ms
+
+  memory-run-supervisor.mjs  29.25 KB  (entry point)
+
+Bundled 115 modules in 7ms
+
+  omo-init-deep-advisor.js  68.88 KB  (entry point)
+
+Built omo-senpi extensions: /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/extensions/omo.js, /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/extensions/omo-task.js, /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/extensions/omo-member.js, /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/skills
+generated directive is current: /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 6 modules in 3ms
+
+  install.mjs  19.89 KB  (entry point)
+
+Built omo-senpi installer: /Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/plugin/scripts/install.mjs
+omo-native payload complete at /var/folders/7f/ql_mvwgs5g15nfq29_bqjhxr0000gn/T/omo-plugin-stage-Fbj38b/plugin (36 required artifacts present)
+  [36ms]  bundle  1 modules
+ [124ms] compile  /var/folders/7f/ql_mvwgs5g15nfq29_bqjhxr0000gn/T/omo-embed-probe-771IXA/probe
+
+script/sync-lazycodex-marketplace.test.ts:
+[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing LSP daemon dist at /var/folders/7f/ql_mvwgs5g15nfq29_bqjhxr0000gn/T/omo-sync-prev-source-XY2f0h/packages/lsp-daemon/dist
+[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing OMO root CLI dist at /var/folders/7f/ql_mvwgs5g15nfq29_bqjhxr0000gn/T/omo-sync-prev-source-XY2f0h/dist/cli
+[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing OMO node fallback CLI dist at /var/folders/7f/ql_mvwgs5g15nfq29_bqjhxr0000gn/T/omo-sync-prev-source-XY2f0h/dist/cli-node
+[materialize] wrote 148 frontend reference files from submodules
+[materialize] wrote 148 frontend reference files from submodules
+[materialize] wrote 148 frontend reference files from submodules
+Bundled 796 modules in 28ms
+
+  omo.js  1.29 MB  (entry point)
+
+Bundled 671 modules in 22ms
+
+  omo-task.js  0.92 MB  (entry point)
+
+Bundled 284 modules in 11ms
+
+  omo-member.js  175.36 KB  (entry point)
+
+Bundled 94 modules in 6ms
+
+  omo-memory-mcp.js  97.19 KB  (entry point)
+
+Bundled 125 modules in 6ms
+
+  memory-run-supervisor.mjs  29.25 KB  (entry point)
+
+Bundled 115 modules in 7ms
+
+  omo-init-deep-advisor.js  68.88 KB  (entry point)
+
+Bundled 796 modules in 28ms
+
+  omo.js  1.29 MB  (entry point)
+
+Bundled 671 modules in 22ms
+
+  omo-task.js  0.92 MB  (entry point)
+
+Bundled 284 modules in 10ms
+
+  omo-member.js  175.36 KB  (entry point)
+
+Bundled 94 modules in 6ms
+
+  omo-memory-mcp.js  97.19 KB  (entry point)
+
+Bundled 125 modules in 5ms
+
+  memory-run-supervisor.mjs  29.25 KB  (entry point)
+
+Bundled 115 modules in 7ms
+
+  omo-init-deep-advisor.js  68.88 KB  (entry point)
+
+Bundled 796 modules in 32ms
+
+  omo.js  1.29 MB  (entry point)
+
+Bundled 671 modules in 22ms
+
+  omo-task.js  0.92 MB  (entry point)
+
+Bundled 284 modules in 10ms
+
+  omo-member.js  175.36 KB  (entry point)
+
+Bundled 94 modules in 5ms
+
+  omo-memory-mcp.js  97.19 KB  (entry point)
+
+Bundled 125 modules in 5ms
+
+  memory-run-supervisor.mjs  29.25 KB  (entry point)
+
+Bundled 115 modules in 6ms
+
+  omo-init-deep-advisor.js  68.88 KB  (entry point)
+
+Bundled 796 modules in 31ms
+
+  omo.js  1.29 MB  (entry point)
+
+Bundled 671 modules in 22ms
+
+  omo-task.js  0.92 MB  (entry point)
+
+Bundled 284 modules in 11ms
+
+  omo-member.js  175.36 KB  (entry point)
+
+Bundled 94 modules in 5ms
+
+  omo-memory-mcp.js  97.19 KB  (entry point)
+
+Bundled 125 modules in 5ms
+
+  memory-run-supervisor.mjs  29.25 KB  (entry point)
+
+Bundled 115 modules in 7ms
+
+  omo-init-deep-advisor.js  68.88 KB  (entry point)
+
+Bundled 796 modules in 30ms
+
+  omo.js  1.29 MB  (entry point)
+
+Bundled 671 modules in 21ms
+
+  omo-task.js  0.92 MB  (entry point)
+
+Bundled 284 modules in 10ms
+
+  omo-member.js  175.36 KB  (entry point)
+
+Bundled 94 modules in 5ms
+
+  omo-memory-mcp.js  97.19 KB  (entry point)
+
+Bundled 125 modules in 5ms
+
+  memory-run-supervisor.mjs  29.25 KB  (entry point)
+
+Bundled 115 modules in 6ms
+
+  omo-init-deep-advisor.js  68.88 KB  (entry point)
+
+Bundled 796 modules in 28ms
+
+  omo.js  1.29 MB  (entry point)
+
+Bundled 671 modules in 21ms
+
+  omo-task.js  0.92 MB  (entry point)
+
+Bundled 284 modules in 10ms
+
+  omo-member.js  175.36 KB  (entry point)
+
+Bundled 94 modules in 6ms
+
+  omo-memory-mcp.js  97.19 KB  (entry point)
+
+Bundled 125 modules in 5ms
+
+  memory-run-supervisor.mjs  29.25 KB  (entry point)
+
+Bundled 115 modules in 7ms
+
+  omo-init-deep-advisor.js  68.88 KB  (entry point)
+
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+changed
+ulw-loop help
+
+packages/omo-senpi/src/extension/index.test.ts:
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+
+packages/omo-senpi/src/extension/compose.test.ts:
+omo-senpi component disabled by flag {
+  component: "beta",
+}
+
+packages/ast-grep-mcp/src/tools/scan.test.ts:
+199 |   }, { timeout: 15000 });
+200 | });
+201 | 
+202 | describe.skipIf(!SG_AVAILABLE)("scan tool: pinned real-binary fixtures", () => {
+203 |   it("#given the provisioned runtime #when inspected #then it is the 0.43.0 OMO pin", () => {
+204 |     expect(existsSync(PINNED_SG_PATH)).toBe(true);
+                                             ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/ast-grep-mcp/src/tools/scan.test.ts:204:40)
+(fail) scan tool: pinned real-binary fixtures > #given the provisioned runtime #when inspected #then it is the 0.43.0 OMO pin [0.83ms]
+
+packages/senpi-task/src/__adversarial__/chaos-bench.test.ts:
+[chaos] seed=senpi-task-w1-chaos base=2337725802 iterations=200
+[lsp] ignored connection error notification failure during cleanup: Cannot call write after a stream was destroyed
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at /var/folders/7f/ql_mvwgs5g15nfq29_bqjhxr0000gn/T/lsp-apply-edit-UpoUo3 exited with code 0
+
+packages/omo-senpi/src/components/ultrawork/ultrawork-arming.test.ts:
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+fatal: not a git repository (or any of the parent directories): .git
+fatal: git cat-file: could not get object info
+fatal: git cat-file: could not get object info
+Preparing worktree (new branch 'linked-branch')
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+
+packages/omo-senpi/src/components/task/dag-runtime.test.ts:
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishDurableEvents (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:542:58)
+      at writeCheckpoint (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:108:9)
+      at <anonymous> (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:110:21)
+      at withLock (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/store.ts:570:12)
+      at appendPayload (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:90:32)
+      at <anonymous> (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/manager.ts:392:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:226:13)
+      at <anonymous> (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:209:12)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:226:13)
+
+DAG runtime subscriber failed 652 |     cleanupRoots.push(cwd)
+653 |     const runner = new ScriptedRunner()
+654 |     const pi = Object.assign(new FakeExtensionAPI(), {
+655 |       rpc: {
+656 |         emit: (name: string) => {
+657 |           if (name === "omo.dag.event") throw new Error("subscriber exploded")
+                                                        ^
+error: subscriber exploded
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.test.ts:657:51)
+      at emit (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:68:13)
+      at forward (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-rpc-bridge.ts:77:5)
+      at deliverDurableEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:551:5)
+      at publishSchedulerEvent (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/omo-senpi/src/components/task/dag-runtime.ts:149:65)
+      at deliver (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:238:11)
+      at drain (/Users/mediratta/code/offgrid/vuln_repos/oh-my-openagent/packages/senpi-task/src/dag/journal.ts:226:13)
+
+[omo] worktree-sweep failed: Could not determine the default branch for /private/var/folders/7f/ql_mvwgs5g15nfq29_bqjhxr0000gn/T/wt-sweep-bad-RqvJWq/not-a-repo
+
+  ⚙ read_file filePath=/src/index.ts  
+
+packages/omo-opencode/src/__tests__/perf/plugin-init.test.ts:
+empty-project: cold=36.6ms warm=[13.3, 13.2] median=13.3ms
+in-tree-fixture: cold=35.8ms warm=[9.8, 10.6] median=10.6ms
+
+ 16552 pass
+ 8 skip
+ 1 fail
+ 46483 expect() calls
+Ran 16561 tests across 2136 files. [431.50s]
