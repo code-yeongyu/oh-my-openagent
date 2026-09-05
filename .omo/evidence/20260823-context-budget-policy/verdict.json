@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-08-23T14:28:00Z",
+  "branch": "feat/context-budget-policy",
+  "status": "PASS",
+  "checks": {
+    "live_hook_driver": {
+      "status": "PASS",
+      "sub_warmup_trigger_count": 0,
+      "supra_warmup_trigger_count": 1,
+      "post_compact_idempotency_pass": true
+    },
+    "typecheck": {
+      "status": "PASS",
+      "errors": 0
+    },
+    "unit_tests": {
+      "status": "PASS",
+      "total": 464,
+      "passed": 464,
+      "failed": 0
+    },
+    "schema_build": {
+      "status": "PASS",
+      "assets_updated": [
+        "assets/omo.schema.json",
+        "assets/oh-my-opencode.schema.json"
+      ]
+    }
+  }
+}

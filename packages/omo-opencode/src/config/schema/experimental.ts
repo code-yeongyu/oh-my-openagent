@@ -1,10 +1,13 @@
 import { z } from "zod"
+import { ContextBudgetConfigSchema } from "./context-budget"
 import { DynamicContextPruningConfigSchema } from "./dynamic-context-pruning"
 
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
   preemptive_compaction: z.boolean().optional(),
   truncate_all_tool_outputs: z.boolean().optional(),
+  /** Context budget policy configuration for preemptive compaction */
+  context_budget: ContextBudgetConfigSchema.optional(),
   /** Dynamic context pruning configuration */
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
   /** Enable experimental task system for Todowrite disabler hook */
