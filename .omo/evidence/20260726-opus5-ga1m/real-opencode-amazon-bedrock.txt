@@ -1,0 +1,38 @@
+PR 6340 final real OpenCode Amazon Bedrock QA
+
+Harness:
+- OpenCode: 0.0.0-codeg/v1.18.5-adjacency-leading-v4-202607260248
+- Plugin: file:///Volumes/DATA/tmp/omo-opus5-1m-101314/packages/omo-opencode/src/index.ts
+- OpenCode model identity: amazon-bedrock/us.anthropic.claude-opus-5
+- Provider transport: isolated local @ai-sdk/openai-compatible fake provider
+- XDG config/data/state/cache: /tmp/pr6340-amazon-bedrock-qa/*
+- Session: ses_06348c9e4ffew7NIK2Yri4WjR3
+
+Exact drive:
+1. Started the final branch plugin in an isolated real OpenCode server.
+2. POSTed a real message with providerID=amazon-bedrock and modelID=us.anthropic.claude-opus-5.
+3. The local provider returned 200000 input tokens, then 790000 input tokens, through real message and bash-tool events.
+4. SSE showed no compaction after the 200000-token turn; after the 790000-token turn it emitted an auto compaction part and session.compacted.
+
+Provider receipts (request bodies intentionally omitted):
+- request 1: normal tool turn, 200000 input tokens
+- request 2: normal tool turn, 790000 input tokens
+- request 3: trigger-check tool turn
+- request 4: compaction summary
+- request 5: post-compaction continuation
+
+Selected exact SSE records:
+data: {"id":"evt_f9cb7d88a001tSNJJP5dK4LX4T","type":"message.part.updated","properties":{"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","part":{"type":"tool","tool":"bash","callID":"call_1","state":{"status":"completed","input":{"command":"printf BELOW_THRESHOLD_TOOL","description":"BELOW_THRESHOLD_TOOL"},"output":"BELOW_THRESHOLD_TOOL","metadata":{"output":"BELOW_THRESHOLD_TOOL","exit":0,"truncated":false},"title":"printf BELOW_THRESHOLD_TOOL","time":{"start":1785040721705,"end":1785040722058}},"id":"prt_f9cb7d5390017NWknjSoWt0oyd","sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","messageID":"msg_f9cb7b65a001JNVlNbdrkx2m5K"},"time":1785040722058}}
+data: {"id":"evt_f9cb7d8960016Xb5OHRW1jYws0","type":"message.updated","properties":{"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","info":{"id":"msg_f9cb7b65a001JNVlNbdrkx2m5K","parentID":"msg_f9cb7b162001XowE77q5eelwor","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/tmp/pr6340-amazon-bedrock-qa/project","root":"/"},"cost":1.000125,"tokens":{"total":200005,"input":200000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"us.anthropic.claude-opus-5","providerID":"amazon-bedrock","time":{"created":1785040713306,"completed":1785040722077},"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","finish":"tool-calls"}}}
+data: {"id":"evt_f9cb7d89e00127iiorUMjQs6J7","type":"message.updated","properties":{"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","info":{"id":"msg_f9cb7b65a001JNVlNbdrkx2m5K","parentID":"msg_f9cb7b162001XowE77q5eelwor","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/tmp/pr6340-amazon-bedrock-qa/project","root":"/"},"cost":1.000125,"tokens":{"total":200005,"input":200000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"us.anthropic.claude-opus-5","providerID":"amazon-bedrock","time":{"created":1785040713306,"completed":1785040722077},"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","finish":"tool-calls"}}}
+data: {"id":"evt_f9cb7db96001kLL7SAGLWpfkdk","type":"message.part.updated","properties":{"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","part":{"type":"tool","tool":"bash","callID":"call_2","state":{"status":"completed","input":{"command":"printf ABOVE_THRESHOLD_TOOL","description":"ABOVE_THRESHOLD_TOOL"},"output":"ABOVE_THRESHOLD_TOOL","metadata":{"output":"ABOVE_THRESHOLD_TOOL","exit":0,"truncated":false},"title":"printf ABOVE_THRESHOLD_TOOL","time":{"start":1785040722538,"end":1785040722838}},"id":"prt_f9cb7d8f9001UqeT9i5ewjRaob","sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","messageID":"msg_f9cb7d8a4001pQ4vO2jnWLuOFW"},"time":1785040722838}}
+data: {"id":"evt_f9cb7db9e001L4L1Moj2Sbfw2k","type":"message.updated","properties":{"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","info":{"id":"msg_f9cb7d8a4001pQ4vO2jnWLuOFW","parentID":"msg_f9cb7b162001XowE77q5eelwor","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/tmp/pr6340-amazon-bedrock-qa/project","root":"/"},"cost":3.950125,"tokens":{"total":790005,"input":790000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"us.anthropic.claude-opus-5","providerID":"amazon-bedrock","time":{"created":1785040722084,"completed":1785040722849},"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","finish":"tool-calls"}}}
+data: {"id":"evt_f9cb7dba1001XDlFBQDmXIGri2","type":"message.updated","properties":{"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","info":{"id":"msg_f9cb7d8a4001pQ4vO2jnWLuOFW","parentID":"msg_f9cb7b162001XowE77q5eelwor","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/tmp/pr6340-amazon-bedrock-qa/project","root":"/"},"cost":3.950125,"tokens":{"total":790005,"input":790000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"us.anthropic.claude-opus-5","providerID":"amazon-bedrock","time":{"created":1785040722084,"completed":1785040722849},"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","finish":"tool-calls"}}}
+data: {"id":"evt_f9cb7de5c0015tJCyuSUZvOY9B","type":"message.part.updated","properties":{"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","part":{"id":"prt_f9cb7de5b001Bwx6lzundl2J0o","messageID":"msg_f9cb7de59001haTInCDSzi44DG","sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3","type":"compaction","auto":true},"time":1785040723548}}
+data: {"id":"evt_f9cb8cb69001urX52lgvlztHUG","type":"session.compacted","properties":{"sessionID":"ses_06348c9e4ffew7NIK2Yri4WjR3"}}
+
+Isolation receipt:
+real_before=4329
+real_after=4329
+
+QA_RESULT=PASS

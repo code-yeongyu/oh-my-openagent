@@ -13,6 +13,8 @@ function isAnthropicProvider(providerID: string, modelID: string): boolean {
   return normalized === "anthropic"
     || normalized === "google-vertex-anthropic"
     || normalized === "aws-bedrock-anthropic"
+    || (normalized === "amazon-bedrock"
+      && /^(?:[^.]+\.)?anthropic\.claude-/.test(modelID.toLowerCase()))
     || (normalized === "google" && modelID.toLowerCase().startsWith("claude-"))
 }
 
@@ -25,8 +27,9 @@ function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState):
 }
 
 function hasGA1MContext(modelID: string): boolean {
-  return /^claude-(opus|sonnet)-4(?:-|\.)(?:6|7|8)(?:-high)?$/.test(modelID) ||
-    /^claude-(?:fable|mythos|sonnet)-5$/.test(modelID)
+  const normalizedModelID = modelID.replace(/^(?:[^.]+\.)?anthropic\./, "")
+  return /^claude-(opus|sonnet)-4(?:-|\.)(?:6|7|8)(?:-(?:high|fast))?$/.test(normalizedModelID) ||
+    /^claude-(?:fable|mythos|sonnet|opus)-5(?:[-.]0|\[1m\])?(?:-high|-fast|@default)?$/.test(normalizedModelID)
 }
 
 export function resolveActualContextLimit(
@@ -35,10 +38,16 @@ export function resolveActualContextLimit(
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
   if (isAnthropicProvider(providerID, modelID)) {
+    const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
+    if (providerID.toLowerCase() === "amazon-bedrock") {
+      if (cachedLimit) return cachedLimit
+      if (hasGA1MContext(modelID)) return ANTHROPIC_GA_1M_LIMIT
+      return DEFAULT_ANTHROPIC_ACTUAL_LIMIT
+    }
+
     const explicit1M = getAnthropicActualLimit(modelCacheState)
     if (explicit1M === ANTHROPIC_GA_1M_LIMIT) return explicit1M
 
-    const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
     if (cachedLimit && hasGA1MContext(modelID)) return cachedLimit
 
     if (hasGA1MContext(modelID)) return ANTHROPIC_GA_1M_LIMIT
