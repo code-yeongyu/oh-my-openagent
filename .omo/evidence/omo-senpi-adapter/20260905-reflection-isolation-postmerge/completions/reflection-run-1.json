@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "runId": "reflection-run-1",
+  "identity": "project-948f01e6",
+  "category": "quick",
+  "model": "omo-reflection-qa/mock-1",
+  "conversationIds": [
+    "01a072f7-9380-7f29-8cdd-41cbaee0d957"
+  ],
+  "trigger": "step-count",
+  "outcome": "merged",
+  "startedAt": "2026-09-05T19:07:04.521Z",
+  "finishedAt": "2026-09-05T19:07:05.830Z",
+  "durationMs": 1309,
+  "mergedCommitSha": "1d0b06b19ded693978e6bd246082e81ccde81544",
+  "filesChanged": 1,
+  "consecutiveFailures": 0,
+  "delivery": {
+    "status": "consumed",
+    "sessionId": "01a072f7-9380-7f29-8cdd-41cbaee0d957",
+    "consumedAt": "2026-09-05T19:07:05.842Z"
+  }
+}
