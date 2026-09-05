@@ -9,6 +9,7 @@ import { CategoriesConfigSchema } from "./categories"
 import { ClaudeCodeConfigSchema } from "./claude-code"
 import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
+import { CompactionConfigSchema } from "./compaction"
 import { DefaultModeConfigSchema } from "./default-mode"
 import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
@@ -88,6 +89,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   team_mode: TeamModeConfigSchema.optional(),
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
+  compaction: CompactionConfigSchema.optional(),
   git_master: GitMasterConfigSchema.default({
     commit_footer: true,
     include_co_authored_by: true,
