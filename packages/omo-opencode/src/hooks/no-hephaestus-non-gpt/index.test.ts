@@ -28,21 +28,28 @@ describe("no-hephaestus-non-gpt hook", () => {
     const output2 = createOutput()
 
     // when - chat.message is called repeatedly
-    await hook["chat.message"]?.({
+    const first = hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: HEPHAESTUS_DISPLAY,
       model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output1)
-    await hook["chat.message"]?.({
+    const second = hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: HEPHAESTUS_DISPLAY,
       model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output2)
 
-    // then - toast is shown and agent is switched to sisyphus
+    // then - toast is shown and a typed error is thrown instead of a silent switch
+    await expect(first).rejects.toMatchObject({
+      name: "HephaestusRequiresGptError",
+      message: expect.stringContaining("Hephaestus requires a GPT-family model (got claude-opus-4-7)"),
+    })
+    await expect(second).rejects.toMatchObject({
+      name: "HephaestusRequiresGptError",
+    })
     expect(showToast).toHaveBeenCalledTimes(2)
-    expect(output1.message.agent).toBe("sisyphus")
-    expect(output2.message.agent).toBe("sisyphus")
+    expect(output1.message.agent).toBeUndefined()
+    expect(output2.message.agent).toBeUndefined()
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
         title: "NEVER Use Hephaestus with Non-GPT",
@@ -135,13 +142,17 @@ describe("no-hephaestus-non-gpt hook", () => {
     const output = createOutput()
 
     // when - chat.message runs without input.agent
-    await hook["chat.message"]?.({
+    const result = hook["chat.message"]?.({
       sessionID: "ses_4",
       model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
     }, output)
 
-    // then - toast shown via session-agent fallback, switched to sisyphus
+    // then - toast shown via session-agent fallback, typed error thrown
+    await expect(result).rejects.toMatchObject({
+      name: "HephaestusRequiresGptError",
+      message: expect.stringContaining("got claude-opus-4-7"),
+    })
     expect(showToast).toHaveBeenCalledTimes(1)
-    expect(output.message.agent).toBe("sisyphus")
+    expect(output.message.agent).toBeUndefined()
   })
 })
