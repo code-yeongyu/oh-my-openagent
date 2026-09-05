@@ -226,9 +226,32 @@ describe("bun runtime re-exec decision", () => {
       expect(consumed).toBe(true)
       expect(calls).toHaveLength(1)
       expect(calls[0]?.command).toBe(bunPath)
-      expect(calls[0]?.args).toEqual([treeScript, "say", "hi"])
+      expect(calls[0]?.args).toEqual([treeScript, "--", "say", "hi"])
       expect(calls[0]?.options).toMatchObject({ stdio: "inherit", windowsHide: true })
       expect(propagated).toEqual([{ status: 0, signal: null }])
+    })
+
+    test("#then a user option separator survives bun argument parsing", async () => {
+      // given
+      const calls: Array<{ args: string[] }> = []
+      // when
+      await maybeReexecUnderBun({
+        scriptPath: treeScript,
+        argv: ["node", treeScript, "--", "--session", "prompt-value"],
+        env: {},
+        versions: {},
+        homedir: () => POSIX_HOME,
+        platform: "linux",
+        exists: existsOnly(bunPath),
+        realpath: identityRealpath,
+        spawn: (_command: string, args: string[]) => {
+          calls.push({ args })
+          return { status: 0, signal: null }
+        },
+        propagate: () => {},
+      })
+      // then
+      expect(calls).toEqual([{ args: [treeScript, "--", "--", "--session", "prompt-value"] }])
     })
 
     test("#then a stay decision spawns nothing and lets the caller continue", async () => {

@@ -212,7 +212,7 @@ export async function maybeReexecUnderBun(input) {
   const run = input.spawn ?? runChild
   const propagate = input.propagate ?? propagateResult
   const argv = input.argv ?? process.argv
-  const result = await run(decision.bunPath, [input.scriptPath, ...argv.slice(2)], {
+  const result = await run(decision.bunPath, [input.scriptPath, "--", ...argv.slice(2)], {
     stdio: "inherit",
     windowsHide: true,
   })

@@ -1,0 +1,2 @@
+real_home_protected_files_unchanged=true
+isolated_agent_dir=/Users/sungsoopark/Documents/GitHub/oh-my-openagent-7491/.omo/evidence/20260829-issue-7471-session-resume-diagnostics/sandbox-agent

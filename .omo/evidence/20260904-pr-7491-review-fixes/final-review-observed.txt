@@ -1,0 +1,29 @@
+tested_commit=63c4c8433d769d8109eee5846a4380248d754c14-plus-working-tree-fix
+runner=darwin-arm64-local
+runtime=bun-1.4.0-via-real-node-launcher-reexec
+surface=packages/omo-native/bin/omo.js with pinned Senpi engine
+
+CASE indexed matching header
+args=--session <requested-id> --version
+result=PASS
+rejection_diagnostic=false
+version=5.0.0-0.beta.42
+exit_status=0
+
+CASE prompt-side session directory
+args=--session <requested-id> --version -- --session-dir prompt-text
+result=PASS
+genuine_mismatch_diagnostic=true
+version=5.0.0-0.beta.42
+exit_status=0
+
+CASE prompt-side session option
+args=--version -- --session <requested-id>
+result=PASS
+rejection_diagnostic=false
+version=5.0.0-0.beta.42
+exit_status=0
+
+OMITTED
+Absolute temporary paths, unrelated startup hints, environment dumps,
+credentials, and private configuration were omitted.

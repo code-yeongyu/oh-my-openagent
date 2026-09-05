@@ -1,10 +1,18 @@
-import { existsSync } from "node:fs"
+import { closeSync, existsSync, openSync, readdirSync, readSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
 import { runDoctor } from "./doctor.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
-import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
+import {
+  nearestNodeBin,
+  packageManifest,
+  packageRoot,
+  quoteShellArgument,
+  readJson,
+  resolveSenpi,
+  updateTarget,
+} from "./package-paths.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
 import { printSetupReport } from "./setup-report.js"
@@ -89,16 +97,106 @@ function senpiEnvironment(senpiRoot) {
   return env
 }
 
+function optionArguments(args) {
+  const separator = args.indexOf("--")
+  return separator >= 0 ? args.slice(0, separator) : args
+}
+
+function optionValue(args, name) {
+  const optionArgs = optionArguments(args)
+  const inline = optionArgs.find((arg) => arg.startsWith(`${name}=`))
+  if (inline) return inline.slice(name.length + 1)
+  const index = optionArgs.indexOf(name)
+  return index >= 0 ? optionArgs[index + 1] : undefined
+}
+
+function readSessionHeaderId(filePath) {
+  const buffer = Buffer.allocUnsafe(4096)
+  let fd
+  try {
+    fd = openSync(filePath, "r")
+    const bytesRead = readSync(fd, buffer, 0, buffer.length, 0)
+    const line = buffer.toString("utf8", 0, bytesRead).split(/\r?\n/, 1)[0]
+    const header = JSON.parse(line)
+    return header?.type === "session" && typeof header.id === "string" ? header.id : undefined
+  } catch {
+    return undefined
+  } finally {
+    if (fd !== undefined) closeSync(fd)
+  }
+}
+
+function sessionFilenameId(filename) {
+  if (!filename.endsWith(".jsonl")) return undefined
+  const separator = filename.indexOf("_")
+  if (separator < 0) return undefined
+  return filename.slice(separator + 1, -".jsonl".length) || undefined
+}
+
+export function sessionResumeSuggestion(headerId, filePath, platform = process.platform) {
+  const headerSuggestion = `\`omo --session ${headerId}\``
+  if (platform === "win32") return headerSuggestion
+  return `${headerSuggestion} or \`omo --session ${quoteShellArgument(filePath)}\``
+}
+
+function printSessionResumeDiagnostic(args, env) {
+  const requestedId = optionValue(args, "--session")
+  if (!requestedId || /[\\/]/.test(requestedId) || requestedId.endsWith(".jsonl")) return
+  if (optionValue(args, "--session-dir") || env.OMO_CODING_AGENT_SESSION_DIR?.trim()) return
+
+  const sessionRoot = join(canonicalAgentDir(env), "sessions")
+  let directories
+  try {
+    directories = readdirSync(sessionRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+      .map((entry) => join(sessionRoot, entry.name))
+  } catch {
+    return
+  }
+
+  const candidates = []
+  const sessionFiles = []
+  for (const directory of directories) {
+    try {
+      for (const filename of readdirSync(directory)) {
+        if (!filename.endsWith(".jsonl")) continue
+        const filePath = join(directory, filename)
+        sessionFiles.push(filePath)
+        const filenameId = sessionFilenameId(filename)
+        if (filenameId?.startsWith(requestedId)) {
+          candidates.push({ path: filePath, filenameId })
+        }
+      }
+    } catch {
+      continue
+    }
+  }
+  if (candidates.length !== 1) return
+
+  const candidate = candidates[0]
+  const headerId = readSessionHeaderId(candidate.path)
+  if (!headerId || headerId.startsWith(requestedId)) return
+  if (sessionFiles.some((filePath) => readSessionHeaderId(filePath)?.startsWith(requestedId))) return
+  console.error(`omo: searched ${sessionRoot}`)
+  console.error(
+    `omo: candidate ${candidate.path} was rejected because its header id is '${headerId}', not filename id '${candidate.filenameId}'`,
+  )
+  console.error(`omo: retry with ${sessionResumeSuggestion(headerId, candidate.path)}`)
+}
+
 async function spawnSenpi(args, withExtension) {
   const senpi = resolveSenpi()
+  const env = senpiEnvironment(senpi.packageRoot)
+  printSessionResumeDiagnostic(args, env)
   const finalArgs = withExtension
     ? ["--extension", join(packageRoot, "plugin"), ...args]
     : args
-  await spawnNode(senpi.cliPath, finalArgs, { env: senpiEnvironment(senpi.packageRoot) })
+  await spawnNode(senpi.cliPath, finalArgs, { env })
 }
 
 function isInteractiveDefault(args) {
-  return process.stderr.isTTY === true && !args.includes("-p") && !args.includes("--print")
+  const optionArgs = optionArguments(args)
+  return process.stderr.isTTY === true && !optionArgs.includes("-p") && !optionArgs.includes("--print")
 }
 
 /**
