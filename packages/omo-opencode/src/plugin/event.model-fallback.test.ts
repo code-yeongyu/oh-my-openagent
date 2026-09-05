@@ -1242,6 +1242,36 @@ describe("createEventHandler - model fallback", () => {
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)
   })
 
+  test("#given a name-only session.error after a selected fallback #when fallback applies #then it advances from the active model", async () => {
+    //#given
+    const sessionID = "ses_name_only_active_fallback"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    setSessionModel(sessionID, { providerID: "opencode-go", modelID: "kimi-k3" })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "ModelNotSupportedError" },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(modelFallback.getFallbackState(sessionID)).toMatchObject({
+      providerID: "opencode-go",
+      modelID: "kimi-k3",
+      pending: true,
+    })
+  })
+
   test("#given session.error omits model metadata after Opus 5 fails #when fallback applies #then it skips Opus 5 and advances to Kimi", async () => {
     //#given
     const sessionID = "ses_error_missing_model_opus5"

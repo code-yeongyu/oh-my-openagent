@@ -10,6 +10,7 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "providermodelnotfounderror",
   "ratelimiterror",
   "modelunavailableerror",
+  "modelnotsupportederror",
   "providerconnectionerror",
   "authenticationerror",
 ])
