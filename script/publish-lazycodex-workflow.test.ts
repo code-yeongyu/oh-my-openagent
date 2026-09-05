@@ -315,6 +315,10 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@latest"')
     const retriesRegistryPropagation = smokeStep.includes("for attempt in $(seq 1 12)") &&
       smokeStep.includes("registry propagation")
+    const distinguishesVisibleInstallFailure =
+      smokeStep.includes('npm view "$package_spec" version --silent') &&
+      smokeStep.includes("install dry-run failed after") &&
+      smokeStep.includes("this is not registry propagation")
     const isolatesCodexState = smokeStep.includes('export HOME="$SMOKE_DIR/home"') &&
       smokeStep.includes('export CODEX_HOME="$SMOKE_DIR/codex"') &&
       smokeStep.includes('export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"')
@@ -323,11 +327,15 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('expected_install_output="npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous"') &&
       smokeStep.includes('expected_doctor_output_prefix="codex exec ') &&
       smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous") &&
-      smokeStep.includes('case "$npx_doctor_output" in "$expected_doctor_output_prefix"*) true ;; *) false ;; esac') &&
-      smokeStep.includes('case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac') &&
       smokeStep.includes('expected_doctor_hint="Use \\$omo:lcx-doctor"') &&
-      smokeStep.includes('case "$npx_doctor_output" in *"$expected_doctor_hint"*) true ;; *) false ;; esac') &&
-      smokeStep.includes('case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac') &&
+      smokeStep.includes("doctor_prefix_ok=false") &&
+      smokeStep.includes("doctor_sandbox_ok=false") &&
+      smokeStep.includes("doctor_hint_ok=false") &&
+      smokeStep.includes("doctor_model_ok=true") &&
+      smokeStep.includes('[ "$doctor_prefix_ok" != true ]') &&
+      smokeStep.includes('[ "$doctor_sandbox_ok" != true ]') &&
+      smokeStep.includes('[ "$doctor_hint_ok" != true ]') &&
+      smokeStep.includes('[ "$doctor_model_ok" != true ]') &&
       !smokeStep.includes("npx --yes --package oh-my-openagent omo install") &&
       !smokeStep.includes("--platform=claude-code") &&
       !smokeStep.includes("--platform=gemini")
@@ -335,11 +343,12 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('npx -y "$package_spec" install --no-tui --codex-autonomous') &&
       smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ]') &&
       smokeStep.includes('omo_agent_toolkit_version_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" --version 2>&1)') &&
-      smokeStep.includes('[ "$omo_agent_toolkit_version_output" = "$OMO_VERSION" ]') &&
+      smokeStep.includes('[ "$omo_agent_toolkit_version_output" != "$OMO_VERSION" ]') &&
       smokeStep.includes('ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo-agent-toolkit" ulw-loop --help 2>&1)') &&
       smokeStep.includes('printf "%s" "$ulw_loop_output" | grep -q "ulw-loop"')
     const assertsLegacyOmoBinIsRemoved =
-      smokeStep.includes('[ ! -e "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
+      smokeStep.includes('[ -e "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
+      smokeStep.includes("runtime verification failed") &&
       !smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
       !smokeStep.includes('"$CODEX_LOCAL_BIN_DIR/omo" --version') &&
       !smokeStep.includes('"$CODEX_LOCAL_BIN_DIR/omo" ulw-loop --help')
@@ -358,6 +367,10 @@ describe("LazyCodex publish workflow", () => {
     expect(smokesReleaseVersion, "post-publish smoke must verify the exact release version").toBe(true)
     expect(smokesStableLatestOnly, "post-publish smoke must verify latest only for stable releases").toBe(true)
     expect(retriesRegistryPropagation, "post-publish smoke must tolerate npm registry propagation").toBe(true)
+    expect(
+      distinguishesVisibleInstallFailure,
+      "post-publish smoke must stop and report install failures once the package is registry-visible",
+    ).toBe(true)
     expect(isolatesCodexState, "post-publish smoke must isolate HOME and Codex paths").toBe(true)
     expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
     expect(

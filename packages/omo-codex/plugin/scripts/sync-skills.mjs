@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 
 import { resolveCanonicalUltraworkDirectivePath } from "./canonical-ultrawork-directive.mjs";
 import { isCliEntry } from "./entry-guard.mjs";
-import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
-import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter";
+import { sharedSkillsRootPath } from "../../../shared-skills/index.mjs";
+import { createSkillSourceCopyFilter } from "../../../shared-skills/skill-source-filter.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(root, "..", "..", "..");
