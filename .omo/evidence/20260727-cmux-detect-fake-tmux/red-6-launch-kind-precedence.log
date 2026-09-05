@@ -1,0 +1,33 @@
+RED round 6 - CMUX_AGENT_LAUNCH_KIND promoted above the socket shape
+
+This is the naive reading of "reconcile socket-shape detection with the official
+CMUX_AGENT_LAUNCH_KIND=omo contract": treat the documented contract as the
+highest-precedence signal.
+
+	if (environment.CMUX_AGENT_LAUNCH_KIND === CMUX_OMO_LAUNCH_KIND) return true
+	const tmuxEnvironment = environment.TMUX
+	...
+
+$ bun test packages/tmux-core/src/cmux-detect.test.ts
+
+-   "socket=true  kind=omo tmux=real   -> false",
++   "socket=true  kind=omo tmux=real   -> true",
+-   "socket=false kind=omo tmux=absent -> false",
++   "socket=false kind=omo tmux=absent -> true",
+-   "socket=false kind=omo tmux=real   -> false",
++   "socket=false kind=omo tmux=real   -> true",
+(fail) #given every combination of both cmux signals and a TMUX shape
+(fail) #given a real tmux socket inherited alongside both cmux signals
+       #then the socket shape outranks both signals
+(fail) #given only CMUX_AGENT_LAUNCH_KIND with no socket path and no TMUX
+       #then returns false (fails closed on an inherited-only signal)
+
+ 12 pass
+ 3 fail
+
+Two of the three failures are the nested-real-tmux invariant this review asked to
+preserve, and the third is the fail-closed boundary. The cause is measured, not
+assumed: CMUX_AGENT_LAUNCH_KIND is inherited by a real tmux server started inside
+a cmux pane (see live-signal-inheritance.log), so it describes the launcher, not
+the socket we would actually talk to. That is why the shipped algorithm keeps the
+launch kind subordinate to the TMUX socket shape.

@@ -1,0 +1,20 @@
+has-session exit-code parity between the cmux compat layer and real tmux
+
+Flipping detection to true makes `killTmuxSessionIfExists` route through
+`cmux __tmux-compat` for the first time. That helper reads a non-zero
+`has-session` exit as "session does not exist", so an inverted convention on
+the cmux side would either skip cleanup or kill the wrong target. Measured
+rather than assumed:
+
+$ /Applications/cmux.app/Contents/Resources/bin/cmux __tmux-compat has-session \
+      -t omo-pr6390-does-not-exist-xyz
+  Error: Workspace target not found: omo-pr6390-does-not-exist-xyz
+  exit 1
+
+$ /opt/homebrew/bin/tmux has-session -t omo-pr6390-does-not-exist-xyz
+  exit 1
+
+Both report a missing session as non-zero, so the existing guard keeps its
+meaning under the compat layer. (The real-tmux invocation reports a connection
+error rather than a missing session because the cmux shim's TMUX is still
+exported in this shell; the exit code, which is what the guard reads, matches.)

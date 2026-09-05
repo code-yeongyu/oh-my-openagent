@@ -131,7 +131,7 @@ describe("cmux authenticated pane lifecycle", () => {
 
 	test("#given authenticated cmux with fake TMUX #when spawning a window #then fails before credentials reach the command runner", async () => {
 		// given
-		process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
+		process.env.TMUX = "/tmp/cmux-omo/workspace,surface,pane"
 		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
 
 		// when
@@ -157,7 +157,7 @@ describe("cmux authenticated pane lifecycle", () => {
 
 	test("#given authenticated cmux with fake TMUX #when spawning a session #then fails before credentials reach the command runner", async () => {
 		// given
-		process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
+		process.env.TMUX = "/tmp/cmux-omo/workspace,surface,pane"
 		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
 
 		// when

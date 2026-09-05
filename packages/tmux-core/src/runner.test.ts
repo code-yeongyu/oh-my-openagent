@@ -12,6 +12,8 @@ const temporaryDirectories: string[] = []
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
 const originalTmux = process.env.TMUX
 const originalPath = process.env.PATH
+const originalCmuxCliPath = process.env.CMUX_OMO_CMUX_BIN
+const originalCmuxBundledCliPath = process.env.CMUX_BUNDLED_CLI_PATH
 
 async function createTemporaryDirectory(): Promise<string> {
 	const directoryPath = await fs.mkdtemp(path.join(os.tmpdir(), "tmux-runner-"))
@@ -53,6 +55,8 @@ async function createFakeCmux(directoryPath: string, argsFilePath: string): Prom
 beforeEach(() => {
 	delete process.env.CMUX_SOCKET_PATH
 	delete process.env.TMUX
+	delete process.env.CMUX_OMO_CMUX_BIN
+	delete process.env.CMUX_BUNDLED_CLI_PATH
 	process.env.PATH = originalPath
 })
 
@@ -70,6 +74,18 @@ afterAll(async () => {
 	}
 
 	process.env.PATH = originalPath
+
+	if (originalCmuxCliPath === undefined) {
+		delete process.env.CMUX_OMO_CMUX_BIN
+	} else {
+		process.env.CMUX_OMO_CMUX_BIN = originalCmuxCliPath
+	}
+
+	if (originalCmuxBundledCliPath === undefined) {
+		delete process.env.CMUX_BUNDLED_CLI_PATH
+	} else {
+		process.env.CMUX_BUNDLED_CLI_PATH = originalCmuxBundledCliPath
+	}
 
 	for (const directoryPath of temporaryDirectories) {
 		await fs.rm(directoryPath, { recursive: true, force: true })
@@ -211,6 +227,33 @@ describe("runTmuxCommand", () => {
 
 		// when
 		const result = await runTmuxCommand(cmuxPath, ["display-message", "-p", "#{pane_id}"])
+
+		// then
+		expect(result).toEqual({
+			success: true,
+			output: "%42",
+			stdout: "%42",
+			stderr: "",
+			exitCode: 0,
+		})
+		const argsFileContent = await fs.readFile(argsFilePath, "utf8")
+		expect(normalizeLineEndings(argsFileContent)).toBe("__tmux-compat\ndisplay-message\n-p\n#{pane_id}\n")
+	})
+
+	test("#given cmux fake TMUX and cmux CLI reachable only through CMUX_OMO_CMUX_BIN #when run #then delegates through that binary", async () => {
+		// given
+		const temporaryDirectory = await createTemporaryDirectory()
+		const argsFilePath = path.join(temporaryDirectory, "cmux.args")
+		const cmuxPath = await createFakeCmux(temporaryDirectory, argsFilePath)
+		process.env.CMUX_SOCKET_PATH = path.join(temporaryDirectory, "cmux.sock")
+		// Literal POSIX path on purpose: cmux runs only on macOS and always injects a `/`-separated
+		// socket path. Building this with `path.join` would emit `\` separators on Windows, which is
+		// a shape no cmux build produces and which the Unix-only detector correctly rejects.
+		process.env.TMUX = "/tmp/cmux-omo/workspace,surface,pane"
+		process.env.CMUX_OMO_CMUX_BIN = cmuxPath
+
+		// when
+		const result = await runTmuxCommand(path.join(temporaryDirectory, "tmux"), ["display-message", "-p", "#{pane_id}"])
 
 		// then
 		expect(result).toEqual({

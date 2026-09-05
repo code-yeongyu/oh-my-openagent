@@ -1,0 +1,5 @@
+  packages/tmux-core                                    107 pass  0 fail 
+  packages/omo-opencode/src/shared/tmux                 89 pass  0 fail 
+  packages/omo-opencode/src/tools/interactive-bash      3 pass  0 fail 
+  packages/omo-opencode/src/features/tmux-subagent      166 pass  0 fail 
+  packages/openclaw-core                                67 pass  0 fail 
