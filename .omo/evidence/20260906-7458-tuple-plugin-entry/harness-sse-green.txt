@@ -1,0 +1,8 @@
+opencode: 1.18.29
+server_ready: yes
+session_created_on_sse_wire: yes
+session_created_line: {"id":"evt_072b50693002tWdGWOfhD9N3Dy","type":"session.created","properties":{"sessionID":"ses_f8d4af96cffeXfJvPG42VA1obX","info":{"id":"ses_f8d4af96cffeXfJvPG42VA1obX","slug":"calm-pixel","version":"
+sse_event_type_histogram:    1 "type":"session.created";   1 "type":"server.connected";
+probe_decision: {  "ok": true,  "directory": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.9nWzziCTsl/proj",  "findPluginEntry": {    "entry": "oh-my-openagent@4.19.4",    "isPinned": true,    "pinnedVersion": "4.19.4",    "configPath": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq20000
+real_db_sessions_before: 8077
+real_db_sessions_after: 8077
