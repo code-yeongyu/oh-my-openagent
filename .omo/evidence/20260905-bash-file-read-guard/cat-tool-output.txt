@@ -1,0 +1,7 @@
+[WARNING: Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing.]
+
+{
+  "name": "bash-guard-qa-fixture",
+  "version": "1.0.0",
+  "description": "fixture for bash-file-read-guard QA"
+}
