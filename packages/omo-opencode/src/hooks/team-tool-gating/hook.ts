@@ -96,6 +96,14 @@ export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig |
       const participant = await resolveParticipant(input.sessionID, config)
 
       if (toolName === "delegate-task") {
+        if (participant.role === "member") {
+          const runtimeState = await loadRuntimeState(participant.teamRunId, config).catch(() => undefined)
+          const member = runtimeState?.members.find((candidate) => candidate.name === participant.memberName)
+          if (member?.readOnly) {
+            throw new Error("delegate-task denied: read-only team members must not spawn child agents")
+          }
+        }
+
         return
       }
 
