@@ -13,6 +13,35 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("memory runtime facts wiring", () => {
+  test("#given a live event context #when captured before it becomes stale #then model resolution uses the snapshot", () => {
+    // given
+    const registry = {
+      getAvailable: () => [],
+      find: () => undefined,
+      getProviderAuth: () => undefined,
+    }
+    let stale = false
+    const eventCtx = {
+      get modelRegistry() {
+        if (stale) throw new Error("stale extension ctx")
+        return registry
+      },
+    }
+    const runtime = createMemoryRuntimeWiring({
+      sessions: new Map(),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => "/tmp",
+      env: {},
+    }, {})
+
+    // when
+    runtime.captureSessionContext(eventCtx)
+    stale = true
+
+    // then
+    expect(runtime.resolveModelRegistry()).toBe(registry)
+  })
+
   test("#given production facts wiring #when its extractor is constructed #then it uses the in-process seam without spawn options", async () => {
     // given
     const root = await mkdtemp(`${tmpdir()}/omo-memory-runtime-wiring-`)

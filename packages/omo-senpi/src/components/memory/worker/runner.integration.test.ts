@@ -7,7 +7,10 @@ import { rmEfaultTolerant } from "../teardown.test-support"
 import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { REFLECTION_COMPLETION_ENTRY_TYPE, REFLECTION_LAUNCHED_ENTRY_TYPE } from "./completion"
+import {
+  REFLECTION_COMPLETION_ENTRY_TYPE,
+  REFLECTION_LAUNCHED_ENTRY_TYPE,
+} from "./completion"
 import { resetModelPreflightCacheForTests } from "./model-preflight"
 import { createRunnerHarness, type RunnerHarness } from "./runner.test-support"
 
@@ -135,11 +138,6 @@ describe("SenpiSubprocessRunner integration", () => {
         backlogSteps: 1,
       }),
     })
-    expect(item.api.renderers.map((entry) => entry.customType)).toEqual([
-      "senpi-memory.reflection-completion",
-      "senpi-memory.reflection-launched",
-      "senpi-memory.reflection-summary",
-    ])
     expect(item.notifications).toHaveLength(1)
     expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
     expect(item.spawnCalls).toHaveLength(1)

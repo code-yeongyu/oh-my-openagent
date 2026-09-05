@@ -7,9 +7,7 @@ import { resolveAgentReflectionSettings } from "../reflection-settings"
 import { createOncePerSessionGuard } from "../../task/usage-guidance"
 import {
   REFLECTION_LAUNCHED_ENTRY_TYPE,
-  registerReflectionCompletionRenderer,
   safeNotify,
-  type ReflectionLiveSession,
 } from "./completion"
 import {
   chooseMemoryLaunchRoute,
@@ -65,12 +63,10 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
   private readonly now: () => Date
   private readonly warnedCategory = createOncePerSessionGuard()
   private readonly warnedHealth = createOncePerSessionGuard()
-  private readonly registeredApis = new WeakSet<object>()
 
   constructor(private readonly options: SenpiSubprocessRunnerOptions) {
     this.loadConfig = options.loadConfig ?? loadSenpiOmoConfig
     this.now = options.now ?? (() => new Date())
-    this.ensureRenderer(options.liveSession?.())
   }
 
   async launch(run: ReservedRun): Promise<ReflectionRunResult> {
@@ -81,9 +77,12 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     const category = reflection.category
     const registry = this.options.resolveModelRegistry()
     const sessionModel = this.options.resolveSessionModel?.()
-    const resolution = resolveReflectionModel(category, loaded.config, registry, {
-      ...(sessionModel === undefined ? {} : { sessionModel }),
-    })
+    const resolution = resolveReflectionModel(
+      category,
+      loaded.config,
+      registry,
+      sessionModel === undefined ? {} : { sessionModel },
+    )
 
     if (resolution.kind === "category_unavailable") {
       this.notifyCategoryUnavailable(loaded.config, resolution)
@@ -163,7 +162,6 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
       suppressCompletionNotification,
       options: this.options,
       now: this.now,
-      ensureRenderer: (live) => this.ensureRenderer(live),
       warnedHealth: this.warnedHealth,
     })
   }
@@ -172,7 +170,6 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     return publishFinalizedReflectionRun({
       result,
       options: this.options,
-      ensureRenderer: (live) => this.ensureRenderer(live),
       mergedMetadata: (runId) => this.mergedMetadata(runId),
       warnedHealth: this.warnedHealth,
     })
@@ -192,18 +189,24 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
       (sum, state) => sum + (state?.steps_since_last_successful_reflection ?? 0),
       0,
     )
-    live.api.appendEntry(REFLECTION_LAUNCHED_ENTRY_TYPE, {
-      schemaVersion: 1,
-      runId: run.runId,
-      identity: this.options.identity.id,
-      trigger: run.request.trigger,
-      category: resolution.category,
-      model: resolution.model,
-      ...(resolution.thinking === undefined ? {} : { thinking: resolution.thinking }),
-      conversationIds: run.request.conversationIds,
-      backlogSteps,
-      startedAt,
-    })
+    try {
+      live.api.appendEntry(REFLECTION_LAUNCHED_ENTRY_TYPE, {
+        schemaVersion: 1,
+        runId: run.runId,
+        identity: this.options.identity.id,
+        trigger: run.request.trigger,
+        category: resolution.category,
+        model: resolution.model,
+        ...(resolution.thinking === undefined ? {} : { thinking: resolution.thinking }),
+        conversationIds: run.request.conversationIds,
+        backlogSteps,
+        startedAt,
+      })
+    } catch (error) {
+      live.logger?.warn("memory reflection launch entry failed", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   private async mergedMetadata(runId: string): Promise<{ mergedCommitSha?: string; filesChanged?: number }> {
@@ -232,12 +235,6 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
         : `Category "${resolution.category}" has no usable model for memory reflection.`,
       "info",
     )
-  }
-
-  private ensureRenderer(live: ReflectionLiveSession | undefined): void {
-    if (!live || this.registeredApis.has(live.api)) return
-    registerReflectionCompletionRenderer(live.api)
-    this.registeredApis.add(live.api)
   }
 
   private finalizationContext(): RunFinalizationContext {

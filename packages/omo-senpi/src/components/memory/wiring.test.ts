@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
-import type { MemoryIdentityRuntime } from "./identity-runtime"
+import type { MemoryIdentityRuntime, MemoryIdentityRuntimeDeps } from "./identity-runtime"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { createMemoryComponent, ensureIdentityRuntimeDirs } from "./index"
@@ -652,6 +652,42 @@ describe("facts shutdown wiring", () => {
 })
 
 describe("memory footer live wiring", () => {
+  test("#given a live reflection session #when the session shuts down #then detached work can no longer reach its API", async () => {
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-live-session-shutdown-")))
+    roots.push(root)
+    const sessionId = "session-live-shutdown"
+    const identity = createMemoryIdentityContext({
+      identity: "live-shutdown-agent",
+      identityPaths: buildIdentityPaths(root, "live-shutdown-agent"),
+      binding: { identity: "live-shutdown-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    let liveSession: MemoryIdentityRuntimeDeps["liveSession"]
+    const wiring = createMemoryWiring({
+      sessions: new Map([[sessionId, { context: identity }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      env: {},
+      createRuntime: (_context, deps) => {
+        liveSession = deps.liveSession
+        return { reconcile: async () => {} } as unknown as MemoryIdentityRuntime
+      },
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    const eventCtx = sessionContext(sessionId)
+
+    await wiring.afterBind(pi, sessionId, identity, eventCtx)
+    expect(liveSession?.()?.sessionId).toBe(sessionId)
+
+    await wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId,
+      deadlineAt: Date.now() + 1_000,
+      now: () => Date.now(),
+    })
+
+    expect(liveSession?.()).toBeUndefined()
+  })
+
   test("#given a spinner animating mid-session #when the footer is cleared #then the interval is released and nothing repaints", async () => {
     const harness = await liveFooterHarness()
 

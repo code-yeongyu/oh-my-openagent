@@ -16,6 +16,35 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("memory identity runtime", () => {
+  test("#given renderers registered by static wiring #when a runtime is created #then it never re-registers through the live API", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-memory-renderer-owner-"))
+    roots.push(root)
+    const paths = buildIdentityPaths(root, "agent-test")
+    const identity = createMemoryIdentityContext({
+      identity: "agent-test",
+      identityPaths: paths,
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+    })
+    const create = () => createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      liveSession: () => ({
+        sessionId: "session-a",
+        api: {
+          appendEntry: () => undefined,
+          registerEntryRenderer: () => {
+            throw new Error("stale extension ctx")
+          },
+        },
+      }),
+    })
+
+    // when / then
+    expect(create).not.toThrow()
+  }, 30_000)
+
   // Regression: https://github.com/code-yeongyu/oh-my-openagent/issues/7815
   test("#given a rejected background runner #when launched #then the rejection is logged without escaping", async () => {
     // given
