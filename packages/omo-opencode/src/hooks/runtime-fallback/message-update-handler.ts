@@ -11,6 +11,11 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import {
+  applyGitHubCopilotRateLimit,
+  getGitHubCopilotRateLimitState,
+  isGitHubCopilotRetryPending,
+} from "./copilot-rate-limit"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -102,6 +107,18 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         return
       }
 
+      if (retrySignal && isGitHubCopilotRetryPending(
+        getGitHubCopilotRateLimitState(deps),
+        model ?? state?.currentModel,
+        Date.now(),
+      )) {
+        log(`[${HOOK_NAME}] message.updated retry signal skipped during GitHub Copilot backoff`, {
+          sessionID,
+          model,
+        })
+        return
+      }
+
       if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
         log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
           sessionID,
@@ -147,6 +164,13 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
           errorType: classifyErrorType(error),
         })
       }
+
+      applyGitHubCopilotRateLimit(getGitHubCopilotRateLimitState(deps), {
+        error,
+        model: model ?? state?.currentModel,
+        now: Date.now(),
+        random: Math.random,
+      })
 
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)

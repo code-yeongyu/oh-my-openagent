@@ -4,6 +4,11 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { prepareFallback } from "./fallback-state"
 import { restoreFallbackState, snapshotFallbackState } from "./fallback-state-snapshot"
+import {
+  filterGitHubCopilotModelsInCooldown,
+  getGitHubCopilotRateLimitState,
+  waitForGitHubCopilotRetry,
+} from "./copilot-rate-limit"
 
 type DispatchFallbackRetryOptions = {
   sessionID: string
@@ -26,14 +31,35 @@ export async function dispatchFallbackRetry(
   options: DispatchFallbackRetryOptions,
 ): Promise<void> {
   const snapshot = snapshotFallbackState(options.state)
+  const fallbackModels = filterGitHubCopilotModelsInCooldown(
+    options.fallbackModels,
+    getGitHubCopilotRateLimitState(deps),
+    Date.now(),
+  )
   const result = prepareFallback(
     options.sessionID,
     options.state,
-    options.fallbackModels,
+    fallbackModels,
     deps.config,
   )
 
   if (result.success && result.newModel) {
+    const retryWindowAvailable = await waitForGitHubCopilotRetry({
+      state: getGitHubCopilotRateLimitState(deps),
+      model: result.newModel,
+      sessionID: options.sessionID,
+      sessionRetryInFlight: deps.sessionRetryInFlight,
+    })
+    if (!retryWindowAvailable || deps.sessionStates.get(options.sessionID) !== options.state) {
+      if (deps.sessionStates.get(options.sessionID) === options.state) {
+        restoreFallbackState(options.state, snapshot)
+      }
+      log(`[${HOOK_NAME}] Fallback dispatch skipped during GitHub Copilot backoff`, {
+        sessionID: options.sessionID,
+        source: options.source,
+      })
+      return
+    }
     const rawDispatchOutcome = await helpers.autoRetryWithFallback(
       options.sessionID,
       result.newModel,

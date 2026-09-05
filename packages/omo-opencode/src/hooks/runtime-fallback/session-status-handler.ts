@@ -10,6 +10,10 @@ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import {
+  getGitHubCopilotRateLimitState,
+  isGitHubCopilotRetryPending,
+} from "./copilot-rate-limit"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -31,6 +35,18 @@ export function createSessionStatusHandler(
     const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return
+
+    if (isGitHubCopilotRetryPending(
+      getGitHubCopilotRateLimitState(deps),
+      model ?? sessionStates.get(sessionID)?.currentModel,
+      Date.now(),
+    )) {
+      log(`[${HOOK_NAME}] session.status retry skipped during GitHub Copilot backoff`, {
+        sessionID,
+        model,
+      })
+      return
+    }
 
     const retryMessage = typeof status.message === "string" ? status.message : ""
     const retrySignal = extractAutoRetrySignal({ status: retryMessage, message: retryMessage })
