@@ -10,6 +10,13 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
 - brand: the launcher injects a `SENPI_BRAND` profile (name, `~/.omo/agent` home, `OMO_*` env prefix, wire identity, omo-ai beta update channel) so the pinned engine presents as omo; `--version` and every self-update spelling are answered by the launcher. See `docs/reference/omo-ai-publishing.md`.
 - `bin/lib/` - launcher modules:
   - `launcher.js` — `runLauncher()` dispatch, senpi environment/brand/update routing
+  - `claude-code-executable.js` — `claudeCodeExecutableOverride()`: the engine's claude-sdk-oauth lane
+    runs the native binary bundled with its pinned `@anthropic-ai/claude-agent-sdk`, and a build below
+    `BUNDLED_SDK_FLOOR` does not know the newer Claude model ids the catalog advertises, so those queries
+    fail with `errorMessage: "unknown"` and the retry fallback silently answers from another model. When
+    the bundled build is stale AND a newer standalone Claude Code is installed beside this package, the
+    launcher points `CLAUDE_CODE_EXECUTABLE` at it. An explicit user value always wins, and every
+    resolution failure is fail-open — this never gates the engine spawn.
   - `agent-dir.js` — `canonicalAgentDir()`, `adoptLegacyFlatState()`, legacy flat-dir migration
   - `setup-detect.js` / `setup-import.js` / `setup-models.js` / `setup-report.js` — harness detection, SQLite read-only import, provider mapping, report rendering
   - `setup-detect-cache.js` / `setup-detect-refresh.js` — the interactive launch's setup-suggestion cache: a

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
+import { claudeCodeExecutableOverride } from "./claude-code-executable.js"
 import { runDoctor } from "./doctor.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
@@ -83,6 +84,13 @@ function senpiEnvironment(senpiRoot) {
     const shim = join(binDir, process.platform === "win32" ? "senpi.cmd" : "senpi")
     if (existsSync(shim)) env.SENPI_BIN = shim
   }
+  // The engine's claude-sdk-oauth lane runs the native binary bundled with its pinned
+  // claude-agent-sdk, and a bundled build older than the Claude model ids the catalog advertises
+  // fails those queries with `errorMessage: "unknown"` - which the retry fallback then hides by
+  // answering from a different model. When a newer standalone Claude Code is already installed
+  // beside this package, hand the engine that binary instead; an explicit user value always wins.
+  const claudeCodeExecutable = claudeCodeExecutableOverride({ env, senpiRoot })
+  if (claudeCodeExecutable !== undefined) env.CLAUDE_CODE_EXECUTABLE = claudeCodeExecutable
   // Anything resolving the product by name must re-enter through this launcher, otherwise it
   // would reach the engine directly and lose the brand.
   env.OMO_BIN = join(packageRoot, "bin", "omo.js")
