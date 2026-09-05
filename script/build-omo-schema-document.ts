@@ -24,6 +24,7 @@ export function createOmoJsonSchema(): Record<string, unknown> {
   const profile = requiredRecord(profiles.additionalProperties, "properties.profiles.additionalProperties")
   const profileProperties = requiredRecord(profile.properties, "properties.profiles.additionalProperties.properties")
   const openCodeSchema = createOhMyOpenCodeJsonSchema()
+  delete openCodeSchema.$id
 
   properties["[opencode]"] = openCodeSchema
   profileProperties["[opencode]"] = openCodeSchema

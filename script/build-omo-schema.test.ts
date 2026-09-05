@@ -179,6 +179,21 @@ describe("build-omo-schema-document", () => {
     expect(result.success).toBe(false)
   })
 
+  test("#given embedded OpenCode schemas #when serialized #then only the composed document declares an identifier", () => {
+    // given
+    const schema = createOmoJsonSchema()
+    const identifiers: unknown[] = []
+
+    // when
+    JSON.parse(JSON.stringify(schema), (key: string, value: unknown) => {
+      if (key === "$id") identifiers.push(value)
+      return value
+    })
+
+    // then
+    expect(identifiers).toEqual([OMO_SCHEMA_ID])
+  })
+
   test("#given the schema generator #when it runs twice #then it produces no diff", () => {
     // given
     const first = JSON.stringify(createOmoJsonSchema(), null, 2)

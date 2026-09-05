@@ -1314,14 +1314,6 @@
           "type": "string",
           "minLength": 1
         },
-        "tool_exposure": {
-          "default": "direct",
-          "type": "string",
-          "enum": [
-            "direct",
-            "search"
-          ]
-        },
         "reflection": {
           "default": {
             "enabled": true,
@@ -1844,7 +1836,6 @@
       "required": [
         "enabled",
         "agent",
-        "tool_exposure",
         "reflection",
         "nudge",
         "facts",
@@ -1875,7 +1866,6 @@
     },
     "[opencode]": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
       "title": "Oh My OpenCode Configuration",
       "description": "Configuration schema for oh-my-opencode plugin",
       "type": "object",
@@ -12998,13 +12988,6 @@
               "type": "string",
               "minLength": 1
             },
-            "tool_exposure": {
-              "type": "string",
-              "enum": [
-                "direct",
-                "search"
-              ]
-            },
             "reflection": {
               "type": "object",
               "properties": {
@@ -14624,13 +14607,6 @@
             "agent": {
               "type": "string",
               "minLength": 1
-            },
-            "tool_exposure": {
-              "type": "string",
-              "enum": [
-                "direct",
-                "search"
-              ]
             },
             "reflection": {
               "type": "object",
@@ -16258,13 +16234,6 @@
                 "type": "string",
                 "minLength": 1
               },
-              "tool_exposure": {
-                "type": "string",
-                "enum": [
-                  "direct",
-                  "search"
-                ]
-              },
               "reflection": {
                 "type": "object",
                 "properties": {
@@ -16668,7 +16637,6 @@
           },
           "[opencode]": {
             "$schema": "http://json-schema.org/draft-07/schema#",
-            "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
             "title": "Oh My OpenCode Configuration",
             "description": "Configuration schema for oh-my-opencode plugin",
             "type": "object",
@@ -27791,13 +27759,6 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "tool_exposure": {
-                    "type": "string",
-                    "enum": [
-                      "direct",
-                      "search"
-                    ]
-                  },
                   "reflection": {
                     "type": "object",
                     "properties": {
@@ -29417,13 +29378,6 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "tool_exposure": {
-                    "type": "string",
-                    "enum": [
-                      "direct",
-                      "search"
-                    ]
                   },
                   "reflection": {
                     "type": "object",
