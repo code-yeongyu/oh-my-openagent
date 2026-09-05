@@ -254,6 +254,15 @@ export class ParentWakeFlushRunner {
   }
 
   private shouldForceDispatchAfterActiveDefer(wake: PendingParentWake): boolean {
+    // A noReply admission already deposited the reminder into the live turn.
+    // Forcing a reply-producing wake while that session is still active forks a
+    // second assistant loop (duplicate [ALL BACKGROUND TASKS COMPLETE] parent
+    // message, cache-busting dual chain). Resume only after the session goes
+    // idle; dropAdmittedWakeConsumedByParent drops the follow-up if the live
+    // turn already consumed the deposit.
+    if (wake.noReplyAdmittedAt !== undefined) {
+      return false
+    }
     return wake.shouldReply && this.getQueuedAgeMs(wake) >= PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS
   }
 
