@@ -1,4 +1,4 @@
-import type { AutoRetryDispatchOutcome, HookDeps, RuntimeFallbackTimeout } from "./types"
+import type { AutoRetryDispatchOutcome, FallbackState, HookDeps, RuntimeFallbackTimeout } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { getFallbackModelsForSession } from "./fallback-models"
@@ -8,6 +8,11 @@ import { subagentSessions } from "../../features/claude-code-session-state"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+
+// Deliberately absent from the internal-abort source list in auto-retry-abort.ts:
+// this abort must reach the caller as a real cancellation instead of being
+// consumed as a silent fallback handoff.
+const TERMINAL_ABORT_SOURCE = "session.timeout.fallback-exhausted"
 
 export function createFallbackTimeoutHelpers(
   deps: HookDeps,
@@ -34,6 +39,56 @@ export function createFallbackTimeoutHelpers(
       clearTimeout(timer)
       sessionFallbackTimeouts.delete(sessionID)
     }
+  }
+
+  // Ends the fallback lifecycle with a failure the caller can observe. Without
+  // this the session keeps waiting on a fallback that will never arrive (#6637).
+  const failSessionFallbackTerminally = async (
+    sessionID: string,
+    expectedState: FallbackState,
+    reason: string,
+    details: Record<string, unknown> = {},
+  ) => {
+    clearSessionFallbackTimeout(sessionID)
+    sessionRetryInFlight.delete(sessionID)
+    const wasAwaitingFallbackResult = deps.sessionAwaitingFallbackResult.delete(sessionID)
+
+    log(`[${HOOK_NAME}] Session fallback exhausted`, { sessionID, reason, ...details })
+
+    // The timeout path already marked this session as internally aborted. Leaving
+    // that marker behind would make a later real abort look like our own fallback
+    // handoff and preserve fallback state that no longer has an owner.
+    deps.internallyAbortedSessions.delete(sessionID)
+    if (!wasAwaitingFallbackResult) return
+
+    if (config.notify_on_fallback) {
+      // Best effort, not awaited: a showToast() call that never settles must
+      // not block the terminal abort below, or the caller is left hanging on
+      // the very rejected-fallback path this function exists to bound.
+      void deps.ctx.client.tui
+        .showToast({
+          body: {
+            title: "Model Fallback Failed",
+            message: `No fallback model could be reached (${reason})`,
+            variant: "error",
+            duration: 5000,
+          },
+        })
+        .catch(() => {})
+    }
+
+    // The caller already awaited a dispatch or a prepare step before reaching
+    // this function, which is enough time for a newer fallback generation to
+    // take over the session. Aborting that generation would cancel a retry
+    // this call never owned, so ownership is revalidated before the abort.
+    if (sessionStates.get(sessionID) !== expectedState) {
+      log(`[${HOOK_NAME}] Session fallback terminal abort skipped for superseded generation`, {
+        sessionID,
+      })
+      return
+    }
+
+    await abortSessionRequest(sessionID, TERMINAL_ABORT_SOURCE)
   }
 
   const scheduleSessionFallbackTimeout = (sessionID: string, resolvedAgent?: string) => {
@@ -84,7 +139,10 @@ export function createFallbackTimeoutHelpers(
       const stateSnapshot = snapshotFallbackState(state)
 
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
-      if (fallbackModels.length === 0) return
+      if (fallbackModels.length === 0) {
+        await failSessionFallbackTerminally(sessionID, state, "no fallback models configured")
+        return
+      }
 
       log(`[${HOOK_NAME}] Session fallback timeout reached`, {
         sessionID,
@@ -93,19 +151,63 @@ export function createFallbackTimeoutHelpers(
       })
 
       const result = prepareFallback(sessionID, state, fallbackModels, config)
-      if (result.success && result.newModel) {
-        const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
-        if (!dispatchOutcome.accepted) {
-          restoreFallbackState(state, stateSnapshot)
-          if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
-            scheduleSessionFallbackTimeout(sessionID, resolvedAgent)
-          }
-          log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
-            sessionID,
-            status: dispatchOutcome.status,
-            reason: dispatchOutcome.reason,
-          })
-        }
+      if (!result.success || !result.newModel) {
+        await failSessionFallbackTerminally(
+          sessionID,
+          state,
+          result.maxAttemptsReached ? "max fallback attempts reached" : "no available fallback models",
+          { attemptCount: state.attemptCount },
+        )
+        return
+      }
+
+      const preparedOwnership = {
+        currentModel: state.currentModel,
+        fallbackIndex: state.fallbackIndex,
+        attemptCount: state.attemptCount,
+      }
+
+      const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
+      if (dispatchOutcome.accepted) return
+
+      // Identity alone is not ownership: a superseding retry can advance the same
+      // FallbackState object without replacing it. Only the dispatch that still
+      // owns exactly what prepareFallback produced may roll that preparation back.
+      const stillOwnsPreparedState =
+        sessionStates.get(sessionID) === state &&
+        state.currentModel === preparedOwnership.currentModel &&
+        state.fallbackIndex === preparedOwnership.fallbackIndex &&
+        state.attemptCount === preparedOwnership.attemptCount
+      if (!stillOwnsPreparedState) {
+        log(`[${HOOK_NAME}] Session timeout fallback rejection skipped for superseded dispatch`, {
+          sessionID,
+        })
+        return
+      }
+
+      // A rejected dispatch still burned an attempt. Restoring the snapshot
+      // verbatim would rewind attemptCount as well, leaving the guard in
+      // prepareFallback unreachable and the timeout loop unbounded (#6637).
+      const attemptsUsed = state.attemptCount
+      restoreFallbackState(state, stateSnapshot)
+      state.attemptCount = attemptsUsed
+
+      log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
+        sessionID,
+        status: dispatchOutcome.status,
+        reason: dispatchOutcome.reason,
+        attemptCount: attemptsUsed,
+      })
+
+      if (attemptsUsed >= config.max_fallback_attempts) {
+        await failSessionFallbackTerminally(sessionID, state, "max fallback attempts reached", {
+          attemptCount: attemptsUsed,
+        })
+        return
+      }
+
+      if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
+        scheduleSessionFallbackTimeout(sessionID, resolvedAgent)
       }
     }, timeoutMs)
 
