@@ -39,6 +39,47 @@ describe("BackgroundManager session permission", () => {
     expect(promptCalls[0]?.query).toEqual({ directory: "/parent" })
   })
 
+  test("routes child session creation and prompts through an explicit cwd", async () => {
+    // given
+    const createCalls: Array<Record<string, unknown>> = []
+    const promptCalls: Array<Record<string, unknown>> = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent" } }),
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "ses_child" } }
+        },
+        promptAsync: async (input: Record<string, unknown>) => {
+          promptCalls.push(input)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    })
+
+    // when
+    await manager.launch({
+      description: "Worktree task",
+      prompt: "Do something in the worktree",
+      agent: "explore",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+      cwd: "/worktree",
+    })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    manager.shutdown()
+
+    // then
+    expect(createCalls).toHaveLength(1)
+    expect(createCalls[0]?.query).toEqual({ directory: "/worktree" })
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0]?.query).toEqual({ directory: "/worktree" })
+  })
+
   test("passes query directory when loading the parent session", async () => {
     // given
     const getCalls: Array<Record<string, unknown>> = []

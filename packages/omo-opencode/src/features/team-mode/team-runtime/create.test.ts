@@ -298,6 +298,28 @@ describe("createTeamRun", () => {
     expect(await pathExists(path.resolve(baseDir, "./worktrees/member-2"))).toBe(false)
   })
 
+  test("passes each resolved member worktree as the background child cwd", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-worktree-cwd-"))
+    temporaryDirectories.push(baseDir)
+    let launchCount = 0
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: `task-${++launchCount}`,
+      sessionId: `session-${launchCount}`,
+      status: "running",
+    } as BackgroundTask))
+
+    // when
+    await createTeamRun(createSpec(2, true), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+
+    // then
+    const launchInputs = (launchMock.mock.calls as Array<[LaunchInput]>).map(([input]) => input)
+    expect(launchInputs.map((input) => input.cwd)).toEqual([
+      path.resolve(baseDir, "./worktrees/member-1"),
+      path.resolve(baseDir, "./worktrees/member-2"),
+    ])
+  })
+
   test("returns the existing runtime on repeated calls with the same spec and lead session", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-idempotent-"))

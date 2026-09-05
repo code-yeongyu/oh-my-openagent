@@ -199,6 +199,7 @@ export async function createTeamRun(
             parentSessionId: leadSessionId,
             parentMessageId: options?.parentMessageID ?? `team-create:${runtimeState.teamRunId}:${member.name}`,
             teamRunId: runtimeState.teamRunId,
+            cwd: resource.worktreePath,
             suppressTmuxSpawn: true,
             model: resolvedMember.model,
             fallbackChain: resolvedMember.fallbackChain,
