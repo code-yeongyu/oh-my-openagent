@@ -1,4 +1,8 @@
-import type { ChildModelRegistry } from "@oh-my-opencode/senpi-task"
+import type {
+  ChildModelRegistry,
+  SenpiModelPort,
+  SenpiModelRegistryPort,
+} from "@oh-my-opencode/senpi-task"
 
 export type { ChildModelRegistry }
 
@@ -13,6 +17,24 @@ export function resolveMemoryModelRegistry(eventContext: unknown): ChildModelReg
   if (!isRecord(eventContext)) return undefined
   const registry = eventContext.modelRegistry
   return isModelRegistry(registry) ? registry : undefined
+}
+
+/**
+ * Copy the model lookup data needed by detached reflection before the host invalidates its live
+ * extension context. The concrete registry remains available separately for in-process children,
+ * which require its auth/runtime methods and never use this detached port.
+ */
+export function snapshotMemoryModelRegistry(
+  registry: ChildModelRegistry | undefined,
+): SenpiModelRegistryPort<SenpiModelPort> | undefined {
+  if (registry === undefined) return undefined
+  const all = registry.getAll()
+  const available = registry.getAvailable()
+  const bySelector = new Map(all.map((model) => [`${model.provider}/${model.id}`, model] as const))
+  return {
+    getAvailable: () => available,
+    find: (provider, modelId) => bySelector.get(`${provider}/${modelId}`),
+  }
 }
 
 function isModelRegistry(value: unknown): value is ChildModelRegistry {

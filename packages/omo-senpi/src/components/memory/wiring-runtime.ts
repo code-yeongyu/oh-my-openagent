@@ -15,7 +15,10 @@ import {
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
 import { MemorianGateRunner } from "./memorian-runner"
 import type { MemorianGatePort } from "./memorian-wiring"
-import { resolveMemoryModelRegistry } from "./model-registry-resolver"
+import {
+  resolveMemoryModelRegistry,
+  snapshotMemoryModelRegistry,
+} from "./model-registry-resolver"
 import { resolveMemorySessionModel } from "./session-model-resolver"
 import {
   resolveParentCacheReusable as resolveParentCacheReusableFromCtx,
@@ -59,6 +62,7 @@ export function createMemoryRuntimeWiring(
   const memorianRunners = new Map<string, MemorianGatePort>()
   let sessionSnapshot: {
     readonly modelRegistry: ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]>
+    readonly liveModelRegistry: ReturnType<typeof resolveMemoryModelRegistry>
     readonly sessionModel: ReflectionSessionModel | undefined
     readonly parentContextTokens: number | undefined
     readonly parentSessionFile: string | undefined
@@ -69,8 +73,10 @@ export function createMemoryRuntimeWiring(
     options.sessions.get(sessionId)?.context
 
   function captureSessionContext(eventCtx: unknown): void {
+    const liveModelRegistry = resolveMemoryModelRegistry(eventCtx)
     sessionSnapshot = {
-      modelRegistry: resolveMemoryModelRegistry(eventCtx),
+      modelRegistry: snapshotMemoryModelRegistry(liveModelRegistry),
+      liveModelRegistry,
       sessionModel: resolveMemorySessionModel(eventCtx),
       parentContextTokens: resolveParentContextTokensFromCtx(eventCtx),
       parentSessionFile: resolveParentSessionFileFromCtx(eventCtx),
@@ -122,7 +128,7 @@ export function createMemoryRuntimeWiring(
       },
       cwd: options.cwd(),
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
-      resolveModelRegistry,
+      resolveModelRegistry: () => sessionSnapshot?.liveModelRegistry,
       env: options.env,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
