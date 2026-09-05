@@ -1,0 +1,10 @@
+file:///Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/packages/omo-senpi/scripts/qa/memory-model-fallback-e2e.mjs:158
+      reject(new Error("timed out waiting for reflection completion"))
+             ^
+
+Error: timed out waiting for reflection completion
+    at Timeout._onTimeout (file:///Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/packages/omo-senpi/scripts/qa/memory-model-fallback-e2e.mjs:158:14)
+    at listOnTimeout (node:internal/timers:635:17)
+    at process.processTimers (node:internal/timers:571:7)
+
+Node.js v24.19.0

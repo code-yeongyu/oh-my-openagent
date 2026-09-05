@@ -1,0 +1,22 @@
+Scenario: C001 reflection child launch contract before production fix
+Command: bun test packages/omo-senpi/src/components/memory/worker/runner-fork-spawn.test.ts
+Exit code: 1
+
+Observed decisive diff:
+  error: expect(received).toEqual(expected)
+  - "--system-prompt"
+  - "--tools"
+  - "--no-extensions"
+  - "--no-skills"
+  - "--no-prompt-templates"
+  - "--no-context-files"
+  + "--fork"
+  + "<temporary-parent-session>/parent.jsonl"
+    "--session-dir"
+    "--model"
+
+Result:
+  3 pass
+  1 fail
+
+The failure is behavioral, not a syntax or import failure. Inputs that make the legacy cost route choose a parent-session fork produce `--fork` and omit the bounded reflection worker's system-prompt, tool allowlist, and discovery-disable flags.

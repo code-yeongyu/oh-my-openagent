@@ -1,0 +1,5 @@
+memorian gate child failed {
+  runId: "fad23dea-691a-403b-a5e8-7ec628e39f94",
+  cause: "child_failed",
+  reason: "parent-only model must never execute",
+}

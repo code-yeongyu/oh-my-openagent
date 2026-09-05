@@ -1,0 +1,22 @@
+Scenario: C002 fresh-session bind before health alert gating fix
+Command:
+  bun test packages/omo-senpi/src/components/memory/wiring.test.ts \
+    --test-name-pattern "memory wiring health alert delivery"
+
+Exit code: 1
+
+Observed:
+  Expected length: 0
+  Received length: 1
+
+  FAIL: three consumed stable failures, zero pending completions, fresh session bind
+        -> historical health entry was appended
+  PASS: three consumed failures plus one newly pending failure
+        -> exactly one health alert was emitted and identity status remained
+
+Result:
+  1 pass
+  1 fail
+  Ran 2 tests across 1 file. [1.55s]
+
+The failure is the intended behavioral regression: bind-time completion draining surfaced nothing, but the identity-wide historical streak still produced a new transcript health entry.

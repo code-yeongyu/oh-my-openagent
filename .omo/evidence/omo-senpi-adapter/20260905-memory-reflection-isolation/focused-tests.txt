@@ -1,0 +1,18 @@
+Command: bun test packages/omo-senpi/src/components/memory
+Exit code: 0
+Result:
+  1046 pass
+  0 fail
+  3418 expect() calls
+  Ran 1046 tests across 148 files. [93.74s]
+
+Scope covered:
+  Reflection/dream launch, model resolution, supervisor/finalization, completion delivery,
+  health derivation and alerting, bind wiring, identity status, memory commands, and adjacent
+  cursor/reservation integration within the Senpi memory component.
+
+LSP note:
+  The session LSP MCP could not initialize TypeScript in the task worktree. The standalone
+  lsp-setup roundtrip also failed inside its own path handling despite detecting
+  typescript-language-server and the local TypeScript installation. This is a tooling failure,
+  not a source diagnostic. The required package tsgo gate is run separately.

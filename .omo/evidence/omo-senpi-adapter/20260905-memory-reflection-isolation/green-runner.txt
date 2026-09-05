@@ -1,0 +1,26 @@
+Scenario: C001 reflection and dream launch contract after fork retirement
+Command:
+  bun test \
+    packages/omo-senpi/src/components/memory/worker/runner-spawn-contract.test.ts \
+    packages/omo-senpi/src/components/memory/worker/runner.integration.test.ts \
+    packages/omo-senpi/src/components/memory/worker/runner-finalization.test.ts \
+    packages/omo-senpi/src/components/memory/worker/spawn.test.ts \
+    packages/omo-senpi/src/components/memory/worker/spawn-supervisor.test.ts \
+    packages/omo-senpi/src/components/memory/worker/resolve-model.test.ts \
+    packages/omo-senpi/src/components/memory/worker/model-cost.test.ts \
+    packages/omo-senpi/src/components/memory/worker/registry-fallback.test.ts \
+    packages/omo-senpi/src/components/memory/index.test.ts
+
+Exit code: 0
+Result:
+  62 pass
+  0 fail
+  208 expect() calls
+  Ran 62 tests across 9 files. [11.60s]
+
+Additional check:
+  ./node_modules/.bin/tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+  Exit code: 0
+
+Observed contract:
+  Previously fork-winning inputs now prepare the bounded reflection worker argv with `--system-prompt`, `--tools bash,edit`, all discovery-disable flags, a fresh `--session-dir`, the quick model, the worktree cwd, and a run-local `TRANSCRIPT_PATH`. The retired `--fork` path is absent.

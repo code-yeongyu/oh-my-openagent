@@ -1,0 +1,27 @@
+{
+  "title": "OMO memory reflection isolation",
+  "connector": "xterm-replay",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "file-replay",
+    "path": "/Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/.omo/evidence/omo-senpi-adapter/20260905-reflection-isolation-live3/trigger.terminal.raw"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 120,
+    "rows": 32
+  },
+  "cleanup": "no pty (replay)",
+  "files": {
+    "png": "/Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/.omo/evidence/omo-senpi-adapter/20260905-reflection-isolation-live3/visual/terminal.png",
+    "text": "/Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/.omo/evidence/omo-senpi-adapter/20260905-reflection-isolation-live3/visual/terminal.txt",
+    "ansi": "/Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/.omo/evidence/omo-senpi-adapter/20260905-reflection-isolation-live3/visual/terminal-ansi.txt",
+    "metadata": "/Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/.omo/evidence/omo-senpi-adapter/20260905-reflection-isolation-live3/visual/metadata.json"
+  }
+}
