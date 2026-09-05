@@ -12,6 +12,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-runtime-fallback-mock-provider.ts")
 const finalText = "omo e2e fallback child final text"
 const realAgentDir = join(homedir(), ".senpi", "agent")
+const qwenFallback = "opencode-go/qwen3.7-plus"
 
 // Scenario fixtures. The mock provider (task-runtime-fallback-mock-provider.ts) reads
 // OMO_FALLBACK_SCENARIO to decide which category the parent spawns and which child models die.
@@ -70,7 +71,66 @@ const scenarios = [
       task_failed: artifacts.task?.status === "error" ? "PASS" : "FAIL",
     }),
   },
+  {
+    name: "explore-qwen-fallback",
+    omoConfig: {},
+    checks: agentFallbackChecks("explore"),
+  },
+  {
+    name: "librarian-qwen-fallback",
+    omoConfig: {},
+    checks: agentFallbackChecks("librarian"),
+  },
 ]
+
+function agentFallbackChecks(agentType) {
+  return (artifacts, stdoutText) => ({
+    final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
+    agent_type: artifacts.task?.agent_type === agentType ? "PASS" : "FAIL",
+    selected_model: artifacts.task?.model === qwenFallback ? "PASS" : "FAIL",
+    resolved_from_agent:
+      artifacts.task?.resolved_model?.source === "agent" &&
+      artifacts.task.resolved_model.display === qwenFallback
+        ? "PASS"
+        : "FAIL",
+  })
+}
+
+function childEnv(baseEnv, sandbox, sessionDir, scenarioName) {
+  const common = {
+    HOME: sandbox.homeDir,
+    OMO_CODING_AGENT_DIR: sandbox.agentDir,
+    PI_CODING_AGENT_DIR: sandbox.agentDir,
+    SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+    SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
+    XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+    OMO_SENPI_QA: "1",
+    OMO_FALLBACK_SCENARIO: scenarioName,
+  }
+  const isolatesAgentSelection =
+    scenarioName === "explore-qwen-fallback" ||
+    scenarioName === "librarian-qwen-fallback"
+  if (!isolatesAgentSelection) return { ...baseEnv, ...common }
+
+  const env = {}
+  for (const [key, value] of Object.entries(baseEnv)) {
+    if (value === undefined) continue
+    if (/TOKEN|SECRET|PASSWORD|COOKIE|CREDENTIAL|API_KEY/i.test(key)) continue
+    if (key === "SENPI_CODING_AGENT_DIR" || key === "SENPI_CODING_AGENT_SESSION_DIR") continue
+    env[key] = value
+  }
+  return {
+    ...env,
+    ...common,
+    XDG_DATA_HOME: sandbox.xdgDataHome,
+    XDG_CACHE_HOME: sandbox.xdgCacheHome,
+    OMO_SENPI_QA: "1",
+    OMO_SENPI_DISABLE_POSTHOG: "1",
+    OMO_FALLBACK_SCENARIO: scenarioName,
+    PI_OFFLINE: "1",
+    PI_TELEMETRY: "0",
+  }
+}
 
 function readTaskArtifacts(stateDir) {
   const tasksDir = join(stateDir, "tasks")
@@ -100,10 +160,6 @@ function runScenario(scenario, outDir) {
     writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(scenario.omoConfig, null, 2)}\n`)
     const sessionDir = join(sandbox.root, "sessions")
     mkdirSync(sessionDir, { recursive: true })
-    // HOME-based user config (~/.omo/config.jsonc) would otherwise leak the developer's real
-    // category overrides into the fixture and hijack builtin category resolution.
-    const homeDir = join(sandbox.root, "home")
-    mkdirSync(homeDir, { recursive: true })
     runResult = spawnSync(
       process.env.SENPI_BIN?.trim() || "senpi",
       [
@@ -122,15 +178,7 @@ function runScenario(scenario, outDir) {
       ],
       {
         cwd: sandbox.cwd,
-        env: {
-          ...process.env,
-          HOME: homeDir,
-          SENPI_CODING_AGENT_DIR: sandbox.agentDir,
-          XDG_CONFIG_HOME: sandbox.xdgConfigHome,
-          SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
-          OMO_SENPI_QA: "1",
-          OMO_FALLBACK_SCENARIO: scenario.name,
-        },
+        env: childEnv(process.env, sandbox, sessionDir, scenario.name),
         encoding: "utf8",
         timeout: 120_000,
         maxBuffer: 64 * 1024 * 1024,
@@ -168,10 +216,22 @@ function runScenario(scenario, outDir) {
   return verdict
 }
 
+function selectedScenarios(raw) {
+  if (raw === undefined || raw.trim().length === 0) return scenarios
+  const requested = new Set(raw.split(",").map((name) => name.trim()).filter((name) => name.length > 0))
+  const selected = scenarios.filter((scenario) => requested.has(scenario.name))
+  if (selected.length !== requested.size) {
+    const missing = [...requested].filter((name) => !scenarios.some((scenario) => scenario.name === name))
+    throw new Error(`unknown fallback scenario: ${missing.join(", ")}`)
+  }
+  return selected
+}
+
 function run() {
   const outDir = resolve(process.env.TASK_RUNTIME_FALLBACK_OUT_DIR ?? join(process.cwd(), ".omo", "evidence", "task-runtime-fallback"))
   mkdirSync(outDir, { recursive: true })
-  const verdicts = scenarios.map((scenario) => runScenario(scenario, outDir))
+  const verdicts = selectedScenarios(process.env.OMO_FALLBACK_SCENARIOS)
+    .map((scenario) => runScenario(scenario, outDir))
   const result = verdicts.every((verdict) => verdict.result === "PASS") ? "PASS" : "FAIL"
   const summary = { result, scenarios: verdicts }
   writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(summary, null, 2)}\n`)
@@ -182,6 +242,31 @@ function run() {
 function selfTest() {
   const parsed = parseJsonEvents(`${JSON.stringify({ type: "text", text: finalText })}\n`)
   if (!JSON.stringify(parsed).includes(finalText)) throw new Error("event parser did not preserve final text")
+  const sandbox = createSandbox()
+  const isolated = childEnv(
+    {
+      ...process.env,
+      OPENAI_API_KEY: "secret",
+      OMO_CODING_AGENT_DIR: "/real-omo",
+      PI_CODING_AGENT_DIR: "/real-pi",
+      SENPI_CODING_AGENT_DIR: "/real-senpi",
+    },
+    sandbox,
+    join(sandbox.root, "sessions"),
+    "explore-qwen-fallback",
+  )
+  if (
+    isolated.OPENAI_API_KEY !== undefined ||
+    isolated.OMO_CODING_AGENT_DIR !== sandbox.agentDir ||
+    isolated.PI_CODING_AGENT_DIR !== sandbox.agentDir ||
+    isolated.SENPI_CODING_AGENT_DIR !== sandbox.agentDir
+  ) {
+    throw new Error("child environment isolation failed")
+  }
+  if (selectedScenarios("explore-qwen-fallback,librarian-qwen-fallback").length !== 2) {
+    throw new Error("scenario selection failed")
+  }
+  rmSync(sandbox.root, { recursive: true, force: true })
   console.log("SELF-TEST OK")
 }
 

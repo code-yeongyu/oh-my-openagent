@@ -1,0 +1,16 @@
+{
+  "result": "PASS",
+  "scenario": "explore-qwen-fallback",
+  "checks": {
+    "exit_zero": "PASS",
+    "final_text": "PASS",
+    "agent_type": "PASS",
+    "selected_model": "PASS",
+    "resolved_from_agent": "PASS",
+    "real_credentials_untouched": "PASS",
+    "cleanup": "PASS"
+  },
+  "task_id": "st_01a06dbc",
+  "credential_digest_before": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f",
+  "credential_digest_after": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f"
+}

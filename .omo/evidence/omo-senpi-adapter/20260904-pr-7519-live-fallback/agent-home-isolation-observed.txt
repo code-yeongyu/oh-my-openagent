@@ -1,0 +1,5 @@
+driver_self_test=PASS
+explore_selected_model=opencode-go/qwen3.7-plus
+librarian_selected_model=opencode-go/qwen3.7-plus
+forbidden_omo_absent=true
+forbidden_pi_absent=true

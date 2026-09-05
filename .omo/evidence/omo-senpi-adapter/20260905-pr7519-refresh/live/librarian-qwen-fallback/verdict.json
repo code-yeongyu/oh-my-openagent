@@ -1,0 +1,16 @@
+{
+  "result": "PASS",
+  "scenario": "librarian-qwen-fallback",
+  "checks": {
+    "exit_zero": "PASS",
+    "final_text": "PASS",
+    "agent_type": "PASS",
+    "selected_model": "PASS",
+    "resolved_from_agent": "PASS",
+    "real_credentials_untouched": "PASS",
+    "cleanup": "PASS"
+  },
+  "task_id": "st_01a07216",
+  "credential_digest_before": "421c20282c22dc4c24353c4a7e22afff28aec338b7759d62dbc0fca8beca7184",
+  "credential_digest_after": "421c20282c22dc4c24353c4a7e22afff28aec338b7759d62dbc0fca8beca7184"
+}

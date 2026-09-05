@@ -1,0 +1,66 @@
+{
+  "task_id": "st_01a06db9",
+  "status": "completed",
+  "residency_state": "persisted_only",
+  "parent_session_id": "01a06db9-d9fd-79f3-aae8-f15a037c736e",
+  "root_session_id": "01a06db9-d9fd-79f3-aae8-f15a037c736e",
+  "depth": 1,
+  "execution_mode": "in-process",
+  "model": "openai-codex/gpt-5.6-luna-fast",
+  "notify_on_terminal": false,
+  "created_at": "2026-09-04T18:41:32.693Z",
+  "updated_at": "2026-09-04T18:41:33.014Z",
+  "notification": {
+    "run_epoch": 0,
+    "notified_epoch": -1
+  },
+  "terminal_at": "2026-09-04T18:41:32.792Z",
+  "name": "fallback-child",
+  "category": "quick",
+  "requested_model": {
+    "provider": "kimi-coding",
+    "model_id": "kimi-for-coding-highspeed",
+    "display": "kimi-coding/kimi-for-coding-highspeed",
+    "source": "category"
+  },
+  "fallback_models": [],
+  "fallback_attempts": [
+    {
+      "provider": "kimi-coding",
+      "model_id": "kimi-for-coding-highspeed",
+      "display": "Dead chain rung one",
+      "source": "category"
+    },
+    {
+      "provider": "openai-codex",
+      "model_id": "gpt-5.6-luna-fast",
+      "display": "openai-codex/gpt-5.6-luna-fast",
+      "source": "category"
+    }
+  ],
+  "resolved_model": {
+    "provider": "openai-codex",
+    "model_id": "gpt-5.6-luna-fast",
+    "display": "openai-codex/gpt-5.6-luna-fast",
+    "source": "category"
+  },
+  "spawn_spec": {
+    "version": 1,
+    "cwd": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-1FS6h1/project",
+    "prompt": "complete through the configured fallback chain\n\n<Category_Context>\nYou are working on SMALL / QUICK tasks.\n\nEfficient execution mindset:\n- Fast, focused, minimal overhead\n- Get to the point immediately\n- No over-engineering\n- Simple solutions for simple problems\n\nApproach:\n- Minimal viable implementation\n- Skip unnecessary abstractions\n- Direct and concise\n</Category_Context>"
+  },
+  "final_response": "omo e2e fallback child final text",
+  "run_stats": {
+    "runtime_ms": 85,
+    "turns": 2,
+    "tool_calls": 0,
+    "generation_ms": 2,
+    "cost_usd": 0,
+    "token_status": "complete",
+    "cost_status": "reported",
+    "duration_status": "monotonic"
+  },
+  "task_seq": 0,
+  "config_generation": 0,
+  "background_mode": "foreground"
+}

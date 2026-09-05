@@ -1,0 +1,66 @@
+{
+  "task_id": "st_01a06db9",
+  "status": "completed",
+  "residency_state": "persisted_only",
+  "parent_session_id": "01a06db9-8f22-7d1c-b607-c2f89ba23a76",
+  "root_session_id": "01a06db9-8f22-7d1c-b607-c2f89ba23a76",
+  "depth": 1,
+  "execution_mode": "in-process",
+  "model": "omo-fallback-mock/healthy-fallback",
+  "notify_on_terminal": false,
+  "created_at": "2026-09-04T18:41:14.480Z",
+  "updated_at": "2026-09-04T18:41:14.769Z",
+  "notification": {
+    "run_epoch": 0,
+    "notified_epoch": -1
+  },
+  "terminal_at": "2026-09-04T18:41:14.566Z",
+  "name": "fallback-child",
+  "category": "fallbackcat",
+  "requested_model": {
+    "provider": "omo-fallback-mock",
+    "model_id": "dead-primary",
+    "display": "omo-fallback-mock/dead-primary",
+    "source": "category"
+  },
+  "fallback_models": [],
+  "fallback_attempts": [
+    {
+      "provider": "omo-fallback-mock",
+      "model_id": "dead-primary",
+      "display": "Dead primary",
+      "source": "category"
+    },
+    {
+      "provider": "omo-fallback-mock",
+      "model_id": "healthy-fallback",
+      "display": "omo-fallback-mock/healthy-fallback",
+      "source": "category"
+    }
+  ],
+  "resolved_model": {
+    "provider": "omo-fallback-mock",
+    "model_id": "healthy-fallback",
+    "display": "omo-fallback-mock/healthy-fallback",
+    "source": "category"
+  },
+  "spawn_spec": {
+    "version": 1,
+    "cwd": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-pqGgZJ/project",
+    "prompt": "complete through the configured fallback chain"
+  },
+  "final_response": "omo e2e fallback child final text",
+  "run_stats": {
+    "runtime_ms": 72,
+    "turns": 2,
+    "tool_calls": 0,
+    "generation_ms": 1,
+    "cost_usd": 0,
+    "token_status": "complete",
+    "cost_status": "reported",
+    "duration_status": "monotonic"
+  },
+  "task_seq": 0,
+  "config_generation": 0,
+  "background_mode": "foreground"
+}

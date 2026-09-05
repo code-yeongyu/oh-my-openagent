@@ -1,0 +1,23 @@
+{
+  "result": "FAIL",
+  "checksPassed": 21,
+  "checksFailed": [
+    "followup_revive",
+    "task_output_peek",
+    "jsonl_sequence",
+    "resume_revived_resident",
+    "resume_finished_steerable",
+    "resume_ttl_not_revived"
+  ],
+  "leakedPids": 0,
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "concurrentRealSenpiChangedPaths": [
+    "<concurrent-oh-my-openagent-session>.jsonl",
+    "<concurrent-goal-state>.json",
+    "<concurrent-openclaw-session>.jsonl"
+  ],
+  "sandboxCount": 9,
+  "sandboxesRemoved": true,
+  "mainExit": 0
+}

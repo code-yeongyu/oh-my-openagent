@@ -1,0 +1,19 @@
+Failing-first mirror contract:
+5 pass
+1 fail
+Expected: qwen3.7-plus
+Received: qwen3.5-plus
+
+After syncing production:
+fallback-chains.test.ts: 6 pass, 0 fail
+model-requirements-agents.test.ts: 12 pass, 0 fail
+builtin-agents.test.ts: 6 pass, 0 fail
+package typecheck: exit 0
+omo-senpi tsgo gate: exit 0
+build-extension.test.mjs with Bun 1.4.0: 12 pass, 0 fail
+
+Final upstream refresh:
+fallback-chains.test.ts: 7 pass, 0 fail, 202 assertions
+senpi-task tsgo gate: exit 0
+omo-senpi tsgo gate: exit 0
+all-six extension bundle freshness: PASS

@@ -25,7 +25,7 @@ interface AssistantMessage {
     | { readonly type: "toolCall"; readonly id: string; readonly name: string; readonly arguments: Readonly<Record<string, unknown>> }
   )[]
   readonly api: "openai-completions"
-  readonly provider: "omo-fallback-mock"
+  readonly provider: string
   readonly model: string
   readonly usage: {
     readonly input: number
@@ -96,7 +96,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
             id: "fallback-task-call",
             name: "task",
             arguments: {
-              category: SCENARIO === "user-fallback" ? "fallbackcat" : "quick",
+              ...scenarioTarget(SCENARIO),
               prompt: "complete through the configured fallback chain",
               run_in_background: false,
               name: "fallback-child",
@@ -105,6 +105,20 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
         : assistant(model.id, "stop", [{ type: "text", text: "parent observed fallback completion" }]))
     },
   })
+
+  if (SCENARIO === "explore-qwen-fallback" || SCENARIO === "librarian-qwen-fallback") {
+    pi.registerProvider("opencode-go", {
+      name: "omo runtime fallback Qwen fixture",
+      baseUrl: "file://omo-runtime-fallback-mock",
+      apiKey: "mock",
+      api: "openai-completions",
+      models: [mockModel("qwen3.7-plus", "Qwen 3.7 fallback")],
+      streamSimple(model, context) {
+        return streamMessage(childReply(model.id, "opencode-go"))
+      },
+    })
+    return
+  }
 
   // Builtin chain fixture providers for the "quick" category: rung 1 (kimi-coding/
   // kimi-for-coding-highspeed) always dies on the child; rung 2 (openai-codex/gpt-5.6-luna-fast)
@@ -151,14 +165,23 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   }
 }
 
-function childReply(modelId: string): AssistantMessage {
+function scenarioTarget(scenario: string): { category: string } | { subagent_type: string } {
+  if (scenario === "explore-qwen-fallback") return { subagent_type: "explore" }
+  if (scenario === "librarian-qwen-fallback") return { subagent_type: "librarian" }
+  return { category: scenario === "user-fallback" ? "fallbackcat" : "quick" }
+}
+
+function childReply(modelId: string, provider = "omo-fallback-mock"): AssistantMessage {
   if (modelId === "healthy-fallback") {
-    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
+    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, provider)
   }
   if (modelId === "gpt-5.6-luna-fast" && SCENARIO !== "chain-exhausted") {
-    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
+    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, provider)
   }
-  return assistant(modelId, "error", [], QUOTA_ERROR)
+  if (modelId === "qwen3.7-plus") {
+    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, provider)
+  }
+  return assistant(modelId, "error", [], QUOTA_ERROR, provider)
 }
 
 function mockModel(id: string, name: string) {
@@ -185,12 +208,13 @@ function assistant(
   stopReason: StopReason,
   content: AssistantMessage["content"],
   errorMessage?: string,
+  provider = "omo-fallback-mock",
 ): AssistantMessage {
   return {
     role: "assistant",
     content,
     api: "openai-completions",
-    provider: "omo-fallback-mock",
+    provider,
     model,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
     stopReason,
@@ -246,5 +270,9 @@ function streamMessage(message: AssistantMessage): EventStream {
 if (process.argv[1]?.endsWith("task-runtime-fallback-mock-provider.ts") && process.argv.includes("--self-test")) {
   if (!isChild({ messages: [{ content: `You are ${CHILD_IDENTITY}.` }] })) throw new Error("child detection failed")
   if (isChild({ messages: [{ content: "parent" }] })) throw new Error("parent misclassified")
+  const exploreTarget = scenarioTarget("explore-qwen-fallback")
+  const librarianTarget = scenarioTarget("librarian-qwen-fallback")
+  if (!("subagent_type" in exploreTarget) || exploreTarget.subagent_type !== "explore") throw new Error("explore target missing")
+  if (!("subagent_type" in librarianTarget) || librarianTarget.subagent_type !== "librarian") throw new Error("librarian target missing")
   console.log("SELF-TEST OK")
 }

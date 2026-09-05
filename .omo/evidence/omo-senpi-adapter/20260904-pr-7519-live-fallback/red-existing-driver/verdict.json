@@ -1,0 +1,84 @@
+{
+  "result": "FAIL",
+  "scenarios": [
+    {
+      "result": "PASS",
+      "scenario": "user-fallback",
+      "checks": {
+        "exit_zero": "PASS",
+        "final_text": "PASS",
+        "fallback_event": "PASS",
+        "final_model": "PASS",
+        "fallback_attempts": "PASS",
+        "real_credentials_untouched": "PASS",
+        "cleanup": "PASS"
+      },
+      "task_id": "st_01a06db9",
+      "credential_digest_before": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f",
+      "credential_digest_after": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f"
+    },
+    {
+      "result": "PASS",
+      "scenario": "builtin-chain-fallback",
+      "checks": {
+        "exit_zero": "PASS",
+        "final_text": "PASS",
+        "fallback_event": "PASS",
+        "final_model": "PASS",
+        "requested_model": "PASS",
+        "fallback_attempts": "PASS",
+        "real_credentials_untouched": "PASS",
+        "cleanup": "PASS"
+      },
+      "task_id": "st_01a06db9",
+      "credential_digest_before": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f",
+      "credential_digest_after": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f"
+    },
+    {
+      "result": "FAIL",
+      "scenario": "chain-exhausted",
+      "checks": {
+        "exit_zero": "PASS",
+        "exhausted_event": "FAIL",
+        "task_failed": "PASS",
+        "real_credentials_untouched": "PASS",
+        "cleanup": "PASS"
+      },
+      "task_id": "st_01a06db9",
+      "credential_digest_before": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f",
+      "credential_digest_after": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f"
+    },
+    {
+      "result": "FAIL",
+      "scenario": "explore-qwen-fallback",
+      "checks": {
+        "exit_zero": "PASS",
+        "final_text": "PASS",
+        "agent_type": "FAIL",
+        "selected_model": "FAIL",
+        "resolved_from_agent": "FAIL",
+        "real_credentials_untouched": "PASS",
+        "cleanup": "PASS"
+      },
+      "task_id": "st_01a06db9",
+      "credential_digest_before": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f",
+      "credential_digest_after": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f"
+    },
+    {
+      "result": "FAIL",
+      "scenario": "librarian-qwen-fallback",
+      "checks": {
+        "exit_zero": "PASS",
+        "final_text": "PASS",
+        "agent_type": "FAIL",
+        "selected_model": "FAIL",
+        "resolved_from_agent": "FAIL",
+        "real_credentials_untouched": "PASS",
+        "cleanup": "PASS"
+      },
+      "task_id": "st_01a06db9",
+      "credential_digest_before": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f",
+      "credential_digest_after": "5774503f62f38a081552b87c3169abb3e9f3d7881484ad4c2a089a87d3c2913f"
+    }
+  ]
+}

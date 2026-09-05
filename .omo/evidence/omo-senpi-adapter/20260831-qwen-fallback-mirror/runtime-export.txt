@@ -1,0 +1,2 @@
+explore: qwen3.7-plus
+librarian: qwen3.7-plus

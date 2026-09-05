@@ -1,0 +1,61 @@
+PR #7519 current-dev conflict refresh
+
+Base merged:
+  upstream/dev 928aa8571cfd54722c6aacdcd64b340fca664bf8
+
+Conflict:
+  packages/omo-senpi/plugin/extensions/omo-task.js
+
+Resolution:
+  PATH=/tmp/bun-v1.4.0-darwin-aarch64/bun-darwin-aarch64:$PATH \
+    /tmp/bun-v1.4.0-darwin-aarch64/bun-darwin-aarch64/bun \
+    packages/omo-senpi/plugin/scripts/build-extension.mjs
+  Result: all six extension artifacts built successfully.
+
+Focused regression:
+  /tmp/bun-v1.4.0-darwin-aarch64/bun-darwin-aarch64/bun test \
+    packages/senpi-task/src/agents/builtin/fallback-chains.test.ts
+  Result: 6 pass, 0 fail, 130 expect() calls, 1 file.
+
+Generated artifact check:
+  Bun 1.4.0 packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+  Result: omo-senpi extension build is current.
+
+Adapter typecheck:
+  Bun 1.4.0 x tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+  Result: exit 0 with no diagnostics.
+
+Package gate:
+  PATH=<official-bun-1.4.0> Bun 1.4.0 run test:senpi
+  Result: 2677 pass, 32 skip, 0 fail, 8503 expect() calls, 352 files.
+  Evidence resolver sub-gate: 10 pass, 0 fail, 31 expect() calls.
+
+Live driver harness:
+  node packages/omo-senpi/scripts/qa/drive.mjs --self-test
+  Result: SELF-TEST OK.
+
+Real isolated Senpi run:
+  SENPI_BIN="$(command -v senpi)" node packages/omo-senpi/scripts/qa/drive.mjs
+  Result: PASS
+  ultraworkInjected: true
+  commentChecker: PASS
+  certificationEnvironmentObserved: true
+  realSenpiProtectedStateComplete: true
+  realOmoProtectedStateComplete: true
+  realSenpiChangedPaths: []
+  realOmoChangedPaths: []
+  sandboxAgentDir:
+    /private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-senpi-qa-rGRUzp/agent
+  sandbox cleanup: driver finally block removed the sandbox root.
+
+Platform limitation:
+  isolationCertified: false
+  realHomeIsolationCertified: false
+  reason: the current upstream driver returns DIRECTORY_IDENTITY_UNAVAILABLE
+    for recursive directory identity checks on non-Linux hosts. No changed
+    protected or observed path was reported.
+
+Omitted:
+  Raw dependency installation, full test progress, absolute protected-home
+  contents, credentials, tokens, authentication headers, and unrelated session
+  data are not included.

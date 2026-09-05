@@ -1,0 +1,7 @@
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"running","residency_state":"resident"}}
+{"type":"child_error","payload":{"message":"403: {\"message\":\"You've reached your usage limit for this billing cycle. Your quota will be refreshed in the next cycle.\",\"type\":\"access_terminated_error\"}","stop_reason":"error"}}
+{"type":"retry_fallback_applied","payload":{"from":"kimi-coding/kimi-for-coding-highspeed","to":"openai-codex/gpt-5.6-luna-fast","chain_key":"kimi-coding/kimi-for-coding-highspeed","reason":"billing"}}
+{"type":"assistant_message","payload":{"text":"omo e2e fallback child final text"}}
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"completed","residency_state":"resident"}}
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"completed","residency_state":"persisted_only"}}
+{"type":"suspended","payload":{"reason":"quit"}}

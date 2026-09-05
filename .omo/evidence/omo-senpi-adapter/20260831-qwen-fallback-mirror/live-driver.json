@@ -1,0 +1,19 @@
+{
+  "result": "PASS",
+  "ultraworkInjected": true,
+  "commentChecker": "PASS",
+  "realSenpiUntouched": true,
+  "realSenpiChangedPaths": [],
+  "realSenpiObservedChangedPaths": [],
+  "realSenpiVolatileChangedPaths": [],
+  "realSenpiProtectedChangedPaths": [],
+  "realSenpiCredentialDigestUntouched": true,
+  "realOmoUntouched": true,
+  "realOmoChangedPaths": [],
+  "realOmoObservedChangedPaths": [],
+  "realOmoVolatileChangedPaths": [],
+  "realOmoProtectedChangedPaths": [],
+  "providedSenpiCodingAgentDir": "IGNORED",
+  "sandboxAgentDir": "$TMPDIR/omo-senpi-qa-okSRDG/agent",
+  "sandboxCwd": "$TMPDIR/omo-senpi-qa-okSRDG/project"
+}
