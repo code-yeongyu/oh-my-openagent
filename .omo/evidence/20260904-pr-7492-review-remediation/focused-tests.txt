@@ -1,0 +1,10 @@
+COMMAND: bun test packages/omo-opencode/src/testing/create-plugin-module.test.ts
+EXIT: 0
+
+(pass) #then startup warns that the category overrides are ignored
+(pass) #then a simultaneous migration keeps the diagnostic toast warning-styled
+
+17 pass
+0 fail
+44 expect() calls
+Ran 17 tests across 1 file.

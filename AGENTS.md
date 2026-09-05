@@ -127,6 +127,7 @@ pluginModule.server(input, options)   # serverPlugin() in packages/omo-opencode/
   ├─→ detectExternalSkillPlugin()     # warn on conflicts
   ├─→ injectServerAuthIntoClient()    # auth headers into shared SDK client
   ├─→ loadPluginConfig()              # JSONC parse → user/project merge → Zod validate → migrate
+  ├─→ getMisplacedCategoryConfigDiagnostics()  # warn when OMO categories are placed in OpenCode config
   ├─→ recordPluginTelemetry()         # plugin-load telemetry
   ├─→ ensureTuiPluginEntry()          # always; BTW remains available when sidebar is disabled
   ├─→ initLiveServerRoute() + setLiveParentWakeRoutingDisabled() + warmLiveServerProbe()  # live-listener wake routing

@@ -79,6 +79,7 @@ function createTestPluginModule(overrides: Partial<PluginModuleDeps> = {}): Retu
     runOpenCodeStartupMigration: mockRunOpenCodeStartupMigration,
     loadConfigChain: mockLoadConfigChain as never,
     loadPluginConfig: mockLoadPluginConfig as never,
+    getMisplacedCategoryConfigDiagnostics: mock(() => []),
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
     createManagers: mockCreateManagers as never,

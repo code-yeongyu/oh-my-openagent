@@ -1,0 +1,20 @@
+CI FAILURE
+head=4d13547463fd6beaf23b636f755e3bb552f16bcf
+gate=CI/test (ubuntu-latest, 1/2)
+root_result=9047 pass, 1 skip, 1 fail, 24554 assertions across 1074 files
+failure=opencode-config-dir expected both release and dev Desktop roots
+
+CORRECTION
+config_directory_suite=31 pass, 0 fail, 36 assertions
+diagnostic_factory_suites=47 pass, 0 fail, 103 assertions
+behavior=release discovery includes only release Desktop root
+behavior_dev=dev discovery includes only dev Desktop root
+
+WHY ENOUGH
+The failed assertion was the legacy contract replaced by the reviewed
+active-edition behavior. Its owning suite now pins both release and dev
+versions independently, while the diagnostic and factory suites remain green.
+
+OMITTED
+Routine passing CI logs, credentials, tokens, auth headers, private
+configuration, and unrelated output were not retained.

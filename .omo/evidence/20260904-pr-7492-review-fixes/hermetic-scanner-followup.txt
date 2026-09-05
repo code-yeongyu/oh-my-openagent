@@ -1,0 +1,36 @@
+FAILING FIRST
+scenario=shared plugin test factory with inherited host OpenCode categories
+result=22 pass, 1 fail, 55 assertions
+observed=unrelated migration toast changed from success to warning
+
+PASSING
+focused=26 pass, 0 fail, 59 assertions across 2 files
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+
+REAL OPENCODE
+capture_id=pr7492-hermetic-ccf85c87d-20260904T210605Z
+captured_at_utc=2026-09-04T21:06:05Z
+tested_base_commit=ccf85c87d65dee38829f47b4dabca428c28a4dce-plus-working-tree-fix
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+observed=[oh-my-openagent] OMO ignores "categories" in OPENCODE_CONFIG_CONTENT; move it to ~/.omo/omo.jsonc.
+resolved_home=<sandbox>/home
+resolved_db=<sandbox>/data/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+The failing-first test pins the hermetic dependency boundary. The focused
+tests prove diagnostic cases opt into the real scanner. The real OpenCode run
+proves the production default still scans and reports through plugin startup.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

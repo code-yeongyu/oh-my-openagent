@@ -1,0 +1,43 @@
+FAILING FIRST
+overlap_and_home_boundary=9 pass, 2 fail, 17 assertions
+dual_home_parity=11 pass, 1 fail, 21 assertions
+observed=duplicate project sources retained user targets and account-home discovery crossed its boundary
+
+PASSING
+focused=35 pass, 0 fail, 77 assertions across 2 files
+canonical_project_precedence=PASS
+home_boundary_user_scope=PASS
+configured_home_boundary=PASS
+account_home_boundary=PASS
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+
+REAL OPENCODE
+capture_id=pr7492-overlap-dcbf8d122-20260904T214535Z
+captured_at_utc=2026-09-04T21:45:35Z
+tested_base_commit=dcbf8d1224866e89cc6cda4cf0907e645416b663-plus-working-tree-fix
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+source=<sandbox>/project/.opencode/opencode.jsonc
+observed=[oh-my-openagent] OMO ignores "categories" in <sandbox>/project/.opencode/opencode.jsonc; move it to <sandbox>/project/.omo/omo.jsonc.
+overlap_project_target=PASS
+resolved_home=<sandbox>/home
+resolved_db=<sandbox>/data/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+The deterministic tests cover canonical duplicate reconciliation, user-layer
+classification at both loader boundaries, symlink interaction, and projects
+outside both homes. The real OpenCode run proves the overlapping source is
+reported once with the project-scoped destination.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

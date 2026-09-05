@@ -44,7 +44,8 @@ serverPlugin(input, options)
   2. initConfigContext()           # detects opencode-vs-openagent config layout
   3. detectExternalSkillPlugin()   # warn if conflicting plugin loaded
   4. injectServerAuthIntoClient()  # wire auth headers into shared SDK client
-  5. loadPluginConfig()            # walk project + user JSONC → Zod safeParse → migrate
+  5a. loadPluginConfig()           # walk project + user JSONC → Zod safeParse → migrate
+  5b. getMisplacedCategoryConfigDiagnostics() # warn about ignored categories in OpenCode config
   6a. initializeOpenClaw()         # if openclaw config present (start reply-listener daemon)
   6b. checkTeamModeDependencies()  # if team_mode.enabled (verify git, tmux, ensure ~/.omo/teams/)
   7. createManagers/Tools/Hooks/PluginInterface

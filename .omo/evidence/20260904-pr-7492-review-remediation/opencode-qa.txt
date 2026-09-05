@@ -1,0 +1,17 @@
+COMMAND: bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+EXIT: 0
+OBSERVED:
+- required dependencies present
+- database path resolved
+- SQL escaping passed
+- free port allocated
+- isolated XDG sandbox removed
+- isolated HOME stayed inside the sandbox
+
+COMMAND: bash .agents/skills/opencode-qa/scripts/tui-smoke.sh --self-test
+EXIT: 0
+OBSERVED:
+- TUI rendered under tmux with OpenCode 1.18.27
+- send-keys reached the composer
+- tmux session was removed
+- real database session count remained 8067

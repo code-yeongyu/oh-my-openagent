@@ -1,0 +1,2 @@
+[oh-my-openagent] OMO ignores "categories" in <profile-config>/opencode.jsonc; move it to ~/.omo/omo.jsonc under profiles.focused."[opencode]".categories.
+status=0 real_db_sessions_before=8072 real_db_sessions_after=8072

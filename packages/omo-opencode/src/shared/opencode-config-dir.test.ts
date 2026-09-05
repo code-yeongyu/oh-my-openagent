@@ -4,6 +4,7 @@ import { homedir } from "node:os"
 import { join, resolve, win32 } from "node:path"
 import {
   getOpenCodeConfigDir,
+  getOpenCodeConfigDiscoveryDirs,
   getOpenCodeConfigDirs,
   getOpenCodeConfigPaths,
   isDevBuild,
@@ -11,6 +12,7 @@ import {
   TAURI_APP_IDENTIFIER,
   TAURI_APP_IDENTIFIER_DEV,
 } from "./opencode-config-dir"
+import { getOpenCodeRuntimeConfigOptions } from "./opencode-runtime-config-options"
 
 describe("opencode-config-dir", () => {
   let originalPlatform: NodeJS.Platform
@@ -20,8 +22,11 @@ describe("opencode-config-dir", () => {
     originalPlatform = process.platform
     originalEnv = {
       APPDATA: process.env.APPDATA,
+      OPENCODE_CHANNEL: process.env.OPENCODE_CHANNEL,
+      OPENCODE_CLIENT: process.env.OPENCODE_CLIENT,
       XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
       XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+      XDG_STATE_HOME: process.env.XDG_STATE_HOME,
       OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
     }
   })
@@ -163,6 +168,76 @@ describe("opencode-config-dir", () => {
 
       // then the array contains a single deduplicated entry
       expect(result).toEqual([resolve(defaultDir)])
+    })
+
+    test("adds only the active host config directory for diagnostics", () => {
+      // given
+      process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
+      process.env.XDG_CONFIG_HOME = "/xdg/config"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      // when
+      const cliResult = getOpenCodeConfigDiscoveryDirs({
+        binary: "opencode",
+        version: null,
+      })
+      const releaseResult = getOpenCodeConfigDiscoveryDirs({
+        binary: "opencode-desktop",
+        version: "1.0.200",
+      })
+      const devResult = getOpenCodeConfigDiscoveryDirs({
+        binary: "opencode-desktop",
+        version: "1.0.200-dev",
+      })
+
+      // then
+      expect(cliResult).toEqual([
+        resolve("/custom/opencode/path"),
+        resolve("/xdg/config/opencode"),
+      ])
+      expect(releaseResult).toEqual([
+        resolve("/custom/opencode/path"),
+        resolve("/xdg/config/opencode"),
+        resolve("/xdg/config/ai.opencode.desktop"),
+      ])
+      expect(devResult).toEqual([
+        resolve("/custom/opencode/path"),
+        resolve("/xdg/config/opencode"),
+        resolve("/xdg/config/ai.opencode.desktop.dev"),
+      ])
+    })
+
+    test("includes the Windows APPDATA CLI directory for diagnostic discovery", () => {
+      // given
+      Object.defineProperty(process, "platform", { value: "win32" })
+      process.env.APPDATA = String.raw`C:\Users\Test\AppData\Roaming`
+      delete process.env.OPENCODE_CONFIG_DIR
+      delete process.env.XDG_CONFIG_HOME
+
+      // when
+      const result = getOpenCodeConfigDiscoveryDirs({
+        binary: "opencode",
+        version: null,
+      })
+
+      // then
+      expect(result).toContain(String.raw`C:\Users\Test\AppData\Roaming\opencode`)
+    })
+
+    test("derives Desktop host and dev channel from official runtime environment", () => {
+      expect(getOpenCodeRuntimeConfigOptions({
+        OPENCODE_CLIENT: "desktop",
+        XDG_STATE_HOME: "/tmp/ai.opencode.desktop.dev",
+      })).toEqual({ binary: "opencode-desktop", version: "desktop-dev" })
+      expect(getOpenCodeRuntimeConfigOptions({
+        OPENCODE_CHANNEL: "dev",
+        OPENCODE_CLIENT: "desktop",
+        XDG_STATE_HOME: "/tmp/ai.opencode.desktop",
+      })).toEqual({ binary: "opencode-desktop", version: null })
+      expect(getOpenCodeRuntimeConfigOptions({
+        OPENCODE_CHANNEL: "dev",
+        OPENCODE_CLIENT: "cli",
+      })).toEqual({ binary: "opencode", version: null })
     })
 
     test("returns single-element array for non-opencode binary", () => {

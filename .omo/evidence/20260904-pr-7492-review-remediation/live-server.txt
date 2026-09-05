@@ -1,0 +1,29 @@
+capture_id=pr7492-live-server-a0e86726f-4ce7d993
+captured_at_utc=2026-09-04T20:52:45Z
+tested_commit=a0e86726f347b07b04287f5cdf6247452383b0cf
+runner=opencode-1.18.28-darwin-arm64-local
+driver=manual opencode serve plus project-scoped config HTTP request
+
+surface=real OpenCode server with built local plugin
+serve_command=opencode serve --hostname 127.0.0.1 --port <ephemeral> --print-logs
+config_request=GET /config with x-opencode-directory=<sandbox>/project
+health_request=GET /global/health
+config_http=200
+health_http=200
+warning=[oh-my-openagent] OMO ignores "categories" in <sandbox>/project/.opencode/opencode.jsonc; move it to <sandbox>/project/.omo/omo.jsonc.
+
+resolved_home=<sandbox>/home
+resolved_xdg_data_home=<sandbox>/data
+resolved_db=<sandbox>/data/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+db_inside_xdg_data_home=PASS
+sandbox_db_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+server_exit=0
+server_stopped=PASS
+port_unreachable_after_teardown=PASS
+
+result=PASS
+omitted=credentials, auth headers, full resolved config, private user config, full environment, unrelated logs

@@ -1,0 +1,16 @@
+surface=real opencode debug config --print-logs
+opencode_version=1.18.27
+HOME=<sandbox>/home
+XDG_CONFIG_HOME=<sandbox>/config
+XDG_DATA_HOME=<sandbox>/data
+XDG_STATE_HOME=<sandbox>/state
+XDG_CACHE_HOME=<sandbox>/cache
+sandbox_db=<sandbox>/data/opencode/opencode.db
+sandbox_db_inside_xdg_data_home=true
+sandbox_db_sessions=0
+real_db=<real-home>/.local/share/opencode/opencode.db
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+warning_observed=true
+explicit_config_source_observed=true
+exit_status=0

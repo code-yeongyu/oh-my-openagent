@@ -1,0 +1,41 @@
+FAILING FIRST
+scenario=existing omo.json user and project destinations
+result=5 pass, 2 fail, 10 assertions
+observed=diagnostics incorrectly named a new omo.jsonc destination
+
+PASSING
+focused=30 pass, 0 fail, 66 assertions across 2 files
+user_json_destination=PASS
+project_json_destination=PASS
+jsonc_preference_preserved=PASS
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+
+REAL OPENCODE
+capture_id=pr7492-json-target-862c9e263-20260904T212221Z
+captured_at_utc=2026-09-04T21:22:21Z
+tested_base_commit=862c9e26331715d19d9e291c49292cbf48f2fd0f-plus-working-tree-fix
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+active_user_config=<sandbox>/home/.omo/omo.json
+observed=[oh-my-openagent] OMO ignores "categories" in OPENCODE_CONFIG_CONTENT; move it to ~/.omo/omo.json.
+json_target_observed=PASS
+resolved_home=<sandbox>/home
+resolved_db=<sandbox>/data/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+The deterministic tests pin both user and project destinations while retaining
+JSONC preference when both formats exist. The real OpenCode run proves the
+user-facing warning names the file the unified loader actually reads.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.
