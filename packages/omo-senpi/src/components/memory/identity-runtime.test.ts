@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths, type ReservedRun } from "@oh-my-opencode/memory-core"
 
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createMemoryIdentityContext } from "./context"
@@ -16,6 +16,54 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("memory identity runtime", () => {
+  // Regression: https://github.com/code-yeongyu/oh-my-openagent/issues/7815
+  test("#given a rejected background runner #when launched #then the rejection is logged without escaping", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-memory-fail-open-"))
+    roots.push(root)
+    const paths = buildIdentityPaths(root, "agent-test")
+    const identity = createMemoryIdentityContext({
+      identity: "agent-test",
+      identityPaths: paths,
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+    })
+    const failure = new Error("Unable to resolve a runnable Senpi launcher")
+    let resolveWarning: ((value: { readonly message: string; readonly details?: unknown }) => void) | undefined
+    const warning = new Promise<{ readonly message: string; readonly details?: unknown }>((resolve) => {
+      resolveWarning = resolve
+    })
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      logger: {
+        info: () => undefined,
+        warn: (message, details) => resolveWarning?.({ message, details }),
+        error: () => undefined,
+      },
+    })
+    runtime.runner.launch = async () => {
+      throw failure
+    }
+    const run: ReservedRun = {
+      runId: "reflection-run-fail-open",
+      request: {
+        trigger: "manual",
+        conversationIds: ["conversation-a"],
+        snapshots: [],
+      },
+    }
+
+    // when
+    runtime.launch(run)
+
+    // then
+    await expect(warning).resolves.toEqual({
+      message: "memory reflection launch failed",
+      details: { error: failure.message },
+    })
+  }, 30_000)
+
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
     "#given an unresolved reflection child command #when the real lazy sandbox is constructed #then the unsandboxed escape reaches the injected logger",
     async () => {

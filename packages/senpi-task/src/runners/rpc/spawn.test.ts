@@ -72,11 +72,30 @@ describe("resolveSenpiExecutable", () => {
     expect(resolved).toBe(existing)
   })
 
-  test("#given SENPI_BIN pointing at a missing absolute path #when resolving #then it is null (no silent PATH fallthrough)", () => {
-    // when
-    const resolved = resolveSenpiExecutable({ ...runtime, parentEnv: { SENPI_BIN: "/definitely/missing/senpi" } })
-    // then
-    expect(resolved).toBeNull()
+  // Regression: https://github.com/code-yeongyu/oh-my-openagent/issues/7815
+  test("#given stale SENPI_BIN and versioned PATH candidates #when resolving #then a matching launcher is recovered", () => {
+    const stale = installSenpiPackage("2026.8.27")
+    const matching = installSenpiPackage("2026.9.4")
+    const warnings: string[] = []
+    try {
+      // when
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: {
+          SENPI_BIN: join(stale.root, "deleted-senpi"),
+          PATH: [stale.binDir, matching.binDir].join(delimiter),
+        },
+      })
+      // then
+      expect(resolved).toBe(realpathSync.native(matching.cliPath))
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain("2026.8.27")
+    } finally {
+      rmSync(stale.root, { recursive: true, force: true })
+      rmSync(matching.root, { recursive: true, force: true })
+    }
   })
 
   test("#given a relative SENPI_BIN #when resolving #then the validated executable is returned as a canonical absolute path", () => {
