@@ -23,6 +23,9 @@ export const NON_INTERACTIVE_ENV: Record<string, string> = {
   YARN_ENABLE_IMMUTABLE_INSTALLS: "false",
 }
 
+export const WINDOWS_BACKGROUND_COMMAND_MESSAGE =
+  "Native Windows cannot safely return from POSIX background commands (`nohup ... &` or a trailing `&`) because child processes inherit the bash tool's output handles. Use PowerShell `Start-Process` with redirected standard output and error instead."
+
 /**
  * Shell command guidance for non-interactive environments.
  * These patterns should be followed to avoid hanging on user input.
