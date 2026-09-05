@@ -142,35 +142,6 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   }
 }
 
-// Fork mode reuses the parent session's request prefix so the provider cache can hit. That cache
-// is keyed on the exact system prompt, tool list, and cwd, so this variant must NOT pass
-// --system-prompt/--tools/--no-*/--no-context-files and must run in the PARENT cwd. The reflection
-// persona and task prompt ride as the initial message (@file) instead of the system prompt.
-export async function prepareReflectionForkSpawn(input: PrepareReflectionSpawnInput): Promise<ReflectionSpawnArgs> {
-  const base = await prepareReflectionSpawn(input)
-  const parentSessionFile = input.parentSessionFile
-  if (parentSessionFile === undefined) {
-    throw new Error("fork-mode reflection requires the parent session file")
-  }
-  // Fork mode replaces the sandboxed argv wholesale, so it must re-apply the launch prefix the
-  // base spawn resolved: without it the child is the bare interpreter and dies on senpi flags.
-  const args = [
-    ...resolveMemoryChildLaunch(input).prefixArgs,
-    "-p",
-    "--fork", parentSessionFile,
-    "--session-dir", base.paths.sessionDir,
-    "--model", input.model,
-    ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
-    `@${base.paths.prompt}`,
-  ]
-  return {
-    ...base,
-    fork: { parentSessionFile },
-    args,
-    cwd: input.parentCwd ?? base.cwd,
-  }
-}
-
 function resolveDreamTarget(worktree: string, targetDoc: string): string {
   if (isAbsolute(targetDoc) || /^[a-zA-Z]:[\\/]/.test(targetDoc) || !targetDoc.endsWith(".md")) {
     throw new TypeError("dream target must be a memory-repo-relative .md document")

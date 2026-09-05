@@ -61,7 +61,7 @@ export async function settleReflectionRun(input: {
       ? { sessionId: live.sessionId, api: live.api, logger: live.logger }
       : live,
   )
-  await emitReflectionHealthAlert(completionsDir, input.options.identity.id, live, input.warnedHealth)
+  await emitReflectionHealthAlert(completionsDir, input.options.identity.id, live, input.warnedHealth, [completion])
   return {
     runId: input.run.runId,
     outcome: input.result.outcome,
@@ -96,6 +96,6 @@ export async function publishFinalizedReflectionRun(input: {
     },
     live,
   )
-  await emitReflectionHealthAlert(completionsDir, input.options.identity.id, live, input.warnedHealth)
+  await emitReflectionHealthAlert(completionsDir, input.options.identity.id, live, input.warnedHealth, [completion])
   return { ...input.result, completion }
 }

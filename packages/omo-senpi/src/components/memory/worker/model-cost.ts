@@ -31,8 +31,8 @@ export function estimateFreshCost(candidate: ReflectionLaunchCandidate, workload
   return workloadTokens * candidate.cost.input
 }
 
-// Inherit replays the live session prefix. With a reusable provider cache the prefix bills at
-// cacheRead and only the delta pays full input price; without it the whole workload pays input.
+// Model inheritance does not imply session inheritance. Reflection passes cacheReusable: false
+// and pays full input price; the cache-aware arithmetic applies only when reuse is explicit.
 export function estimateInheritCost(
   candidate: ReflectionLaunchCandidate,
   prefixTokens: number,

@@ -1,6 +1,6 @@
 import type { EntryRenderer } from "@code-yeongyu/senpi"
 
-import { safeNotify, type ReflectionCompletionApi, type ReflectionLiveSession } from "./completion"
+import { safeNotify, type ReflectionCompletionApi, type ReflectionCompletionRecord, type ReflectionLiveSession } from "./completion"
 import {
   detailExcerpt,
   joinFields,
@@ -8,7 +8,7 @@ import {
   normalizeRendererText,
   optionalRendererText,
 } from "./entry-renderers"
-import { readReflectionHealth } from "./health"
+import { readReflectionHealth, REFLECTION_HEALTH_STALE_MS } from "./health"
 import { reflectionRemediation } from "./remediation"
 
 export const REFLECTION_HEALTH_ENTRY_TYPE = "senpi-memory.health"
@@ -61,19 +61,28 @@ function recommendationWhy(recommendation: string): string {
 }
 
 /**
- * Write side of reflection health: reads derived health, then appends a transcript entry and
- * notifies the session. Kept out of `./health` so that module stays purely derivational.
+ * Alerts only for a surfaced failure in the active streak, never a historical health read.
+ * Kept out of `./health` so that module stays purely derivational.
  */
 export async function emitReflectionHealthAlert(
   completionsDir: string,
   identity: string,
   live: ReflectionLiveSession | undefined,
   once: (key: string) => boolean,
+  surfaced: readonly ReflectionCompletionRecord[],
 ): Promise<boolean> {
-  if (!live?.ui) return false
+  if (!live?.ui || surfaced.length === 0) return false
   const health = await readReflectionHealth(completionsDir)
   if (health.streak < 3 || health.fingerprint.length === 0) return false
   if (health.recentFailureFingerprints.filter((item) => item === health.fingerprint).length < 2) return false
+  const streakStart = Date.parse(health.streakSinceISO ?? "")
+  const streakEnd = Date.parse(health.lastFailure?.finishedAt ?? "")
+  // A drain also consumes expired records silently; those are not newly surfaced failures.
+  const surfacedCutoff = Math.max(streakStart, Date.now() - REFLECTION_HEALTH_STALE_MS)
+  if (!surfaced.some((record) => record.identity === identity
+    && record.outcome === "failed"
+    && Date.parse(record.finishedAt) >= surfacedCutoff
+    && Date.parse(record.finishedAt) <= streakEnd)) return false
   if (!once(`${live.sessionId}:${health.fingerprint}`)) return false
   const failure = health.lastFailure
   const recommendation = reflectionRemediation(failure?.reason, failure?.detail)

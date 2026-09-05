@@ -92,10 +92,9 @@ describe("createMemoryComponent", () => {
     }
   })
 
-  test("#given a memory child sentinel in env #when registered #then memory registers nothing so a forked child cannot recurse", () => {
-    // A fork-mode child loads extensions (the request prefix must match its parent for the provider
-    // cache to hit), so --no-extensions no longer protects against recursion. The sentinel that the
-    // child already carries must therefore act as a hard disable.
+  test("#given a memory child sentinel in env #when registered #then memory registers nothing so a memory child cannot recurse", () => {
+    // The sentinel remains a recursion guard if memory is registered explicitly in a child,
+    // independent of the reflection launcher's discovery-disable flags.
     for (const sentinel of ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"]) {
       const pi = new MemoryFakeExtensionAPI()
       const ctx = componentContext()

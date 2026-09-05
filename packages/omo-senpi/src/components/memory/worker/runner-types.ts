@@ -45,9 +45,6 @@ export interface SenpiSubprocessRunnerOptions {
   readonly logger?: ComponentLogger
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined
   readonly resolveSessionModel?: () => ReflectionSessionModel | undefined
-  readonly resolveParentContextTokens?: () => number | undefined
-  readonly resolveParentSessionFile?: () => string | undefined
-  readonly resolveParentCacheReusable?: () => boolean
   readonly loadConfig?: (options?: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly cwd?: string
   readonly env?: NodeJS.ProcessEnv

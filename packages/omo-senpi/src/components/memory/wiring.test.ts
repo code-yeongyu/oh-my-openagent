@@ -1,3 +1,4 @@
+// allow: SIZE_OK - one integration fixture covers the memory component's event wiring lifecycle.
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
@@ -24,6 +25,9 @@ import {
 import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./prompt"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { createMemoryWiring } from "./wiring"
+import { REFLECTION_COMPLETION_ENTRY_TYPE, writeCompletionRecord } from "./worker/completion"
+import { readReflectionHealth } from "./worker/health"
+import { REFLECTION_HEALTH_ENTRY_TYPE } from "./worker/health-alert"
 const roots: string[] = []
 
 // afterBind starts background git pipelines it never exposes a drain handle for
@@ -513,6 +517,87 @@ describe("memory wiring reflection completion delivery", () => {
       })
     })
   })
+})
+
+describe("memory wiring health alert delivery", () => {
+  for (const newFailure of [false, true]) {
+    test(`#given three consumed stable failures and ${newFailure ? "one newly pending failure" : "zero pending completions"} #when a fresh session binds #then ${newFailure ? "one health alert is emitted" : "historical health stays silent"} and identity status remains`, async () => {
+      // given
+      const fixture = await createFixture()
+      const repo = new GitMemoryRepo({ dir: fixture.context.identityPaths.repo, agentId: fixture.identity })
+      await repo.init({ seedFiles: [{ relativePath: "reference/seed.md", content: "fixture memory\n" }] })
+      const completionsDir = join(fixture.context.identityPaths.reflection, "completions")
+      const now = Date.now()
+      const count = newFailure ? 4 : 3
+      for (let index = 0; index < count; index += 1) {
+        const finishedAt = new Date(now - (60 - index) * 60_000).toISOString()
+        await writeCompletionRecord(completionsDir, {
+          schemaVersion: 1,
+          runId: `run-health-${index}`,
+          identity: fixture.identity,
+          category: "quick",
+          conversationIds: ["past-session"],
+          trigger: "manual",
+          outcome: "failed",
+          reason: "child_exit",
+          detail: "stable",
+          startedAt: finishedAt,
+          finishedAt,
+          delivery: index === 3
+            ? { status: "pending" }
+            : { status: "consumed", sessionId: "past-session", consumedAt: finishedAt },
+        })
+      }
+      expect(await readReflectionHealth(completionsDir)).toMatchObject({
+        streak: count,
+        fingerprint: "child_exit:stable",
+        pendingCount: newFailure ? 1 : 0,
+      })
+      const pi = new MemoryFakeExtensionAPI()
+      const statusCalls: Array<{ key: string; text: string | undefined }> = []
+      const notifications: Array<{ level: string; entryType: string | undefined }> = []
+      const settings = memorySettings()
+      settings.dream.enabled = false
+      settings.facts.enabled = false
+      const wiring = createMemoryWiring({
+        sessions: new Map([[fixture.sessionId, { context: fixture.context }]]),
+        loadConfig: () => loadedMemoryConfig(settings),
+        cwd: () => fixture.cwd,
+        env: fixture.env,
+      })
+      const bindContext = {
+        sessionManager: { getSessionId: () => fixture.sessionId, getEntries: () => [] },
+        ui: {
+          setStatus: (key: string, text: string | undefined) => statusCalls.push({ key, text }),
+          notify: (_message: string, level: string) => notifications.push({
+            level,
+            entryType: pi.entries.at(-1)?.customType,
+          }),
+        },
+      }
+
+      try {
+        // when
+        await wiring.afterBind(pi, fixture.sessionId, fixture.context, bindContext)
+        if (newFailure) await wiring.afterBind(pi, fixture.sessionId, fixture.context, bindContext)
+
+        // then
+        expect(await readReflectionHealth(completionsDir)).toMatchObject({ streak: count, pendingCount: 0 })
+        expect(statusCalls).toContainEqual({
+          key: MEMORY_STATUS_KEY,
+          text: expect.stringContaining(`mem:${fixture.identity}`),
+        })
+        expect(pi.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE)).toHaveLength(newFailure ? 1 : 0)
+        expect(pi.entries.filter((entry) => entry.customType === REFLECTION_HEALTH_ENTRY_TYPE)).toHaveLength(newFailure ? 1 : 0)
+        expect(notifications.filter((notification) => notification.entryType === REFLECTION_HEALTH_ENTRY_TYPE)).toEqual(
+          newFailure ? [{ level: "warning", entryType: REFLECTION_HEALTH_ENTRY_TYPE }] : [],
+        )
+        expect(notifications).toHaveLength(newFailure ? 2 : 0)
+      } finally {
+        wiring.clearStatus(bindContext)
+      }
+    })
+  }
 })
 
 describe("memory wiring reflection policy", () => {

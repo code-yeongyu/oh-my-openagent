@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -12,32 +12,85 @@ import {
   type ReflectionHealthEntry,
 } from "./health-alert"
 import { CapturedCompletionApi } from "./runner.test-support"
+import { writeCompletionRecord, type ReflectionCompletionRecord } from "./completion"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("reflection health alert", () => {
+  test("#given a stable streak but no surfaced records #when alerting runs #then history stays silent without consuming the once guard", async () => {
+    // given
+    const { root, surfaced } = await failureStreak(3, "stable")
+    const harness = liveHarness()
+
+    // when / then
+    expect(await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, [])).toBe(false)
+    expect(harness.api.entries).toEqual([])
+    expect(harness.notifications).toEqual([])
+    expect(await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, surfaced)).toBe(true)
+  })
+
+  test("#given a stable streak and an older surfaced merged record #when alerting runs #then the successful delivery cannot trigger a health warning", async () => {
+    // given
+    const { root } = await failureStreak(3, "stable")
+    const merged: ReflectionCompletionRecord = { ...completion("merged", minutesAgo(90), ""), outcome: "merged" }
+    await writeCompletionRecord(root, merged)
+    const harness = liveHarness()
+
+    // when / then
+    expect(await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, [merged])).toBe(false)
+    expect(harness.api.entries).toEqual([])
+    expect(harness.notifications).toEqual([])
+  })
+
+  test("#given a surfaced failure before the success that reset the streak #when alerting runs #then that previous streak cannot trigger an alert", async () => {
+    // given
+    const { root } = await failureStreak(3, "stable")
+    const previous = completion("previous", minutesAgo(120), "stable")
+    await writeCompletionRecord(root, previous)
+    await writeCompletionRecord(root, { ...completion("reset", minutesAgo(90), ""), outcome: "merged" })
+    const harness = liveHarness()
+
+    // when / then
+    expect(await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, [previous])).toBe(false)
+    expect(harness.api.entries).toEqual([])
+    expect(harness.notifications).toEqual([])
+  })
+
+  test("#given a silently expired failure within a still-active streak #when a drain consumes only that record #then historical health stays silent", async () => {
+    // given
+    const { root } = await failureStreak(3, "stable")
+    const expired = completion("expired", daysAgo(8), "stable")
+    await writeCompletionRecord(root, expired)
+    const harness = liveHarness()
+
+    // when / then
+    expect(await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, [expired])).toBe(false)
+    expect(harness.api.entries).toEqual([])
+    expect(harness.notifications).toEqual([])
+  })
+
   test("#given three stable failures and a live UI #when health alerting repeats in one session #then one entry and one warning are emitted", async () => {
     // given
-    const root = await failureStreak(3, "stable")
+    const { root, surfaced } = await failureStreak(3, "stable")
     const harness = liveHarness()
 
     // when
-    await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once)
-    await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once)
+    await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, surfaced)
+    await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, surfaced)
 
     // then
     expect(harness.api.entries.filter((entry) => entry.customType === REFLECTION_HEALTH_ENTRY_TYPE)).toHaveLength(1)
     expect(harness.notifications).toHaveLength(1)
   })
 
-  test("#given the alert entry is appended #when the transcript is inspected #then it carries the streak fingerprint and remediation", async () => {
+  test("#given the newest failed record is surfaced #when alerting runs #then the entry carries the streak fingerprint and remediation", async () => {
     // given
-    const root = await failureStreak(3, "stable")
+    const { root, surfaced } = await failureStreak(3, "stable")
     const harness = liveHarness()
 
     // when
-    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once)
+    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, surfaced)
 
     // then
     expect(emitted).toBe(true)
@@ -55,11 +108,11 @@ describe("reflection health alert", () => {
 
   test("#given only two consecutive failures #when alerting runs #then the streak threshold suppresses the alert", async () => {
     // given
-    const root = await failureStreak(2, "stable")
+    const { root, surfaced } = await failureStreak(2, "stable")
     const harness = liveHarness()
 
     // when
-    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once)
+    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, surfaced)
 
     // then
     expect(emitted).toBe(false)
@@ -71,16 +124,16 @@ describe("reflection health alert", () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "reflection-health-alert-"))
     roots.push(root)
+    const surfaced: ReflectionCompletionRecord[] = []
     for (let index = 0; index < 3; index += 1) {
-      await writeFile(
-        join(root, `run-${index}.json`),
-        JSON.stringify(completion(`run-${index}`, minutesAgo(60 - index * 10), `detail-${index}`)),
-      )
+      const record = completion(`run-${index}`, minutesAgo(60 - index * 10), `detail-${index}`)
+      await writeCompletionRecord(root, record)
+      surfaced.push(record)
     }
     const harness = liveHarness()
 
     // when
-    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once)
+    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, surfaced)
 
     // then
     expect(emitted).toBe(false)
@@ -91,16 +144,16 @@ describe("reflection health alert", () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "reflection-health-alert-"))
     roots.push(root)
+    const surfaced: ReflectionCompletionRecord[] = []
     for (let index = 0; index < 3; index += 1) {
-      await writeFile(
-        join(root, `run-${index}.json`),
-        JSON.stringify(completion(`run-${index}`, daysAgo(10 - index), "stable")),
-      )
+      const record = completion(`run-${index}`, daysAgo(10 - index), "stable")
+      await writeCompletionRecord(root, record)
+      surfaced.push(record)
     }
     const harness = liveHarness()
 
     // when
-    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once)
+    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, surfaced)
 
     // then
     expect(emitted).toBe(false)
@@ -110,11 +163,11 @@ describe("reflection health alert", () => {
 
   test("#given a session without a UI #when alerting runs #then nothing is appended", async () => {
     // given
-    const root = await failureStreak(3, "stable")
+    const { root, surfaced } = await failureStreak(3, "stable")
     const api = new CapturedCompletionApi()
 
     // when
-    const emitted = await emitReflectionHealthAlert(root, "agent-test", { sessionId: "session-a", api }, () => true)
+    const emitted = await emitReflectionHealthAlert(root, "agent-test", { sessionId: "session-a", api }, () => true, surfaced)
 
     // then
     expect(emitted).toBe(false)
@@ -123,7 +176,7 @@ describe("reflection health alert", () => {
 
   test("#given the same fingerprint in a second session #when alerting runs #then the guard key admits the new session", async () => {
     // given
-    const root = await failureStreak(3, "stable")
+    const { root, surfaced } = await failureStreak(3, "stable")
     const seen = new Set<string>()
     const once = (key: string): boolean => {
       if (seen.has(key)) return false
@@ -134,8 +187,8 @@ describe("reflection health alert", () => {
     const second = liveHarness("session-b")
 
     // when
-    await emitReflectionHealthAlert(root, "agent-test", first.live, once)
-    await emitReflectionHealthAlert(root, "agent-test", second.live, once)
+    await emitReflectionHealthAlert(root, "agent-test", first.live, once, surfaced)
+    await emitReflectionHealthAlert(root, "agent-test", second.live, once, surfaced)
 
     // then
     expect([...seen]).toEqual(["session-a:child_exit:stable", "session-b:child_exit:stable"])
@@ -209,16 +262,16 @@ function liveHarness(sessionId = "session-a") {
   }
 }
 
-async function failureStreak(count: number, detail: string): Promise<string> {
+async function failureStreak(count: number, detail: string) {
   const root = await mkdtemp(join(tmpdir(), "reflection-health-alert-"))
   roots.push(root)
+  const records: ReflectionCompletionRecord[] = []
   for (let index = 0; index < count; index += 1) {
-    await writeFile(
-      join(root, `run-${index}.json`),
-      JSON.stringify(completion(`run-${index}`, minutesAgo(60 - index * 10), detail)),
-    )
+    const record = completion(`run-${index}`, minutesAgo(60 - index * 10), detail)
+    await writeCompletionRecord(root, record)
+    records.push(record)
   }
-  return root
+  return { root, surfaced: records.slice(-1) }
 }
 
 function minutesAgo(minutes: number): string {
@@ -229,7 +282,7 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60_000).toISOString()
 }
 
-function completion(runId: string, finishedAt: string, detail: string): Record<string, unknown> {
+function completion(runId: string, finishedAt: string, detail: string): ReflectionCompletionRecord {
   return {
     schemaVersion: 1,
     runId,
