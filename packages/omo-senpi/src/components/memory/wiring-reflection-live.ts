@@ -173,7 +173,7 @@ async function drainCompletions(
   const completionsDir = join(identity.identityPaths.reflection, "completions")
   const consumed = await consumePendingReflectionCompletions(completionsDir, identity.identity, liveSession)
   for (const record of consumed) settle(identity.identity, record.runId)
-  await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession, healthAlertOnce)
+  await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession, healthAlertOnce, consumed)
 }
 
 function describe(error: unknown): string {

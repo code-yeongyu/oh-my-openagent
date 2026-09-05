@@ -1,0 +1,20 @@
+153 | function waitForCompletion(dir, existing) {
+154 |   mkdirSync(dir, { recursive: true })
+155 |   return new Promise((resolve, reject) => {
+156 |     const timer = setTimeout(() => {
+157 |       subscription.close()
+158 |       reject(new Error("timed out waiting for reflection completion"))
+                       ^
+error: timed out waiting for reflection completion
+      at <anonymous> (/Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/packages/omo-senpi/scripts/qa/memory-model-fallback-e2e.mjs:158:18)
+153 | function waitForCompletion(dir, existing) {
+154 |   mkdirSync(dir, { recursive: true })
+155 |   return new Promise((resolve, reject) => {
+156 |     const timer = setTimeout(() => {
+157 |       subscription.close()
+158 |       reject(new Error("timed out waiting for reflection completion"))
+                       ^
+error: timed out waiting for reflection completion
+      at <anonymous> (/Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/packages/omo-senpi/scripts/qa/memory-model-fallback-e2e.mjs:158:18)
+
+Bun v1.4.0 (macOS arm64)

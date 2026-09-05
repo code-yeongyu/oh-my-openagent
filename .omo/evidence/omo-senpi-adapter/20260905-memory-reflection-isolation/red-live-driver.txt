@@ -1,0 +1,25 @@
+Scenario: Live Senpi memory reflection driver loads the task worktree plugin
+Command attempts:
+  1. Global Senpi binary with task-worktree plugin in isolated settings
+  2. Worktree-local `node_modules/.bin/senpi` with the same isolated settings
+
+Both exit codes: 1
+
+Observed session behavior:
+  - The real Senpi process started in the isolated `SENPI_CODING_AGENT_DIR`.
+  - The scripted parent called the `memory` tool.
+  - Senpi returned `Tool memory not found`.
+  - No identity repository was created under `<sandbox>/memory/agents`.
+  - The driver then failed at `memoryRepo()` with ENOENT.
+
+Root cause:
+  `memory-model-fallback-e2e.mjs` relies on package discovery through sandbox
+  settings but does not explicitly load the task worktree's built
+  `plugin/extensions/omo.js`. The current real Senpi print-mode invocation
+  therefore runs the mock provider without the local OMO memory extension.
+
+Cleanup:
+  Both retained sandboxes were removed.
+  No process remained for either sandbox path.
+  Before/after credential digest for real `~/.senpi/agent` was identical.
+  Before/after digest for real `~/.omo/memory` was identical.

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "identity": "project-51f7673a",
+  "category": "quick",
+  "model": "omo-reflection-qa/mock-1",
+  "runId": "qa-health-3",
+  "conversationIds": [],
+  "trigger": "manual",
+  "outcome": "failed",
+  "reason": "child_exit",
+  "detail": "QA_HEALTH_STABLE_FAILURE",
+  "startedAt": "2026-09-05T17:45:43.330Z",
+  "finishedAt": "2026-09-05T17:45:43.330Z",
+  "delivery": {
+    "status": "consumed",
+    "sessionId": "01a072ad-259d-7a1a-a017-a93c66891d6b",
+    "consumedAt": "2026-09-05T17:45:45.480Z"
+  }
+}

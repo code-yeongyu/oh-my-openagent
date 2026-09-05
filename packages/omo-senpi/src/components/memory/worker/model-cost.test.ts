@@ -41,9 +41,8 @@ describe("chooseReflectionLaunchModel", () => {
   })
 
   describe("#given the launch can replay a cached prefix", () => {
-    // Cache-reuse arithmetic: a large prefix billed at cacheRead can beat a cheaper model that
-    // must pay full input price for the whole workload. Pinned so a future fork-mode launch
-    // path inherits proven math rather than a guess.
+    // These arithmetic inputs are not a reflection launch mode: the isolated runner always
+    // resolves model inheritance with cacheReusable: false.
     test("#when the cached prefix dominates #then inheriting the pricier session model wins", () => {
       // given: fresh = 200k * 0.3 = 60_000; inherit = 190k * 0.01 + 10k * 5 = 51_900
       const decision = chooseReflectionLaunchModel({

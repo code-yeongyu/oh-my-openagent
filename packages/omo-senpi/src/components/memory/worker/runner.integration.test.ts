@@ -1,3 +1,4 @@
+// allow: SIZE_OK - one integration harness owns reflection launch, fallback, and settlement cases.
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { readFile, readdir } from "node:fs/promises"
@@ -8,6 +9,7 @@ import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { REFLECTION_COMPLETION_ENTRY_TYPE, REFLECTION_LAUNCHED_ENTRY_TYPE } from "./completion"
+import { REFLECTION_HEALTH_ENTRY_TYPE } from "./health-alert"
 import { resetModelPreflightCacheForTests } from "./model-preflight"
 import { createRunnerHarness, type RunnerHarness } from "./runner.test-support"
 
@@ -54,6 +56,28 @@ async function assertWorktreesClean(item: RunnerHarness): Promise<void> {
 }
 
 describe("SenpiSubprocessRunner integration", () => {
+  for (const categoryAvailable of [false, true]) {
+    test(`#given consecutive live failures through ${categoryAvailable ? "finalized publication" : "settlement"} #when the streak reaches three and then four #then health alerts once and the cursor stays retryable`, async () => {
+      // given
+      const item = await harness({ childMode: "admin", categoryAvailable })
+      let run = item.run
+
+      // when / then
+      for (let attempt = 1; attempt <= 4; attempt += 1) {
+        const result = await item.runner.launch(run)
+        expect(result.outcome).toBe("failed")
+        expect(result.completion.delivery).toMatchObject({ status: "consumed", sessionId: "conversation-a" })
+        const alerts = item.api.entries.filter((entry) => entry.customType === REFLECTION_HEALTH_ENTRY_TYPE)
+        expect(alerts).toHaveLength(attempt < 3 ? 0 : 1)
+        if (attempt < 4) run = await item.reserveAgain()
+      }
+      expect(item.notifications.filter((notification) => notification.level === "warning")).toHaveLength(categoryAvailable ? 5 : 1)
+      expect(item.api.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE)).toHaveLength(4)
+      expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
+      expect((await item.store.readState()).active).toBeUndefined()
+    })
+  }
+
   test("#given conflicting base and agent reflection settings #when launched #then execution uses the agent category merge and timeout", async () => {
     // given
     const memory = OmoMemorySettingsSchema.parse({

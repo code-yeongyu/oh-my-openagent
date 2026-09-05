@@ -8,9 +8,8 @@ import {
 import { chooseReflectionLaunchModel, type ReflectionLaunchCandidate } from "./model-cost"
 import { readModelPricing, selectRegistryFallbackModels } from "./registry-fallback"
 
-// Reflection reads a bounded transcript slice, so a fixed workload estimate is enough to compare
-// per-token prices. It cancels out while cache reuse is impossible and becomes load-bearing only
-// once a cache-replaying launch path exists.
+// Reflection reads a bounded transcript slice. The fixed workload cancels out when comparing
+// per-token input prices because an isolated child cannot reuse the parent session's cache.
 const ESTIMATED_WORKLOAD_TOKENS = 50_000
 
 export type ReflectionThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"

@@ -49,7 +49,7 @@ export function resolveSenpiLaunch(
  *
  * A host that resolves its own senpi command (the npm install shape: the node binary plus the
  * CLI entry in `senpiPrefixArgs`) must keep BOTH halves. Dropping the prefix leaves the bare
- * interpreter receiving senpi flags, which dies as `node: bad option: --fork`.
+ * interpreter receiving senpi flags instead of executing the CLI.
  */
 export function resolveMemoryChildLaunch(input: {
   readonly senpiCommand?: string

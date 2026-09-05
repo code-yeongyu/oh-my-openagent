@@ -70,6 +70,7 @@ const supervisorFixture = join(import.meta.dir, "memory-run-supervisor.ts")
 export async function createRunnerHarness(options: {
   readonly childMode: "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown"
   readonly categoryAvailable?: boolean
+  readonly dream?: boolean
   readonly config?: OmoConfig
   readonly models?: readonly HarnessModel[]
   readonly preflightModels?: readonly HarnessModel[]
@@ -78,9 +79,6 @@ export async function createRunnerHarness(options: {
   readonly now?: () => Date
   readonly resolveAndPreflightLaunch?: ResolveAndPreflightMemoryLaunch
   readonly resolveSessionModel?: () => { readonly provider: string; readonly id: string; readonly thinking?: string } | undefined
-  readonly resolveParentContextTokens?: () => number | undefined
-  readonly resolveParentSessionFile?: () => string | undefined
-  readonly resolveParentCacheReusable?: () => boolean
 }): Promise<RunnerHarness> {
   const root = await mkdtemp(join(tmpdir(), "memory-reflection-worker-"))
   const identity: MemoryIdentity = {
@@ -113,7 +111,16 @@ export async function createRunnerHarness(options: {
     },
     createRunId: () => `run-${++nextRun}`,
   })
-  const reserved = await store.evaluate("conversation-a", { kind: "settled", success: true })
+  const snapshot = await journal.captureReflectionSnapshot()
+  if (snapshot === null) throw new Error("expected reflection snapshot")
+  const reserved = options.dream
+    ? await store.tryReserve({
+        trigger: "dream",
+        origin: "manual",
+        conversationIds: ["conversation-a"],
+        snapshots: [{ conversationId: "conversation-a", snapshot }],
+      })
+    : await store.evaluate("conversation-a", { kind: "settled", success: true })
   if (!reserved || reserved.status !== "active") throw new Error("expected active reflection reservation")
 
   const model: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
@@ -172,9 +179,6 @@ export async function createRunnerHarness(options: {
     senpiPrefixArgs: [senpiLauncher],
     resolveAndPreflightLaunch: options.resolveAndPreflightLaunch,
     ...(options.resolveSessionModel === undefined ? {} : { resolveSessionModel: options.resolveSessionModel }),
-    ...(options.resolveParentContextTokens === undefined ? {} : { resolveParentContextTokens: options.resolveParentContextTokens }),
-    ...(options.resolveParentSessionFile === undefined ? {} : { resolveParentSessionFile: options.resolveParentSessionFile }),
-    ...(options.resolveParentCacheReusable === undefined ? {} : { resolveParentCacheReusable: options.resolveParentCacheReusable }),
     getTranscriptState: (conversationId) => {
       if (conversationId !== "conversation-a") throw new Error(`unknown conversation: ${conversationId}`)
       return journal.getState()

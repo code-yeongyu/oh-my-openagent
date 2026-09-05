@@ -1,0 +1,730 @@
+[?25l[2K[2m⠋ Loading senpi… extensions & models[0m[2K[2m⠋ Loading senpi… opening session[0m[2K[?25h[?2004h[>7u[?u[c[?25l]11;?[?2026h[?7l[2K[0m]8;;[0m]8;;
+[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[0m]8;;
+[38;5;239m❯[39m [7m [0m                                                                                                                     [0m]8;;
+[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[0m]8;;
+[38;5;109m/private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-ADvlxl/project[39m[38;5;239m • [39m[38;5;244m0/200K (0.0%) (auto)[39m     [38;5;109mparent-1[39m[0m]8;;[2A[3G[?7h[?2026l[?2026h[?7l[3G[?7h[?2026l[?2026h[?7l[3G[?7h[?2026l]0;senpi - project[?2026h[?7l[2A[2K[0m]8;;[38;5;69m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[0m]8;;
+[2K[0m]8;; [1m[38;5;109mWhat's New[39m[22m                                                                                                             [0m]8;;
+[2K[0m]8;;[0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.5-3] - 2026-09-05[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.5-2] - 2026-09-05[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mRestored the literal [38;5;109mWorking[39m text shimmer on turn start by supplying the generated working indicator options.        [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.5] - 2026-09-05[22m[39m                                                                                                [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mGPT-6 Astra ([38;5;109mgpt-6-astra[39m) is now a built-in recommended default model at thinking level [38;5;109mhigh[39m, placed ahead of        [0m]8;;
+[2K[0m]8;;   GPT-5.6 Sol which remains the OpenAI fallback recommendation.                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mPersistent monitors now survive repeated restarts: file watches are re-registered and compare their persisted        [0m]8;;
+[2K[0m]8;;   checkpoint once, reporting exactly one detached created, replaced, or modified change (and nothing when unchanged),  [0m]8;;
+[2K[0m]8;;   while command watches are re-run once under the same [38;5;109mmon_[39m id without replaying pre-restart output. Sessions may keep [0m]8;;
+[2K[0m]8;;   up to five durable watches; each expires seven days after creation without extending that deadline on restart or     [0m]8;;
+[2K[0m]8;;   rearm, and a watch muted by the wake budget remains muted when restored.                                             [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mA standing watch that exceeds its 200-line matching-event budget within a rolling 24-hour window now mutes itself    [0m]8;;
+[2K[0m]8;;   and says so once, telling you to rearm it; rearming resumes the watch, ordinary one-shot monitors are never counted, [0m]8;;
+[2K[0m]8;;   and the window survives restarts so a noisy watch cannot receive a fresh allowance.                                  [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mRestored the literal [38;5;109mWorking[39m text shimmer and formatter by removing duplicate working status indicator construction. [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFavorite-model cycling (Ctrl+P) no longer breaks callers that predate the skipped-model list, and it raises the      [0m]8;;
+[2K[0m]8;;   documented model-usability budget error again when the single alternative cannot host the current context instead of [0m]8;;
+[2K[0m]8;;   silently staying on the current model.                                                                               [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe GPT-6 Astra prompt preset names the subscription form an eval session can call ([38;5;109mtool.monitor(...)[39m from the cell  [0m]8;;
+[2K[0m]8;;   that starts the run) instead of gating the rule on a [38;5;109mmonitor[39m tool the session withholds, lists the conditions worth  [0m]8;;
+[2K[0m]8;;   a watch, and arms one the moment the user names such state, so a CI run, PR, deploy, or long command is subscribed   [0m]8;;
+[2K[0m]8;;   to without being asked instead of polled.                                                                            [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe GPT-6 Astra prompt preset now treats the asynchronous form as the default for every call that offers one (child  [0m]8;;
+[2K[0m]8;;   tasks and bash sessions start in the background, long eval cells detach) and names the only two cases for blocking,  [0m]8;;
+[2K[0m]8;;   so a single dependent delegation is spawned in the background and the turn ends to wait instead of blocking on it.   [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe [38;5;109mmonitor[39m tool's [38;5;109mpersistent[39m option now reads as what it is — a standing watch: no deadline, survives a session     [0m]8;;
+[2K[0m]8;;   restart (the command is re-run once, the file is rescanned and any change missed while detached is reported),        [0m]8;;
+[2K[0m]8;;   expires seven days after creation, and at most five per session. The native file branch no longer claims to reject   [0m]8;;
+[2K[0m]8;;   [38;5;109mpersistent[39m, since a persistent file watch is exactly the one that is checkpointed and restored, and the guidance the [0m]8;;
+[2K[0m]8;;   tool description duplicated from the terminal prompt section was removed rather than restated, so the reworded       [0m]8;;
+[2K[0m]8;;   switch and its bounds cost fewer prompt bytes than the wording they replace.                                         [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mStarting a session with a compatible [38;5;109m-fast[39m catalog variant now keeps fast mode enabled and preserves the requested   [0m]8;;
+[2K[0m]8;;   thinking level when the variant is normalized to its base model; remembered service-tier behavior for ordinary       [0m]8;;
+[2K[0m]8;;   base-model starts is unchanged.                                                                                      [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mInteractive shared-host regression tests now wait for RPC child processes to exit before removing their temporary    [0m]8;;
+[2K[0m]8;;   roots, preventing teardown [38;5;109mENOTEMPTY[39m races.                                                                          [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mMake the reftable polling fallback detect content changes without relying on filesystem timestamp precision, and     [0m]8;;
+[2K[0m]8;;   test the fallback with deterministic timer/event control.                                                            [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.4-3] - 2026-09-04[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mTerminal monitors and background Bash sessions are now recorded per session, and a fresh startup reports what was    [0m]8;;
+[2K[0m]8;;   carried over, lost, expired, or unreadable in exactly one notification instead of silently dropping the state;       [0m]8;;
+[2K[0m]8;;   durable watches are reported as lost rather than resumed for now, while reloads continue preserving live terminal    [0m]8;;
+[2K[0m]8;;   state without this report.                                                                                           [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mTerminal monitors now expose a stable [38;5;109mmon_[39m id in their result while retaining the runtime [38;5;109mbash_N[39m handle as           [0m]8;;
+[2K[0m]8;;   [38;5;109mdetails.bash_id[39m, and [38;5;109mbash_output[39m, [38;5;109mbash_input[39m, [38;5;109mbash_resize[39m, [38;5;109mkill_bash[39m, and monitor rearming accept either id.         [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mA clean checkout no longer fails [38;5;109mbun install --frozen-lockfile[39m, because the committed lockfile now matches the       [0m]8;;
+[2K[0m]8;;   [38;5;109m@anthropic-ai/sdk[39m override in [38;5;109mpackage.json[39m.                                                                          [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mA spawned RPC host that never answers [38;5;109mget_protocol_info[39m now reports why. Its teardown validated pid ownership with a [0m]8;;
+[2K[0m]8;;   process-identity probe that throws when the platform query fails (on Windows a starved [38;5;109mpowershell.exe[39m CIM read), so  [0m]8;;
+[2K[0m]8;;   the failure surfaced as [38;5;109mCommand failed: powershell.exe …[39m instead of the readiness diagnostic and the pidfile and     [0m]8;;
+[2K[0m]8;;   socket were left behind. A just-spawned host is now stopped through its own process handle, a probe that fails       [0m]8;;
+[2K[0m]8;;   against a live pid is retried and then reported as a typed unreadable-identity error instead of the raw shell        [0m]8;;
+[2K[0m]8;;   failure, and a probe that fails against a dead pid simply reads as gone — so the same Windows probe flake can no     [0m]8;;
+[2K[0m]8;;   longer surface from concurrent starts, attach, or teardown.                                                          [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed Anthropic native tool search sending [38;5;109mtool_reference[39m blocks under a [38;5;109mname[39m field instead of the API's [38;5;109mtool_name[39m,  [0m]8;;
+[2K[0m]8;;   and restricted the injected BM25 server tool to models that actually support tool search (Opus/Sonnet 4.5+ and       [0m]8;;
+[2K[0m]8;;   Fable), so Anthropic-compatible gateways and proxies no longer 400 and permanently fall back to local [38;5;109mtool_search[39m    [0m]8;;
+[2K[0m]8;;   for the session.                                                                                                     [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mImage generation no longer fails with an OpenAI 401 when a placeholder API key is stored for the [38;5;109mopenai[39m provider. A  [0m]8;;
+[2K[0m]8;;   seeded [38;5;109mSK-SENTINEL-DO-NOT-LOG[39m value is treated as absent instead of as a credential, so resolution falls through to  [0m]8;;
+[2K[0m]8;;   a configured OpenAI-compatible gateway, and image generation is reported as not configured when no gateway exists.   [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mHook trust-state reads no longer fail tool execution when the lock directory cannot be created ([38;5;109mEPERM[39m/[38;5;109mEACCES[39m/[38;5;109mEROFS[39m   [0m]8;;
+[2K[0m]8;;   in sandboxed or read-only children); writers still fail closed on those errors.                                      [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFile-backed credential, auth, and settings locks now wait through bounded contention retries; exhausted waits report [0m]8;;
+[2K[0m]8;;   an actionable transient [38;5;109mCredentialStoreBusyError[39m instead of burning the provider fallback chain.                     [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.4-2] - 2026-09-04[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mBranded build labels now render verbatim in the startup UI instead of gaining a [38;5;109mv[39m prefix, and unorderable version    [0m]8;;
+[2K[0m]8;;   pairs no longer advertise a bogus engine update.                                                                     [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mStarting an RPC socket host or app-server daemon on a loaded Windows machine no longer fails with [38;5;109mspawned daemon pid [0m]8;;
+[2K[0m]8;;   [38;5;109mN had no process start time[39m while the process is running normally. The process-identity probe defaults to a          [0m]8;;
+[2K[0m]8;;   one-second timeout on Windows, so a busy [38;5;109mGet-CimInstance[39m could exhaust the whole startup budget; an unreadable       [0m]8;;
+[2K[0m]8;;   identity for a live process is now treated as unknown and retried once at length instead of being reported as a      [0m]8;;
+[2K[0m]8;;   startup failure.                                                                                                     [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[1mTerminal capability overrides[22m — Override detected terminal hyperlink, image, and truecolor support. See [38;5;109m[4mCapability[24m   [0m]8;;
+[2K[0m]8;;   [4;38;5;109mOverrides[24m[39m[38;5;241m                                                                                                            [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/blob/v2026.9.4/packages/coding-agent/docs/terminal-setup.md#capability-overrid [0m]8;;
+[2K[0m]8;;   [38;5;241mes)[39m.                                                                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[1mExtension UI prompt events[22m — Integrations can distinguish active agent work from time spent waiting for [38;5;109mctx.ui[39m       [0m]8;;
+[2K[0m]8;;   prompts. See [38;5;109m[4mExtension UI prompt events[24m[39m[38;5;241m                                                                              [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/blob/v2026.9.4/packages/coding-agent/docs/extensions.md#ui_prompt_start--ui_pr [0m]8;;
+[2K[0m]8;;   [38;5;241mompt_end)[39m.                                                                                                           [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[1mRPC queue clearing[22m — Retrieve and clear queued steering and follow-up messages with [38;5;109mclear_queue[39m. See [38;5;109m[4mRPC [38;5;109mclear_queue[24m [0m]8;;
+[2K[0m]8;;   [4;38;5;109m[39m[24m[39m[38;5;241m (https://github.com/earendil-works/pi/blob/v2026.9.4/packages/coding-agent/docs/rpc.md#clear_queue)[39m.                [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[1mFullscreen selection copy controls[22m — Disable automatic selection copying in fullscreen mode and use Ctrl+X to copy   [0m]8;;
+[2K[0m]8;;   the active selection. See [38;5;109m[4mUI & Display[24m[39m[38;5;241m                                                                               [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/blob/v2026.9.4/packages/coding-agent/docs/settings.md#ui--display)[39m.            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[1mDeepSeek V4 Flash Vision (experimental)[22m — Use the vision-capable model through the built-in DeepSeek provider. See   [0m]8;;
+[2K[0m]8;;   [38;5;109m[4mAPI Keys[24m[39m[38;5;241m (https://github.com/earendil-works/pi/blob/v2026.9.4/packages/coding-agent/docs/providers.md#api-keys)[39m.     [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded [38;5;109msupportsMidConvoEffort[39m to custom Anthropic Messages model compatibility settings.                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded transcript notices for Anthropic thinking blocks dropped during provider recovery when cache miss notices are  [0m]8;;
+[2K[0m]8;;   enabled.                                                                                                             [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded [38;5;109mui_prompt_start[39m and [38;5;109mui_prompt_end[39m extension events so host integrations can distinguish active agent work from [0m]8;;
+[2K[0m]8;;   waiting on user-facing [38;5;109mctx.ui[39m prompts ([38;5;109m[4m#8355[24m[39m[38;5;241m (https://github.com/earendil-works/pi/pull/8355)[39m by [38;5;109m[4m@cristinaponcela[24m[39m[38;5;241m    [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/cristinaponcela)[39m).                                                                               [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded [38;5;109mdetectSupportedImageMimeTypeFromFile()[39m to the public library exports ([38;5;109m[4m#8600[24m[39m[38;5;241m                                    [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/pull/8600)[39m by [38;5;109m[4m@xl0[24m[39m[38;5;241m (https://github.com/xl0)[39m).                                  [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded inherited experimental vision-capable [38;5;109mdeepseek-v4-flash-vision-exp[39m model support.                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded transcript usage notices for compaction and branch summaries when cache miss notices are enabled.              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded RPC [38;5;109mclear_queue[39m to retrieve and remove queued steering and follow-up messages ([38;5;109m[4m#8432[24m[39m[38;5;241m                           [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8432)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded environment variables and advanced settings for overriding auto-detected terminal hyperlink, image, and        [0m]8;;
+[2K[0m]8;;   truecolor capabilities ([38;5;109m[4m#8665[24m[39m[38;5;241m (https://github.com/earendil-works/pi/issues/8665)[39m).                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAdded [38;5;109mfullscreenCopyOnSelect[39m to disable automatic fullscreen selection copy; when disabled, [38;5;109mCtrl+X[39m copies the active [0m]8;;
+[2K[0m]8;;   text selection before falling back to the last assistant message, while [38;5;109m/tree[39m still copies the selected message      [0m]8;;
+[2K[0m]8;;   ([38;5;109m[4m#7720[24m[39m[38;5;241m (https://github.com/earendil-works/pi/issues/7720)[39m).                                                          [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe skills prompt section aliases each shared skill root to an [38;5;109mr0[39m/[38;5;109mr1[39m prefix once and renders per-skill locations     [0m]8;;
+[2K[0m]8;;   relative to it, so the long absolute root is no longer billed per skill (145 skills, -1,137 tokens/turn).            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mTyping [38;5;109m.[39m alone in the editor now resumes the agent's most recent intent (manual continue): no user message is        [0m]8;;
+[2K[0m]8;;   created or rendered, and a hidden [38;5;109mmanual-continue[39m custom message (display off) drives the next turn — a new turn     [0m]8;;
+[2K[0m]8;;   when idle, steer/follow-up while streaming. A lone [38;5;109m.[39m on an empty session remains an ordinary user message.           [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[38;5;109mschedule_wakeup[39m is no longer a resident tool: it registers search-exposed with lazy activation disabled, and the     [0m]8;;
+[2K[0m]8;;   [38;5;109m/loop[39m extension activates it only while a dynamic loop is live and retires it when that loop ends or suspends (-234  [0m]8;;
+[2K[0m]8;;   prompt tokens per turn in every session without a dynamic loop). Its description keeps the delay guidance and drops  [0m]8;;
+[2K[0m]8;;   the monitor/[38;5;109mbash_output[39m/[38;5;109mkill_bash[39m waiting rule that the dynamic tick prompt already carries.                         [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mChanged selectors in [38;5;109m/thinking[39m, [38;5;109m/model[39m, [38;5;109m/scoped-models[39m, [38;5;109m/trust[39m, per-model thinking settings, and theme settings to   [0m]8;;
+[2K[0m]8;;   keep active options marked while browsing. [38;5;109m/scoped-models[39m now uses consistent per-item toggles and strikes through   [0m]8;;
+[2K[0m]8;;   unavailable models ([38;5;109m[4m#8900[24m[39m[38;5;241m (https://github.com/earendil-works/pi/pull/8900)[39m).                                         [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed the write tool reporting UTF-16 code-unit counts as byte counts by removing the misleading count ([38;5;109m[4m#8979[24m[39m[38;5;241m        [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8979)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed proxied plain-HTTP provider requests hanging after a tool call by tunneling them with CONNECT ([38;5;109m[4m#8134[24m[39m[38;5;241m           [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8134)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed RPC [38;5;109mabort[39m reporting success without cancelling an in-progress manual compaction ([38;5;109m[4m#8920[24m[39m[38;5;241m                         [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8920)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed toggling thinking visibility clearing partial output from running Bash tools ([38;5;109m[4m#8611[24m[39m[38;5;241m                            [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8611)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed Windows shell aborts crashing Pi when [38;5;109mtaskkill.exe[39m is unavailable on [38;5;109mPATH[39m ([38;5;109m[4m#6596[24m[39m[38;5;241m                               [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/6596)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed resumed sessions corrupting the next appended entry when their JSONL file lacks a trailing newline ([38;5;109m[4m#8345[24m[39m[38;5;241m      [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8345)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed extension messages sent with [38;5;109mtriggerTurn: false[39m while the agent is running being inserted between a tool call  [0m]8;;
+[2K[0m]8;;   and its result, which made providers that validate message order reject the replayed history. They are now appended  [0m]8;;
+[2K[0m]8;;   once the turn's tool results are in ([38;5;109m[4m#8537[24m[39m[38;5;241m (https://github.com/earendil-works/pi/issues/8537)[39m).                      [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed compaction and branch summaries forcing [38;5;109mtoolChoice: "none"[39m ([38;5;109m[4m#8649[24m[39m[38;5;241m                                              [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8649)[39m, [38;5;109m[4m#8638[24m[39m[38;5;241m (https://github.com/earendil-works/pi/issues/8638)[39m).       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed large tool results crossing the auto-compaction threshold being sent to the provider before compaction. Pi now [0m]8;;
+[2K[0m]8;;   compacts between tool execution and the next assistant response in the same run, and restores interactive progress   [0m]8;;
+[2K[0m]8;;   when that run resumes ([38;5;109m[4m#6879[24m[39m[38;5;241m (https://github.com/earendil-works/pi/issues/6879)[39m).                                    [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed Google Vertex requests failing with [38;5;109mHttpsProxyAgent is not a constructor[39m when the bundled Node.js runtime uses [0m]8;;
+[2K[0m]8;;   an HTTP(S) proxy ([38;5;109m[4m#8610[24m[39m[38;5;241m (https://github.com/earendil-works/pi/issues/8610)[39m).                                         [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited [38;5;109m@[39m file autocomplete ranking to prefer direct and shallower matches over similarly ranked nested      [0m]8;;
+[2K[0m]8;;   paths ([38;5;109m[4m#8669[24m[39m[38;5;241m (https://github.com/earendil-works/pi/pull/8669)[39m).                                                      [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited OpenAI-compatible streams serializing thinking signatures repeatedly during streaming ([38;5;109m[4m#8671[24m[39m[38;5;241m         [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/pull/8671)[39m).                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited main-screen rendering crashing when image-heavy output exceeded V8's string length limit ([38;5;109m[4m#8028[24m[39m[38;5;241m      [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8028)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited fullscreen double-click word selection splitting paths and kebab-case tokens on [38;5;109m/[39m and [38;5;109m-[39m ([38;5;109m[4m#8676[24m[39m[38;5;241m       [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/pull/8676)[39m).                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited Cloudflare AI Gateway catalogs omitting supported [38;5;109mworkers-ai/*[39m passthrough models.                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited OpenAI-compatible reasoning replay to merge consecutive streamed text and summary [38;5;109mreasoning_details[39m  [0m]8;;
+[2K[0m]8;;   deltas.                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited OpenRouter reasoning controls so reasoning-mandatory models do not receive [38;5;109meffort: "none"[39m ([38;5;109m[4m#8614[24m[39m[38;5;241m     [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/pull/8614)[39m by [38;5;109m[4m@davidbrai[24m[39m[38;5;241m (https://github.com/davidbrai)[39m).                      [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited OpenAI-compatible Chat Completions ignoring an explicitly requested [38;5;109mtoolChoice[39m when no tools are     [0m]8;;
+[2K[0m]8;;   defined.                                                                                                             [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed inherited fragmented Mistral tool calls splitting when continuation chunks omit the tool-call ID ([38;5;109m[4m#8387[24m[39m[38;5;241m        [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/earendil-works/pi/issues/8387)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed queued steering and follow-up messages still reaching the provider after a queue clear on a terminating        [0m]8;;
+[2K[0m]8;;   continuation: the terminating continuation boundary now runs before the drained queue is refreshed, so a clear or    [0m]8;;
+[2K[0m]8;;   replacement at [38;5;109mturn_start[39m wins over pending input.                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed [38;5;109mprepareNextTurn[39m and [38;5;109mprepareNextTurnWithContext[39m being skipped on completed turns without tool calls: the        [0m]8;;
+[2K[0m]8;;   next-turn preparation now runs after every completed assistant turn that can reach the preparation boundary,         [0m]8;;
+[2K[0m]8;;   including a normal stop response, while the terminating queue boundary and ownership refresh are preserved before a  [0m]8;;
+[2K[0m]8;;   continuation provider request.                                                                                       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mFixed next-turn compaction firing on completed turns that will not reach the provider: compaction is now gated on    [0m]8;;
+[2K[0m]8;;   real provider admission (a tool continuation or queued message actually being admitted), while the next-turn         [0m]8;;
+[2K[0m]8;;   callback keeps running on every completed turn and the late queue re-sample and one bounded callback replay after    [0m]8;;
+[2K[0m]8;;   compaction are retained.                                                                                             [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mErrored and aborted provider turns are now excluded from every LLM request at the session level: [38;5;109mconvertToLlm[39m runs   [0m]8;;
+[2K[0m]8;;   the shared [38;5;109mdropFailedAssistantTurns[39m from [38;5;109m@earendil-works/pi-ai[39m as its final step, so lanes that build requests       [0m]8;;
+[2K[0m]8;;   straight from its output (the claude-sdk-oauth prompt bridge's [38;5;109m<conversation_history>[39m rendering and cursor turn      [0m]8;;
+[2K[0m]8;;   building) no longer replay a failed turn's partial text and unexecuted tool calls, and token estimation              [0m]8;;
+[2K[0m]8;;   ([38;5;109mestimateContextTokens(buildSessionContext(...))[39m) no longer counts them. A tool call id re-declared by a later kept  [0m]8;;
+[2K[0m]8;;   assistant keeps its result; [38;5;109mstop[39m/[38;5;109mlength[39m/[38;5;109mtoolUse[39m turns are untouched; the provider transform layer's existing drop in [0m]8;;
+[2K[0m]8;;   [38;5;109mtransform-messages.ts[39m stays as-is.                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.4] - 2026-09-04[22m[39m                                                                                                [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mNew [38;5;109mgpt-6-astra[39m prompt preset, written from scratch against the GPT-6 Astra prompting guide: every [38;5;109mgpt-6-astra[39m model [0m]8;;
+[2K[0m]8;;   id (bare, [38;5;109m-fast[39m, dated snapshots, provider-prefixed, Bedrock [38;5;109mopenai.gpt-6-astra[39m, display name "GPT-6 Astra") now     [0m]8;;
+[2K[0m]8;;   gets a full-core system prompt with an initiative section (bias to action, approval as the last step on a concrete   [0m]8;;
+[2K[0m]8;;   result), explicit instruction precedence for skills and project files, an asynchronous-work section mapping Astra's  [0m]8;;
+[2K[0m]8;;   async-tool training onto background sessions, monitors, child tasks, and detached eval cells (end the turn to wait;  [0m]8;;
+[2K[0m]8;;   no wait tool), calibrated test-first verification, and an engineer-prose writing style with the guide's slop-phrase  [0m]8;;
+[2K[0m]8;;   ban. [38;5;109mpromptPreset: "gpt-6-astra"[39m forces it.                                                                          [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAnthropic Messages requests that carry deferred ([38;5;109mdefer_loading[39m) tools no longer fail with [38;5;109minvalid_request_error:     [0m]8;;
+[2K[0m]8;;   [38;5;109mtools.N.tool_search_tool_bm25_20251119.name: Input should be 'tool_search_tool_bm25'[39m. The injected native            [0m]8;;
+[2K[0m]8;;   tool-search server tool is now named [38;5;109mtool_search_tool_bm25[39m as the API contract requires; the local [38;5;109mtool_search[39m       [0m]8;;
+[2K[0m]8;;   custom tool is unchanged.                                                                                            [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mPrompt surfaces no longer ship the same guidance twice per turn: the [38;5;109mTask_Management[39m section stops re-sending the    [0m]8;;
+[2K[0m]8;;   todo tool description, [38;5;109mupdate_goal[39m points at the goal audits instead of restating them, and the bash timeout policy  [0m]8;;
+[2K[0m]8;;   hands the waiting doctrine to the terminal section. Roughly 1.5K tokens leave every turn with no rule removed.       [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe shared GPT eval-routing bridge no longer routes multi-call work to the [38;5;109mexec[39m/[38;5;109mwait[39m Code Mode tools that were       [0m]8;;
+[2K[0m]8;;   removed in favor of detached [38;5;109meval[39m cells; every GPT preset now points at [38;5;109meval[39m only.                                   [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mResuming a session left on a [38;5;109m-fast[39m catalog variant (or any model with an [38;5;109mupstreamModelId[39m) now restores that exact    [0m]8;;
+[2K[0m]8;;   selection instead of its upstream base model, so the priority tier and the fast indicator survive the resume;        [0m]8;;
+[2K[0m]8;;   assistant messages no longer override an explicit same-provider model selection during session restore.              [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mTTSR now interrupts a single streamed assistant message that repeats the same paragraph three times (a               [0m]8;;
+[2K[0m]8;;   within-message narration loop such as re-announcing the same "now writing the DAG cell" step for minutes without     [0m]8;;
+[2K[0m]8;;   ever issuing the tool call): the collapse guard gains a paragraph-repeat mechanism, truncates the message from the   [0m]8;;
+[2K[0m]8;;   first repeat, and injects the usual recovery nudge. Scalar runs, short periods, and line cycles were the only        [0m]8;;
+[2K[0m]8;;   mechanisms before, and blank lines reset line-cycle tracking, so paragraph-level loops streamed unchecked until the  [0m]8;;
+[2K[0m]8;;   user aborted. Tool-argument streams are not affected.                                                                [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.3-3] - 2026-09-03[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[38;5;109m/gpt-account[39m manages OpenAI Codex OAuth accounts the way [38;5;109m/claude-account[39m manages claude-sdk-oauth ones: [38;5;109madd[39m runs an  [0m]8;;
+[2K[0m]8;;   interactive Codex login and stores the new account beside the existing ones, [38;5;109mremove <name>[39m, [38;5;109mpin <name>[39m and [38;5;109munpin[39m     [0m]8;;
+[2K[0m]8;;   select which account is used, and the bare command lists every stored account with its source, availability and pin  [0m]8;;
+[2K[0m]8;;   state without printing token material.                                                                               [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mRPC clients that send [38;5;109mmedia_placeholders[39m in [38;5;109mset_client_info[39m now receive inline tool-result images as [38;5;109mimage_ref[39m       [0m]8;;
+[2K[0m]8;;   placeholders shaped with [38;5;109mmimeType[39m, [38;5;109mbyteLength[39m and a [38;5;109m{ toolCallId, contentIndex }[39m reference, and can retrieve an      [0m]8;;
+[2K[0m]8;;   omitted image through the [38;5;109mget_media[39m command; default clients remain byte-identical, while classic stdio mode is not  [0m]8;;
+[2K[0m]8;;   covered. This prevented inline image tool results from overflowing a desktop client's socket queue.                  [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth restart continuity now persists from the compaction-aware active context, survives                  [0m]8;;
+[2K[0m]8;;   goal-continuation metadata and a resident entry closing before [38;5;109mmessage_end[39m, and therefore avoids flattening and      [0m]8;;
+[2K[0m]8;;   re-sending an oversized full transcript after restart.                                                               [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mMulti-session RPC socket clients no longer lose assistant text when they fall behind: a queued [38;5;109mmessage_update[39m        [0m]8;;
+[2K[0m]8;;   snapshot superseded by a newer one is now delivered in its delta-only form instead of being replaced, so [38;5;109mtext_delta[39m  [0m]8;;
+[2K[0m]8;;   streams stay lossless the way the stdout path already was. A stalled omo-desktop reader had lost a 411-character     [0m]8;;
+[2K[0m]8;;   window and rendered a message that started mid-word.                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mA multi-session RPC socket whose per-connection event queue overflows is now closed (after the [38;5;109moverflow[39m record),     [0m]8;;
+[2K[0m]8;;   instead of being left open while the host silently dropped every later record and command response for it; the       [0m]8;;
+[2K[0m]8;;   client reconnects and resyncs. The overflow is reported to stderr with the queued/incoming/max byte counts and a     [0m]8;;
+[2K[0m]8;;   preview of the offending record, and the default per-connection cap rises from 4 MiB to 64 MiB, which four inline    [0m]8;;
+[2K[0m]8;;   image tool results had exceeded in one burst.                                                                        [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[38;5;109m/gpt-account remove[39m (and every other account-removal path) now leaves the remaining account actually in use.         [0m]8;;
+[2K[0m]8;;   Removing the account the stored credential's top-level fields projected used to keep those fields pointing at the    [0m]8;;
+[2K[0m]8;;   deleted account's tokens, and a provider left with one account does not enter credential rotation, so requests kept  [0m]8;;
+[2K[0m]8;;   authenticating as the removed account; the surviving account's material is now projected onto those fields.          [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth classifies Fable-style "requires usage credits" failures as a non-retryable entitlement instead of  [0m]8;;
+[2K[0m]8;;   a rate limit, so the account is not blocked for 60s and AgentSession can fall through to the next model ([38;5;109m[4m#709[24m[39m[38;5;241m        [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/code-yeongyu/senpi/issues/709)[39m).                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mPrint mode ([38;5;109m-p[39m / [38;5;109m--mode json[39m) now writes a stderr notice when retry fallback substitutes a model, so silent          [0m]8;;
+[2K[0m]8;;   wrong-model answers are visible without corrupting JSON stdout ([38;5;109m[4moh-my-openagent#7626[24m[39m[38;5;241m                                 [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/code-yeongyu/oh-my-openagent/issues/7626)[39m).                                                      [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth host-tool denial now states that Senpi executes the tool on the host and returns the result as the  [0m]8;;
+[2K[0m]8;;   next user message, so models no longer treat "Do not retry with other tools; end the turn." as a failure ([38;5;109m[4m#784[24m[39m[38;5;241m       [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/code-yeongyu/senpi/issues/784)[39m, [38;5;109m[4moh-my-openagent#7115[24m[39m[38;5;241m                                             [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/code-yeongyu/oh-my-openagent/issues/7115)[39m).                                                      [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth no longer falls back to the host [38;5;109mclaude[39m CLI login when a managed lane is selected and its account   [0m]8;;
+[2K[0m]8;;   pool is empty: [38;5;109moauth-slots[39m and [38;5;109mconfig-dir[39m now fail with [38;5;109mNo Claude SDK OAuth accounts configured for the managed lane [0m]8;;
+[2K[0m]8;;   [38;5;109m[39m instead of silently answering with ambient credentials after [38;5;109m/logout[39m. The ambient lane (no [38;5;109mtokenInjection[39m and no    [0m]8;;
+[2K[0m]8;;   stored accounts) is unchanged.                                                                                       [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mNew Features[22m[39m                                                                                                       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.3-2] - 2026-09-03[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[38;5;109mbash[39m, [38;5;109mpowershell[39m, [38;5;109mworkflow[39m and [38;5;109mmonitor[39m now run only inside eval cells whenever the [38;5;109meval[39m tool is available, with no   [0m]8;;
+[2K[0m]8;;   setting to enable it. They leave the model's direct tool list and are called as [38;5;109mtool.bash(...)[39m, [38;5;109mtool.workflow(...)[39m   [0m]8;;
+[2K[0m]8;;   and [38;5;109mtool.monitor(...)[39m; hooks and permission checks still apply, a direct call returns a hint naming the eval form,   [0m]8;;
+[2K[0m]8;;   and a session without [38;5;109meval[39m (codemode disabled, or a child agent whose allowlist omits it) keeps all four directly    [0m]8;;
+[2K[0m]8;;   callable. The prompt surfaces that document these tools render the reachable call form to match, and no session is   [0m]8;;
+[2K[0m]8;;   told about a tool its registry does not hold.                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe wait-as-subscription guidance moved from the model presets into the [38;5;109meval[39m tool description, where it can name the [0m]8;;
+[2K[0m]8;;   reachable [38;5;109mtool.monitor(...)[39m form. Because the preset rule was gated on [38;5;109mmonitor[39m being directly selectable, it would   [0m]8;;
+[2K[0m]8;;   otherwise have stopped rendering entirely once monitor became eval-only.                                             [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mPer-model system prompt presets for Claude Opus 4.5-4.8, Claude Opus 5, and GLM 5.2/5.3 are audited against their    [0m]8;;
+[2K[0m]8;;   prompting guides and the dieted shared core: the Opus 5 core is rebuilt on the Fable 5.1 skeleton with the Opus 5    [0m]8;;
+[2K[0m]8;;   guide behaviors stated once each and gains the guide's outcome-first final-summary shape; Opus 4.7/4.8 keep only     [0m]8;;
+[2K[0m]8;;   their documented deltas and gain the same-turn subagent fan-out direction; Opus 4.6 drops tuning text the core now   [0m]8;;
+[2K[0m]8;;   carries; GLM 5.2/5.3 share one builder, gain the eval/monitor execution-tooling stance, and lose the lineage         [0m]8;;
+[2K[0m]8;;   preamble, undefined-mode reference, and unconditional todo procedure. The shared core gains a conditional delegation [0m]8;;
+[2K[0m]8;;   rule and states the auto-compaction mechanism behind the context-limits rule.                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe Kimi K3 prompt preset is rebuilt on the Fable 5.1 skeleton for Moonshot's documented K3 "excessive               [0m]8;;
+[2K[0m]8;;   proactiveness": a Scope section makes the request the deliverable (pre-existing problems become follow-ups, tests    [0m]8;;
+[2K[0m]8;;   are committed only where the task or repository calls for them), the ambiguity gate does the answer-independent work [0m]8;;
+[2K[0m]8;;   first and then asks one question, a bounded failure cap stops improvisation after three failed approaches,           [0m]8;;
+[2K[0m]8;;   delegation propagates a stop condition to subagents, and the K2.6-era act-bias repetition that outvoted those        [0m]8;;
+[2K[0m]8;;   boundaries is gone - at 11 fewer Kimi K3 tokens than before.                                                         [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mRPC logins now answer providers' mid-flow prompts over the extension UI dialog channel ([38;5;109mextension_ui_request[39m [38;5;109minput[39m   [0m]8;;
+[2K[0m]8;;   for pasted codes, text, and secrets; [38;5;109mselect[39m for account choices) and release an unanswered dialog when the login     [0m]8;;
+[2K[0m]8;;   settles, so Anthropic Claude Pro/Max and other prompt-driven OAuth flows complete through the browser callback       [0m]8;;
+[2K[0m]8;;   instead of failing with [38;5;109mInteractive login input is not supported over RPC[39m and a dead callback port ([38;5;109m[4m#1316[24m[39m[38;5;241m            [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/code-yeongyu/senpi/issues/1316)[39m).                                                                [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth no longer loops on [38;5;109mNo conversation found with session ID[39m after a failed cold seed: a session id is  [0m]8;;
+[2K[0m]8;;   resumed only once Claude Code acknowledged it (init or replay echo), and an id Claude Code reports missing is        [0m]8;;
+[2K[0m]8;;   dropped instead of retried ([38;5;109m[4moh-my-openagent#7562[24m[39m[38;5;241m (https://github.com/code-yeongyu/oh-my-openagent/issues/7562)[39m).     [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mBundled Claude Code is now 2.1.259 via [38;5;109m@anthropic-ai/claude-agent-sdk[39m 0.3.259, so [38;5;109mclaude-sdk-oauth[39m sessions on       [0m]8;;
+[2K[0m]8;;   [38;5;109mclaude-fable-5-1[39m no longer fail with the API 400 that required version 2.1.251 or newer ([38;5;109m[4m#1298[24m[39m[38;5;241m                       [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/code-yeongyu/senpi/issues/1298)[39m).                                                                [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth maps malformed or raw-string content entries to text (or an omission placeholder) instead of image  [0m]8;;
+[2K[0m]8;;   blocks with undefined [38;5;109mmedia_type[39m/[38;5;109mdata[39m, which made Claude Code abort the next query ([38;5;109m[4moh-my-openagent#7660[24m[39m[38;5;241m             [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/code-yeongyu/oh-my-openagent/issues/7660)[39m).                                                      [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mA second [38;5;109mclaude-sdk-oauth[39m login now stores the newly issued OAuth tokens instead of a broken slot holding the        [0m]8;;
+[2K[0m]8;;   managed placeholder, and no longer fails with [38;5;109mProvider is not configured: claude-sdk-oauth[39m when account rotation has [0m]8;;
+[2K[0m]8;;   selected a single account ([38;5;109m[4m#1279[24m[39m[38;5;241m (https://github.com/code-yeongyu/senpi/issues/1279)[39m).                               [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth [38;5;109mis_error[39m results now trigger model fallback and multi-account failover instead of being treated as  [0m]8;;
+[2K[0m]8;;   successful results ([38;5;109m[4m#1169[24m[39m[38;5;241m (https://github.com/code-yeongyu/senpi/issues/1169)[39m).                                      [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth now surfaces the SDK assistant's API error text and explains version-floor and unknown-model        [0m]8;;
+[2K[0m]8;;   failures instead of reporting [38;5;109munknown[39m ([38;5;109m[4m#1298[24m[39m[38;5;241m (https://github.com/code-yeongyu/senpi/issues/1298)[39m,                    [0m]8;;
+[2K[0m]8;;   [38;5;109m[4moh-my-openagent#7626[24m[39m[38;5;241m (https://github.com/code-yeongyu/oh-my-openagent/issues/7626)[39m).                                 [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mNew Features[22m[39m                                                                                                       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe [38;5;109mexperimental.bashEvalOnly[39m and [38;5;109mexperimental.workflowEvalOnly[39m settings are removed; the behaviour they enabled is  [0m]8;;
+[2K[0m]8;;   now the default and needs no configuration. Existing entries in a settings file are ignored.                         [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.3] - 2026-09-03[22m[39m                                                                                                [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe universal fallback system prompt (models without a dedicated preset) is rewritten to the contracts proven by the [0m]8;;
+[2K[0m]8;;   dieted per-model presets: the routing line now declares an observable stop condition, the Surface Form table and     [0m]8;;
+[2K[0m]8;;   request-classification taxonomy are compressed into three intent-family decision rules, parallel-tool and            [0m]8;;
+[2K[0m]8;;   exploration guidance merge into one Working the Task section with a one-plan commitment rule, verification adopts    [0m]8;;
+[2K[0m]8;;   the claim-audit rule, policies collapse into four hard blocks, and the style section gains end-of-turn,              [0m]8;;
+[2K[0m]8;;   blocked-part, surgical-edit, and context-continuation rules — at a net cost of +6 tokens.                            [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe terminal monitor footer now labels paused monitors as [38;5;109mmuted[39m or [38;5;109mN muted[39m while preserving the [38;5;109mpaused[39m wire field.   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mA failing RPC socket host startup now reports its own cause instead of the signal [38;5;109mensureHost[39m sent while cleaning up. [0m]8;;
+[2K[0m]8;;   [38;5;109mstartHost()[39m kills the just-spawned child when registration fails before the pidfile is written, and that kill        [0m]8;;
+[2K[0m]8;;   recorded the same early-exit result a genuine self-exit produces, so the catch block dropped the real error and      [0m]8;;
+[2K[0m]8;;   always reported [38;5;109mexited with code null (SIGTERM) before answering get_protocol_info[39m. On the [38;5;109mwindows-latest[39m runner     [0m]8;;
+[2K[0m]8;;   this made every transient startup failure unobservable and surfaced as the flaky [38;5;109mRPC named pipes (Windows)[39m job       [0m]8;;
+[2K[0m]8;;   ([38;5;109m[4m#1290[24m[39m[38;5;241m (https://github.com/code-yeongyu/senpi/issues/1290)[39m).                                                         [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe shared RPC supervisor's observer receives content-free session and agent lifecycle records even without a        [0m]8;;
+[2K[0m]8;;   session attachment, so it no longer exits the host during an active turn.                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe Windows RPC host supervisor no longer dies when its baseline process-identity probe times out; a failed baseline [0m]8;;
+[2K[0m]8;;   read is treated as unknown instead of throwing past the startup guard and taking the internal host down with it.     [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe Windows shared RPC host is no longer shut down by its own identity watchdog when the PowerShell process probe    [0m]8;;
+[2K[0m]8;;   merely times out; an absent identity is confirmed with [38;5;109mkill(pid, 0)[39m before the host is treated as exited.            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mShared RPC host startup no longer runs its orphaned-directory cleanup while holding the endpoint lock, so a          [0m]8;;
+[2K[0m]8;;   concurrent [38;5;109msenpi[39m start on a busy machine no longer fails with a raw [38;5;109mdatabase is locked[39m when the cleanup's            [0m]8;;
+[2K[0m]8;;   temp-directory scan and per-candidate process probes outlast the lock budget.                                        [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[38;5;109m/reload[39m and hot-reload no longer stall for seconds on macOS/Linux: config-reload's per-directory [38;5;109mfs.watch[39m            [0m]8;;
+[2K[0m]8;;   subscriptions are created and torn down on the watch worker thread instead of the interactive main thread (measured  [0m]8;;
+[2K[0m]8;;   lifecycle phase 2.0-3.2s → ~150ms idle, 12s+ → ~150ms under load).                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe [38;5;109mmonitor[39m tool's prompt surfaces document its file branch: [38;5;109mprompt.ts[39m, the tool description, and                    [0m]8;;
+[2K[0m]8;;   [38;5;109mdocs/terminal-tools.md[39m now state that [38;5;109mcommand[39m and [38;5;109mpath[39m are mutually exclusive and show the native [38;5;109mmonitor({          [0m]8;;
+[2K[0m]8;;   [38;5;109mdescription, path, event? })[39m recipe, instead of publishing a command-only signature that made the file branch added  [0m]8;;
+[2K[0m]8;;   on 2026-08-29 unreachable and led agents to abandon the tool for a plain background session. Schema branch labels    [0m]8;;
+[2K[0m]8;;   are symmetric, so [38;5;109mcommand[39m no longer claims to be unconditionally required.                                           [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mMulti-session RPC [38;5;109mclose_session[39m teardown is bounded by a 10-second grace period (configurable via                    [0m]8;;
+[2K[0m]8;;   [38;5;109mSENPI_RPC_CLOSE_GRACE_MS[39m), force-releasing the session and path reservation on expiry; a second close joins the      [0m]8;;
+[2K[0m]8;;   in-flight teardown instead of returning [38;5;109munknown_session[39m.                                                             [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mMonitor wake-budget pauses now use single-source, scoped state: only the noisy monitor is muted, quiet monitors are  [0m]8;;
+[2K[0m]8;;   not left permanently paused, and [38;5;109mrearm[39m without a [38;5;109mbash_id[39m resumes all paused monitors.                                [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mReal interactive and RPC user input now resumes paused terminal monitors while extension-generated input and tool    [0m]8;;
+[2K[0m]8;;   calls remain unable to unpause them.                                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mRearming a muted monitor now reports how many filter-matching output lines were dropped while it was muted; the      [0m]8;;
+[2K[0m]8;;   count resets on resume.                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[38;5;109mbash_output[39m now reports when the peeked session is a muted monitor ([38;5;109mdetails.monitorMuted[39m, plus [38;5;109mmutedDropped[39m and a    [0m]8;;
+[2K[0m]8;;   short note) so the muted state remains in the model's textual context; non-monitor sessions are unchanged.           [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mNew Features[22m[39m                                                                                                       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.2-4] - 2026-09-02[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAnthropic OAuth requests advertise [38;5;109mclaude-cli/2.1.251[39m instead of the stale [38;5;109m2.1.75[39m, so Claude Fable 5.1 and Opus 5 no [0m]8;;
+[2K[0m]8;;   longer fail with [38;5;109mclaude_code_version_too_old[39m (syncs upstream pi [38;5;109m96317e50[39m) ([38;5;109m[4moh-my-openagent#7650[24m[39m[38;5;241m                      [0m]8;;
+[2K[0m]8;;   [38;5;241m(https://github.com/code-yeongyu/oh-my-openagent/issues/7650)[39m).                                                      [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mNew Features[22m[39m                                                                                                       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.2-3] - 2026-09-02[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude (Fable 5/5.1, Opus 4.5-4.8/5), Kimi (K2.6/K2.7/K3), and GPT-5.6 presets now carry an execution-tooling        [0m]8;;
+[2K[0m]8;;   stance: when the [38;5;109meval[39m tool is selected, multi-call steps are routed through one code cell with maximal parallel      [0m]8;;
+[2K[0m]8;;   batching and real control-flow code; when [38;5;109mmonitor[39m is selected, every wait on a long-running command, child task, or  [0m]8;;
+[2K[0m]8;;   detached cell is a subscription instead of a sleep or poll. Wording is tailored per family and renders only for      [0m]8;;
+[2K[0m]8;;   tools the session actually has.                                                                                      [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mDropped [38;5;109m.codegraph[39m from the omo local-update fingerprint's excluded roots; the omo product removed its CodeGraph     [0m]8;;
+[2K[0m]8;;   integration, so that directory is never created.                                                                     [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mTwo concurrent shared-host starts for one socket no longer fail with a raw [38;5;109mdatabase is locked[39m: the ensure-lock wait  [0m]8;;
+[2K[0m]8;;   now covers the whole host startup critical section (probe, incompatible-host stop, spawned-host readiness) instead   [0m]8;;
+[2K[0m]8;;   of ten seconds.                                                                                                      [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mMulti-session socket hosts deliver agent events only to connections attached to the session; targeted responses and  [0m]8;;
+[2K[0m]8;;   dialog extension UI requests remain requester-only, while other extension UI state reaches attached connections.     [0m]8;;
+[2K[0m]8;;   [38;5;109mRpcClient[39m drops foreign session events while lease-less and buffers own pre-lease startup events during              [0m]8;;
+[2K[0m]8;;   [38;5;109mopen_session[39m.                                                                                                        [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mNew Features[22m[39m                                                                                                       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.2-2] - 2026-09-02[22m[39m                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude Mythos 5 and Mythos 5.1 model ids now route to the matching Claude Fable prompt presets (Anthropic ships one  [0m]8;;
+[2K[0m]8;;   prompting guide per Fable/Mythos release pair), instead of falling back to the default dynamic prompt.               [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe [38;5;109mclaude-fable-5-1[39m prompt preset was dieted per the full Anthropic guide set: duplicated scope/stop/evidence rules [0m]8;;
+[2K[0m]8;;   are stated once (scope now has its own section), model-default style traits are removed, and the Fable 5 delegation  [0m]8;;
+[2K[0m]8;;   guidance plus the 5.1 ask-after-independent-work clause are added. The rendered static core shrinks about 16%.       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mmodels.json custom models under extension-registered providers now inherit the extension's provider-level [38;5;109mapi[39m and    [0m]8;;
+[2K[0m]8;;   [38;5;109mbaseUrl[39m, while extension catalog models remain available alongside new custom models.                                [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude SDK OAuth compaction retries that forbid tool calls now send a genuinely tool-less request, preventing        [0m]8;;
+[2K[0m]8;;   host-denied tool calls from producing an empty summary.                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mManual [38;5;109m/compact[39m now recovers through the deterministic no-LLM fallback for classified summarizer failures, while     [0m]8;;
+[2K[0m]8;;   unclassified failures remain fail-closed.                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mNew Features[22m[39m                                                                                                       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe default provider stream-start timeout rises from 90s to 300s ([38;5;109mretry.provider.streamStartTimeoutMs[39m overrides are  [0m]8;;
+[2K[0m]8;;   unchanged, and the default still never exceeds the idle timeout), so Opus/Fable-class models with long thinking no   [0m]8;;
+[2K[0m]8;;   longer fail healthy requests with [38;5;109mProvider stream start timed out after 90000ms[39m before the first stream event; every [0m]8;;
+[2K[0m]8;;   comparable harness (opencode, codex, oh-my-pi) already grants 300s here. The agent-level retry budget also rises     [0m]8;;
+[2K[0m]8;;   from 3 to 5 attempts: [38;5;109mSENPI_DEFAULT_RETRY_PROFILE.turn.maxRetries[39m and the [38;5;109mretry.maxRetries[39m settings default now      [0m]8;;
+[2K[0m]8;;   agree, so the documented default is the budget every consumer actually sees (session-title retry stays clamped by    [0m]8;;
+[2K[0m]8;;   its own cap).                                                                                                        [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mProvider retry continuation watchdog messages now name [38;5;109mretry.provider.streamStartTimeoutMs[39m; claude-sdk-oauth         [0m]8;;
+[2K[0m]8;;   regression coverage pins SDK [38;5;109mapi_retry[39m as stream liveness on query and resident paths.                               [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m[2026.9.2] - 2026-09-02[22m[39m                                                                                                [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mClaude Fable 5.1 gets its own system prompt preset ([38;5;109mclaude-fable-5-1[39m): the dieted Fable 5 core plus surgical deltas  [0m]8;;
+[2K[0m]8;;   from the Fable 5.1 prompting guide (scope-is-the-deliverable, per-response tool-call batching, surgical-edit         [0m]8;;
+[2K[0m]8;;   preference, test-scope discipline, and formatting/narration recalibration). The dotted release resolves before the   [0m]8;;
+[2K[0m]8;;   generic [38;5;109mfable-5[39m matcher, [38;5;109mpromptPreset: "claude-fable-5-1"[39m can force it, and the fable default lanes now point at     [0m]8;;
+[2K[0m]8;;   5.1: the recommended default model, the shipped fallback chain (the [38;5;109mclaude-fable-5[39m chain stays for sessions still on [0m]8;;
+[2K[0m]8;;   it), the startup tip, and doc examples.                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mThe shared RPC host now starts on Windows: socket endpoints resolve to [38;5;109m\\.\pipe\[39m named-pipe addresses derived from a [0m]8;;
+[2K[0m]8;;   per-endpoint secret (stored [38;5;109m0600[39m beside the logical path) with a constant-time authenticated handshake gating both   [0m]8;;
+[2K[0m]8;;   the public and internal listeners, pidfile ownership proof no longer depends on MSYS [38;5;109mps[39m, logical-path filesystem     [0m]8;;
+[2K[0m]8;;   cleanup is skipped for named pipes, and detached supervisor/daemon startup failures no longer leak live children or  [0m]8;;
+[2K[0m]8;;   signal reused PIDs. POSIX transports keep the prior unix-socket + [38;5;109m0600[39m behavior.                                     [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39m[38;5;109m/quit[39m and [38;5;109m/exit[39m submitted while startup is still finishing (managed-tool downloads) now quit instead of being parked [0m]8;;
+[2K[0m]8;;   back in the editor behind a "Startup is still in progress" notice. Parking the text also disabled the Ctrl+D quit    [0m]8;;
+[2K[0m]8;;   escape, which only fires on an empty editor, so the usual way out was a dead end until the line was cleared by hand. [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mAn extension calling [38;5;109mctx.shutdown()[39m while the session is idle now shuts down immediately instead of waiting for an   [0m]8;;
+[2K[0m]8;;   [38;5;109magent_settled[39m event that an idle session never emits, which previously stranded the request until the user happened  [0m]8;;
+[2K[0m]8;;   to run another turn.                                                                                                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mInteractive quit now keeps stderr capture installed while session shutdown handlers drain during runtime disposal,   [0m]8;;
+[2K[0m]8;;   so shutdown-time diagnostics (for example memory drain warnings) are recorded in the debug log instead of printing   [0m]8;;
+[2K[0m]8;;   raw beside the resume hint. The TUI still stops first to avoid final-frame repaints, and stderr is restored after    [0m]8;;
+[2K[0m]8;;   disposal even when disposal fails.                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mMulti-session RPC hosts launched with [38;5;109mSENPI_RPC_CLIENT_CAPABILITIES[39m (for example [38;5;109mextension_events[39m) now apply those   [0m]8;;
+[2K[0m]8;;   capabilities to connection-owned session bindings when the client never sends [38;5;109mset_client_info[39m. Previously the launch [0m]8;;
+[2K[0m]8;;   capabilities were advertised through [38;5;109mget_protocol_info[39m but dropped at binding creation, so undeclared clients        [0m]8;;
+[2K[0m]8;;   received no [38;5;109mextension_event[39m frames (breaking downstream task/DAG/monitor liveness in omo-desktop-app). An explicit   [0m]8;;
+[2K[0m]8;;   [38;5;109mset_client_info[39m declaration, including an empty capability list, still overrides the launch default.                 [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mRPC [38;5;109mabort[39m acknowledgements are now sent immediately after the abort signal is dispatched instead of waiting for full [0m]8;;
+[2K[0m]8;;   session quiescence, preventing desktop stop requests from hitting their 10-second bounded-ack timeout under host     [0m]8;;
+[2K[0m]8;;   load.                                                                                                                [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mNew Features[22m[39m                                                                                                       [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;109m- [39mRPC clients can opt into native session auto-titles with the [38;5;109mauto_title_sessions[39m capability; supported RPC sessions  [0m]8;;
+[2K[0m]8;;   generate and emit their title through [38;5;109msession_info_changed[39m.                                                          [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mBreaking Changes[22m[39m                                                                                                   [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mAdded[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mChanged[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mFixed[22m[39m                                                                                                              [0m]8;;
+[2K[0m]8;;                                                                                                                        [0m]8;;
+[2K[0m]8;; [38;5;222m[1m### [22m[39m[38;5;222m[1mRemoved[22m[39m                                                                                                            [0m]8;;
+[2K[0m]8;;[0m]8;;
+[2K[0m]8;;[38;5;69m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[0m]8;;
+[2K[0m]8;;[0m]8;;
+[2K[0m]8;; [38;5;241mSettings: settings.json (JSON)[39m                                                                                         [0m]8;;
+[2K[0m]8;;[0m]8;;
+[2K[0m]8;;[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[0m]8;;
+[2K[0m]8;;[38;5;239m❯[39m [7m [0m                                                                                                                     [0m]8;;
+[2K[0m]8;;[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[0m]8;;
+[2K[0m]8;;[38;5;109m/private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-ADvlxl/project[39m[38;5;239m • [39m[38;5;244m0/200K (0.0%) (auto)[39m     [38;5;109mparent-1[39m[0m]8;;
+[2K[0m]8;;(😺 OmO Native)[0m]8;;[3A[3G[?7h[?2026l[?2026h[?7l[1;34r[34;1H
+
+
+
+[r[31;1H[2K[0m]8;;[0m]8;;[32;1H[2K[0m]8;;]133;A[48;5;59m                                                                                                                        [49m[0m]8;;[33;1H[2K[0m]8;;[48;5;59m [38;5;188mAcknowledge QA follow-up.[39m                                                                                              [49m[0m]8;;[34;1H[2K[0m]8;;]133;B]133;C[48;5;59m                                                                                                                        [49m[0m]8;;[3B[3G[?7h[?2026l[?2026h[?7l[2B[2K[0m]8;;[38;5;109m/private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-ADvlxl/project[39m[38;5;239m • [39m[38;5;244m146/200K (0.1%) (auto)[39m   [38;5;109mparent-1[39m[0m]8;;[2A[3G[?7h[?2026l[?2026h[?7l[3B[2K[0m]8;;(😺 OmO Native) mem:project-948f01e6 just now !3[0m]8;;[3A[3G[?7h[?2026l[?2026h[?7l[3G[?7h[?2026l]0;senpi - project[?2026h[?7l[2A[2K[0m]8;;]133;A[0m]8;;
+[2K[0m]8;;]133;B]133;C QA_PARENT_DONE                                                                                                         [0m]8;;
+[2K[0m]8;;[0m]8;;
+[2K[0m]8;; [38;5;109m•[39m [38;5;241mW[39m[38;5;241mo[39m[38;5;241mr[39m[38;5;241mk[39m[38;5;241mi[39m[38;5;241mn[39m[38;5;241mg[39m[38;5;241m (0s • esc to interrupt)[39m                                                                                      [0m]8;;
+[2K[0m]8;; [38;5;241mTip: Rotate through favorite models with ctrl+p; go backward with shift+ctrl+p.                                        [0m]8;;
+[2K[0m]8;; [38;5;241m↳ Want the full story on any tip? Ask about it — the give-me-tips skill has the tour.[39m                                  [0m]8;;
+[2K[0m]8;;[0m]8;;
+[2K[0m]8;;[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[0m]8;;
+[2K[0m]8;;[38;5;239m❯[39m [7m [0m                                                                                                                     [0m]8;;
+[2K[0m]8;;[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[0m]8;;
+[2K[0m]8;;[38;5;109m/private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-ADvlxl/project[39m[38;5;239m • [39m[38;5;244m184/200K (0.1%) (auto)[39m   [38;5;109mparent-1[39m[0m]8;;
+[2K[0m]8;;(😺 OmO Native) mem:project-948f01e6 just now !3[0m]8;;[3A[3G[?7h[?2026l]0;senpi - project[?2026h[?7l[3G[?7h[?2026l[?2026h[?7l[5A[2K[0m]8;;[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[0m]8;;
+[2K[0m]8;;[38;5;239m❯[39m [7m [0m                                                                                                                     [0m]8;;
+[2K[0m]8;;[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[38;5;239m─[39m[0m]8;;
+[2K[0m]8;;[38;5;109m/private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-ADvlxl/project[39m[38;5;239m • [39m[38;5;244m184/200K (0.1%) (auto)[39m   [38;5;109mparent-1[39m[0m]8;;
+[2K[0m]8;;(😺 OmO Native) mem:project-948f01e6 just now !3[0m]8;;
+[2K[0m]8;;
+[2K[0m]8;;
+[2K[0m]8;;
+[2K[0m]8;;[4A[3A[3G[?7h[?2026l[?2026h[?7l[3B[2K[0m]8;;(😺 OmO Native) mem:project-948f01e6 just now (+1) !3[0m]8;;[3A[3G[?7h[?2026l[<u[?2026h[?7l[3G[?7h[?2026l[?2026h[?7l[3G[?7h[?2026l]0;senpi - project [4B
+[?25h[?2004l]0;senpi - project]0;senpi - project[2mTo resume this session:[22m senpi --session-dir /private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-ADvlxl/agent/sessions/followup --session 01a072f7-a177-7f43-8f06-27990888e5b3

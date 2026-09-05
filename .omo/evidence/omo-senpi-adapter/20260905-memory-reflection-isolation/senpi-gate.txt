@@ -1,0 +1,20 @@
+Command: bun run test:senpi
+Exit code: 0
+
+Primary package result:
+  2678 pass
+  32 platform/capability skips
+  0 fail
+  8570 expect() calls
+  Ran 2710 tests across 352 files. [122.49s]
+
+Evidence resolver result:
+  10 pass
+  0 fail
+  31 expect() calls
+  Ran 10 tests across 1 file. [1043.00ms]
+
+The gate rebuilt and staged the Senpi plugin, ran `tsgo --noEmit`, executed the full
+omo-senpi package suite, and validated the canonical evidence-directory resolver.
+The platform skips are the suite's existing capability-gated Darwin/Windows/Linux cases;
+no test was skipped or weakened by this change.

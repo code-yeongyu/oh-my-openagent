@@ -10,6 +10,7 @@ Live Senpi QA harness: E2E drivers, continuation probes, scenario fixtures, and 
 | Team | `team-e2e.mjs`, `team-resume-e2e.mjs`, `team-delete-6413-qa.mjs`, `team-e2e-crash.mjs`/`-crash-state.mjs`, support modules `team-e2e-{support,runtime,process,scripts,analysis}.mjs`, `team-e2e-mock-provider.ts` |
 | RPC | `task-rpc-e2e.mjs`, `-helpers.mjs`, `-scenarios.mjs` (+`.test.mjs`), `task-rpc-e2e.windows.test.ts` |
 | Resume | `task-resume-e2e.mjs`, `task-resume-failure-e2e.mjs`, `task-resume-e2e-scenarios.mjs`, `resume-e2e-runtime.mjs` |
+| Reflection isolation | `memory-reflection-isolation-e2e.mjs [--evidence-slug <slug>] [--timeout-ms <ms>] [--keep-sandbox] [--self-test]`: real worktree-local Senpi through Bun PTYs, localhost scripted model, pre-armed exact completion-file events, child argv/system prompts and session JSONL, consumed-history silence and one pending-failure health alert; automatic sandbox cleanup and protected-state receipts. Resolves its own canonical evidence directory. |
 | Memory | `memory-e2e.mjs`, `memory-model-fallback-e2e.mjs`, `memory-skill-startup-e2e.mjs`, `facts-backlog-e2e.mjs`, `memory-write-visual-qa.mjs [--keep-sandbox]`, `memorian-gate-e2e.mjs [--plugin-root <p>] [--senpi-cli <p>] [--evidence-dir <d>] [--scenario s1\|s2\|all] [--keep-sandbox] [--self-test]` (offline two-turn RPC proof of the recall gate: S1 a silent tool-only judge nudges the next turn with no failed gate entry, S2 a 500 from the judge's provider is reported as `child_failed` with a sanitized reason and a runId; routes judge-vs-parent by the `nudge` tool plus the Memorian persona in the request body, and takes the parent session file from `get_state`, never "the newest file") |
 | Components | `fallback-architect-e2e.mjs`, `git-master-attribution-e2e.mjs`, `skill-pointers-e2e.mjs`, `mass-ulw-prompts-e2e.mjs`, `ulw-prompts-e2e.mjs`, `ulw-goal-footer-tui.mjs`, `todo-fanout-reminder-e2e.mjs`, `no-todo-continuity-e2e.mjs`, `variant-thinking-e2e.mjs`, `task-tui-{e2e,scenarios}.mjs`, `task-stats-renderer.mjs` |
 | Runtimes | `lsp-e2e.mjs` (largest, ~1.4k LOC: staged runtime, extension loading, tool behavior, post-edit flows), `ast-grep-mcp-e2e.mjs`, `curated-agents-e2e.mjs`, `parallelism-eval-e2e.mjs`, `plan-gated-agents-e2e.mjs`, `dag-gate-proof.ts`, `dag-wait-detach-qa.ts`, `probe-continuation.mjs`, `probe-cross-session.mjs` |
@@ -49,6 +50,8 @@ node scripts/qa/drive.mjs --self-test
 node scripts/qa/task-rpc-e2e.mjs --self-test
 node scripts/qa/task-load-skills-e2e.mjs --self-test
 bun packages/omo-senpi/scripts/qa/memorian-gate-e2e.mjs --self-test
+bun packages/omo-senpi/scripts/qa/memory-reflection-isolation-e2e.mjs --self-test
+bun packages/omo-senpi/scripts/qa/memory-reflection-isolation-e2e.mjs --evidence-slug reflection-isolation-qa  # requires freshly built local plugin and worktree node_modules Senpi; no real credentials
 bun packages/omo-senpi/plugin/scripts/build-extension.mjs && bun packages/omo-senpi/scripts/qa/memorian-gate-e2e.mjs --scenario all   # needs the built bundle
 SENPI_BIN="$(command -v senpi)" node scripts/qa/task-e2e.mjs   # live mode; same for team-e2e.mjs
 bun test scripts/qa/task-e2e-analysis.test.mjs scripts/qa/resume-e2e-runtime.test.mjs

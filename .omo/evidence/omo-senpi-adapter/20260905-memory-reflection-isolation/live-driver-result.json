@@ -1,0 +1,16 @@
+{
+  "result": "BLOCKED",
+  "repair": "PASS",
+  "parentCount": 2,
+  "explicitLocalPluginEveryParent": true,
+  "memoryToolSucceeded": true,
+  "blocker": "memory reflection launch failed: This extension ctx is stale after session replacement or reload.",
+  "stderr": "/Users/sangwon/Documents/feelso/oh-my-openagent-wt/fix-memory-reflection-isolation-health/.omo/evidence/omo-senpi-adapter/20260905-memory-reflection-isolation/live-driver-10804.stderr",
+  "triggerSession": "/private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-Uxwvqq/agent/sessions/2026-09-05T17-05-17-098Z_01a07288-192a-7012-8f96-c36d8965a43f.jsonl",
+  "attemptsLogExists": false,
+  "reflectionChildPromptCaptured": false,
+  "parentSeedMarkerCaptured": true,
+  "modelUsabilityBudgetErrorObserved": false,
+  "isolationRoot": "/private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-Uxwvqq",
+  "additionalRetainedSandbox": "/private/var/folders/_h/z60gns1573b9cv1kj_n1q20w0000gn/T/omo-senpi-qa-d9n3Rk"
+}

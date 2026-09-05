@@ -7,7 +7,7 @@ import { buildIdentityPaths, type ReflectionWorktree, type ReservedRun } from "@
 
 import { loadedMemoryConfig, memorySettings } from "../memory.test-support"
 import { prepareReflectionCandidateSpawn } from "./reflection-spawn-input"
-import { prepareReflectionForkSpawn, prepareReflectionSpawn } from "./spawn"
+import { prepareReflectionSpawn } from "./spawn"
 import { realpathSync } from "node:fs"
 import { rmEfaultTolerant } from "../teardown.test-support"
 
@@ -165,18 +165,6 @@ describe("worker senpi prefix args", () => {
 
     expect(prepared.command).toBe("/custom/senpi")
     expect(prepared.args[0]).toBe(PREFIX_MARKER)
-  })
-
-  test("#given senpiCommand and senpiPrefixArgs #when a reflection fork spawn is prepared #then args start with the prefix before -p/--fork", async () => {
-    const base = await root()
-    const prepared = await prepareReflectionForkSpawn({
-      ...reflectionInput(base),
-      parentSessionFile: join(base, "parent.jsonl"),
-    })
-
-    expect(prepared.args[0]).toBe(PREFIX_MARKER)
-    expect(prepared.args.indexOf("-p")).toBeGreaterThan(0)
-    expect(prepared.args.indexOf("--fork")).toBeGreaterThan(prepared.args.indexOf("-p"))
   })
 
   test("#given runner-style senpiPrefixArgs #when prepareReflectionCandidateSpawn builds the spawn #then the prefix is forwarded onto args", async () => {

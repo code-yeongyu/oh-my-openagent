@@ -1,0 +1,25 @@
+Scenario: C002 edge-triggered reflection health after fix
+Command:
+  bun test \
+    packages/omo-senpi/src/components/memory/worker/health-alert.test.ts \
+    packages/omo-senpi/src/components/memory/worker/health.test.ts \
+    packages/omo-senpi/src/components/memory/wiring.test.ts \
+    packages/omo-senpi/src/components/memory/worker/completion.test.ts \
+    packages/omo-senpi/src/components/memory/worker/runner.integration.test.ts \
+    packages/omo-senpi/src/components/memory/worker/runner-finalization.test.ts \
+    packages/memory-core/src/reflection/machine.test.ts \
+    packages/memory-core/src/reflection/reservation.test.ts \
+    packages/memory-core/src/journal/cursor.test.ts
+
+Exit code: 0
+Result:
+  83 pass
+  0 fail
+  979 expect() calls
+  Ran 83 tests across 9 files. [7.32s]
+
+Observed behavior:
+  - Three consumed historical failures plus zero pending completions produce no new health entry and no health warning on a fresh bind.
+  - One newly pending failed completion is delivered and produces exactly one health alert across repeated binds.
+  - Identity-level memory status remains present.
+  - Completion delivery, failure cursor preservation, successful cursor advancement, reservation promotion, and finalization tests remain green.

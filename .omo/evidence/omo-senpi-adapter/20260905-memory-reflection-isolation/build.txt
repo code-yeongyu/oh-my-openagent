@@ -1,0 +1,14 @@
+Command: bun run build
+Exit code: 0
+
+Observed:
+  - OpenCode bundles, CLI, declarations, schema generation, MCP runtimes, Codex plugin,
+    and Senpi plugin build steps completed.
+  - Senpi `omo.js` rebuilt from 869 modules.
+  - Final line: `build: all steps completed`.
+
+Generated-file note:
+  The build refreshed `packages/omo-senpi/plugin/extensions/omo.js`, which is part of this
+  Senpi change. It also exposed pre-existing unrelated generation drift in
+  `assets/omo.schema.json` and `packages/omo-codex/scripts/install-dist/install-local.mjs`;
+  those two files will not be staged or committed.

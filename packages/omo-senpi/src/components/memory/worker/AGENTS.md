@@ -15,7 +15,7 @@ Detached `senpi -p` reflection/dream/facts child execution and the durable run l
 | `run-finalization*.ts` | Terminal-state machine: claim (`-claim.ts`), gate/settlement (`-settlement.ts`), git decision (`-git.ts`), types. Matching published outcomes win races; abandoned runs are never published; inactive runs must not complete. |
 | `run-reconciliation.ts` | Startup scan: run directories, process liveness, sentinel waiting, state repair. |
 | `run-liveness.ts` / `run-sentinel.ts` | Liveness probes and sentinel waits; the sentinel basename never fires on the relevant watcher path, so waiting degrades to a bounded timeout. |
-| `resolve-model.ts` / `model-miss.ts` / `model-preflight.ts` / `model-cost.ts` / `fork-cost.ts` / `registry-fallback.ts` / `memory-launch-preflight.ts` | Model ladder: ordered candidates with cost-aware routing (`chooseMemoryLaunchRoute`), session/thinking inheritance, preflight caching, retry classification (`classifyRetryableModelMiss`). |
+| `resolve-model.ts` / `model-miss.ts` / `model-preflight.ts` / `model-cost.ts` / `registry-fallback.ts` / `memory-launch-preflight.ts` | Model ladder: ordered candidates with cost-aware model selection, session-model/thinking inheritance, preflight caching, retry classification (`classifyRetryableModelMiss`). |
 | `completion*.ts` | Durable completion records (`runtime/reflection/completions/`): record, deliver, render; `REFLECTION_*_ENTRY_TYPE` constants and renderer registration. |
 | `health.ts` / `health-alert.ts` | READ-ONLY derived health over completion records (failure streak, fingerprint, last outcome; `senpi-memory.health` entries). A trailing streak whose newest failure is older than `REFLECTION_HEALTH_STALE_MS` (7 days) reports streak 0 so dormant identities stop alerting; historical fields stay intact. |
 | `remediation.ts` | Failure-reason -> user-facing hint mapping. |
@@ -29,7 +29,10 @@ Detached `senpi -p` reflection/dream/facts child execution and the durable run l
 
 ## Anti-patterns
 
+- Never launch reflection or dream with `--fork` or parent-session context. Both use a bounded `TRANSCRIPT_PATH`, their own system prompt, `--tools bash,edit`, all four discovery-disable flags, a fresh per-run session directory, and the memory worktree cwd. Session-model inheritance through `resolveBeyondCategory` is model selection only, never session inheritance.
+
 - `health.ts` must never write - no transcript entries, no notifications, no nagging from a frozen burst.
+- `emitReflectionHealthAlert` requires caller-surfaced failed completions in the active streak and delivery-age window. Empty drains, successful completions, and silently expired records must not re-alert on historical health or consume the once guard. Footer and RPC health remain read-only identity status.
 - Never hide a pre-spawn resolution cause behind `child-stderr.log`; no child ran in that path.
 - Never publish failed-child output into the memory repository; keep the cursor retryable.
 - Abandoned runs must never be published; matching published outcomes win races.

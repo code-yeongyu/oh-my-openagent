@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url"
 import { createSandbox, seedSandbox } from "./drive.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
+const pluginEntry = join(scriptDir, "..", "..", "plugin", "extensions", "omo.js")
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const senpiBin = process.env.SENPI_BIN ?? Bun.which("senpi")
 const sandbox = createSandbox()
@@ -111,6 +112,7 @@ function writeMockScript(steps) {
 
 async function runParent(parentProvider, childShim, prompt, extraExtensions = []) {
   const child = spawn(senpiBin, [
+    "-e", pluginEntry,
     "-e", parentProvider,
     ...extraExtensions.flatMap((extension) => ["-e", extension]),
     "-p",
