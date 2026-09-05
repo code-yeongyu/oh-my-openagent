@@ -23,6 +23,7 @@ export async function waitForCompletion(
   let stablePolls = 0
   const STABILITY_REQUIRED = 3
   let sawActiveStatus = false
+  let sawActiveStatusAt = 0 // Track when the session first became active
 
   while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
     if (toolContext.abort?.aborted) {
@@ -37,6 +38,9 @@ export async function waitForCompletion(
     const sessionStatus = allStatuses[sessionID]
 
     if (sessionStatus && sessionStatus.type !== "idle") {
+      if (!sawActiveStatus) {
+        sawActiveStatusAt = Date.now()
+      }
       sawActiveStatus = true
       stablePolls = 0
       lastMsgCount = 0
@@ -54,6 +58,13 @@ export async function waitForCompletion(
       lastMsgCount = 0
       if (!sawActiveStatus && Date.now() - pollStart >= PROMPT_ACCEPTANCE_TIMEOUT_MS) {
         throw new Error(`Prompt was not durably accepted by OpenCode for session ${sessionID}.`)
+      }
+      // If session was active but no messages arrived within 15s, suspect dispatch failure
+      if (sawActiveStatus && Date.now() - sawActiveStatusAt >= 15_000) {
+        throw new Error(
+          `Session ${sessionID} was briefly active but no messages arrived within 15 seconds. ` +
+          `The prompt dispatch likely failed without being durably accepted.`,
+        )
       }
       continue
     }
