@@ -2,6 +2,7 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { applyRuntimeSkillSourceConfig } from "../features/opencode-runtime-skills"
 import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
 import { applyOpenGatewayProviderConfig } from "../features/opengateway-provider";
+import { applyOrcaRouterProviderConfig } from "../features/orcarouter-provider";
 import type { ModelCacheState } from "../plugin-state";
 import { log } from "../shared";
 import { applyAgentConfig } from "./agent-config-handler";
@@ -97,6 +98,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
     applyOpenGatewayProviderConfig(config);
+    applyOrcaRouterProviderConfig(config);
     applyProviderConfig({
       config,
       modelCacheState,

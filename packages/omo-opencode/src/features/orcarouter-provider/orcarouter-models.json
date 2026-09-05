@@ -1,0 +1,123 @@
+{
+  "orcarouter/auto": {
+    "name": "OrcaRouter Auto",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 128000,
+      "output": 16384
+    }
+  },
+  "orcarouter/free": {
+    "name": "OrcaRouter Free",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 4096,
+      "output": 4096
+    }
+  },
+  "orcarouter/fusion": {
+    "name": "OrcaRouter Fusion",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 4096
+    }
+  },
+  "orcarouter/fusion-flash": {
+    "name": "OrcaRouter Fusion Flash",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 200000,
+      "output": 4096
+    }
+  },
+  "orcarouter/fusion-mini": {
+    "name": "OrcaRouter Fusion Mini",
+    "reasoning": false,
+    "tool_call": true,
+    "attachment": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1000000,
+      "output": 4096
+    }
+  }
+}
