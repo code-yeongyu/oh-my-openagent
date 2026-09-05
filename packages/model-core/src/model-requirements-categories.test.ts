@@ -66,7 +66,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["zai-coding-plan", "opencode-go"],
+        providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
         model: "glm-5.2",
         variant: "max",
       },
@@ -185,7 +185,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "xhigh",
       },
       {
-        providers: ["zai-coding-plan", "opencode-go"],
+        providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
         model: "glm-5.3",
         variant: "max",
       },

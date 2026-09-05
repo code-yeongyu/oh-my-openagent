@@ -12,6 +12,7 @@ export function toProviderAvailability(config: InstallConfig): ProviderAvailabil
 		opencodeZen: config.hasOpencodeZen,
 		copilot: config.hasCopilot,
 		zai: config.hasZaiCodingPlan,
+		zhipuaiCodingPlan: config.hasZhipuaiCodingPlan,
 		kimiForCoding: config.hasKimiForCoding,
 		opencodeGo: config.hasOpencodeGo,
 		bailianCodingPlan: config.hasBailianCodingPlan,
@@ -30,6 +31,7 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
 		"github-copilot": availability.copilot,
 		opencode: availability.opencodeZen,
 		"zai-coding-plan": availability.zai,
+		"zhipuai-coding-plan": availability.zhipuaiCodingPlan,
 		"kimi-for-coding": availability.kimiForCoding,
 		"opencode-go": availability.opencodeGo,
 		"bailian-coding-plan": availability.bailianCodingPlan,
@@ -49,6 +51,7 @@ export function hasAnyConfiguredProvider(config: InstallConfig): boolean {
 		availability.copilot ||
 		availability.opencodeZen ||
 		availability.zai ||
+		availability.zhipuaiCodingPlan ||
 		availability.kimiForCoding ||
 		availability.opencodeGo ||
 		availability.bailianCodingPlan ||

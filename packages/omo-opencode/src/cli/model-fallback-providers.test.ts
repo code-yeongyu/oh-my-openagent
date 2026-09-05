@@ -19,6 +19,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasCopilot: false,
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,
+    hasZhipuaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
     hasBailianCodingPlan: false,
@@ -100,6 +101,66 @@ describe("generateModelConfig provider routes", () => {
 
       // then Hephaestus has no eligible provider
       expect(result.agents?.hephaestus).toBeUndefined()
+    })
+  })
+
+  describe("Zhipu Coding Plan (bigmodel.cn) routes", () => {
+    test("sisyphus routes to GLM when only Zhipu Coding Plan is available", () => {
+      // given only the Zhipu domestic coding plan is available
+      const config = createConfig({ hasZhipuaiCodingPlan: true })
+
+      // when the generated model config is resolved
+      const result = generateModelConfig(config)
+
+      // then Sisyphus uses the GLM route instead of the ultimate fallback
+      expect(result.agents?.sisyphus?.model).toBe("zhipuai-coding-plan/glm-5.2")
+    })
+
+    test("multimodal-looker routes to the GLM vision model when only Zhipu Coding Plan is available", () => {
+      // given only the Zhipu domestic coding plan is available
+      const config = createConfig({ hasZhipuaiCodingPlan: true })
+
+      // when the generated model config is resolved
+      const result = generateModelConfig(config)
+
+      // then Multimodal Looker uses the GLM vision route
+      expect(result.agents?.["multimodal-looker"]?.model).toBe("zhipuai-coding-plan/glm-4.6v")
+    })
+
+    test("oracle and momus route to GLM when only Zhipu Coding Plan is available", () => {
+      // given only the Zhipu domestic coding plan is available
+      const config = createConfig({ hasZhipuaiCodingPlan: true })
+
+      // when the generated model config is resolved
+      const result = generateModelConfig(config)
+
+      // then the GLM chain entries cover Oracle and Momus
+      expect(result.agents?.oracle?.model).toBe("zhipuai-coding-plan/glm-5.2")
+      expect(result.agents?.momus?.model).toBe("zhipuai-coding-plan/glm-5.2")
+    })
+
+    test("visual-engineering and unspecified-high categories route to GLM when only Zhipu Coding Plan is available", () => {
+      // given only the Zhipu domestic coding plan is available on a max20 plan
+      // (unspecified-high downgrades to the unspecified-low chain when not isMaxPlan)
+      const config = createConfig({ hasZhipuaiCodingPlan: true, isMax20: true })
+
+      // when the generated model config is resolved
+      const result = generateModelConfig(config)
+
+      // then the GLM category defaults are used
+      expect(result.categories?.["visual-engineering"]?.model).toBe("zhipuai-coding-plan/glm-5.2")
+      expect(result.categories?.["unspecified-high"]?.model).toBe("zhipuai-coding-plan/glm-5.3")
+    })
+
+    test("prefers Z.ai over Zhipu when both coding plans are available", () => {
+      // given both the international and domestic Zhipu coding plans are available
+      const config = createConfig({ hasZaiCodingPlan: true, hasZhipuaiCodingPlan: true })
+
+      // when the generated model config is resolved
+      const result = generateModelConfig(config)
+
+      // then the international plan keeps chain priority
+      expect(result.agents?.sisyphus?.model).toBe("zai-coding-plan/glm-5.2")
     })
   })
 
@@ -357,6 +418,7 @@ describe("shouldShowChatGPTOnlyWarning", () => {
     { name: "Copilot", overrides: { hasCopilot: true } },
     { name: "OpenCode Zen", overrides: { hasOpencodeZen: true } },
     { name: "Z.ai Coding Plan", overrides: { hasZaiCodingPlan: true } },
+    { name: "Zhipu Coding Plan", overrides: { hasZhipuaiCodingPlan: true } },
     { name: "Kimi for Coding", overrides: { hasKimiForCoding: true } },
     { name: "OpenCode Go", overrides: { hasOpencodeGo: true } },
     { name: "Bailian Coding Plan", overrides: { hasBailianCodingPlan: true } },
