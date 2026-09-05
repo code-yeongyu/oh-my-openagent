@@ -65,6 +65,11 @@ const delegateTaskArgsSchema = {
     .describe("Skill names to inject. Optional; defaults to [] when omitted. Pass an explicit array (e.g. [\"git-master\"]) for skill-specific tasks."),
   description: tool.schema.string().optional().describe("Short task description (3-5 words). Auto-generated from prompt if omitted."),
   prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
+  directory: tool.schema
+    .string()
+    .min(1)
+    .optional()
+    .describe("Directory for the child session. Defaults to the parent session directory when omitted."),
   run_in_background: tool.schema
     .boolean()
     .optional()

@@ -252,6 +252,51 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     ])
   })
 
+  testFn("passes the explicit directory to BackgroundManager.launch", async () => {
+    //#given
+    const launchCalls: Array<{ directory?: string }> = []
+    const manager = {
+      launch: async (input: { directory?: string }) => {
+        launchCalls.push(input)
+        return {
+          id: "bg_directory",
+          sessionId: "ses_directory",
+          description: "Directory session",
+          agent: "explore",
+          status: "running",
+        }
+      },
+      getTask: () => ({ sessionId: "ses_directory" }),
+    }
+
+    //#when
+    await executeBackgroundTask(
+      {
+        description: "Directory session",
+        prompt: "check",
+        directory: "/worktree-a",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_directory",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_directory" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then
+    expectFn(launchCalls).toHaveLength(1)
+    expectFn(launchCalls[0].directory).toBe("/worktree-a")
+  })
+
   testFn("strips leading zwsp from agent name before launching background task", async () => {
     //#given - display-sorted agent names should be normalized before manager launch
     const launchCalls: unknown[] = []

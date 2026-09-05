@@ -57,6 +57,7 @@ export interface DelegateTaskArgs {
   description: string
   descriptionSource?: "explicit" | "generated"
   prompt: string
+  directory?: string
   category?: string
   subagent_type?: string
   requested_subagent_type?: string

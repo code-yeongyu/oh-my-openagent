@@ -8,12 +8,13 @@ export async function createSyncSession(
     parentSessionID: string
     agentToUse: string
     description: string
+    directory?: string
     defaultDirectory: string
     categoryModel?: DelegatedModelConfig
   }
-): Promise<{ ok: true; sessionID: string; parentDirectory: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; sessionID: string; sessionDirectory: string } | { ok: false; error: string }> {
   const parentSession = await client.session.get({ path: { id: input.parentSessionID } }).catch(() => null)
-  const parentDirectory = parentSession?.data?.directory ?? input.defaultDirectory
+  const sessionDirectory = input.directory ?? parentSession?.data?.directory ?? input.defaultDirectory
 
   const createResult = await client.session.create({
     body: {
@@ -31,7 +32,7 @@ export async function createSyncSession(
         : {}),
     } as Record<string, unknown>,
     query: {
-      directory: parentDirectory,
+      directory: sessionDirectory,
     },
   })
 
@@ -42,5 +43,5 @@ export async function createSyncSession(
     return { ok: false, error: "Failed to create session: missing session data" }
   }
 
-  return { ok: true, sessionID: createResult.data.id, parentDirectory }
+  return { ok: true, sessionID: createResult.data.id, sessionDirectory }
 }

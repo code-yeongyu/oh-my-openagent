@@ -212,6 +212,7 @@ export async function tryFallbackRetry(args: {
     description: task.description,
     prompt: task.prompt,
     agent: task.agent,
+    directory: task.directory,
     parentSessionId: task.parentSessionId,
     parentMessageId: task.parentMessageId,
     parentModel: task.parentModel,

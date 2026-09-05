@@ -21,6 +21,7 @@ type SyncTaskRunnerInput = {
   readonly fallbackChain: FallbackEntry[] | undefined
   readonly deps: SyncTaskDeps
   readonly sessionID: string
+  readonly sessionDirectory: string
   readonly spawnDepth: number
   readonly taskId: string
   readonly startTime: Date
@@ -73,6 +74,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
     agentToUse,
     fallbackChain,
     deps,
+    sessionDirectory,
     spawnDepth,
     taskId,
     startTime,
@@ -85,7 +87,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
     cleanupRetrySession,
     setSyncSessionID,
   } = input
-  const { client, directory, sisyphusAgentConfig } = executorCtx
+  const { client, sisyphusAgentConfig } = executorCtx
   const hasActiveChildBackgroundTasks = executorCtx.manager?.hasActiveChildTasks?.bind(executorCtx.manager)
   const hasPendingParentWake = executorCtx.manager?.hasPendingParentWake?.bind(executorCtx.manager)
   const deliverableTag = getDeliverableTag(agentToUse)
@@ -107,7 +109,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       agentToUse,
       args,
       systemContent,
-      directory,
+      directory: sessionDirectory,
       toastManager,
       taskId,
       sisyphusAgentConfig,
@@ -125,7 +127,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
             agentToUse,
             args,
             systemContent,
-            directory,
+            directory: sessionDirectory,
             toastManager,
             taskId,
             sisyphusAgentConfig,
@@ -183,7 +185,8 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
         parentSessionID: parentContext.sessionID,
         agentToUse,
         description: args.description,
-        defaultDirectory: directory,
+        directory: sessionDirectory,
+        defaultDirectory: sessionDirectory,
         categoryModel: nextFallbackModel,
       })
       if (!retrySessionResult.ok) {

@@ -287,6 +287,7 @@ describe("tryFallbackRetry", () => {
 
     test("preserves delegated launch context in retry input", async () => {
       const args = createDefaultArgs({
+        directory: "/worktree-a",
         skillContent: "delegated skill system",
         sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
       })
@@ -295,6 +296,7 @@ describe("tryFallbackRetry", () => {
 
       const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
       const retryInput = args.queuesByKey.get(key)?.[0]?.input
+      expect(retryInput?.directory).toBe("/worktree-a")
       expect(retryInput?.skillContent).toBe("delegated skill system")
       expect(retryInput?.sessionPermission).toEqual(QUESTION_DENIED_SESSION_PERMISSION)
     })

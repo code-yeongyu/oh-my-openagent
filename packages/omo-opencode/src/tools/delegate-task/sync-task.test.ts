@@ -180,6 +180,58 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(rollback).toHaveBeenCalledTimes(1)
   })
 
+  test("passes the explicit directory to sync session creation", async () => {
+    //#given
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_unused" } }),
+      },
+    }
+    const { executeSyncTask } = require("./sync-task")
+    let createInput: { directory?: string } | undefined
+    const deps = {
+      createSyncSession: async (_client: unknown, input: { directory?: string }) => {
+        createInput = input
+        return { ok: false as const, error: "stop after capture" }
+      },
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "unused" }),
+    }
+    const reserveSubagentSpawn = mock(async () => ({
+      spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+      descendantCount: 1,
+      commit: () => 1,
+      rollback: () => {},
+    }))
+
+    //#when
+    const result = await executeSyncTask({
+      prompt: "test prompt",
+      description: "test task",
+      directory: "/worktree-a",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+    }, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "sisyphus",
+      abort: new AbortController().signal,
+    }, {
+      manager: { reserveSubagentSpawn },
+      client: mockClient,
+      directory: "/fallback",
+    }, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+
+    //#then
+    expect(result).toBe("stop after capture")
+    expect(createInput?.directory).toBe("/worktree-a")
+  })
+
   test("recovers from MessageAbortedError poll error when result already exists", async () => {
     const mockClient = {
       session: {
@@ -609,94 +661,87 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(deleteCalls[0]).toBe("ses_test_12345678")
   })
 
-  test("retries sync session on retryable runtime session error using next fallback model", async () => {
-    const mockClient = {
-      session: {
-        create: async () => ({ data: { id: "ignored" } }),
-      },
-    }
-
+  test("preserves the effective child directory across sync retry session creation", async () => {
     const { executeSyncTask } = require("./sync-task")
-    const createdSessions: string[] = []
-    const attemptedModels: Array<{ providerID: string; modelID: string; variant?: string } | undefined> = []
-    const polledSessions: string[] = []
-
-    const deps = {
-      createSyncSession: async () => {
-        const sessionID = createdSessions.length === 0 ? "ses_first" : "ses_second"
-        createdSessions.push(sessionID)
-        return { ok: true as const, sessionID }
-      },
-      sendSyncPrompt: async (_client: unknown, input: { categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
-        attemptedModels.push(input.categoryModel)
-        return null
-      },
-      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
-        polledSessions.push(input.sessionID)
-        return input.sessionID === "ses_first"
-          ? "Forbidden: Selected provider is forbidden"
-          : null
-      },
-      fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
-    }
-
-    const metadataCalls: CapturedMetadata[] = []
-    const mockCtx = {
-      sessionID: "parent-session",
-      callID: "call-123",
-      metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
-    }
-
-    const mockExecutorCtx = {
-      client: mockClient,
-      directory: "/tmp",
-      onSyncSessionCreated: null,
-      modelFallbackControllerAccessor: {
-        setSessionFallbackChain: () => {},
-        clearSessionFallbackChain: () => {},
-      },
-    }
-
-    const args = {
-      prompt: "test prompt",
-      description: "test task",
-      category: "quick",
-      load_skills: [],
-      run_in_background: false,
-      command: null,
-    }
-
     const initialModel = {
-      providerID: "genai-proxy-openai",
-      modelID: "gpt-5.6-luna-fast",
+      providerID: "openai",
+      modelID: "gpt-5.6-luna",
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
-      { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
+      { providers: ["openai"], model: "gpt-5.6-luna" },
+      { providers: ["openai"], model: "gpt-5.6-terra" },
     ]
 
-    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
-      sessionID: "parent-session",
-    }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
+    async function runCase(explicitDirectory?: string): Promise<{
+      createdSessionDirectories: Array<string | undefined>
+      promptDirectories: string[]
+    }> {
+      const createdSessionDirectories: Array<string | undefined> = []
+      const promptDirectories: string[] = []
+      let createCount = 0
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/base" } }),
+          create: async (input: { query?: { directory?: string } }) => {
+            createdSessionDirectories.push(input.query?.directory)
+            createCount += 1
+            return { data: { id: createCount === 1 ? "ses_first" : "ses_second" } }
+          },
+        },
+      }
+      const deps = {
+        createSyncSession: require("./sync-session-creator").createSyncSession,
+        sendSyncPrompt: async (_client: unknown, input: { directory: string }) => {
+          promptDirectories.push(input.directory)
+          return null
+        },
+        pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
+          return input.sessionID === "ses_first"
+            ? "Forbidden: Selected provider is forbidden"
+            : null
+        },
+        fetchSyncResult: async (_client: unknown, sessionID: string) => ({
+          ok: true as const,
+          textContent: `Result from ${sessionID}`,
+        }),
+      }
 
-    expect(createdSessions).toEqual(["ses_first", "ses_second"])
-    expect(polledSessions).toEqual(["ses_first", "ses_second"])
-    expect(attemptedModels).toEqual([
-      { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast", variant: undefined },
-      { providerID: "genai-proxy-aws", modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0", variant: undefined },
-    ])
-    expect(result).toContain("Result from ses_second")
-    expect(deleteCalls).toContain("ses_first")
+      const result = await executeSyncTask({
+        prompt: "test prompt",
+        description: "test task",
+        category: "quick",
+        load_skills: [],
+        run_in_background: false,
+        command: null,
+        ...(explicitDirectory === undefined ? {} : { directory: explicitDirectory }),
+      }, {
+        sessionID: "parent-session",
+        callID: "call-123",
+        metadata: () => {},
+      }, {
+        client: mockClient,
+        directory: "/base",
+        onSyncSessionCreated: null,
+        modelFallbackControllerAccessor: {
+          setSessionFallbackChain: () => {},
+          clearSessionFallbackChain: () => {},
+        },
+      }, {
+        sessionID: "parent-session",
+      }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
 
-    const finalMetadata = metadataCalls[metadataCalls.length - 1]
-    expect(finalMetadata.metadata.sessionId).toBe("ses_second")
-    expect(finalMetadata.metadata.taskId).toBe("ses_second")
-    expect(finalMetadata.metadata.model).toEqual({
-      providerID: "genai-proxy-aws",
-      modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-      variant: undefined,
-    })
+      expect(result).toContain("Result from ses_second")
+      return { createdSessionDirectories, promptDirectories }
+    }
+
+    const explicit = await runCase("/worktree-a")
+    expect(explicit.createdSessionDirectories).toEqual(["/worktree-a", "/worktree-a"])
+    expect(explicit.promptDirectories).toEqual(["/worktree-a", "/worktree-a"])
+
+    const inherited = await runCase()
+    expect(inherited.createdSessionDirectories).toEqual(["/base", "/base"])
+    expect(inherited.promptDirectories).toEqual(["/base", "/base"])
   })
 
   test("#given sync poll hits subscription quota exhaustion #when a fallback chain exists #then retries on the next fallback model without changing generic stop semantics", async () => {
