@@ -39,6 +39,7 @@ export function createTeamModeToolsRecord(args: {
     team_approve_shutdown: factories.createTeamApproveShutdownTool(pluginConfig.team_mode, ctx.client),
     team_reject_shutdown: factories.createTeamRejectShutdownTool(pluginConfig.team_mode, ctx.client),
     team_send_message: factories.createTeamSendMessageTool(pluginConfig.team_mode, ctx.client),
+    team_read_messages: factories.createTeamReadMessagesTool(pluginConfig.team_mode),
     team_task_create: factories.createTeamTaskCreateTool(pluginConfig.team_mode, ctx.client),
     team_task_list: factories.createTeamTaskListTool(pluginConfig.team_mode, ctx.client),
     team_task_update: factories.createTeamTaskUpdateTool(pluginConfig.team_mode, ctx.client),

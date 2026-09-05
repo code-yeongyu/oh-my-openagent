@@ -66,7 +66,7 @@ export function createTeamCreateTool(
   deps: TeamCreateToolDeps = defaultTeamCreateToolDeps,
 ): ToolDefinition {
   return tool({
-    description: "Create a team run from a named or inline team spec.",
+    description: "Create a team run from a named or inline team spec. Pass either teamName (an existing saved team), inline_spec ({ name, members:[...] }), or the spec fields (name + members) directly at the top level — top-level name+members are folded into inline_spec automatically.",
     args: {
       teamName: tool.schema.string().optional().describe("Named team spec to load. Provide exactly one of teamName or inline_spec."),
       inline_spec: TeamCreateInlineSpecToolSchema.optional().describe("Inline team spec object or JSON string. Provide exactly one of teamName or inline_spec; members must be a flat array, e.g. { name: \"project-analysis-team\", members: [{ name: \"structure-analyst\", category: \"quick\", prompt: \"Analyze project structure.\" }] }."),
