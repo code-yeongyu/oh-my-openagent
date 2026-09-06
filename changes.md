@@ -653,3 +653,6 @@ budget a test grants a subprocess or timed promise; `test/test-timeout-budget.te
 reads both the configured value and the real budgets out of the test sources and
 fails if that ordering is ever reintroduced. Keep the bound proportionate: it
 exists to survive a cold Windows process spawn, not to hide a genuine hang.
+## 2026-09-06 — Keep lead polling alive through runtime access windows
+
+Lead polling now suppresses repeated `EPERM` and `EACCES` runtime-directory errors, reports the first unavailable transition and the subsequent recovery, and leaves mailbox state untouched while the runtime directory cannot be enumerated. Mailbox reads and missing-directory handling remain unchanged.

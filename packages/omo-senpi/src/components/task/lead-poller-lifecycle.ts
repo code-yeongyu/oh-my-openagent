@@ -60,6 +60,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
   let stopped = false
   let syncInFlight: Promise<readonly ActiveTeamSummary[]> | undefined
   let tickInFlight: Promise<void> | undefined
+  let runtimeUnavailable = false
 
   const synchronize = (): Promise<readonly ActiveTeamSummary[]> => {
     if (syncInFlight !== undefined) return syncInFlight
@@ -110,7 +111,23 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     if (deps.runtime.sessionFile() === undefined) return Promise.resolve()
     if (tickInFlight !== undefined) return tickInFlight
     const pending = (async () => {
-      const owned = await synchronize()
+      let owned: readonly ActiveTeamSummary[]
+      try {
+        owned = await synchronize()
+      } catch (error) {
+        if (!isRuntimeAccessError(error)) throw error
+        if (!runtimeUnavailable) {
+          runtimeUnavailable = true
+          deps.logger.warn("omo-senpi lead poller runtime unavailable", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+        return
+      }
+      if (runtimeUnavailable) {
+        runtimeUnavailable = false
+        deps.logger.info("omo-senpi lead poller runtime recovered")
+      }
       if (deps.runtime.sessionFile() === undefined) return
       if (isTransition(deps.runtime.parentState())) return
       for (const team of owned) {
@@ -240,6 +257,12 @@ function scheduleInterval(tick: () => void, intervalMs: number): () => void {
   const timer = setInterval(tick, intervalMs)
   timer.unref?.()
   return () => clearInterval(timer)
+}
+
+function isRuntimeAccessError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error
+    && "code" in error
+    && (error.code === "EACCES" || error.code === "EPERM")
 }
 
 function assertNever(value: never): never {
