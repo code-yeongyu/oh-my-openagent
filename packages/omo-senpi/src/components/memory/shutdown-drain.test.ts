@@ -50,7 +50,6 @@ function recordingSteps(order: string[], overrides: Partial<ShutdownDrainSteps> 
     flushJournal: async () => { order.push("a") },
     enqueueFinalDelta: async () => { order.push("b") },
     flushSkillsUsage: async () => { order.push("c-prime") },
-    launchFacts: async () => { order.push("c") },
     ...overrides,
   }
 }
@@ -83,7 +82,7 @@ describe("session shutdown drain budget", () => {
     expect(deadlineAt).toBe(11_500)
   })
 
-  test("#given a quit shutdown #when the drain runs #then steps run in the a, b, c-prime, c, d order", async () => {
+  test("#given a quit shutdown with facts threshold met #when the drain runs #then it enqueues but never launches facts before evaluators", async () => {
     // given
     const order: string[] = []
     const signals: AbortSignal[] = []
@@ -95,7 +94,7 @@ describe("session shutdown drain budget", () => {
     await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: openBudget(0), now: () => 0 })
 
     // then
-    expect(order).toEqual(["a", "b", "c-prime", "c", "d1", "d2"])
+    expect(order).toEqual(["a", "b", "c-prime", "d1", "d2"])
     expect(signals).toHaveLength(1)
     expect(signals[0]?.aborted).toBe(true)
   })
@@ -156,7 +155,7 @@ describe("session shutdown drain budget", () => {
     const drain = createShutdownDrain({
       logger,
       steps: recordingSteps(order, {
-        launchFacts: async () => { order.push("c"); clock = SESSION_SHUTDOWN_DRAIN_BUDGET_MS },
+        flushSkillsUsage: async () => { order.push("c-prime"); clock = SESSION_SHUTDOWN_DRAIN_BUDGET_MS },
       }),
     })
     let evaluated = false
@@ -174,7 +173,7 @@ describe("session shutdown drain budget", () => {
         reason: "quit",
         sessionId: SESSION,
         remainingMs: 0,
-        completedSteps: ["journal-flush", "facts-enqueue", "skills-usage-flush", "facts-launch"],
+        completedSteps: ["journal-flush", "facts-enqueue", "skills-usage-flush"],
       },
     }])
     expect(warningCalls).toHaveLength(0)
@@ -256,11 +255,11 @@ describe("session shutdown drain budget", () => {
     await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: openBudget(0), now: () => 0 })
 
     // then
-    expect(order).toEqual(["a", "b", "c-prime", "c", "d2"])
+    expect(order).toEqual(["a", "b", "c-prime", "d2"])
     expect(warnings).toHaveLength(1)
   })
 
-  test("#given a bound session with journal rows #when session_shutdown fires #then the drain runs before the session is released", async () => {
+  test("#given a bound session with journal rows and facts threshold met #when session_shutdown fires #then entries stay queued and no facts launch is invoked", async () => {
     // given
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-shutdown-")))
     tempDirs.push(root)
@@ -334,7 +333,7 @@ describe("session shutdown drain budget", () => {
     await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: openBudget(0), now: () => 0 })
 
     // then
-    expect(order).toEqual(["b", "c-prime", "c"])
+    expect(order).toEqual(["b", "c-prime"])
     expect(warnings).toHaveLength(1)
   })
 })

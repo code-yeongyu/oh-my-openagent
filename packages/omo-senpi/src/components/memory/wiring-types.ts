@@ -25,8 +25,6 @@ export interface MemoryWiringOptions {
   readonly createFactsExtractor?: (options: FactsExtractorRunnerOptions) => FactsExtractorPort
   /** Memorian gate runner seam; the live QA driver substitutes a scripted child here. */
   readonly createMemorianRunner?: (identity: MemoryIdentityContext) => MemorianGatePort
-  /** Boot-snapshot tool exposure; registration must not re-read config (latch order is observable). */
-  readonly toolExposure?: "direct" | "search"
   readonly now?: () => number
   readonly refreshStatus?: typeof refreshMemoryStatus
   /** Injectable animation timers; tests drive frames without touching the wall clock. */

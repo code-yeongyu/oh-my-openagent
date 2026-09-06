@@ -1,0 +1,1 @@
+/bin/bash: SENPI_BIN="$(command: command not found

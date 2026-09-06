@@ -4,13 +4,21 @@ import type { CreateAgentSessionOptions, ToolDefinition } from "@code-yeongyu/se
 
 import type { ResolvedModelRecord } from "../state"
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
-import { createChildHandle, createRestoredChildHandle, type ChildHandle, type ChildSession } from "./in-process/child-handle"
+import {
+  createChildHandle,
+  createRestoredChildHandle,
+  discardUnstartedChildSession,
+  type ChildHandle,
+  type ChildCompletionPolicy,
+  type ChildSession,
+} from "./in-process/child-handle"
 import { buildChildSessionOptions, requireChildSessionDir, resolveMemberScopedToolNames } from "./in-process/child-options"
 import { RunnerError } from "./in-process/runner-error"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
 
 export type {
   ChildHandle,
+  ChildCompletionPolicy,
   ChildSession,
   ChildSessionEvent,
   ChildSessionListener,
@@ -67,6 +75,23 @@ export type ChildSpec = {
   readonly agentType?: string
   readonly instructions?: string
   readonly prompt: string
+  /**
+   * System prompt that REPLACES senpi's default for this child: the minimal child loader returns
+   * it from getSystemPrompt(), and senpi's session construction uses a loader prompt INSTEAD of
+   * its dynamic default. Absent keeps the engine default for every existing caller.
+   */
+  readonly systemPrompt?: string
+  /**
+   * How `prompt` is delivered. "subagent" (the default) wraps it in the task ancestry envelope;
+   * "bare" passes it VERBATIM as the initial user message - for children whose prompt is a
+   * self-contained data block that must not be prefixed with "You are running as an omo
+   * senpi-task child" lines (the memorian judge persona/payload split).
+   */
+  readonly promptEnvelope?: "subagent" | "bare"
+  /**
+   * How the settled turn is judged: final-text (default) requires assistant text, turn treats any normally settled turn as completion - for tool-only children whose deliverable is a side effect.
+   */
+  readonly completion?: ChildCompletionPolicy
 }
 
 export type CreateChildSession = (options: CreateAgentSessionOptions) => Promise<ChildSession>
@@ -121,17 +146,32 @@ export class InProcessRunner {
       throw new RunnerError({ kind: "session-create-failed", message: sessionCreateMessage(error), cause: error })
     }
 
-    const promptText = buildSubagentPrompt({
-      taskId: spec.taskId,
-      parentSessionId: spec.parentSessionId,
-      rootSessionId: spec.rootSessionId,
-      depth: spec.depth,
-      prompt: spec.prompt,
-      ...(spec.agentType !== undefined && { agentType: spec.agentType }),
-      ...(spec.instructions !== undefined && { instructions: spec.instructions }),
-    })
+    // The bare envelope is the opt-out from the subagent ancestry wrapper: the spec's prompt is the
+    // whole user message, byte-identical. Every other value (including undefined) wraps it in the
+    // task envelope, which is what all existing callers rely on.
+    const promptText = spec.promptEnvelope === "bare"
+      ? spec.prompt
+      : buildSubagentPrompt({
+        taskId: spec.taskId,
+        parentSessionId: spec.parentSessionId,
+        rootSessionId: spec.rootSessionId,
+        depth: spec.depth,
+        prompt: spec.prompt,
+        ...(spec.agentType !== undefined && { agentType: spec.agentType }),
+        ...(spec.instructions !== undefined && { instructions: spec.instructions }),
+      })
 
-    return createChildHandle({ taskId: spec.taskId, session, promptText })
+    try {
+      return createChildHandle({
+        taskId: spec.taskId,
+        session,
+        promptText,
+        ...(spec.completion === undefined ? {} : { completion: spec.completion }),
+      })
+    } catch (error) {
+      discardUnstartedChildSession(session)
+      throw error
+    }
   }
 
   // Rebuild a persisted child from its session transcript WITHOUT replaying its prompt. The tool
@@ -160,7 +200,11 @@ export class InProcessRunner {
       throw new RunnerError({ kind: "session_unavailable", message: sessionResumeMessage(error), cause: error })
     }
 
-    return createRestoredChildHandle({ taskId: spec.taskId, session })
+    return createRestoredChildHandle({
+      taskId: spec.taskId,
+      session,
+      ...(spec.completion === undefined ? {} : { completion: spec.completion }),
+    })
   }
 }
 

@@ -204,6 +204,7 @@ export async function reattachManagedTask(input: {
   readonly isAttached: (taskId: string) => boolean
   readonly attachLive: (record: TaskRecord, handle: ManagedChildHandle) => () => void
   readonly detachLive: (taskId: string, handle: ManagedChildHandle, unsubscribe: () => void) => void
+  readonly destroyAttached: (taskId: string) => Promise<void>
   readonly armOutcome: (record: TaskRecord, handle: ManagedChildHandle, epoch: number) => void
 }): Promise<ReattachResult> {
   const fresh = input.store.load(input.record.task_id)
@@ -216,14 +217,14 @@ export async function reattachManagedTask(input: {
     return { ok: false, kind: "already_attached", reason: "task already has a live handle" }
   }
   let unsubscribe: (() => void) | undefined
+  let attached = false
   try {
     unsubscribe = input.attachLive(fresh, input.handle)
+    attached = true
     if (isTerminalRecord(fresh)) {
-      input.store.replace({
-        ...fresh,
-        updated_at: nowIso(input.now),
-        ...(input.handle.pid === undefined ? {} : { pid: input.handle.pid }),
-      })
+      if (input.handle.pid !== undefined) {
+        input.store.mutate(fresh.task_id, (current) => ({ ...current, pid: input.handle.pid }))
+      }
       return { ok: true }
     }
     const { error_message: _error, final_response: _final, killed: _killed, ...rest } = fresh
@@ -239,8 +240,9 @@ export async function reattachManagedTask(input: {
     input.armOutcome(reattached, input.handle, epoch)
     return { ok: true }
   } catch (error) {
+    if (attached) await input.destroyAttached(fresh.task_id)
+    else await discardManagedHandle(input.handle)
     if (unsubscribe !== undefined) input.detachLive(fresh.task_id, input.handle, unsubscribe)
-    await discardManagedHandle(input.handle)
     log("senpi-task reattach failed", { taskId: fresh.task_id, error: String(error) })
     return { ok: false, kind: "failed", reason: "manager reattach failed" }
   }

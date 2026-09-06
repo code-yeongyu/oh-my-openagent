@@ -1,0 +1,4 @@
+Command: bun test packages/omo-senpi/scripts/qa/isolation-state.test.mjs packages/omo-senpi/scripts/qa/isolation-state-races.test.mjs packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs packages/omo-senpi/scripts/qa/isolation-ultrabrain-blockers.test.mjs packages/omo-senpi/scripts/qa/task-13.test.ts
+Baseline production source: 9e8ec6eb97d41a70b9e410ec3667702be05cccde
+Result after tests were added and before production changes: 48 pass, 5 fail, 195 assertions across 5 files.
+The intended failures were: volatile sessions consumed maxEntries; missing and empty roots compared equal; a stale directory Dirent followed an external symlink; protected auth.json symlinks were followed; missing/arbitrary observation domains certified untouched.

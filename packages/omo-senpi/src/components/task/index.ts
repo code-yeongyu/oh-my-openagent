@@ -45,6 +45,8 @@ import { createTaskSkillLoader } from "./task-skill-loader"
 const TASK_ENABLED_FLAG = "omo-task"
 
 export { wireEventBridge } from "./event-bridge"
+export { createInProcessJudgeRunner, findModelReference } from "./judge-runner"
+export type { InProcessRunnerLike } from "./judge-runner"
 
 export interface TaskComponentOptions {
   // Project root the task engine anchors its state dir + omo.json load to. Defaults to the cwd the

@@ -1,11 +1,9 @@
 import type { FactsApplyRecovery, FactsQueue, MemoryIdentity } from "@oh-my-opencode/memory-core"
-import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
+import type { CreateChildSession, InProcessRunnerLike, SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { FactsFailurePort, FactsQueuedKey } from "./facts-failure-recording"
-import type { ResolveAndPreflightMemoryLaunch } from "./worker/memory-launch-preflight"
-import type { FactsSandbox } from "./worker/spawn"
 
 export type FactsLaunchResult =
   | { readonly status: "empty" | "active" | "skipped" }
@@ -14,20 +12,14 @@ export type FactsLaunchResult =
 
 export interface FactsExtractorRunnerOptions {
   readonly identity: MemoryIdentity
-  readonly queue?: FactsQueue
   readonly cwd: string
+  readonly queue?: FactsQueue
   readonly loadConfig: () => SenpiOmoConfigResult
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined
   readonly logger?: ComponentLogger
   readonly env?: NodeJS.ProcessEnv
   readonly deadlineMs?: number
   readonly terminationGraceMs?: number
-  readonly maxOutputBytes?: number
-  readonly senpiCommand?: string
-  readonly senpiPrefixArgs?: readonly string[]
-  readonly resolveAndPreflightLaunch?: ResolveAndPreflightMemoryLaunch
-  readonly supervisorPath?: string
-  readonly sandbox?: FactsSandbox
   readonly now?: () => Date
   readonly createBatchId?: () => string
   readonly withWriterLock?: <T>(operation: () => Promise<T>, attempt: number) => Promise<T>
@@ -40,6 +32,8 @@ export interface FactsExtractorRunnerOptions {
   /** Post-sentinel artifact deletion seam; tests observe the ordering and inject failures. */
   readonly removeRunArtifact?: (path: string) => Promise<void>
   readonly createPreflightId?: () => string
+  readonly createSession?: CreateChildSession
+  readonly createRunner?: (options: { readonly createSession?: CreateChildSession }) => InProcessRunnerLike
 }
 
 export interface FactsRunLedger {

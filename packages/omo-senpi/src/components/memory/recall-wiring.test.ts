@@ -17,6 +17,7 @@ import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
+import { NUDGED_ENTRY_TYPE } from "./memorian-notice"
 import { RECALL_CUSTOM_TYPE, createMemoryRecallWiring } from "./recall-wiring"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
@@ -206,7 +207,7 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
     await dispatch(pi, eventContext([userEntry("m1", "anything at all")]))
 
     // then
-    expect(pi.entries).toEqual([{ customType: RECALL_CUSTOM_TYPE, data: { paths: [ROLLOUTS_PATH] } }])
+    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE] } }])
   }, 30_000)
 
   test("#given a failing ledger #when a nudge is injected #then the injection still lands and the failure is logged", async () => {
@@ -320,7 +321,7 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
     const { repo, context } = await fixture()
     await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE], { epoch: 0 })
 
-    for (const sentinel of ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS", "SENPI_MEMORY_MEMORIAN"]) {
+    for (const sentinel of ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"]) {
       const pi = new MemoryFakeExtensionAPI()
       wiringFor({ repo, identity: context, env: { [sentinel]: "1" } }).register(pi)
 
@@ -491,7 +492,7 @@ describe("createMemoryRecallWiring collectCandidates", () => {
     const { repo, context } = await fixture()
     const reflection = wiringFor({ repo, identity: context, env: { SENPI_MEMORY_REFLECTION: "1" } })
     const facts = wiringFor({ repo, identity: context, env: { SENPI_MEMORY_FACTS: "1" } })
-    const memorian = wiringFor({ repo, identity: context, env: { SENPI_MEMORY_MEMORIAN: "1" } })
+    const memorian = wiringFor({ repo, identity: context, env: { SENPI_MEMORY_FACTS: "1" } })
 
     // when
     const ctx = eventContext([userEntry("m1", KUBERNETES_PROMPT)])

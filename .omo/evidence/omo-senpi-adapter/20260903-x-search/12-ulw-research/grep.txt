@@ -1,0 +1,16 @@
+$ grep -n -F "X / social (`x_search`" packages/omo-senpi/plugin/skills/ulw-research/SKILL.md
+190:- **X / social (`x_search`, only when xAI is connected).** Run `tool_search "X posts"` first; if `x_search` activates, read the x-search skill and run the lane with its rules: from_date >= yesterday for time-sensitive topics (widen to 7 days), allowed_x_handles for the trusted accounts the brief names, latest/recent phrasing with since:/from:/filter: operators, 2-3 split searches (by handle, by keyword), one x_search call per search; give the lane to a `librarian` lane or a category member (curated explore cannot call it); record the `Queries used:` trailer as provenance and reconcile every X-only claim against the web lane before it enters the claim graph. If `tool_search` finds nothing, xAI is not connected: record `x_search: unavailable` in the brief and skip the lane.
+
+$ grep -n -F "X/social signal" packages/omo-senpi/plugin/skills/ulw-research/SKILL.md
+80:Codebase relevant: <yes/no> · External: <yes/no> · Browsing: <yes/no> · Verification likely: <yes/no> · X/social signal: <yes/no>
+181:X lanes is 1 on every row when the brief says `X/social signal: yes` and 0 otherwise; the `(+1)` in the floor column applies only in the yes case, so a `Multi-faceted` run with X signal must field 18 workers, not 17.
+
+$ grep -n -F "X lanes" packages/omo-senpi/plugin/skills/ulw-research/SKILL.md
+173:| Query scope | explore lanes | librarian lanes | browsing lanes | repo-dive lanes | X lanes | team members | floor |
+181:X lanes is 1 on every row when the brief says `X/social signal: yes` and 0 otherwise; the `(+1)` in the floor column applies only in the yes case, so a `Multi-faceted` run with X signal must field 18 workers, not 17.
+
+$ grep -n -F "X search operators" packages/omo-senpi/plugin/skills/ulw-research/SKILL.md
+377:- X search operators: `since:YYYY-MM-DD until:YYYY-MM-DD from:handle filter:links -filter:replies lang:ko`; always phrase time-sensitive queries as latest/recent.
+
+$ diff source vs shipped (blank-line normalized)
+IDENTICAL

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { realpathSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { basename, join, relative, sep } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import test from "node:test";
 
 import { installCachedPlugin } from "./install-dist/install-local.mjs";
@@ -164,6 +164,32 @@ test("#given packaged root CLI runtimes #when caching omo plugin #then root dist
 	// then
 	assert.equal(await readFile(join(installed.path, "dist", "cli", "index.js"), "utf8"), "console.log('omo')\n");
 	assert.equal(await readFile(join(installed.path, "dist", "cli-node", "index.js"), "utf8"), "console.log('omo node')\n");
+});
+
+test("#given packaged prompts-core directive #when caching omo plugin #then the ultrawork directive is materialized into the plugin cache", async () => {
+	// given
+	const root = await makeTempDir();
+	const repoRoot = join(root, "repo");
+	const codexHome = join(root, "codex-home");
+	const sourceRoot = join(repoRoot, "packages", "omo-codex", "plugin");
+	const directiveRelativePath = join("packages", "prompts-core", "prompts", "ultrawork", "codex.md");
+	await mkdir(sourceRoot, { recursive: true });
+	await mkdir(dirname(join(repoRoot, directiveRelativePath)), { recursive: true });
+	await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }));
+	await writeFile(join(repoRoot, directiveRelativePath), "# ultrawork directive\n");
+
+	// when
+	const installed = await installCachedPlugin({
+		codexHome,
+		marketplaceName: "sisyphuslabs",
+		name: "omo",
+		sourcePath: sourceRoot,
+		version: "0.1.0",
+		runCommand: async () => {},
+	});
+
+	// then
+	assert.equal(await readFile(join(installed.path, directiveRelativePath), "utf8"), "# ultrawork directive\n");
 });
 
 test("#given existing cache #when npm install fails #then previous active cache is preserved", async () => {

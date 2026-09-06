@@ -1,0 +1,12 @@
+# RED/GREEN for the shape-test assertion that both release steps carry `set -euo pipefail`.
+# mengmotaMac via bunshin, bun invoked by absolute path (~/.bun/bin/bun 1.4.0), hermetic dir swept.
+
+GREEN - guard present in both steps:
+  9 pass / 0 fail, 73 expect() calls, GREEN_EXIT=0
+
+RED - mutation: the guard line removed from ONLY the two release steps
+     (guard_hits_in_release_steps_after_strip=0; the workflow's 9 other uses left intact):
+  8 pass / 1 fail, 68 expect() calls, RED_EXIT=1
+  failing assertion: script/omo-ai-publish-shape.test.ts:117  expect(run).toContain("set -euo pipefail")
+
+# The assertion fails for exactly the regression it names, and only that one test moves.

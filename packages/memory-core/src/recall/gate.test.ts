@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs"
 import { mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { PendingNudges, parseNudgeLines, validateNudges } from "./gate"
+import { PendingNudges, validateNudges } from "./gate"
 
 const tempDirs: string[] = []
 
@@ -17,52 +17,6 @@ afterEach(async () => {
   await Promise.all(
     tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
   )
-})
-
-describe("parseNudgeLines", () => {
-  it("#given well-formed NDJSON #when parsed #then every nudge is returned in order", () => {
-    // given
-    const raw = `{"path":"reference/a.md","hint":"alpha"}\n{"path":"notes/b.md","hint":"beta"}\n`
-
-    // when
-    const nudges = parseNudgeLines(raw)
-
-    // then
-    expect(nudges).toEqual([
-      { path: "reference/a.md", hint: "alpha" },
-      { path: "notes/b.md", hint: "beta" },
-    ])
-  })
-
-  it("#given malformed and non-conforming lines #when parsed #then only valid lines survive", () => {
-    // given
-    const raw = [
-      "{not json",
-      `{"path":"reference/a.md","hint":"alpha"}`,
-      `{"path":"reference/c.md"}`,
-      `{"hint":"orphan"}`,
-      `["reference/d.md","hint"]`,
-      `{"path":"","hint":"empty"}`,
-      `{"path":"reference/e.md","hint":""}`,
-      "   ",
-      `{"path":"notes/b.md","hint":"beta","extra":1}`,
-    ].join("\n")
-
-    // when
-    const nudges = parseNudgeLines(raw)
-
-    // then
-    expect(nudges).toEqual([
-      { path: "reference/a.md", hint: "alpha" },
-      { path: "notes/b.md", hint: "beta" },
-    ])
-  })
-
-  it("#given empty output #when parsed #then the result is empty", () => {
-    // given / when / then
-    expect(parseNudgeLines("")).toEqual([])
-    expect(parseNudgeLines("\n\n")).toEqual([])
-  })
 })
 
 describe("validateNudges", () => {

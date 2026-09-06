@@ -25,6 +25,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import ptyFixture from "./release-binary-pty-fixture.json"
+import { parseBuildInfo, type OmoBuildInfo } from "../packages/omo-native/build-info"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
@@ -126,8 +127,11 @@ export function relPathForEmbeddedName(embeddedName: string): string | undefined
 }
 
 /** Stamped sibling package.json the engine reads for its version contract. */
-export function createStampedPackageJson(omoAiVersion: string): string {
-  return `${JSON.stringify({ name: "omo", version: omoAiVersion }, null, 2)}\n`
+export function createStampedPackageJson(omoAiVersion: string, buildInfo?: OmoBuildInfo): string {
+  const stamped = buildInfo === undefined
+    ? { name: "omo", version: omoAiVersion }
+    : { name: "omo", version: omoAiVersion, omoBuild: buildInfo }
+  return `${JSON.stringify(stamped, null, 2)}\n`
 }
 
 /** Lists every file under `stageDir` as sorted POSIX-relative paths. */
@@ -158,6 +162,7 @@ export interface RuntimeManifest {
   readonly omoAiVersion: string
   readonly enginePin: string
   readonly manifestSha: string
+  readonly buildInfo?: OmoBuildInfo
   readonly entries: readonly RuntimeManifestEntry[]
 }
 
@@ -168,7 +173,7 @@ function sha256OfFile(filePath: string): string {
 /** Builds the embedded runtime manifest for a staged payload directory. */
 export async function buildRuntimeManifest(
   stageDir: string,
-  options: { readonly omoAiVersion: string; readonly enginePin: string },
+  options: { readonly omoAiVersion: string; readonly enginePin: string; readonly buildInfo?: OmoBuildInfo },
 ): Promise<RuntimeManifest> {
   const entries: RuntimeManifestEntry[] = collectStagedFiles(stageDir)
     .filter((relPath) => relPath !== RUNTIME_MANIFEST_REL_PATH)
@@ -182,16 +187,14 @@ export async function buildRuntimeManifest(
         size: stats.size,
       }
     })
-  const manifestSha = createHash("sha256")
-    .update(
-      JSON.stringify({
-        omoAiVersion: options.omoAiVersion,
-        enginePin: options.enginePin,
-        entries,
-      }),
-    )
-    .digest("hex")
-  return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, entries }
+  const digestPayload = options.buildInfo === undefined
+    ? { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, entries }
+    : { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, buildInfo: options.buildInfo, entries }
+  const manifestSha = createHash("sha256").update(JSON.stringify(digestPayload)).digest("hex")
+  if (options.buildInfo === undefined) {
+    return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, entries }
+  }
+  return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, buildInfo: options.buildInfo, entries }
 }
 
 /** Fails loud when a compiled binary exceeds the per-binary size budget. */
@@ -344,9 +347,9 @@ function engineSidecarSources(): SidecarSource[] {
   return sources
 }
 
-// Mirrors PAYLOAD_DIRECTORIES / PAYLOAD_FILES in script/build-omo-native.ts.
-const PLUGIN_PAYLOAD_DIRECTORIES = ["extensions", "skills", "runtime"] as const
-const PLUGIN_PAYLOAD_FILES = ["package.json", "README.md", "NOTICE", "LICENSE"] as const
+// Mirrors PAYLOAD_DIRECTORIES / PAYLOAD_FILES in script/build-omo-native.ts (locked by build-omo-binary.test.ts).
+export const PLUGIN_PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
+export const PLUGIN_PAYLOAD_FILES = ["package.json", "README.md", "NOTICE", "LICENSE"] as const
 
 const EXPORT_HTML_KEEP = new Set([
   "template.html",
@@ -545,10 +548,11 @@ export function stageSidecarPayload(
   target: ReleaseBinaryTarget,
   stageDir: string,
   omoAiVersion: string,
+  buildInfo?: OmoBuildInfo,
 ): string[] {
   mkdirSync(stageDir, { recursive: true })
   const staged = new Set<string>()
-  writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion), "utf8")
+  writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo), "utf8")
   staged.add("package.json")
   for (const source of engineSidecarSources()) stageSource(source, stageDir, staged)
   stagePluginPayload(stageDir, staged)
@@ -560,6 +564,7 @@ export interface BuildReleaseBinaryOptions {
   readonly omoVersion: string
   readonly omoAiVersion: string
   readonly outDir?: string
+  readonly buildInfo?: OmoBuildInfo
 }
 
 export interface BuildReleaseBinaryResult {
@@ -589,11 +594,12 @@ export async function buildReleaseBinary(
     // spelling. Basename is preserved, so embedded names stay
     // `${EMBEDDED_PAYLOAD_ROOT}/<relPath>`.
     const stageDir = realpathSync(stagedRoot)
-    stageSidecarPayload(target, stageDir, options.omoAiVersion)
+    stageSidecarPayload(target, stageDir, options.omoAiVersion, options.buildInfo)
 
     const manifest = await buildRuntimeManifest(stageDir, {
       omoAiVersion: options.omoAiVersion,
       enginePin: target.enginePin,
+      buildInfo: options.buildInfo,
     })
     writeFileSync(
       join(stageDir, RUNTIME_MANIFEST_REL_PATH),
@@ -659,6 +665,13 @@ interface CliOptions {
   readonly omoVersion: string
   readonly omoAiVersion: string
   readonly outDir: string | undefined
+  readonly buildInfo: OmoBuildInfo | undefined
+}
+
+function parseBuildInfoValue(raw: string): OmoBuildInfo {
+  const parsed = parseBuildInfo(JSON.parse(raw))
+  if (parsed === undefined) throw new Error("--build-info is not a valid OmoBuildInfo payload")
+  return parsed
 }
 
 function parseArgs(argv: readonly string[]): CliOptions {
@@ -666,6 +679,7 @@ function parseArgs(argv: readonly string[]): CliOptions {
   let omoVersion: string | undefined
   let omoAiVersion: string | undefined
   let outDir: string | undefined
+  let buildInfo: OmoBuildInfo | undefined
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
     const value = argv[index + 1]
@@ -680,6 +694,10 @@ function parseArgs(argv: readonly string[]): CliOptions {
     } else if (argument === "--omo-ai-version") {
       if (value === undefined) throw new Error("--omo-ai-version requires a value")
       omoAiVersion = value
+      index += 1
+    } else if (argument === "--build-info") {
+      if (value === undefined) throw new Error("--build-info requires a value")
+      buildInfo = parseBuildInfoValue(value)
       index += 1
     } else if (argument === "--out-dir") {
       if (value === undefined) throw new Error("--out-dir requires a value")
@@ -696,7 +714,7 @@ function parseArgs(argv: readonly string[]): CliOptions {
       ? RELEASE_BINARY_TARGETS
       : RELEASE_BINARY_TARGETS.filter((entry) => entry.target === targetName)
   if (targets.length === 0) throw new Error(`unknown target: ${targetName}`)
-  return { targets, omoVersion, omoAiVersion, outDir }
+  return { targets, omoVersion, omoAiVersion, outDir, buildInfo }
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -706,6 +724,7 @@ async function main(argv: readonly string[]): Promise<number> {
       omoVersion: options.omoVersion,
       omoAiVersion: options.omoAiVersion,
       outDir: options.outDir,
+      buildInfo: options.buildInfo,
     })
     console.log(
       `built ${result.target}: ${result.binaryPath} (${result.size} bytes, ${result.manifest.entries.length} embedded sidecar files)`,

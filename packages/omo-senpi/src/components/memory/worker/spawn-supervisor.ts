@@ -10,7 +10,6 @@ import {
   type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
-import type { FactsQueuedKey } from "../facts-failure-recording"
 import { requireRunMetadata } from "./spawn-metadata"
 import { waitForRunCompletion } from "./run-sentinel"
 import {
@@ -20,9 +19,6 @@ import {
   readTail,
 } from "./spawn-supervisor-support"
 import type {
-  FactsRunLedgerEnvelope,
-  FactsSandbox,
-  FactsSpawnArgs,
   ReflectionChildResult,
   ReflectionSandbox,
   ReflectionSpawnArgs,
@@ -100,62 +96,6 @@ export async function runReflectionChild(
   })
 }
 
-export async function runFactsChild(
-  spawnArgs: FactsSpawnArgs,
-  options: {
-    readonly terminationGraceMs?: number
-    readonly maxOutputBytes?: number
-    readonly sandbox?: FactsSandbox
-    readonly supervisorPath?: string
-    readonly now?: () => number
-    readonly batchId: string
-    readonly queued: readonly FactsQueuedKey[]
-  },
-): Promise<ReflectionChildResult> {
-  const graceMs = options.terminationGraceMs ?? DEFAULT_GRACE_MS
-  const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES
-  if (graceMs < 0 || maxOutputBytes <= 0) throw new TypeError("facts spawn limits are invalid")
-  const prepared = await (options.sandbox ?? passthroughFactsSandbox)(spawnArgs)
-  const launchedAt = (options.now ?? Date.now)()
-  // The absolute deadline anchors to the enforcing supervisor's wall clock, never to the
-  // parent's logical clock: an injected now() may sit arbitrarily in the past, which would
-  // make the supervisor fire the deadline at spawn and always report a timeout.
-  if (!Number.isFinite(prepared.hardDeadlineAt) || prepared.hardDeadlineAt <= 0) {
-    throw new TypeError("facts deadline must be positive")
-  }
-  return runSupervisedChild({
-    runDir: prepared.paths.runDir,
-    runId: prepared.runId,
-    kind: "facts",
-    command: prepared.command,
-    args: prepared.args,
-    cwd: prepared.cwd,
-    env: prepared.env,
-    attempt: prepared.attempt,
-    model: prepared.model,
-    thinking: prepared.thinking,
-    nextAttempt: prepared.nextAttempt,
-    hardDeadlineAt: prepared.hardDeadlineAt,
-    terminationGraceMs: graceMs,
-    maxOutputBytes,
-    supervisorPath: options.supervisorPath,
-    ledger: {
-      version: 1,
-      runId: prepared.runId,
-      kind: "facts",
-      startedAt: new Date(launchedAt).toISOString(),
-      attempt: prepared.attempt,
-      model: prepared.model,
-      ...(prepared.thinking === undefined ? {} : { thinking: prepared.thinking }),
-      hardDeadlineAt: prepared.hardDeadlineAt,
-      terminationGraceMs: graceMs,
-      deadlineAt: prepared.hardDeadlineAt + graceMs,
-      batchId: options.batchId,
-      queued: options.queued,
-    } satisfies FactsRunLedgerEnvelope,
-  })
-}
-
 async function runSupervisedChild(input: {
   readonly runDir: string
   readonly runId: string
@@ -163,7 +103,7 @@ async function runSupervisedChild(input: {
   readonly model: string
   readonly thinking?: string
   readonly nextAttempt?: RunLaunchManifest["nextAttempt"]
-  readonly kind: "reflection" | "dream" | "facts"
+  readonly kind: "reflection" | "dream"
   readonly command: string
   readonly args: readonly string[]
   readonly cwd: string
@@ -280,9 +220,5 @@ async function runSupervisedChild(input: {
 }
 
 function passthroughSandbox(spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs {
-  return spawnArgs
-}
-
-function passthroughFactsSandbox(spawnArgs: FactsSpawnArgs): FactsSpawnArgs {
   return spawnArgs
 }

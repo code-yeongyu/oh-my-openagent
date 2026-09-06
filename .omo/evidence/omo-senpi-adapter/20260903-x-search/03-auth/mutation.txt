@@ -1,0 +1,25 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/auth.test.ts:
+(pass) xAI auth > stored credential uses registry bearer [0.45ms]
+error: expect(received).toBeUndefined()
+
+Received: {
+  bearer: "mutated",
+  provenance: "env",
+}
+
+(fail) xAI auth > stored credential failure fails closed [1.88ms]
+(pass) xAI auth > no stored credential uses trimmed env [0.10ms]
+(pass) xAI auth > neither source is undefined [0.07ms]
+(pass) xAI auth > credential gate recognizes oauth and api_key [1.02ms]
+(pass) xAI auth > gate handles missing, invalid, and unknown entries [0.58ms]
+(pass) xAI auth > env gates missing file [0.06ms]
+
+ 6 pass
+ 1 fail
+ 10 expect() calls
+Ran 7 tests across 1 file. [513.00ms]
+EXIT:1
+
+Mutation target: stored credential + registry throw expected undefined; mutated fallback returned a bearer and the assertion failed.

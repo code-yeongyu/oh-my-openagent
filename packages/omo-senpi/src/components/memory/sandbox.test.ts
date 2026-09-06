@@ -83,6 +83,35 @@ function build(policy: SandboxPolicy, options: {
 }
 
 describe("reflection worker OS sandbox", () => {
+  test("#given the reflection sandbox transform with the agent dir in runtimeWrites #when the Darwin profile is generated #then the whole agent dir is writable, so every senpi lock file under it (settings, auth, hooks-state) is too", () => {
+    // given: identity-runtime passes resolveAgentDir() through runtimeWrites; the transform itself
+    // never resolves the agent home (that would read process-wide state the caller never passed).
+    const { setup } = build("required", { platform: "darwin", which: () => "/usr/bin/sandbox-exec" })
+    const agentDir = join(setup.root, "agent")
+    mkdirSync(agentDir, { recursive: true })
+    const transform = buildSandboxTransform({
+      policy: "required",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: setup.payloadPaths,
+      runtimeWrites: [agentDir],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      platform: "darwin",
+      which: () => "/usr/bin/sandbox-exec",
+    })
+
+    // when
+    const profile = transform(spawnArgs(setup.worktree)).args[1] ?? ""
+
+    // then: one subpath grant on the agent dir covers settings.json.lock, auth.json.lock and hooks-state.json.lock
+    const realAgentDir = realpathSync(agentDir)
+    expect(profile).toContain(`(allow file-write* (subpath ${JSON.stringify(realAgentDir)}))`)
+    for (const lock of ["settings.json.lock", "auth.json.lock", "hooks-state.json.lock"]) {
+      expect(dirname(join(realAgentDir, lock))).toBe(realAgentDir)
+    }
+  }, 30_000)
+
   test.skipIf(process.platform !== "darwin" || !existsSync("/usr/bin/sandbox-exec"))(
     "#given the real Darwin seatbelt #when a child writes inside the worktree and its parent repo #then only the worktree write succeeds",
     () => {

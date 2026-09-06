@@ -1,0 +1,7 @@
+$ bun -e ...old explore target assertion
+1 | import { scenarioTarget } from "./packages/omo-senpi/scripts/qa/x-search-live-e2e.mjs"; const actual = scenarioTarget("explore"); if (JSON.stringify(actual) !== JSON.stringify({ category: "quick" })) throw new Error(`Expected old category target, received ${JSON.stringify(actual)}`)
+                                                                                                                                                                                                                      ^
+error: Expected old category target, received {"subagent_type":"explore"}
+      at /Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/[eval]:1:211
+
+Bun v1.4.0 (macOS arm64)

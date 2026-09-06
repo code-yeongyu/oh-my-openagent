@@ -110,6 +110,13 @@ function foldSendOutcome(
         settled: watchRevived?.(nodeId, taskId) ?? watchRevivedTask(options, nodeId, taskId),
       }
     }
+    case "delivery_uncertain":
+      throw new DagNodeControlError({
+        code: "node_not_continuable",
+        message: `dag node "${nodeId}" has uncertain delivery for task ${taskId}: ${outcome.reason} ${outcome.suggestion}`,
+        runId,
+        nodeIds: [nodeId],
+      })
     case "capacity_deferred":
       throw new DagNodeControlError({
         code: "node_not_continuable",

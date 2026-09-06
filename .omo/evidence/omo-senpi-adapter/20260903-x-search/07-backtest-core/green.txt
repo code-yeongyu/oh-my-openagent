@@ -1,0 +1,14 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest-core.test.mjs:
+(pass) x-search backtest core > extracts tweet ids recursively and metrics handle empty sets [0.54ms]
+(pass) x-search backtest core > aggregates numeric values only and exposes lane statuses [0.26ms]
+(pass) x-search backtest core > fixture keys are canonical and estimates fail closed [2.57ms]
+(pass) x-search backtest core > cost guard reserves ceiling and reconciliation marks exceeded [0.16ms]
+(pass) x-search backtest core > redacts secret keys and sentinel strings recursively [0.20ms]
+(pass) x-search backtest core > web overlap normalizes words and validates queries/materializes dates [0.30ms]
+
+ 6 pass
+ 0 fail
+ 20 expect() calls
+Ran 6 tests across 1 file. [1.83s]

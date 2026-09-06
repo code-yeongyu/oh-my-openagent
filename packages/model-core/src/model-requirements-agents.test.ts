@@ -149,7 +149,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("prometheus uses Fable 5 xhigh before Kimi K3 max", () => {
+  test("prometheus uses Fable 5.1 xhigh before Kimi K3 max", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
@@ -160,7 +160,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(prometheus.fallbackChain).toHaveLength(2)
     expect(primary).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
-          model: "claude-fable-5",
+          model: "claude-fable-5-1",
           variant: "xhigh",
         })
     expect(kimiFallback).toEqual({
@@ -191,33 +191,28 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("momus keeps native gpt-5.6-terra high before gpt-5.6-sol xhigh", () => {
+  test("momus leads with native gpt-6-astra xhigh before the Copilot and opencode Astra rungs", () => {
     // given
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
     // when
-    const [primary, copilot, solFallback, copilotSolFallback, opusFallback] = momus.fallbackChain
+    const [primary, copilot, astraHighFallback, opusFallback] = momus.fallbackChain
 
     // then
     expect(momus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
           providers: ["openai", "openai-codex"],
-          model: "gpt-5.6-terra",
-          variant: "high",
+          model: "gpt-6-astra",
+          variant: "xhigh",
         })
     expect(copilot).toEqual({
           providers: ["github-copilot"],
-          model: "gpt-5.6-terra",
+          model: "gpt-6-astra",
           variant: "high",
         })
-    expect(solFallback).toEqual({
+    expect(astraHighFallback).toEqual({
           providers: ["openai", "openai-codex", "opencode"],
-          model: "gpt-5.6-sol",
-          variant: "xhigh",
-        })
-    expect(copilotSolFallback).toEqual({
-          providers: ["github-copilot"],
-          model: "gpt-5.6-sol",
+          model: "gpt-6-astra",
           variant: "high",
         })
     expect(opusFallback).toEqual({
@@ -225,6 +220,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
           model: "claude-opus-5",
           variant: "max",
         })
+    expect(momus.fallbackChain.some((entry) => entry.model.startsWith("gpt-5.6-"))).toBe(false)
   })
 
   test("atlas keeps sonnet, kimi, gpt-5.6-sol, and minimax fallback order", () => {

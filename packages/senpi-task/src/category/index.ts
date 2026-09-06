@@ -5,7 +5,7 @@ export {
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
-  categoryGateModel,
+  categoryGateModels,
   isCategoryChainRungResolvable,
   isCategoryChainViable,
   isCategoryGateSatisfied,

@@ -213,13 +213,14 @@ describe("memory write notice gathering", () => {
     expect(result.details.writeNotice).toBeUndefined()
   }, 60_000)
 
-  test("#given memory_apply_patch commits #when the result is built #then it carries the same notice payload shape", async () => {
+  test("#given memory apply_patch commits #when the result is built #then it carries the same notice payload shape", async () => {
     // given
     const fixture = await boundFixture()
-    const [, applyPatchTool] = toolsFor(fixture)
+    const [applyPatchTool] = toolsFor(fixture)
 
     // when
     const result = await applyPatchTool.execute("call-1", {
+      command: "apply_patch",
       reason: "Patch a new block",
       input: [
         "*** Begin Patch",

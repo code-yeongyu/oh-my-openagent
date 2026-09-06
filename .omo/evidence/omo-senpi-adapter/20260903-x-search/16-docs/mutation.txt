@@ -1,0 +1,5 @@
+Todo 16 has no mutation gate. Documentation wording is not a machine-consumed assertion; no test was added to pin it.
+
+Named check under mutation: none. Restoring prose is N/A.
+
+The live named check (`bun run build:senpi-plugin`) exited 0 before and after this todo's doc edits because adapter sources were already bundled (plugin/extensions/*.js sha256 unchanged). That is the observed result, not a killed assertion.

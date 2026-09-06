@@ -7,6 +7,9 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 // bypass. This predicate matches on the REGISTERED TOOL NAME, so it must track any rename of that
 // tool - it was `dag` before the workflow rename.
 
+// Children have no tool_search builtin; thread_* tools are intentionally excluded.
+export const CHILD_DIRECT_EXPOSURE_TOOL_NAMES: ReadonlySet<string> = new Set(["x_search"])
+
 export type SharedToolFilterOptions = {
   readonly uiOnlyToolNames?: Iterable<string>
 }
@@ -20,7 +23,13 @@ export function filterSharedParentTools(
   options: SharedToolFilterOptions = {},
 ): ToolDefinition[] {
   const uiOnly = new Set(options.uiOnlyToolNames ?? [])
-  return tools.filter((tool) => !isTaskOrTeamFamilyTool(tool.name) && !uiOnly.has(tool.name))
+  return tools
+    .filter((tool) => !isTaskOrTeamFamilyTool(tool.name) && !uiOnly.has(tool.name))
+    .map((tool) =>
+      CHILD_DIRECT_EXPOSURE_TOOL_NAMES.has(tool.name) && tool.exposure === "search"
+        ? { ...tool, exposure: "direct" }
+        : tool,
+    )
 }
 
 export function mergeChildCustomTools(

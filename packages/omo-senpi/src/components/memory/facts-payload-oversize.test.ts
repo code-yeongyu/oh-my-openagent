@@ -60,7 +60,11 @@ function warnCollector() {
 async function queueFileNames(identity: MemoryIdentity): Promise<string[]> {
   const layout = factsQueuePaths(identity.paths)
   return (await readdir(layout.queueDir).catch(() => []))
-    .filter((name) => name.endsWith(".json") && name !== "consumed.json" && name !== "failures.json")
+    .filter((name) =>
+      name.endsWith(".json") &&
+      name !== "consumed.json" &&
+      name !== "failures.json" &&
+      name !== "claims.json")
     .sort()
 }
 

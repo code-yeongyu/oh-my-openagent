@@ -1,0 +1,16 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest-queries.test.mjs:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './fixtures/x-search-backtest/queries.v1.json' from '/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-backtest-queries.test.mjs'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [526.00ms]
+
+exit=1

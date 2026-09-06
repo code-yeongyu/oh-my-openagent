@@ -8,7 +8,7 @@ import type { TaskCategoryInfo } from "./types"
 export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task_send to continue an existing child."
 
 export const TASK_PROMPT_GUIDELINES: readonly string[] = [
-  "Use run_in_background=true only for parallel independent work; the default waits and returns the result.",
+  "Spawn children with run_in_background=true; pass false only for a short child whose result gates your very next call.",
   "NEVER pass model together with category: category-routed tasks take their model from omo.json (categories.<name>.models).",
   "Continue an existing child with task_send(to=\"st_...\", message=\"...\"); task always spawns.",
   "Use task_output for one midpoint status or transcript peek; use task_cancel to end a child.",
@@ -56,11 +56,10 @@ ${renderCategoryList(categories)}
 - subagent_type invokes a loaded agent directly. Available agents: ${agentNames}${gatedLine}${momusNotice}
 
 Blank provider padding is normalized automatically; do not add filler values.
-load_skills prepends named skills. run_in_background=true returns task ids for parallel work; false waits for results.
+load_skills prepends named skills. run_in_background=true returns the task id at once and the child's result arrives later as a message; false blocks this turn until the child finishes.
+run_in_background is batch-wide: set it once at the top level. An item-level copy must agree with the top-level value and every other item, or the call fails with invalid_arguments.
 name is an optional stable handle. model is an explicit override for subagent_type spawns ONLY.
 NEVER combine model with category: a category-routed task always takes its model from omo.json (categories.<name>.models), so passing both fails with invalid_arguments.
-  CORRECT: task(subagent_type="momus", model="openai/gpt-5.6-sol", prompt="...")
-  INCORRECT: task(category="architect", model="openai-codex/gpt-5.6-luna-fast", prompt="...")
 task_send continues an existing child; task always spawns.
 Prompts MUST be in English.`
 }

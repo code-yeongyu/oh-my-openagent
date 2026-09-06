@@ -187,6 +187,7 @@ describe("omo-senpi skill-pointers component", () => {
       const content = pi.messages[0]?.message["content"]
       if (typeof content !== "string") throw new Error("expected string content")
       expect(content).toContain("workflow tool")
+      expect(content).toContain("per phase")
     })
 
     it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop includes the resolved CLI shim", async () => {

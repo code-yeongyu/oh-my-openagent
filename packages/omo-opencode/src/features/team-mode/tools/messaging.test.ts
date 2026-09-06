@@ -108,6 +108,8 @@ type Deferred<T> = {
 
 const temporaryDirectories: string[] = []
 const TEST_EVENT_TIMEOUT_MS = 3_000
+// The inner event timeout still fails a missing wake; this outer budget covers fixture I/O on loaded Windows runners.
+const FALLBACK_WAKE_TEST_TIMEOUT_MS = process.platform === "win32" ? 15_000 : 5_000
 const realSetTimeout = globalThis.setTimeout
 const realClearTimeout = globalThis.clearTimeout
 
@@ -828,7 +830,7 @@ describe("createTeamSendMessageTool", () => {
     expect(promptTexts).toHaveLength(2)
     expect(secondInjection.injected).toBe(true)
     expect(secondInjection.content).toContain("second fallback")
-  })
+  }, FALLBACK_WAKE_TEST_TIMEOUT_MS)
 
   test("#given a queued fallback recipient shut down #when the prompt gate clears #then the obsolete wake is cancelled", async () => {
     // given

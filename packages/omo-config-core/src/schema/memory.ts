@@ -90,7 +90,7 @@ export const OmoMemorySoulSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
-// Write notice (memory / memory_apply_patch tool-result row)
+// Write notice (memory tool-result row)
 // ---------------------------------------------------------------------------
 
 export const OmoMemoryWriteNoticeSchema = z.object({
@@ -191,7 +191,6 @@ export const OmoMemorySettingsSchema = z.object({
   agent: z.string().min(1).default("auto"),
   // "direct" registers the memory tools as always-on ToolDefinitions; "search" opts in to the
   // extension-declared MCP server surfaced through senpi's tool_search catalog.
-  tool_exposure: z.enum(["direct", "search"]).default("direct"),
   reflection: OmoMemoryReflectionSchema.default({
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
@@ -223,7 +222,6 @@ export const OmoMemorySettingsSchema = z.object({
 export const OmoMemorySettingsLayerSchema = z.object({
   enabled: z.boolean().optional(),
   agent: z.string().min(1).optional(),
-  tool_exposure: z.enum(["direct", "search"]).optional(),
   reflection: OmoMemoryReflectionLayerSchema.optional(),
   nudge: OmoMemoryNudgeLayerSchema.optional(),
   facts: OmoMemoryFactsLayerSchema.optional(),

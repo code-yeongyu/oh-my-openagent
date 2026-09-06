@@ -26,6 +26,7 @@ const PACKED_ARTIFACTS = [
   "bin/omo-agent-toolkit.js",
   "plugin/package.json",
   "plugin/extensions/omo.js",
+  "plugin/skills-conditional/x-search/SKILL.md",
   "plugin/runtime/lsp-daemon/dist/cli.js",
   "plugin/runtime/ast-grep-mcp/cli.js",
   "plugin/runtime/agent-toolkit/cli.js",

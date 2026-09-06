@@ -1,7 +1,8 @@
 import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
+import type * as z from "zod"
 
-import { OmoCodegraphSettingsSchema, OmoConfigLayerSchema, OmoConfigSchema, resolveOmoTaskSettings, type OmoConfig } from "../schema"
-import { mergeOmoConfigRecords } from "./merge"
+import { OmoConfigLayerSchema, OmoConfigSchema, resolveOmoTaskSettings, type OmoConfig } from "../schema"
+import { isUnsafeObjectKey, mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
 import { resolveOmoConfigView, resolveOmoProfileName } from "./resolution"
 import {
@@ -38,7 +39,6 @@ function parseJsoncSafe<T>(content: string): JsoncParseResult<T> {
 const DEFAULT_RAW_CONFIG: Record<string, unknown> = {
   agents: {},
   categories: {},
-  codegraph: OmoCodegraphSettingsSchema.parse({}),
   task: resolveOmoTaskSettings({}),
   teams: {},
 }
@@ -62,6 +62,72 @@ function validationDiagnostic(path: string, issues: readonly { readonly path: re
     path,
     issuePaths,
   }
+}
+
+type UnrecognizedKeyIssue = {
+  readonly keys: readonly string[]
+  readonly path: readonly string[]
+}
+
+function unrecognizedKeyIssues(issues: readonly z.core.$ZodIssue[]): readonly UnrecognizedKeyIssue[] {
+  return issues.flatMap((issue) =>
+    issue.code === "unrecognized_keys"
+      ? [{ keys: issue.keys, path: issue.path.map((segment) => String(segment)) }]
+      : [],
+  )
+}
+
+/**
+ * A layer carrying `__proto__`, `prototype`, or `constructor` is hostile input, not a stale key, so it
+ * stays fail-closed (whole layer rejected) instead of being stripped and partially loaded.
+ *
+ * The unrecognized key alone is not the signal: a JSON `"__proto__"` member is written THROUGH the
+ * prototype rather than becoming an own property, so the parsed record reports only the injected
+ * payload's inner keys (`polluted`) and never `__proto__` itself. Detect the tampering directly.
+ */
+function hasUnsafeUnrecognizedKey(parsed: unknown, issues: readonly UnrecognizedKeyIssue[]): boolean {
+  if (issues.some((issue) => issue.keys.some((key) => isUnsafeObjectKey(key)))) return true
+  return hasTamperedPrototype(parsed)
+}
+
+function hasTamperedPrototype(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some((entry) => hasTamperedPrototype(entry))
+  if (!isRecord(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null) return true
+  return Object.values(value).some((entry) => hasTamperedPrototype(entry))
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function containerAt(record: Record<string, unknown>, path: readonly string[]): Record<string, unknown> | null {
+  let container: Record<string, unknown> = record
+  for (const segment of path) {
+    const next = container[segment]
+    if (!isRecord(next)) return null
+    container = next
+  }
+  return container
+}
+
+/** Delete every unrecognized key reported by zod, returning the pruned clone plus the dotted path of each removal. */
+function stripUnrecognizedKeys(
+  record: Record<string, unknown>,
+  issues: readonly UnrecognizedKeyIssue[],
+): { readonly issuePaths: readonly string[]; readonly stripped: Record<string, unknown> } {
+  const stripped = structuredClone(record)
+  const issuePaths: string[] = []
+  for (const issue of issues) {
+    const container = containerAt(stripped, issue.path)
+    if (container === null) continue
+    for (const key of issue.keys) {
+      delete container[key]
+      issuePaths.push([...issue.path, key].join("."))
+    }
+  }
+  return { issuePaths, stripped }
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -109,14 +175,39 @@ function readConfigSource(
     }
   }
 
+  const parsedRecord = toRecord(parsed.data)
   const validation = OmoConfigLayerSchema.safeParse(parsed.data)
   if (!validation.success) {
-    return {
+    // NOTE: the guard reads `parsed.data` directly. `toRecord` rebuilds the object from its own
+    // enumerable properties, which silently discards the tampered prototype this guard looks for.
+    const unrecognized = unrecognizedKeyIssues(validation.error.issues)
+    if (unrecognized.length > 0 && hasUnsafeUnrecognizedKey(parsed.data, unrecognized)) {
+      return {
+        diagnostic: validationDiagnostic(path, validation.error.issues),
+        source: { exists: true, loaded: false, path, scope },
+      }
+    }
+    const rejected = {
       diagnostic: validationDiagnostic(path, validation.error.issues),
       source: { exists: true, loaded: false, path, scope },
+    } as const
+    const unknownIssues = unrecognizedKeyIssues(validation.error.issues)
+    if (parsedRecord === null || unknownIssues.length === 0) return rejected
+
+    const { issuePaths, stripped } = stripUnrecognizedKeys(parsedRecord, unknownIssues)
+    if (!OmoConfigLayerSchema.safeParse(stripped).success) return rejected
+
+    return {
+      diagnostic: {
+        kind: "unknown-keys",
+        message: `Ignored unknown keys in ${path}: ${issuePaths.join(", ")}`,
+        path,
+        issuePaths,
+      },
+      source: { exists: true, loaded: true, path, scope },
+      value: stripped,
     }
   }
-  const parsedRecord = toRecord(parsed.data)
   if (parsedRecord === null) {
     return {
       diagnostic: { kind: "validation", message: `Invalid omo config at ${path}: root must be an object`, path },

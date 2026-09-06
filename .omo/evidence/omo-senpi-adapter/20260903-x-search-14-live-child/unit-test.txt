@@ -1,0 +1,15 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-live-e2e.test.mjs:
+(pass) x-search live QA isolation helpers > resolves SENPI_BIN, then the peer dependency, then PATH [277.68ms]
+(pass) x-search live QA isolation helpers > uses the observed child x_search execution outcome [0.23ms]
+(pass) x-search live QA isolation helpers > detects x_search in a tool execution transcript [0.11ms]
+(pass) x-search live QA isolation helpers > maps each live scenario to its intended task target [0.09ms]
+(pass) x-search live QA isolation helpers > keeps the negative catalog control query distinct from X posts [0.15ms]
+(pass) x-search live QA isolation helpers > scrubs XAI and GROK variables from the environment passed to a spawned process [11.95ms]
+(pass) x-search live QA isolation helpers > copies only the xai credential into the sandbox and removes the seeded file [1.09ms]
+
+ 7 pass
+ 0 fail
+ 24 expect() calls
+Ran 7 tests across 1 file. [1.74s]

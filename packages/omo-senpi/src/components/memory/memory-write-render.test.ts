@@ -1,4 +1,4 @@
-// Presentation tests for the memory write notice (the row a memory/memory_apply_patch
+// Presentation tests for the memory write notice (the row a memory
 // tool result draws in the transcript).
 //
 // The contract is senpi's own notice family (notice/box.ts + cache-warm-renderer.ts):

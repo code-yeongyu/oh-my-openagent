@@ -15,11 +15,6 @@ export const MEMORY_NUDGE_METADATA_TOKEN = "user turns since your last memory sa
 export const MEMORY_PRESSURE_METADATA_TOKEN = "memory pressure:"
 export const MEMORY_SOUL_METADATA_TOKEN = "Soul updated by"
 
-// Injected ONLY under the opt-in search exposure: pointing the agent at tool_search while the tools
-// are directly registered sent it hunting for a tool that does not exist (session 019fe95c-09d2).
-const MEMORY_TOOL_DISCOVERY_NOTE =
-  'The memory tools are discoverable through tool_search: run `tool_search("memory")` once to activate them, then use them for every save.'
-
 export interface MemoryPromptSession {
   readonly id: string
   readonly priorMessageCount: number
@@ -29,7 +24,6 @@ export interface MemoryPromptInjectionOptions {
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
   readonly createRepo?: (context: MemoryIdentityContext) => GitMemoryRepo
   readonly cache?: MemoryBlockCache
-  readonly searchExposure?: () => boolean
   readonly resolveCompileWarnTokens?: (identity: string) => number
   readonly resolveNudgeTurns?: (
     repo: GitMemoryRepo,
@@ -72,9 +66,8 @@ export function createMemoryPromptHandler(
       repo,
       options.resolveCompileWarnTokens?.(context.identity),
     )
-    const composed = options.searchExposure?.() === true ? `${pressureBlock}\n\n${MEMORY_TOOL_DISCOVERY_NOTE}` : pressureBlock
     return {
-      systemPrompt: replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, composed)),
+      systemPrompt: replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, pressureBlock)),
       message: {
         customType: MEMORY_NOTICE_CUSTOM_TYPE,
         content: renderMemoryNotice(session.priorMessageCount, nudgeTurns, soulNotice),

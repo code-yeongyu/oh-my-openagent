@@ -17,7 +17,7 @@ const workflowChecks = [
     path: ciWorkflowPath,
     testRuns: [
       "run: bun test",
-      "run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts",
+      "run: bun test --timeout 20000 packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts",
     ],
   },
 ]
@@ -266,7 +266,6 @@ describe("test workflows", () => {
       ["vendored lsp-tools package tests", "npm --prefix packages/lsp-tools-mcp test"],
       ["nested Codex plugin npm install", "npm --prefix packages/omo-codex/plugin ci"],
       ["nested Codex plugin build", "bun run --cwd packages/omo-codex/plugin build"],
-      ["CodeGraph component tests", "npm --prefix packages/omo-codex/plugin/components/codegraph test"],
       ["third-party notices ship check", "node scripts/check-third-party-notices.mjs --ship"],
       ["Codex compatibility Bun tests", "bun test"],
     ] as const

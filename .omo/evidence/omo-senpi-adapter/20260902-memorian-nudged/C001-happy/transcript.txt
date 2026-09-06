@@ -1,0 +1,40 @@
+workers-best-practices, wrangler, x-likes-sync, youtube-mesh-download, zipcode-search                                                       
+
+[Extensions]                                                                                                                                
+  account, anthropic-bash, anthropic-web-search, bash-timeout, btw, cache-keepalive, claude-sdk-oauth, compaction, config-reload,           
+cursor-cli-oauth, diff.js, files.js, goal, gpt-apply-patch, help, history-search, hooks, imagegen, import-repro, look-at, loop, loop-guard, 
+mcp, model-fallback, nested-agents-md, omo.js, openai-image-gen, openai-web-search, permission-system, prompt-preset, prompt-url-widget.js, 
+reasoning, recommended-models, redraws, rules, service-tier, src, task-e2e-mock-provider.ts, terminal, todo, tool-pair-guard, tool-search,  
+tps.js, ttsr, video-in, webfetch, websearch                                                                                                 
+
+                                                                                                                                            
+ remind me about the zebra-quokka rebase ordering rule before I restack the branches                                                        
+                                                                                                                                            
+
+ Settings: settings.json (JSON)                                                                                                             
+
+ ok                                                                                                                                         
+
+                                                                                                                                            
+ Update Available                                                                                                                           
+ New version 2026.9.2-3 is available. Run senpi update                                                                                      
+ Changelog: https://github.com/code-yeongyu/senpi/blob/v2026.9.2-3/packages/coding-agent/CHANGELOG.md                                       
+                                                                                                                                            
+
+                                                                                                                                            
+ now walk me through the restack steps one by one                                                                                           
+                                                                                                                                            
+
+                                                                                                                                            
+ · Memorian nudged · Rebase the oldest reviewed branch first so the dependent stack never inverts.                                          
+ Memorian judged a stored memory relevant to the previous turn; it is a hint, not current state.                                            
+ reference/project/test-note.md                                                                                                             
+                                                                                                                                            
+
+ ok                                                                                                                                         
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                                           
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-YFQXe2/project • 307/200K (0.2%) (auto)                         mock-1
+(😺 OmO Native) mem:project-247dc7b1 3m ago (+2)

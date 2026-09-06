@@ -1,0 +1,8 @@
+Command:
+TASK_E2E_OUT_DIR=<canonical-evidence-dir>/live-task-e2e SENPI_BIN=$(command -v senpi) node packages/omo-senpi/scripts/qa/task-e2e.mjs
+
+Observed:
+The optional live task driver returned FAIL on followup_revive, task_output_peek, jsonl_sequence, resume_revived_resident, resume_finished_steerable, and resume_ttl_not_revived.
+
+Attribution:
+This PR has no runtime-source changes. The driver reported all 16 spawned PIDs were gone and realSenpiUntouched: true, but it also observed concurrent writes from the active parent Senpi session. This transcript is not used as a passing QA claim; raw session-bearing logs remain uncommitted in the canonical task evidence directory.

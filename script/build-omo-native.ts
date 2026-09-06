@@ -21,8 +21,8 @@ const packageDir = join(repoRoot, "packages", "omo-native")
 const sourcePluginDir = join(repoRoot, "packages", "omo-senpi", "plugin")
 const defaultOutputDir = join(packageDir, "plugin")
 
-// Mirrors REQUIRED_PLUGIN_ARTIFACTS in packages/omo-senpi/src/install/install-senpi.ts.
-const REQUIRED_PLUGIN_ARTIFACTS = [
+// Mirrors REQUIRED_PLUGIN_ARTIFACTS in packages/omo-senpi/src/install/plugin-artifacts.ts.
+export const REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
   join("extensions", "memory-run-supervisor.mjs"),
   join("extensions", "reflection-persona.md"),
@@ -46,6 +46,7 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("skills", "ulw-plan", "SKILL.md"),
   join("skills", "ulw-research", "SKILL.md"),
   join("skills", "visual-qa", "SKILL.md"),
+  join("skills-conditional", "x-search", "SKILL.md"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "agent-toolkit", "cli.js"),
   join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
@@ -61,10 +62,10 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("scripts", "install.mjs"),
 ] as const
 
-// Mirrors the files allowlist in packages/omo-senpi/plugin/package.json.
-const PAYLOAD_DIRECTORIES = ["extensions", "skills", "runtime"] as const
-const PAYLOAD_FILES = ["package.json", "README.md", "NOTICE", "LICENSE"] as const
-const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
+// Mirrors the files allowlist in packages/omo-senpi/plugin/package.json (locked by build-omo-native.test.ts).
+export const PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
+export const PAYLOAD_FILES = ["package.json", "README.md", "NOTICE", "LICENSE"] as const
+export const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
 
 interface BuildOptions {
   readonly outputDir: string

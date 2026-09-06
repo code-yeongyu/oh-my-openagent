@@ -15,10 +15,15 @@ export const RECALL_HINT_HEADER =
  * and the source path is what it opens for the full detail the hint had to leave out.
  */
 export function renderNudgeBlock(nudge: RecallNudge): string {
+  const escapeMarkup = (value: string): string => value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
   return [
-    `<recalled-memory source="[[${nudge.path}]]">`,
+    `<recalled-memory source="[[${escapeMarkup(nudge.path)}]]">`,
     RECALL_HINT_HEADER,
-    nudge.hint,
+    escapeMarkup(nudge.hint),
     "</recalled-memory>",
   ].join("\n")
 }

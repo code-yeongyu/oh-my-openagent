@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { basename, join } from "node:path"
+import type { ChildModelRegistry } from "@oh-my-opencode/senpi-task"
 
 import {
   FactsFailureStore,
@@ -23,18 +24,15 @@ import { drainFactsLaunches } from "./facts-drain"
 import { classifyOversizePayload } from "./facts-oversize"
 import { FactsTerminalWrites } from "./facts-terminal-writes"
 import { readFactsPeoplePayload } from "./facts-people-payload"
-import { SandboxUnavailableError } from "./sandbox-contracts"
-import { launchFactsModelChain } from "./worker/facts-child-launch"
+import { launchFactsInProcess } from "./facts-in-process-launch"
 import { resolveReflectionModel } from "./worker/resolve-model"
 import { readRunJson } from "./worker/run-artifacts"
 
-const QUICK_CATEGORY = "quick"
-const DEFAULT_DEADLINE_MS = 15 * 60_000
 const WRITER_WAIT_MS = 2_000
 
 export type { FactsExtractorRunnerOptions, FactsLaunchResult } from "./facts-runner-types"
 import type { FactsExtractorRunnerOptions, FactsFinalRecord, FactsLaunchResult, FactsRunLedger } from "./facts-runner-types"
-import { describe, finalResult, queueKeys, reserveFactsRunDir } from "./facts-run-storage"
+import { describe, FACTS_DEADLINE_MS, finalResult, queueKeys, reserveFactsRunDir } from "./facts-run-storage"
 import { finalizeClaimedFactsRun } from "./facts-run-finalize"
 import { reconcileFactsRuns } from "./facts-run-reconcile"
 import { sweepTerminalFactsRuns } from "./facts-run-cleanup"
@@ -45,7 +43,7 @@ export class FactsExtractorRunner {
   private readonly now: () => Date
   private readonly terminal: FactsTerminalWrites
   private readonly failureReader: FactsFailureReadPort
-  private activeLaunch: Promise<FactsLaunchResult> | undefined
+  private activeLaunch: Promise<FactsLaunchResult> | undefined; private activeCancel: (() => void) | undefined
 
   constructor(private readonly options: FactsExtractorRunnerOptions) {
     this.queue = options.queue ?? new FactsQueue({ identityPaths: options.identity.paths })
@@ -65,12 +63,6 @@ export class FactsExtractorRunner {
     })
   }
 
-  /**
-   * Launches pending facts work and DRAINS: a capped payload splits one backlog into several
-   * runs, so every success immediately attempts the next batch instead of waiting for another
-   * settle. The existing `activeLaunch` latch spans the whole drain, so a concurrent caller is
-   * still refused with `active` and only one launch ever runs.
-   */
   async launchPending(signal?: AbortSignal): Promise<FactsLaunchResult> {
     if (signal?.aborted === true) return { status: "skipped" }
     if (this.activeLaunch !== undefined) return { status: "active" }
@@ -79,9 +71,11 @@ export class FactsExtractorRunner {
     try {
       return await operation
     } finally {
-      if (this.activeLaunch === operation) this.activeLaunch = undefined
+      if (this.activeLaunch === operation) { this.activeLaunch = undefined; this.activeCancel = undefined }
     }
   }
+
+  async cancelActive(): Promise<void> { this.activeCancel?.(); await this.activeLaunch }
 
   async reconcilePending(signal?: AbortSignal): Promise<FactsLaunchResult> {
     const active = await this.reconcileRuns()
@@ -96,24 +90,20 @@ export class FactsExtractorRunner {
     const pending = await this.queue.listPending()
     if (isAborted()) return { status: "skipped" }
     if (pending.length === 0) return { status: "empty" }
-    // FAIL-CLOSED: an unreadable ledger aborts the launch. Treating it as "no failures" would
-    // relaunch every parked batch forever - the incident this gating exists to prevent.
     const ledger = await readLaunchableFailures(this.failureReader, (message, fields) =>
       this.options.logger?.warn(message, fields),
     )
     if (!ledger.ok) return { status: "skipped" }
     const selection = selectLaunchable(pending, ledger.failures, this.now())
     if (selection.selected.length === 0) return { status: "empty" }
-    const entries: readonly FactsQueueEntry[] = selection.selected
-    const loaded = this.options.loadConfig()
-    const resolution = resolveReflectionModel(QUICK_CATEGORY, loaded.config, this.options.resolveModelRegistry())
-    // `category_unavailable` is not the only unavailable answer. resolveReflectionModel also has a
-    // beyond-category ladder (registry_fallback / session_inherit) that resolves ANY usable registry
-    // model when the quick chain is dead, and it marks those resolutions with a `source`.
-    // Category-sourced resolutions carry no `source`. This surface is quick-PINNED with no fallback:
-    // an unattended extraction must never land on an arbitrary, possibly frontier-priced model, so
-    // anything outside the category counts as unavailable and takes the same skip path.
-    if (resolution.kind === "category_unavailable" || resolution.source !== undefined) {
+    const claimId = randomUUID()
+    const entries = await this.queue.claim(selection.selected, claimId)
+    if (entries.length === 0) return { status: "active" }
+    const releaseClaim = async (): Promise<void> => this.queue.releaseClaim(entries, claimId)
+    const loaded = this.options.loadConfig(); const deadlineMs = this.options.deadlineMs ?? FACTS_DEADLINE_MS
+    const modelRegistry = this.options.resolveModelRegistry(); const resolution = resolveReflectionModel("quick", loaded.config, modelRegistry)
+    const childModelRegistry = isChildModelRegistry(modelRegistry) ? modelRegistry : undefined
+    if (childModelRegistry === undefined || resolution.kind === "category_unavailable" || resolution.source !== undefined) {
       const cause = resolution.kind === "category_unavailable" ? resolution.cause : resolution.source
       this.options.logger?.warn("facts extractor quick category unavailable", { cause })
       await this.terminal.preflightFail(
@@ -122,23 +112,21 @@ export class FactsExtractorRunner {
         "quick_category_unavailable",
         cause ?? "unknown",
       )
+      await releaseClaim()
       return { status: "skipped" }
     }
 
-    const repo = new GitMemoryRepo({ dir: this.options.identity.paths.repo, agentId: this.options.identity.id })
-    if (!existsSync(join(repo.dir, ".git"))) await repo.init({ seedFiles: buildDefaultSeedFiles() })
-    // The people fields are part of the measured envelope, so they are read BEFORE the cap
-    // decides which entries fit - and the run dir is reserved for the SELECTED entries only.
+    let repo: GitMemoryRepo
+    try {
+      repo = new GitMemoryRepo({ dir: this.options.identity.paths.repo, agentId: this.options.identity.id })
+      if (!existsSync(join(repo.dir, ".git"))) await repo.init({ seedFiles: buildDefaultSeedFiles() })
+    } catch (error) {
+      await releaseClaim()
+      throw error
+    }
     const people = await readFactsPeoplePayload(repo.dir)
-    const envelope = {
-      version: 1,
-      identity: this.options.identity.id,
-      today: this.now().toISOString().slice(0, 10),
-      ...people,
-    } as const
+    const envelope = { version: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people } as const
     const capped = selectCappedFactsBatch({ entries, envelope, now: this.now() })
-    // Ledger-only classification, BEFORE any reservation: an entry that cannot ever fit parks
-    // now, so a failing launch path can never lose the verdict.
     const envelopeRefused = await classifyOversizePayload({
       terminal: this.terminal,
       envelope,
@@ -148,71 +136,91 @@ export class FactsExtractorRunner {
       ...(this.options.createPreflightId === undefined ? {} : { createFailureId: this.options.createPreflightId }),
       warn: (message, fields) => this.options.logger?.warn(message, fields),
     })
-    if (envelopeRefused) return { status: "skipped" }
+    if (envelopeRefused) {
+      await releaseClaim()
+      return { status: "skipped" }
+    }
     if (capped.selected.length === 0) {
       this.options.logger?.warn("facts batch selection carried nothing within the payload cap", {
         pending: entries.length,
         oversized: capped.oversized.length,
       })
+      await releaseClaim()
       return { status: "empty" }
     }
     const batch: readonly FactsQueueEntry[] = capped.selected
+    await this.queue.releaseClaim(entries.filter((entry) => !batch.includes(entry)), claimId)
     const batchId = (this.options.createBatchId ?? randomUUID)()
-    const launchedAt = this.now().getTime()
-    if (isAborted()) return { status: "skipped" }
-    const runDir = await reserveFactsRunDir({
-      factsDir: this.options.identity.paths.facts,
-      locksDir: this.options.identity.paths.locks,
-      entries: batch,
-      batchId,
-      launchedAt,
-      deadlineMs: this.options.deadlineMs,
-      terminationGraceMs: this.options.terminationGraceMs,
-    })
-    if (runDir === undefined) return { status: "active" }
-    const runId = basename(runDir)
-    const payload: FactsPayload = { ...envelope, entries: batch }
-    if (isAborted()) return { status: "skipped" }
+    const launchedAt = this.now().getTime(); if (isAborted()) {
+      await this.queue.releaseClaim(batch, claimId)
+      return { status: "skipped" }
+    }
+    let runDir: string | undefined
     try {
-      const { child } = await launchFactsModelChain({
+      runDir = await reserveFactsRunDir({
+        factsDir: this.options.identity.paths.facts,
+        locksDir: this.options.identity.paths.locks,
+        entries: batch,
+        batchId,
+        launchedAt,
+        deadlineMs,
+        terminationGraceMs: this.options.terminationGraceMs,
+      })
+    } catch (error) {
+      await this.queue.releaseClaim(batch, claimId)
+      throw error
+    }
+    if (runDir === undefined) {
+      await this.queue.releaseClaim(batch, claimId)
+      return { status: "active" }
+    }
+    const runId = basename(runDir); const payload: FactsPayload = { ...envelope, entries: batch }
+    if (isAborted()) {
+      await this.queue.releaseClaim(batch, claimId)
+      return { status: "skipped" }
+    }
+    try {
+      const cancelled = await launchFactsInProcess({
         runId,
         runDir,
         payload,
         resolution,
+        modelRegistry: childModelRegistry,
+        options: this.options,
         env: this.options.env ?? process.env,
         configSources: loaded.sources,
-        warn: (message, details) => this.options.logger?.warn(message, details),
-        senpiCommand: this.options.senpiCommand,
-        senpiPrefixArgs: this.options.senpiPrefixArgs,
-        resolveAndPreflightLaunch: this.options.resolveAndPreflightLaunch,
-        hardDeadlineAt: Date.now() + (this.options.deadlineMs ?? DEFAULT_DEADLINE_MS),
-        terminationGraceMs: this.options.terminationGraceMs,
-        maxOutputBytes: this.options.maxOutputBytes,
-        sandbox: this.options.sandbox,
-        supervisorPath: this.options.supervisorPath,
         batchId,
         queued: queueKeys(batch),
         launchedAt,
+        deadlineMs,
+        onState: (state) => { this.activeCancel = state.cancel }
       })
-      if (child.timedOut || child.code !== 0) {
-        const reason: FactsFailureReason = child.timedOut ? "deadline_exceeded" : "child_exit"
-        const detail = child.stderr.trim() || "facts child failed"
-        await this.terminal.fail({ runDir, runId, batchId, targets: queueEntryTargets(batch), reason, detail })
-        return { status: "failed", runId }
+      if (cancelled) {
+        return await this.abandonCancelledRun(runDir, runId)
       }
     } catch (error) {
-      const reason: FactsFailureReason = error instanceof SandboxUnavailableError ? "sandbox_unavailable" : "child_exit"
-      await this.terminal.fail({
-        runDir,
-        runId,
-        batchId,
-        targets: queueEntryTargets(batch),
-        reason,
-        detail: describe(error),
-      })
+      const reason: FactsFailureReason = "child_exit"
+      try {
+        await this.terminal.fail({
+          runDir,
+          runId,
+          batchId,
+          targets: queueEntryTargets(batch),
+          reason,
+          detail: describe(error),
+        })
+      } finally {
+        await this.queue.releaseClaim(batch, claimId)
+      }
       return { status: "failed", runId }
+    } finally {
+      if (isAborted()) await this.queue.releaseClaim(batch, claimId)
     }
-    return this.finalizeRun(runDir, repo)
+    try {
+      return await this.finalizeRun(runDir, repo)
+    } finally {
+      await this.queue.releaseClaim(batch, claimId)
+    }
   }
 
   private async reconcileRuns(): Promise<boolean> {
@@ -245,11 +253,6 @@ export class FactsExtractorRunner {
     return active
   }
 
-  /**
-   * Retention pruning. Always OUTSIDE the finalize lock (the prune path takes each run's finalize
-   * lock itself, non-blocking) and never allowed to fail a run: retention is best effort, the
-   * outcome it follows is already published.
-   */
   private async prune(): Promise<void> {
     try {
       await pruneTerminalFactsRuns({
@@ -262,11 +265,15 @@ export class FactsExtractorRunner {
     }
   }
 
+  private async abandonCancelledRun(runDir: string, runId: string): Promise<FactsLaunchResult> {
+    const ledger = await readRunJson<FactsRunLedger>(join(runDir, "ledger.json"))
+    await this.terminal.abandon(runDir, ledger, "session_shutdown")
+    return { status: "failed", runId }
+  }
+
   private async finalizeRun(runDir: string, repo: GitMemoryRepo): Promise<FactsLaunchResult> {
     const ledger = await readRunJson<FactsRunLedger>(join(runDir, "ledger.json"))
     const record = await createLockRecord("facts-finalize", { runId: ledger.runId })
-    // The prune below runs only after this lock is released: it takes each run's finalize lock
-    // itself, and a run holding its own finalize lock could never be pruned from inside it.
     const finalizeLock = runFinalizationLockPath(this.options.identity.paths.locks, ledger.runId)
     const result = await withLock<FactsLaunchResult>(finalizeLock, record, async () => {
       const finalPath = join(runDir, "final.json")
@@ -294,5 +301,9 @@ export class FactsExtractorRunner {
       waitTimeoutMs: WRITER_WAIT_MS,
     })
   }
+}
 
+function isChildModelRegistry(value: unknown): value is ChildModelRegistry {
+  return value !== null && typeof value === "object" && "getProviderAuth" in value
+    && typeof value.getProviderAuth === "function"
 }

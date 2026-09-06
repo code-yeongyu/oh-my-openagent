@@ -190,5 +190,4 @@ export const noopSteps: ShutdownDrainSteps = {
   flushJournal: async () => {},
   enqueueFinalDelta: async () => {},
   flushSkillsUsage: async () => {},
-  launchFacts: async () => {},
 }

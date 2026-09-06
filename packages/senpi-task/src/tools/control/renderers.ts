@@ -148,6 +148,8 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       }
     case "revived":
       return { color: "success", text: `task_send revived ${details.task_id} epoch ${details.run_epoch}` }
+    case "delivery_uncertain":
+      return { color: "warning", text: `task_send delivery uncertain ${details.task_id} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}` }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
     case "capacity_deferred":

@@ -7,6 +7,7 @@ export {
   mergeChildCustomTools,
 } from "./in-process"
 export type {
+  ChildCompletionPolicy,
   ChildHandle,
   ChildSession,
   ChildSessionEvent,

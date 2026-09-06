@@ -1,0 +1,4 @@
+Verified source head: ba455bc1c9a60acc354915f909d89fd2cb338dc4
+Base and fetched origin/dev: 65c55dc6b470e0b21f60ff3c16c8e9594d575cd8
+origin/dev did not advance, so no additional merge was required.
+All focused, static, extension-freshness, full Senpi, and live-driver receipts in this directory were produced from this source tree before the evidence-only follow-up commit.

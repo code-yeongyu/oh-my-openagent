@@ -1,0 +1,31 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-live-e2e.test.mjs:
+15 |       XAI_OTHER: "must-not-reach-child",
+16 |       GROK_TOKEN: "must-not-reach-child",
+17 |     })
+18 |     const child = spawnSync(process.execPath, ["-e", "process.stdout.write(JSON.stringify({safe:process.env.SAFE_VALUE,xai:process.env.XAI_API_KEY,grok:process.env.GROK_TOKEN}))"], { env, encoding: "utf8" })
+19 |     expect(child.status).toBe(0)
+20 |     expect(JSON.parse(child.stdout)).toEqual({ safe: "kept" })
+                                          ^
+error: expect(received).toEqual(expected)
+
+  {
++   "grok": "must-not-reach-child",
+    "safe": "kept",
++   "xai": "must-not-reach-child",
+  }
+
+- Expected  - 0
++ Received  + 2
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-live-e2e.test.mjs:20:38)
+(fail) x-search live QA isolation helpers > scrubs XAI and GROK variables from the environment passed to a spawned process [14.83ms]
+(pass) x-search live QA isolation helpers > copies only the xai credential into the sandbox and removes the seeded file [1.33ms]
+
+ 1 pass
+ 1 fail
+ 8 expect() calls
+Ran 2 tests across 1 file. [1396.00ms]
+
+mutation_exit=1 (expected nonzero)

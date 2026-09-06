@@ -1,0 +1,1 @@
+Mutation proof: changing the acceptance predicate from requiring /x_search results:/ in positive child/librarian transcripts to requiring only a nested x_search execution count makes the saved child evidence fail (the generic parent transcript counter is 0); restoring the header assertion makes green.txt pass.

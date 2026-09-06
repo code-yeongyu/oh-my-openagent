@@ -5,7 +5,6 @@ import {
   isClaimHeld,
   isOrphan,
   reclaimResident,
-  REVIVABLE_STATUSES,
   reviveClaimed,
   type SessionPathResolver,
   type SuspendedResidency,
@@ -16,6 +15,8 @@ import type { ReconcileOutcome } from "./types"
 export { beginLocalReclamation } from "./reconcile-reclamation"
 
 const SUSPENDED_RESIDENCIES = new Set(["persisted_only", "rpc_detached"])
+// `interrupted` is terminal by status, but remains in the revival set here for in-flight session recovery.
+const SESSION_REVIVABLE_STATUSES = new Set(["pending", "running", "interrupted"])
 
 type RevivalCandidate = {
   readonly record: TaskRecord
@@ -124,7 +125,7 @@ function disposeSuspendedTerminalWithoutTranscript(
 function suspendedCandidates(context: LifecycleContext, parentSessionId: string): readonly RevivalCandidate[] {
   return context.store.list().records.flatMap((record): readonly RevivalCandidate[] => {
     if (record.parent_session_id !== parentSessionId || !isSuspended(record)) return []
-    if (!REVIVABLE_STATUSES.has(record.status) || record.killed === true) return []
+    if (!SESSION_REVIVABLE_STATUSES.has(record.status) || record.killed === true) return []
     return [{ record, priorResidency: record.residency_state }]
   })
 }

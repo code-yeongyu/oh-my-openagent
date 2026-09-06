@@ -241,7 +241,6 @@ describe("memory footer wiring", () => {
 
     const toolContext = sessionContext(fixture.sessionId, statusCalls)
     await pi.dispatch("tool_result", memoryResult("mcp_omo-memory_memory"), toolContext)
-    await pi.dispatch("tool_result", memoryResult("mcp_omo-memory_memory_apply_patch"), toolContext)
     await pi.dispatch("tool_result", memoryResult("read"), toolContext)
 
     expect(statusCalls).toHaveLength(1)
@@ -672,6 +671,45 @@ async function liveFooterHarness(): Promise<{
     },
   }
 }
+
+describe("facts shutdown wiring", () => {
+  test("#given an active facts launch #when the session shuts down #then facts cancellation runs before the shutdown drain", async () => {
+    // given
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-facts-shutdown-")))
+    roots.push(root)
+    const sessionId = "session-facts-shutdown"
+    const identity = createMemoryIdentityContext({
+      identity: "facts-shutdown-agent",
+      identityPaths: buildIdentityPaths(root, "facts-shutdown-agent"),
+      binding: { identity: "facts-shutdown-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const sequence: string[] = []
+    const wiring = createMemoryWiring({
+      sessions: new Map([[sessionId, { context: identity }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      env: {},
+      createRuntime: () => ({ reconcile: async () => {} } as unknown as MemoryIdentityRuntime),
+      createFactsExtractor: () => ({
+        launchPending: async () => undefined,
+        reconcilePending: async () => undefined,
+        cancelActive: async () => { sequence.push("cancel") },
+      }),
+    })
+    wiring.registerShutdownEvaluator(async () => { sequence.push("drain") })
+
+    // when
+    await wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId,
+      deadlineAt: Date.now() + 1_000,
+      now: () => Date.now(),
+    })
+
+    // then
+    expect(sequence.indexOf("cancel")).toBeLessThan(sequence.indexOf("drain"))
+  })
+})
 
 describe("memory footer live wiring", () => {
   test("#given a spinner animating mid-session #when the footer is cleared #then the interval is released and nothing repaints", async () => {

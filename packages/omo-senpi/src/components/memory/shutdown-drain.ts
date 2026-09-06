@@ -1,9 +1,8 @@
 // Bounded session_shutdown drain (IC-10). senpi awaits session_shutdown handlers before
 // disposing the runtime, so the drain owns a hard budget: an absolute deadline propagated
-// with a shared AbortSignal into every step. Each step is raced against the remaining
-// budget AND re-checks the clock and the signal before it starts, so a timed-out drain
-// STARTS no further mutation or spawn once the handler returns. Work abandoned this way is
-// recovered by the session_start reconcile paths, never by fire-and-forget continuation.
+// with a shared AbortSignal into every step. Shutdown enqueues the final transcript delta but
+// never launches facts: an in-process extractor cannot outlive this session. Pending work is
+// launched by the next session_start reconcile path.
 
 import type { ComponentLogger } from "../../extension/types"
 
@@ -35,10 +34,8 @@ export interface ShutdownDrainSteps {
   flushJournal(sessionId: string, signal: AbortSignal): Promise<void>
   /** (b) final un-enqueued transcript delta. */
   enqueueFinalDelta(sessionId: string, signal: AbortSignal): Promise<void>
-  /** (c') debounced skills-usage writer, flushed before any launch. */
+  /** (c') debounced skills-usage writer. */
   flushSkillsUsage(sessionId: string, signal: AbortSignal): Promise<void>
-  /** (c) facts child spawn, gated by the debounce threshold. */
-  launchFacts(sessionId: string, signal: AbortSignal): Promise<void>
 }
 
 export interface ShutdownDrain {
@@ -135,7 +132,6 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
         if (!(await runStep("facts-enqueue", () => options.steps.enqueueFinalDelta(input.sessionId, signal)))) return
         if (input.reason !== "quit") return
         if (!(await runStep("skills-usage-flush", () => options.steps.flushSkillsUsage(input.sessionId, signal)))) return
-        if (!(await runStep("facts-launch", () => options.steps.launchFacts(input.sessionId, signal)))) return
         for (const evaluator of evaluators) {
           const proceed = await runStep("shutdown-evaluator", async () => {
             await evaluator(evaluatorInput)

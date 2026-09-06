@@ -133,7 +133,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名のテレメトリは、アクティブなインストール数(DAU/WAU/MAU)の集計のためにデフォルトで有効になっています。マシン1台につきUTC日あたり最大1回イベントが送信され、ハッシュ化されたインストール識別子を使用し、生のホスト名は使用せず、PostHog person profile も作成されません。無効化するには `OMO_SEND_ANONYMOUS_TELEMETRY=0` または `OMO_DISABLE_POSTHOG=1` を設定してください。[プライバシーポリシー](docs/legal/privacy-policy.md)と[利用規約](docs/legal/terms-of-service.md)をご覧ください。
 
-**Ultimate と Light:** oh-my-openagent は同じ製品の 2 つのエディションとして提供されます。**Ultimate エディション**（`bunx oh-my-openagent install` または `--platform=opencode`、デフォルト）は OpenCode 上のフル機能で、11 エージェント、54+ フック、Team Mode、すべての MCP、スラッシュコマンド、IntentGate モードを提供します。**Light エディション**（`npx lazycodex-ai install` または `bunx oh-my-openagent install --platform=codex`）は OpenAI Codex CLI のプラグインシステムへ綺麗に移植できるコアコンポーネント（`rules`、`comment-checker`、`git-bash`、`lsp`、`ultrawork`、`ulw-loop`、`ulw-execute-continuation`、`telemetry`）に加え、`teammode` と補助コンポーネント（`bootstrap`、`codegraph`、`lcx` など）を提供し、Codex エージェントの TOML を `~/.codex/agents/` にインストールします。両方を同時にインストールするには `--platform=both`。Codex 専用テレメトリは `OMO_CODEX_DISABLE_POSTHOG=1` または `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` で無効化できます。
+**Ultimate と Light:** oh-my-openagent は同じ製品の 2 つのエディションとして提供されます。**Ultimate エディション**（`bunx oh-my-openagent install` または `--platform=opencode`、デフォルト）は OpenCode 上のフル機能で、11 エージェント、54+ フック、Team Mode、すべての MCP、スラッシュコマンド、IntentGate モードを提供します。**Light エディション**（`npx lazycodex-ai install` または `bunx oh-my-openagent install --platform=codex`）は OpenAI Codex CLI のプラグインシステムへ綺麗に移植できるコアコンポーネント（`rules`、`comment-checker`、`git-bash`、`lsp`、`ultrawork`、`ulw-loop`、`ulw-execute-continuation`、`telemetry`）に加え、`teammode` と補助コンポーネント（`bootstrap`、`lcx` など）を提供し、Codex エージェントの TOML を `~/.codex/agents/` にインストールします。両方を同時にインストールするには `--platform=both`。Codex 専用テレメトリは `OMO_CODEX_DISABLE_POSTHOG=1` または `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` で無効化できます。
 
 ---
 
@@ -195,7 +195,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`gpt-5.6-sol`** / **`glm-5.2`**) はあなたのメインオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。Claude Opus 5 と Kimi K3 が推奨デフォルトです。
 
-**Hephaestus** (OpenAI、GitHub Copilot、Vercel、または OpenCode 経由で medium effort の `gpt-5.6-sol` のみを使う) はあなたの自律的なディープワーカーです。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを調査し、エンドツーエンドで実行します。*正当なる職人 (The Legitimate Craftsman).*
+**Hephaestus** (OpenAI、OpenAI Codex、GitHub Copilot、または OpenCode 経由で medium effort の `gpt-5.6-sol` のみを使う) はあなたの自律的なディープワーカーです。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを調査し、エンドツーエンドで実行します。最強の GPT を使いたいなら、OpenAI の最上位モデル `gpt-6-astra` を指定してください。*正当なる職人 (The Legitimate Craftsman).*
 
 **Prometheus** (`claude-fable-5` / **`kimi-k3`**) はあなたの戦略プランナーです。インタビューモードで質問を投げ、スコープを特定し、コードに一行触れる前に詳細な計画を構築します。
 
@@ -240,7 +240,7 @@ Sisyphus がサブエージェントにタスクを委任する際、モデル�
 | `quick`              | 単一ファイルの変更、タイポの修正     |
 | `ultrabrain`         | ハードロジック、アーキテクチャの決定 |
 
-エージェントは作業の種類を伝えるだけで、ハーネスが適切なモデルを選びます。`ultrabrain` は GPT-5.6 Sol max にルーティングされます (OpenAI / Vercel、次に GitHub Copilot、次に OpenCode)。あなたが触るものは何もありません。
+エージェントは作業の種類を伝えるだけで、ハーネスが適切なモデルを選びます。`ultrabrain` は GPT-6 Astra max に、`deep` は GPT-6 Astra high にルーティングされ (OpenAI / OpenAI Codex、次に GitHub Copilot、次に OpenCode)、使えなければ GPT-5.6 Sol にフォールバックします。あなたが触るものは何もありません。
 
 ### Claude Code 互換性
 

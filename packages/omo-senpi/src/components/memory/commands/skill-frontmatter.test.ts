@@ -8,6 +8,7 @@ import {
   formatSkillNameFrontmatterRepairReport,
   repairMissingSkillNameFrontmatter,
   repairSkillNameFrontmatterContent,
+  setSkillFrontmatterField,
 } from "./skill-frontmatter"
 
 const tempDirs: string[] = []
@@ -131,5 +132,129 @@ describe("repairMissingSkillNameFrontmatter", () => {
     expect(report).toContain("skills/commit/SKILL.md")
     expect(report).toContain("skills/broken/SKILL.md")
     expect(report).toContain("missing YAML frontmatter")
+  })
+})
+
+// Regression guard for the 2026-09-04 skill-body wipe: an ad-hoc description
+// rewrite used /^(---\n[\s\S]*?)(\ndescription:)([^\n]*(?:\n\s+[^\n]*)*)([\s\S]*?\n---)/
+// and rebuilt the file as m1+m2+new+m4. Group 4 ran to the CLOSING delimiter, so
+// every byte after the frontmatter was discarded: 38 SKILL.md files under
+// ~/.agents/skills were left frontmatter-only, and 47 symlinks propagated the
+// damage into their оpenclaw originals. Any frontmatter write MUST leave the
+// body byte-identical, which is what these cases pin.
+describe("setSkillFrontmatterField", () => {
+  function bodyOf(content: string): string {
+    const match = content.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/)
+    return match ? content.slice(match[0].length) : content
+  }
+
+  test("#given a skill with a body #when the description is rewritten #then the body bytes are identical", () => {
+    // given
+    const body = "# Commit\n\nStep one.\n\n## Rules\n\n- never force push\n"
+    const content = `---\nname: commit\ndescription: "old"\n---\n${body}`
+
+    // when
+    const result = setSkillFrontmatterField(content, "description", "new routing line")
+
+    // then
+    expect(result.changed).toBe(true)
+    expect(bodyOf(result.content)).toBe(body)
+    expect(result.content).toContain('description: "new routing line"')
+    expect(result.content).not.toContain('description: "old"')
+  })
+
+  test("#given a body containing a --- horizontal rule #when rewritten #then nothing after the frontmatter is lost", () => {
+    // given — the exact shape that made the original regex destructive
+    const body = "# Skill\n\nIntro.\n\n---\n\n## Section\n\nTail line.\n"
+    const content = `---\nname: x\ndescription: old\n---\n${body}`
+
+    // when
+    const result = setSkillFrontmatterField(content, "description", "replacement")
+
+    // then
+    expect(bodyOf(result.content)).toBe(body)
+    expect(result.content.endsWith("Tail line.\n")).toBe(true)
+  })
+
+  test("#given a multi-line folded description #when rewritten #then continuation lines are replaced and the body survives", () => {
+    // given
+    const body = "Body stays.\n"
+    const content = `---\nname: x\ndescription: first line\n  continued line\n  another\nlicense: MIT\n---\n${body}`
+
+    // when
+    const result = setSkillFrontmatterField(content, "description", "single line now")
+
+    // then
+    expect(bodyOf(result.content)).toBe(body)
+    expect(result.content).toContain("license: MIT")
+    expect(result.content).not.toContain("continued line")
+  })
+
+  test("#given CRLF frontmatter #when rewritten #then the body keeps its bytes and CRLF endings", () => {
+    // given
+    const body = "line one\r\nline two\r\n"
+    const content = `---\r\nname: x\r\ndescription: old\r\n---\r\n${body}`
+
+    // when
+    const result = setSkillFrontmatterField(content, "description", "new")
+
+    // then
+    expect(result.changed).toBe(true)
+    expect(bodyOf(result.content)).toBe(body)
+    expect(result.content).toContain("---\r\nname: x\r\ndescription: new\r\n---\r\n")
+  })
+
+  test("#given no frontmatter #when rewritten #then the content is refused untouched", () => {
+    // given
+    const content = "# Just a document\n\nNo frontmatter here.\n"
+
+    // when
+    const result = setSkillFrontmatterField(content, "description", "x")
+
+    // then
+    expect(result.changed).toBe(false)
+    expect(result.content).toBe(content)
+    expect(result.reason).toBe("missing YAML frontmatter")
+  })
+
+  test("#given the same value already quoted #when rewritten #then it reports no change", () => {
+    // given
+    const content = '---\nname: x\ndescription: "same"\n---\nBody\n'
+
+    // when
+    const result = setSkillFrontmatterField(content, "description", "same")
+
+    // then
+    expect(result.changed).toBe(false)
+    expect(result.content).toBe(content)
+  })
+
+  test("#given a missing field #when set #then it is appended to the frontmatter and the body survives", () => {
+    // given
+    const body = "# Doc\n\nText.\n"
+    const content = `---\nname: x\n---\n${body}`
+
+    // when
+    const result = setSkillFrontmatterField(content, "description", "added line")
+
+    // then
+    expect(result.changed).toBe(true)
+    expect(result.content).toBe(`---\nname: x\ndescription: "added line"\n---\n${body}`)
+  })
+
+  test("#given the exact regex that caused the 2026-09-04 wipe #when compared #then the helper keeps what it destroyed", () => {
+    // given — verbatim from the incident record; group 4 runs to the closing ---
+    const destructive = /^(---\n[\s\S]*?)(\ndescription:)([^\n]*(?:\n\s+[^\n]*)*)([\s\S]*?\n---)/
+    const body = "# Skill\n\nBody that must survive.\n"
+    const content = `---\nname: x\ndescription: old\n---\n${body}`
+
+    // when
+    const match = content.match(destructive)
+    const wiped = match ? `${match[1]}${match[2]} new${match[4]}` : content
+    const repaired = setSkillFrontmatterField(content, "description", "new")
+
+    // then
+    expect(bodyOf(wiped)).toBe("")
+    expect(bodyOf(repaired.content)).toBe(body)
   })
 })

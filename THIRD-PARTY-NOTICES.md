@@ -1,70 +1,22 @@
 # Third Party Notices
 
-This file enumerates third-party components redistributed by the root `oh-my-opencode` package surface from `package.json` `files[]`, root production dependencies, bundled MCP/runtime payloads, and the planned pinned CodeGraph provisioning payload for the CodeGraph OMO integration.
+This file enumerates third-party components redistributed by the root `oh-my-opencode` package surface from `package.json` `files[]`, root production dependencies, and bundled MCP/runtime payloads.
 
 Generator/checker note: update this file with the audited component list, then run `node scripts/check-third-party-notices.mjs`. Task 11 owns tarball ship verification.
 
 ## Components
 
-### @clack/core@1.3.0
-- License: MIT, from CodeGraph platform bundle `lib/node_modules/@clack/core/LICENSE`.
-- Copyright: Copyright (c) Nate Moore.
-- Upstream URL: https://github.com/bombshell-dev/clack
-- Where-bundled: CodeGraph platform bundle vendored dependency.
-
 ### @clack/prompts@1.5.0
 - License: MIT, from `node_modules/@clack/prompts/LICENSE`.
 - Copyright: Copyright (c) Nate Moore.
 - Upstream URL: https://github.com/bombshell-dev/clack
-- Where-bundled: root production dependency; CodeGraph platform bundles also vendor `@clack/prompts@1.3.0`.
+- Where-bundled: root production dependency.
 
 ### @code-yeongyu/comment-checker@0.8.0
 - License: MIT, from package metadata. The inspected package did not include a separate LICENSE file.
 - Copyright: Yeongyu Kim and contributors.
 - Upstream URL: https://github.com/code-yeongyu/go-claude-code-comment-checker
 - Where-bundled: root production dependency and vendored checker binary payload under `vendor/<platform>/`.
-
-### @colbymchenry/codegraph@1.5.0
-- License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
-- Copyright: CodeGraph contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
-- Where-bundled: pinned CodeGraph provisioning payload for the CodeGraph OMO integration.
-
-### @colbymchenry/codegraph-darwin-arm64@1.5.0
-- License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
-- Copyright: CodeGraph contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-darwin-arm64
-- Where-bundled: optional CodeGraph platform bundle for darwin arm64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
-
-### @colbymchenry/codegraph-darwin-x64@1.5.0
-- License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
-- Copyright: CodeGraph contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-darwin-x64
-- Where-bundled: optional CodeGraph platform bundle for darwin x64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
-
-### @colbymchenry/codegraph-linux-arm64@1.5.0
-- License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
-- Copyright: CodeGraph contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-linux-arm64
-- Where-bundled: optional CodeGraph platform bundle for linux arm64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
-
-### @colbymchenry/codegraph-linux-x64@1.5.0
-- License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
-- Copyright: CodeGraph contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-linux-x64
-- Where-bundled: optional CodeGraph platform bundle for linux x64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
-
-### @colbymchenry/codegraph-win32-arm64@1.5.0
-- License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
-- Copyright: CodeGraph contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-win32-arm64
-- Where-bundled: optional CodeGraph platform bundle for win32 arm64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
-
-### @colbymchenry/codegraph-win32-x64@1.5.0
-- License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
-- Copyright: CodeGraph contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-win32-x64
-- Where-bundled: optional CodeGraph platform bundle for win32 x64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
 
 ### @modelcontextprotocol/sdk@1.29.0
 - License: MIT, from `node_modules/@modelcontextprotocol/sdk/LICENSE`.
@@ -84,17 +36,29 @@ Generator/checker note: update this file with the audited component list, then r
 - Upstream URL: https://www.npmjs.com/package/@opencode-ai/sdk
 - Where-bundled: root production dependency for OpenCode API access.
 
-### CodeGraph bundled Node.js runtime
-- License: Node.js MIT license plus bundled third-party licenses for runtime components such as OpenSSL and V8. The inspected CodeGraph platform tarballs include the Node.js binary but no separate Node LICENSE or NOTICE files; the Codex CodeGraph component therefore ships Node.js v24.16.0 license text at `packages/omo-codex/plugin/components/codegraph/NODE-RUNTIME-LICENSES.md`.
-- Copyright: Node.js contributors, OpenSSL Software Foundation, V8 authors, and other Node.js third-party contributors.
-- Upstream URL: https://nodejs.org/
-- Where-bundled: each `@colbymchenry/codegraph-*` platform bundle includes `node` or `node.exe`.
+### @opentui/core@0.5.8
+- License: MIT, from `node_modules/@opentui/core/LICENSE`.
+- Copyright: Copyright (c) 2025 opentui.
+- Upstream URL: https://www.npmjs.com/package/@opentui/core
+- Where-bundled: root production dependency.
+
+### @opentui/keymap@0.5.8
+- License: MIT, from `node_modules/@opentui/keymap/LICENSE`.
+- Copyright: Copyright (c) 2025 opentui.
+- Upstream URL: https://www.npmjs.com/package/@opentui/keymap
+- Where-bundled: root production dependency.
+
+### @opentui/solid@0.5.8
+- License: MIT, from `node_modules/@opentui/solid/LICENSE`.
+- Copyright: Copyright (c) 2025 opentui.
+- Upstream URL: https://www.npmjs.com/package/@opentui/solid
+- Where-bundled: root production dependency.
 
 ### commander@14.0.3
 - License: MIT, from `node_modules/commander/LICENSE`.
 - Copyright: Copyright (c) 2011 TJ Holowaychuk.
 - Upstream URL: https://github.com/tj/commander.js
-- Where-bundled: root production dependency; CodeGraph platform bundles also vendor commander.
+- Where-bundled: root production dependency.
 
 ### detect-libc@2.1.2
 - License: Apache-2.0, from `node_modules/detect-libc/LICENSE`.
@@ -108,30 +72,6 @@ Generator/checker note: update this file with the audited component list, then r
 - Upstream URL: https://github.com/kpdecker/jsdiff
 - Where-bundled: root production dependency used by diff rendering and patch helpers.
 
-### fast-string-truncated-width@3.0.3
-- License: MIT, from CodeGraph platform bundle `lib/node_modules/fast-string-truncated-width/license`.
-- Copyright: Fabio Spampinato and contributors.
-- Upstream URL: https://github.com/fabiospampinato/fast-string-truncated-width
-- Where-bundled: CodeGraph platform bundle vendored dependency.
-
-### fast-string-width@3.0.2
-- License: MIT, from CodeGraph platform bundle `lib/node_modules/fast-string-width/license`.
-- Copyright: Fabio Spampinato and contributors.
-- Upstream URL: https://github.com/fabiospampinato/fast-string-width
-- Where-bundled: CodeGraph platform bundle vendored dependency.
-
-### fast-wrap-ansi@0.2.0
-- License: MIT, from CodeGraph platform bundle `lib/node_modules/fast-wrap-ansi/LICENSE`.
-- Copyright: James Garbutt and contributors.
-- Upstream URL: https://github.com/43081j/fast-wrap-ansi
-- Where-bundled: CodeGraph platform bundle vendored dependency.
-
-### ignore@7.0.5
-- License: MIT, from CodeGraph platform bundle `lib/node_modules/ignore/LICENSE-MIT`.
-- Copyright: ignore contributors.
-- Upstream URL: https://github.com/kaelzhang/node-ignore
-- Where-bundled: CodeGraph platform bundle vendored dependency.
-
 ### js-yaml@4.2.0
 - License: MIT, from `node_modules/js-yaml/LICENSE`.
 - Copyright: Copyright (C) 2011-2015 Vitaly Puzrin.
@@ -142,7 +82,7 @@ Generator/checker note: update this file with the audited component list, then r
 - License: MIT, from `node_modules/jsonc-parser/LICENSE.md`.
 - Copyright: Copyright (c) Microsoft.
 - Upstream URL: https://github.com/microsoft/node-jsonc-parser
-- Where-bundled: root production dependency and CodeGraph platform bundle vendored dependency.
+- Where-bundled: root production dependency.
 
 ### pi-comment-checker
 - License: MIT, from `packages/omo-codex/plugin/components/comment-checker/LICENSE` and component NOTICE.
@@ -172,7 +112,7 @@ Generator/checker note: update this file with the audited component list, then r
 - License: MIT, from `node_modules/picomatch/LICENSE`.
 - Copyright: Copyright (c) 2017-present, Jon Schlinkert.
 - Upstream URL: https://github.com/micromatch/picomatch
-- Where-bundled: root production dependency; CodeGraph platform bundles also vendor `picomatch@4.0.3`.
+- Where-bundled: root production dependency.
 
 ### posthog-node@5.35.12
 - License: Apache-2.0 text in `node_modules/posthog-node/LICENSE`; package metadata declares MIT.
@@ -180,26 +120,14 @@ Generator/checker note: update this file with the audited component list, then r
 - Upstream URL: https://github.com/PostHog/posthog-js
 - Where-bundled: root production dependency for anonymous telemetry.
 
-### sisteransi@1.0.5
-- License: MIT, from CodeGraph platform bundle `lib/node_modules/sisteransi/license`.
-- Copyright: Terkel Gjervig and contributors.
-- Upstream URL: https://github.com/terkelg/sisteransi
-- Where-bundled: CodeGraph platform bundle vendored dependency.
-
-### tree-sitter-wasms@0.1.13
-- License: Unlicense, from CodeGraph platform bundle `lib/node_modules/tree-sitter-wasms/LICENSE`.
-- Copyright: Gregor, Menci, and grammar contributors.
-- Upstream URL: https://github.com/Gregoor/tree-sitter-wasms
-- Where-bundled: CodeGraph platform bundle vendored dependency and bundled language grammar WASM files.
-
 ### vscode-jsonrpc@8.2.1
 - License: MIT, from `node_modules/vscode-jsonrpc/License.txt`.
 - Copyright: Copyright (c) Microsoft Corporation.
 - Upstream URL: https://github.com/microsoft/vscode-languageserver-node
 - Where-bundled: root production dependency for LSP JSON-RPC transport.
 
-### web-tree-sitter@0.25.10
-- License: MIT, from CodeGraph platform bundle `lib/node_modules/web-tree-sitter/LICENSE`.
-- Copyright: Max Brunsfeld and tree-sitter contributors.
-- Upstream URL: https://github.com/tree-sitter/tree-sitter
-- Where-bundled: CodeGraph platform bundle vendored dependency and bundled WebAssembly tree-sitter runtime.
+### zod@4.4.3
+- License: MIT, from `node_modules/zod/LICENSE`.
+- Copyright: Copyright (c) 2025 Colin McDonnell.
+- Upstream URL: https://zod.dev
+- Where-bundled: root production dependency.

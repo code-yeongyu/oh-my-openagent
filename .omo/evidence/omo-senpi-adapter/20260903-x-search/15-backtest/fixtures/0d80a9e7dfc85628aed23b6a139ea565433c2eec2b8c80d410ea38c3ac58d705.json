@@ -1,0 +1,274 @@
+{
+  "queryId": "q17",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"삼성전자 HBM 시장 반응 since:2026-08-14 until:2026-08-27\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-14",
+        "to_date": "2026-08-27"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422176,
+    "completed_at": 1788422176,
+    "id": "ab0b4af6-d3b3-9959-a144-376d8af7b592",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_ab0b4af6-d3b3-9959-a144-376d8af7b592_call-86de1a1b-a1c5-490a-94b5-b6ea6c41260f-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "삼성전자 HBM 시장 반응",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.mt.co.kr/industry/2026/07/15/2026071515184935358"
+            },
+            {
+              "type": "url",
+              "url": "https://www.cna.com.tw/news/afe/202605290140.aspx"
+            },
+            {
+              "type": "url",
+              "url": "https://www.segye.com/newsView/20260623504144"
+            },
+            {
+              "type": "url",
+              "url": "https://www.businesspost.co.kr/BP?command=article_view&num=440632"
+            },
+            {
+              "type": "url",
+              "url": "https://www.chaincatcher.com/zh-tw/article/2279143"
+            },
+            {
+              "type": "url",
+              "url": "https://www.theblockbeats.info/news/63474"
+            },
+            {
+              "type": "url",
+              "url": "https://n.news.naver.com/article/016/0002690803"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mt.co.kr/industry/2025/12/14/2025121413485892165"
+            },
+            {
+              "type": "url",
+              "url": "https://www.junggi.co.kr/news/articleView.html?idxno=36755"
+            },
+            {
+              "type": "url",
+              "url": "https://n.news.naver.com/article/421/0009136402"
+            },
+            {
+              "type": "url",
+              "url": "https://www.donga.com/news/Economy/article/all/20260623/134164302/1"
+            },
+            {
+              "type": "url",
+              "url": "https://en.fnnews.com/news/202608310944394777"
+            },
+            {
+              "type": "url",
+              "url": "https://www.ajunews.com/view/20260824144015652"
+            },
+            {
+              "type": "url",
+              "url": "https://www.eet-china.com/news/202609012788.html"
+            },
+            {
+              "type": "url",
+              "url": "https://www.joongang.co.kr/article/25432519"
+            },
+            {
+              "type": "url",
+              "url": "https://news.futunn.com/en/post/78039564/bernstein-analysis-samsung-accelerates-hbm4-volume-ramp-up-q3-revenue"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/en/stock/12140044"
+            },
+            {
+              "type": "url",
+              "url": "https://www.choicestock.co.kr/stock/news_view/136414?bu="
+            },
+            {
+              "type": "url",
+              "url": "https://biz.heraldcorp.com/article/10665257"
+            },
+            {
+              "type": "url",
+              "url": "https://www.sedaily.com/article/14164537"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_ab0b4af6-d3b3-9959-a144-376d8af7b592_call-86de1a1b-a1c5-490a-94b5-b6ea6c41260f-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**삼성전자 HBM(고대역폭메모리) 시장 반응은 2026년 들어 매우 긍정적으로 전환**되고 있습니다. SK하이닉스에 밀려 2025년 점유율 3위(약 17~18%)까지 떨어졌던 삼성전자가 **HBM4** 양산 성공과 고객 기반 확대(특히 ASIC·구글·AMD 등)로 빠르게 추격하며, **2026~2027년 시장 1위 탈환** 전망이 나오고 있습니다.\n\n### 주요 시장 반응 및 전망 요약\n- **HBM4 실적 폭발**: 2026년 2월 세계 최초 양산 출하 후 약 4개월(130일) 만에 누적 매출 **10억 달러(약 1.5조 원)** 돌파, 6월 말 기준 12억 달러 이상 예상. 첫해(2026년) 매출 **100억 달러(약 15조 원)** 이상 전망. HBM4가 올해 하반기 전체 HBM 매출의 **60% 이상**을 차지할 것으로 회사 측 전망.[[1]](https://www.mt.co.kr/industry/2026/07/15/2026071515184935358)\n\n- **증권사·투자은행 전망**:\n  - UBS: 2027년 삼성 HBM 점유율 **41%** (SK하이닉스 39%)로 1위.\n  - 번스타인(Bernstein): 2027년 **46%** (SK 37%)로 1위. 2026년 3분기 HBM 매출이 기존 예측보다 30% 상향(약 120억 달러) 가능성 제시. 한국 수출 데이터(단위 가치 2배 상승)로 HBM4 방량 가속 확인.[[2]](https://www.theblockbeats.info/news/63474)\n  - LS증권: HBM4 출하 비중이 1분기 5% → 2분기 35%로 급증, 수율도 5%p 이상 개선. 삼성전자 목표주가 **45만원**으로 상향 (기존 40만원), SK하이닉스는 **240만원**으로 대폭 하향 (기존 330만원).[[3]](https://n.news.naver.com/article/016/0002690803)\n\n- **주가 및 시장 심리 반응**:\n  - HBM4E 샘플 선제 출하(2026년 5월) 소식에 삼성전자 주가 **6.5% 급등** (KOSPI 상승률 2.3% 대비 크게 상회).[[4]](https://www.cna.com.tw/news/afe/202605290140.aspx)\n  - 엔비디아 ‘베라 루빈(Vera Rubin)’ 양산 공식화(2026년 8월)로 HBM4 수혜 기대감 ↑. 삼성은 HBM4를 이미 공급 중이며, 최근 엔비디아를 위한 8층 HBM4E 개발도 진행 중.[[5]](https://n.news.naver.com/article/421/0009136402)\n\n### 긍정적 요인\n- **고객 다변화**: 기존 엔비디아 중심에서 구글·아마존·마이크로소프트·메타·브로드컴 등 **ASIC** 수요 확대. 구글 HBM 수요 비중이 2026년 30%까지 증가 예상.\n- **기술 우위**: HBM4 속도 11.7Gbps (JEDEC 기준 대비 46%↑), 전력 효율 40~50% 개선. HBM4E(12층)는 이전 세대보다 20% 이상 빠름. “삼성이 돌아왔다”는 고객 평가.\n- **장기 계약**: 글로벌 10대 테크 기업과 5년 롤링 LTA(장기공급계약) 체결, 60~70%产能 선점.\n\n### 여전한 불확실성\n- 2025년 기준 SK하이닉스 점유율이 58~62%로 여전히 앞서며, 엔비디아 Rubin 플랫폼에서는 SK가 주도적.\n- 수율 안정화와 전력·인증 문제가 완전히 해결돼야 본격 1위 등극 가능.\n- 일부 분석에서는 2026년에도 SK하이닉스가 매출 기준 50% 내외를 유지할 수 있다는 의견 존재.\n\n**전반적 시장 분위기**는 “삼성전자가 HBM4를 앞세워 D램·낸드에 이어 HBM까지 **메모리 전 분야 1위**로 복귀할 가능성이 높아졌다”는 쪽으로 기울고 있습니다. 2026년 하반기~2027년 실적과 점유율 변화가 핵심 관전 포인트입니다.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://www.mt.co.kr/industry/2026/07/15/2026071515184935358",
+                "start_index": 421,
+                "end_index": 488,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.theblockbeats.info/news/63474",
+                "start_index": 700,
+                "end_index": 748,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://n.news.naver.com/article/016/0002690803",
+                "start_index": 880,
+                "end_index": 934,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.cna.com.tw/news/afe/202605290140.aspx",
+                "start_index": 1036,
+                "end_index": 1092,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://n.news.naver.com/article/421/0009136402",
+                "start_index": 1206,
+                "end_index": 1260,
+                "title": "5"
+              }
+            ]
+          }
+        ],
+        "id": "msg_ab0b4af6-d3b3-9959-a144-376d8af7b592",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 227215500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 227215500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:56:12.444Z"
+}

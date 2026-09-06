@@ -1,0 +1,8 @@
+Todo 16 is prose/data/evidence work. There is no RED assertion and no test that pins documentation wording.
+
+Named deterministic checks (not a failing unit test):
+- named inventory files exist
+- `bun run build:senpi-plugin` exits 0
+
+Those checks are recorded in green.txt / build.txt / pre-check.txt.
+A missing AGENTS.md or a non-zero build would be the failure mode; neither was forced for a red capture.

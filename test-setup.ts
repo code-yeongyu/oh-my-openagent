@@ -29,11 +29,12 @@ const { loadPiTui } = await import("./packages/senpi-task/src/lazy/pi-tui")
 const { loadSenpiBarrel } = await import("./packages/senpi-task/src/lazy/senpi-barrel")
 await Promise.all([loadPiTui(), loadSenpiBarrel()])
 
-// setDefaultTimeout is per-file when a TEST file calls it, but the preload runs before every file and
-// its value becomes the default each file starts from. CI runners need multiples of the local time for
-// the same git/npm/installer subprocesses, so raise the floor here once rather than rediscovering the
-// class one flaking suite at a time. A file that needs more still sets its own budget, and a file that
-// wants the strict default can lower it locally.
+// This raises the floor for the FIRST test file of a sequential run only: Bun (1.4.0/1.4.1) resets
+// the default to its built-in 5000ms for every later file, and only the CLI flag reaches all of them
+// (bunfig [test] timeout and a beforeEach re-assert were both measured not to). CI therefore passes
+// --timeout explicitly: the Windows wrapper injects 30000 for every job it launches, and the POSIX
+// multi-file invocations in ci.yml carry 20000. Keep those three numbers in step. Local single-file
+// runs get this value; a file that needs more still sets its own budget.
 setDefaultTimeout(process.platform === "win32" ? 30_000 : 20_000)
 
 // Skill/agent/command discovery reads the developer's real HOME (~/.agents/skills,

@@ -58,4 +58,16 @@ describe("bundled model capabilities snapshot", () => {
       })
     }
   })
+
+  test("reports the 1M context window for Luna and Luna Fast", () => {
+    // given
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
+    const modelIDs = ["openai/gpt-5.6-luna", "openai/gpt-5.6-luna-fast"]
+
+    // when
+    const results = modelIDs.map((modelID) => bundledSnapshot.models[modelID]?.limit?.context)
+
+    // then
+    expect(results).toEqual([1_050_000, 1_050_000])
+  })
 })

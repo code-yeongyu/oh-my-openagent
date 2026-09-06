@@ -58,7 +58,7 @@ async function registerFooterScenario(input: {
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent({
     resolveOmoBin: () => "/tmp/omo",
-    planDirExists: () => true,
+    planExists: () => true,
     runCommand: async () => ({ code: 0, stdout: input.outputs.shift() ?? activeStatus() }),
     footerStatus: {
       isGoalActive: input.goalActive,
@@ -87,7 +87,7 @@ async function defaultFooterScenario(sessionId: string, outputs = [activeStatus(
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent({
     resolveOmoBin: () => "/tmp/omo",
-    planDirExists: () => true,
+    planExists: () => true,
     runCommand: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     footerStatus: { timers },
   }).register(pi, {

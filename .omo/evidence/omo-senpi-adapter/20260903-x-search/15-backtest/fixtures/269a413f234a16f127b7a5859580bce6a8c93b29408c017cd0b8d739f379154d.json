@@ -1,0 +1,293 @@
+{
+  "queryId": "q05",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"코스피 반도체 외인 매수 since:2026-08-31 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-31",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421374,
+    "completed_at": 1788421374,
+    "id": "b0f4b6d4-0750-96b3-babc-c11a874cbd63",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_b0f4b6d4-0750-96b3-babc-c11a874cbd63_call-4d6bc7a3-3b46-4531-a9a9-1ca2b69cb3f5-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "코스피 반도체 외인 매수",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://m.ekn.kr/view.php?key=20260724020015790"
+            },
+            {
+              "type": "url",
+              "url": "https://github.com/james-brand/korea-market-data"
+            },
+            {
+              "type": "url",
+              "url": "https://dealsite.co.kr/articles/167443"
+            },
+            {
+              "type": "url",
+              "url": "https://en.sedaily.com/finance/2026/05/26/chip-retail-frenzy-powers-kospi-rally-but-diversification"
+            },
+            {
+              "type": "url",
+              "url": "https://dealsite.co.kr/articles/155011"
+            },
+            {
+              "type": "url",
+              "url": "https://www.ajunews.com/view/20260818091055490"
+            },
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=u-CajLhIAho"
+            },
+            {
+              "type": "url",
+              "url": "https://www.koreaherald.com/article/10826609"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/jp/stock/12029646"
+            },
+            {
+              "type": "url",
+              "url": "https://www.joongang.co.kr/article/25418431"
+            },
+            {
+              "type": "url",
+              "url": "https://www.joongang.co.kr/article/25418231"
+            },
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=PIpdbLx6ZhU"
+            },
+            {
+              "type": "url",
+              "url": "https://finance.daum.net/news/20260828160331328"
+            },
+            {
+              "type": "url",
+              "url": "https://www.newsis.com/view/NISX20260901_0003770745"
+            },
+            {
+              "type": "url",
+              "url": "https://biz.heraldcorp.com/article/10601868"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_b0f4b6d4-0750-96b3-babc-c11a874cbd63_call-4d6bc7a3-3b46-4531-a9a9-1ca2b69cb3f5-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**코스피 반도체 외국인 매수 관련 최근 동향 (2026년 기준)**\n\n외국인 투자자들은 2026년 들어 코스피에서 **반도체 대형주(삼성전자, SK하이닉스 중심)**를 집중적으로 매수하며 지수 상승을 주도하는 경우가 많았습니다. AI 수요 확대, 메모리 반도체 업황 개선 기대, 저가 매수 기회 등이 주요 요인으로 작용했습니다. 다만 최근(8~9월)에는 미국의 추가 관세 검토 보도 등으로 변동성이 커지며 매도 전환되는 모습도 보입니다.[[1]](https://m.ekn.kr/view.php?key=20260724020015790)\n\n### 주요 최근 사례\n- **2026년 7월 하순~8월 초**: 반도체주 급락 후 외국인이 저가 매수에 적극 나섰습니다. 7월 20~23일 4거래일 연속 순매수에서 **SK하이닉스**와 **삼성전자**가 순매수 1·2위를 차지했으며, 두 종목이 외국인 순매수 금액의 60%를 차지했습니다. 이 기간 외국인 총 순매수 규모는 수조 원대에 달했습니다.[[1]](https://m.ekn.kr/view.php?key=20260724020015790)\n- **7월 23일경**: 반도체 대장주 30~40% 급락 후 외국인이 3거래일 동안 **4조 5,771억 원** 순매수(삼성전자 1조 5,638억 원, SK하이닉스 1조 4,819억 원). 하루 최대 2조 6,211억 원 매수 기록. 모건스탠리 등 글로벌 IB도 “매수 기회”로 태도를 전환했습니다.[[2]](https://www.youtube.com/watch?v=u-CajLhIAho)\n- **8월 18일**: 외국인 **7,356억 원** 순매수로 코스피 2%대 상승을 이끌며 7,100선 회복. SK하이닉스(+6.32%), 삼성전자(+3.46%) 등 반도체주 강세.[[3]](https://www.ajunews.com/view/20260818091055490)\n- **7월 31일**: 필라델피아 반도체지수 급등 영향으로 코스피 17% 가까이 상승(6,500선 회복). 외국인이 단시간에 **4조 원** 순매수하며 랠리를 주도했습니다.[[4]](https://www.koreaherald.com/article/10826609)\n\n### 최근(8월 말~9월 초) 흐름\n- **8월 28일**: 미국의 반도체 추가 관세 검토 보도로 코스피 1.79% 하락. 외국인 **1조 7,564억 원** 순매도(기관도 매도). 삼성전자(-3.38%), SK하이닉스(-4.45%) 등 반도체주 약세.[[5]](https://finance.daum.net/news/20260828160331328)\n- **9월 1일**: 외국인 **940억 원**, 기관 **1,297억 원** 순매도로 코스피 0.52% 하락 출발. 삼성전자·SK하이닉스 등 반도체 대형주가 1% 안팎 하락.[[6]](https://www.newsis.com/view/NISX20260901_0003770745)\n\n### 연초~중반 전체 흐름\n- 연초부터 외국인 순매수가 반도체 업종에 집중되며 코스피 5,000~6,500선 상승을 견인했습니다. 반도체가 지수 상승 기여도의 대부분을 차지한 구간도 있었습니다.[[7]](https://dealsite.co.kr/articles/155011)\n- 다만 7월 중순까지는 대규모 순매도(33조 원 규모) 구간도 있었으며, 개인(개미)은 반대로 미국 반도체 ETF(SOXL 등)를 집중 매수하는 “국경을 넘은 반도체 사랑” 현상이 나타났습니다.[[1]](https://m.ekn.kr/view.php?key=20260724020015790)[[8]](https://dealsite.co.kr/articles/167443)\n\n### 추가 참고 자료\n- 일별·섹터별 외국인 매수 데이터: GitHub 저장소(korea-market-data)에서 KOSPI/KOSDAQ 전 종목 및 KRX 섹터 지수별 외국인 흐름을 영어 CSV/JSON으로 확인 가능 (매일 업데이트).[[9]](https://github.com/james-brand/korea-market-data)\n\n최신 실시간 데이터는 한국거래소(KRX)나 네이버증권·다음증권에서 “외국인 순매수 상위”나 “반도체 업종 수급”을 검색해 확인하는 것을 추천합니다. 시장은 변동성이 크니 최신 뉴스를 지속적으로 체크하세요.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://m.ekn.kr/view.php?key=20260724020015790",
+                "start_index": 245,
+                "end_index": 299,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://m.ekn.kr/view.php?key=20260724020015790",
+                "start_index": 496,
+                "end_index": 550,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.youtube.com/watch?v=u-CajLhIAho",
+                "start_index": 719,
+                "end_index": 769,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.ajunews.com/view/20260818091055490",
+                "start_index": 872,
+                "end_index": 925,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.koreaherald.com/article/10826609",
+                "start_index": 1023,
+                "end_index": 1074,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://finance.daum.net/news/20260828160331328",
+                "start_index": 1218,
+                "end_index": 1272,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.newsis.com/view/NISX20260901_0003770745",
+                "start_index": 1372,
+                "end_index": 1430,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://dealsite.co.kr/articles/155011",
+                "start_index": 1541,
+                "end_index": 1586,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://m.ekn.kr/view.php?key=20260724020015790",
+                "start_index": 1696,
+                "end_index": 1750,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://dealsite.co.kr/articles/167443",
+                "start_index": 1750,
+                "end_index": 1795,
+                "title": "8"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://github.com/james-brand/korea-market-data",
+                "start_index": 1932,
+                "end_index": 1987,
+                "title": "9"
+              }
+            ]
+          }
+        ],
+        "id": "msg_b0f4b6d4-0750-96b3-babc-c11a874cbd63",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 203060500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 203060500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:42:54.395Z"
+}

@@ -2,6 +2,7 @@
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, extname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter"
 import { createNativeSkillSources } from "./native-skill-sources.mjs"
 import { insertSenpiCompatibilityGuidance } from "./senpi-compatibility-guidance.mjs"
 import { applySenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
@@ -34,15 +35,9 @@ const sectionHeadingsToStrip = new Set([
 ])
 const forbiddenGuidancePattern = /\b(?:multi_agent|spawn_agent|update_plan)\b/i
 
-const sourceTestFilePattern = /\.test\.ts$/
-const ignoredSkillSourceDirNames = new Set([
-  ".mypy_cache",
-  ".omo",
-  ".pytest_cache",
-  ".ruff_cache",
-  "__pycache__",
-])
-const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json", "openai.yaml"])
+
+/** senpi additionally excludes the generated Codex agent manifest from packaged skills. */
+const senpiFilterOptions = { ignoredFileNames: ["openai.yaml"] }
 
 function isTextFile(path) {
   return textExtensions.has(extname(path))
@@ -203,17 +198,6 @@ function applySharedTierAdaptation(skillName, content) {
   return normalizeBlankLines(adapted)
 }
 
-function shouldCopySkillSource(source) {
-  const normalized = source.replaceAll("\\", "/")
-  const segments = normalized.split("/")
-  const name = segments.at(-1) ?? ""
-  if (segments.some((segment) => ignoredSkillSourceDirNames.has(segment))) return false
-  if (ignoredSkillSourceFileNames.has(name)) return false
-  if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false
-  const scriptsIndex = segments.lastIndexOf("scripts")
-  return scriptsIndex === -1 || segments[scriptsIndex + 1] !== "tests"
-}
-
 async function listFiles(root) {
   const entries = await readdir(root, { withFileTypes: true })
   const files = []
@@ -257,14 +241,14 @@ export async function syncSkills() {
   for (const { name, source } of skillSources) {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
-    await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
+    await cp(source, destination, { filter: createSkillSourceCopyFilter(source, senpiFilterOptions), recursive: true })
     await adaptSkillTree(destination, normalizeBlankLines)
   }
 
   for (const { name, source } of nativeSkillSources) {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
-    await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
+    await cp(source, destination, { filter: createSkillSourceCopyFilter(source, senpiFilterOptions), recursive: true })
     await adaptSkillTree(destination, normalizeBlankLines)
   }
 
@@ -278,7 +262,7 @@ export async function syncSkills() {
     if (componentSkillNames.has(skillName) || nativeSkillNames.has(skillName)) continue
     const source = join(sharedSkillsRoot, skillName)
     const destination = join(skillsRoot, skillName)
-    await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
+    await cp(source, destination, { filter: createSkillSourceCopyFilter(source, senpiFilterOptions), recursive: true })
     await adaptSkillTree(destination, (content) => applySharedTierAdaptation(skillName, content))
   }
 

@@ -1,0 +1,15 @@
+bun test v1.4.0 (34cbb9a40)
+EXIT=0
+
+packages/omo-senpi/src/components/memory/recall-reingestion.test.ts:
+
+packages/omo-senpi/src/components/memory/recall-wiring.test.ts:
+(pass) createMemoryRecallWiring pending-nudge injection > #given a memory worker child sentinel #when a nudge is pending #then the child receives nothing [52.27ms]
+(pass) createMemoryRecallWiring collectCandidates > #given a memory worker child sentinel #when candidates are collected #then nothing is collected [40.60ms]
+
+ 2 pass
+ 26 filtered out
+ 0 fail
+ 6 expect() calls
+Ran 2 tests across 2 files. [1416.00ms]
+

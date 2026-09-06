@@ -1,0 +1,2 @@
+secret scan: PASS (no matching files)
+artifact_files=34

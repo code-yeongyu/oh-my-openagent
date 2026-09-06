@@ -32,7 +32,7 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // 1,000,377 bytes; 1,050,000 preserves explicit headroom per this comment's own rule (never the failing
 // value). Still no new third-party dependency - bundle-purity green against the merged manifest.
 // Raised 710,000 -> 880,000 for plan letta-memory-parity-port: the new `memory` component ports the
-// full Letta-Code local memory engine (git-backed MemFS, memory/memory_apply_patch tools, prompt
+// full Letta-Code local memory engine (git-backed MemFS, memory tool, prompt
 // compiler, reflection/dreaming worker + state machine, palace viewer, transcript search, git sync
 // mirror) plus the harness-neutral `@oh-my-opencode/memory-core` package. It is a single self-contained
 // user feature wired into the extension entry; the imports span the whole engine (nothing accidental

@@ -21,7 +21,17 @@ Every subcommand below is implemented. Pass `--json` where supported for machine
 | `omo-agent-toolkit ulw-loop record-evidence` | Record observable evidence for one criterion. |
 | `omo-agent-toolkit ulw-loop record-review-blockers` | Mark a goal as review-blocked and add follow-up work from final-review findings. |
 
-The final quality gate parsed by `checkpoint` validates `codeReview`, `manualQa`, `gateReview`, `iteration`, and `criteriaCoverage`. `criteriaCoverage` records the original intent, desired outcome, user-facing outcome review, pass counts, and covered adversarial classes.
+The final quality gate parsed by `checkpoint` validates `codeReview`, `manualQa`, `gateReview`, `iteration`, and `criteriaCoverage`, reporting all defects together in one invocation. `criteriaCoverage` records the original intent, desired outcome, user-facing outcome review, pass counts, and covered adversarial classes. The companion `codex-goal-json` must contain `goal.objective` equal to the plan's `codexObjective` verbatim.
+
+A complete passing checkpoint uses both payloads:
+
+```json
+{"goal":{"objective":"Ship the requested behavior","status":"complete"}}
+```
+
+```json
+{"gateReview":{"by":"lazycodex-gate-reviewer","recommendation":"APPROVE","reportPath":".omo/evidence/gate-review.md","evidence":"Gate review passed.","blockers":[],"notes":[]},"manualQa":{"by":"lazycodex-qa-executor","status":"passed","evidence":"Manual QA passed.","surfaceEvidence":[{"id":"cli","criterionRef":"C1","surface":"cli","invocation":"omo-agent-toolkit ulw-loop checkpoint --json","verdict":"passed","artifactRefs":["cli-artifact"]}],"adversarialCases":[{"id":"malformed","criterionRef":"C2","scenario":"Malformed input","expectedBehavior":"Rejected","verdict":"not_applicable","reason":"Not triggered","artifactRefs":["cli-artifact"]}],"artifactRefs":[{"id":"cli-artifact","kind":"cli-transcript","description":"Passing CLI transcript","path":".omo/evidence/cli.txt"}]},"codeReview":{"by":"lazycodex-code-reviewer","recommendation":"APPROVE","codeQualityStatus":"CLEAR","reportPath":".omo/evidence/code-review.md","evidence":"Code review passed.","blockers":[]},"iteration":{"fullRerun":true,"status":"passed","rerunCommands":["bun test"],"evidence":"Full rerun passed."},"criteriaCoverage":{"totalCriteria":2,"passCount":2,"originalIntent":"Ship the requested behavior","desiredOutcome":"The behavior works for users.","userOutcomeReview":"The result matches the requested outcome.","adversarialClassesCovered":["malformed_input"]}}
+```
 
 Validation batches are optional review boundaries declared at plan creation with `--validation-batch-json '[{"batchId":"VB001","memberIds":[...],"finalGoalId":"..."}]'`. The batch-final goal cannot complete until every other member is complete or superseded-resolved, every member criterion is pass, and a quality gate's coverage counts match the recomputed member criteria. Steering split/supersede mutations keep batch membership consistent and record `batch_updated`.
 

@@ -1,0 +1,296 @@
+{
+  "queryId": "q18",
+  "lane": "web",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"xAI Grok API changes since:2026-08-13 until:2026-08-31\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-13",
+        "to_date": "2026-08-31"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788423314,
+    "completed_at": 1788423314,
+    "id": "599c196b-d14d-9649-bd0f-b0200870a7fc",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_599c196b-d14d-9649-bd0f-b0200870a7fc_call-d10e006f-eca3-4cc0-94b2-2a5c80542869-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "xAI Grok API changes",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://docs.x.ai/developers/migration/may-15-retirement"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/docs/developers/grok-4-5"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/api/changelog"
+            },
+            {
+              "type": "url",
+              "url": "https://aiweekly.co/alerts/xai-cuts-grok-api-to-single-model-at-125m"
+            },
+            {
+              "type": "url",
+              "url": "https://www.infoq.com/news/2026/05/xai-grok-skills/"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/docs/release-notes"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/docs/developers/pricing"
+            },
+            {
+              "type": "url",
+              "url": "https://www.therundown.ai/tools/grok-4-1"
+            },
+            {
+              "type": "url",
+              "url": "https://docs.x.ai/developers/migration/imagine-image-quality-nov-2"
+            },
+            {
+              "type": "url",
+              "url": "https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/11-custom-models.md"
+            },
+            {
+              "type": "url",
+              "url": "https://r.jina.ai/https:/docs.x.ai/docs/models"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/docs/developers/advanced-api-usage/batch-api"
+            },
+            {
+              "type": "url",
+              "url": "https://www.socialmediatoday.com/news/x-formerly-twitter-announces-new-api-pricing-structure-xai/811667/"
+            },
+            {
+              "type": "url",
+              "url": "https://x.com/xai/status/2060392252858589669"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/api?via=topaitools"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_599c196b-d14d-9649-bd0f-b0200870a7fc_call-d10e006f-eca3-4cc0-94b2-2a5c80542869-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**Major recent changes to the xAI Grok API (as of September 2026) include model retirements, new frontier model releases, pricing adjustments, and feature enhancements.**[[1]](https://docs.x.ai/developers/migration/may-15-retirement)\n\n### May 15, 2026: Major Model Retirement and Consolidation\nxAI retired eight older Grok model variants effective May 15, 2026, at 12:00 PM PT to focus on newer generations. The retired models were:\n- grok-4-1-fast-reasoning\n- grok-4-1-fast-non-reasoning\n- grok-4-fast-reasoning\n- grok-4-fast-non-reasoning\n- grok-4-0709\n- grok-code-fast-1\n- grok-3\n- grok-imagine-image-pro\n\nRequests to these legacy slugs now **automatically redirect** to `grok-4.3` (or `grok-build-0.1` for the code variant). The slugs continue to resolve without requiring code changes, but:\n- Reasoning variants redirect with specific effort levels (e.g., low or none).\n- Pricing shifts to `grok-4.3` rates: **$1.25 per 1M input tokens** and **$2.50 per 1M output tokens** (higher than many prior models).\n- Redirects may break streaming, function calling, or other workloads—explicit migration to the new model is recommended for control and reliability.[[1]](https://docs.x.ai/developers/migration/may-15-retirement)\n\nThis effectively consolidated the API toward fewer flagship models. A follow-up retirement for `grok-imagine-image-quality` is scheduled for November 2, 2026, redirecting to `grok-imagine-image-2.0` (at lower cost for equivalent quality).[[2]](https://docs.x.ai/developers/migration/imagine-image-quality-nov-2)\n\n### New Model Releases\n- **Grok 4.6** (August 2026): The current frontier model optimized for coding, agentic tasks, and knowledge work.\n  - Context window: 500k tokens.\n  - Knowledge cutoff: February 1, 2026.\n  - Modalities: Text + image input, text output (no output limit).\n  - Reasoning effort: Low, medium, high (default), or xhigh.\n  - Pricing: $2.00 / $0.50 (cached) / $6.00 per 1M tokens (short context); higher for long context (≥200k).\n  - Available via Responses API, Chat Completions, and integrated in tools like Cursor, Grok Build, OpenRouter.[[3]](https://x.ai/docs/developers/grok-4-5)\n\n- Earlier in 2026: Grok 4.5 and Grok 4.3 were released with similar capabilities (coding/agentic focus, configurable reasoning, up to 1M context in some cases). Grok 4.1 variants were among those retired in May.[[4]](https://x.ai/docs/release-notes)\n\n- Specialized models like `grok-build-0.1` (for agentic coding, ~$1–2 per 1M tokens) and various Imagine models for image/video generation were also updated or added.[[5]](https://x.com/xai/status/2060392252858589669)\n\n### Pricing Overview (Current as of mid-2026)\nPricing is usage-based and tiered by context length. Examples (per 1M tokens, USD):\n- **grok-4.6**: $2.00 input / $0.50 cached / $6.00 output (short); doubles for long context.\n- **grok-4.3 / grok-4.20 variants**: $1.25 input / $0.20–0.40 cached / $2.50 output (with long-context surcharges).\n- **grok-build-0.1**: Lower at ~$1.00 input / $2.00 output.\n- Batch API offers discounts (e.g., 20% on certain models). Imagine (image/video) and Voice APIs have separate per-image/second/character rates.[[6]](https://x.ai/docs/developers/pricing)\n\nCaching, prompt caching keys, and context compaction are heavily encouraged to reduce costs, especially for long agent loops.\n\n### Other Notable Updates\n- **Tools and API enhancements**: Improved function/tool calling (parallel calls, up to 128 tools), server-side execution for web/X search, code interpreter. Responses API updates, Grok Skills for persistent custom expertise, and better integration with agentic workflows.[[7]](https://www.infoq.com/news/2026/05/xai-grok-skills/)\n- **Console and features**: Public changelog, usage insights, voice cloning, image/video generation in playground, Batch API support (not all models, e.g., Grok 4.6 excluded from Batch in some cases), and mobile/console improvements.[[8]](https://x.ai/api/changelog)\n- **Compatibility**: OpenAI/Anthropic SDK compatible; custom model support for third-party or self-hosted backends.[[9]](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/11-custom-models.md)\n- **X API integration**: X (formerly Twitter) updated its own API pricing and introduced xAI credits as incentives for heavy X API users.[[10]](https://www.socialmediatoday.com/news/x-formerly-twitter-announces-new-api-pricing-structure-xai/811667/)\n\nFor the latest details, check the official docs at [docs.x.ai](https://docs.x.ai) or the console at [console.x.ai](https://console.x.ai). Model pages include specific rate limits, benchmarks, and migration guides. Changes emphasize fewer, more capable models with better tooling for agents and developers.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://docs.x.ai/developers/migration/may-15-retirement",
+                "start_index": 170,
+                "end_index": 233,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://docs.x.ai/developers/migration/may-15-retirement",
+                "start_index": 1160,
+                "end_index": 1223,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://docs.x.ai/developers/migration/imagine-image-quality-nov-2",
+                "start_index": 1463,
+                "end_index": 1536,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.ai/docs/developers/grok-4-5",
+                "start_index": 2095,
+                "end_index": 2139,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.ai/docs/release-notes",
+                "start_index": 2352,
+                "end_index": 2390,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/xai/status/2060392252858589669",
+                "start_index": 2558,
+                "end_index": 2609,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.ai/docs/developers/pricing",
+                "start_index": 3154,
+                "end_index": 3197,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.infoq.com/news/2026/05/xai-grok-skills/",
+                "start_index": 3624,
+                "end_index": 3682,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.ai/api/changelog",
+                "start_index": 3916,
+                "end_index": 3949,
+                "title": "8"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/11-custom-models.md",
+                "start_index": 4065,
+                "end_index": 4185,
+                "title": "9"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.socialmediatoday.com/news/x-formerly-twitter-announces-new-api-pricing-structure-xai/811667/",
+                "start_index": 4323,
+                "end_index": 4435,
+                "title": "10"
+              }
+            ]
+          }
+        ],
+        "id": "msg_599c196b-d14d-9649-bd0f-b0200870a7fc",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 191549500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 191549500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:15:14.096Z"
+}

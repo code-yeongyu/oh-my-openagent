@@ -1,0 +1,12 @@
+Remote bunshin RED (mengmotaMac; RED commit d4c627165)
+
+bun test packages/model-core/src/model-settings-compatibility.test.ts packages/model-core/src/model-requirements-categories.test.ts
+
+5 tests failed:
+- GPT-6 Astra compatibility: family not recognized, max downgraded, aliases dropped, temperature retained
+- ultrabrain/deep/visual-engineering Astra routing assertions failed
+
+89 pass
+5 fail
+218 expect() calls
+Ran 94 tests across 2 files.

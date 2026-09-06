@@ -1,0 +1,272 @@
+{
+  "queryId": "q10",
+  "lane": "web",
+  "variant": "v2",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Bun 1.4 javascript since:2026-08-26 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-26",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422462,
+    "completed_at": 1788422462,
+    "id": "7cc85068-c74a-9953-aeb0-021e98d12e7a",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_7cc85068-c74a-9953-aeb0-021e98d12e7a_call-69e6bd2e-c13e-4e92-9c00-e836a11f7bb7-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "Bun 1.4 javascript",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=i38DgEuaJwM"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/docs"
+            },
+            {
+              "type": "url",
+              "url": "https://gihyo.jp/article/2026/08/bun-1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://appwrite.io/blog/post/announcing-bun-1-4-runtime"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://daily.dev/posts/bun-1-4-nz2dmgftt"
+            },
+            {
+              "type": "url",
+              "url": "https://r.jina.ai/https:/bun.com/"
+            },
+            {
+              "type": "url",
+              "url": "https://www.stork.ai/blog/bun-14-the-update-that-kills-your-dependencies"
+            },
+            {
+              "type": "url",
+              "url": "https://daily.dev/posts/bun-1-4-finally-ships-the-rust-rewrite-drama-isn-t-over--fdy7op2yl"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://medium.com/@onix_react/whats-new-in-bun-v1-4-c9f2d85923db"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://bun.com/blog/bun-v1.4"
+            },
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=IcoB5AZ6TJ0"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_7cc85068-c74a-9953-aeb0-021e98d12e7a_call-69e6bd2e-c13e-4e92-9c00-e836a11f7bb7-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**Bun v1.4** is the latest major release (August 20, 2026) of Bun, a fast all-in-one JavaScript and TypeScript runtime, package manager, test runner, and bundler designed as a drop-in replacement for Node.js.[[1]](https://bun.com/blog/bun-v1.4)\n\n### Major Highlights\n- **Rust Rewrite**: The entire runtime (roughly 1 million lines) was rewritten from Zig to Rust. This is the first release using the new implementation while keeping JavaScriptCore as the JS engine. The change improves memory safety, reduces binary size (~20% smaller), and maintains or beats prior performance. Bun 1.3.14 was the final Zig-based version.[[2]](https://gihyo.jp/article/2026/08/bun-1.4)\n- **Node.js Compatibility**: Passes **+1,517** more tests from the Node.js test suite (the largest jump since v1.0). Many core modules (`node:http`, `node:fs`, `node:cluster`, etc.) now pass 97–100% of Node's own tests. This enables better support for frameworks like Next.js 16, Playwright, Vitest, and OpenTelemetry. Over **2,900** GitHub issues were fixed.[[3]](https://appwrite.io/blog/post/announcing-bun-1-4-runtime)\n- **Performance Improvements**:\n  - Idle CPU usage reduced by up to **5x**.\n  - Memory usage cut by up to **35–48%** (e.g., HTTP servers).\n  - Startup time **50% faster** on Linux (hello-world in ~5.1 ms vs. 10.9 ms in 1.3; Node 26 takes ~27 ms).\n  - Significant speedups in `marked.parse()` (138×), `isbot` (200×), `Buffer.from` (up to 46× for certain encodings), Promises (1.5–2.4×), source map decoding (3.1×), and more.[[1]](https://bun.com/blog/bun-v1.4)\n\n### New Built-in APIs (Reducing npm Dependencies)\nBun 1.4 ships several high-performance native APIs to replace common third-party packages:\n- **`Bun.Image`**: Fast image processing (faster than Sharp).\n- **`Bun.WebView`**: Headless browser automation (no Puppeteer/Playwright needed). Uses system WebKit on macOS or drives Chrome/Edge via CDP. Supports navigation, clicks, JS evaluation, screenshots, etc.[[1]](https://bun.com/blog/bun-v1.4)\n- **`Bun.markdown`**: Native Markdown parsing and rendering (much faster than Marked).\n- **`Bun.cron()`**: Built-in cron job scheduling.\n- **`Bun.Terminal`**: PTY (pseudo-terminal) support (replaces `node-pty`).\n- Other additions: Native `JSON5` parser, improved streams (`ReadableStream`, `CompressionStream`, etc.), ~3× faster `bun:ffi`, experimental HTTP/2 & HTTP/3 in `Bun.serve()` and `fetch()`, directory serving, and better Range/conditional request handling.\n- CLI enhancements: `bun run --parallel`, `bun test --parallel`, `bun audit fix`, `bun dedupe`, `bun prune`.\n\nThese features aim to provide a stronger \"standard library\" for JavaScript, reducing supply-chain risks from npm dependencies.[[4]](https://www.stork.ai/blog/bun-14-the-update-that-kills-your-dependencies)\n\n### Bundler & Other Improvements\n- `bun build --compile --target=browser` can now produce a single self-contained HTML file (inlining JS, CSS, images, etc.). Works with React, JSX, and TypeScript; the React compiler is now built-in and ~19× faster than via Babel.\n- Major enhancements to minification, tree-shaking, CSS/JS handling, and sourcemaps.\n- Windows ARM64 support and many production/runtime fixes (e.g., memory allocators now unified on mimalloc with better reclamation).\n\n### Installation & Upgrade\n```bash\nbun upgrade\n```\nOr fresh install:\n```bash\ncurl -fsSL https://bun.sh/install | bash\n```\n\nOfficial release notes: [bun.com/blog/bun-v1.4](https://bun.com/blog/bun-v1.4).[[1]](https://bun.com/blog/bun-v1.4)\n\nBun v1.4 is now available on platforms like Appwrite and continues to grow in adoption (over 20 million monthly downloads post-acquisition by Anthropic). Some community discussion exists around the rewrite's necessity and development process, but the release focuses on compatibility, performance, and built-in tools.[[5]](https://daily.dev/posts/bun-1-4-finally-ships-the-rust-rewrite-drama-isn-t-over--fdy7op2yl)\n\nFor full details, benchmarks, and API examples, check the official blog post linked above.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 208,
+                "end_index": 244,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://gihyo.jp/article/2026/08/bun-1.4",
+                "start_index": 622,
+                "end_index": 669,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://appwrite.io/blog/post/announcing-bun-1-4-runtime",
+                "start_index": 1029,
+                "end_index": 1092,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 1516,
+                "end_index": 1552,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 1960,
+                "end_index": 1996,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.stork.ai/blog/bun-14-the-update-that-kills-your-dependencies",
+                "start_index": 2700,
+                "end_index": 2779,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bun.com/blog/bun-v1.4",
+                "start_index": 3466,
+                "end_index": 3502,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://daily.dev/posts/bun-1-4-finally-ships-the-rust-rewrite-drama-isn-t-over--fdy7op2yl",
+                "start_index": 3821,
+                "end_index": 3918,
+                "title": "5"
+              }
+            ]
+          }
+        ],
+        "id": "msg_7cc85068-c74a-9953-aeb0-021e98d12e7a",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 159410000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 159410000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:00:58.659Z"
+}

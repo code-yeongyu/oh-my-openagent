@@ -66,7 +66,9 @@ function clockFrom(start: number): () => Date {
 
 async function queueFileNames(paths: MemoryIdentityPaths): Promise<string[]> {
   const names = await readdir(paths.factsQueue).catch(() => [] as string[])
-  return names.filter((name) => name.endsWith(".json") && name !== "consumed.json").sort()
+  return names.filter((name) =>
+    name.endsWith(".json") && name !== "consumed.json" && name !== "claims.json"
+  ).sort()
 }
 
 describe("facts queue reconcile", () => {

@@ -114,4 +114,66 @@ describe("planRecallQueries", () => {
     // verbatim adjacent kept pair is "api repo")
     expect(queries).toEqual(["repo", "run", '"api repo"'])
   })
+
+  describe("Korean (Hangul) support", () => {
+    it("#given Korean-only conversation texts #when queries are planned #then Hangul terms and bigram phrases are emitted", () => {
+      // given
+      const texts = ["메모리 시스템 리콜 플래너를 점검해줘"]
+
+      // when
+      const queries = planRecallQueries(texts)
+
+      // then (Hangul survives tokenization; ranking stays deterministic)
+      expect(queries).toEqual([
+        "플래너를",
+        "점검해줘",
+        '"메모리 시스템"',
+        '"시스템 리콜"',
+      ])
+    })
+
+    it("#given a Korean-only complaint #when queries are planned #then at least one query carries Hangul", () => {
+      // given / when
+      const queries = planRecallQueries(["어제 메모리 리콜이 한국어 대화에서 안 떴어"])
+
+      // then
+      expect(queries.length).toBeGreaterThan(0)
+      expect(queries.some((query) => /[가-힣]/.test(query))).toBe(true)
+    })
+
+    it("#given mixed Korean and English texts #when queries are planned #then both scripts contribute terms", () => {
+      // given
+      const texts = ["내일 kubernetes 배포 전에 메모리 캐시 정책 다시 보자"]
+
+      // when
+      const queries = planRecallQueries(texts)
+
+      // then
+      expect(queries).toEqual([
+        "kubernetes",
+        "메모리",
+        '"내일 kubernetes"',
+        '"kubernetes 배포"',
+      ])
+    })
+
+    it("#given Korean stopword chatter #when queries are planned #then no query is emitted", () => {
+      // given / when
+      const queries = planRecallQueries(["그리고 그래서 그냥 진짜"])
+
+      // then
+      expect(queries).toEqual([])
+    })
+
+    it("#given two-syllable Korean keywords #when queries are planned #then they survive the minimum length filter", () => {
+      // given ("리콜" is two syllables: a complete Korean content word)
+      const texts = ["리콜 검색"]
+
+      // when
+      const queries = planRecallQueries(texts)
+
+      // then
+      expect(queries).toEqual(["리콜", "검색", '"리콜 검색"'])
+    })
+  })
 })

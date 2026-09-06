@@ -14,6 +14,90 @@ import { dirname, join } from "node:path"
 import { CONFIG_DIR_NAME } from "../node_modules/@code-yeongyu/senpi/dist/config.js"
 import { FileHookStateStorage } from "../node_modules/@code-yeongyu/senpi/dist/core/extensions/builtin/hooks/trust-storage.js"
 
+type WriterCleanupPhase = "terminate" | "verify-exit"
+
+interface WriterCleanupReport {
+  readonly phase: WriterCleanupPhase
+  readonly pid: number
+}
+
+interface WriterTermination {
+  readonly platform: NodeJS.Platform
+  readonly run: (command: string, args: readonly string[]) => {
+    readonly error?: Error
+    readonly status: number | null
+    readonly stderr?: string | null
+  }
+  readonly signal: (pid: number, signal: NodeJS.Signals) => void
+}
+
+interface WriterExitVerification {
+  readonly isAlive: (pid: number) => boolean
+  readonly pause: (ms: number) => Promise<void>
+  readonly pollAttempts: number
+}
+
+class TimedOutWriterCleanupError extends Error {
+  constructor(
+    readonly phase: WriterCleanupPhase,
+    readonly pid: number,
+    reason: string,
+  ) {
+    super(`Hooks-state writer cleanup failed during ${phase} for pid ${pid}: ${reason}`)
+  }
+}
+
+const defaultWriterTermination: WriterTermination = {
+  platform: process.platform,
+  run: (command, args) => spawnSync(command, [...args], { encoding: "utf8" }),
+  signal: process.kill.bind(process),
+}
+
+const defaultWriterExitVerification: WriterExitVerification = {
+  isAlive: (pid) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
+      const code = "code" in error ? error.code : undefined
+      if (code === "ESRCH") return false
+      if (code === "EPERM") return true
+      throw error
+    }
+  },
+  pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  pollAttempts: 20,
+}
+
+async function terminateTimedOutWriter(
+  pid: number,
+  termination: WriterTermination = defaultWriterTermination,
+  verification: WriterExitVerification = defaultWriterExitVerification,
+): Promise<WriterCleanupReport> {
+  if (termination.platform === "win32") {
+    const result = termination.run("taskkill.exe", ["/PID", String(pid), "/T", "/F"])
+    if (result.error !== undefined || result.status !== 0) {
+      const reason = result.error?.message
+        ?? result.stderr?.trim()
+        ?? `taskkill exited with status ${result.status}`
+      throw new TimedOutWriterCleanupError("terminate", pid, reason)
+    }
+  } else {
+    try {
+      termination.signal(-pid, "SIGTERM")
+    } catch (error) {
+      throw new TimedOutWriterCleanupError("terminate", pid, error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  for (let attempt = 0; attempt < verification.pollAttempts; attempt += 1) {
+    if (!verification.isAlive(pid)) return { phase: "verify-exit", pid }
+    if (attempt + 1 < verification.pollAttempts) await verification.pause(10)
+  }
+  throw new TimedOutWriterCleanupError("verify-exit", pid, "writer remained alive after termination")
+}
+
 function withStorage(run: (fixture: {
   root: string
   statePath: string
@@ -36,6 +120,66 @@ function temporarySnapshots(statePath: string): string[] {
   return readdirSync(dirname(statePath)).filter((name) => name.startsWith(prefix) && name.endsWith(".tmp"))
 }
 
+describe("timed-out hooks-state writer cleanup", () => {
+  test("uses forced taskkill tree termination on win32 and reports the writer", async () => {
+    const calls: Array<{ readonly args: readonly string[]; readonly command: string }> = []
+
+    const report = await terminateTimedOutWriter(
+      4242,
+      {
+        platform: "win32",
+        run: (command, args) => {
+          calls.push({ args, command })
+          return { status: 0 }
+        },
+        signal: () => undefined,
+      },
+      { isAlive: () => false, pause: () => Promise.resolve(), pollAttempts: 1 },
+    )
+
+    expect(calls).toEqual([{
+      command: "taskkill.exe",
+      args: ["/PID", "4242", "/T", "/F"],
+    }])
+    expect(report).toEqual({ phase: "verify-exit", pid: 4242 })
+  })
+
+  test("signals the POSIX writer process group and reports the writer", async () => {
+    const signals: Array<{ readonly pid: number; readonly signal: NodeJS.Signals }> = []
+
+    const report = await terminateTimedOutWriter(
+      5151,
+      {
+        platform: "linux",
+        run: () => {
+          throw new Error("unexpected command spawn")
+        },
+        signal: (pid, signal) => signals.push({ pid, signal }),
+      },
+      { isAlive: () => false, pause: () => Promise.resolve(), pollAttempts: 1 },
+    )
+
+    expect(signals).toEqual([{ pid: -5151, signal: "SIGTERM" }])
+    expect(report).toEqual({ phase: "verify-exit", pid: 5151 })
+  })
+
+  test("reports the verification phase and pid when the writer survives", async () => {
+    const cleanup = terminateTimedOutWriter(
+      6161,
+      {
+        platform: "linux",
+        run: () => {
+          throw new Error("unexpected command spawn")
+        },
+        signal: () => undefined,
+      },
+      { isAlive: () => true, pause: () => Promise.resolve(), pollAttempts: 1 },
+    )
+
+    await expect(cleanup).rejects.toMatchObject({ phase: "verify-exit", pid: 6161 })
+  })
+})
+
 describe("patched Senpi hooks state snapshots", () => {
   test("reads the last complete snapshot while the exact writer lock is held", () => {
     withStorage(({ statePath, storage }) => {
@@ -46,14 +190,14 @@ describe("patched Senpi hooks state snapshots", () => {
     })
   })
 
-  test("recovers a trusted snapshot at a synchronized legacy truncate/write boundary", () => {
+  test("recovers a trusted snapshot at a synchronized legacy truncate/write boundary", async () => {
     const runner = join(import.meta.dir, "fixtures", "senpi-hooks-state-legacy-reader.ts")
     const child = spawnSync(process.execPath, [runner], { encoding: "utf8", timeout: 10_000 })
     if (child.error !== undefined && "code" in child.error && child.error.code === "ETIMEDOUT") {
       const marker = join(tmpdir(), `omo-hooks-legacy-reader-${child.pid}.json`)
       try {
         const { root, writerPid } = JSON.parse(readFileSync(marker, "utf8")) as { root: string; writerPid?: number }
-        if (writerPid !== undefined) spawnSync("kill", ["-TERM", `-${writerPid}`])
+        if (writerPid !== undefined) await terminateTimedOutWriter(writerPid)
         rmSync(root, { recursive: true, force: true })
       } finally {
         rmSync(marker, { force: true })

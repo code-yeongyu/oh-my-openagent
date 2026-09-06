@@ -1,0 +1,279 @@
+{
+  "queryId": "q12",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"OpenAI agents API update since:2026-08-23 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-23",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421471,
+    "completed_at": 1788421471,
+    "id": "4f9d56da-eb7c-9959-bd13-638222c53906",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_4f9d56da-eb7c-9959-bd13-638222c53906_call-c433e709-352f-4f60-841c-2d761b7a6b58-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "OpenAI agents API update",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://ecorpit.com/openai-agent-api-selection-responses-agents-sdk-agentkit-2026/"
+            },
+            {
+              "type": "url",
+              "url": "https://openai.github.io/openai-agents-python/llms.txt"
+            },
+            {
+              "type": "url",
+              "url": "https://techcrunch.com/2026/04/15/openai-updates-its-agents-sdk-to-help-enterprises-build-safer-more-capable-agents/"
+            },
+            {
+              "type": "url",
+              "url": "https://openai.com/index/introducing-agentkit/"
+            },
+            {
+              "type": "url",
+              "url": "https://platform.openai.com/docs/llms-full.txt"
+            },
+            {
+              "type": "url",
+              "url": "https://developers.openai.com/api/docs/guides/agent-builder"
+            },
+            {
+              "type": "url",
+              "url": "https://openai.com/index/new-tools-for-building-agents/"
+            },
+            {
+              "type": "url",
+              "url": "https://openai.com/ja-JP/index/the-next-evolution-of-the-agents-sdk/"
+            },
+            {
+              "type": "url",
+              "url": "https://www.respan.ai/articles/openai-agents-sdk-vs-swarm"
+            },
+            {
+              "type": "url",
+              "url": "https://pickaxe.co/post/openai-agent-builder-deprecation"
+            },
+            {
+              "type": "url",
+              "url": "https://developers.openai.com/api/docs/guides/responses-multi-agent"
+            },
+            {
+              "type": "url",
+              "url": "https://newreleases.io/project/github/openai/openai-agents-python/release/v0.11.0"
+            },
+            {
+              "type": "url",
+              "url": "https://www.infoq.com/news/2026/03/openai-responses-api-agents/"
+            },
+            {
+              "type": "url",
+              "url": "https://venturebeat.com/orchestration/openai-unveils-workspace-agents-a-successor-to-custom-gpts-for-enterprises-that-can-plug-directly-into-slack-salesforce-and-more"
+            },
+            {
+              "type": "url",
+              "url": "https://developers.openai.com/cookbook/topic/agents"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_4f9d56da-eb7c-9959-bd13-638222c53906_call-c433e709-352f-4f60-841c-2d761b7a6b58-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**OpenAI has shifted its focus to a code-first, production-oriented agent ecosystem centered on the Responses API and the Agents SDK.**[[1]](https://ecorpit.com/openai-agent-api-selection-responses-agents-sdk-agentkit-2026/)\n\n### Key Recent Updates (2025–2026)\n- **March 2025**: OpenAI introduced the **Responses API** (a superset of Chat Completions that adds built-in tools like web search, file search, and computer use) and the **Agents SDK** for orchestrating single- and multi-agent workflows. It also added integrated observability (tracing), guardrails, sessions, and realtime/voice capabilities. The older Assistants API was slated for eventual deprecation (now set for August 26, 2026).[[2]](https://openai.com/index/new-tools-for-building-agents/)\n\n- **October 2025**: Launch of **AgentKit**, which included Agent Builder (a visual canvas for workflows), ChatKit (embeddable UI), Connector Registry, and Evals tools. These were positioned for building, deploying, and optimizing agents.[[3]](https://openai.com/index/introducing-agentkit/)\n\n- **April 2026**: Major update to the **Agents SDK** with enterprise-focused safety and capability improvements, including:\n  - Native sandbox execution (isolated workspaces for file/code access while protecting the broader system).\n  - In-distribution harness for frontier models, supporting file operations, code editing, shell tools, and long-running tasks.\n  - Features like MCP tools, skills (gradual information disclosure), AGENTS.md for custom instructions, and apply-patch for file edits.\n  - Initial Python support, with TypeScript following; standard API pricing applies.[[4]](https://techcrunch.com/2026/04/15/openai-updates-its-agents-sdk-to-help-enterprises-build-safer-more-capable-agents/)\n\n- **June 2026 Deprecations** (announced June 3):\n  - **Assistants API** (`/v1/assistants` and `/v1/threads`): Fully sunsets August 26, 2026 — calls will error with no grace period. Migrate to Responses API + Conversations API.[[1]](https://ecorpit.com/openai-agent-api-selection-responses-agents-sdk-agentkit-2026/)\n  - **Agent Builder** (visual canvas in AgentKit) and **Evals platform**: Both shut down November 30, 2026 (Evals becomes read-only October 31). Reusable prompt objects are also removed. Recommendation: Rebuild logic in the Agents SDK (code-first) or use Workspace Agents in ChatGPT for natural-language prompting. ChatKit and the Responses API remain fully supported.[[5]](https://pickaxe.co/post/openai-agent-builder-deprecation)\n\n- **Ongoing (as of mid-2026)**: The **Responses API** is now OpenAI’s flagship primitive for new agent projects. It supports multi-agent workflows (beta as of 2026, allowing a root agent to spawn parallel subagents for tasks like codebase exploration). The Agents SDK is production-ready (evolved from the experimental Swarm framework), with releases up to v0.17+ and features like tool search, computer-use GA, sessions, tracing, and hosted tools.[[6]](https://platform.openai.com/docs/llms-full.txt)\n\n### Current Recommendations (Late 2026)\n- For new agent development: Start with the **Responses API** (own the loop, direct control) or the **Agents SDK** (SDK manages orchestration, ideal for typed code in Python/TypeScript).[[6]](https://platform.openai.com/docs/llms-full.txt)\n- Avoid starting new projects on Assistants API or Agent Builder.\n- Documentation and SDKs are available on GitHub (openai-agents-python, openai-agents-js) and the OpenAI developer platform.[[7]](https://openai.github.io/openai-agents-python/llms.txt)\n\nThis represents a clear move away from visual/low-code builders toward robust, observable, sandboxed code-based agents. For the latest official details, check the OpenAI platform docs or the Agents SDK release notes, as features like multi-agent and sandboxing continue to evolve.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://ecorpit.com/openai-agent-api-selection-responses-agents-sdk-agentkit-2026/",
+                "start_index": 135,
+                "end_index": 224,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://openai.com/index/new-tools-for-building-agents/",
+                "start_index": 696,
+                "end_index": 758,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://openai.com/index/introducing-agentkit/",
+                "start_index": 997,
+                "end_index": 1050,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://techcrunch.com/2026/04/15/openai-updates-its-agents-sdk-to-help-enterprises-build-safer-more-capable-agents/",
+                "start_index": 1634,
+                "end_index": 1757,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://ecorpit.com/openai-agent-api-selection-responses-agents-sdk-agentkit-2026/",
+                "start_index": 1985,
+                "end_index": 2074,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://pickaxe.co/post/openai-agent-builder-deprecation",
+                "start_index": 2443,
+                "end_index": 2506,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://platform.openai.com/docs/llms-full.txt",
+                "start_index": 2956,
+                "end_index": 3009,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://platform.openai.com/docs/llms-full.txt",
+                "start_index": 3237,
+                "end_index": 3290,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://openai.github.io/openai-agents-python/llms.txt",
+                "start_index": 3481,
+                "end_index": 3542,
+                "title": "7"
+              }
+            ]
+          }
+        ],
+        "id": "msg_4f9d56da-eb7c-9959-bd13-638222c53906",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 166653000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 166653000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:44:31.542Z"
+}

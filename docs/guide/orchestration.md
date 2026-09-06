@@ -37,7 +37,7 @@ flowchart TB
         User[(" User")]
         Prometheus[" Prometheus<br/>(Planner)<br/>claude-fable-5 / kimi-k3"]
         Metis[" Metis<br/>(Consultant)<br/>claude-opus-5 / kimi-k3"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.6-sol / claude-opus-5 / gemini-3.1-pro / glm-5.2"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-6-astra / claude-opus-5 / gemini-3.1-pro / glm-5.2"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
@@ -49,7 +49,7 @@ flowchart TB
         Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.6-sol / gemini-3.1-pro / claude-opus-5 / glm-5.2"]
         Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / qwen3.7-plus / minimax-m2.7-highspeed / minimax-m3 / MiniMax-M3 / minimax-m2.7 / claude-haiku-4-5 / gpt-5.4-nano"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / qwen3.7-plus / minimax-m2.7-highspeed / minimax-m3 / MiniMax-M3 / minimax-m2.7 / claude-haiku-4-5 / gpt-5.4-nano"]
-        Frontend[" visual-engineering<br/>(category + frontend)<br/>claude-opus-5 / kimi-k3 / glm-5.2 / gpt-5.6-sol"]
+        Frontend[" visual-engineering<br/>(category + frontend)<br/>claude-opus-5 / kimi-k3 / glm-5.2 / gpt-6-astra / gpt-5.6-sol"]
     end
 
     User -->|"Describe work"| Prometheus
@@ -103,7 +103,7 @@ Three names can appear together in logs or the TUI:
 
 - **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
 - **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
-- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-5.6-sol`, `glm-5.2`
+- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-6-astra`, `gpt-5.6-sol`, `glm-5.2`
 
 The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k3`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
 
@@ -327,7 +327,7 @@ task({ agent: "claude-opus-5", prompt: "..." }); // Different self-perception
 
 ```typescript
 // NEW: Category describes INTENT, not implementation
-task({ category: "ultrabrain", prompt: "..." }); // "Think strategically"
+task({ category: "ultrabrain", prompt: "..." }); // "Think strategically" (GPT-6 Astra max, then GPT-5.6 Sol)
 task({ category: "visual-engineering", prompt: "..." }); // "Design beautifully"
 task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 ```
@@ -491,7 +491,7 @@ Atlas is automatically activated when you run `/ulw-execute`. You don't need to 
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.2` depending on setup |
+| **Model**       | `gpt-5.6-sol` (`medium`) by default, GPT-only chain; `gpt-6-astra` as a manual override | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.2` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Executes Prometheus plans via `/ulw-execute` (Atlas), not by typing `ulw` |
@@ -514,7 +514,7 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
 4. **You specifically want GPT-native autonomous reasoning**
-   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.6 Sol as the broad fallback
+   - Hephaestus defaults to GPT-5.6 Sol through OpenAI, OpenAI Codex, GitHub Copilot, or OpenCode; pin `openai/gpt-6-astra` to run him on OpenAI's most capable model
 
 **When to Use Sisyphus + `ulw`:**
 

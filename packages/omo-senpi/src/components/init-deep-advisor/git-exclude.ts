@@ -1,13 +1,11 @@
-import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, join } from "node:path"
 
+import { run } from "./git-helpers"
+
 function resolveExcludePath(root: string): string | null {
   try {
-    const relative = execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim()
+    const relative = run(root, ["rev-parse", "--git-path", "info/exclude"]).trim()
     return isAbsolute(relative) ? relative : join(root, relative)
   } catch {
     return null

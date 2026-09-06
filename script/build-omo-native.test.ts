@@ -3,9 +3,18 @@
 // 33586966744 hit ENOENT on packages/lsp-daemon/dist in every platform leg.
 
 import { describe, expect, test } from "bun:test"
-import { sep } from "node:path"
+import { readFileSync } from "node:fs"
+import { dirname, join, resolve, sep } from "node:path"
+import { fileURLToPath } from "node:url"
 
-import { ensurePrebuiltNativeInputs, type PrebuiltInputDependencies } from "./build-omo-native"
+import {
+  ensurePrebuiltNativeInputs,
+  PAYLOAD_DIRECTORIES,
+  PAYLOAD_FILES,
+  PAYLOAD_SCRIPT,
+  REQUIRED_PLUGIN_ARTIFACTS,
+  type PrebuiltInputDependencies,
+} from "./build-omo-native"
 
 function recordingDependencies(input: {
   readonly existing: readonly string[]
@@ -84,5 +93,36 @@ describe("ensurePrebuiltNativeInputs", () => {
 
     // when / then
     expect(() => ensurePrebuiltNativeInputs(dependencies)).toThrow("spawn bun ENOENT")
+  })
+})
+
+// Regression: skills-conditional was in the plugin `files` allowlist but not in the payload copy
+// lists, so every published omo-ai shipped without the staged x-search SKILL.md and senpi warned
+// "skill path does not exist" at startup.
+describe("plugin payload allowlist parity", () => {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+  const pluginFiles: readonly string[] = JSON.parse(
+    readFileSync(join(repoRoot, "packages", "omo-senpi", "plugin", "package.json"), "utf8"),
+  ).files
+
+  test("#given the plugin files allowlist #when compared with the payload lists #then every published entry is copied", () => {
+    // given
+    const copied = new Set<string>([
+      ...PAYLOAD_DIRECTORIES,
+      ...PAYLOAD_FILES,
+      PAYLOAD_SCRIPT.split(sep).join("/"),
+    ])
+
+    // when
+    const uncopied = pluginFiles.filter((entry) => !copied.has(entry))
+
+    // then
+    expect(uncopied).toEqual([])
+  })
+
+  test("#given the conditional x-search skill #when checking the payload #then it is both copied and required", () => {
+    // when / then
+    expect(PAYLOAD_DIRECTORIES).toContain("skills-conditional")
+    expect(REQUIRED_PLUGIN_ARTIFACTS).toContain(join("skills-conditional", "x-search", "SKILL.md"))
   })
 })

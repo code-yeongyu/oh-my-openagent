@@ -51,6 +51,8 @@ async function makePackagedPlugin(): Promise<string> {
   for (const skillName of requiredSkillNames) {
     await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
   }
+  // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
+  await writeFixtureFile(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
   const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
   await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")
   await chmod(astGrepRuntime, 0o755)

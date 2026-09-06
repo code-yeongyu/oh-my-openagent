@@ -2,10 +2,11 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 
 import { OmoGitMasterSettingsSchema } from "@oh-my-opencode/omo-config-core"
 
-import { createTaskSkillLoader } from "./task-skill-loader"
+import { createTaskSkillLoader, packagedSkillDirs } from "./task-skill-loader"
 
 const CO_AUTHOR_TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
 
@@ -29,6 +30,56 @@ function writeSkill(root: string, body: string, name = "shared"): void {
     `---\nname: ${name}\ndescription: ${name} test skill\n---\n${body}\n`,
   )
 }
+
+describe("packagedSkillDirs", () => {
+  test("#given the source-tree layout #when packaged dirs resolve #then load_skills [\"x-search\"] resolves from plugin/skills-conditional", () => {
+    // given
+    const root = tempDir()
+    const moduleDir = join(root, "packages", "omo-senpi", "src", "components", "task")
+    mkdirSync(moduleDir, { recursive: true })
+    const conditionalDir = join(root, "packages", "omo-senpi", "plugin", "skills-conditional")
+    writeSkill(conditionalDir, "SOURCE TREE X SEARCH BODY", "x-search")
+
+    // when
+    const dirs = packagedSkillDirs(pathToFileURL(join(moduleDir, "task-skill-loader.ts")).href)
+    const loader = createTaskSkillLoader({
+      agentDir: tempDir(),
+      homeDir: tempDir(),
+      pluginSkillsDirs: dirs,
+      loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+    })
+    const resolution = loader(["x-search"], tempDir())
+
+    // then
+    expect(dirs).toContain(conditionalDir)
+    expect(resolution.resolved).toEqual(["x-search"])
+    expect(resolution.prepend).toContain("SOURCE TREE X SEARCH BODY")
+  })
+
+  test("#given the bundled runtime layout #when packaged dirs resolve #then load_skills [\"x-search\"] resolves from ../skills-conditional", () => {
+    // given
+    const root = tempDir()
+    const moduleDir = join(root, "plugin", "extensions")
+    mkdirSync(moduleDir, { recursive: true })
+    const conditionalDir = join(root, "plugin", "skills-conditional")
+    writeSkill(conditionalDir, "BUNDLED X SEARCH BODY", "x-search")
+
+    // when
+    const dirs = packagedSkillDirs(pathToFileURL(join(moduleDir, "omo.js")).href)
+    const loader = createTaskSkillLoader({
+      agentDir: tempDir(),
+      homeDir: tempDir(),
+      pluginSkillsDirs: dirs,
+      loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+    })
+    const resolution = loader(["x-search"], tempDir())
+
+    // then
+    expect(dirs).toContain(conditionalDir)
+    expect(resolution.resolved).toEqual(["x-search"])
+    expect(resolution.prepend).toContain("BUNDLED X SEARCH BODY")
+  })
+})
 
 describe("createTaskSkillLoader", () => {
   test("#given canonical and packaged skill roots #when the loader resolves a collision #then canonical wins", () => {

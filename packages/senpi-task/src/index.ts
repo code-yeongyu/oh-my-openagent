@@ -115,6 +115,7 @@ export {
   mergeChildCustomTools,
 } from "./runners"
 export type {
+  ChildCompletionPolicy,
   ChildHandle,
   ChildSession,
   ChildSessionEvent,
@@ -283,13 +284,16 @@ export type {
 export {
   AgentLimitReached,
   createTaskLifecycle,
+  getLifecycleDetachedRevivalRollback,
   getLifecycleReattachPorts,
+  registerLifecycleDetachedRevivalRollback,
   registerLifecycleReattachPorts,
 } from "./lifecycle"
 export type {
   AdmissionResult,
   CleanupResult,
   DestroyCause,
+  DetachedRevivalRollbackResult,
   LifecycleDeps,
   LifecycleReattachPorts,
   ProcessSignaller,

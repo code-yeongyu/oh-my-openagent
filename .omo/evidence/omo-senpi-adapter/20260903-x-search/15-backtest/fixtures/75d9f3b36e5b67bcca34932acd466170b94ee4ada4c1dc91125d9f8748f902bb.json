@@ -1,0 +1,41 @@
+{
+  "queryId": "q09",
+  "lane": "grok-cli",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"xAI Grok CLI since:2026-08-30 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-30",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "blocked_auth",
+  "reason": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+  "errors": [
+    "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)"
+  ],
+  "grokProbe": {
+    "status": "blocked_auth",
+    "reason": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+    "errors": [
+      "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)"
+    ]
+  },
+  "usage": {},
+  "recordedAt": "2026-09-03T07:43:31.299Z"
+}

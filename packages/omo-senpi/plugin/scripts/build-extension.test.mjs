@@ -1,5 +1,6 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { appendFile, cp, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -36,7 +37,6 @@ function outputPathsIn(root) {
     outputPath: join(root, "omo.js"),
     taskOutputPath: join(root, "omo-task.js"),
     memberOutputPath: join(root, "omo-member.js"),
-    memoryMcpOutputPath: join(root, "omo-memory-mcp.js"),
     supervisorOutputPath: join(root, "memory-run-supervisor.mjs"),
     advisorRuntimeOutputPath: join(root, "omo-init-deep-advisor.js"),
   }
@@ -49,7 +49,7 @@ function outputPathsIn(root) {
  */
 async function sharedOutputs() {
   sharedBuildPromise ??= (async () => {
-    const root = await mkdtemp(join(repoRoot, ".build-extension-test-shared-"))
+    const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-shared-"))
     const paths = outputPathsIn(root)
     const build = await buildExtension(paths)
     return { root, ...paths, ...build }
@@ -59,7 +59,7 @@ async function sharedOutputs() {
 
 async function mutableOutputs() {
   const shared = await sharedOutputs()
-  const root = await mkdtemp(join(repoRoot, ".build-extension-test-"))
+  const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-"))
   perTestRoots.push(root)
   await cp(shared.root, root, { recursive: true })
   return { root, ...outputPathsIn(root), mainInputs: shared.mainInputs, taskInputs: shared.taskInputs }
@@ -77,11 +77,10 @@ describe("checkExtensionCurrent", () => {
     const outputs = await sharedOutputs()
 
     // when
-    const mcp = await readFile(outputs.memoryMcpOutputPath, "utf8")
     const supervisor = await readFile(outputs.supervisorOutputPath, "utf8")
 
     // then (Node's ESM loader strips a shebang only at byte 0; a marker above it breaks startup)
-    for (const text of [mcp, supervisor]) {
+    for (const text of [supervisor]) {
       expect(text.startsWith("#!/usr/bin/env node\n")).toBe(true)
       expect(text.indexOf("\n// omo:")).toBeGreaterThan(0)
     }
@@ -89,10 +88,10 @@ describe("checkExtensionCurrent", () => {
     const check = await checkExtensionCurrent({
       outputPath: outputs.outputPath,
       memberOutputPath: outputs.memberOutputPath,
-      memoryMcpOutputPath: outputs.memoryMcpOutputPath,
       supervisorOutputPath: outputs.supervisorOutputPath,
     })
-    expect(check.ok).toBe(true)
+    // Compare the whole result so a failure names the stale artifact instead of printing "false".
+    expect(check).toMatchObject({ ok: true })
   })
 
   test("#given an empty output directory #when extensions are built #then all runtime personas match their sources", async () => {

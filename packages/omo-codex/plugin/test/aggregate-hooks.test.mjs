@@ -30,7 +30,6 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	const componentMarkers = [
 		"components/comment-checker/dist/cli.js",
 		"components/lsp/dist/cli.js",
-		"components/codegraph/dist/cli.js",
 		"components/rules/dist/cli.js",
 		"components/ulw-execute-continuation/dist/cli.js",
 		"components/telemetry/dist/cli.js",
@@ -220,32 +219,14 @@ test("#given aggregate SessionStart hooks #when inspected #then cold-start-prone
 	const coldStartHooks = sessionStartHooks.filter(
 		({ command }) =>
 			command.includes("components/telemetry/dist/cli.js") ||
-			command.includes("scripts/auto-update.mjs") ||
-			command.includes("components/codegraph/dist/cli.js"),
+			command.includes("scripts/auto-update.mjs"),
 	);
 
 	// then
-	assert.equal(coldStartHooks.length, 3);
+	assert.equal(coldStartHooks.length, 2);
 	for (const hook of coldStartHooks) {
 		assert.equal(hook.timeout, 15, `${hook.source} must carry timeout 15 for cold-start headroom`);
 	}
-});
-
-test("#given aggregate PostToolUse hooks #when inspected #then CodeGraph init guidance is registered for CodeGraph tools", async () => {
-	// given
-	const commandHooks = await readAggregateCommandHooks();
-
-	// when
-	const codegraphPostToolUseHooks = commandHooks.filter(
-		(hook) =>
-			hook.eventName === "PostToolUse" &&
-			hook.handler.command === 'node "${PLUGIN_ROOT}/components/codegraph/dist/cli.js" hook post-tool-use',
-	);
-
-	// then
-	assert.equal(codegraphPostToolUseHooks.length, 1);
-	assert.equal(codegraphPostToolUseHooks[0]?.matcher, "^(codegraph[._].*|mcp__codegraph__.*)$");
-	assert.match(codegraphPostToolUseHooks[0]?.handler.statusMessage ?? "", /\S/);
 });
 
 test("#given aggregate PostToolUse hooks #when inspected #then thread title hygiene is registered for created Codex threads", async () => {

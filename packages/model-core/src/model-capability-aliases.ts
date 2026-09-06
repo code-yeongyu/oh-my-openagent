@@ -42,11 +42,11 @@ const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(
 
 const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
   {
-    ruleID: "openai-gpt-5.6-fast-service-tier-alias",
-    description: "Normalizes OpenCode's OpenAI GPT-5.6 fast service-tier IDs to canonical snapshot IDs.",
+    ruleID: "openai-gpt-fast-service-tier-alias",
+    description: "Normalizes OpenCode's OpenAI GPT fast service-tier IDs to canonical snapshot IDs.",
     providerIDs: ["openai"],
     allowedSubproviderHosts: ["vercel"],
-    match: (normalizedModelID) => /^gpt-5\.6-(?:sol|terra|luna)-fast$/.test(normalizedModelID),
+    match: (normalizedModelID) => /^(?:gpt-5\.6-(?:sol|terra|luna)|gpt-6-astra)-fast$/.test(normalizedModelID),
     canonicalize: (normalizedModelID) => normalizedModelID.slice(0, -"-fast".length),
   },
   {

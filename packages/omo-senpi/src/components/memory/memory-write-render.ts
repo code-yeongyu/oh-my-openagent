@@ -1,4 +1,4 @@
-// Tool-result row for the memory / memory_apply_patch writes.
+// Tool-result row for memory writes.
 //
 // The model still receives the plain "Memory <command> committed locally (<sha7>)." string; this
 // module only replaces what the HUMAN sees with the house notice contract (noticeComponent, the

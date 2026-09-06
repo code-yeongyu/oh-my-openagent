@@ -17,8 +17,11 @@ import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-l
 // v1 tradeoff: children run WITHOUT senpi builtin extensions (no compaction / goal / todo tools
 // inside children); the core read/bash/edit tools plus the injected customTools remain. Skills
 // and context per spec are still delivered through prompt injection.
-export function createChildResourceLoader(): ResourceLoader {
+export function createChildResourceLoader(options: { readonly systemPrompt?: string } = {}): ResourceLoader {
   // createExtensionRuntime is read through the lazy barrel boundary; every caller reaches here
   // from InProcessRunner.start/resume, which awaits loadSenpiBarrel() beforehand.
-  return createMinimalSenpiResourceLoader({ runtime: senpiBarrel().createExtensionRuntime() })
+  return createMinimalSenpiResourceLoader({
+    runtime: senpiBarrel().createExtensionRuntime(),
+    ...(options.systemPrompt === undefined ? {} : { systemPrompt: options.systemPrompt }),
+  })
 }

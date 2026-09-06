@@ -165,7 +165,7 @@ describe("OmO Native tool telemetry", () => {
 
   test("#given feature tools across two sessions #when repeated #then each feature emits once per session", async () => {
     const { pi, events } = fixture()
-    const tools = ["create_goal", "team_create", "memory", "memory_apply_patch"]
+    const tools = ["create_goal", "team_create", "memory"]
 
     for (const toolName of tools) await pi.dispatch("tool_result", result(toolName, {}), context("session-a"))
     for (const toolName of tools) await pi.dispatch("tool_result", result(toolName, {}), context("session-a"))

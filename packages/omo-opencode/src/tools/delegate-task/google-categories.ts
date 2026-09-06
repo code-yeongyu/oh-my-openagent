@@ -109,13 +109,13 @@ Approach:
 export const GOOGLE_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
     name: "visual-engineering",
-    config: { model: "anthropic/claude-opus-5", variant: "max" },
-    description: "Frontend, UI/UX, design, styling, animation",
+    config: { model: "anthropic/claude-fable-5-1", variant: "max" },
+    description: "Visual design, UI/UX, frontend, styling, animation, and design systems",
     promptAppend: VISUAL_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "artistry",
-    config: { model: "anthropic/claude-fable-5", variant: "xhigh" },
+    config: { model: "anthropic/claude-fable-5-1", variant: "max" },
     description: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
     promptAppend: ARTISTRY_CATEGORY_PROMPT_APPEND,
   },

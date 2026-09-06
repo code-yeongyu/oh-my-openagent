@@ -35,7 +35,7 @@ export function createTaskChildPlanner(
   const availableAgents = listAvailableAgents(agents)
   return (spec): PlanResolution => {
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry)
+      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig)
       if (agentResolution !== undefined) return agentResolution
     }
 
@@ -75,6 +75,7 @@ function resolveAgentTarget(
   explicitModel: string | undefined,
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
+  omoConfig: OmoConfig,
 ): PlanResolution | undefined {
   const definition = Object.hasOwn(agents, agentName) ? agents[agentName] : undefined
   if (definition?.disable === true) {
@@ -96,7 +97,7 @@ function resolveAgentTarget(
   }
 
   const registry = resolveRegistry()
-  const resolution = resolveAgent(agentName, agents, registry)
+  const resolution = resolveAgent(agentName, agents, registry, { omoConfig })
   if (resolution.kind === "resolved") {
     return { kind: "resolved", plan: toAgentPlan(resolution, undefined) }
   }

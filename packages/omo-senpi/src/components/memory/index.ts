@@ -84,7 +84,6 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         ...(options.refreshStatus === undefined ? {} : { refreshStatus: options.refreshStatus }),
         // Reuse the boot snapshot: registration must not add a loadConfig() call, because the
         // enablement latch depends on the ORDER of reads across boot -> session_start -> reload.
-        toolExposure: bootConfig.tool_exposure,
       })
       wiring.registerStatic(pi, ctx)
       pi.registerEntryRenderer(MEMORY_BINDING_CUSTOM_TYPE, renderMemoryBindingEntry)
@@ -161,13 +160,8 @@ export function resolveMemoryConfig(loaded: SenpiOmoConfigResult): ResolvedMemor
   return resolveMemorySettings(loaded.config.memory)
 }
 
-// A memory child carries one of these sentinels. Today the child also runs --no-extensions, so omo
-// never loads there; a fork-mode child cannot pass --no-extensions (its request prefix must match
-// the parent for the provider cache to hit), so the sentinel is the only thing standing between a
-// forked reflection and unbounded self-triggering recursion. The memorian gate child DOES load one
-// extension by explicit -e, which makes its sentinel load-bearing for a second reason: without it a
-// gate child would settle and spawn a gate over its own transcript.
-const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS", "SENPI_MEMORY_MEMORIAN"] as const
+// Detached memory workers carry sentinels so their own settles do not recursively trigger memory.
+const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
 
 export function isMemoryChildProcess(env: Record<string, string | undefined>): boolean {
   return CHILD_SENTINELS.some((sentinel) => env[sentinel] === "1")

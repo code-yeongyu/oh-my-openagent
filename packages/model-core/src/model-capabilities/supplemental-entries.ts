@@ -31,6 +31,37 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 262144,
 		},
 	},
+	"claude-fable-5-1": {
+		id: "claude-fable-5-1",
+		family: "claude-fable",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
+		},
+	},
+	"gpt-6-astra": {
+		id: "gpt-6-astra",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
 	"gpt-5.6-sol": {
 		id: "gpt-5.6-sol",
 		family: "gpt",
@@ -106,8 +137,9 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: ["text"],
 		},
 		limit: {
-			context: 400000,
-			input: 272000,
+			// DevNewbie1826: thanks for catching the 1M Luna Fast capability gap.
+			context: 1050000,
+			input: 922000,
 			output: 128000,
 		},
 	},

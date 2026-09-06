@@ -9,7 +9,7 @@ Detached `senpi -p` reflection/dream/facts child execution and the durable run l
 | `index.ts` | Barrel: completion, health, health-alert, remediation, resolve-model, runner, run-reconciliation, spawn. |
 | `memory-run-supervisor.ts` | Child lifecycle: launch manifest + gated bootstrap handshake, durable run ledger, absolute hard deadline (SIGTERM->SIGKILL process group; win32 spawns non-detached with null process identity, `taskkill /T /F` tree kill, abrupt-death reconciliation resolves through the non-destructive UNKNOWN path to `abandoned.json`), `outcome.json`/`final.json` sentinels. `*.ic8.test.ts` + `memory-run-supervisor-ic8-*.ts` pin process-group/resource behavior. |
 | `runner*.ts` | Reflection run execution: preflight, spawn, supervision, publication, settlement. `ReflectionRunner` / `SenpiSubprocessRunnerOptions` / `ExecutionResult` ports are injectable for tests. |
-| `spawn.ts` / `spawn-supervisor.ts` / `spawn-payload.ts` / `reflection-spawn-input.ts` | Spawn contracts (`ReflectionSpawnArgs`, `FactsSpawnArgs`, sandbox prep, env/path contracts and cleanup). `spawn.ts` is a thin re-export surface consumed by memory wiring and tests. |
+| `spawn.ts` / `spawn-supervisor.ts` / `spawn-payload.ts` / `reflection-spawn-input.ts` | Reflection/dream spawn contracts, payload materialization, supervision, and cleanup. `spawn.ts` is a thin re-export surface consumed by memory wiring and tests. Facts and the memorian judge run in-process via senpi-task's InProcessRunner. |
 | `create-run-worktree.ts` | Isolated git worktree per reflection run. |
 | `run-artifacts.ts` | Atomic JSON/text/ledger writes: temp+rename, mode 0600. `writeRunJsonAtomic` / `readRunJson` / `updateRunLedger` are the most-imported symbols here. |
 | `run-finalization*.ts` | Terminal-state machine: claim (`-claim.ts`), gate/settlement (`-settlement.ts`), git decision (`-git.ts`), types. Matching published outcomes win races; abandoned runs are never published; inactive runs must not complete. |
@@ -20,7 +20,6 @@ Detached `senpi -p` reflection/dream/facts child execution and the durable run l
 | `health.ts` / `health-alert.ts` | READ-ONLY derived health over completion records (failure streak, fingerprint, last outcome; `senpi-memory.health` entries). A trailing streak whose newest failure is older than `REFLECTION_HEALTH_STALE_MS` (7 days) reports streak 0 so dormant identities stop alerting; historical fields stay intact. |
 | `remediation.ts` | Failure-reason -> user-facing hint mapping. |
 | `entry-renderers.ts` | Notice-box renderer contract: fields joined with `" · "` (`FIELD_SEPARATOR`), normalized/truncated text, outcome glyph/color/label helpers. |
-| `facts-child-launch.ts` | Facts extractor child launch path. |
 
 ## Conventions
 

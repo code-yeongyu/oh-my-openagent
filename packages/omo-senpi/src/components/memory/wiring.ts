@@ -61,17 +61,6 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       const override = settings.agents[identity]?.soul
       return override?.edit_notice ?? settings.soul.edit_notice
     },
-    resolveWriteNotice: (identity) => {
-      // Presentation must never depend on config health, matching the direct surface's gate:
-      // an unreadable config keeps the default on.
-      try {
-        const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-        const override = settings.agents[identity]?.write_notice
-        return override?.enabled ?? settings.write_notice.enabled
-      } catch {
-        return true
-      }
-    },
   })
 
   // Late-bound because the two wirings are mutually dependent by design: recall's drain needs the
@@ -127,11 +116,6 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       flushSkillsUsage: async (_sessionId, signal) => {
         if (signal.aborted) return
         await flushSkillsUsageTrackers(signal)
-      },
-      launchFacts: async (sessionId, signal) => {
-        const identity = resolveContext(sessionId)
-        if (identity === undefined || signal.aborted) return
-        await factsWiringFor(identity).launchIfThresholdMet(signal)
       },
     },
   })
@@ -219,6 +203,9 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     async onSessionShutdown(input: MemorySessionShutdownInput): Promise<void> {
       lastEventCtx.current = input.eventCtx
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
+      await memorianGateWiring.onSessionShutdown(input.sessionId)
+      const identity = resolveContext(input.sessionId)
+      if (identity !== undefined) await factsWiringFor(identity).cancelActive?.()
       await shutdownDrain.run(input)
     },
 

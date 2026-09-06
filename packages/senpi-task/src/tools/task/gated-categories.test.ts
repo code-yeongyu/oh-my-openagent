@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
+import { OPENAI_CATEGORIES } from "../../category/openai-categories"
 import { listTaskCategories } from "./categories"
+
+function requiredAnnotation(name: string): string {
+  const definition = OPENAI_CATEGORIES.find((category) => category.name === name)
+  if (definition?.requiresModel === undefined) throw new Error(`builtin category ${name} is not model-gated`)
+  return `(requires ${definition.requiresModel.join(" or ")})`
+}
 
 function entryFor(name: string, config: Parameters<typeof listTaskCategories>[0]) {
   return listTaskCategories(config).find((entry) => entry.name === name)
@@ -13,7 +20,7 @@ describe("gated category listing", () => {
       const entry = entryFor("architect", {})
 
       // then
-      expect(entry?.description).toContain("(requires claude-fable-5)")
+      expect(entry?.description).toContain("(requires claude-fable-5-1)")
     })
 
     test("#when the categories are listed #then ultrabrain carries its required model annotation", () => {
@@ -21,7 +28,7 @@ describe("gated category listing", () => {
       const entry = entryFor("ultrabrain", {})
 
       // then
-      expect(entry?.description).toContain("(requires gpt-5.6-sol)")
+      expect(entry?.description).toContain(requiredAnnotation("ultrabrain"))
     })
 
     test("#when the categories are listed #then deep carries its required model annotation", () => {
@@ -29,7 +36,7 @@ describe("gated category listing", () => {
       const entry = entryFor("deep", {})
 
       // then
-      expect(entry?.description).toContain("(requires gpt-5.6-sol)")
+      expect(entry?.description).toContain(requiredAnnotation("deep"))
     })
   })
 

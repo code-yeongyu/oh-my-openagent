@@ -1,0 +1,78 @@
+name: npm-dist-tag-rollback
+run-name: "dist-tag ${{ inputs.dist_tag }} -> ${{ inputs.version }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Existing published version to point the dist-tag at (e.g., 5.0.0-beta.36)"
+        required: true
+        type: string
+      dist_tag:
+        description: "npm dist-tag to move"
+        required: true
+        type: string
+        default: beta
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  retag:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Validate inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          DIST_TAG: ${{ inputs.dist_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]] || { echo "::error::Invalid version: $VERSION"; exit 1; }
+          [[ "$DIST_TAG" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "::error::Invalid dist_tag: $DIST_TAG"; exit 1; }
+          if [ "$DIST_TAG" = "latest" ]; then echo "::error::latest is never moved by this workflow"; exit 1; fi
+
+      - name: Move dist-tags
+        env:
+          VERSION: ${{ inputs.version }}
+          DIST_TAG: ${{ inputs.dist_tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          OMO_AI_VERSION="${VERSION/-/-0.}"
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
+          retag() {
+            local pkg="$1" ver="$2"
+            if [ "$(npm view "$pkg@$ver" version 2>/dev/null || true)" != "$ver" ]; then
+              echo "::error::$pkg@$ver is not published"; exit 1
+            fi
+            npm dist-tag add "$pkg@$ver" "$DIST_TAG"
+            echo "$pkg $DIST_TAG -> $(npm view "$pkg" "dist-tags.$DIST_TAG")"
+          }
+          retag oh-my-opencode "$VERSION"
+          retag oh-my-openagent "$VERSION"
+          retag lazycodex-ai "$VERSION"
+          retag omo-ai "$OMO_AI_VERSION"
+          for plat in "${PLATFORMS[@]}"; do
+            retag "oh-my-opencode-$plat" "$VERSION"
+            retag "oh-my-openagent-$plat" "$VERSION"
+          done
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## npm dist-tag rollback"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Version | \`${{ inputs.version }}\` |"
+            echo "| Dist tag | \`${{ inputs.dist_tag }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

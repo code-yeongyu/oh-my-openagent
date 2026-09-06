@@ -1,3 +1,22 @@
+
+## 2026-09-05 — Make run_in_background=true the standard spawn in the task tool's prompt surfaces
+
+`src/tools/task/description.ts` no longer tells the model to use `run_in_background=true` "only for parallel
+independent work" with a default that "waits and returns the result". The guideline now reads "Spawn children
+with run_in_background=true; pass false only for a short child whose result gates your very next call", the
+description states the mechanics once (true returns the task id at once and the child's result arrives later
+as a message; false blocks this turn until the child finishes), and `src/tools/task/params.ts` describes the
+flag as "true (the standard spawn) ... false blocks this turn ... Omitted counts as false" instead of labelling
+false as the default. The runtime default is unchanged (an omitted flag still runs in the foreground); only
+the text the model reads changed. A live backtest against gpt-6-astra with senpi's async-first preset showed
+the old wording still pulling one of three single-dependent delegations back to a blocking spawn.
+`description.test.ts` and `params.test.ts` pin the new wording and the absence of the old.
+
+## 2026-09-04 — Defer the lead tasklist tools to tool_search
+
+The four lead tasklist tools (`task_create`, `task_get`, `task_list`, `task_update`) register with `exposure: "search"` (plus `searchText`/`searchKeywords`/`searchGroup: "team-tasklist"`/`allowLazyActivation`) instead of the resident tool list. They only matter once a team exists, so they cost no prompt tokens until a tasklist operation is searched for and promote through `tool_search` on demand. Descriptions now lead with the selecting situation. `src/tools/team/tasklist-exposure.test.ts` pins the exposure on all four.
+
+
 ## 2026-08-28 — Align the task engine with Senpi 2026.8.28
 
 `packages/senpi-task/package.json` now carries the exact published

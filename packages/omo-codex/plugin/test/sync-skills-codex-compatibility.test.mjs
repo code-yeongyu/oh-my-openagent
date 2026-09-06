@@ -99,3 +99,11 @@ test("#given the aggregate sync implementation #when its skill adaptation pipeli
 	);
 	assert.match(script, /await adaptSkillForCodex\(skillName\)/);
 });
+
+test("#given the published package layout #when sync-skills resolves shared skill helpers #then it uses files shipped beside the package instead of a workspace-only dependency", async () => {
+	const script = await readFile(join(pluginRoot, "scripts", "sync-skills.mjs"), "utf8");
+
+	assert.match(script, /from "\.\.\/\.\.\/\.\.\/shared-skills\/index\.mjs"/);
+	assert.match(script, /from "\.\.\/\.\.\/\.\.\/shared-skills\/skill-source-filter\.mjs"/);
+	assert.doesNotMatch(script, /from "@oh-my-opencode\/shared-skills/);
+});

@@ -114,6 +114,32 @@ describe("checkpointUlwLoop final story surface resolution", () => {
 });
 
 describe("checkpointUlwLoop final story", () => {
+	it("#given a mismatched codex objective and multiple gate defects #when completing the final checkpoint #then reports both validation domains", async () => {
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+		const gate = JSON.parse(await qualityGateJson(repo)) as Record<string, Record<string, unknown>>;
+		const manualQa = requiredSection(gate, "manualQa");
+		manualQa["surfaceEvidence"] = [];
+		requiredSection(gate, "gateReview")["recommendation"] = "REJECT";
+
+		try {
+			await checkpointUlwLoop(repo, {
+				goalId: "G002",
+				status: "complete",
+				evidence: "final work complete and validation passed",
+				codexGoalJson: snapshot("complete", "wrong objective"),
+				qualityGateJson: JSON.stringify(gate),
+			});
+			throw new Error("expected validation failure");
+		} catch (error) {
+			expect(error).toBeInstanceOf(Error);
+			if (!(error instanceof Error)) throw error;
+			expect(error.message).toContain("Codex goal objective mismatch");
+			expect(error.message).toContain("manualQa.surfaceEvidence");
+			expect(error.message).toContain("gateReview.recommendation");
+		}
+	});
 	it("requires quality-gate-json for the final goal complete", async () => {
 		const repo = await repoWith(
 			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),

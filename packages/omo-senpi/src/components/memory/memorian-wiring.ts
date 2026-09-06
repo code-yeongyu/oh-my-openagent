@@ -7,9 +7,11 @@
 // advisory, and a turn must never pay for the advice about the turn that just ended.
 
 import { PendingNudges, type RecallCandidate } from "@oh-my-opencode/memory-core"
-import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
+import { createOncePerSessionGuard } from "../task/usage-guidance"
+import { GATE_ENTRY_TYPE, type MemorianGateRecord } from "./memorian-notice"
+import type { ChildModelRegistry } from "./model-registry-resolver"
 import type { MemoryIdentityContext } from "./context"
 import type { CollectedRecallCandidates, RecallSessionSnapshot, RecallTranscriptTurn } from "./recall-wiring"
 
@@ -22,15 +24,19 @@ export interface MemorianGatePort {
     readonly maxItems: number
     readonly transcript: readonly RecallTranscriptTurn[]
     /**
-     * Captured at settle, before the host disposed the ctx the registry lives on. Absent means the
-     * capture was unavailable, and the runner skips rather than reading a disposed ctx.
+     * Captured at settle, before the host disposed the ctx the registry lives on. The CONCRETE
+     * registry instance threads into the in-process judge session, so the child resolves the
+     * parent's exact provider set. Absent means the capture was unavailable, and the runner skips
+     * rather than reading a disposed ctx.
      */
-    readonly modelRegistry?: SenpiModelRegistryPort<SenpiModelPort> | undefined
+    readonly modelRegistry?: ChildModelRegistry | undefined
     /** The session's compaction epoch at launch time. */
     readonly compactionEpoch?: number
     /** The session's live compaction epoch, read again before the verdict is persisted. */
     readonly currentCompactionEpoch?: () => number
   }): Promise<unknown>
+  cancel?(): Promise<void>
+  whenIdle?(): Promise<void>
 }
 
 export interface MemorianGateWiringOptions {
@@ -53,7 +59,7 @@ export interface MemorianGateWiringOptions {
    * Reads the model registry off the live senpi ctx. Called SYNCHRONOUSLY inside onSettled, because
    * the host disposes the ctx the moment the handler returns and every later read throws.
    */
-  readonly resolveModelRegistry?: (eventCtx: unknown) => SenpiModelRegistryPort<SenpiModelPort> | undefined
+  readonly resolveModelRegistry?: (eventCtx: unknown) => ChildModelRegistry | undefined
   readonly pendingFor?: (context: MemoryIdentityContext) => Pick<PendingNudges, "take">
   readonly logger?: ComponentLogger
 }
@@ -61,8 +67,14 @@ export interface MemorianGateWiringOptions {
 export interface MemorianGateWiring {
   /** Fire-and-forget gate launch for a settled turn. Returns immediately. */
   onSettled(eventCtx: unknown): void
+  /** Binds the live host entry seam after registration; detached launches never retain event ctx. */
+  attachEntrySink(appendEntry: (customType: string, data?: unknown) => void): void
   /** Accepted compaction: the pending nudges judged a transcript that no longer exists. */
   onCompactionAccepted(sessionId: string): void
+  /**
+   * Cancels and drains the judge for a session before its identity is released.
+   */
+  onSessionShutdown(sessionId: string): Promise<void>
   /**
    * The session's live compaction epoch. The consumption side (recall's before_agent_start drain)
    * reads it to reject a pending payload stamped with a superseded epoch, which is what makes the
@@ -77,6 +89,8 @@ export function createMemorianGateWiring(options: MemorianGateWiringOptions): Me
   const pendingFor = options.pendingFor
     ?? ((context: MemoryIdentityContext) => new PendingNudges(context.identityPaths.recallPending))
   const inFlight = new Set<Promise<void>>()
+  const skippedOnce = createOncePerSessionGuard()
+  let appendEntry: ((customType: string, data?: unknown) => void) | undefined
   // Per-session compaction epoch. A gate child judges ONE transcript; when a compaction is accepted
   // while that child is still running, the pending-file drop in onCompactionAccepted cannot help -
   // the write has not happened yet. The epoch is the in-flight half of the same policy: stamped at
@@ -102,12 +116,15 @@ export function createMemorianGateWiring(options: MemorianGateWiringOptions): Me
   }
 
   return {
+    attachEntrySink(sink): void {
+      appendEntry = sink
+    },
     onSettled(eventCtx: unknown): void {
       // Snapshot every ctx-derived input BEFORE detaching. The launch below is fire-and-forget by
       // contract, and the host runs AgentSession dispose -> _extensionRunner.invalidate() as soon as
       // this handler returns; any ctx read from the detached task then throws the stale-ctx error and
       // the gate silently never spawns. Everything the async part consumes is a plain value.
-      let modelRegistry: SenpiModelRegistryPort<SenpiModelPort> | undefined
+      let modelRegistry: ChildModelRegistry | undefined
       try {
         modelRegistry = options.resolveModelRegistry?.(eventCtx)
       } catch (error) {
@@ -130,7 +147,7 @@ export function createMemorianGateWiring(options: MemorianGateWiringOptions): Me
         // Everything below is a plain captured value; eventCtx is intentionally NOT in this closure.
         const collected = await collectFromSnapshot(session)
         if (collected === undefined) return
-        await options.runnerFor(collected.context).launch({
+        const result = await options.runnerFor(collected.context).launch({
           sessionId: collected.sessionId,
           compactionEpoch: launchedAtEpoch,
           currentCompactionEpoch: () => epochOf(collected.sessionId),
@@ -140,7 +157,33 @@ export function createMemorianGateWiring(options: MemorianGateWiringOptions): Me
           transcript: collected.transcript,
           ...(modelRegistry === undefined ? {} : { modelRegistry }),
         })
+        if (result !== null && typeof result === "object" && "status" in result) {
+          const outcome = result as { status?: string; cause?: string; model?: string; candidateCount?: number; reason?: string; runId?: string }
+          if (outcome.status === "skipped" || outcome.status === "failed" || outcome.status === "dropped") {
+            const cause = typeof outcome.cause === "string" ? outcome.cause : "unknown"
+            if (outcome.status !== "skipped" || skippedOnce(`${collected.sessionId}:${cause}`)) {
+              appendEntry?.(GATE_ENTRY_TYPE, {
+                version: 1,
+                status: outcome.status,
+                cause,
+                ...(typeof outcome.model === "string" ? { model: outcome.model } : {}),
+                candidateCount: outcome.candidateCount ?? collected.candidates.length,
+                ...(typeof outcome.reason === "string" ? { reason: outcome.reason } : {}),
+                ...(typeof outcome.runId === "string" ? { runId: outcome.runId } : {}),
+              } satisfies MemorianGateRecord)
+            }
+          }
+        }
       })
+    },
+
+    async onSessionShutdown(sessionId: string): Promise<void> {
+      compactionEpochs.delete(sessionId)
+      const context = options.resolveContext(sessionId)
+      if (context === undefined) return
+      const runner = options.runnerFor(context)
+      await runner.cancel?.()
+      await runner.whenIdle?.()
     },
 
     onCompactionAccepted(sessionId: string): void {

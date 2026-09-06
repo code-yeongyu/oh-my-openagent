@@ -1,0 +1,24 @@
+# GREEN: resolver implemented (mengmotaMac, bun 1.4.0, hermetic)
+# remote exit=0
+cwd=/tmp/omo-rls-20260904/green-resolver
+./script/release-latest-flag.test.ts
+./script/release-latest-flag.ts
+bun test v1.4.0 (34cbb9a40)
+
+script/release-latest-flag.test.ts:
+(pass) resolveLatestFlag > #given a version above every published release #when resolved #then it becomes Latest [0.76ms]
+(pass) resolveLatestFlag > #given an older-line hotfix below a published release #when resolved #then Latest is left alone [0.02ms]
+(pass) resolveLatestFlag > #given a rerun for an already published version #when resolved #then it still resolves to Latest [0.01ms]
+(pass) resolveLatestFlag > #given a stable version after its own betas #when resolved #then the stable becomes Latest
+(pass) resolveLatestFlag > #given multi-digit prerelease counters #when compared #then ordering is numeric, not lexical [0.02ms]
+(pass) resolveLatestFlag > #given tags that are not semver #when resolved #then they are ignored instead of throwing [0.04ms]
+(pass) resolveLatestFlag > #given a leading v on the candidate #when resolved #then it is tolerated like the tag list
+(pass) resolveLatestFlag > #given no published releases yet #when resolved #then the first release is Latest
+(pass) resolveLatestFlag > #given a candidate that is not a release version #when resolved #then it throws instead of guessing [0.14ms]
+
+ 9 pass
+ 0 fail
+ 14 expect() calls
+Ran 9 tests across 1 file. [29.00ms]
+EXIT=0
+

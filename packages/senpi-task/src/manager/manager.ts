@@ -183,6 +183,7 @@ class TaskManagerImpl implements TaskManager {
         return removed
       },
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
+      reserveForDetachedRevive: (record) => this.#reserveForDetachedRevive(record),
       destruction: options.destruction ?? NOOP_DESTRUCTION,
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       now: this.#now,
@@ -594,6 +595,8 @@ class TaskManagerImpl implements TaskManager {
         unsubscribe()
         if (this.#live.get(taskId)?.handle === attachedHandle) this.#live.delete(taskId)
       },
+      destroyAttached: (taskId: string) =>
+        (this.#options.destruction ?? NOOP_DESTRUCTION).destroyResidentTask(taskId, "revive_failure"),
       armOutcome: (fresh, attachedHandle, epoch) => {
         this.#outcome.trackOutcome(fresh.task_id, attachedHandle, fresh.model, epoch)
         void this.#steering.notifyStarted(fresh.task_id)
@@ -911,6 +914,30 @@ class TaskManagerImpl implements TaskManager {
       commit: () => {
         this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now))
         this.#outcome.trackOutcome(taskId, live.handle, live.model, epoch)
+      },
+    }
+  }
+
+  #reserveForDetachedRevive(record: TaskRecord): { readonly ok: false } | { readonly ok: true; commit(): void; release(): void } {
+    const epoch = record.notification.run_epoch + 1
+    if (!this.#concurrency.tryAcquire(record.model, record.task_id, epoch)) return { ok: false }
+    let released = false
+    const release = (): void => {
+      if (released) return
+      released = true
+      this.#concurrency.releaseLease(record.task_id, epoch)
+    }
+    return {
+      ok: true,
+      release,
+      commit: () => {
+        const live = this.#live.get(record.task_id)
+        if (live === undefined) {
+          release()
+          return
+        }
+        this.#runStats.set(record.task_id, createRunStatsTracker(this.#now(), this.#now))
+        this.#outcome.trackOutcome(record.task_id, live.handle, live.model, epoch)
       },
     }
   }

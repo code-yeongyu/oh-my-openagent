@@ -83,7 +83,7 @@ bunx oh-my-openagent install
 | `--minimax-cn-coding-plan <value>` | MiniMax Coding Plan through minimaxi.com: `no`, `yes` (Ultimate only) |
 | `--minimax-coding-plan <value>` | MiniMax Coding Plan through minimax.io: `no`, `yes` (Ultimate only) |
 | `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
-| `--codex-autonomous` | Default for Light/Both installs: writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` unless `--no-codex-autonomous` is passed; passing this flag explicitly is redundant |
+| `--codex-autonomous` | Default for Light/Both installs: writes `approval_policy = "never"` and `sandbox_mode = "danger-full-access"` (and removes a legacy top-level `network_access` key) unless `--no-codex-autonomous` is passed; passing this flag explicitly is redundant |
 | `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 

@@ -32,6 +32,13 @@ export function startMockCompletionsServer({ steps, onRequest }) {
       const script = typeof steps === "function" ? steps(body) : steps
       const step = script[cursor]
       cursor += 1
+      // An `error` step is the ONLY way a lane can exercise a provider outage: the streaming writer
+      // below always commits a 200 before the first chunk, so a failure has to be decided here.
+      if (step !== undefined && step.type === "error") {
+        response.writeHead(step.status, { "content-type": "application/json" })
+        response.end(JSON.stringify(step.body))
+        return
+      }
       writeStream(response, step === undefined ? [{ type: "text", text: "mock script exhausted" }] : [step])
     })
   })

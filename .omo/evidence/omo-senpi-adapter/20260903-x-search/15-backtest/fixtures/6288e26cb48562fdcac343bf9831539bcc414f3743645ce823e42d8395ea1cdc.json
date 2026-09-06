@@ -1,0 +1,230 @@
+{
+  "queryId": "q13",
+  "lane": "api-direct",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Grok latest release since:2026-08-19 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421476,
+    "completed_at": 1788421476,
+    "id": "d2cfb9c7-b56f-994d-bbea-98c064764e26",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-ec0819c8-7ec8-4647-a2b6-dffb270ceeab-0",
+        "input": "{\"query\":\"Grok latest release since:2026-08-19 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_d2cfb9c7-b56f-994d-bbea-98c064764e26_call-ec0819c8-7ec8-4647-a2b6-dffb270ceeab-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_d2cfb9c7-b56f-994d-bbea-98c064764e26_call-ec0819c8-7ec8-4647-a2b6-dffb270ceeab-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/grok/status/2094991346473779600 - Rumors on X lean toward a possible release this week, with several accounts specifically guessing Thursday. Others say any day soon or mid-September at latest. All unconfirmed speculation—OpenAI only said \"soon\" with limited advanced cyber access at first. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094991036552548614 - OpenAI has not announced a specific release date for Astra. Their latest update (Sept 1) states they plan to make it available soon, with advanced cybersecurity capabilities limited initially to testers and Daybreak Blue partners. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094880585948746211 - Texas Roadhouse does not release monthly sales data. Latest official update (Aug 6 earnings): comparable restaurant sales rose 6.2% in the first five weeks of Q3 2026 (early July into early August). Q2 sales were also up 11.1% overall. No public figures yet for full August. (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094870657263624455 - NYT review of the latest DOJ Epstein release found over 38,000 references to Trump, his wife, and Mar-a-Lago in more than 5,300 files. Many are news articles from Epstein's inbox. DOJ reviewed and found no credible evidence of wrongdoing by Trump. (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094860609548382248 - Official records confirm Ghislaine Maxwell remains at FPC Bryan in Texas. A federal judge denied her latest bid to vacate the conviction in late August 2026; projected release is 2037. The side-by-side compares her February 2026 deposition (with glasses) to older photos. Nose and other differences are explained by aging, weight changes, lighting, angles, and prison conditions. Her attorney has stated it is her. Visual side-by-sides alone cannot prove a swap. (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094838052388471110 - The NYT review of the latest DOJ Epstein release found over 38,000 references to Trump, Melania, Mar-a-Lago and related terms across 5,300+ files. This is broader than Trump’s name alone. Many are news clippings in Epstein’s inbox. No direct Trump-Epstein messages appear in that batch. DOJ found no credible evidence warranting investigation of Trump. The “second only to Epstein” ranking is not supported by the NYT analysis or other primary counts. (@grok, 2026-09-01)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095184212768747692",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095184212768747692"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094991346473779600",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094991346473779600"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094991036552548614",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094991036552548614"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095131808304132139",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095131808304132139"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094870657263624455",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094870657263624455"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094838052388471110",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094838052388471110"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094880585948746211",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094880585948746211"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094860609548382248",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094860609548382248"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094992579615957039",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094992579615957039"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095018119957794904",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095018119957794904"
+              }
+            ]
+          }
+        ],
+        "id": "msg_d2cfb9c7-b56f-994d-bbea-98c064764e26",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 98922000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 98922000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:44:36.773Z"
+}

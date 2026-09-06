@@ -1,111 +1,69 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
-  GitMemoryRepo,
-  ReflectionReservationStore,
-  TranscriptJournal,
-  buildIdentityPaths,
   createLockRecord,
-  createReflectionWorktree,
+  parseLockRecord,
   reflectionSchedulerLockPath,
   withLock,
-  type MemoryIdentity,
 } from "@oh-my-opencode/memory-core"
 
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
-import { existsSync, realpathSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { rmEfaultTolerant } from "../teardown.test-support"
+import {
+  cleanupReconciliationFixtures,
+  commitOrphanWorktree,
+  contendedReservation,
+  reconciliationFixture as fixture,
+  withinPhase,
+} from "./run-reconciliation.test-support"
 
-const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
-
-async function fixture(trigger: "step-count" | "dream" = "step-count") {
-  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reconcile-")))
-  roots.push(root)
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
-  const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
-  await repo.init({ seedFiles: [{ relativePath: "system/base.md", content: "---\ndescription: Base\n---\nbase\n" }] })
-  const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, "conversation-a") })
-  await journal.reconcile([
-    { kind: "user", messageId: "user-1", text: "remember" },
-    { kind: "assistant", messageId: "assistant-1", textBlocks: ["noted"] },
-  ])
-  const store = new ReflectionReservationStore({
-    identity,
-    config: { stepCount: 1, onCompaction: true },
-    getJournal: async () => journal,
-    createRunId: () => "run-orphan",
-    now: () => new Date("2026-08-10T00:00:00.000Z"),
-    launcherIdentity: async () => ({ pid: 111, hostname: "fixture-host", processStart: "launcher-start" }),
-  })
-  const snapshot = await journal.captureReflectionSnapshot()
-  if (snapshot === null) throw new Error("expected snapshot")
-  const reserved = await store.tryReserve({
-    trigger,
-    ...(trigger === "dream" ? { origin: "shutdown" as const } : {}),
-    conversationIds: ["conversation-a"],
-    snapshots: [{ conversationId: "conversation-a", snapshot }],
-  })
-  const worktree = await createReflectionWorktree(repo, reserved.run.runId, identity.paths.worktrees)
-  const runDir = join(identity.paths.reflection, "runs", reserved.run.runId)
-  await mkdir(runDir, { recursive: true, mode: 0o700 })
-  await writeRunJsonAtomic(join(runDir, "prelaunch.json"), {
-    version: 1,
-    runId: reserved.run.runId,
-    worktreeDir: worktree.dir,
-    worktreeBranch: worktree.branch,
-  })
-  const ledger = {
-    version: 1 as const,
-    runId: reserved.run.runId,
-    category: "quick",
-    conversationIds: ["conversation-a"],
-    kind: trigger === "dream" ? "dream" as const : "reflection" as const,
-    trigger,
-    ...(trigger === "dream" ? { origin: "shutdown" as const } : {}),
-    startedAt: "2026-08-10T00:00:00.000Z",
-    hardDeadlineAt: 1_000,
-    terminationGraceMs: 100,
-    deadlineAt: 1_100,
-    mergePolicy: "auto" as const,
-    worktreeDir: worktree.dir,
-    worktreeBranch: worktree.branch,
-    baseSha: worktree.baseSha,
-    gitFilePath: worktree.gitFilePath,
-    gitFileSnapshot: worktree.gitFileSnapshot,
-    commonConfigPath: worktree.commonConfigPath,
-    commonConfigSnapshot: worktree.commonConfigSnapshot,
-  }
-  await writeRunJsonAtomic(join(runDir, "ledger.json"), ledger)
-  return { identity, repo, journal, store, worktree, runDir, ledger }
-}
-
-async function commitOrphanWorktree(item: Awaited<ReturnType<typeof fixture>>): Promise<void> {
-  await mkdir(join(item.worktree.dir, "system"), { recursive: true })
-  await writeFile(join(item.worktree.dir, "system", "orphan.md"), "---\ndescription: Orphan\n---\nrecovered\n")
-  await item.worktree.exec.run(["add", "system/orphan.md"], { cwd: item.worktree.dir, timeoutMs: 30_000 })
-  await item.worktree.exec.run(["commit", "-m", "reflection orphan"], { cwd: item.worktree.dir, timeoutMs: 30_000 })
-}
+afterEach(cleanupReconciliationFixtures)
 
 describe("reflection and dream run reconciliation", () => {
+  test("#given the scheduler owner is unreadable on Windows #when reconciliation defers #then reservation state is not mutated", async () => {
+    const item = await fixture()
+    const initialState = await item.store.readState()
+    const lockPath = reflectionSchedulerLockPath(item.identity.paths.locks)
+
+    const result = await withinPhase("defer", () => reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: contendedReservation(lockPath, null),
+      deferOnSchedulerContention: true,
+    }))
+
+    expect(result).toEqual([])
+    expect(await item.store.readState()).toEqual(initialState)
+  })
+
   test("#given the scheduler lock is held by a sibling bind #when reconciliation starts #then it defers without surfacing contention", async () => {
     const item = await fixture()
     const record = await createLockRecord("bind contention test")
     const lockPath = reflectionSchedulerLockPath(item.identity.paths.locks)
+    const activePath = join(item.identity.paths.reflection, "active.lock")
+    const initialReservation = await readFile(activePath, "utf8")
 
-    const result = await withLock(lockPath, record, async () => {
-      return reconcileReflectionRuns({
-        identity: item.identity,
-        reservation: item.store,
-        deferOnSchedulerContention: true,
+    const result = await withinPhase("scheduler-lock-held", () =>
+      withLock(lockPath, record, async () => {
+        const deferred = await withinPhase("defer", () => reconcileReflectionRuns({
+          identity: item.identity,
+          reservation: contendedReservation(lockPath, record),
+          deferOnSchedulerContention: true,
+        }))
+        expect(await readFile(activePath, "utf8")).toBe(initialReservation)
+        expect(parseLockRecord(await readFile(lockPath, "utf8"))).toEqual(record)
+        return deferred
       })
-    })
+    )
 
     expect(result).toEqual([])
+    expect(await withinPhase("post-release-reconcile", () => reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+    }))).toEqual([{ runId: "run-orphan", outcome: "failed" }])
   })
 
   test("#given an orphaned successful dream worktree #when session-start reconciliation runs #then it merges clears the reservation records completion and publishes final", async () => {

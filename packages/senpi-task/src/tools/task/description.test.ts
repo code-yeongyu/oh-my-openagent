@@ -65,6 +65,21 @@ describe("buildTaskToolDescription", () => {
     expect(TASK_PROMPT_GUIDELINES.some((guideline) => guideline.includes("task_summary"))).toBe(true)
   })
 
+  test("#given the run_in_background guidance #when read #then background is the standard spawn and the wait-by-default wording is gone", () => {
+    // given
+    const config: OmoConfig = { categories: {}, agents: {} }
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents })
+    const joinedGuidelines = TASK_PROMPT_GUIDELINES.join("\n")
+
+    // then
+    expect(joinedGuidelines).toContain("run_in_background=true")
+    expect(joinedGuidelines).not.toContain("only for parallel independent work")
+    expect(joinedGuidelines).not.toContain("the default waits")
+    expect(description).not.toContain("false waits for results")
+  })
+
   test("#given the prompt surfaces #when read #then snippet and guidelines are present", () => {
     // then
     expect(TASK_PROMPT_SNIPPET.length).toBeGreaterThan(0)

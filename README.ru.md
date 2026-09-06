@@ -131,7 +131,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 Анонимная телеметрия включена по умолчанию для подсчёта активных установок (DAU/WAU/MAU). Не более одного события на машину за UTC-сутки, использует хешированный идентификатор установки, никогда не использует исходное имя хоста, и не создаёт PostHog person profile. Можно отключить через `OMO_SEND_ANONYMOUS_TELEMETRY=0` или `OMO_DISABLE_POSTHOG=1`. См. [Политику конфиденциальности](docs/legal/privacy-policy.md) и [Условия обслуживания](docs/legal/terms-of-service.md).
 
-**Ultimate и Light:** oh-my-openagent поставляется в двух редакциях одного продукта. **Ultimate** (`bunx oh-my-openagent install` или `--platform=opencode`, по умолчанию) — полнофункциональная редакция поверх OpenCode: 11 агентов, 54+ хука, Team Mode, все MCP, все слэш-команды, режимы IntentGate. **Light** (`npx lazycodex-ai install` или `bunx oh-my-openagent install --platform=codex`) — портируемые компоненты omo для системы плагинов OpenAI Codex CLI: ядро (`rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `ulw-execute-continuation`, `telemetry`), а также `teammode` и вспомогательные компоненты (`bootstrap`, `codegraph`, `lcx` и другие); TOML-файлы Codex-агентов устанавливаются в `~/.codex/agents/`. Чтобы установить обе редакции одной командой, используйте `--platform=both`. Телеметрию только для Codex можно отключить через `OMO_CODEX_DISABLE_POSTHOG=1` или `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
+**Ultimate и Light:** oh-my-openagent поставляется в двух редакциях одного продукта. **Ultimate** (`bunx oh-my-openagent install` или `--platform=opencode`, по умолчанию) — полнофункциональная редакция поверх OpenCode: 11 агентов, 54+ хука, Team Mode, все MCP, все слэш-команды, режимы IntentGate. **Light** (`npx lazycodex-ai install` или `bunx oh-my-openagent install --platform=codex`) — портируемые компоненты omo для системы плагинов OpenAI Codex CLI: ядро (`rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `ulw-execute-continuation`, `telemetry`), а также `teammode` и вспомогательные компоненты (`bootstrap`, `lcx` и другие); TOML-файлы Codex-агентов устанавливаются в `~/.codex/agents/`. Чтобы установить обе редакции одной командой, используйте `--platform=both`. Телеметрию только для Codex можно отключить через `OMO_CODEX_DISABLE_POSTHOG=1` или `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
 
 ------
 
@@ -194,7 +194,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`gpt-5.6-sol`** / **`glm-5.2`**) — главный оркестратор. Он планирует, делегирует задачи специалистам и доводит их до завершения с агрессивным параллельным выполнением. Он не останавливается на полпути. Claude Opus 5 и Kimi K3 — рекомендуемые значения по умолчанию.
 
-**Hephaestus** (использует только `gpt-5.6-sol` с medium effort через OpenAI, GitHub Copilot, Vercel или OpenCode) — автономный глубокий исполнитель. Дайте ему цель, а не рецепт. Он исследует кодовую базу, изучает паттерны и выполняет задачи сквозным образом без лишних подсказок. *Законный Мастер.*
+**Hephaestus** (использует только `gpt-5.6-sol` с medium effort через OpenAI, OpenAI Codex, GitHub Copilot или OpenCode) — автономный глубокий исполнитель. Дайте ему цель, а не рецепт. Он исследует кодовую базу, изучает паттерны и выполняет задачи сквозным образом без лишних подсказок. Если нужен самый сильный GPT, укажите ему `gpt-6-astra`, самую мощную модель OpenAI. *Законный Мастер.*
 
 **Prometheus** (`claude-fable-5` / **`kimi-k3`**) — стратегический планировщик. Режим интервью: он задаёт вопросы, определяет объём работ и формирует детальный план до того, как написана хотя бы одна строка кода.
 
@@ -239,7 +239,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | `quick`              | Изменения в одном файле, опечатки     |
 | `ultrabrain`         | Сложная логика, архитектурные решения |
 
-Агент сообщает тип задачи, а обвязка подбирает нужную модель. `ultrabrain` направляется в GPT-5.6 Sol max (OpenAI / Vercel, затем GitHub Copilot, затем OpenCode). Вы ни к чему не прикасаетесь.
+Агент сообщает тип задачи, а обвязка подбирает нужную модель. `ultrabrain` направляется в GPT-6 Astra max, а `deep` в GPT-6 Astra high (OpenAI / OpenAI Codex, затем GitHub Copilot, затем OpenCode), а при недоступности откатываются к GPT-5.6 Sol. Вы ни к чему не прикасаетесь.
 
 ### Совместимость с Claude Code
 
