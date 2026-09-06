@@ -36,7 +36,7 @@ export interface MemoryReflectionLiveWiring {
   onLiveReflectionCompleted(identity: string, runId: string): Promise<void>
   onSettled(sessionId: string, eventCtx: unknown): Promise<void>
   syncRpc(): Promise<void>
-  shutdown(identity?: string): void
+  shutdown(sessionId?: string, identity?: string): void
   clearStatus(eventCtx: unknown): void
 }
 
@@ -59,7 +59,9 @@ export function createMemoryReflectionLiveWiring(
 ): MemoryReflectionLiveWiring {
   const activeRuns = createActiveReflectionRuns()
   const healthAlertOnce = createOncePerSessionGuard()
-  const liveSession: { current?: ReflectionLiveSession } = {}
+  let bindGeneration = 0
+  const bindGenerations = new Map<string, number[]>()
+  const liveSession: { current?: ReflectionLiveSession & { readonly generation: number } } = {}
   const rpcBridge: { current?: MemoryRpcBridge } = {}
   const footerLive = createMemoryFooterStatusLive({
     resolveContext: (sessionId) => options.sessions.get(sessionId)?.context,
@@ -95,10 +97,15 @@ export function createMemoryReflectionLiveWiring(
     async bind(pi, sessionId, identity, eventCtx, requestPressureDream): Promise<void> {
       const ui = readUi(eventCtx)
       const api = createReflectionCompletionApi(pi)
+      const generation = ++bindGeneration
+      const pending = bindGenerations.get(sessionId) ?? []
+      pending.push(generation)
+      bindGenerations.set(sessionId, pending)
       liveSession.current = api === undefined
         ? undefined
         : {
             sessionId,
+            generation,
             api,
             ...(ui === undefined ? {} : { ui }),
             ...(options.logger === undefined ? {} : { logger: options.logger }),
@@ -124,11 +131,19 @@ export function createMemoryReflectionLiveWiring(
     async syncRpc(): Promise<void> {
       await rpcBridge.current?.sync()
     },
-    shutdown(identity): void {
-      liveSession.current = undefined
+    shutdown(sessionId, identity): void {
+      const pending = sessionId === undefined ? undefined : bindGenerations.get(sessionId)
+      const retiringGeneration = pending?.shift()
+      if (sessionId !== undefined && pending !== undefined && pending.length === 0) {
+        bindGenerations.delete(sessionId)
+      }
+      const current = liveSession.current
+      if (current === undefined || current.generation === retiringGeneration) {
+        liveSession.current = undefined
+        footerLive.dispose()
+        rpcBridge.current?.detach()
+      }
       if (identity !== undefined) activeRuns.clear(identity)
-      footerLive.dispose()
-      rpcBridge.current?.detach()
     },
     clearStatus(eventCtx): void {
       footerLive.stop()

@@ -1,3 +1,0 @@
-Command: node packages/omo-senpi/scripts/qa/drive.mjs --self-test
-Result: PASS
-Output: SELF-TEST OK

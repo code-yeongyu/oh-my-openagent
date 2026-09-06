@@ -508,6 +508,107 @@ describe("memory shutdown context wiring", () => {
     expect(resolvedModel).toEqual({ provider: "current-provider", id: "current-model" })
     expect(liveSessionPresentDuringShutdown).toBe(false)
   })
+
+  test("#given a newer bind replaced the live session for the same identity #when the retiring session shuts down #then the replacement bind stays live", async () => {
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-shutdown-generation-")))
+    roots.push(root)
+    const retiringSessionId = "session-retiring"
+    const replacementSessionId = "session-replacement"
+    const identity = createMemoryIdentityContext({
+      identity: "agent-shutdown-generation",
+      identityPaths: buildIdentityPaths(root, "agent-shutdown-generation"),
+      binding: { identity: "agent-shutdown-generation", repoPathHash: "hash", boundAt: 1 },
+    })
+    const settings = memorySettings()
+    settings.dream.shutdown_launch = false
+    let runtimeDeps: MemoryIdentityRuntimeDeps | undefined
+    const wiring = createMemoryWiring({
+      sessions: new Map([
+        [retiringSessionId, { context: identity }],
+        [replacementSessionId, { context: identity }],
+      ]),
+      loadConfig: () => loadedMemoryConfig(settings),
+      cwd: () => root,
+      env: {},
+      createRuntime: (_identity, deps) => {
+        runtimeDeps = deps
+        return { reconcile: async () => {} } as unknown as MemoryIdentityRuntime
+      },
+    })
+    const retiringContext = {
+      sessionManager: { getSessionId: () => retiringSessionId, getEntries: () => [] },
+      ui: { setStatus: () => {}, notify: () => {} },
+    }
+    const replacementContext = {
+      sessionManager: { getSessionId: () => replacementSessionId, getEntries: () => [] },
+      ui: { setStatus: () => {}, notify: () => {} },
+    }
+    await wiring.afterBind(new MemoryFakeExtensionAPI(), retiringSessionId, identity, retiringContext)
+    await wiring.afterBind(new MemoryFakeExtensionAPI(), replacementSessionId, identity, replacementContext)
+    let liveSessionDuringRetiringShutdown: { sessionId?: string } | undefined
+    wiring.registerShutdownEvaluator(() => {
+      liveSessionDuringRetiringShutdown = runtimeDeps?.liveSession?.()
+    })
+
+    await wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId: retiringSessionId,
+      deadlineAt: Date.now() + 1_000,
+      eventCtx: retiringContext,
+    })
+
+    expect(liveSessionDuringRetiringShutdown?.sessionId).toBe(replacementSessionId)
+    expect(runtimeDeps?.liveSession?.()?.sessionId).toBe(replacementSessionId)
+  })
+
+  test("#given print mode rebound the same session id #when the retiring generation shuts down #then the newer bind is not cleared", async () => {
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-shutdown-rebind-")))
+    roots.push(root)
+    const sessionId = "session-rebound"
+    const identity = createMemoryIdentityContext({
+      identity: "agent-shutdown-rebind",
+      identityPaths: buildIdentityPaths(root, "agent-shutdown-rebind"),
+      binding: { identity: "agent-shutdown-rebind", repoPathHash: "hash", boundAt: 1 },
+    })
+    const settings = memorySettings()
+    settings.dream.shutdown_launch = false
+    let runtimeDeps: MemoryIdentityRuntimeDeps | undefined
+    const wiring = createMemoryWiring({
+      sessions: new Map([[sessionId, { context: identity }]]),
+      loadConfig: () => loadedMemoryConfig(settings),
+      cwd: () => root,
+      env: {},
+      createRuntime: (_identity, deps) => {
+        runtimeDeps = deps
+        return { reconcile: async () => {} } as unknown as MemoryIdentityRuntime
+      },
+    })
+    const retiringPi = new MemoryFakeExtensionAPI()
+    const replacementPi = new MemoryFakeExtensionAPI()
+    const context = {
+      sessionManager: { getSessionId: () => sessionId, getEntries: () => [] },
+      ui: { setStatus: () => {}, notify: () => {} },
+    }
+    await wiring.afterBind(retiringPi, sessionId, identity, context)
+    await wiring.afterBind(replacementPi, sessionId, identity, context)
+    let liveSessionDuringRetiringShutdown: boolean | undefined
+    wiring.registerShutdownEvaluator(() => {
+      liveSessionDuringRetiringShutdown = runtimeDeps?.liveSession?.() !== undefined
+      runtimeDeps?.liveSession?.()?.api.appendEntry("replacement-probe", { ok: true })
+    })
+
+    await wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId,
+      deadlineAt: Date.now() + 1_000,
+      eventCtx: context,
+    })
+
+    expect(liveSessionDuringRetiringShutdown).toBe(true)
+    expect(replacementPi.entries).toContainEqual({ customType: "replacement-probe", data: { ok: true } })
+    expect(retiringPi.entries).not.toContainEqual({ customType: "replacement-probe", data: { ok: true } })
+    expect(runtimeDeps?.liveSession?.()).toBeDefined()
+  })
 })
 
 describe("memory wiring reflection completion delivery", () => {
@@ -704,6 +805,9 @@ describe("facts shutdown wiring", () => {
       sessionId,
       deadlineAt: Date.now() + 1_000,
       now: () => Date.now(),
+      eventCtx: {
+        sessionManager: { getSessionId: () => sessionId, getEntries: () => [] },
+      },
     })
 
     // then
