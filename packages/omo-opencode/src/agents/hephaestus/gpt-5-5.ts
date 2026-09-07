@@ -11,6 +11,7 @@ import {
   buildOracleSection,
   buildFrontendGuidanceSection,
 } from "../dynamic-agent-prompt-builder"
+import { HEPHAESTUS_DELEGATION_ALLOWLIST } from "../../tools/delegate-task/constants"
 
 function buildTaskSystemGuide(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -246,7 +247,7 @@ export function buildGpt55HephaestusPrompt(
   )
   const delegationTable = buildDelegationTable(
     availableAgents.filter((agent) =>
-      ["explore", "librarian", "oracle"].includes(agent.name),
+      HEPHAESTUS_DELEGATION_ALLOWLIST.includes(agent.name),
     ),
   )
   const oracleSection = buildOracleSection(availableAgents)
