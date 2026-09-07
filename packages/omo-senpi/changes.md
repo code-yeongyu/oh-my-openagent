@@ -1,3 +1,7 @@
+## 2026-09-07 — Flush the journal before shutdown cleanup
+
+The session shutdown path now flushes the transcript journal before awaiting memory cleanup, gate cancellation, and facts cancellation, so the fixed 1500 ms shutdown budget cannot skip the durable journal step. Journal-flush budget exhaustion is emitted as an error-level alarm with the session and step details, while optional work keeps its existing informational message. Memorian gate runs now stop promptly when the child reports a terminal upstream 503, `auth_unavailable`, or overloaded provider error; silent children still use the deadline backstop.
+
 ## 2026-09-05 — Name `tool.monitor` in the ultrawork directive and drop the polling loop
 
 The Waiting discipline section of `skills/ultrawork/SKILL.md` told the model that

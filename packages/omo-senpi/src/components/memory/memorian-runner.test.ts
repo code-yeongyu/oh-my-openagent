@@ -245,4 +245,5 @@ describe("MemorianGateRunner", () => {
     expect(captured?.tools).toEqual(["nudge"])
     const toolNames = (captured?.customTools ?? []).map((tool) => tool.name)
     expect(toolNames).toEqual(["nudge"])
-  })})
+  })
+})

@@ -597,8 +597,9 @@ Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 ### Memory
 
 Persistent, per-agent memory stored as a git repository. Memory is on by default and learns
-actively: it reflects on its own, nudges when durable facts go unsaved, extracts facts in the
-background, consolidates during a dream pass, and keeps records about people.
+actively: it reflects on its own, nudges when durable facts go unsaved, recalls a stored memory
+mid-session when it would change the next step, extracts facts in the background, consolidates
+during a dream pass, and keeps records about people.
 
 Configured under `memory` in `omo.json`, with per-agent overrides under `memory.agents.<name>`.
 
@@ -646,6 +647,25 @@ Reminds the agent to save when durable facts have gone unwritten.
 | ------------------------- | ------- | ---------------------------------------------------- |
 | `nudge.enabled`           | `true`  | Emit the nudge line in the memory metadata block      |
 | `nudge.every_user_turns`  | `10`    | Nudge after this many user turns without a save       |
+
+#### Recall (Aha moments)
+
+The nudge above asks the agent to write. Recall is the other direction: a read-only judge called
+Memorian watches each turn, checks stored memory against what the agent is doing, and hands back
+a hint only when that memory would change the next step (a constraint being ignored, a past
+failure of the same approach, an answer about to be re-derived). Silence is the default. Most
+turns produce nothing, and a judge that finds nothing leaves no trace.
+
+When it does fire, you see an `Aha moment!` line in the transcript written in the agent's own
+voice (`just remembered: <hint>`) with the memory path beneath it. It's a transcript entry, not a
+toast. The hint is one sentence of at most 200 characters, and the same memory surfaces at most
+once per session. Treat it as a hint, not current state: the agent is told to verify before
+relying on it, and expanding the entry shows that caveat.
+
+| Option              | Default | Description                                                     |
+| ------------------- | ------- | --------------------------------------------------------------- |
+| `recall.enabled`    | `true`  | Run the Memorian judge and surface Aha moments                  |
+| `recall.max_items`  | `2`     | Most memories one judge run may surface (1-5)                   |
 
 #### Facts
 

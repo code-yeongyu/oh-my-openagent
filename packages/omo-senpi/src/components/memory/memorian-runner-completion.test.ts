@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { readdir, readFile } from "node:fs/promises"
+import { join } from "node:path"
 import { MemorianGateRunner } from "./memorian-runner"
-import { callNudge, fixture, launchInput, roots, runnerOptions, scriptedSession } from "./memorian-runner.test-support"
+import { CANDIDATE_PATH, callNudge, fixture, launchInput, nudgeOnce, roots, runnerOptions, scriptedSession } from "./memorian-runner.test-support"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 const SECRET = "sk-live-abcdefghijklmnop"
@@ -124,5 +126,69 @@ describe("MemorianGateRunner", () => {
     expect(creationLog).toBeDefined()
     expect(creationLog?.details).toMatchObject({ error: "redacted" })
     expect(JSON.stringify({ result, warnings })).not.toContain(SECRET)
+  })
+
+  test("#given a child that accepts one nudge then never settles #when the launch deadline fires #then the result is nudged with partial true and the accepted path", async () => {
+    // given: the judge records one valid nudge, then the child turn stays open until the deadline.
+    const { identityPaths } = await fixture()
+    const stub = scriptedSession(nudgeOnce)
+    const runner = new MemorianGateRunner(runnerOptions(identityPaths, { createSession: stub.createSession }))
+
+    // when
+    const result = await runner.launch(launchInput({ deadlineMs: 50 }))
+
+    // then
+    expect(result.status).toBe("nudged")
+    if (result.status === "nudged") {
+      expect(result.partial).toBe(true)
+      expect(result.nudges[0]?.path).toBe(CANDIDATE_PATH)
+    }
+  })
+
+  test("#given a child that never nudges and never settles #when the launch deadline fires #then the result is dropped with cause deadline", async () => {
+    // given
+    const { identityPaths } = await fixture()
+    const stub = scriptedSession(async () => undefined)
+    const runner = new MemorianGateRunner(runnerOptions(identityPaths, { createSession: stub.createSession }))
+
+    // when
+    const result = await runner.launch(launchInput({ deadlineMs: 50 }))
+
+    // then
+    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
+    expect(result.status).not.toBe("nudged")
+  })
+
+  test("#given an accepted nudge and a compaction epoch bump mid-flight #when the launch deadline fires #then the result is dropped with cause compaction", async () => {
+    // given: the child accepted a nudge against transcript T1; the live epoch no longer matches.
+    const { identityPaths } = await fixture()
+    const stub = scriptedSession(nudgeOnce)
+    const runner = new MemorianGateRunner(runnerOptions(identityPaths, { createSession: stub.createSession }))
+
+    // when
+    const result = await runner.launch(launchInput({
+      deadlineMs: 50,
+      compactionEpoch: 1,
+      currentCompactionEpoch: () => 2,
+    }))
+
+    // then
+    expect(result).toMatchObject({ status: "dropped", cause: "compaction" })
+  })
+
+  test("#given a completed scripted run #when the runner launches #then outcome.json records status completed", async () => {
+    const { identityPaths } = await fixture()
+    const stub = scriptedSession(async () => undefined)
+    const runner = new MemorianGateRunner(runnerOptions(identityPaths, { createSession: stub.createSession }))
+    const pending = runner.launch(launchInput())
+    stub.resolve()
+    await pending
+    const names = await readdir(join(identityPaths.recall, "runs"))
+    expect(names).toHaveLength(1)
+    const name = names[0]
+    expect(name).toBeDefined()
+    if (name === undefined) return
+    const parsed: unknown = JSON.parse(await readFile(join(identityPaths.recall, "runs", name, "outcome.json"), "utf8"))
+    expect(parsed).toMatchObject({ version: 1, status: "completed" })
   })
 })

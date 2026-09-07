@@ -17,6 +17,7 @@ import { createRecallDrain } from "./recall-drain"
 const sessionId = "observability-session"
 const nudge: RecallNudge = { path: "memory/rollouts.md", hint: "Drain nodes before rollout." }
 const dirs: string[] = []
+type GateEntry = { outcome: { status: string; cause?: string }; collected?: unknown }
 
 afterEach(async () => {
   for (const dir of dirs.splice(0)) await Bun.$`rm -rf ${dir}`
@@ -30,7 +31,7 @@ function contextFor(dir: string): MemoryIdentityContext {
   })
 }
 
-function triggerFor(logs: Array<{ message: string; details?: unknown }>, gateEntries: unknown[]) {
+function triggerFor(logs: Array<{ message: string; details?: unknown }>, gateEntries: GateEntry[], nudgedEntries: unknown[] = [], result: unknown = { status: "empty" }) {
   const context = contextFor("/tmp/memorian-observability-trigger")
   return createMemorianTrigger({
     snapshotSession: () => ({ id: sessionId, entries: [] }),
@@ -43,9 +44,9 @@ function triggerFor(logs: Array<{ message: string; details?: unknown }>, gateEnt
       maxItems: 1,
       transcript: [],
     }),
-    runnerFor: () => ({ launch: async () => ({ status: "empty" }) }),
+    runnerFor: () => ({ launch: async () => result }),
     resolveContext: () => context,
-    onAccepted: async () => undefined,
+    onAccepted: async (_sessionId, _context, nudges) => { nudgedEntries.push({ version: 1, nudges }) },
     report: (_sessionId, outcome, collected) => gateEntries.push({ outcome, collected }),
     currentCompactionEpoch: () => 0,
     argWindow: new ToolArgWindow(),
@@ -75,7 +76,7 @@ async function fixture(): Promise<{
 describe("memorian observability contract", () => {
   test("#given unchanged candidates #when triggered twice #then skip is logged without a gate entry", async () => {
     const logs: Array<{ message: string; details?: unknown }> = []
-    const gateEntries: unknown[] = []
+    const gateEntries: GateEntry[] = []
     const trigger = triggerFor(logs, gateEntries)
 
     trigger.onSettled({})
@@ -92,7 +93,7 @@ describe("memorian observability contract", () => {
 
   test("#given judge slots are full #when triggered #then judge cap is logged without a gate entry", async () => {
     const logs: Array<{ message: string; details?: unknown }> = []
-    const gateEntries: unknown[] = []
+    const gateEntries: GateEntry[] = []
     const trigger = triggerFor(logs, gateEntries)
     const first = tryAcquireJudgeSlot()
     const second = tryAcquireJudgeSlot()
@@ -107,6 +108,31 @@ describe("memorian observability contract", () => {
       details: { sessionId, reason: "judge_cap" },
     })
     expect(gateEntries).toEqual([])
+  })
+
+  test("#given a salvaged launch #when the judge returns partial nudges #then one normal nudged entry and no gate entry are produced", async () => {
+    const logs: Array<{ message: string; details?: unknown }> = []
+    const gateEntries: GateEntry[] = []
+    const nudgedEntries: unknown[] = []
+    const trigger = triggerFor(logs, gateEntries, nudgedEntries, { status: "nudged", partial: true, nudges: [nudge] })
+
+    trigger.onSettled({})
+    await trigger.whenIdle()
+
+    expect(nudgedEntries).toEqual([{ version: 1, nudges: [nudge] }])
+    expect(gateEntries).toEqual([])
+  })
+
+  test("#given a dropped deadline outcome #when reported and rendered #then a gate record is kept without a notice", async () => {
+    const logs: Array<{ message: string; details?: unknown }> = []
+    const gateEntries: GateEntry[] = []
+    const trigger = triggerFor(logs, gateEntries, [], { status: "dropped", cause: "deadline" })
+
+    trigger.onSettled({})
+    await trigger.whenIdle()
+
+    expect(gateEntries).toHaveLength(1)
+    expect(gateEntries[0].outcome).toMatchObject({ status: "dropped", cause: "deadline" })
   })
 
   test("#given accepted nudges #when steer wake and prompt deliver #then each trace records its via", async () => {
@@ -134,7 +160,10 @@ describe("memorian observability contract", () => {
       pendingFor: () => wake.pending,
       coordinator,
       sendMessage: () => undefined,
-      appendEntry: (_type, data) => { wakeEntries.push(data); if (typeof data === "object" && data !== null && "via" in data && (data as { via: unknown }).via === "wake") wakeEntryReady?.() },
+      appendEntry: (_type, data) => {
+        wakeEntries.push(data)
+        if (typeof data === "object" && data !== null && "via" in data && data.via === "wake") wakeEntryReady?.()
+      },
     })
     await wakeDelivery.accept("wake-session", wake.context, [nudge], 0)
     coordinator.enqueue({ key: "task-completion:1", source: "task-completion", content: "done" })

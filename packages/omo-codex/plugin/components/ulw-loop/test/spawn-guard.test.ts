@@ -543,3 +543,40 @@ describe("applySpawnGuards gate-artifact check before reviewer quota", () => {
 		expect(counters["lazycodex-gate-reviewer:g1:a1"]).toBe(1);
 	});
 });
+
+describe("applySpawnGuards session state lock", () => {
+	function lockPath(): string {
+		return join(sessionDir(), ".state.lock");
+	}
+
+	it("#given the state lock held by a live process past the timeout #when guarded #then denies without counting", () => {
+		writeGoals();
+		mkdirSync(sessionDir(), { recursive: true });
+		writeFileSync(
+			lockPath(),
+			JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString(), token: "live" }),
+		);
+
+		const output = applySpawnGuards(payload("spawn_agent", { message: "scan" }), { lockTimeoutMs: 100 });
+
+		expect(deny(output).permissionDecision).toBe("deny");
+		expect(deny(output).permissionDecisionReason).toContain("state lock");
+		expect(existsSync(join(sessionDir(), "spawn-count.json"))).toBe(false);
+		expect(existsSync(lockPath())).toBe(true);
+	});
+
+	it("#given a stale lock from a dead process #when guarded #then reclaims it and counts normally", () => {
+		writeGoals();
+		mkdirSync(sessionDir(), { recursive: true });
+		writeFileSync(
+			lockPath(),
+			JSON.stringify({ pid: 2147483646, createdAt: "2026-01-01T00:00:00.000Z", token: "gone" }),
+		);
+
+		expect(applySpawnGuards(payload("spawn_agent", { message: "scan" }), { lockTimeoutMs: 1000 })).toBe("");
+
+		const counter = JSON.parse(readFileSync(join(sessionDir(), "spawn-count.json"), "utf8"));
+		expect(counter.count).toBe(1);
+		expect(existsSync(lockPath())).toBe(false);
+	});
+});

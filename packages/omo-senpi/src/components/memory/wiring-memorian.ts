@@ -4,8 +4,10 @@ import type { ComponentContext, ComponentLogger, SenpiExtensionAPI } from "../..
 import type { MemoryIdentityContext } from "./context"
 import { createMemorianDelivery, type MemorianDelivery } from "./memorian-delivery"
 import { registerMemorianHooks } from "./memorian-hooks"
+import { createThrottledPrune } from "./memorian-run-retention"
 import { createMemorianTrigger, type MemorianTrigger } from "./memorian-trigger"
 import { createMemorianGateWiring, type MemorianGateWiring } from "./memorian-wiring"
+import { sessionIdFrom } from "./wiring-context"
 import { resolveMemoryModelRegistry } from "./model-registry-resolver"
 import { ToolArgWindow } from "./recall-query-planner-tools"
 import type { MemoryRecallWiring } from "./recall-wiring"
@@ -42,6 +44,18 @@ export function createMemorianComposition(
     appendEntry: (customType, data) => pi.appendEntry?.(customType, data),
     ...(logger === undefined ? {} : { logger }),
   })
+  const pruners = new Map<string, () => void>()
+  const pruneFor = (recallDir: string): (() => void) => {
+    const existing = pruners.get(recallDir)
+    if (existing !== undefined) return existing
+    const created = createThrottledPrune({
+      recallDir,
+      now: () => new Date(),
+      ...(logger === undefined ? {} : { warn: (message, fields) => logger.warn(message, fields) }),
+    })
+    pruners.set(recallDir, created)
+    return created
+  }
   const trigger = createMemorianTrigger({
     snapshotSession: recall.snapshotSession,
     resolveModelRegistry: (eventCtx) => resolveMemoryModelRegistry(eventCtx),
@@ -58,7 +72,25 @@ export function createMemorianComposition(
   return {
     gate,
     delivery,
-    trigger,
+    trigger: {
+      onToolCall: trigger.onToolCall,
+      onSettled(eventCtx): void {
+        trigger.onSettled(eventCtx)
+        try {
+          const sessionId = sessionIdFrom(eventCtx)
+          const context = sessionId === undefined ? undefined : runtime.resolveContext(sessionId)
+          if (context === undefined) return
+          pruneFor(context.identityPaths.recall)()
+        } catch (error: unknown) {
+          logger?.warn("memorian run prune failed", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      },
+      onCompactionAccepted: trigger.onCompactionAccepted,
+      onSessionShutdown: trigger.onSessionShutdown,
+      whenIdle: trigger.whenIdle,
+    },
     registerHooks(hookPi): void {
       registerMemorianHooks(hookPi, {
         trigger,

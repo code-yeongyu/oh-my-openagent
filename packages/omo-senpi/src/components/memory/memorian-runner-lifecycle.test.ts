@@ -47,12 +47,12 @@ describe("MemorianGateRunner", () => {
     await Promise.race([lateDisposed, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("late handle was never disposed")), 5_000))])
 
     // then
-    expect(result).toMatchObject({ status: "failed", cause: "deadline" })
+    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
     expect((await runner.launch(launchInput())).status).not.toBe("active")
     expect(disposed).toBe(1)
   })
 
-  test("#given a runner constructed with deadlineMs 60_000, a launch input with deadlineMs 50, and a child that never settles #when the runner launches #then the result is failed with cause deadline within 2s", async () => {
+  test("#given a runner constructed with deadlineMs 60_000, a launch input with deadlineMs 50, and a child that never settles #when the runner launches #then the result is dropped with cause deadline within 2s", async () => {
     // given: constructor deadline is 60s; the launch input pins 50ms. Ignoring the input
     // deadline would wait on the constructor value and miss the 2s bound.
     const { identityPaths } = await fixture()
@@ -79,7 +79,7 @@ describe("MemorianGateRunner", () => {
     const elapsed = Date.now() - started
 
     // then
-    expect(result).toMatchObject({ status: "failed", cause: "deadline" })
+    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
     expect(elapsed).toBeLessThan(2000)
   })
 
@@ -112,7 +112,7 @@ describe("MemorianGateRunner", () => {
     await Promise.all([aborted, disposed])
 
     // then
-    expect(result).toMatchObject({ status: "failed", cause: "deadline" })
+    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
     expect(result.runId).toMatch(/^[0-9a-f-]{36}$/)
   })
 

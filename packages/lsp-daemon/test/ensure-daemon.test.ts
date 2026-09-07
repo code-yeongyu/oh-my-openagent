@@ -1,4 +1,7 @@
-import { spawnSync } from "node:child_process";
+import { type ChildProcess, type SpawnOptions, spawnSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +9,7 @@ import {
 	type EnsureDaemonDeps,
 	ensureDaemonRunning,
 	resolveDaemonNodeExecutable,
+	spawnDaemonProcess,
 } from "../src/ensure-daemon.js";
 import { daemonTestPaths } from "./daemon-path-fixture.js";
 
@@ -36,6 +40,38 @@ function makeHarness(config: { probeQueue: boolean[]; onSpawnPush?: boolean[] })
 
 	return { deps, counts };
 }
+
+describe("spawnDaemonProcess", () => {
+	it("#given the packaged omo binary #when spawning the daemon #then the env forces Bun runtime mode", () => {
+		const paths = daemonTestPaths(mkdtempSync(join(tmpdir(), "lsp-daemon-spawn-env-")), "9.9.9");
+		const observed: Array<{ executable: string; args: string[]; options: SpawnOptions }> = [];
+		const stubChild: ChildProcess = {
+			once(event: string, listener: () => void) {
+				if (event === "spawn") listener();
+				return stubChild;
+			},
+			unref() {
+				return undefined;
+			},
+		} as unknown as ChildProcess;
+
+		spawnDaemonProcess(paths, {
+			spawn: (executable, args, options) => {
+				observed.push({ executable, args: [...args], options });
+				return stubChild;
+			},
+			// Compiled-binary style path: under the packaged runtime execPath IS the
+			// omo binary, not a node interpreter, so without BUN_BE_BUN the CLI argv
+			// boots a billable agent session instead of the daemon.
+			resolveExecutable: () => "/opt/omo/payload/omo",
+		});
+
+		expect(observed).toHaveLength(1);
+		expect(observed[0]?.executable).toBe("/opt/omo/payload/omo");
+		expect(observed[0]?.args).toEqual([paths.cliPath, "daemon"]);
+		expect(observed[0]?.options.env).toEqual({ ...process.env, BUN_BE_BUN: "1" });
+	});
+});
 
 describe("ensureDaemonRunning", () => {
 	it("#given the cached Node executable was removed #when resolving the daemon launcher #then uses argv0", () => {

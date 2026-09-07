@@ -38,17 +38,18 @@ export const renderMemorianNudgedEntry: EntryRenderer<unknown> = (entry, options
   }
   const [first, ...rest] = nudges
   if (first === undefined) return undefined
-  const via = record.via === "steer" || record.via === "wake" || record.via === "prompt" ? record.via : undefined
+  // The notice is written in the agent's own voice: a nudge is a recollection the agent just had,
+  // not a third-party act report. `via` stays in the record for forensics but is never drawn.
   return noticeComponent({
-    glyph: "·",
-    title: joinFields(["Memorian nudged", first.hint]),
-    tone: "muted",
-    why: "Memorian judged a stored memory relevant to the previous turn; it is a hint, not current state.",
+    glyph: "✦",
+    title: "Aha moment!",
+    tone: "accent",
+    why: `just remembered: ${first.hint}`,
     extra: [
-      ...rest.map((nudge) => ({ text: nudge.hint, tone: "dim" as const })),
+      ...rest.map((nudge) => ({ text: `also remembered: ${nudge.hint}`, tone: "dim" as const })),
       ...nudges.map((nudge) => ({ text: nudge.path, tone: "dim" as const })),
-      ...(via === undefined ? [] : [{ text: `via ${via}`, tone: "dim" as const }]),
     ],
+    detail: "Memorian surfaced this from stored memory; it is a hint, not current state.",
   }, options, theme)
 }
 
@@ -102,8 +103,8 @@ export const renderMemorianGateEntry: EntryRenderer<MemorianGateRecord> = (entry
     title: joinFields([`Memorian gate ${record.status === "skipped" ? "skipped" : "failed"}`, cause]),
     tone: record.status === "skipped" ? "warning" : "error",
     why: record.status === "skipped"
-      ? "Memorian could not judge the stored memories for the previous turn."
-      : "Memorian failed while judging the stored memories for the previous turn.",
+      ? "Memorian could not judge the recalled memory candidates for the previous turn."
+      : "Memorian failed while judging the recalled memory candidates for the previous turn.",
     ...(extra.length === 0 ? {} : { extra }),
   }, options, theme)
 }

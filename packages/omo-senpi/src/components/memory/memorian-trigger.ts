@@ -9,6 +9,8 @@ import type { CollectedRecallCandidates, RecallSessionSnapshot } from "./recall-
 import type { RecallNudge } from "@oh-my-opencode/memory-core"
 
 const MAX_LAUNCHES_PER_SESSION = 200
+/** Judge deadline for a `tool_call`-origin launch; settle-origin launches keep the runner default. */
+export const TOOL_CALL_JUDGE_DEADLINE_MS = 90_000
 
 type Origin = "tool_call" | "settled"
 type ToolCallPayload = { readonly toolName: string; readonly input: Record<string, unknown> }
@@ -152,7 +154,7 @@ export function createMemorianTrigger(options: MemorianTriggerOptions): Memorian
         ...(modelRegistry === undefined ? {} : { modelRegistry }),
         compactionEpoch: launchEpoch,
         currentCompactionEpoch: () => options.currentCompactionEpoch(collected.sessionId),
-        ...(origin === "tool_call" ? { deadlineMs: 45_000 } : {}),
+        ...(origin === "tool_call" ? { deadlineMs: TOOL_CALL_JUDGE_DEADLINE_MS } : {}),
       })
       if (!isLaunchResult(result)) return
       if (result.status === "active") {

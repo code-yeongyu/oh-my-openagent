@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import type { CustomEntry } from "@code-yeongyu/senpi"
 
 import { Theme } from "../../senpi-test-runtime"
-import { renderMemorianNudgedEntry } from "./memorian-notice"
+import { renderMemorianGateEntry, renderMemorianNudgedEntry, type MemorianGateRecord } from "./memorian-notice"
 
 const TEST_FG_COLORS = {
   accent: "#000000", bashMode: "#000000", border: "#000000", borderAccent: "#000000", borderMuted: "#000000",
@@ -20,19 +20,61 @@ const TEST_BG_COLORS = {
   customMessageBg: "#000000", selectedBg: "#000000", toolErrorBg: "#000000", toolPendingBg: "#000000", toolSuccessBg: "#000000", userMessageBg: "#000000",
 } as const satisfies ConstructorParameters<typeof Theme>[1]
 const theme = new Theme(TEST_FG_COLORS, TEST_BG_COLORS, "truecolor")
-function entry(data: unknown): CustomEntry<unknown> {
+function entry<T>(data: T): CustomEntry<T> {
   return { type: "custom", id: "entry-1", parentId: null, timestamp: new Date(0).toISOString(), customType: "test", data }
 }
 
-describe("memorian nudged provenance", () => {
-  test("#given a steer provenance #when rendered #then the via line is shown", () => {
-    const component = renderMemorianNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], via: "steer" }), { expanded: false }, theme)
-    expect(component?.render(120).join("\n")).toContain("via steer")
+describe("memorian gate notice", () => {
+  test("#given a dropped deadline gate record #when rendered #then nothing is drawn", () => {
+    const record: MemorianGateRecord = { version: 1, status: "dropped", cause: "deadline", candidateCount: 2 }
+    expect(renderMemorianGateEntry(entry(record), { expanded: false }, theme)).toBeUndefined()
   })
 
-  test("#given an unknown provenance #when rendered #then no via line is shown", () => {
-    const component = renderMemorianNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], via: "bogus" }), { expanded: false }, theme)
-    expect(component?.render(120).join("\n")).not.toContain("via bogus")
-    expect(component?.render(120).join("\n")).not.toContain("via ")
+  test("#given a skipped gate record #when rendered #then the why line names recalled memory candidates", () => {
+    const record: MemorianGateRecord = { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 }
+    const component = renderMemorianGateEntry(entry(record), { expanded: false }, theme)
+    expect(component?.render(120).join("\n")).toContain("Memorian could not judge the recalled memory candidates for the previous turn.")
+  })
+
+  test("#given a failed gate record #when rendered #then the why line names recalled memory candidates", () => {
+    const record: MemorianGateRecord = { version: 1, status: "failed", cause: "child_failed", candidateCount: 2 }
+    const component = renderMemorianGateEntry(entry(record), { expanded: false }, theme)
+    expect(component?.render(120).join("\n")).toContain("Memorian failed while judging the recalled memory candidates for the previous turn.")
+  })
+})
+
+describe("memorian nudged aha moment", () => {
+  test("#given a nudged record #when rendered #then the title celebrates the recollection", () => {
+    const component = renderMemorianNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], via: "steer" }), { expanded: false }, theme)
+    const rendered = component?.render(120).join("\n")
+    expect(rendered).toContain("✦ Aha moment!")
+    expect(rendered).toContain("just remembered: Use it.")
+    expect(rendered).toContain("a.md")
+  })
+
+  test("#given a second nudge #when rendered #then the extra hint continues the recollection", () => {
+    const component = renderMemorianNudgedEntry(
+      entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }, { path: "b.md", hint: "Also this." }], via: "wake" }),
+      { expanded: false },
+      theme,
+    )
+    const rendered = component?.render(120).join("\n")
+    expect(rendered).toContain("just remembered: Use it.")
+    expect(rendered).toContain("also remembered: Also this.")
+  })
+
+  test("#given any provenance #when rendered #then no provenance line is shown", () => {
+    for (const via of ["steer", "wake", "prompt", "bogus"]) {
+      const component = renderMemorianNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], via }), { expanded: false }, theme)
+      expect(component?.render(120).join("\n")).not.toContain("via ")
+    }
+  })
+
+  test("#given an expanded nudged record #when rendered #then the stored-memory caveat is available", () => {
+    const record = { version: 1, nudges: [{ path: "a.md", hint: "Use it." }] }
+    expect(renderMemorianNudgedEntry(entry(record), { expanded: false }, theme)?.render(120).join("\n")).not.toContain("not current state")
+    expect(renderMemorianNudgedEntry(entry(record), { expanded: true }, theme)?.render(120).join("\n")).toContain(
+      "it is a hint, not current state",
+    )
   })
 })

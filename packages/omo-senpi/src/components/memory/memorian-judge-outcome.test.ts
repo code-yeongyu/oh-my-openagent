@@ -14,6 +14,15 @@ describe("classifyJudgeTurn", () => {
     })).toEqual({ status: "failed", cause: "child_failed", reason: "providerfailedwhile judging" })
   })
 
+  test("#given an error outcome whose message is upstream-shaped #when classified #then failed/child_failed_upstream carries the sanitized reason", () => {
+    // given: the engine settled the turn after its same-model budget and fallback chain were exhausted
+    const message = "OpenAI API error (503): auth_unavailable (model gpt-5.6-luna, server_is_overloaded)"
+
+    // when / then
+    expect(classifyJudgeTurn({ status: "error", failure: { kind: "child-turn-failed", message } }))
+      .toEqual({ status: "failed", cause: "child_failed_upstream", reason: message })
+  })
+
   test("#given a cancelled outcome #when classified #then the judge turn is dropped as cancelled", () => {
     expect(classifyJudgeTurn({ status: "cancelled" })).toEqual({ status: "dropped", cause: "cancelled" })
   })

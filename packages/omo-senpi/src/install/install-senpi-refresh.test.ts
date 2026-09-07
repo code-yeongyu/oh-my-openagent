@@ -40,6 +40,7 @@ describe("runSenpiInstaller source refresh", () => {
     // when
     await runSenpiInstaller({
       agentDir,
+      homeDir: await tempDir("omo-senpi-source-refresh-home-"),
       repoRoot,
       runCommand: async (command, args, options) => {
         calls.push({ command, args, cwd: options.cwd })
@@ -72,10 +73,27 @@ describe("runSenpiInstaller source refresh", () => {
     )
 
     // when
-    await runSenpiInstaller({ agentDir, repoRoot, pluginPath })
+    await runSenpiInstaller({ agentDir, homeDir: await tempDir("omo-senpi-package-replace-home-"), repoRoot, pluginPath })
 
     // then
     expect(await settingsPackages(agentDir)).toEqual(["keep-me", pluginPath])
+  })
+
+  test("#given dead generated and unrelated package entries #when installing #then only the generated omo entry is pruned", async () => {
+    // given
+    const agentDir = await tempDir("omo-senpi-package-cleanup-")
+    const readableUnrelated = await tempDir("omo-senpi-readable-unrelated-")
+    await writeFile(join(readableUnrelated, "package.json"), JSON.stringify({ name: "unrelated" }))
+    await writeFile(
+      join(agentDir, "settings.json"),
+      JSON.stringify({ packages: ["omo-senpi-cli-plugin-Ab12Cd", "omo-senpi-cli-plugin-bad", readableUnrelated, "dead-unrelated"] }),
+    )
+
+    // when
+    await runSenpiInstaller({ agentDir, homeDir: await tempDir("omo-senpi-package-cleanup-home-"), repoRoot, pluginPath })
+
+    // then
+    expect(await settingsPackages(agentDir)).toEqual(["omo-senpi-cli-plugin-bad", readableUnrelated, "dead-unrelated", pluginPath])
   })
 
   test("#given current and stale OMO entries #when refreshing #then the current package keeps its precedence", async () => {
@@ -89,7 +107,7 @@ describe("runSenpiInstaller source refresh", () => {
     )
 
     // when
-    await runSenpiInstaller({ agentDir, repoRoot, pluginPath })
+    await runSenpiInstaller({ agentDir, homeDir: await tempDir("omo-senpi-package-order-home-"), repoRoot, pluginPath })
 
     // then
     expect(await settingsPackages(agentDir)).toEqual(["before", pluginPath, "after"])

@@ -5,9 +5,11 @@ import { join } from "node:path"
 
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { abortAndDispose } from "./memorian-lifecycle"
+import { childModelChainSpec } from "./memory-child-model-chain"
 import { classifyJudgeTurn, normalizeGateReason } from "./memorian-judge-outcome"
 import { buildMemorianJudgeSpec } from "./memorian-judge-spec"
 import { memorianCandidatesPayload, renderTranscriptWindow } from "./memorian-prompt"
+import { writeMemorianRunOutcome } from "./memorian-run-retention"
 import type {
   MemorianGateLaunchInput,
   MemorianGateLaunchResult,
@@ -35,7 +37,23 @@ export async function runMemorianJudge(
   runId: string,
   accepted: RecallNudge[],
   state: MemorianGateLaunchState,
-): Promise<{ readonly status: "completed" } | Extract<MemorianGateLaunchResult, { readonly status: "failed" | "dropped" }>> {
+): Promise<{ readonly status: "completed"; readonly partial?: true; readonly model?: string } | Extract<MemorianGateLaunchResult, { readonly status: "failed" | "dropped" }>> {
+  const runDir = join(host.options.identityPaths.recall, "runs", runId)
+  const record = async <T extends { readonly status: "completed" | "failed" | "dropped"; readonly cause?: string; readonly model?: string }>(
+    result: T,
+  ): Promise<T> => {
+    await writeMemorianRunOutcome({
+      runDir,
+      runId,
+      status: result.status,
+      model: result.model ?? resolution.model,
+      ...(result.cause === undefined ? {} : { cause: result.cause }),
+      nudged: accepted.map((nudge) => nudge.path),
+      now: () => new Date(),
+      warn: (message, fields) => host.options.logger?.warn(message, fields),
+    })
+    return result
+  }
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined
   let deadlineReached = false
   const deadline = new Promise<"deadline">((resolve) => {
@@ -46,7 +64,6 @@ export async function runMemorianJudge(
     deadlineTimer.unref?.()
   })
   const setup = (async (): Promise<ChildHandle> => {
-    const runDir = join(host.options.identityPaths.recall, "runs", runId)
     await mkdir(runDir, { recursive: true, mode: 0o700 })
     // Auditable artifacts, NOT inputs: the child receives both inline in its prompt and holds no
     // read tool. The run dir is kept after the run so a live or finished judge can be inspected.
@@ -56,12 +73,19 @@ export async function runMemorianJudge(
     ])
 
     const taskRuntime = await import("#omo-task-runtime")
-    const runner = host.options.createRunner?.(
-      host.options.createSession === undefined ? {} : { createSession: host.options.createSession },
-    ) ?? taskRuntime.createInProcessJudgeRunner(
-      host.options.createSession === undefined ? {} : { createSession: host.options.createSession },
-    )
-    return runner.start(buildMemorianJudgeSpec({ launch: input, runId, runDir, agentDir: resolveAgentHome({ env: host.options.env }), model: input.modelRegistry === undefined ? undefined : taskRuntime.findModelReference(input.modelRegistry, resolution.model), ...(resolution.thinking === undefined ? {} : { thinkingLevel: resolution.thinking }), accepted }))
+    const runnerOptions = host.options.createSession === undefined ? {} : { createSession: host.options.createSession }
+    const runner = host.options.createRunner?.(runnerOptions)
+      ?? taskRuntime.createInProcessJudgeRunner(runnerOptions)
+    return runner.start(buildMemorianJudgeSpec({
+      launch: input,
+      runId,
+      runDir,
+      agentDir: resolveAgentHome({ env: host.options.env }),
+      model: input.modelRegistry === undefined ? undefined : taskRuntime.findModelReference(input.modelRegistry, resolution.model),
+      chain: childModelChainSpec({ model: resolution.model, fallbacks: resolution.fallbacks }),
+      ...(resolution.thinking === undefined ? {} : { thinkingLevel: resolution.thinking }),
+      accepted,
+    }))
   })()
   const setupResult = setup.then(
     async (handle) => {
@@ -84,29 +108,38 @@ export async function runMemorianJudge(
       const handle = host.handle
       if (handle !== undefined) await abortAndDispose(handle, host.options.logger, runId)
       if (state.cancelled && settled === undefined) {
-        return { status: "dropped", cause: "cancelled", runId, candidateCount: input.candidates.length }
+        return await record({ status: "dropped", cause: "cancelled", runId, candidateCount: input.candidates.length })
       }
-      host.options.logger?.warn("memorian gate deadline exceeded", { runId })
+      host.options.logger?.warn("memorian gate deadline exceeded", { runId, salvaged: accepted.length })
+      if (accepted.length > 0) return await record({ status: "completed", partial: true })
       state.cancelled = true
-      return { status: "failed", cause: "deadline", model: resolution.model, candidateCount: input.candidates.length, runId }
+      return await record({ status: "dropped", cause: "deadline", model: resolution.model, candidateCount: input.candidates.length, runId })
     }
-    const turn = await Promise.race([settled.waitForIdle(), deadline])
-    if (turn === "deadline") {
-      host.options.logger?.warn("memorian gate deadline exceeded", { runId })
+    const raced = await Promise.race([
+      settled.waitForIdle().then((outcome) => ({ kind: "turn-settled" as const, outcome })),
+      deadline,
+    ])
+    if (raced === "deadline") {
+      host.options.logger?.warn("memorian gate deadline exceeded", { runId, salvaged: accepted.length })
       await abortAndDispose(settled, host.options.logger, runId)
-      return { status: "failed", cause: "deadline", model: resolution.model, candidateCount: input.candidates.length, runId }
+      if (accepted.length > 0) return await record({ status: "completed", partial: true })
+      state.cancelled = true
+      return await record({ status: "dropped", cause: "deadline", model: resolution.model, candidateCount: input.candidates.length, runId })
     }
-    const classification = classifyJudgeTurn(turn)
+    const classification = classifyJudgeTurn(raced.outcome)
+    const model = raced.outcome.status === "cancelled" ? undefined : raced.outcome.model
     if (classification.status === "failed") {
       const reason = normalizeGateReason(classification.reason)
-      host.options.logger?.warn("memorian gate child failed", { runId, cause: "child_failed", reason })
-      return { status: "failed", cause: "child_failed", reason, runId, model: resolution.model, candidateCount: input.candidates.length }
+      host.options.logger?.warn("memorian gate child failed", { runId, cause: classification.cause, reason })
+      return await record({ status: "failed", cause: classification.cause, reason, runId, model: model ?? resolution.model, candidateCount: input.candidates.length })
     }
-    if (classification.status === "dropped") return { status: "dropped", cause: "cancelled", runId, candidateCount: input.candidates.length }
-    return { status: "completed" }
+    if (classification.status === "dropped") {
+      return await record({ status: "dropped", cause: "cancelled", runId, candidateCount: input.candidates.length })
+    }
+    return await record({ status: "completed", ...(model === undefined ? {} : { model }) })
   } catch (error) {
     host.options.logger?.warn("memorian gate child session creation failed", { error: normalizeGateReason(describe(error)), runId })
-    return { status: "failed", cause: "session_create_failed", reason: normalizeGateReason(describe(error)), runId, model: resolution.model, candidateCount: input.candidates.length }
+    return await record({ status: "failed", cause: "session_create_failed", reason: normalizeGateReason(describe(error)), runId, model: resolution.model, candidateCount: input.candidates.length })
   } finally {
     const handle = (clearTimeout(deadlineTimer), host.handle)
     if (handle !== undefined) {

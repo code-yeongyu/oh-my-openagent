@@ -88,7 +88,7 @@ async function runScenario(options) {
   try {
     seedResumeProject(sandbox, resumeOmoConfig())
     if (options.pluginPath === undefined) {
-      await runSenpiInstaller({ agentDir: sandbox.agentDir, repoRoot })
+      await runSenpiInstaller({ agentDir: sandbox.agentDir, homeDir: sandbox.homeDir, repoRoot })
     } else {
       const settingsPath = join(sandbox.agentDir, "settings.json")
       const settings = JSON.parse(readFileSync(settingsPath, "utf8"))

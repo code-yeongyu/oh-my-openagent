@@ -1,0 +1,113 @@
+task-8-planner-tool-slots
+worktree: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage
+branch: feat/memorian-trigger-coverage
+head: 0edab030c (plus uncommitted task-8 edits; not committed)
+
+WHAT CHANGED
+- planner.ts: planRecallQueries(texts, options?: { toolTexts? }). No-options path
+  unchanged (early return, cap MAX_RECALL_QUERIES=4). When toolTexts is a non-empty
+  array, rank up to MAX_TOOL_SINGLE_TERMS=2 extra singles from those texts alone
+  (newest-first firstTextIndex/textCount/length/firstSequence), skipping !isKeptTerm,
+  already-chosen user singles, and COMMAND_STOPWORDS (bash/sh/zsh/git/bun/bunx/node/
+  npm/npx/pnpm/cd/ls/cat/echo/printf/grep/rg/sed/awk/head/tail/tee/true/false/mkdir/
+  rm/cp/mv/curl/jq/find/sort/uniq/wc/xargs/timeout/env/export/set/eval/read). Phrases
+  still come from user+tool via the existing planPhrases scan. Cap becomes 6 only
+  when tool texts were supplied. MAX_SINGLE_TERMS / MAX_PHRASES / isKeptTerm untouched.
+- recall-wiring.ts collectFrom: texts = userTexts only; extraTexts reversed newest-first
+  as toolTexts. Empty check allows extraTexts-only. collect() still delegates to
+  collectFrom. CollectedRecallCandidates unchanged.
+- recall-query-planner-tools.ts commandTexts: within each segment, path words emit
+  before the leading command name so they win the newest-first tool slots after reverse.
+
+TDD
+1. Characterization pins (three existing no-options fixtures) written first on
+   unchanged planner.ts. GREEN captured.
+2. RED tests (i)(iii)(v)(vi) written against unchanged sources. RED captured.
+   (ii) is a negative stoplist guard and was already green.
+3. Implementation. GREEN captured. tsgo clean. LOC <= 250.
+
+================================================================
+1. CHARACTERIZATION — pins only, planner.ts unsynced (unchanged code)
+================================================================
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh --sync packages/memory-core/src/recall/planner.test.ts -- packages/memory-core/src/recall/planner.test.ts
+
+output:
+  RBT_SYNCED=1
+  16 pass
+  0 fail
+  Ran 16 tests across 1 file. [2.34s]
+  PASS_LINES=16
+  RBT_LOG=/tmp/rbt-178876019912416.log
+  RBT_RC=0
+
+  Pins (no options, exact today's output):
+  - distinctive newest text -> kubernetes / controller / "kubernetes ingress" / "ingress controller"
+  - repeated terms -> eviction / policy / "memory cache" / "cache eviction"
+  - short stopword tokens -> repo / run / "api repo"
+
+================================================================
+2. RED — new tests synced, sources NOT synced
+================================================================
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/memory-core/src/recall/planner.test.ts \
+    --sync packages/omo-senpi/src/components/memory/recall-wiring.test.ts \
+    --sync packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts \
+    -- packages/memory-core/src/recall/planner.test.ts \
+       packages/omo-senpi/src/components/memory/recall-wiring.test.ts \
+       packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts
+
+output:
+  RBT_SYNCED=3
+  (fail) planRecallQueries > #given user text please continue with the checklist and toolTexts naming rollout #when queries are planned #then queries include rollout
+  (fail) planRecallQueries > #given toolTexts newer.ts then older.ts #when queries are planned #then newer is chosen before older and at most two tool singles appear
+  (fail) toolArgTexts > #given command git rebase -i origin/dev | tee log.txt #when toolArgTexts harvests it #then path words appear before git
+  (fail) createMemoryRecallWiring collectCandidates > #given a collectFrom call with a neutral user text and extraTexts naming a word from a seeded memory description #when candidates are collected #then that candidate is yielded
+  42 pass
+  4 fail
+  Ran 46 tests across 3 files. [4.50s]
+  PASS_LINES=42
+  RBT_LOG=/tmp/rbt-178876026314583.log
+  RBT_RC=1
+
+================================================================
+3. GREEN — sources + tests synced
+================================================================
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/memory-core/src/recall/planner.ts \
+    --sync packages/memory-core/src/recall/planner.test.ts \
+    --sync packages/omo-senpi/src/components/memory/recall-wiring.ts \
+    --sync packages/omo-senpi/src/components/memory/recall-wiring.test.ts \
+    --sync packages/omo-senpi/src/components/memory/recall-query-planner-tools.ts \
+    --sync packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts \
+    -- packages/memory-core/src/recall/planner.test.ts \
+       packages/memory-core/src/recall/select.test.ts \
+       packages/omo-senpi/src/components/memory/recall-wiring.test.ts \
+       packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-trigger.test.ts
+
+output:
+  RBT_SYNCED=6
+  66 pass
+  0 fail
+  Ran 66 tests across 5 files. [4.50s]
+  PASS_LINES=66
+  RBT_LOG=/tmp/rbt-178876035419265.log
+  RBT_RC=0
+
+-------------------------------------------------------------------------------
+TYPECHECK / LOC
+cd worktree && bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+TSGO_SENPI=0
+cd worktree && bunx tsgo --noEmit -p packages/memory-core/tsconfig.json
+TSGO_CORE=0
+
+pure LOC (awk '!/^[[:space:]]*$/ && !/^[[:space:]]*\/\//' | wc -l), all <= 250:
+  133 packages/memory-core/src/recall/planner.ts
+  163 packages/memory-core/src/recall/planner.test.ts
+  186 packages/omo-senpi/src/components/memory/recall-wiring.ts
+  217 packages/omo-senpi/src/components/memory/recall-wiring.test.ts
+   93 packages/omo-senpi/src/components/memory/recall-query-planner-tools.ts
+   68 packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts

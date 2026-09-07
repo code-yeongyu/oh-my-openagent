@@ -1222,7 +1222,7 @@ async function runSelfTest(evidenceDir) {
       "bun",
       [
         "-e",
-        `import { runSenpiInstaller } from ${JSON.stringify(pathToFileURL(join(packageRoot, "src", "install", "install-senpi.ts")).href)}; await runSenpiInstaller({ agentDir: ${JSON.stringify(agentDir)}, pluginPath: ${JSON.stringify(plugin)} })`,
+        `import { runSenpiInstaller } from ${JSON.stringify(pathToFileURL(join(packageRoot, "src", "install", "install-senpi.ts")).href)}; await runSenpiInstaller({ agentDir: ${JSON.stringify(agentDir)}, homeDir: ${JSON.stringify(join(workRoot, "home"))}, pluginPath: ${JSON.stringify(plugin)} })`,
       ],
       { cwd: repoRoot, encoding: "utf8" },
     )

@@ -91,6 +91,103 @@ describe("planRecallQueries", () => {
     }
   })
 
+  it("#given characterization pin distinctive newest text #when queries are planned with no options #then today's kubernetes ingress output is reproduced", () => {
+    // given / when / then — pin the no-options output before tool-slot work
+    expect(planRecallQueries([
+      "Can you check the Kubernetes ingress controller setup?",
+      "Sure, I will look at the database schema next.",
+    ])).toEqual([
+      "kubernetes",
+      "controller",
+      '"kubernetes ingress"',
+      '"ingress controller"',
+    ])
+  })
+
+  it("#given characterization pin repeated terms #when queries are planned with no options #then today's rarer-term output is reproduced", () => {
+    // given / when / then — pin the no-options output before tool-slot work
+    expect(planRecallQueries([
+      "The memory cache eviction policy still feels wrong",
+      "We tuned the memory cache again yesterday",
+      "The memory cache keeps evicting hot entries",
+    ])).toEqual([
+      "eviction",
+      "policy",
+      '"memory cache"',
+      '"cache eviction"',
+    ])
+  })
+
+  it("#given characterization pin short stopword tokens #when queries are planned with no options #then today's api-repo output is reproduced", () => {
+    // given / when / then — pin the no-options output before tool-slot work
+    expect(planRecallQueries(["Run go vet on the api repo"])).toEqual(["repo", "run", '"api repo"'])
+  })
+
+  it("#given user text please continue with the checklist and toolTexts naming rollout #when queries are planned #then queries include rollout", () => {
+    // given / when
+    const queries = planRecallQueries(["please continue with the checklist"], {
+      toolTexts: ["rollout.md", "rollout", "grep", "printf"],
+    })
+    // then
+    expect(queries).toContain("rollout")
+  })
+
+  it("#given toolTexts of only command stopwords #when queries are planned #then no tool single is added", () => {
+    // given
+    const userTexts = ["please continue with the checklist"]
+    // when
+    const without = planRecallQueries(userTexts)
+    const withTools = planRecallQueries(userTexts, { toolTexts: ["git", "grep", "printf"] })
+    // then
+    expect(withTools).not.toContain("git")
+    expect(withTools).not.toContain("grep")
+    expect(withTools).not.toContain("printf")
+    expect(withTools.filter((query) => !query.startsWith('"'))).toEqual(
+      without.filter((query) => !query.startsWith('"')),
+    )
+  })
+
+  it("#given toolTexts newer.ts then older.ts #when queries are planned #then newer is chosen before older and at most two tool singles appear", () => {
+    // given / when
+    const queries = planRecallQueries(["yes please"], {
+      toolTexts: ["newer.ts", "newer", "older.ts", "older", "oldest.ts", "oldest"],
+    })
+    const singles = queries.filter((query) => !query.startsWith('"'))
+    // then
+    expect(singles.indexOf("newer")).toBeGreaterThanOrEqual(0)
+    expect(singles.indexOf("older")).toBeGreaterThan(singles.indexOf("newer"))
+    expect(singles.filter((term) => term === "newer" || term === "older" || term === "oldest")).toHaveLength(2)
+    expect(singles).not.toContain("oldest")
+  })
+
+  it("#given toolTexts cargo then rollout then rollout.md #when queries are planned #then the tool singles are rollout then cargo", () => {
+    // given / when: a non-stoplisted command is first, as recall-wiring's newest-first reverse produces
+    const queries = planRecallQueries(["please continue with the checklist"], {
+      toolTexts: ["cargo", "rollout", "rollout.md"],
+    })
+    const singles = queries.filter((query) => !query.startsWith('"'))
+    // then: path-derived rollout ranks before the command name cargo
+    expect(singles.filter((term) => term === "rollout" || term === "cargo")).toEqual(["rollout", "cargo"])
+  })
+
+  it("#given a user single colliding with cargo #when the remaining tool slot is filled #then the surviving tool single is rollout", () => {
+    // given: cargo is already a user single, so one tool slot is consumed by the collision;
+    // console is a non-path distractor that would otherwise take that remaining slot
+    const userTexts = ["please continue the cargo"]
+    const userSingles = planRecallQueries(userTexts).filter((query) => !query.startsWith('"'))
+    // when
+    const queries = planRecallQueries(userTexts, {
+      toolTexts: ["cargo", "console", "rollout", "rollout.md"],
+    })
+    const toolSingles = queries
+      .filter((query) => !query.startsWith('"'))
+      .filter((term) => !userSingles.includes(term))
+    // then
+    expect(userSingles).toContain("cargo")
+    expect(toolSingles[0]).toBe("rollout")
+    expect(toolSingles).not.toContain("cargo")
+  })
+
   it("#given the same input twice #when queries are planned #then the output is deterministic", () => {
     // given
     const texts = ["Retry the webhook deployment once more", "The webhook keeps timing out"]

@@ -638,6 +638,18 @@ jobs:
           test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
           test -f dist/index.d.ts || (echo "ERROR: dist/index.d.ts not found!" && exit 1)
 
+      # `bun run build` regenerates both JSON Schema artifacts, and every job
+      # builds before it tests, so tests/omo-schema-freshness.test.ts compares
+      # the regenerated file with itself in CI. Diffing against the commit is
+      # what actually catches a stale committed schema.
+      - name: Verify generated schema artifacts are committed
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: |
+          if ! git diff --exit-code -- assets/oh-my-opencode.schema.json assets/omo.schema.json; then
+            echo "::error::Committed JSON Schema artifacts are stale. Run 'bun run build:schema && bun run build:omo-schema' and commit assets/*.schema.json."
+            exit 1
+          fi
+
       - name: Verify dist bundle tests
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun test --timeout 20000 packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts
@@ -651,8 +663,9 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Builds the distributable OpenCode/Codex packages.
             - Confirms `dist/index.js` and `dist/index.d.ts` exist.
+            - Fails when the build regenerates `assets/oh-my-opencode.schema.json` or `assets/omo.schema.json` differently from the committed copy.
             - Runs dist bundle regression tests.
-          JOB_SUMMARY_NEXT: Fix the first failing build prerequisite before debugging downstream dist checks.
+          JOB_SUMMARY_NEXT: Fix the first failing build prerequisite before debugging downstream dist checks; a stale schema artifact is fixed by `bun run build:schema && bun run build:omo-schema` plus committing the result.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   omo-ai-payload-check:

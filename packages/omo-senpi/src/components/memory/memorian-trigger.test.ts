@@ -58,7 +58,7 @@ test("#given a tool call #when triggered #then args are captured and a deadline 
   trigger.onToolCall({ toolName: "read", input: { path: "src/rollouts.md" } }, {})
   await trigger.whenIdle()
   expect(extraTexts.length).toBeGreaterThan(0)
-  expect(launches).toEqual([{ deadlineMs: 45_000 }])
+  expect(launches).toEqual([{ deadlineMs: 90_000 }])
 })
 
 test("#given unchanged candidates #when triggered twice #then the second launch is skipped", async () => {

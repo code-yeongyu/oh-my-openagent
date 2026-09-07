@@ -267,6 +267,21 @@ describe("createMemoryRecallWiring collectCandidates", () => {
     expect(collected).toBeUndefined()
   }, 30_000)
 
+  test("#given a collectFrom call with a neutral user text and extraTexts naming a word from a seeded memory description #when candidates are collected #then that candidate is yielded", async () => {
+    // given
+    const { repo, context } = await fixture(tempDirs)
+    const wiring = wiringFor({ repo, identity: context })
+
+    // when
+    const collected = await wiring.collectCandidates(
+      eventContext([userEntry("m1", "please continue with the checklist")]),
+      ["printf", "grep", "rollout.md", "rollout"],
+    )
+
+    // then
+    expect(collected?.candidates.map((candidate) => candidate.path)).toEqual([ROLLOUTS_PATH])
+  }, 30_000)
+
   test("#given a corpus load failure #when candidates are collected #then the settle path is unaffected and the failure is logged", async () => {
     // given
     const { repo, context } = await fixture(tempDirs)

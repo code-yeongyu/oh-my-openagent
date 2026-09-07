@@ -1,21 +1,12 @@
 import { randomBytes } from "node:crypto";
-import {
-	existsSync,
-	mkdirSync,
-	openSync,
-	readdirSync,
-	readFileSync,
-	renameSync,
-	statSync,
-	unlinkSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { PreToolUsePayload } from "./codex-hook.js";
 import { parsePreToolUsePayload } from "./codex-hook.js";
 import { isFinalRunCompletionCandidate } from "./goal-status.js";
-import { ulwLoopAttemptEvidenceDir, ulwLoopDir } from "./paths.js";
+import { ulwLoopAttemptEvidenceDir, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
+import { isStateLockTimeout, type StateLockOptions, withStateLockSync } from "./state-lock.js";
 import {
 	GATE_REVIEWER_AGENT_NAMES,
 	REVIEWER_ROLES_BY_SURFACE,
@@ -38,11 +29,32 @@ const REVIEW_AGENT_TYPES = [
 ] as const;
 const REVIEW_AGENT_TYPE_SET = new Set<string>(REVIEW_AGENT_TYPES);
 
-export function applySpawnGuards(payload: PreToolUsePayload): string {
+export interface SpawnGuardOptions {
+	readonly lockTimeoutMs?: number;
+}
+
+export function applySpawnGuards(payload: PreToolUsePayload, options: SpawnGuardOptions = {}): string {
 	if (payload.hook_event_name !== "PreToolUse" || !SPAWN_TOOL_TOKENS.has(payload.tool_name)) return "";
-	const stateDir = ulwLoopDir(payload.cwd, { sessionId: payload.session_id });
+	const scope = { sessionId: payload.session_id } as const;
+	const stateDir = ulwLoopDir(payload.cwd, scope);
 	const plan = readPlan(join(stateDir, "goals.json"));
 	if (plan === null) return "";
+	const lockOptions: StateLockOptions =
+		options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs };
+	try {
+		return withStateLockSync(
+			ulwLoopStateLockPath(payload.cwd, scope),
+			() => evaluateGuards(payload, plan, stateDir),
+			lockOptions,
+		);
+	} catch (error) {
+		if (isStateLockTimeout(error))
+			return deny(`ulw-loop spawn guard could not take the session state lock: ${error.message}`);
+		throw error;
+	}
+}
+
+function evaluateGuards(payload: PreToolUsePayload, plan: UlwLoopPlan, stateDir: string): string {
 	const fanOutPeek = peekFanOutBudget(stateDir);
 	if (fanOutPeek !== null) return deny(fanOutPeek);
 	const missingArtifact = missingGateArtifact(payload, plan);
@@ -99,18 +111,15 @@ function consumeReviewSpawnBudget(payload: PreToolUsePayload, plan: UlwLoopPlan,
 		plan.goals.find((candidate) => isFinalRunCompletionCandidate(plan, candidate));
 	if (goal === undefined) return null;
 	const counterPath = join(stateDir, "review-spawn-counts.json");
-	const lockPath = `${counterPath}.lock`;
 	const limit = reviewSpawnLimit();
-	return withExclusiveLock(lockPath, () => {
-		const counts = readCounts(counterPath);
-		const key = `${agentType}:${goal.id}:a${goal.attempt}`;
-		const count = (counts[key] ?? 0) + 1;
-		if (count > limit)
-			return `ulw-loop reviewer no-progress cap reached (${agentType} ${count}/${limit}) for ${goal.id} attempt ${goal.attempt}. Consolidate existing review findings, or checkpoint and start a new attempt after concrete progress.`;
-		counts[key] = count;
-		atomicWriteJson(counterPath, counts);
-		return null;
-	});
+	const counts = readCounts(counterPath);
+	const key = `${agentType}:${goal.id}:a${goal.attempt}`;
+	const count = (counts[key] ?? 0) + 1;
+	if (count > limit)
+		return `ulw-loop reviewer no-progress cap reached (${agentType} ${count}/${limit}) for ${goal.id} attempt ${goal.attempt}. Consolidate existing review findings, or checkpoint and start a new attempt after concrete progress.`;
+	counts[key] = count;
+	atomicWriteJson(counterPath, counts);
+	return null;
 }
 
 function missingGateArtifact(payload: PreToolUsePayload, plan: UlwLoopPlan): string | null {
@@ -188,45 +197,6 @@ function activeSurfaceReviewerAlias(reviewer: string): string {
 		if (reviewer === roles.gateReview) return activeRoles.gateReview;
 	}
 	return reviewer;
-}
-
-function withExclusiveLock<T>(lockPath: string, fn: () => T): T {
-	mkdirSync(dirname(lockPath), { recursive: true });
-	const maxAttempts = 10;
-	const baseDelayMs = 10;
-	for (let attempt = 0; attempt < maxAttempts; attempt++) {
-		let fd: number | null = null;
-		try {
-			fd = openSync(lockPath, "wx");
-			writeFileSync(fd, process.pid.toString());
-			try {
-				return fn();
-			} finally {
-				try {
-					unlinkSync(lockPath);
-				} catch {
-					/* empty */
-				}
-			}
-		} catch (error) {
-			if (fd !== null) {
-				try {
-					unlinkSync(lockPath);
-				} catch {
-					/* empty */
-				}
-			}
-			if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
-				return fn();
-			}
-			const delayMs = baseDelayMs * 2 ** attempt + Math.random() * baseDelayMs;
-			const deadline = Date.now() + delayMs;
-			while (Date.now() < deadline) {
-				/* spin */
-			}
-		}
-	}
-	return fn();
 }
 
 function atomicWriteJson(targetPath: string, data: unknown): void {

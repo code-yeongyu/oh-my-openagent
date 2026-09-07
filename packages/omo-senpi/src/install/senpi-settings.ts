@@ -1,10 +1,11 @@
 import { constants } from "node:fs"
 import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 
 export type SettingsRecord = Record<string, unknown>
 
 const OMO_SENPI_PACKAGE_NAME = "@code-yeongyu/omo-senpi"
+const GENERATED_PLUGIN_BASENAME = /^omo-senpi-cli-plugin-[A-Za-z0-9]{6}$/
 
 const LEGACY_BUILTIN_SHADOW_PACKAGES = [
   join("packages", "pi-goal"),
@@ -57,7 +58,9 @@ export async function removeSupersededOmoPackages(
     packages.map(async (entry) => {
       const packagePath = resolve(agentDir, entry)
       if (packagePath === currentPath) return currentPath
-      return (await readPackageName(packagePath)) === OMO_SENPI_PACKAGE_NAME ? undefined : entry
+      if ((await readPackageName(packagePath)) === OMO_SENPI_PACKAGE_NAME) return undefined
+      if (GENERATED_PLUGIN_BASENAME.test(basename(entry)) && !(await fileExists(packagePath))) return undefined
+      return entry
     }),
   )
   return entries.filter((entry): entry is string => entry !== undefined)
@@ -106,7 +109,13 @@ async function readPackageName(packagePath: string): Promise<string | undefined>
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) return undefined
     throw error
   }
-  const parsed: unknown = JSON.parse(raw)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined
+    throw error
+  }
   return isRecord(parsed) && typeof parsed.name === "string" ? parsed.name : undefined
 }
 

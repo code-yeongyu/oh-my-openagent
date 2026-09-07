@@ -198,12 +198,16 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
 
     async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+      // The journal flush runs FIRST, before the pre-drain awaits can consume the fixed budget:
+      // the transcript bytes are already on disk (append writes immediately, flush is fsync), so
+      // one first-position flush captures everything and the drain must never re-run it.
+      const journalFlushed = await shutdownDrain.flushJournal(input)
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
       await memorianRef.current?.onSessionShutdown(input.sessionId)
       await memorianRef.current?.gate.onSessionShutdown(input.sessionId)
       const identity = resolveContext(input.sessionId)
       if (identity !== undefined) await factsWiringFor(identity).cancelActive?.()
-      await shutdownDrain.run(input)
+      await shutdownDrain.run(input, { journalFlushed })
     },
 
     registerShutdownEvaluator(evaluator: ShutdownEvaluator): void {

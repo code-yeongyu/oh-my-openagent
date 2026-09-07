@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { spawnSync } from "node:child_process"
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs"
 import { open as fsOpen } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -16,6 +16,22 @@ import {
 
 const SECOND_FILE = "other-notes.md"
 const ROLLOUT_FILE = "rollout-notes.md"
+const S6_PROMPT = "please continue with the checklist"
+// The sandbox parent exposes eval, not bash. Keep this fallback over 300 characters and end with
+// the single-word filename the seed describes so the long-argument boundary is exercised through the available tool.
+const S6_TOKEN = "rollout.md" // single-word filename the seed describes ("Rollout policy")
+const EVAL_LONG_CODE = [
+  "const segments = [",
+  "  \"alpha-checklist-segment-001\", \"alpha-checklist-segment-002\", \"alpha-checklist-segment-003\",",
+  "  \"alpha-checklist-segment-004\", \"alpha-checklist-segment-005\", \"alpha-checklist-segment-006\",",
+  "  \"alpha-checklist-segment-007\", \"alpha-checklist-segment-008\", \"alpha-checklist-segment-009\",",
+  "  \"alpha-checklist-segment-010\", \"alpha-checklist-segment-011\", \"alpha-checklist-segment-012\",",
+  "  \"alpha-checklist-segment-013\", \"alpha-checklist-segment-014\", \"alpha-checklist-segment-015\",",
+  "];",
+  "void segments.join(\"|\");",
+  "await tool.read({ path: \"checkpoint.pipe\" });",
+  JSON.stringify(S6_TOKEN),
+].join("\n")
 
 export function record(checks, name, ok, detail) {
   checks.push({ name, ok, detail })
@@ -180,5 +196,52 @@ export async function runS5(options, checks, requestLogPath) {
     const entries = readEntries(state.sessionFile)
     const counts = { ...countsOf(entries, router, pendingFiles(sandbox.memoryHome, state.sessionId).length > 0), parentRequestsBefore: before.parentRequests, parentRequestsAfter: after.parentRequests, assistantMessagesBefore: before.assistantMessages, assistantMessagesAfter: after.assistantMessages }
     return { counts, entries }
+  }))
+}
+
+export async function runS6(options, checks, requestLogPath) {
+  return finish(checks, "s6", await withHarness(options, { parentSteps: [{ type: "tool_call", name: "eval", arguments: { language: "js", code: EVAL_LONG_CODE, summary: "neutral" } }, readSecond, textDone], requestLogPath }, async ({ sandbox, session, state, router }) => {
+    record(checks, "s6.tool-fixture", EVAL_LONG_CODE.length >= 300 && EVAL_LONG_CODE.split(S6_TOKEN).length - 1 === 1, `tool=eval codeLength=${EVAL_LONG_CODE.length} token=${S6_TOKEN}`)
+    const fifoPath = join(sandbox.cwd, "checkpoint.pipe")
+    const made = spawnSync("mkfifo", [fifoPath], { encoding: "utf8" })
+    if (made.status !== 0) throw new Error(`mkfifo failed: ${made.stderr}`)
+    // Subscribe before prompting, then release the first tool only after the judge has accepted.
+    // The FIFO makes mid-turn delivery an ordering assertion, not a race with a fast eval cell.
+    let watcher
+    let timer
+    const accepted = new Promise((resolve, reject) => {
+      watcher = watch(sandbox.memoryHome, { recursive: true }, () => {
+        if (pendingFiles(sandbox.memoryHome, state.sessionId).length > 0) resolve()
+      })
+      watcher.on("error", reject)
+      timer = setTimeout(() => reject(new Error(`judge acceptance timed out after ${JUDGE_TIMEOUT_MS}ms`)), JUDGE_TIMEOUT_MS)
+    })
+    const pending = prompt(session, S6_PROMPT, 120_000)
+    try {
+      await accepted
+      record(checks, "s6.judge-accepted", true, "pending nudge before first tool result")
+    } catch (error) {
+      record(checks, "s6.judge-accepted", false, error instanceof Error ? error.message : String(error))
+    } finally {
+      watcher.close()
+      clearTimeout(timer)
+      const handle = await fsOpen(fifoPath, "w")
+      await handle.close()
+    }
+    await pending
+    const entries = readEntries(state.sessionFile)
+    const firstResult = entries.find(isToolResult)?.message
+    record(checks, "s6.tool-executed", firstResult?.toolName === "eval" && firstResult.isError === false, `tool=${firstResult?.toolName} isError=${firstResult?.isError}`)
+    const runs = recallRuns(sandbox.memoryHome)
+    const candidates = runs.map((run) => ({ path: join(run.dir, "candidates.json"), payload: JSON.parse(readFileSync(join(run.dir, "candidates.json"), "utf8")) }))
+    const harvested = candidates.find(({ payload }) => payload.candidates.some((item) => item.path === SEED_PATH))
+    const candidatesPath = harvested?.path
+    const argHarvested = harvested !== undefined
+    record(checks, "s6.judge-launched", runs.length > 0, `recallRuns=${runs.length}`)
+    record(checks, "s6.arg-harvested", argHarvested, `candidates=${candidatesPath ?? "none"} seedPath=${SEED_PATH}`)
+    record(checks, "s6.mid-turn-recall", midTurnRecallOk(entries), "recall after first tool result and before second tool call")
+    const counts = countsOf(entries, router, pendingFiles(sandbox.memoryHome, state.sessionId).length > 0)
+    record(checks, "s6.no-extra-round", counts.parentRequests === 3, `parentRequests=${counts.parentRequests}`)
+    return { counts: { ...counts, tool: "eval", argumentLength: EVAL_LONG_CODE.length, candidatePaths: harvested?.payload.candidates.map((item) => item.path) ?? [] }, entries }
   }))
 }

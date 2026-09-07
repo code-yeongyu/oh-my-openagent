@@ -158,10 +158,13 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     if (recall.enabled === false) return undefined
 
     // USER-role texts only: candidates are keyed on user intent, and assistant prose (which often
-    // paraphrases memory back at the user) would skew matching.
-    const texts = [...userTexts(session.entries), ...extraTexts]
-    if (texts.length === 0) return undefined
-    const queries = planRecallQueries(texts)
+    // paraphrases memory back at the user) would skew matching. Tool-arg harvests get their own
+    // newest-first slots so a filename can score even when user chatter owns both default singles.
+    const texts = userTexts(session.entries)
+    if (texts.length === 0 && extraTexts.length === 0) return undefined
+    const queries = extraTexts.length === 0
+      ? planRecallQueries(texts)
+      : planRecallQueries(texts, { toolTexts: [...extraTexts].reverse() })
     if (queries.length === 0) return undefined
 
     const repo = createRepo(context)

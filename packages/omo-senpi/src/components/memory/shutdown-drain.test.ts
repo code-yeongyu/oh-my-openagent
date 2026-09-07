@@ -26,21 +26,23 @@ afterEach(async () => {
 
 type LogCall = { message: string; details: unknown }
 
-function recordingLogger(): { logger: ComponentLogger; warnings: string[]; infos: LogCall[]; warningCalls: LogCall[] } {
+function recordingLogger(): { logger: ComponentLogger; warnings: string[]; infos: LogCall[]; warningCalls: LogCall[]; errorCalls: LogCall[] } {
   const warnings: string[] = []
   const infos: LogCall[] = []
   const warningCalls: LogCall[] = []
+  const errorCalls: LogCall[] = []
   return {
     warnings,
     infos,
     warningCalls,
+    errorCalls,
     logger: {
       info: (message, details) => { infos.push({ message, details }) },
       warn: (message, details) => {
         warnings.push(message)
         warningCalls.push({ message, details })
       },
-      error: () => {},
+      error: (message, details) => { errorCalls.push({ message, details }) },
     },
   }
 }
@@ -114,7 +116,7 @@ describe("session shutdown drain budget", () => {
     expect(order).toEqual(["a", "b", "a", "b", "a", "b", "a", "b"])
   })
 
-  test("#given a durable step exhausts the budget #when quit drains #then it warns with timing and completed steps", async () => {
+  test("#given an in-drain step exhausts the budget #when quit drains #then it warns with timing and completed steps", async () => {
     // given
     const order: string[] = []
     const { logger, warningCalls } = recordingLogger()
@@ -123,7 +125,7 @@ describe("session shutdown drain budget", () => {
     const drain = createShutdownDrain({
       logger,
       steps: recordingSteps(order, {
-        flushJournal: async () => {
+        enqueueFinalDelta: async () => {
           clock = SESSION_SHUTDOWN_DRAIN_BUDGET_MS
           await stalled
         },
@@ -138,13 +140,90 @@ describe("session shutdown drain budget", () => {
     expect(warningCalls[0]).toEqual({
       message: "memory shutdown drain hit its budget",
       details: {
+        step: "facts-enqueue",
+        reason: "quit",
+        sessionId: SESSION,
+        remainingMs: 0,
+        completedSteps: ["journal-flush"],
+      },
+    })
+  })
+
+  test("#given the budget is already spent when the drain starts #when quit drains #then the skipped journal flush raises an error-level alarm instead of a warning", async () => {
+    // given
+    const order: string[] = []
+    const { logger, warningCalls, errorCalls } = recordingLogger()
+    const drain = createShutdownDrain({ logger, steps: recordingSteps(order) })
+
+    // when
+    await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: SESSION_SHUTDOWN_DRAIN_BUDGET_MS, now: () => SESSION_SHUTDOWN_DRAIN_BUDGET_MS })
+
+    // then: a journal flush that never started is silent data loss, so it must be observable as
+    // an alarm-grade event distinct from the budget warnings optional steps emit.
+    expect(order).toEqual([])
+    expect(errorCalls).toEqual([{
+      message: "memory shutdown drain skipped the journal flush",
+      details: {
         step: "journal-flush",
         reason: "quit",
         sessionId: SESSION,
         remainingMs: 0,
         completedSteps: [],
       },
+    }])
+    expect(warningCalls).toHaveLength(0)
+  })
+
+  test("#given the journal flush itself stalls past the deadline #when quit drains #then the aborted flush raises the error-level alarm", async () => {
+    // given
+    const order: string[] = []
+    const { logger, warningCalls, errorCalls } = recordingLogger()
+    let clock = 0
+    const stalled = new Promise<void>(() => {})
+    const drain = createShutdownDrain({
+      logger,
+      steps: recordingSteps(order, {
+        flushJournal: async () => {
+          order.push("a")
+          clock = SESSION_SHUTDOWN_DRAIN_BUDGET_MS
+          await stalled
+        },
+      }),
     })
+
+    // when
+    await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: SESSION_SHUTDOWN_DRAIN_BUDGET_MS, now: () => clock })
+
+    // then
+    expect(order).toEqual(["a"])
+    expect(errorCalls).toHaveLength(1)
+    expect(errorCalls[0]?.message).toBe("memory shutdown drain skipped the journal flush")
+    expect(warningCalls).toHaveLength(0)
+  })
+
+  test("#given only optional tail work is dropped #when the journal flush completes #then no journal-loss alarm fires", async () => {
+    // given
+    const order: string[] = []
+    const { logger, infos, errorCalls } = recordingLogger()
+    let clock = 0
+    const drain = createShutdownDrain({
+      logger,
+      steps: recordingSteps(order, {
+        flushSkillsUsage: async () => { order.push("c-prime"); clock = SESSION_SHUTDOWN_DRAIN_BUDGET_MS },
+      }),
+    })
+    let evaluated = false
+    drain.registerEvaluator(() => { evaluated = true })
+
+    // when
+    await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: SESSION_SHUTDOWN_DRAIN_BUDGET_MS, now: () => clock })
+
+    // then: the benign deferral line keeps its info severity and its message, so operator
+    // monitors can alert on the journal-loss alarm without matching evaluator drops.
+    expect(order).toEqual(["a", "b", "c-prime"])
+    expect(evaluated).toBe(false)
+    expect(errorCalls).toHaveLength(0)
+    expect(infos[0]?.message).toBe("memory shutdown drain deferred optional work")
   })
 
   test("#given the budget is consumed before shutdown evaluation #when quit drains #then optional work is deferred at info severity", async () => {

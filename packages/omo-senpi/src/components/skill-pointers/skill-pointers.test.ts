@@ -41,13 +41,14 @@ async function dispatchInput(
   text: unknown,
   source: unknown = "interactive",
   streamingBehavior?: unknown,
+  eventCtx?: unknown,
 ): Promise<InputDispatchResult> {
   const [result] = await pi.dispatch("input", {
     type: "input",
     text,
     source,
     ...(streamingBehavior === undefined ? {} : { streamingBehavior }),
-  })
+  }, eventCtx)
   return result as InputDispatchResult
 }
 
@@ -62,8 +63,8 @@ function expectPointerInjections(pi: FakeExtensionAPI, result: unknown, expected
     if (typeof content !== "string") {
       throw new Error("expected a string skill-pointer message")
     }
+    expect(content).toContain(`<omo-${entry.skillName}-pointer>`)
     expect(content).toContain(`${entry.skillName}/SKILL.md`)
-    expect(content).toContain("read tool")
   }
 }
 
@@ -163,7 +164,7 @@ describe("omo-senpi skill-pointers component", () => {
   })
 
   describe("#given a matching interactive prompt", () => {
-    it("#when one skill is mentioned #then one hidden pointer is injected and the text is untouched", async () => {
+    it("#when the user requests a skill #then one hidden conditional pointer is injected", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -173,9 +174,12 @@ describe("omo-senpi skill-pointers component", () => {
 
       // then
       expectPointerInjections(pi, result, [{ customType: MASS_ULW_CUSTOM_TYPE, skillName: "mass-ulw" }])
+      const content = pi.messages[0]?.message["content"]
+      expect(content).toEndWith("</omo-mass-ulw-pointer>")
+      expect(content).toContain("If the user of this session is asking to run mass-ulw")
     })
 
-    it("#when the mass-ulw pointer is injected #then it still instructs workflow orchestration", async () => {
+    it("#when the mass-ulw pointer is injected #then it points at the packaged skill", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -186,8 +190,8 @@ describe("omo-senpi skill-pointers component", () => {
       // then
       const content = pi.messages[0]?.message["content"]
       if (typeof content !== "string") throw new Error("expected string content")
-      expect(content).toContain("workflow tool")
-      expect(content).toContain("per phase")
+      expect(content).toContain("mass-ulw/SKILL.md")
+      expect(content).toEndWith("</omo-mass-ulw-pointer>")
     })
 
     it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop includes the resolved CLI shim", async () => {
@@ -206,6 +210,7 @@ describe("omo-senpi skill-pointers component", () => {
       }
       expect(loopContent).toContain("runtime/agent-toolkit/omo-agent-toolkit")
       expect(loopContent).toContain("ulw-loop <subcommand>")
+      expect(loopContent).not.toContain("--session-id")
       expect(massContent).not.toContain("runtime/agent-toolkit")
     })
 
@@ -252,6 +257,70 @@ describe("omo-senpi skill-pointers component", () => {
     })
   })
 
+  describe("#given quoted and relayed mentions", () => {
+    it("#when a mention is inside inline code #then no pointer is injected", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      for (const text of ["explain `ulw-loop` without running it", "explain ``ulw-loop `status` ``"]) {
+        expect(matchedSkillPointerNames(text)).toEqual([])
+        expectNoInjection(pi, await dispatchInput(pi, text))
+      }
+    })
+
+    it("#when a mention is inside a fenced code block #then no pointer is injected", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      for (const text of [
+        "review this log:\n```text\nulw-loop\n```",
+        "~~~text\nulw-loop\n~~~",
+        "````text\n```\nulw-loop\n````",
+        "```text\nulw-loop",
+      ]) {
+        expect(matchedSkillPointerNames(text)).toEqual([])
+        expectNoInjection(pi, await dispatchInput(pi, text))
+      }
+    })
+
+    it("#when a mention is inside a relayed pointer block #then no pointer is injected", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      for (const tag of ["omo-ulw-loop-pointer", "omo-mass-ulw-pointer", "ultrawork-mode", "omo-ultrawork-reminder"]) {
+        const text = `<${tag}>ulw-loop</${tag}>`
+        expect(matchedSkillPointerNames(text)).toEqual([])
+        expectNoInjection(pi, await dispatchInput(pi, text))
+      }
+    })
+
+    it("#when code separates skill-name fragments #then removing it does not fabricate a match", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      expectNoInjection(pi, await dispatchInput(pi, "ulw `not a request` loop"))
+    })
+
+    it("#when a request follows a quoted mention #then only the requested skill matches", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      const result = await dispatchInput(pi, "explain `ulw-plan`, then run ulw-loop")
+
+      expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
+    })
+
+    it("#when plain prose mentions a skill #then the pointer remains harmlessly conditional", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      const result = await dispatchInput(pi, "the status report mentions ulw-loop")
+
+      expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
+      expect(pi.messages[0]?.message["content"]).toEndWith("</omo-ulw-loop-pointer>")
+    })
+  })
+
   describe("#given a queued prompt", () => {
     it("#when streamingBehavior is set #then all pointers ride inside the same message", async () => {
       // given
@@ -268,6 +337,54 @@ describe("omo-senpi skill-pointers component", () => {
       expect(result.text).toContain("mass-ulw/SKILL.md")
       expect(result.text).toContain("ulw-loop/SKILL.md")
       expect(pi.messages).toHaveLength(0)
+    })
+  })
+
+  describe("#given ulw-loop session scope", () => {
+    it("#when the input session id is known #then the pointer carries its normalized scope", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      const result = await dispatchInput(pi, "run ulw-loop", "interactive", undefined, {
+        sessionManager: { getSessionId: () => "session/a weird" },
+      })
+
+      expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
+      const content = pi.messages[0]?.message["content"]
+      expect(content).toContain("--session-id session-a-weird")
+      expect(content).toContain(".omo/ulw-loop/session-a-weird/")
+    })
+
+    it("#when a queued RPC input changes sessions #then the pointer uses that event's scope", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+      await dispatchInput(pi, "run ulw-loop", "interactive", undefined, {
+        sessionManager: { getSessionId: () => "previous-session" },
+      })
+
+      const prompt = "/skill:mass-ulw then ulw-loop"
+      const result = await dispatchInput(pi, prompt, "rpc", "steer", {
+        sessionManager: { getSessionId: () => "new/session" },
+      })
+
+      expect(result.action).toBe("transform")
+      if (result.action !== "transform") throw new Error("expected transform")
+      expect(result.text).toStartWith(`${prompt}\n<omo-ulw-loop-pointer>`)
+      expect(result.text).toContain("--session-id new-session")
+      expect(result.text).not.toContain("--session-id previous-session")
+      expect(pi.messages).toHaveLength(1)
+    })
+
+    it("#when the input session id is unknown #then the pointer omits the session flag", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      const result = await dispatchInput(pi, "run ulw-loop")
+
+      expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
+      const content = pi.messages[0]?.message["content"]
+      expect(content).not.toContain("--session-id")
+      expect(content).not.toContain(".omo/ulw-loop/")
     })
   })
 

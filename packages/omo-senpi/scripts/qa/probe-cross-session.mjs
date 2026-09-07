@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -63,16 +63,24 @@ process.stdout.write(
 )
 
 // Legacy/unscoped runs live at `.omo/ulw-loop/goals.json` and are visible to every session sharing the
-// cwd. A host that cannot name its own session must report inactive rather than adopt that run.
+// cwd. The toolkit itself no longer writes there (a scope-less call fails closed), so the fixture is
+// written by hand the way an older toolkit left it. A host that cannot name its own session must
+// report inactive rather than adopt that run.
 function runNoSessionScenario() {
   const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-no-session-"))
   try {
-    runToolkit(
+    const refusal = runToolkit(
       ["ulw-loop", "create-goals", "--brief", "- An unscoped legacy run nobody owns", "--json"],
       cwd,
       null,
-      0,
+      1,
     )
+    assert(
+      refusal.includes("ULW_LOOP_SESSION_SCOPE_REQUIRED"),
+      `toolkit without a session scope did not refuse: ${refusal}`,
+    )
+    assert(!existsSync(join(cwd, ".omo")), "a scope-less toolkit call wrote state")
+    writeLegacyUnscopedPlan(cwd)
     const unscopedPlan = existsSync(join(cwd, ".omo/ulw-loop/goals.json"))
     assert(unscopedPlan, "the unscoped legacy plan fixture was not created")
 
@@ -81,10 +89,58 @@ function runNoSessionScenario() {
       child.messageCount === 0,
       `host without session identity continued ${child.messageCount} times, expected 0`,
     )
-    return { sessionId: null, messageCount: child.messageCount, unscopedPlan }
+    return { sessionId: null, messageCount: child.messageCount, unscopedPlan, toolkitRefusedUnscoped: true }
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }
+}
+
+function writeLegacyUnscopedPlan(cwd) {
+  const now = new Date().toISOString()
+  const dir = join(cwd, ".omo/ulw-loop")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "brief.md"), "- An unscoped legacy run nobody owns\n")
+  writeFileSync(
+    join(dir, "goals.json"),
+    `${JSON.stringify(
+      {
+        version: 1,
+        evidenceLayoutVersion: 2,
+        createdAt: now,
+        updatedAt: now,
+        briefPath: ".omo/ulw-loop/brief.md",
+        goalsPath: ".omo/ulw-loop/goals.json",
+        ledgerPath: ".omo/ulw-loop/ledger.jsonl",
+        codexGoalMode: "aggregate",
+        activeGoalId: "G001-legacy",
+        goals: [
+          {
+            id: "G001-legacy",
+            title: "An unscoped legacy run nobody owns",
+            objective: "An unscoped legacy run nobody owns",
+            status: "in_progress",
+            attempt: 1,
+            createdAt: now,
+            updatedAt: now,
+            successCriteria: [
+              {
+                id: "C001",
+                scenario: "legacy",
+                userModel: "happy",
+                expectedEvidence: "legacy",
+                essential: true,
+                capturedEvidence: null,
+                status: "pending",
+              },
+            ],
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  writeFileSync(join(dir, "ledger.jsonl"), `${JSON.stringify({ at: now, kind: "plan_created", message: "1 goal(s) created" })}\n`)
 }
 
 async function runExtensionChild(sessionId) {
