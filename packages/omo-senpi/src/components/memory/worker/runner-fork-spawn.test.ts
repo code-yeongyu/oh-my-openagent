@@ -23,8 +23,7 @@ const OPUS = { input: 5.00, cacheRead: 0.50, output: 25.0 }
 const PREFIX_BREAKING_FLAGS = [
   "--system-prompt",
   "--tools",
-  "--no-extensions",
-  "--no-skills",
+    "--no-skills",
   "--no-prompt-templates",
   "--no-context-files",
 ]
@@ -91,7 +90,7 @@ describe("reflection fork-mode spawn", () => {
       const spawn = harness.spawnCalls[0]
       expect(spawn?.fork).toBeUndefined()
       expect(spawn?.args).toContain("--system-prompt")
-      expect(spawn?.args).toContain("--no-extensions")
+      expect(spawn?.args).not.toContain("--no-extensions")
     })
   })
 

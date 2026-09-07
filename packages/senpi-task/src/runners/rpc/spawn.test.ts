@@ -294,42 +294,42 @@ describe("buildChildArgs", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", extensions: ["/tmp/a.ts", "/tmp/b.ts"] })
     // then
-    expect(args).toEqual(["--no-extensions", "--extension", "/tmp/a.ts", "--extension", "/tmp/b.ts", "--model", "omo-mock/mock-1"])
+    expect(args).toEqual(["--extension", "/tmp/a.ts", "--extension", "/tmp/b.ts", "--model", "omo-mock/mock-1"])
   })
 
   test("#given a spec with neither model nor extensions #when building child args #then only no-extensions is present", () => {
     // when
     const args = buildChildArgs(baseSpec)
     // then
-    expect(args).toEqual(["--no-extensions"])
+    expect(args).toEqual([])
   })
 
   test("#given a spec with a valid variant #when building child args #then --thinking follows --model", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "xhigh" })
     // then
-    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1", "--thinking", "xhigh"])
+    expect(args).toEqual(["--model", "omo-mock/mock-1", "--thinking", "xhigh"])
   })
 
   test("#given a spec with high reasoning effort #when building child args #then it maps to senpi high", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "high" })
     // then
-    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1", "--thinking", "high"])
+    expect(args).toEqual(["--model", "omo-mock/mock-1", "--thinking", "high"])
   })
 
   test("#given the omo.json reasoningEffort none as variant #when building child args #then it maps to senpi off", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, variant: "none" })
     // then
-    expect(args).toEqual(["--no-extensions", "--thinking", "off"])
+    expect(args).toEqual(["--thinking", "off"])
   })
 
   test("#given an unknown variant #when building child args #then no --thinking flag is emitted", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "ultra" })
     // then
-    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1"])
+    expect(args).toEqual(["--model", "omo-mock/mock-1"])
   })
 })
 
@@ -362,7 +362,6 @@ describe("buildRpcSpawn spawn strategy", () => {
         realpathSync.native(cli),
         "--mode",
         "rpc",
-        "--no-extensions",
         "--model",
         "omo-mock/mock-1",
       ])
@@ -425,7 +424,7 @@ describe("buildRpcSpawn spawn strategy", () => {
     )
     // then
     expect(descriptor.command).toBe(join("/opt/senpi/bin", "senpi"))
-    expect(descriptor.args).toEqual(["--mode", "rpc", "--no-extensions", "--model", "omo-mock/mock-1"])
+    expect(descriptor.args).toEqual(["--mode", "rpc", "--model", "omo-mock/mock-1"])
     expect(descriptor.cwd).toBe(baseSpec.cwd)
   })
 
@@ -446,7 +445,6 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.command).toBe("/usr/bin/node")
     expect(descriptor.args).toEqual([
       "/pkg/@code-yeongyu/senpi/dist/rpc-entry.js",
-      "--no-extensions",
       "--extension",
       "/tmp/mock.ts",
       "--model",

@@ -97,14 +97,14 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   }
   // Verified against senpi packages/coding-agent/src/cli/args.ts and cli/file-processor.ts:
   // -p selects print mode; --system-prompt reads a file path; --tools is a comma allowlist;
-  // --no-extensions/--no-skills/--no-prompt-templates/--no-context-files disable discovery;
+  // --no-skills/--no-prompt-templates/--no-context-files disable discovery (extensions remain
+  // enabled so custom providers like freeinference are visible to the reflection child);
   // --session-dir isolates JSONL storage; --model/--thinking select the category result; @file
   // loads the mechanics prompt as the initial non-interactive message.
   const args = [
     "-p",
     "--system-prompt", persona,
     "--tools", "bash,edit",
-    "--no-extensions",
     "--no-skills",
     "--no-prompt-templates",
     "--no-context-files",
