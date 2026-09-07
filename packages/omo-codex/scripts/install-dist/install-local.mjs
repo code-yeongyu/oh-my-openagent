@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:81cf03496fa0db52b428d9e5f1d2a022f753fe60530d84f72d767af03333373f:cc1555990cc7467cc545d7f3fcb60ad36f9dc529737a841ed819c2d8ac9303be
+// omo-codex-install:8a7b33cc72c1d247c0de20cf8f0e0d63ab6052dc1f7956ce90b7f4d9acd1baed:3c4f96992dc7785a3c4e8c104f8a0cc2e8ec8eda331aa12725c9e1b78a30a220
 var __defProp = Object.defineProperty;
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -3075,32 +3075,32 @@ var init_release = () => {};
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/index.mjs
 var exports_error_tracking = {};
 __export(exports_error_tracking, {
-  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG,
-  DOMExceptionCoercer: () => DOMExceptionCoercer,
-  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
-  ErrorCoercer: () => ErrorCoercer,
-  ErrorEventCoercer: () => ErrorEventCoercer,
-  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
-  EventCoercer: () => EventCoercer,
-  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
-  ObjectCoercer: () => ObjectCoercer,
-  PrimitiveCoercer: () => PrimitiveCoercer,
-  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
-  ReduceableCache: () => ReduceableCache,
-  StringCoercer: () => StringCoercer,
-  chromeStackLineParser: () => chromeStackLineParser,
-  createDefaultStackParser: () => createDefaultStackParser,
-  createStackParser: () => createStackParser,
-  geckoStackLineParser: () => geckoStackLineParser,
-  getInjectedReleaseId: () => getInjectedReleaseId,
-  getUtf8ByteLength: () => getUtf8ByteLength,
-  nodeStackLineParser: () => nodeStackLineParser,
-  opera10StackLineParser: () => opera10StackLineParser,
-  opera11StackLineParser: () => opera11StackLineParser,
-  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
-  reverseAndStripFrames: () => reverseAndStripFrames,
+  winjsStackLineParser: () => winjsStackLineParser,
   stripReservedExceptionStepFields: () => stripReservedExceptionStepFields,
-  winjsStackLineParser: () => winjsStackLineParser
+  reverseAndStripFrames: () => reverseAndStripFrames,
+  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
+  opera11StackLineParser: () => opera11StackLineParser,
+  opera10StackLineParser: () => opera10StackLineParser,
+  nodeStackLineParser: () => nodeStackLineParser,
+  getUtf8ByteLength: () => getUtf8ByteLength,
+  getInjectedReleaseId: () => getInjectedReleaseId,
+  geckoStackLineParser: () => geckoStackLineParser,
+  createStackParser: () => createStackParser,
+  createDefaultStackParser: () => createDefaultStackParser,
+  chromeStackLineParser: () => chromeStackLineParser,
+  StringCoercer: () => StringCoercer,
+  ReduceableCache: () => ReduceableCache,
+  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
+  PrimitiveCoercer: () => PrimitiveCoercer,
+  ObjectCoercer: () => ObjectCoercer,
+  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
+  EventCoercer: () => EventCoercer,
+  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
+  ErrorEventCoercer: () => ErrorEventCoercer,
+  ErrorCoercer: () => ErrorCoercer,
+  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
+  DOMExceptionCoercer: () => DOMExceptionCoercer,
+  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG
 });
 var init_error_tracking = __esm(() => {
   init_error_properties_builder();
@@ -8183,14 +8183,14 @@ var init_posthog = __esm(() => {
 // packages/omo-codex/src/telemetry/index.ts
 var exports_telemetry = {};
 __export(exports_telemetry, {
-  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting,
-  __resetOsProviderForTesting: () => __resetOsProviderForTesting,
-  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
-  __setOsProviderForTesting: () => __setOsProviderForTesting,
-  createCliPostHog: () => createCliPostHog,
-  createInstallPostHog: () => createInstallPostHog,
+  getPostHogDistinctId: () => getPostHogDistinctId,
   createPluginPostHog: () => createPluginPostHog,
-  getPostHogDistinctId: () => getPostHogDistinctId
+  createInstallPostHog: () => createInstallPostHog,
+  createCliPostHog: () => createCliPostHog,
+  __setOsProviderForTesting: () => __setOsProviderForTesting,
+  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
+  __resetOsProviderForTesting: () => __resetOsProviderForTesting,
+  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting
 });
 var init_telemetry = __esm(() => {
   init_posthog();
@@ -9645,6 +9645,26 @@ function repoRootForCodexPluginSource(sourcePath) {
 // packages/omo-codex/src/install/codex-cache-prune.ts
 import { lstat as lstat5, readdir as readdir5, rm as rm5, stat as stat4 } from "node:fs/promises";
 import { join as join11 } from "node:path";
+var REMOVE_RETRY_DELAYS_MS = [50, 100, 200, 400, 800];
+var RETRIABLE_REMOVE_CODES = new Set(["EPERM", "EBUSY", "EACCES", "ENOTEMPTY"]);
+async function removeWithRetry(path) {
+  for (let attempt = 0;; attempt += 1) {
+    try {
+      await rm5(path, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!isRetriableRemoveError(error) || attempt >= REMOVE_RETRY_DELAYS_MS.length)
+        throw error;
+      await delay(REMOVE_RETRY_DELAYS_MS[attempt] ?? 0);
+    }
+  }
+}
+function isRetriableRemoveError(error) {
+  return isNodeErrorWithCode(error) && typeof error.code === "string" && RETRIABLE_REMOVE_CODES.has(error.code);
+}
+function delay(milliseconds) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}
 async function pruneMarketplaceCache(input) {
   const cacheRoot = join11(input.codexHome, "plugins", "cache", input.marketplaceName);
   if (!await fileExistsStrict(cacheRoot))
@@ -9654,7 +9674,7 @@ async function pruneMarketplaceCache(input) {
   for (const entry of entries) {
     if (!entry.isDirectory() || keep.has(entry.name))
       continue;
-    await rm5(join11(cacheRoot, entry.name), { recursive: true, force: true });
+    await removeWithRetry(join11(cacheRoot, entry.name));
   }
 }
 async function pruneMarketplacePluginCaches(input) {
@@ -9662,11 +9682,11 @@ async function pruneMarketplacePluginCaches(input) {
   if (!await fileExistsStrict(cacheRoot))
     return;
   for (const pluginName of input.pluginNames) {
-    await rm5(join11(cacheRoot, pluginName), { recursive: true, force: true });
+    await removeWithRetry(join11(cacheRoot, pluginName));
   }
   const remainingEntries = await readCacheEntryNames(cacheRoot);
   if (remainingEntries.length === 0) {
-    await rm5(cacheRoot, { recursive: true, force: true });
+    await removeWithRetry(cacheRoot);
   }
 }
 async function readCacheEntries(path) {
@@ -10408,7 +10428,7 @@ async function renameWithRetry(fromPath, toPath) {
       if (!isRetriableRenameError(error) || attempt >= RENAME_RETRY_DELAYS_MS.length) {
         throw error;
       }
-      await delay(RENAME_RETRY_DELAYS_MS[attempt] ?? 0);
+      await delay2(RENAME_RETRY_DELAYS_MS[attempt] ?? 0);
     }
   }
 }
@@ -10417,7 +10437,7 @@ function isRetriableRenameError(error) {
     return false;
   return typeof error.code === "string" && RETRIABLE_RENAME_CODES.has(error.code);
 }
-function delay(milliseconds) {
+function delay2(milliseconds) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
@@ -13696,23 +13716,23 @@ async function runLazyCodexInstallLocalCli(input) {
   return 0;
 }
 export {
-  PASSTHROUGH_COMMANDS,
-  assertHookCommandTargets,
-  buildDelegatedOmoInvocation,
-  findMissingHookCommandTargets,
-  formatLazyCodexInstallHelp,
-  installCachedPlugin,
-  installMarketplaceLocally,
-  linkCachedPluginBins,
-  linkRootRuntimeBin,
-  parseLazyCodexInstallCliArgs,
-  readCodexModelCatalog,
-  repairNearestProjectLocalCodexArtifacts,
-  resolveCodexInstallerBinDir,
-  resolveDefaultRepoRoot,
-  resolveDefaultRepoRootForEntrypoint,
-  runDelegatedOmoCommand,
-  runLazyCodexInstallLocalCli,
+  updateCodexConfig,
   stampGitBashMcpEnv,
-  updateCodexConfig
+  runLazyCodexInstallLocalCli,
+  runDelegatedOmoCommand,
+  resolveDefaultRepoRootForEntrypoint,
+  resolveDefaultRepoRoot,
+  resolveCodexInstallerBinDir,
+  repairNearestProjectLocalCodexArtifacts,
+  readCodexModelCatalog,
+  parseLazyCodexInstallCliArgs,
+  linkRootRuntimeBin,
+  linkCachedPluginBins,
+  installMarketplaceLocally,
+  installCachedPlugin,
+  formatLazyCodexInstallHelp,
+  findMissingHookCommandTargets,
+  buildDelegatedOmoInvocation,
+  assertHookCommandTargets,
+  PASSTHROUGH_COMMANDS
 };

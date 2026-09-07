@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-codex\src\install\codex-cache-prune.test.ts:
+(pass) pruneMarketplaceCache > #given a stale entry whose runtime is still alive #when it exits during the prune #then the entry is removed [1205.08ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [2.94s]
+EXIT=0

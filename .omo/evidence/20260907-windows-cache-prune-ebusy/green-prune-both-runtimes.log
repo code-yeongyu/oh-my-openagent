@@ -1,0 +1,4 @@
+GREEN, with removeWithRetry
+bun 1.3.14 | pruneMarketplaceCache -> resolved | removed=true | 405ms
+node v26.1.0 | pruneMarketplaceCache -> resolved | removed=true | 393ms
+EXIT=0

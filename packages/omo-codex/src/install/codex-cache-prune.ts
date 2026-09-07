@@ -2,6 +2,34 @@ import type { Dirent } from "node:fs"
 import { lstat, readdir, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { fileExistsStrict, isNodeErrorWithCode } from "./codex-cache-fs"
+// Windows refuses to unlink a mapped image, so pruning a cache entry whose runtime is still alive
+// fails outright: node reports EPERM and bun reports EACCES, and neither retries. A leftover MCP
+// server or daemon from the previous cache is the normal state of a machine being updated in use,
+// so the removal waits for it the way renameWithRetry in codex-config-atomic-write.ts waits for a
+// busy rename.
+const REMOVE_RETRY_DELAYS_MS = [50, 100, 200, 400, 800] as const
+const RETRIABLE_REMOVE_CODES = new Set(["EPERM", "EBUSY", "EACCES", "ENOTEMPTY"])
+
+async function removeWithRetry(path: string): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rm(path, { recursive: true, force: true })
+      return
+    } catch (error) {
+      if (!isRetriableRemoveError(error) || attempt >= REMOVE_RETRY_DELAYS_MS.length) throw error
+      await delay(REMOVE_RETRY_DELAYS_MS[attempt] ?? 0)
+    }
+  }
+}
+
+function isRetriableRemoveError(error: unknown): boolean {
+  return isNodeErrorWithCode(error) && typeof error.code === "string" && RETRIABLE_REMOVE_CODES.has(error.code)
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds))
+}
+
 
 export async function pruneMarketplaceCache(input: {
   readonly codexHome: string
@@ -14,7 +42,7 @@ export async function pruneMarketplaceCache(input: {
   const entries = await readCacheEntries(cacheRoot)
   for (const entry of entries) {
     if (!entry.isDirectory() || keep.has(entry.name)) continue
-    await rm(join(cacheRoot, entry.name), { recursive: true, force: true })
+    await removeWithRetry(join(cacheRoot, entry.name))
   }
 }
 
@@ -26,11 +54,11 @@ export async function pruneMarketplacePluginCaches(input: {
   const cacheRoot = join(input.codexHome, "plugins", "cache", input.marketplaceName)
   if (!(await fileExistsStrict(cacheRoot))) return
   for (const pluginName of input.pluginNames) {
-    await rm(join(cacheRoot, pluginName), { recursive: true, force: true })
+    await removeWithRetry(join(cacheRoot, pluginName))
   }
   const remainingEntries = await readCacheEntryNames(cacheRoot)
   if (remainingEntries.length === 0) {
-    await rm(cacheRoot, { recursive: true, force: true })
+    await removeWithRetry(cacheRoot)
   }
 }
 

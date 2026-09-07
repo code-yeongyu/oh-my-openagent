@@ -1,0 +1,4 @@
+RED, upstream/dev codex-cache-prune.ts
+bun 1.3.14 | pruneMarketplaceCache -> threw EACCES | removed=false | 2ms
+node v26.1.0 | pruneMarketplaceCache -> threw EPERM | removed=false | 4ms
+EXIT=0

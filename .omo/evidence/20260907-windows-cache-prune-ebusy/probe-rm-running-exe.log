@@ -1,0 +1,6 @@
+--- rm -rf a plugin dir containing a RUNNING executable ---
+  as shipped: { recursive, force }                     -> EPERM EPERM: operation not permitted, unlink 'C:\Users\LilMG\AppDa gone=false (4ms)
+  with { maxRetries: 10, retryDelay: 200 }             -> ok                                 gone=true (59721ms)
+  as shipped, process exits after 300ms                -> EPERM EPERM: operation not permitted, unlink 'C:\Users\LilMG\AppDa gone=false (2ms)
+  with retries, process exits after 300ms              -> ok                                 gone=true (624ms)
+EXIT=0

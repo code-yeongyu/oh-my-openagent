@@ -1,0 +1,10 @@
+runtime split for rm on a directory holding a running executable, holder exits after 300ms
+runtime = node v26.1.0
+  no retry, holder exits after 300ms             -> EPERM    gone=false 3ms
+  maxRetries 5 / 100ms, holder exits after 300ms -> ok       gone=true  331ms
+  maxRetries 10 / 200ms, holder exits after 300ms -> ok       gone=true  629ms
+runtime = bun 1.3.14
+  no retry, holder exits after 300ms             -> EACCES   gone=false 2ms
+  maxRetries 5 / 100ms, holder exits after 300ms -> EACCES   gone=false 0ms
+  maxRetries 10 / 200ms, holder exits after 300ms -> EACCES   gone=false 1ms
+EXIT=0
