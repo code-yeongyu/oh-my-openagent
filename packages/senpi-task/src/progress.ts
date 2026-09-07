@@ -69,8 +69,22 @@ export function createChildProgress(
     accept(event): boolean {
       const statsChanged = tracker.accept(event)
       if (event.type === "retry_fallback_applied" && event.to !== undefined) {
-        resolvedModel = undefined
-        model = event.to
+        // Build a resolved model from the selector so the live status line retains the
+        // provider/model_id structure and any thinking level encoded in the selector suffix.
+        // When the Senpi core event carries an explicit thinking field, prefer that over the
+        // selector suffix so the display reflects the actually-applied level even when the
+        // selector was normalized without it.
+        const parsed = parseModelSelector(event.to, resolvedModel?.source ?? "category")
+        const eventThinking = readEventString(event, "thinking")
+        if (parsed !== undefined) {
+          resolvedModel = eventThinking !== undefined
+            ? { ...parsed, reasoning: eventThinking, reasoning_effort: eventThinking }
+            : parsed
+          model = parsed.display
+        } else {
+          resolvedModel = undefined
+          model = event.to
+        }
         fallbackCount += 1
         return true
       }
@@ -170,4 +184,32 @@ function isTextPart(value: unknown): value is { readonly type: "text"; readonly 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function readEventString(event: ManagedChildEvent, key: string): string | undefined {
+  const value = Reflect.get(event, key)
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+// Parse a "provider/model_id" or "provider/model_id:reasoning" selector into a ResolvedModelRecord.
+// Mirrors runtime-fallback-event.ts parseModelSelector so the live progress tracker preserves
+// the thinking level that the task record store already retains.
+function parseModelSelector(
+  selector: string,
+  source: ResolvedModelRecord["source"],
+): ResolvedModelRecord | undefined {
+  const slash = selector.indexOf("/")
+  if (slash <= 0 || slash === selector.length - 1) return undefined
+  const colon = selector.lastIndexOf(":")
+  const hasThinking = colon > slash
+  const display = hasThinking ? selector.slice(0, colon) : selector
+  return {
+    source,
+    provider: display.slice(0, slash),
+    model_id: display.slice(slash + 1),
+    display,
+    ...(hasThinking
+      ? { reasoning: selector.slice(colon + 1), reasoning_effort: selector.slice(colon + 1) }
+      : {}),
+  }
 }
