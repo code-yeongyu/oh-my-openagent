@@ -699,6 +699,91 @@ describe("executeSyncTask - cleanup on error paths", () => {
     })
   })
 
+  test("#given one task invocation hits a retryable poll error #when the loop spawns the fallback retry session #then the superseded session is aborted and handed back before the replacement exists", async () => {
+    //#given
+    const abortCalls: string[] = []
+    const eventTimeline: string[] = []
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input.path.id)
+          eventTimeline.push(`abort:${input.path.id}`)
+          return { data: {} }
+        },
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    const createdSessions: string[] = []
+
+    const deps = {
+      createSyncSession: async () => {
+        const sessionID = createdSessions.length === 0 ? "ses_superseded" : "ses_replacement"
+        createdSessions.push(sessionID)
+        eventTimeline.push(`create:${sessionID}`)
+        return { ok: true as const, sessionID }
+      },
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) =>
+        input.sessionID === "ses_superseded"
+          ? "Forbidden: Selected provider is forbidden"
+          : null,
+      fetchSyncResult: async (_client: unknown, sessionID: string) => ({
+        ok: true as const,
+        textContent: `Result from ${sessionID}`,
+      }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-6487",
+      metadata: () => {},
+    }
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+      modelFallbackControllerAccessor: {
+        setSessionFallbackChain: () => {},
+        clearSessionFallbackChain: () => {},
+      },
+    }
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "quick",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+    const initialModel = {
+      providerID: "genai-proxy-openai",
+      modelID: "gpt-5.6-luna-fast",
+      variant: undefined,
+    }
+    const fallbackChain = [
+      { providers: ["genai-proxy-openai"], model: "gpt-5.6-luna-fast" },
+      { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
+    ]
+
+    //#when - a single invocation falls back to a new session after the poll error
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
+
+    //#then - exactly one live child session: superseded one aborted (and marked
+    //#then handed-back) BEFORE the replacement was created, never in parallel
+    expect(createdSessions).toEqual(["ses_superseded", "ses_replacement"])
+    expect(abortCalls.filter((id) => id === "ses_superseded")).toEqual(["ses_superseded"])
+    expect(eventTimeline.indexOf("abort:ses_superseded")).toBeLessThan(
+      eventTimeline.indexOf("create:ses_replacement"),
+    )
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    expect(handedBackSyncSessions.has("ses_superseded")).toBe(true)
+    expect(result).toContain("Result from ses_replacement")
+  })
+
   test("#given sync poll hits subscription quota exhaustion #when a fallback chain exists #then retries on the next fallback model without changing generic stop semantics", async () => {
     //#given
     const mockClient = {

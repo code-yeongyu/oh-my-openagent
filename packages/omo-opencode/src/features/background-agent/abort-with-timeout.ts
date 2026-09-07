@@ -1,6 +1,11 @@
 import { log } from "../../shared"
 import { isRecord } from "../../shared/record-type-guard"
-import type { OpencodeClient } from "./opencode-client"
+
+export type AbortCapableClient = {
+  session: {
+    abort: (input: { path: { id: string } }) => Promise<unknown>
+  }
+}
 
 function getAbortResponseError(response: unknown): unknown | undefined {
   if (!isRecord(response)) return undefined
@@ -9,7 +14,7 @@ function getAbortResponseError(response: unknown): unknown | undefined {
 }
 
 export async function abortWithTimeout(
-  client: OpencodeClient,
+  client: AbortCapableClient,
   sessionID: string,
   timeoutMs = 10_000,
 ): Promise<boolean> {

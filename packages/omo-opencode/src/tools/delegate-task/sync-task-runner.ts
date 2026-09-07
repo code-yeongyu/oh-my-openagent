@@ -34,7 +34,7 @@ type SyncTaskRunnerInput = {
     currentModel: DelegatedModelConfig | undefined,
     spawnDepth: number,
   ) => Promise<void>
-  readonly cleanupRetrySession: (currentSessionID: string) => void
+  readonly cleanupRetrySession: (currentSessionID: string) => Promise<void>
   readonly setSyncSessionID: (currentSessionID: string) => void
 }
 
@@ -177,7 +177,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
         return pollError
       }
 
-      cleanupRetrySession(activeSessionID)
+      await cleanupRetrySession(activeSessionID)
 
       const retrySessionResult = await deps.createSyncSession(client, {
         parentSessionID: parentContext.sessionID,

@@ -1,0 +1,23 @@
+RED phase output captured before the fix was applied
+(command: bun test packages/omo-opencode/src/tools/delegate-task/sync-task.test.ts -t "superseded session is aborted")
+
+(fail) executeSyncTask - cleanup on error paths > #given one task invocation hits a retryable poll error #when the loop spawns the fallback retry session #then the superseded session is aborted and handed back before the replacement is created [101.71ms]
+
+  777 |     expect(createdSessions).toEqual(["ses_superseded", "ses_replacement"])
+  778 |     expect(abortCalls.filter((id) => id === "ses_superseded")).toEqual(["ses_superseded"])
+                                                                     ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "ses_superseded",
+- ]
++ []
+
+ 0 pass
+ 18 filtered out
+ 1 fail
+
+Interpretation: on pre-fix code the superseded sync session ("ses_superseded")
+was never aborted when the loop fell back to a replacement session, and it was
+never recorded in handedBackSyncSessions. This is the duplicate-spawn defect of
+issue #6487 reproduced at the unit level.
