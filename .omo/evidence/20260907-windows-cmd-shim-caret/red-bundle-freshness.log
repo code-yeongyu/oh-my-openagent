@@ -1,0 +1,30 @@
+bun test v1.3.14 (0d9b296a)
+
+script\codex-install-bundle-freshness.test.ts:
+(pass) committed Codex installer bundle > #given the tracked bundle #when its build marker is read #then it is present and self-consistent [61.34ms]
+38 | 
+39 |     // when
+40 |     const currentSourceDigest = await digestCodexInstallerSources()
+41 | 
+42 |     // then
+43 |     expect({ bundle: trackedBundlePath, sourceDigest: artifact?.sourceDigest }).toEqual({
+                                                                                     ^
+error: expect(received).toEqual(expected)
+
+  {
+    "bundle": "packages/omo-codex/scripts/install-dist/install-local.mjs",
+-   "sourceDigest": "c76c56a6800118333e1adfb34a3d6fd41b9acf88953a901de67d9797bfc01021",
++   "sourceDigest": "81cf03496fa0db52b428d9e5f1d2a022f753fe60530d84f72d767af03333373f",
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\script\codex-install-bundle-freshness.test.ts:43:81)
+(fail) committed Codex installer bundle > #given current installer sources #when compared with the tracked bundle marker #then the bundle is current [63.71ms]
+
+ 1 pass
+ 1 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [1.89s]
+EXIT=1

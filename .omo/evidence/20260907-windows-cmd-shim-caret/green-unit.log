@@ -1,0 +1,61 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-codex\src\install\codex-cache-bins.test.ts:
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the canonical runtime wrapper #then uses the new name, marker, and edition exports [17.71ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given a marker-bearing legacy omo wrapper #when writing the canonical wrapper #then deletes the legacy wrapper [16.59ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given an unmarked user-owned omo #when writing the canonical wrapper twice #then preserves omo byte-identical and remains idempotent [21.74ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the canonical runtime wrapper #then uses the new name and environment exports [41.85ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the omo-agent-toolkit runtime wrapper #then embeds the node fallback chain [18.02ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when bun is absent everywhere #then the wrapper falls back to node before exiting 127 [11.97ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then embeds the node fallback chain [40.29ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then discovers Codex bundled Node from config before bare node [44.77ms]
+(skip) linkRootRuntimeBin runtime wrapper parity > #given posix wrapper target was removed #when running omo #then exits with reinstall guidance
+(skip) linkRootRuntimeBin runtime wrapper parity > #given ulw-loop command #when running omo wrapper #then preserves the ulw-loop token
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 wrapper target was removed #when writing omo.cmd #then it contains reinstall guidance before bun exec [43.32ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 ulw-loop command #when writing omo.cmd #then preserves the ulw-loop token [42.72ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a symlink resolving to a marker-bearing wrapper #when writing the canonical wrapper #then removes the symlink and keeps its target [7.80ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a symlink to an unmarked user file #when writing the canonical wrapper #then preserves the symlink [12.25ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a dangling symlink #when writing the canonical wrapper #then completes without throwing [10.71ms]
+
+packages\omo-codex\src\install\codex-cache-command-shim.test.ts:
+(pass) windows command shim > #given config.toml supplies NODE_REPL_NODE_PATH #when the shim runs #then cmd parses it and reaches the target [246.55ms]
+(pass) windows command shim > #given the node discovery block #when the shim is generated #then it carries no caret-escaped quote comparison [1.50ms]
+
+packages\omo-codex\src\install\codex-cleanup.test.ts:
+(pass) codex cleanup > #given managed Codex Light state and project-local Codex leftovers #when cleanup runs #then removes only managed global state and repairs local config [54.70ms]
+(pass) codex cleanup > #given malformed project directory #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped [14.95ms]
+(pass) codex cleanup > #given managed config and missing install manifests #when cleanup runs #then removes orphaned managed agent links [22.19ms]
+(pass) codex cleanup > #given project directory is a regular file #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped [11.00ms]
+(pass) codex cleanup > #given provisioned runtime binaries and bootstrap plugin data #when cleanup runs #then removes only the managed subtrees [33.31ms]
+(pass) codex cleanup > #given runtime holding only the managed subtrees #when cleanup runs #then prunes the empty runtime directory [13.37ms]
+(pass) codex cleanup > #given codex home without bootstrap or runtime artifacts #when cleanup runs #then succeeds with no removed paths [7.68ms]
+(pass) codex cleanup > #given an artifact recreated after the first removal pass #when removeManagedPathBestEffort runs #then the retry clears it within one call [8.45ms]
+(pass) codex cleanup > #given a mid-flight worker recreates bootstrap state between uninstall runs #when cleanup runs twice #then the second pass clears it without error [16.27ms]
+(pass) codex cleanup > #given config sections shaped like the bootstrap worker setup output #when config text cleanup runs #then managed sections are removed and user sections survive [1.09ms]
+(pass) codex cleanup > #given single-quoted managed hook state table #when config text cleanup runs #then removes the managed hook state [1.12ms]
+(pass) codex cleanup > #given installer-created bin links in the bin dir #when cleanup runs #then removes the managed omo bins and keeps unmanaged files [22.08ms]
+(skip) codex cleanup > #given posix component bin symlinks #when cleanup runs #then removes managed component symlinks and keeps unrelated ones
+(pass) codex cleanup > #given no bin directory on disk #when cleanup runs #then reports no removed bin links and does not throw [8.69ms]
+(pass) codex cleanup > #given a codex home resolving to a filesystem root #when cleanup runs #then no bin link is scanned or removed [8.15ms]
+(pass) codex cleanup > #given a user copy of a generated wrapper #when cleanup runs #then only installer bin names are removed [12.87ms]
+(pass) codex cleanup > #given a user-owned bin using an installer name without the marker #when cleanup runs #then it is kept [17.91ms]
+(pass) codex cleanup > #given a managed windows wrapper left on disk with different casing #when cleanup runs #then it is still removed [10.72ms]
+(pass) codex cleanup > #given a user-owned windows bin using an installer name in different casing #when cleanup runs #then it is kept [12.10ms]
+(pass) codex cleanup > #given an install that used a one-shot CODEX_LOCAL_BIN_DIR #when uninstall runs without that variable #then the wrapper in the recorded dir is still removed [21.43ms]
+(pass) codex cleanup > #given a recorded install bin dir and an explicit CODEX_LOCAL_BIN_DIR at uninstall #when cleanup runs #then the environment override wins [24.95ms]
+(skip) codex cleanup > #given a legacy install under another marketplace #when cleanup runs #then its legacy bins are still removed
+(skip) codex cleanup > #given a user symlink whose target resembles a managed component #when cleanup runs #then it is kept
+
+5 tests skipped:
+(skip) linkRootRuntimeBin runtime wrapper parity > #given posix wrapper target was removed #when running omo #then exits with reinstall guidance
+(skip) linkRootRuntimeBin runtime wrapper parity > #given ulw-loop command #when running omo wrapper #then preserves the ulw-loop token
+(skip) codex cleanup > #given posix component bin symlinks #when cleanup runs #then removes managed component symlinks and keeps unrelated ones
+(skip) codex cleanup > #given a legacy install under another marketplace #when cleanup runs #then its legacy bins are still removed
+(skip) codex cleanup > #given a user symlink whose target resembles a managed component #when cleanup runs #then it is kept
+
+ 35 pass
+ 5 skip
+ 0 fail
+ 146 expect() calls
+Ran 40 tests across 3 files. [2.94s]
+EXIT=0

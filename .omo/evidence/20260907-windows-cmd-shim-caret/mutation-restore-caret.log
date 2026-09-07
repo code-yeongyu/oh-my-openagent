@@ -1,0 +1,68 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-codex\src\install\codex-cache-bins.test.ts:
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the canonical runtime wrapper #then uses the new name, marker, and edition exports [19.04ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given a marker-bearing legacy omo wrapper #when writing the canonical wrapper #then deletes the legacy wrapper [15.49ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given an unmarked user-owned omo #when writing the canonical wrapper twice #then preserves omo byte-identical and remains idempotent [20.54ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the canonical runtime wrapper #then uses the new name and environment exports [42.05ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the omo-agent-toolkit runtime wrapper #then embeds the node fallback chain [14.59ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when bun is absent everywhere #then the wrapper falls back to node before exiting 127 [21.12ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then embeds the node fallback chain [34.40ms]
+140 | 
+141 |     // then
+142 |     expect(link).not.toBeNull()
+143 |     const wrapper = await readFile(link?.path ?? "", "utf8")
+144 |     expect(wrapper).toContain('for /f "tokens=1,* delims==" %%A in (\'findstr /R /C:"NODE_REPL_NODE_PATH[ ]*=" "%CODEX_HOME%\\config.toml" 2^>nul\') do (')
+145 |     expect(wrapper).not.toContain('=="^""')
+                              ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "==\"^\"\""
+Received: "@echo off\r\nrem OMO_GENERATED_RUNTIME_WRAPPER\r\nif not defined CODEX_HOME set \"CODEX_HOME=C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\codex\"\r\nset \"OMO_INVOCATION_NAME=omo-agent-toolkit\"\r\nset \"OMO_EDITION=codex\"\r\nsetlocal EnableExtensions EnableDelayedExpansion\r\nset \"OMO_NODE_BINARY=\"\r\nset \"OMO_NODE_REPL_NODE_PATH=%NODE_REPL_NODE_PATH%\"\r\nif exist \"%CODEX_HOME%\\config.toml\" (\r\n  for /f \"tokens=1,* delims==\" %%A in ('findstr /R /C:\"NODE_REPL_NODE_PATH[ ]*=\" \"%CODEX_HOME%\\config.toml\" 2^>nul') do (\r\n    set \"OMO_NODE_REPL_NODE_PATH=%%B\"\r\n  )\r\n)\r\nif defined OMO_NODE_REPL_NODE_PATH (\r\n  set \"OMO_NODE_BINARY=!OMO_NODE_REPL_NODE_PATH!\"\r\n  for /f \"tokens=* delims= \" %%N in (\"!OMO_NODE_BINARY!\") do set \"OMO_NODE_BINARY=%%N\"\r\n  if \"!OMO_NODE_BINARY:~0,1!\"==\"'\" set \"OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!\"\r\n  if \"!OMO_NODE_BINARY:~-1!\"==\"'\" set \"OMO_NODE_BINARY=!OMO_NODE_BINARY:~0,-1!\"\r\n  if \"!OMO_NODE_BINARY:~0,1!\"==\"^\"\" set \"OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!\"\r\n  if \"!OMO_NODE_BINARY:~-1!\"==\"^\"\" set \"OMO_NODE_BINARY=!OMO_NODE_BINARY:~0,-1!\"\r\n  if defined OMO_NODE_BINARY if not exist \"!OMO_NODE_BINARY!\" set \"OMO_NODE_BINARY=\"\r\n)\r\nif not defined OMO_NODE_BINARY where node >nul 2>nul && set \"OMO_NODE_BINARY=node\"\r\nif \"%~1\"==\"ulw-loop\" if exist \"C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\bin\\omo-ulw-loop.cmd\" (\r\n  shift /1\r\n  \"C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\bin\\omo-ulw-loop.cmd\" ulw-loop %*\r\n  exit /b %ERRORLEVEL%\r\n)\r\nif \"%OMO_RUNTIME%\"==\"node\" if defined OMO_NODE_BINARY if exist \"C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\repo\\dist\\cli-node\\index.js\" (\r\n  \"%OMO_NODE_BINARY%\" \"C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\repo\\dist\\cli-node\\index.js\" %*\r\n  exit /b %ERRORLEVEL%\r\n)\r\nif not defined BUN_BINARY where bun >nul 2>nul && set \"BUN_BINARY=bun\"\r\nif not defined BUN_BINARY if exist \"%USERPROFILE%\\.bun\\bin\\bun.exe\" set \"BUN_BINARY=%USERPROFILE%\\.bun\\bin\\bun.exe\"\r\nif not defined BUN_BINARY (\r\n  if defined OMO_NODE_BINARY if exist \"C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\repo\\dist\\cli-node\\index.js\" (\r\n    \"%OMO_NODE_BINARY%\" \"C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\repo\\dist\\cli-node\\index.js\" %*\r\n    exit /b %ERRORLEVEL%\r\n  )\r\n  echo omo-agent-toolkit: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\repo\\dist\\cli-node\\index.js; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2\r\n  exit /b 127\r\n)\r\nif not exist \"C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\repo\\dist\\cli\\index.js\" (\r\n  echo omo-agent-toolkit: runtime target missing at C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\repo\\dist\\cli\\index.js; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2\r\n  exit /b 1\r\n)\r\n\"%BUN_BINARY%\" \"C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-codex-cache-bins-gsILfg\\repo\\dist\\cli\\index.js\" %*\r\n"
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\packages\omo-codex\src\install\codex-cache-bins.test.ts:145:25)
+(fail) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then discovers Codex bundled Node from config before bare node [42.31ms]
+(skip) linkRootRuntimeBin runtime wrapper parity > #given posix wrapper target was removed #when running omo #then exits with reinstall guidance
+(skip) linkRootRuntimeBin runtime wrapper parity > #given ulw-loop command #when running omo wrapper #then preserves the ulw-loop token
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 wrapper target was removed #when writing omo.cmd #then it contains reinstall guidance before bun exec [57.67ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 ulw-loop command #when writing omo.cmd #then preserves the ulw-loop token [56.25ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a symlink resolving to a marker-bearing wrapper #when writing the canonical wrapper #then removes the symlink and keeps its target [14.10ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a symlink to an unmarked user file #when writing the canonical wrapper #then preserves the symlink [17.71ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a dangling symlink #when writing the canonical wrapper #then completes without throwing [9.40ms]
+
+packages\omo-codex\src\install\codex-cache-command-shim.test.ts:
+40 |       const child = Bun.spawnSync(["cmd.exe", "/c", fixture.shimPath, "hello"], {
+41 |         env: { ...Bun.env, CODEX_HOME: fixture.codexHome },
+42 |       })
+43 | 
+44 |       // then
+45 |       expect(child.stderr.toString()).not.toContain("The syntax of the command is incorrect")
+                                               ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "The syntax of the command is incorrect"
+Received: "The syntax of the command is incorrect.\r\n"
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\packages\omo-codex\src\install\codex-cache-command-shim.test.ts:45:43)
+(fail) windows command shim > #given config.toml supplies NODE_REPL_NODE_PATH #when the shim runs #then cmd parses it and reaches the target [77.03ms]
+51 |   it("#given the node discovery block #when the shim is generated #then it carries no caret-escaped quote comparison", () => {
+52 |     // given / when
+53 |     const shim = windowsCommandShim("C:\\probe\\target.js")
+54 | 
+55 |     // then
+56 |     expect(shim).not.toContain('=="^""')
+                          ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "==\"^\"\""
+Received: "@echo off\r\n:: generated by oh-my-openagent Codex installer\r\nif not defined CODEX_HOME set \"CODEX_HOME=%USERPROFILE%\\.codex\"\r\nsetlocal EnableExtensions EnableDelayedExpansion\r\nset \"OMO_NODE_BINARY=\"\r\nset \"OMO_NODE_REPL_NODE_PATH=%NODE_REPL_NODE_PATH%\"\r\nif exist \"%CODEX_HOME%\\config.toml\" (\r\n  for /f \"tokens=1,* delims==\" %%A in ('findstr /R /C:\"NODE_REPL_NODE_PATH[ ]*=\" \"%CODEX_HOME%\\config.toml\" 2^>nul') do (\r\n    set \"OMO_NODE_REPL_NODE_PATH=%%B\"\r\n  )\r\n)\r\nif defined OMO_NODE_REPL_NODE_PATH (\r\n  set \"OMO_NODE_BINARY=!OMO_NODE_REPL_NODE_PATH!\"\r\n  for /f \"tokens=* delims= \" %%N in (\"!OMO_NODE_BINARY!\") do set \"OMO_NODE_BINARY=%%N\"\r\n  if \"!OMO_NODE_BINARY:~0,1!\"==\"'\" set \"OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!\"\r\n  if \"!OMO_NODE_BINARY:~-1!\"==\"'\" set \"OMO_NODE_BINARY=!OMO_NODE_BINARY:~0,-1!\"\r\n  if \"!OMO_NODE_BINARY:~0,1!\"==\"^\"\" set \"OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!\"\r\n  if \"!OMO_NODE_BINARY:~-1!\"==\"^\"\" set \"OMO_NODE_BINARY=!OMO_NODE_BINARY:~0,-1!\"\r\n  if defined OMO_NODE_BINARY if not exist \"!OMO_NODE_BINARY!\" set \"OMO_NODE_BINARY=\"\r\n)\r\nif not defined OMO_NODE_BINARY where node >nul 2>nul && set \"OMO_NODE_BINARY=node\"\r\nif not defined OMO_NODE_BINARY (\r\n  echo omo: no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH; rerun LazyCodex install from Codex Desktop 1>&2\r\n  exit /b 127\r\n)\r\n\"%OMO_NODE_BINARY%\" \"C:\\probe\\target.js\" %*\r\nexit /b %ERRORLEVEL%\r\n"
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\packages\omo-codex\src\install\codex-cache-command-shim.test.ts:56:22)
+(fail) windows command shim > #given the node discovery block #when the shim is generated #then it carries no caret-escaped quote comparison [1.14ms]
+
+ 12 pass
+ 2 skip
+ 3 fail
+ 43 expect() calls
+Ran 17 tests across 2 files. [2.31s]
+EXIT=1
