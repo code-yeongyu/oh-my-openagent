@@ -86,9 +86,16 @@ async function reconcilePrelaunch(context: ReconcileContext): Promise<Reflection
   )).active
   if (active?.reservedAt === undefined || active.launcherPid === undefined || active.launcherHostname === undefined) return undefined
   const runDir = join(context.identity.paths.reflection, "runs", active.runId)
-  if (existsSync(join(runDir, "ledger.json"))) return undefined
+  const hasLedger = existsSync(join(runDir, "ledger.json"))
+  if (hasLedger) {
+    const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
+    const finalPath = join(runDir, "final.json")
+    const final = existsSync(finalPath) ? await readRunJson<Pick<RunOutcome, "finishedAt">>(finalPath) : undefined
+    const finishedAt = final?.finishedAt ?? ledger.finalizedAt
+    if (finishedAt === undefined || !(Date.parse(finishedAt) < Date.parse(active.reservedAt))) return undefined
+  }
   const prelaunchPath = join(runDir, "prelaunch.json")
-  if (existsSync(runDir) && !existsSync(prelaunchPath)) return undefined
+  if (!hasLedger && existsSync(runDir) && !existsSync(prelaunchPath)) return undefined
   if (context.now() - Date.parse(active.reservedAt) <= 60_000 || active.launcherHostname !== context.hostname()) return undefined
   const liveness = (context.getPidLiveness ?? getPidLiveness)(active.launcherPid)
   let dead = liveness === "dead"

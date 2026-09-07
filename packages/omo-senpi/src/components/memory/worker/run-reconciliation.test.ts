@@ -273,6 +273,31 @@ describe("reflection and dream run reconciliation", () => {
     expect((await unknown.journal.getState()).reflected_completed_steps).toBe(0)
   }, 30_000)
 
+  test("#given a retired merged run with a ledger and a newer reservation with a dead launcher #when reconciled #then the reservation is reclaimed", async () => {
+    // given
+    const item = await fixture()
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      outcome: "merged",
+      finishedAt: "2026-08-05T00:00:00.000Z",
+    })
+    await rm(join(item.runDir, "prelaunch.json"))
+
+    // when
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      hostname: () => "fixture-host",
+      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+      getPidLiveness: () => "dead",
+    })
+
+    // then
+    expect(results).toEqual([{ runId: item.ledger.runId, outcome: "failed" }])
+    expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
   test("#given an old prelaunch worktree without a ledger and a confirmed-dead launcher #when reconciled #then resources and reservation are released", async () => {
     // given
     const item = await fixture()
