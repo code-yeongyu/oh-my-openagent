@@ -138,6 +138,7 @@ function buildStart(
     rootSessionId: `facts-${input.runId}`,
     systemPrompt: loadFactsPersona(),
     promptEnvelope: "bare",
+    completion: "turn",
     prompt: `Extract durable facts from this payload and record each accepted fact with ${FACTS_RECORD_TOOL_NAME}.\n\n${payloadText}`,
   }
 }
