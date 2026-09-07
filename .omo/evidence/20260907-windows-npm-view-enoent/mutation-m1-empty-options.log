@@ -1,0 +1,43 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-codex\src\install\npm-spawn-options.test.ts:
+20 | 
+21 |     // when
+22 |     const withOptions = spawnNpmUnderNode(npmSpawnOptions())
+23 | 
+24 |     // then
+25 |     expect(withOptions).toBe(0)
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 3
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\packages\omo-codex\src\install\npm-spawn-options.test.ts:25:25)
+(fail) npm spawn options > #given node spawning npm #when the installer's options are applied #then npm runs where a bare spawn would not [179.76ms]
+(pass) npm spawn options > #given a non-Windows platform #when the options are built #then no shell is requested [3.00ms]
+34 |     expect(npmSpawnOptions("linux")).toEqual({})
+35 |   })
+36 | 
+37 |   it("#given Windows #when the options are built #then a shell is requested", () => {
+38 |     // given / when / then
+39 |     expect(npmSpawnOptions("win32")).toEqual({ shell: true })
+                                          ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "shell": true,
+- }
++ {}
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\packages\omo-codex\src\install\npm-spawn-options.test.ts:39:38)
+(fail) npm spawn options > #given Windows #when the options are built #then a shell is requested [3.51ms]
+
+ 1 pass
+ 2 fail
+ 4 expect() calls
+Ran 3 tests across 1 file. [4.15s]
+EXIT=1

@@ -1,0 +1,2 @@
+$ bun run script/build-codex-install.ts
+EXIT=0

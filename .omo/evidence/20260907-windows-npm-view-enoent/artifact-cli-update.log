@@ -1,0 +1,4 @@
+npm notice run oh-my-opencode@5.0.0-beta.45 npx
+npm notice run lazycodex --dry-run update
+Unable to check lazycodex-ai updates (unknown-latest).
+EXIT=1

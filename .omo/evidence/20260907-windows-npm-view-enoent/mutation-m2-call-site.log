@@ -1,0 +1,12 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-codex\src\install\npm-spawn-options.test.ts:
+(pass) npm spawn options > #given node spawning npm #when the installer's options are applied #then npm runs where a bare spawn would not [983.59ms]
+(pass) npm spawn options > #given a non-Windows platform #when the options are built #then no shell is requested [7.35ms]
+(pass) npm spawn options > #given Windows #when the options are built #then a shell is requested [3.59ms]
+
+ 3 pass
+ 0 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [5.17s]
+EXIT=0

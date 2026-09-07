@@ -1,0 +1,16 @@
+platform = win32
+as shipped, no shell:
+  status  = null
+  error   = ENOENT spawnSync npm
+  stdout  = ""
+  shipped guard 'result.status !== 0' evaluates to true
+  resolveLatestVersion would return undefined
+with the win32 shell option:
+  status  = 0
+  error   = none
+  stdout  = "4.19.4"
+  shipped guard 'result.status !== 0' evaluates to false
+  resolveLatestVersion would return "4.19.4"
+(node:63048) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+EXIT=0

@@ -4,6 +4,7 @@ import { dirname, join } from "node:path"
 import { createInterface } from "node:readline/promises"
 import { fileURLToPath } from "node:url"
 import { isBunGlobalEntrypointPath } from "./lazycodex-bun-global-paths"
+import { npmSpawnOptions } from "./npm-spawn-options"
 import type { RunCommand } from "./types"
 
 const DEFAULT_UPDATE_COMMAND = "npx"
@@ -129,6 +130,7 @@ function resolveLatestVersion(env: NodeJS.ProcessEnv): string | undefined {
   const result = spawnSync("npm", ["view", "lazycodex-ai", "version", "--silent"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
+    ...npmSpawnOptions(),
   })
   if (result.status !== 0) return undefined
   const version = result.stdout.trim()
