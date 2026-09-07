@@ -121,6 +121,40 @@ describe("child task progress", () => {
     )
   })
 
+  test("#given a fallback event without thinking suffix #when the event carries a thinking field #then the display includes the applied level", () => {
+    // Reproduces https://github.com/code-yeongyu/oh-my-openagent/issues/7934
+    // The Senpi core event.to may not include the :thinking suffix, but a future
+    // event.thinking field should be preferred when present.
+    const progress = createChildProgress(
+      "st_00000005",
+      { category: "deep", resolvedModel: RESOLVED_MODEL },
+      1_000,
+      () => 2_000,
+    )
+
+    // Fallback with bare selector but explicit thinking field on the event
+    progress.accept({ type: "retry_fallback_applied", to: "openai-codex/gpt-5.6-sol", thinking: "high" } as never)
+
+    expect(progress.details().progress.activity).toBe(
+      "st_00000005 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · turn 0 · running",
+    )
+  })
+
+  test("#given a fallback event with thinking in selector #when no explicit thinking field #then the selector suffix is preserved", () => {
+    const progress = createChildProgress(
+      "st_00000006",
+      { category: "deep", resolvedModel: RESOLVED_MODEL },
+      1_000,
+      () => 2_000,
+    )
+
+    progress.accept({ type: "retry_fallback_applied", to: "openai-codex/gpt-5.6-sol:high" })
+
+    expect(progress.details().progress.activity).toBe(
+      "st_00000006 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · turn 0 · running",
+    )
+  })
+
   test("#given no events yet #when composed #then activity has no turn-zero noise beyond the base status", () => {
     // given
     const progress = createChildProgress("st_00000003", { category: "deep" }, 1_000, () => 1_000)
