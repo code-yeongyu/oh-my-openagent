@@ -9,6 +9,29 @@ import { assertHookCommandTargets } from "./codex-hook-targets"
 import type { InstalledPlugin, RunCommand } from "./types"
 
 type RenameDirectory = (fromPath: string, toPath: string) => Promise<void>
+// Windows refuses to rename a directory while a process holds a file inside it open or has it as a
+// cwd, and an npm helper that is still exiting keeps its cwd in the freshly built temp directory.
+// The promote then fails in a few milliseconds over a lock that clears in a few hundred, so it
+// waits the way renameWithRetry in codex-config-atomic-write.ts waits for a busy rename.
+const DIRECTORY_RENAME_RETRY_DELAYS_MS = [50, 100, 200, 400, 800] as const
+const RETRIABLE_DIRECTORY_RENAME_CODES = new Set(["EPERM", "EBUSY"])
+
+async function renameDirectoryWithRetry(fromPath: string, toPath: string): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rename(fromPath, toPath)
+      return
+    } catch (error) {
+      if (!isRetriableDirectoryRenameError(error) || attempt >= DIRECTORY_RENAME_RETRY_DELAYS_MS.length) throw error
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, DIRECTORY_RENAME_RETRY_DELAYS_MS[attempt] ?? 0))
+    }
+  }
+}
+
+function isRetriableDirectoryRenameError(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error)) return false
+  return typeof error.code === "string" && RETRIABLE_DIRECTORY_RENAME_CODES.has(error.code)
+}
 
 export async function installCachedPlugin(input: {
   readonly buildSource?: boolean
@@ -51,7 +74,7 @@ export async function installCachedPlugin(input: {
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
     await assertHookCommandTargets(tempPath)
-    await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
+    await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? renameDirectoryWithRetry)
   } catch (error) {
     await rm(tempPath, { recursive: true, force: true })
     throw error
