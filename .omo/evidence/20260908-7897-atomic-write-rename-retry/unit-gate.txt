@@ -1,0 +1,89 @@
+### RED: new tests against unpatched packages/team-core/src/team-state-store/locks.ts (HEAD 11d5155a8)
+bun test v1.4.0 (34cbb9a40)
+
+packages/team-core/src/team-state-store/locks.test.ts:
+(pass) withLock serializes concurrent work [69.07ms]
+(pass) atomicWrite leaves no partial file when rename fails [2.53ms]
+20 | 
+21 |   return { promise, resolve: resolveSignal }
+22 | }
+23 | 
+24 | function createErrnoError(code: string): Error & { code: string } {
+25 |   return Object.assign(new Error(code), { code })
+                                ^
+error: EPERM
+ code: "EPERM"
+
+      at createErrnoError (<repo>/packages/team-core/src/team-state-store/locks.test.ts:25:28)
+      at <anonymous> (<repo>/packages/team-core/src/team-state-store/locks.test.ts:117:15)
+      at atomicWrite (<repo>/packages/team-core/src/team-state-store/locks.ts:205:11)
+      at async <anonymous> (<repo>/packages/team-core/src/team-state-store/locks.test.ts:109:9)
+(fail) atomicWrite retries a transient Windows EPERM on rename and then lands the new content [1.70ms]
+151 |     },
+152 |   })
+153 | 
+154 |   // then
+155 |   await expect(result).rejects.toThrow("EBUSY")
+156 |   expect(renameCalls).toBe(5)
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 5
+Received: 1
+
+      at <anonymous> (<repo>/packages/team-core/src/team-state-store/locks.test.ts:156:23)
+(fail) atomicWrite stops retrying a Windows rename after the bounded attempts and leaves no partial file [3.35ms]
+(pass) atomicWrite does not retry rename EPERM on POSIX platforms [1.33ms]
+(pass) atomicWrite does not retry a Windows rename that fails for a non-contention reason [1.79ms]
+(pass) lock open treats EPERM as contention when the lock path exists [0.34ms]
+(pass) lock open treats EPERM access probes as possible contention [0.26ms]
+(pass) lock open treats Windows EPERM with an existing parent as possible contention [0.22ms]
+(pass) lock open rethrows EPERM when the lock path does not exist [0.20ms]
+(pass) lock open rethrows Windows EPERM when the lock parent does not exist [0.37ms]
+(pass) lock release retries transient EPERM before removing the lock file [1.00ms]
+(pass) atomicWrite syncs temp files through a writable handle [1.15ms]
+(pass) detects and reaps stale lock entries [0.79ms]
+
+ 12 pass
+ 2 fail
+ 32 expect() calls
+Ran 14 tests across 1 file. [590.00ms]
+
+### GREEN: same tests with the fix applied
+bun test v1.4.0 (34cbb9a40)
+
+packages/team-core/src/team-state-store/locks.test.ts:
+(pass) withLock serializes concurrent work [67.40ms]
+(pass) atomicWrite leaves no partial file when rename fails [1.95ms]
+(pass) atomicWrite retries a transient Windows EPERM on rename and then lands the new content [4.10ms]
+(pass) atomicWrite stops retrying a Windows rename after the bounded attempts and leaves no partial file [1.49ms]
+(pass) atomicWrite does not retry rename EPERM on POSIX platforms [1.16ms]
+(pass) atomicWrite does not retry a Windows rename that fails for a non-contention reason [4.54ms]
+(pass) lock open treats EPERM as contention when the lock path exists [0.44ms]
+(pass) lock open treats EPERM access probes as possible contention [0.30ms]
+(pass) lock open treats Windows EPERM with an existing parent as possible contention [0.29ms]
+(pass) lock open rethrows EPERM when the lock path does not exist [0.61ms]
+(pass) lock open rethrows Windows EPERM when the lock parent does not exist [0.66ms]
+(pass) lock release retries transient EPERM before removing the lock file [0.51ms]
+(pass) atomicWrite syncs temp files through a writable handle [1.60ms]
+(pass) detects and reaps stale lock entries [0.55ms]
+
+ 14 pass
+ 0 fail
+ 39 expect() calls
+Ran 14 tests across 1 file. [588.00ms]
+
+### GREEN: full team-core package suite
+1 tests skipped:
+(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
+
+ 163 pass
+ 1 skip
+ 0 fail
+ 376 expect() calls
+Ran 164 tests across 28 files. [1.55s]
+
+### typecheck
+tsgo packages/team-core rc=0
+tsgo packages/senpi-task rc=0
+tsgo packages/omo-opencode rc=0
