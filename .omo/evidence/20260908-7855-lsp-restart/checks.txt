@@ -1,0 +1,85 @@
+SOURCE
+PR head: da130a5550e78c2181f412fb7373e4c1ba2e8d4b
+No runtime or test source changes in this remediation.
+
+CONTAINER TYPECHECK AND BUILD (Node 24.18.0; Bun 1.4.0)
+npm --prefix packages/lsp-daemon ci
+exit=0; found 0 vulnerabilities
+npm --prefix packages/lsp-daemon run typecheck
+exit=0; tsc --noEmit; no diagnostics
+npm --prefix packages/lsp-daemon run build
+exit=0
+Bundled 83 modules in 41ms
+cli.js     250.43 KB (entry point)
+index.js   231.13 KB (entry point)
+client.js  228.86 KB (entry point)
+
+LEAD-RUN HOST CROSS-CHECK (reported by the lead during this task)
+Working directory: packages/lsp-daemon
+PATH: verified Bun 1.4.0 plus package/root node_modules/.bin
+tsc --noEmit && node scripts/build.mjs
+exit=0; compiler silent
+Bundled 83 modules in 82ms
+cli.js 250.43 KB; index.js 231.13 KB; client.js 228.86 KB
+vitest run test/auth-ownership.test.ts
+exit=0; Test Files 1 passed (1); Tests 13 passed (13)
+Initial host Vitest startup lacked the Darwin ARM64 native binding; no test
+assertions ran. The lead installed that binding without changing manifests
+before the successful focused run. These host results are lead-provided;
+the independent container results above/below were captured by this driver task.
+
+FULL RELATED PACKAGE SUITE
+Initial npm test: 161 passed, 1 failed, 22 files.
+Failure: qa-driver-portability.test.ts could not execute git ls-files because
+this sibling worktree's host .git pointer was not accessible in the container:
+fatal: not a git repository: (null)
+Repair: initialize a private bare Git directory in the container and copy only
+this task worktree's index into it. No host Git metadata mount is required.
+A subsequent launcher attempt failed before assertions: .bin/vitest returned
+Invalid argument after host dependency preparation changed the bind-mounted
+executable link. The existing JavaScript entry point avoids that broken link.
+Final command (working directory packages/lsp-daemon):
+GIT_DIR=<container-private-git> GIT_WORK_TREE=/repo node node_modules/vitest/vitest.mjs run
+exit=0
+Test Files 22 passed (22)
+Tests 162 passed (162)
+Duration 1.96s
+No assertions changed, no tests skipped, no ordering/retry flags.
+
+PRE-EXISTING PR LINT FAILURE (not repaired by evidence-only remediation)
+npm --prefix packages/lsp-daemon run lint
+exit=1; Checked 43 files; Found 11 errors.
+Format: src/ipc-protocol.ts, src/paths.ts, src/proxy.ts,
+src/request-routing.ts, src/version-reap.ts, test/auth-ownership.test.ts,
+test/build-script.test.ts, test/path-contract.test.ts, test/proxy.test.ts.
+Import order: src/ownership.ts, test/daemon-client.test.ts.
+git diff --exit-code HEAD -- packages/lsp-daemon/src packages/lsp-daemon/test
+exit=0; these files are unchanged from the reviewed PR head.
+
+REAL HARNESS
+node .omo/evidence/20260908-7855-lsp-restart/replay.mjs /repo
+exit=0; result.json records replacement PID/nonce and authenticated responses.
+The first two driver attempts reached the real harness but the supplementary
+raw IPC tool call omitted typed request context, then used an obsolete env
+field. The final driver uses the actual typed context contract. Those attempts
+were not counted as passes; no production code or test assertion was weakened.
+
+DIAGNOSTICS AND SETUP LIMITATIONS
+LSP diagnostics tool rejected sibling-worktree paths as outside request cwd.
+The package compiler above checked the actual task worktree instead.
+node --check .omo/evidence/20260908-7855-lsp-restart/replay.mjs
+exit=0
+Root bun install --frozen-lockfile populated dependencies, but its automatic
+prepare/root build failed when frontend submodule materialization could not
+resolve the host worktree Git pointer. The relevant daemon build passed;
+no full root-build pass is claimed.
+The cached Bun image initially supplied an amd64 executable to the arm64 QA
+container. Pulling oven/bun:1.4.0 explicitly for linux/arm64 repaired setup
+before package validators and real QA ran.
+
+ISOLATION AND TEARDOWN
+Docker inspection: exactly one bind mount, this task repository at /repo.
+No host HOME, OpenCode configuration, database, credentials or daemon mounts.
+The model provider was local; no external model calls or credential copies.
+No OpenCode/daemon/probe processes remained in the task container after QA.
+The named task container was removed; subsequent docker inspect failed as expected.

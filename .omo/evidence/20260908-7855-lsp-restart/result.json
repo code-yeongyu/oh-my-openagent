@@ -1,0 +1,65 @@
+{
+  "sourceHead": "da130a5550e78c2181f412fb7373e4c1ba2e8d4b",
+  "capturedAt": "2026-09-08T15:03:55.310Z",
+  "node": "v24.18.0",
+  "bun": "1.4.0",
+  "opencode": "1.18.4",
+  "runtime": "packages/lsp-daemon/dist/cli.js",
+  "runtimeSha256": "53b5c08e3e1db0cf2ea0ebd94a1a92070f42f4abbba1572fb0976de4fd7c209f",
+  "isolation": {
+    "home": "<sandbox>/home",
+    "xdg": "<sandbox>/{data,config,cache,state}",
+    "daemon": "<sandbox>/daemon",
+    "hostMounts": "repository-only",
+    "sandboxSessions": 1
+  },
+  "before": {
+    "pid": 692,
+    "nonce": "bcce7221-e59b-4fea-826f-91be257eab19",
+    "pidDead": true,
+    "persistedEndpointKind": "unix",
+    "endpointAbsent": true,
+    "authenticatedPingError": "ENOENT"
+  },
+  "health": {
+    "healthy": true,
+    "version": "1.18.4"
+  },
+  "after": {
+    "pid": 743,
+    "nonce": "f605a639-eb96-40a3-9897-39ff96bee275",
+    "pidAlive": true,
+    "endpointSocket": true,
+    "authRotated": true,
+    "authenticatedPingMatchesOwner": true,
+    "staleAuthRejected": true,
+    "authenticatedToolCallSucceeded": true
+  },
+  "harness": {
+    "surface": "OpenCode serve HTTP prompt -> lsp MCP stdio proxy -> authenticated daemon",
+    "tool": "lsp_status",
+    "status": "completed",
+    "output": "Configured LSP servers: 42\nInstalled LSP servers: 0\n\n- typescript: missing; source=builtin; extensions=.ts, .tsx, .js, .jsx, .mjs, .cjs, .mts, .cts\n- deno: missing; source=builtin; extensions=.ts, .tsx, .js, .jsx, .mjs\n- vue: missing; source=builtin; extensions=.vue\n- eslint: missing; source=builtin; extensions=.ts, .tsx, .js, .jsx, .mjs, .cjs, .mts, .cts, .vue\n- oxlint: missing; source=builtin; extensions=.ts, .tsx, .js, .jsx, .mjs, .cjs, .mts, .cts, .vue, .astro, .svelte\n- biome: missing; source=builtin; extensions=.ts, .tsx, .js, .jsx, .mjs, .cjs, .mts, .cts, .json, .jsonc, .vue, .astro, .svelte, .css, .graphql, .gql, .html\n- gopls: missing; source=builtin; extensions=.go\n- ruby-lsp: missing; source=builtin; extensions=.rb, .rake, .gemspec, .ru\n- basedpyright: missing; source=builtin; extensions=.py, .pyi\n- pyright: missing; source=builtin; extensions=.py, .pyi\n- ty: missing; source=builtin; extensions=.py, .pyi\n- ruff: missing; source=builtin; extensions=.py, .pyi\n- elixir-ls: missing; source=builtin; extensions=.ex, .exs\n- zls: missing; source=builtin; extensions=.zig, .zon\n- csharp: missing; source=builtin; extensions=.cs\n- fsharp: missing; source=builtin; extensions=.fs, .fsi, .fsx, .fsscript\n- sourcekit-lsp: missing; source=builtin; extensions=.swift, .m, .mm\n- rust: missing; source=builtin; extensions=.rs\n- clangd: missing; source=builtin; extensions=.c, .cpp, .cc, .cxx, .c++, .h, .hpp, .hh, .hxx, .h++\n- svelte: missing; source=builtin; extensions=.svelte\n- astro: missing; source=builtin; extensions=.astro\n- bash: missing; source=builtin; extensions=.sh, .bash, .zsh, .ksh\n- bash-ls: missing; source=builtin; extensions=.sh, .bash, .zsh, .ksh\n- jdtls: missing; source=builtin; extensions=.java\n- yaml-ls: missing; source=builtin; extensions=.yaml, .yml\n- lua-ls: missing; source=builtin; extensions=.lua\n- php: missing; source=builtin; extensions=.php\n- dart: missing; source=builtin; extensions=.dart\n- terraform: missing; source=builtin; extensions=.tf, .tfvars\n- terraform-ls: missing; source=builtin; extensions=.tf, .tfvars\n- prisma: missing; source=builtin; extensions=.prisma\n- ocaml-lsp: missing; source=builtin; extensions=.ml, .mli\n- texlab: missing; source=builtin; extensions=.tex, .bib\n- dockerfile: missing; source=builtin; extensions=.dockerfile\n- gleam: missing; source=builtin; extensions=.gleam\n- clojure-lsp: missing; source=builtin; extensions=.clj, .cljs, .cljc, .edn\n- nixd: missing; source=builtin; extensions=.nix\n- tinymist: missing; source=builtin; extensions=.typ, .typc\n- haskell-language-server: missing; source=builtin; extensions=.hs, .lhs\n- kotlin-ls: missing; source=builtin; extensions=.kt, .kts\n- julials: missing; source=builtin; extensions=.jl\n- razor: missing; source=builtin; extensions=.razor, .cshtml\n\nActive LSP clients: 0",
+    "modelCalls": 2,
+    "externalModelCalls": 0
+  },
+  "cleanup": {
+    "opencodeExited": true,
+    "daemonMetadataRemoved": true,
+    "providerClosed": true,
+    "sandboxRemoved": true
+  },
+  "result": "PASS",
+  "captureId": "pr7855-vanished-endpoint-20260908T150355Z",
+  "container": {
+    "image": "omo-qa:latest",
+    "imageId": "sha256:e40c321a338bacdc02dd643f1b968570b2f5522509c46523b862d05e0bed5ab2",
+    "platform": "linux/arm64",
+    "mountDestinations": [
+      "/repo"
+    ],
+    "hostConfigurationMounted": false,
+    "hostDatabaseMounted": false,
+    "removedAfterCapture": true
+  }
+}
