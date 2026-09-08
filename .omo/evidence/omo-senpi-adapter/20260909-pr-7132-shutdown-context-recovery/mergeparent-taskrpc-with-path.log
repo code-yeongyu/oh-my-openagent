@@ -1,0 +1,23 @@
+bun test v1.4.1 (4661e494f)
+
+packages\omo-senpi\scripts\qa\task-rpc-e2e.windows.test.ts:
+WINDOWS_TASK_RPC_E2E {"result":"FAIL","checks":[{"check":"real_credentials_untouched_and_caller_env_ignored","verdict":"PASS","facts":{"realCredentialsUntouched":true,"providedAgentDir":"IGNORED","sandboxAgentDir":"C:\\Users\\dajiaohuang\\AppData\\Local\\Temp\\omo-senpi-qa-lc3N3g\\agent","credentialFiles":["auth.json","models.json","settings.json","trust.json"]}},{"check":"scenario_a_parent_persisted_records","verdict":"FAIL","reason":"scenario A parent exited status=1 signal=none without persisting any task record","facts":{"status":1,"signal":null,"stdoutEventCount":0,"stderrExcerpt":"omo-senpi ulw-loop inactive; omo binary not found undefined\nomo-senpi ast-grep skipped: staged MCP runtime is missing {\n  component: 'ast-grep',\n  entry: 'D:\\\\repo\\\\repostew\\\\oh-my-openagent-7132-mergeparentcheck-20260909\\\\packages\\\\omo-senpi\\\\plugin\\\\runtime\\\\ast-grep-mcp\\\\cli.js'\n}\nnpm error code ENOVERSIONS\nnpm error No versions available for test-pkg\nnpm error A complete log of this run can be"}}],"realCredentialsUntouched":true,"wholeDirDigestStable":true,"leakedPids":0,"providedAgentDir":"IGNORED","sandboxAgentDir":"C:\\Users\\dajiaohuang\\AppData\\Local\\Temp\\omo-senpi-qa-lc3N3g\\agent","sandboxCwd":"C:\\Users\\dajiaohuang\\AppData\\Local\\Temp\\omo-senpi-qa-lc3N3g\\project","wiringFixed":false,"productGap":"execution_mode:'process' did not reach the rpc runner - the process slot still aliases the in-process runner. Fix engine.ts runners.process to createRpcManagedRunner(new RpcProcessRunner())."}
+156 |     const spawnProof = check(payload, "spawn_process_pid_and_session_jsonl")
+157 |     const leakProof = check(payload, "no_leaked_rpc_child_pids")
+158 | 
+159 |     // then
+160 |     console.log(`WINDOWS_TASK_RPC_E2E ${JSON.stringify(payload)}`)
+161 |     expect(payload.wiringFixed).toBe(true)
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (D:\repo\repostew\oh-my-openagent-7132-mergeparentcheck-20260909\packages\omo-senpi\scripts\qa\task-rpc-e2e.windows.test.ts:161:33)
+(fail) #given the production task driver #when process mode runs on Windows #then it reaches a real RPC child [11718.24ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [13.24s]
