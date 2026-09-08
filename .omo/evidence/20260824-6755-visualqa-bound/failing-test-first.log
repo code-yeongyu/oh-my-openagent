@@ -1,0 +1,71 @@
+bun test v1.3.14 (0d9b296a)
+
+tests/visual-qa-review-budget-contract.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+26 | 		try {
+27 | 			contract = readJsonContract(skill, "visual-qa-review-budget-contract")
+28 | 		} catch (error) {
+29 | 			contract = {}
+30 | 			test("#then the machine-consumed budget sentinel exists", () => {
+31 | 				throw error
+               ^
+error: missing visual-qa-review-budget-contract
+      at <anonymous> (/home/viprix/projects/oom-wt-6755/tests/visual-qa-review-budget-contract.test.ts:31:11)
+(fail) #given the visual-qa fresh-review completion loop > #when SKILL.md declares its review budget contract > #then the machine-consumed budget sentinel exists [13.34ms]
+32 | 			})
+33 | 		}
+34 | 
+35 | 		test("#then the maximum review count is finite per surface risk", () => {
+36 | 			const maxReviewRounds = contract.max_review_rounds as Record<string, unknown>
+37 | 			expect(Number.isInteger(maxReviewRounds.low_risk_surface)).toBe(true)
+                                ^
+TypeError: undefined is not an object (evaluating 'maxReviewRounds.low_risk_surface')
+      at <anonymous> (/home/viprix/projects/oom-wt-6755/tests/visual-qa-review-budget-contract.test.ts:37:28)
+(fail) #given the visual-qa fresh-review completion loop > #when SKILL.md declares its review budget contract > #then the maximum review count is finite per surface risk [0.52ms]
+41 | 			expect(maxReviewRounds.normal_product_surface as number).toBeLessThanOrEqual(3)
+42 | 			expect(contract.budget_override).toBe("explicit_user_request_only")
+43 | 		})
+44 | 
+45 | 		test("#then non-blocking findings never schedule a new reviewer", () => {
+46 | 			expect(contract.non_blocking_finding_disposition).toBe("note_no_new_reviewer")
+                                                          ^
+error: expect(received).toBe(expected)
+
+Expected: "note_no_new_reviewer"
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6755/tests/visual-qa-review-budget-contract.test.ts:46:54)
+(fail) #given the visual-qa fresh-review completion loop > #when SKILL.md declares its review budget contract > #then non-blocking findings never schedule a new reviewer [0.23ms]
+45 | 		test("#then non-blocking findings never schedule a new reviewer", () => {
+46 | 			expect(contract.non_blocking_finding_disposition).toBe("note_no_new_reviewer")
+47 | 		})
+48 | 
+49 | 		test("#then a blocker fixed inside the budget earns a focused fresh review", () => {
+50 | 			expect(contract.blocker_fix_re_review).toBe("focused_fresh_reviewer_within_budget")
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: "focused_fresh_reviewer_within_budget"
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6755/tests/visual-qa-review-budget-contract.test.ts:50:43)
+(fail) #given the visual-qa fresh-review completion loop > #when SKILL.md declares its review budget contract > #then a blocker fixed inside the budget earns a focused fresh review [0.28ms]
+49 | 		test("#then a blocker fixed inside the budget earns a focused fresh review", () => {
+50 | 			expect(contract.blocker_fix_re_review).toBe("focused_fresh_reviewer_within_budget")
+51 | 		})
+52 | 
+53 | 		test("#then exhausting the budget returns needs-human-review instead of dispatching again", () => {
+54 | 			expect(contract.on_budget_exhausted).toBe("needs-human-review")
+                                             ^
+error: expect(received).toBe(expected)
+
+Expected: "needs-human-review"
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6755/tests/visual-qa-review-budget-contract.test.ts:54:41)
+(fail) #given the visual-qa fresh-review completion loop > #when SKILL.md declares its review budget contract > #then exhausting the budget returns needs-human-review instead of dispatching again [0.22ms]
+
+ 0 pass
+ 5 fail
+ 3 expect() calls
+Ran 5 tests across 1 file. [15.45s]
