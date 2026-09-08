@@ -1,4 +1,10 @@
 export const TOOL_ARGS_TRUNCATE_LIMIT = 300
+/**
+ * Tool results are the dominant term in transcript growth: a single `read` of a large file used
+ * to enter the journal verbatim and then replay in every reflection payload. Capture keeps a
+ * head+tail window so both the invocation shape and the outcome survive.
+ */
+export const TOOL_RESULT_TRUNCATE_LIMIT = 4096
 export const REDACTED_REASONING_TEXT = "[REDACTED REASONING]"
 
 export type TextTranscriptEntry = {
@@ -59,6 +65,15 @@ function textRow(
   }
 }
 
+export function truncateToolResult(text: string, limit = TOOL_RESULT_TRUNCATE_LIMIT): string {
+  if (text.length <= limit) return text
+  const headLength = Math.ceil((limit * 3) / 4)
+  const tailLength = limit - headLength
+  const dropped = text.length - limit
+  const tail = tailLength > 0 ? text.slice(text.length - tailLength) : ""
+  return `${text.slice(0, headLength)}\n…[truncated ${dropped} chars]…\n${tail}`
+}
+
 export function projectTranscriptEntries(
   message: TranscriptProjection,
   capturedAt: string,
@@ -111,7 +126,7 @@ export function projectTranscriptEntries(
       kind: "tool_call",
       name: toolCall.name,
       argsText: toolCall.argsText?.slice(0, TOOL_ARGS_TRUNCATE_LIMIT),
-      resultText: toolCall.resultText,
+      resultText: toolCall.resultText === undefined ? undefined : truncateToolResult(toolCall.resultText),
       resultOk: toolCall.resultOk,
       captured_at: capturedAt,
       source_line_id: `${message.messageId}:tool:${toolCall.callId}`,

@@ -3,6 +3,7 @@ import { appendFile, mkdir, readFile, rename, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
+  REFLECTION_SNAPSHOT_MAX_BYTES,
   captureCursorSnapshot,
   deriveState,
   finalizeCursor,
@@ -24,6 +25,8 @@ export type TranscriptJournalOptions = {
   readonly journalDir: string
   readonly now?: () => Date
   readonly lock?: JournalLock
+  /** Byte budget for one reflection payload; the remainder is carried into later captures. */
+  readonly snapshotMaxBytes?: number
 }
 
 export type AppendResult = { readonly appended: number; readonly skipped: number }
@@ -68,7 +71,9 @@ function parseState(raw: string | null): ReflectionTranscriptState {
     if (!parsed || typeof parsed !== "object") return initialReflectionState()
     const state = parsed as Record<string, unknown>
     const reflectedThroughByteOffset = optionalNonNegativeInteger(state.reflected_through_byte_offset)
+    const unreflectedBytes = optionalNonNegativeInteger(state.unreflected_bytes)
     return {
+      ...(unreflectedBytes === undefined ? {} : { unreflected_bytes: unreflectedBytes }),
       schema_version: "v3_assistant_steps",
       reflected_through_message_id: optionalString(state.reflected_through_message_id),
       ...(reflectedThroughByteOffset === undefined ? {} : { reflected_through_byte_offset: reflectedThroughByteOffset }),
@@ -93,8 +98,10 @@ export class TranscriptJournal {
   readonly lockPath: string
   private readonly now: () => Date
   private readonly lock: JournalLock
+  private readonly snapshotMaxBytes: number
 
   constructor(readonly options: TranscriptJournalOptions) {
+    this.snapshotMaxBytes = options.snapshotMaxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES
     this.transcriptPath = join(options.journalDir, "transcript.jsonl")
     this.statePath = join(options.journalDir, "state.json")
     this.lockPath = join(options.journalDir, "state.lock")
@@ -136,11 +143,16 @@ export class TranscriptJournal {
     })
   }
 
-  async captureReflectionSnapshot(signal?: AbortSignal): Promise<ReflectionSnapshot | null> {
+  async captureReflectionSnapshot(
+    signal?: AbortSignal,
+    options: { readonly maxBytes?: number } = {},
+  ): Promise<ReflectionSnapshot | null> {
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
-      const snapshot = captureCursorSnapshot(entries, state)
+      const snapshot = captureCursorSnapshot(entries, state, {
+        maxBytes: options.maxBytes ?? this.snapshotMaxBytes,
+      })
       if (snapshot === null) return null
       signal?.throwIfAborted()
       await this.writeStateUnlocked(

@@ -1,0 +1,3 @@
+npm payload containment OK (1259 packed paths, 0 offenders)
+(node:24224) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)

@@ -25,6 +25,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import ptyFixture from "./release-binary-pty-fixture.json"
+import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
 import { parseBuildInfo, type OmoBuildInfo } from "../packages/omo-native/build-info"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -634,11 +635,13 @@ export async function buildReleaseBinary(
           "build",
           "--compile",
           `--target=${target.bunTarget}`,
+          "--minify-whitespace",
           "--compile-autoload-package-json",
           "--no-compile-autoload-dotenv",
           "--no-compile-autoload-bunfig",
           `--asset=${stageDir}`,
           compileEntry,
+          ...senpiWorkerCompileArgs(repoRoot),
           "--outfile",
           binaryPath,
         ],

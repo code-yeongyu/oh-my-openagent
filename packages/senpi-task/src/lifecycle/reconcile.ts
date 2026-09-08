@@ -113,26 +113,26 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
   if (TERMINAL_STATUSES.has(record.status)) return reconcileLegacyTerminal(context, record)
 
   if (record.execution_mode !== "process") {
-    await markLost(context, record, "in-process task from a previous process cannot be reattached")
+    await markLost(context, record.task_id, "in-process task from a previous process cannot be reattached")
     return { task_id: record.task_id, kind: "lost", reason: "previous-process in-process" }
   }
 
   const pid = record.pid
   if (pid === undefined) {
-    await markLost(context, record, "rpc task had no recorded pid")
+    await markLost(context, record.task_id, "rpc task had no recorded pid")
     return { task_id: record.task_id, kind: "lost", reason: "no recorded pid" }
   }
 
   const alive = context.signaller.isAlive(pid)
   if (context.config.reattach_on_reconcile === false) {
     if (!alive) {
-      await markLost(context, record, `rpc pid=${pid} is dead; mapping exit facts only`)
+      await markLost(context, record.task_id, `rpc pid=${pid} is dead; mapping exit facts only`)
       return { task_id: record.task_id, kind: "lost", reason: `dead pid ${pid}` }
     }
     const heartbeat = heartbeatState(context, record)
     await markLost(
       context,
-      record,
+      record.task_id,
       `rpc orphan pid=${pid} session=${record.child_session_id ?? "unknown"} heartbeat=${heartbeat}; reattach disabled, terminating orphan`,
     )
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
@@ -141,19 +141,19 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
   const sessionPath = newestSessionPath(context, record.task_id)
   if (!alive) {
     if (sessionPath !== undefined) return reattachLegacyRecord(context, record, sessionPath)
-    await markLost(context, record, `rpc pid=${pid} is dead; mapping exit facts only`)
+    await markLost(context, record.task_id, `rpc pid=${pid} is dead; mapping exit facts only`)
     return { task_id: record.task_id, kind: "lost", reason: `dead pid ${pid}` }
   }
 
   const heartbeat = heartbeatState(context, record)
   if (!await terminateClaimedPid(context, record)) {
-    await markLost(context, record, `rpc orphan pid=${pid} could not be terminated`)
+    await markLost(context, record.task_id, `rpc orphan pid=${pid} could not be terminated`)
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
   }
   if (sessionPath === undefined) {
     await markLost(
       context,
-      record,
+      record.task_id,
       `rpc orphan pid=${pid} session=${record.child_session_id ?? "unknown"} heartbeat=${heartbeat}; terminating before reattach`,
     )
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
@@ -185,7 +185,7 @@ async function reattachLegacyRecord(
 ): Promise<ReconcileOutcome> {
   const ports = context.reattachPorts ?? getLifecycleReattachPorts(context.store)
   if (ports === undefined) {
-    await markLost(context, record, "reattach ports unavailable")
+    await markLost(context, record.task_id, "reattach ports unavailable")
     return { task_id: record.task_id, kind: "lost", reason: "reattach ports unavailable" }
   }
 
@@ -200,7 +200,7 @@ async function reattachLegacyRecord(
   }
   if (!respawned.ok) {
     reservation.release()
-    await markLost(context, record, `reattach failed: ${respawned.reason}`)
+    await markLost(context, record.task_id, `reattach failed: ${respawned.reason}`)
     return { task_id: record.task_id, kind: "lost", reason: respawned.reason }
   }
   let reattached: Awaited<ReturnType<typeof ports.reattach>>
@@ -215,7 +215,7 @@ async function reattachLegacyRecord(
     if (reattached.kind === "already_attached") {
       return { task_id: record.task_id, kind: "resumed", reason: reattached.reason }
     }
-    await markLost(context, context.store.load(record.task_id) ?? record, reattached.reason)
+    await markLost(context, record.task_id, reattached.reason)
     return { task_id: record.task_id, kind: "lost", reason: reattached.reason }
   }
   context.store.appendEvent(record.task_id, { type: "reconcile_reattached", payload: { session_path: sessionPath } })
@@ -245,15 +245,21 @@ function heartbeatState(context: LifecycleContext, record: TaskRecord): "fresh" 
   return context.now() - Date.parse(record.updated_at) < HEARTBEAT_FRESH_MS ? "fresh" : "stale"
 }
 
-async function markLost(context: LifecycleContext, record: TaskRecord, message: string): Promise<void> {
-  const result = markRecordLostForReconciliation(record, {
-    timestamp: nowIso(context),
-    error_message: message,
-    updateReason: record.status === "lost",
+async function markLost(context: LifecycleContext, taskId: string, message: string): Promise<void> {
+  let applied = false
+  // Respawn can persist launch evidence before failing. Reduce the current record under its
+  // lock, never the candidate captured before process I/O or a failed reattachment.
+  const record = context.store.mutate(taskId, (fresh) => {
+    const result = markRecordLostForReconciliation(fresh, {
+      timestamp: nowIso(context),
+      error_message: message,
+      updateReason: fresh.status === "lost",
+    })
+    applied = result.applied
+    return result.record
   })
-  if (result.applied) {
-    context.store.replace(result.record)
-    context.store.appendEvent(record.task_id, { type: "reconcile_lost", payload: { reason: message } })
+  if (applied) {
+    context.store.appendEvent(taskId, { type: "reconcile_lost", payload: { reason: message } })
   }
-  if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
+  if (record?.residency_state === "resident") await destroyResidentTask(context, taskId, "reconcile_lost")
 }

@@ -8,9 +8,11 @@ import { ulwLoopCommand } from "../src/cli-commands.js";
 import { writePlan } from "../src/plan-io.js";
 import { validateQualityGate } from "../src/quality-gate.js";
 import { goal, plan } from "./fixtures/checkpoint-builders.js";
+import { CLI_TEST_SCOPE, CLI_TEST_SESSION_ID } from "./fixtures/cli-session.js";
 
 let repo: string;
 let output: string[];
+let originalOmoSessionId: string | undefined;
 
 beforeEach(async () => {
 	repo = await mkdtemp(join(tmpdir(), "ulw-template-"));
@@ -21,10 +23,14 @@ beforeEach(async () => {
 		return true;
 	});
 	delete process.env["OMO_AGENT_TOOLKIT_SURFACE"];
+	originalOmoSessionId = process.env["OMO_ULW_LOOP_SESSION_ID"];
+	process.env["OMO_ULW_LOOP_SESSION_ID"] = CLI_TEST_SESSION_ID;
 });
 
 afterEach(async () => {
 	vi.restoreAllMocks();
+	if (originalOmoSessionId === undefined) delete process.env["OMO_ULW_LOOP_SESSION_ID"];
+	else process.env["OMO_ULW_LOOP_SESSION_ID"] = originalOmoSessionId;
 	await rm(repo, { recursive: true, force: true });
 });
 
@@ -54,6 +60,7 @@ describe("checkpoint --print-template", () => {
 				activeGoalId: "G001",
 				codexObjective: "Exact objective from goals.json",
 			}),
+			CLI_TEST_SCOPE,
 		);
 		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
 		const result = await run(["--print-template", "--goal-id", "G001", "--json"]);
@@ -86,6 +93,7 @@ describe("checkpoint --print-template", () => {
 				activeGoalId: "G001",
 				codexObjective: "Exact objective from goals.json",
 			}),
+			CLI_TEST_SCOPE,
 		);
 		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
 		const result = await run(["--print-template", "--goal-id", "G001", "--json"]);
@@ -96,7 +104,7 @@ describe("checkpoint --print-template", () => {
 		expect(result["codexGoalTemplate"]).toEqual({
 			goal: { objective: "Exact objective from goals.json", status: "complete" },
 		});
-		expect(result["attemptDir"]).toBe(".omo/evidence/ulw/session/G001/a2");
+		expect(result["attemptDir"]).toBe(".omo/evidence/ulw/cli-test/G001/a2");
 	});
 
 	it("#given an active v2 plan #when printed without any goal id #then targets the active goal", async () => {
@@ -107,12 +115,13 @@ describe("checkpoint --print-template", () => {
 				activeGoalId: "G001",
 				codexObjective: "Exact objective from goals.json",
 			}),
+			CLI_TEST_SCOPE,
 		);
 		process.env["OMO_AGENT_TOOLKIT_SURFACE"] = "omo-senpi";
 		const result = await run(["--print-template", "--json"]);
 		const gate = result["qualityGateTemplate"] as Record<string, unknown>;
 		expect(Object.keys(gate)).toEqual(["manualQa", "gateReview", "iteration", "criteriaCoverage"]);
-		expect(result["attemptDir"]).toBe(".omo/evidence/ulw/session/G001/a1");
+		expect(result["attemptDir"]).toBe(".omo/evidence/ulw/cli-test/G001/a1");
 	});
 
 	it("#given two goals #when printed with an explicit non-active goal id #then targets that goal's attempt dir", async () => {
@@ -123,13 +132,14 @@ describe("checkpoint --print-template", () => {
 				activeGoalId: "G001",
 				codexObjective: "Exact objective from goals.json",
 			}),
+			CLI_TEST_SCOPE,
 		);
 		const result = await run(["--print-template", "--goal-id", "G002", "--json"]);
-		expect(result["attemptDir"]).toBe(".omo/evidence/ulw/session/G002/a3");
+		expect(result["attemptDir"]).toBe(".omo/evidence/ulw/cli-test/G002/a3");
 	});
 
 	it("#given a v1 plan #when printed without status #then exits successfully and gives v1 guidance", async () => {
-		await writePlan(repo, plan([goal({ id: "G001" })]));
+		await writePlan(repo, plan([goal({ id: "G001" })]), CLI_TEST_SCOPE);
 		const result = await run(["--print-template", "--goal-id", "G001", "--json"]);
 		expect(result["guidance"]).toContain("evidence-layout v1");
 		expect(result).not.toHaveProperty("attemptDir");

@@ -1,6 +1,43 @@
 import { test, expect } from "@playwright/test"
 
 test.describe("Hero Stats", () => {
+  test("renders the GitHub description as the hero tagline", async ({ page, request }) => {
+    // given
+    const stats: unknown = await (await request.get("/api/stats")).json()
+    const description =
+      typeof stats === "object" && stats !== null && "description" in stats
+        ? stats.description
+        : undefined
+    expect(typeof description).toBe("string")
+
+    // when
+    await page.goto("/")
+
+    // then
+    const tagline = page.getByTestId("hero-tagline")
+    await expect(tagline).toBeVisible()
+    await expect(tagline).toHaveText(/\S/)
+    await expect(tagline).toHaveText(String(description))
+  })
+
+  test("renders the agent count in the proof strip", async ({ page }) => {
+    // given / when
+    await page.goto("/")
+
+    // then
+    await expect(page.getByTestId("proof-strip").getByText(/^11 agents$/)).toBeVisible()
+  })
+
+  test("serves a generated Open Graph image", async ({ request }) => {
+    // given / when
+    const response = await request.get("/opengraph-image")
+
+    // then
+    expect(response.status()).toBe(200)
+    expect(response.headers()["content-type"]).toContain("image/png")
+    expect((await response.body()).length).toBeGreaterThan(10_000)
+  })
+
   test("displays GitHub star count", async ({ page }) => {
     // given
     await page.goto("/")

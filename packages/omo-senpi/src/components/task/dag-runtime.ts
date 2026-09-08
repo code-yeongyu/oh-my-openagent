@@ -8,14 +8,17 @@ import {
 } from "@oh-my-opencode/senpi-task"
 import {
   createDagFileStore,
+  createDagLeaseWatch,
   createDagManager,
   createDagRecovery,
   createDagWaitSurface,
   type DagDefinition,
   type DagFileStore,
+  type DagLeaseWatchOptions,
   type DagNodeSpawnPolicy,
   type DagManager,
   type DagNodeId,
+  type DagRecoveryOutcome,
   type DagRunEvent,
   type DagRunId,
   type DagRunRecordV1,
@@ -26,6 +29,7 @@ import {
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
+import { resolveDagForkSource } from "./dag-fork-source"
 import { createDagRpcBridge, type DagBridgeTimers } from "./dag-rpc-bridge"
 import { registerDagRpcHandlers } from "./dag-rpc-handlers"
 import { createDagStatusUi, type DagStatusUiTimers } from "./dag-status-ui"
@@ -63,7 +67,7 @@ export interface DagRuntime {
   /** Applies an edited definition to the SAME run and resumes it under a NEW scheduler. */
   readonly amend: (runId: DagRunId, definition: DagDefinition) => Promise<DagRunSnapshot>
   readonly taskRecord: (taskId: string) => TaskRecord | undefined
-  attach(): Promise<void>
+  attach(event?: unknown): Promise<void>
   sync(): void
   detach(): void
   pauseForShutdown(): void
@@ -78,6 +82,13 @@ export interface DagRuntimeDeps {
   readonly coordinator?: IdleInjectionCoordinator
   readonly bridgeTimers?: DagBridgeTimers
   readonly statusUiTimers?: DagStatusUiTimers
+  /** Liveness probe + timers for the paused-run lease watch; production uses signal-0 and unref'd timers. */
+  readonly leaseWatch?: DagLeaseWatchOptions
+}
+
+type RecoveryScope = {
+  readonly sessionId: string
+  readonly forkSourceSessionId?: string
 }
 
 export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
@@ -95,6 +106,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const stoppedAdmissions = new Set<DagRunId>()
   const recoveryTaskSubscriptions = new Map<string, () => void>()
   const activityTaskSubscriptions = new Map<string, () => void>()
+  const leaseWatch = createDagLeaseWatch(deps.leaseWatch ?? {})
+  const leaseWatches = new Map<DagRunId, () => void>()
   let mutationListener = (): void => undefined
   let durableEventListener = (_event: DagRunEvent): void => undefined
   let activeSessionId: string | undefined
@@ -285,6 +298,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     })),
     runSnapshots: () => snapshotsForActiveSession(manager, deps.engine),
     parentSessionId: () => deps.engine.runtime.sessionId(),
+    logger: deps.logger,
     ...(dagSettings?.heartbeat_ms === undefined ? {} : { heartbeatMs: dagSettings.heartbeat_ms }),
     ...(deps.bridgeTimers === undefined ? {} : { timers: deps.bridgeTimers }),
   })
@@ -409,6 +423,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const recovery = createDagRecovery({
     store,
     taskManager,
+    ...(deps.leaseWatch?.isProcessAlive === undefined ? {} : { isProcessAlive: deps.leaseWatch.isProcessAlive }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     stopAdmission: (runId) => stoppedAdmissions.add(runId),
@@ -427,6 +442,49 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     statusUi.scheduleSync()
   }
 
+  const cancelLeaseWatches = (): void => {
+    for (const cancel of leaseWatches.values()) cancel()
+    leaseWatches.clear()
+    leaseWatch.dispose()
+  }
+
+  // A run paused for the predecessor host's shutdown is often still "held" when this host resumes
+  // the session: the old process is draining while the new one starts. Recovery runs once per
+  // session_start, so without this watch that skip was final and the run stayed paused forever.
+  const watchLiveLease = (scope: RecoveryScope, outcome: DagRecoveryOutcome & { readonly holderPid: number }): void => {
+    if (leaseWatches.has(outcome.runId)) return
+    deps.logger.warn("omo-senpi DAG run stays paused while its previous host exits; resuming once that pid is gone", {
+      runId: outcome.runId,
+      holderPid: outcome.holderPid,
+      sessionId: scope.sessionId,
+    })
+    leaseWatches.set(outcome.runId, leaseWatch.watch(outcome.holderPid, () => {
+      leaseWatches.delete(outcome.runId)
+      if (activeSessionId !== scope.sessionId) return
+      void recoverPausedRuns(scope).then(mutationListener).catch((error: unknown) => {
+        deps.logger.error("omo-senpi DAG deferred recovery failed", {
+          runId: outcome.runId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+    }))
+  }
+
+  const recoverPausedRuns = async (scope: RecoveryScope): Promise<void> => {
+    let outcomes: readonly DagRecoveryOutcome[]
+    try {
+      outcomes = await recovery.resumePausedRuns(scope.sessionId, scope.forkSourceSessionId)
+    } finally {
+      clearSubscriptions(recoveryTaskSubscriptions)
+    }
+    for (const outcome of outcomes) {
+      if (outcome.kind === "skipped" && outcome.reason === "live_lease" && outcome.holderPid !== undefined) {
+        watchLiveLease(scope, { ...outcome, holderPid: outcome.holderPid })
+      }
+    }
+    for (const run of manager.list(scope.sessionId)) ensureScheduled(run.runId, scope.sessionId)
+  }
+
   const runtime: DagRuntime = {
     manager,
     wait,
@@ -435,18 +493,27 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     send,
     amend,
     taskRecord: (taskId) => deps.engine.manager.get(taskId),
-    async attach() {
+    async attach(event) {
       activeSessionId = deps.engine.runtime.sessionId()
       durableEventListener = onEvent
       wake?.onSessionStart(activeSessionId)
       const sessionId = activeSessionId
       if (sessionId !== undefined) {
-        try {
-          await recovery.resumePausedRuns(sessionId)
-        } finally {
-          clearSubscriptions(recoveryTaskSubscriptions)
+        const forkSource = await resolveDagForkSource({
+          event,
+          currentSessionId: sessionId,
+          currentSessionFile: deps.engine.runtime.sessionFile(),
+        })
+        if (forkSource.kind === "own-only" && forkSource.diagnostic !== undefined) {
+          deps.logger.warn("omo-senpi DAG fork source rejected; recovering own runs only", {
+            sessionId,
+            reason: forkSource.diagnostic,
+          })
         }
-        for (const run of manager.list(sessionId)) ensureScheduled(run.runId, sessionId)
+        await recoverPausedRuns({
+          sessionId,
+          ...(forkSource.kind === "source" ? { forkSourceSessionId: forkSource.sessionId } : {}),
+        })
       }
       // #7316 defect 1: the bridge attaches AFTER recovery so its first emitted snapshot reflects
       // the recovered runs. Attaching first pushed a pre-recovery paused projection, and wholesale
@@ -468,6 +535,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
         owned.scheduler.cancel(runId, "runtime detached"),
       )
       void Promise.allSettled(stopping).then(() => removeListeners(runListeners, detachedListeners))
+      cancelLeaseWatches()
       clearSubscriptions(recoveryTaskSubscriptions)
       clearSubscriptions(activityTaskSubscriptions)
       bridge.detach()
@@ -475,11 +543,13 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       statusUi.dispose()
     },
     pauseForShutdown() {
+      cancelLeaseWatches()
       const sessionId = activeSessionId ?? deps.engine.runtime.sessionId()
       if (sessionId !== undefined) recovery.pauseRunsForShutdown(sessionId)
     },
     dispose() {
       stopObservingSchedulers()
+      cancelLeaseWatches()
       bridge.dispose()
       activeSessionId = undefined
       statusUi.dispose()

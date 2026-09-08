@@ -179,6 +179,17 @@ export function readRunnerArgv(dir: string): string[] {
   return JSON.parse(readFileSync(join(dir, "argv.json"), "utf8")) as string[]
 }
 
+export function createTempEnvEchoScript(): { dir: string; script: string; cleanup: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), "omo-senpi-ulw-loop-env-echo-"))
+  mkdirSync(join(dir, ".omo", "ulw-loop"), { recursive: true })
+  const script = join(dir, "env-echo.js")
+  writeFileSync(
+    script,
+    'process.stdout.write(JSON.stringify({ bunBeBun: process.env.BUN_BE_BUN ?? null }) + "\\n")\n',
+  )
+  return { dir, script, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
 export function createTempStderrFloodScript(
   byteCount: number,
   stdout = activeStatus(),

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  FORK_WINDOW_FIT_RATIO,
   MEMORY_WORKLOAD_PROFILES,
   chooseMemoryLaunchRoute,
   estimateForkCost,
@@ -97,6 +98,70 @@ describe("chooseMemoryLaunchRoute", () => {
 
       // then
       expect(decision.route).toBe("quick")
+    })
+  })
+
+  describe("#given a session model whose context window cannot hold the fork", () => {
+    // Fork seeds the child with the parent's whole context (`--fork <parentSessionFile>`), so at
+    // the parent's compaction threshold a cheaper fork still dies on the provider's window.
+    test("#when fork is cheaper but the inherited context does not fit #then quick wins with window_unfit", () => {
+      const decision = chooseMemoryLaunchRoute({
+        surface: "reflection",
+        quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
+        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 200_000 },
+        parentContextTokens: 190_000,
+        payloadTokens: 32_000,
+        turns: 3,
+        cacheHit: true,
+      })
+      expect(decision.route).toBe("quick")
+      expect(decision.model).toBe("kimi/kimi-for-coding-highspeed")
+      expect(decision.reason).toBe("window_unfit")
+    })
+
+    test("#when the payload plus parent fits inside the fit ratio #then the cost comparison still decides", () => {
+      const decision = chooseMemoryLaunchRoute({
+        surface: "reflection",
+        quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
+        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 1_000_000 },
+        parentContextTokens: PARENT_P50,
+        payloadTokens: 32_000,
+        turns: 3,
+        cacheHit: true,
+      })
+      expect(decision.route).toBe("fork")
+      expect(decision.reason).toBe("cheaper")
+    })
+
+    test("#when the session context window is unknown #then routing is unchanged", () => {
+      const decision = chooseMemoryLaunchRoute({
+        surface: "reflection",
+        quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
+        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
+        parentContextTokens: 190_000,
+        payloadTokens: 32_000,
+        turns: 3,
+        cacheHit: true,
+      })
+      expect(decision.route).toBe("fork")
+      expect(decision.reason).toBe("cheaper")
+    })
+
+    test("#when only the fork candidate exists #then it stays the only candidate regardless of fit", () => {
+      const decision = chooseMemoryLaunchRoute({
+        surface: "reflection",
+        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 8_192 },
+        parentContextTokens: 190_000,
+        payloadTokens: 32_000,
+        turns: 3,
+        cacheHit: true,
+      })
+      expect(decision.route).toBe("fork")
+      expect(decision.reason).toBe("only_candidate")
+    })
+
+    test("#given the exported fit ratio #then it leaves headroom below the full window", () => {
+      expect(FORK_WINDOW_FIT_RATIO).toBe(0.8)
     })
   })
 

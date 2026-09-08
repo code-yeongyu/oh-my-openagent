@@ -69,6 +69,7 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "start":
       return {
         ...record,
+        started_at: transition.timestamp,
         ...(transition.pid === undefined ? {} : { pid: transition.pid }),
         ...(transition.child_session_id === undefined ? {} : { child_session_id: transition.child_session_id }),
       }

@@ -146,8 +146,9 @@ import { dirname as dirname3, join as join4 } from "node:path";
 // packages/omo-senpi/src/install/senpi-settings.ts
 import { constants } from "node:fs";
 import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname as dirname2, join as join3, resolve as resolve3 } from "node:path";
+import { basename, dirname as dirname2, join as join3, resolve as resolve3 } from "node:path";
 var OMO_SENPI_PACKAGE_NAME = "@code-yeongyu/omo-senpi";
+var GENERATED_PLUGIN_BASENAME = /^omo-senpi-cli-plugin-[A-Za-z0-9]{6}$/;
 var LEGACY_BUILTIN_SHADOW_PACKAGES = [
   join3("packages", "pi-goal"),
   join3("packages", "pi-webfetch")
@@ -188,7 +189,11 @@ async function removeSupersededOmoPackages(packages, currentPluginPath, agentDir
     const packagePath = resolve3(agentDir, entry);
     if (packagePath === currentPath)
       return currentPath;
-    return await readPackageName(packagePath) === OMO_SENPI_PACKAGE_NAME ? undefined : entry;
+    if (await readPackageName(packagePath) === OMO_SENPI_PACKAGE_NAME)
+      return;
+    if (GENERATED_PLUGIN_BASENAME.test(basename(entry)) && !await fileExists(packagePath))
+      return;
+    return entry;
   }));
   return entries.filter((entry) => entry !== undefined);
 }
@@ -231,7 +236,14 @@ async function readPackageName(packagePath) {
       return;
     throw error;
   }
-  const parsed = JSON.parse(raw);
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    if (error instanceof SyntaxError)
+      return;
+    throw error;
+  }
   return isRecord(parsed) && typeof parsed.name === "string" ? parsed.name : undefined;
 }
 async function fileExists(path) {
@@ -389,9 +401,10 @@ async function runSenpiInstaller(options = {}) {
     packages.push(context.pluginPath);
   settings.packages = packages;
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
-  installLocalLauncher({
+  const launcherPath = installLocalLauncher({
     pluginPath: context.pluginPath,
-    senpiCliPath: join5(context.repoRoot, "packages", "coding-agent", "dist", "cli.js")
+    senpiCliPath: join5(context.repoRoot, "packages", "coding-agent", "dist", "cli.js"),
+    homeDir: context.homeDir
   });
   return {
     ok: true,
@@ -399,6 +412,7 @@ async function runSenpiInstaller(options = {}) {
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
+    launcherPath,
     changed: JSON.stringify(settings) !== before,
     backupPath
   };
@@ -411,13 +425,14 @@ async function runSenpiUninstaller(options = {}) {
   const nextPackages = packages.filter((entry) => entry !== context.pluginPath);
   settings.packages = nextPackages;
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
-  uninstallLocalLauncher();
+  uninstallLocalLauncher(context.homeDir);
   return {
     ok: true,
     action: "uninstall",
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
+    launcherPath: undefined,
     changed: JSON.stringify(settings) !== before,
     backupPath,
     removed: nextPackages.length !== packages.length
@@ -427,12 +442,14 @@ function resolveInstallContext(options) {
   const env = options.env ?? process.env;
   const allowBuild = options.pluginPath === undefined;
   const repoRoot = resolve4(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname4(fileURLToPath(import.meta.url))) : dirname4(resolve4(options.pluginPath))));
-  const agentDir = resolve4(options.agentDir ?? resolveAgentHome({ env, homeDir: env.HOME ?? homedir3() }));
+  const homeDir = options.homeDir ?? env.HOME ?? homedir3();
+  const agentDir = resolve4(options.agentDir ?? resolveAgentHome({ env, homeDir }));
   const pluginPath = resolve4(options.pluginPath ?? join5(repoRoot, "packages", "omo-senpi", "plugin"));
   return {
     env,
     repoRoot,
     agentDir,
+    homeDir,
     settingsPath: join5(agentDir, "settings.json"),
     pluginPath,
     platform: options.platform ?? process.platform,

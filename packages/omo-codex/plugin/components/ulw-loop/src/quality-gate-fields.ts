@@ -61,7 +61,10 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 export function section(value: unknown, field: string): Record<string, unknown> {
 	if (isRecord(value)) return value;
-	invalid(`Final quality gate is missing ${field} evidence.`, field);
+	invalid(
+		`Final quality gate is missing ${field} evidence (accepted input: a bare object with manualQa/gateReview/iteration/criteriaCoverage and optional codeReview, or the same object under a top-level "qualityGate" key).`,
+		field,
+	);
 	return {};
 }
 export function textField(value: unknown, field: string): string {

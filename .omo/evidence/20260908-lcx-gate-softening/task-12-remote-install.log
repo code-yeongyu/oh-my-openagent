@@ -1,0 +1,175 @@
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-6894330b/omo && bun install --frozen-lockfile
+EXIT: 1
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+fatal: not a git repository (or any of the parent directories): .git
+file:///private/tmp/lcx-t12-20260908-6894330b/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///private/tmp/lcx-t12-20260908-6894330b/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///private/tmp/lcx-t12-20260908-6894330b/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///private/tmp/lcx-t12-20260908-6894330b/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.7.0
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+
+STDERR:
+
+$ node postinstall.mjs
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-01659993/omo && bun install --frozen-lockfile
+EXIT: 1
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+fatal: not a git repository (or any of the parent directories): .git
+file:///private/tmp/lcx-t12-20260908-01659993/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///private/tmp/lcx-t12-20260908-01659993/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///private/tmp/lcx-t12-20260908-01659993/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///private/tmp/lcx-t12-20260908-01659993/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.7.0
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+
+STDERR:
+
+$ node postinstall.mjs
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-f6b2180e/omo && bun install --frozen-lockfile
+EXIT: 1
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+fatal: not a git repository (or any of the parent directories): .git
+file:///private/tmp/lcx-t12-20260908-f6b2180e/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///private/tmp/lcx-t12-20260908-f6b2180e/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///private/tmp/lcx-t12-20260908-f6b2180e/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///private/tmp/lcx-t12-20260908-f6b2180e/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.7.0
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+
+STDERR:
+
+$ node postinstall.mjs
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-8fafc772/omo && bun install --frozen-lockfile
+EXIT: 1
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+fatal: not a git repository (or any of the parent directories): .git
+file:///private/tmp/lcx-t12-20260908-8fafc772/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///private/tmp/lcx-t12-20260908-8fafc772/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///private/tmp/lcx-t12-20260908-8fafc772/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///private/tmp/lcx-t12-20260908-8fafc772/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.7.0
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+
+STDERR:
+
+$ node postinstall.mjs
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-2eff9a4d/omo && bun install --frozen-lockfile
+EXIT: 1
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+fatal: not a git repository (or any of the parent directories): .git
+file:///private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.7.0
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+
+STDERR:
+
+$ node postinstall.mjs
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
+

@@ -1,0 +1,182 @@
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-f6b2180e/omo && bun test ./packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts ./packages/omo-codex/plugin/test/aggregate-manifest.test.mjs ./packages/omo-codex/plugin/test/aggregate-hooks.test.mjs ./packages/omo-codex/plugin/test/hook-status-message.test.mjs
+EXIT: 1
+STDOUT:
+bun test v1.4.0 (34cbb9a40)
+
+STDERR:
+The following filters did not match any test files:
+ ./packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts ./packages/omo-codex/plugin/test/aggregate-manifest.test.mjs ./packages/omo-codex/plugin/test/aggregate-hooks.test.mjs ./packages/omo-codex/plugin/test/hook-status-message.test.mjs
+
+note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
+note: To treat the "./packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts" filter as a path, run "bun test ././packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts"
+
+Learn more about bun test: https://bun.com/docs/cli/test
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-8fafc772/omo && set +e; bun test ./packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts; a=$?; bun test ./packages/omo-codex/plugin/test/aggregate-manifest.test.mjs; b=$?; bun test ./packages/omo-codex/plugin/test/aggregate-hooks.test.mjs; c=$?; bun test ./packages/omo-codex/plugin/test/hook-status-message.test.mjs; d=$?; test $a -eq 0 -a $b -eq 0 -a $c -eq 0 -a $d -eq 0
+EXIT: 1
+STDOUT:
+bun test v1.4.0 (34cbb9a40)
+bun test v1.4.0 (34cbb9a40)
+bun test v1.4.0 (34cbb9a40)
+bun test v1.4.0 (34cbb9a40)
+
+STDERR:
+The following filters did not match any test files:
+ ./packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts
+
+note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
+note: To treat the "./packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts" filter as a path, run "bun test ././packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts"
+
+Learn more about bun test: https://bun.com/docs/cli/test
+The following filters did not match any test files:
+ ./packages/omo-codex/plugin/test/aggregate-manifest.test.mjs
+
+note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
+
+Learn more about bun test: https://bun.com/docs/cli/test
+The following filters did not match any test files:
+ ./packages/omo-codex/plugin/test/aggregate-hooks.test.mjs
+
+note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
+
+Learn more about bun test: https://bun.com/docs/cli/test
+The following filters did not match any test files:
+ ./packages/omo-codex/plugin/test/hook-status-message.test.mjs
+
+note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
+
+Learn more about bun test: https://bun.com/docs/cli/test
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin && set +e; bun test ./components/ulw-execute-continuation/test/codex-hook.test.ts; a=$?; bun test ./test/aggregate-manifest.test.mjs; b=$?; bun test ./test/aggregate-hooks.test.mjs; c=$?; bun test ./test/hook-status-message.test.mjs; d=$?; test $a -eq 0 -a $b -eq 0 -a $c -eq 0 -a $d -eq 0
+EXIT: 1
+STDOUT:
+bun test v1.4.0 (34cbb9a40)
+bun test v1.4.0 (34cbb9a40)
+bun test v1.4.0 (34cbb9a40)
+bun test v1.4.0 (34cbb9a40)
+
+STDERR:
+
+components/ulw-execute-continuation/test/codex-hook.test.ts:
+(pass) ulw-execute Stop hook > #given stop hook is already active #when hook runs #then returns empty output [0.17ms]
+(pass) ulw-execute Stop hook > #given no boulder state and start work prompt #when stop hook runs #then it stays quiet [0.25ms]
+(pass) ulw-execute Stop hook > #given active codex work with remaining top-level tasks #when hook runs #then returns block JSON [2.60ms]
+72 | 
+73 | 		// when
+74 | 		const output = runStopHook(input, fs);
+75 | 
+76 | 		// then
+77 | 		expect(output).toBe("");
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: ""
+Received: "{"decision":"block","reason":"<ulw-execute-continuation>\n\nYou are mid-flight on a Prometheus work... (10082 bytes truncated) ...ckbox, dispatch the parallel sub-agents, verify, mark, continue.\n\n</ulw-execute-continuation>\n"}"
+
+      at <anonymous> (/private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts:77:18)
+(fail) ulw-execute Stop hook > #given active Boulder work and a SubagentStop event #when hook runs #then returns empty output [1.79ms]
+(pass) ulw-execute Stop hook > #given active codex work and an external-blocker marker #when hook runs #then returns empty output [1.28ms]
+(pass) ulw-execute Stop hook > #given ultrawork opener then external-blocker marker #when hook runs #then returns empty output [1.21ms]
+(pass) ulw-execute Stop hook > #given the external-blocker marker with no stated blocker #when hook runs #then still returns block JSON [1.35ms]
+(pass) ulw-execute Stop hook > #given the ultrawork opener and a bare marker #when hook runs #then still returns block JSON [1.54ms]
+(pass) ulw-execute Stop hook > #given the external-blocker marker below the first line #when hook runs #then still returns block JSON [1.59ms]
+(pass) ulw-execute Stop hook > #given active codex work with zero remaining tasks #when hook runs #then blocks for the final gate [1.98ms]
+(pass) ulw-execute Stop hook > #given context-window pressure in transcript #when hook runs #then it does not inject continuation text [0.07ms]
+(pass) ulw-execute Stop hook > #given active work belongs to another harness #when hook runs #then returns empty output [1.20ms]
+(pass) ulw-execute Stop hook > #given bare legacy session id #when hook runs #then returns empty output [1.53ms]
+(pass) ulw-execute Stop hook > #given completed boulder work #when hook runs #then returns empty output [1.49ms]
+(pass) ulw-execute Stop hook > #given malformed boulder JSON #when hook runs #then returns empty output [1.40ms]
+(pass) ulw-execute Stop hook > #given malformed input #when hook runs #then returns empty output [0.04ms]
+
+ 15 pass
+ 1 fail
+ 28 expect() calls
+Ran 16 tests across 1 file. [37.00ms]
+
+test/aggregate-manifest.test.mjs:
+15 | 	const mcpPath = manifest.mcpServers;
+16 | 
+17 | 	// then
+18 | 	assert.equal(manifest.name, "omo");
+19 | 	assert(Array.isArray(hookPaths));
+20 | 	assert.equal(hookPaths.length, 20);
+             ^
+AssertionError: Expected values to be strictly equal:
+
+21 !== 20
+
+ generatedMessage: true,
+     actual: 21,
+   expected: 20,
+   operator: "strictEqual",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/test/aggregate-manifest.test.mjs:20:9
+      at node:test:1445:26
+      at executeTestNode (node:test:1448:63)
+(fail) #given aggregate plugin manifest #when inspected #then it owns the omo namespace [3.12ms]
+(pass) #given aggregate plugin metadata #when inspected #then ulw-loop is the public loop name [0.34ms]
+(pass) #given component directories #when scanned #then only intentional resource roots declare plugin manifests [3.81ms]
+
+ 2 pass
+ 1 fail
+Ran 3 tests across 1 file. [29.00ms]
+
+test/aggregate-hooks.test.mjs:
+(pass) #given isolated components #when hooks are inspected #then commands stay inside component roots [2.85ms]
+(pass) #given aggregate Stop hooks #when inspected #then ulw-execute continuation and ulw-loop resume are separate groups [0.58ms]
+75 | 			hook.handler.command ===
+76 | 				'node "${PLUGIN_ROOT}/components/lazycodex-executor-verify/dist/cli.js" hook subagent-stop',
+77 | 	);
+78 | 
+79 | 	// then
+80 | 	assert.equal(subagentStopGroups.length, 1);
+             ^
+AssertionError: Expected values to be strictly equal:
+
+2 !== 1
+
+ generatedMessage: true,
+     actual: 2,
+   expected: 1,
+   operator: "strictEqual",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/test/aggregate-hooks.test.mjs:80:9
+      at node:test:1445:26
+      at executeTestNode (node:test:1448:63)
+(fail) #given aggregate SubagentStop hooks #when inspected #then only LazyCodex executor verification remains [1.70ms]
+(pass) #given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered [0.52ms]
+(pass) #given aggregate hook commands #when inspected #then every command exposes a Codex status message [0.46ms]
+(pass) #given aggregate hook commands #when inspected #then commands stay Node-based and platform-neutral [0.55ms]
+(pass) #given component hook commands #when inspected #then standalone packages expose Codex status messages [1.78ms]
+(pass) #given aggregate OMO plugin is enabled #when hooks are inspected #then shell guidance and ulw-loop guard are registered [0.84ms]
+(pass) #given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection [0.38ms]
+(pass) #given aggregate SessionStart hooks #when inspected #then LazyCodex auto-update is registered [0.89ms]
+(pass) #given aggregate SessionStart hooks #when inspected #then cold-start-prone hooks carry 15s timeout headroom [0.39ms]
+(pass) #given aggregate PostToolUse hooks #when inspected #then thread title hygiene is registered for created Codex threads [0.38ms]
+(pass) #given aggregate plugin packaging #when inspected #then hooks and compatibility sentinels stay Python-free [0.69ms]
+
+ 12 pass
+ 1 fail
+Ran 13 tests across 1 file. [35.00ms]
+
+test/hook-status-message.test.mjs:
+(pass) #given hook status label #when formatting #then prefixes OmO display namespace and version [1.94ms]
+(pass) #given hook status label with blank version #when formatting #then uses local OmO display version [0.04ms]
+(pass) #given loose legacy status label #when normalizing #then removes OMO wording and title-cases label [0.17ms]
+(pass) #given LazyCodex appears inside hook label #when normalizing #then product casing is preserved [0.17ms]
+(pass) #given MCP appears inside hook label #when normalizing #then protocol casing is preserved [0.04ms]
+(pass) #given versioned OmO status label #when normalizing #then it does not duplicate display prefix [0.07ms]
+(pass) #given aggregate comment-checker hook #when status is inspected #then it uses OmO comments label [1.18ms]
+(pass) #given aggregate and component hooks #when status messages are inspected #then all use the OmO formatter [3.36ms]
+
+ 8 pass
+ 0 fail
+Ran 8 tests across 1 file. [30.00ms]
+

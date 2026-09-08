@@ -12,6 +12,7 @@ import {
   createReflectionWorktree,
   type LockRecord,
   type MemoryIdentity,
+  type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
 import type { ReservationStatePort } from "./run-finalization"
@@ -86,6 +87,50 @@ export async function reconciliationFixture(trigger: "step-count" | "dream" = "s
   }
   await writeRunJsonAtomic(join(runDir, "ledger.json"), ledger)
   return { identity, repo, journal, store, worktree, runDir, ledger }
+}
+
+/**
+ * Retires the fixture's run directory with the selected terminal artifact and its real schema.
+ * Only final.json settles the ledger. The reservation that currently holds the
+ * same run id is untouched, so a `finishedAt` before its `reservedAt` reproduces the shadowing
+ * shape from issue #7912.
+ */
+export async function retireRunGeneration(
+  item: Awaited<ReturnType<typeof reconciliationFixture>>,
+  finishedAt: string,
+  terminal: "final" | "abandoned" = "final",
+): Promise<void> {
+  await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
+    ...item.ledger,
+    startedAt: new Date(Date.parse(finishedAt) - 1_000).toISOString(),
+    ...(terminal === "final" ? {
+      finalizePhase: "settled",
+      finalizeOutcome: "merged",
+      finalizedAt: finishedAt,
+    } : {}),
+  })
+  await writeRunJsonAtomic(join(item.runDir, `${terminal}.json`), {
+    version: 1,
+    runId: item.ledger.runId,
+    ...(terminal === "final"
+      ? { outcome: "merged", finishedAt }
+      : { outcome: "abandoned_unknown", abandonedAt: finishedAt }),
+  })
+}
+
+/** Queues a second request so a reclaimed reservation has something to promote. */
+export async function queuePendingReservation(
+  item: Awaited<ReturnType<typeof reconciliationFixture>>,
+): Promise<void> {
+  const pending: ReservedRun = {
+    runId: "run-pending",
+    request: { trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] },
+  }
+  await writeFile(
+    join(item.identity.paths.reflection, "pending.json"),
+    `${JSON.stringify(pending, null, 2)}\n`,
+    { encoding: "utf8", mode: 0o600 },
+  )
 }
 
 export async function commitOrphanWorktree(

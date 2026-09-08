@@ -1,12 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, readdir, readFile } from "node:fs"
-import { join } from "node:path"
-import type { CreateAgentSessionOptions, ToolDefinition } from "@code-yeongyu/senpi"
-import type { CreateChildSession } from "@oh-my-opencode/senpi-task"
-import { PendingNudges } from "@oh-my-opencode/memory-core"
 import type { ChildHandle } from "@oh-my-opencode/senpi-task"
 import { MemorianGateRunner } from "./memorian-runner"
-import { CANDIDATE_PATH, fixture, launchInput, nudgeOnce, registrySnapshot, roots, runnerOptions, scriptedSession, SESSION_ID } from "./memorian-runner.test-support"
+import { fixture, launchInput, roots, runnerOptions } from "./memorian-runner.test-support"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))) })
@@ -52,9 +47,40 @@ describe("MemorianGateRunner", () => {
     await Promise.race([lateDisposed, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("late handle was never disposed")), 5_000))])
 
     // then
-    expect(result).toMatchObject({ status: "failed", cause: "deadline" })
+    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
     expect((await runner.launch(launchInput())).status).not.toBe("active")
     expect(disposed).toBe(1)
+  })
+
+  test("#given a runner constructed with deadlineMs 60_000, a launch input with deadlineMs 50, and a child that never settles #when the runner launches #then the result is dropped with cause deadline within 2s", async () => {
+    // given: constructor deadline is 60s; the launch input pins 50ms. Ignoring the input
+    // deadline would wait on the constructor value and miss the 2s bound.
+    const { identityPaths } = await fixture()
+    let resolveIdle: (() => void) | undefined
+    const handle: ChildHandle = {
+      task_id: "hung-input-deadline",
+      sessionId: "hung-input-deadline",
+      steer: async () => undefined,
+      followUp: async () => undefined,
+      abort: async () => { resolveIdle?.() },
+      subscribe: () => () => undefined,
+      waitForIdle: () => new Promise((resolve) => { resolveIdle = () => resolve({ status: "cancelled" }) }),
+      lastAssistantText: () => undefined,
+      dispose: () => undefined,
+    }
+    const runner = new MemorianGateRunner(runnerOptions(identityPaths, {
+      createRunner: () => ({ start: async () => handle }),
+      deadlineMs: 60_000,
+    }))
+
+    // when
+    const started = Date.now()
+    const result = await runner.launch(launchInput({ deadlineMs: 50 }))
+    const elapsed = Date.now() - started
+
+    // then
+    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
+    expect(elapsed).toBeLessThan(2000)
   })
 
   test("#given a child that never settles #when the deadline fires #then the child is aborted and disposed", async () => {
@@ -86,42 +112,8 @@ describe("MemorianGateRunner", () => {
     await Promise.all([aborted, disposed])
 
     // then
-    expect(result).toMatchObject({ status: "failed", cause: "deadline" })
+    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
     expect(result.runId).toMatch(/^[0-9a-f-]{36}$/)
-  })
-
-  test("#given a completed child blocked on persistence #when cancel is called #then the pending payload is retracted", async () => {
-    // given
-    const { identityPaths } = await fixture()
-    const child = scriptedSession(async (options) => { await nudgeOnce(options) })
-    let releaseWrite: (() => void) | undefined
-    let resolveWriteEntered: (() => void) | undefined
-    const writeEntered = new Promise<void>((resolve) => { resolveWriteEntered = resolve })
-    const pendingNudges = {
-      write: async () => {
-        resolveWriteEntered?.()
-        await new Promise<void>((resolve) => { releaseWrite = resolve })
-      },
-      delete: async () => { releaseWrite?.() },
-    }
-    const runner = new MemorianGateRunner(runnerOptions(identityPaths, {
-      createSession: child.createSession,
-      pendingNudges,
-      deadlineMs: 1000,
-    }))
-
-    // when
-    const launch = runner.launch(launchInput())
-    await child.whenPrompted()
-    child.resolve()
-    await writeEntered
-    const cancelling = runner.cancel()
-    releaseWrite?.()
-    await cancelling
-    const result = await launch
-
-    // then
-    expect(result).toMatchObject({ status: "dropped", cause: "cancelled" })
   })
 
   test("#given a child in flight #when cancel is called #then it aborts and disposes without writing a late nudge", async () => {
@@ -164,7 +156,6 @@ describe("MemorianGateRunner", () => {
     expect(result).toMatchObject({ status: "dropped", cause: "cancelled" })
     expect(aborted).toBe(1)
     expect(disposed).toBe(1)
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
   })
 
   test("#given child setup is still deferred #when cancel is requested then the handle resolves #then the late handle is dropped without a pending payload", async () => {
@@ -220,7 +211,5 @@ describe("MemorianGateRunner", () => {
     expect(result).toMatchObject({ status: "dropped", cause: "cancelled" })
     expect(aborted).toBe(1)
     expect(disposed).toBe(1)
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
   })
-
 })

@@ -12,7 +12,7 @@ The thirteen memory slash commands, registered once by the memory component thro
 | `backup.ts` / `repo.ts` | Repository backup and git/repository access helpers. |
 | `memory.ts` / `memfs.ts` + `memfs-shared.ts` / `memfs-extra.ts` | `/memory` status; `/memfs` file tree. `/memfs` replacement is noninteractive and ALWAYS backs up first. |
 | `init.ts` | `/init` - NEVER overwrites an existing memory repository. |
-| `doctor.ts` / `doctor-checks.ts` | Health checks; the `facts` line stays silent at zero state. |
+| `doctor.ts` / `doctor-checks.ts` / `doctor-reservation.ts` | Health checks; the `facts` line stays silent at zero state. `doctor-reservation` warns on a ghost `active.lock` (dead/missing launcher identity) with reclaim remediation. |
 | `recompile.ts` / `remember.ts` / `search.ts` / `sleeptime.ts` / `reflect.ts` / `dream.ts` + `dream-staging.ts` | Single-purpose commands; `/sleeptime` shows the resolved nudge/facts/dream/people/soul settings. |
 | `memory-repository.ts` | Push-only git mirror sync (the cloud-free sync story). |
 | `people.ts` / `people-ask.ts` / `people-query.ts` / `people-render.ts` / `people-search.ts` + `people.test-support.ts` | People cards: query/selection, ask runner (`createPeopleAskRunner`), roster/card rendering, search hits. |

@@ -8,6 +8,8 @@
     "dev": "next dev",
     "build": "bun --bun next build --no-lint",
     "start": "next start",
+    "poster:graph": "bun scripts/render-graph-poster.mjs",
+    "check:graph-budget": "bun scripts/check-graph-budget.mjs",
     "lint": "biome lint app components lib e2e scripts && eslint --cache --cache-location .next/cache/eslint/.eslintcache \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mjs}\" \"e2e/**/*.{ts,tsx}\" \"scripts/**/*.mjs\"",
     "lint:fix": "biome lint --write app components lib e2e scripts && eslint --cache --cache-location .next/cache/eslint/.eslintcache --fix \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mjs}\" \"e2e/**/*.{ts,tsx}\" \"scripts/**/*.mjs\"",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,json,css,md}\"",
@@ -23,6 +25,8 @@
   "dependencies": {
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "geist": "^1.7.0",
@@ -33,7 +37,8 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "tailwind-merge": "^3.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "three": "0.159.0"
   },
   "browserslist": [
     "chrome >= 100",
@@ -60,6 +65,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "0.159.0",
     "@typescript/native-preview": "7.0.0-dev.20260518.1",
     "eslint": "^9.39.4",
     "eslint-config-next": "15.5.18",

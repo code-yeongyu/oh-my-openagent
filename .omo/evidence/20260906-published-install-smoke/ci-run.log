@@ -1,0 +1,10 @@
+2026-09-06T09:00:55.9641320Z ^[[36;1m    echo "published install smoke passed for $spec"^[[0m
+2026-09-06T09:00:55.9642440Z ^[[36;1m    echo "::warning::published install smoke failed for $spec"^[[0m
+2026-09-06T09:01:04.4586069Z published install smoke OK (1 plugin(s), /tmp/omo-published-smoke-xFExRp/codex-home/plugins/cache/sisyphuslabs/omo/4.19.4)
+2026-09-06T09:01:04.6713070Z published install smoke passed for lazycodex-ai@latest
+2026-09-06T09:01:08.2645603Z published install smoke failed: npm run sync:skills failed in /tmp/omo-published-smoke-vL7Ytf/codex-home/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.43-2502-1788685265483 with exit code 1
+2026-09-06T09:01:08.3199483Z ##[warning]published install smoke failed for lazycodex-ai@beta
+2026-09-06T09:01:14.5821211Z published install smoke OK (1 plugin(s), /tmp/omo-published-smoke-fqX5D9/codex-home/plugins/cache/sisyphuslabs/omo/4.19.4)
+2026-09-06T09:01:14.8029595Z published install smoke passed for oh-my-openagent@latest
+2026-09-06T09:01:18.5776878Z published install smoke failed: npm run sync:skills failed in /tmp/omo-published-smoke-NvJmZ4/codex-home/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.43-2658-1788685275831 with exit code 1
+2026-09-06T09:01:18.6799464Z ##[warning]published install smoke failed for oh-my-openagent@beta

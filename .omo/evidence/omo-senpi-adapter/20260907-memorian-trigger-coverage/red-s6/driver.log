@@ -1,0 +1,42 @@
+plugin-root: /Users/yeongyu/.bun/install/global/node_modules/omo-ai/plugin
+senpi-cli: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage/node_modules/@code-yeongyu/senpi/dist/cli.js
+scenario: s6
+PASS s6.tool-fixture :: tool=eval codeLength=580 token=rollout.md
+FAIL s6.judge-accepted :: judge acceptance timed out after 60000ms
+PASS s6.tool-executed :: tool=eval isError=false
+FAIL s6.judge-launched :: recallRuns=0
+FAIL s6.arg-harvested :: candidates=none seedPath=reference/kubernetes-rollouts.md
+FAIL s6.mid-turn-recall :: recall after first tool result and before second tool call
+PASS s6.no-extra-round :: parentRequests=3
+cleanup: pid 19819 exited, server closed, sandbox removed
+PASS s6.realSenpiUntouched :: realSenpiUntouched=true
+evidence: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage/.omo/evidence/omo-senpi-adapter/20260907-memorian-trigger-coverage/red-s6
+{
+  "ok": false,
+  "S3": "skipped",
+  "S4": "skipped",
+  "S5": "skipped",
+  "S6": "FAIL",
+  "total": 8,
+  "failures": [
+    "s6.judge-accepted",
+    "s6.judge-launched",
+    "s6.arg-harvested",
+    "s6.mid-turn-recall"
+  ],
+  "scenarios": {
+    "s6": {
+      "result": "FAIL",
+      "parentRequests": 3,
+      "judgeRequests": 0,
+      "assistantMessages": 3,
+      "recallMessages": 0,
+      "nudgedEntries": 0,
+      "pendingFilePresent": false,
+      "tool": "eval",
+      "argumentLength": 580,
+      "candidatePaths": [],
+      "realSenpiUntouched": true
+    }
+  }
+}

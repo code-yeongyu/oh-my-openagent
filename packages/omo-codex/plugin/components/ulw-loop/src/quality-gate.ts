@@ -20,7 +20,12 @@ import {
 	withQualityGateCollector,
 } from "./quality-gate-fields.js";
 import { adversarialVerdict, codeQualityStatusField, passedVerdict } from "./quality-gate-verdicts.js";
-import { GATE_SECTION_BY_ACCEPTOR, type UlwLoopToolkitSurface } from "./surface.js";
+import {
+	GATE_SECTION_BY_ACCEPTOR,
+	OPTIONAL_GATE_SECTIONS_BY_SURFACE,
+	REQUIRED_GATE_SECTIONS_BY_SURFACE,
+	type UlwLoopToolkitSurface,
+} from "./surface.js";
 import type { UlwLoopManualQaArtifactRef, UlwLoopQualityGate } from "./types.js";
 
 export {
@@ -42,20 +47,10 @@ export interface ValidateQualityGateOptions {
 	readonly reviewerSurface?: UlwLoopToolkitSurface;
 }
 
-function reviewerRoleField(value: unknown, expected: string, field: string): string {
-	if (typeof value !== "string" || value.trim() === "") {
-		textField(value, field);
-		return expected;
-	}
-	const actual = textField(value, field);
-	if (actual !== expected) invalid(`${field} must be ${expected}.`, field);
-	return expected;
-}
-
 function reviewerAcceptorField(
 	value: unknown,
 	surface: UlwLoopToolkitSurface,
-	sectionName: "manualQa" | "gateReview",
+	sectionName: "codeReview" | "manualQa" | "gateReview",
 ): string {
 	const field = `${sectionName}.by`;
 	const accepted = GATE_SECTION_BY_ACCEPTOR[surface][sectionName];
@@ -75,19 +70,28 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 
 function validateQualityGateUncollected(input: unknown, opts?: ValidateQualityGateOptions): UlwLoopQualityGate {
 	const surface = opts?.reviewerSurface ?? "lazycodex";
-	const gate = section(input, "qualityGate");
+	const raw = input as Record<string, unknown>;
+	const gate = section(
+		raw && typeof raw === "object" && "qualityGate" in raw ? raw["qualityGate"] : input,
+		"qualityGate",
+	);
+	for (const name of REQUIRED_GATE_SECTIONS_BY_SURFACE[surface]) section(gate[name], name);
+	for (const name of Object.keys(gate)) {
+		if (name === "codeReview" && !OPTIONAL_GATE_SECTIONS_BY_SURFACE[surface].includes(name as never))
+			invalid("omo-senpi gate has no codeReview lane.", name);
+	}
 	if (surface === "omo-senpi" && gate["codeReview"] !== undefined)
 		invalid("omo-senpi gate has no codeReview lane.", "codeReview");
 	const manualQa = section(gate["manualQa"], "manualQa");
 	const gateReview = section(gate["gateReview"], "gateReview");
 	const iteration = section(gate["iteration"], "iteration");
 	const coverage = section(gate["criteriaCoverage"], "criteriaCoverage");
-	const codeReview = surface === "lazycodex" ? section(gate["codeReview"], "codeReview") : {};
+	const codeReview = gate["codeReview"] !== undefined ? section(gate["codeReview"], "codeReview") : undefined;
 	const manualQaBy = reviewerAcceptorField(manualQa["by"], surface, "manualQa");
 	const gateReviewBy = reviewerAcceptorField(gateReview["by"], surface, "gateReview");
 	const manualQaEvidence = textField(manualQa["evidence"], "manualQa.evidence");
 	const gateReviewEvidence = textField(gateReview["evidence"], "gateReview.evidence");
-	if (surface === "lazycodex") reviewerRoleField(codeReview?.["by"], "lazycodex-code-reviewer", "codeReview.by");
+
 	const totalCriteria = numberField(coverage["totalCriteria"], "criteriaCoverage.totalCriteria");
 	const passCount = numberField(coverage["passCount"], "criteriaCoverage.passCount");
 	if (!isPoisoned("criteriaCoverage.passCount") && passCount < totalCriteria)
@@ -133,13 +137,14 @@ function validateQualityGateUncollected(input: unknown, opts?: ValidateQualityGa
 		},
 	};
 	if (surface === "omo-senpi") return { surface, ...common };
+	if (codeReview === undefined) return { surface, ...common };
 	const codeReportPath = textField(codeReview["reportPath"], "codeReview.reportPath");
 	checkFile(codeReportPath, "codeReview.reportPath", opts);
 	return {
 		surface,
 		...common,
 		codeReview: {
-			by: "lazycodex-code-reviewer",
+			by: reviewerAcceptorField(codeReview["by"], surface, "codeReview"),
 			recommendation: literal(codeReview["recommendation"], "APPROVE", "codeReview.recommendation"),
 			codeQualityStatus: codeQualityStatusField(codeReview["codeQualityStatus"], "codeReview.codeQualityStatus"),
 			reportPath: codeReportPath,

@@ -258,7 +258,7 @@ export function wireDagLifecycle(
 ): void {
   pi.on("session_shutdown", () => runtime.pauseForShutdown())
   wireTaskLifecycle()
-  pi.on("session_start", () => runtime.attach())
+  pi.on("session_start", (event) => runtime.attach(event))
   pi.on("session_before_switch", () => runtime.detach())
   pi.on("session_shutdown", () => runtime.dispose())
 }

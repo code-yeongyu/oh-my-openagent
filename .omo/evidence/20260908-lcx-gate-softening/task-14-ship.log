@@ -1,0 +1,29 @@
+ISOLATED_HOME=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/home
+codex-cli 0.144.1
+QA_DRIVER_AND_MOCK_BYTE_IDENTITY=PASS
+COMMAND: scripts/install-verify.sh --self-test
+INSTALL_SELF_TEST_EXIT=0
+COMMAND: scripts/install-verify.sh --keep
+INSTALL_REAL_EXIT=0
+INSTALLED_CODEX_HOME=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/tmp/cqa-home.28cSVG/codex
+INSTALLED_MANIFEST=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/tmp/cqa-home.28cSVG/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.48/.codex-plugin/plugin.json
+INSTALLED_HOOK_COUNT=19
+FAIL: requested native installed cache count 21; observed 19
+INSTALLED_MARKETPLACE_MANIFEST=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/tmp/cqa-home.28cSVG/codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/.codex-plugin/plugin.json
+INSTALLED_MARKETPLACE_HOOK_COUNT=21
+true
+true
+true
+true
+COMMAND: scripts/app-server-drive.sh --self-test
+APP_SERVER_SELF_TEST_EXIT=0
+COMMAND: scripts/app-server-drive.sh --plugin --expect sessionStart,userPromptSubmit
+APP_SERVER_PLUGIN_EXIT=0
+HOOK_STARTED_COMPLETED_PAIRS=PASS
+NO_LOCAL_BUN_TEST=1
+NO_AGENTIC_PROBES=1
+HOOK_COUNT_CONTRACT_EXIT=1
+REAL_CODEX_SHA_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+REAL_CODEX_SHA_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+REMOVAL_RECEIPT: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4 REMOVED
+QA_EXIT=1

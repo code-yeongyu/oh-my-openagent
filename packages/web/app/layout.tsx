@@ -3,76 +3,84 @@ import type { JSX, ReactNode } from "react"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import Script from "next/script"
+import { getStats, FALLBACK_DESCRIPTION } from "@/lib/stats"
 import "./globals.css"
 
 const primarySiteUrl = "https://omo.dev"
 
-export const metadata: Metadata = {
-  metadataBase: new URL(primarySiteUrl),
-  title: {
-    default: "Oh My OpenAgent — The Best Agent Harness",
-    template: "%s | Oh My OpenAgent",
-  },
-  description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 60+ lifecycle hooks.",
-  keywords: [
-    "opencode",
-    "oh-my-opencode",
-    "openagent",
-    "oh-my-openagent",
-    "ai agent",
-    "code agent",
-    "sisyphus",
-    "multi-model",
-    "team mode",
-    "agent orchestration",
-    "claude",
-    "gpt",
-    "gemini",
-    "coding assistant",
-    "lazycodex",
-    "lazycodex-ai",
-    "codex cli",
-    "codex plugin",
-  ],
-  authors: [{ name: "Yeongyu Kim", url: "https://github.com/code-yeongyu" }],
-  creator: "Yeongyu Kim",
-  alternates: {
-    canonical: "/",
-    languages: {
-      en: "/",
-      ko: "/ko",
-      ja: "/ja",
-      zh: "/zh",
+export const revalidate = 3600
+
+export async function generateMetadata(): Promise<Metadata> {
+  let description = FALLBACK_DESCRIPTION
+  try {
+    description = (await getStats()).description
+  } catch (error) {
+    console.warn("Unable to refresh site metadata; using fallback description", error)
+  }
+
+  return {
+    metadataBase: new URL(primarySiteUrl),
+    title: {
+      default: "Oh My OpenAgent — The Best Agent Harness",
+      template: "%s | Oh My OpenAgent",
     },
-  },
-  openGraph: {
-    type: "website",
-    locale: "en_US",
-    alternateLocale: ["ko_KR", "ja_JP", "zh_CN"],
-    url: primarySiteUrl,
-    siteName: "Oh My OpenAgent",
-    title: "Oh My OpenAgent — The Best Agent Harness",
-    description:
-      "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 60+ lifecycle hooks.",
-    // og:image is supplied by app/opengraph-image.tsx via Next.js file-based metadata convention.
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Oh My OpenAgent — The Best Agent Harness",
-    description: "Meet Sisyphus: The batteries-included agent that codes like you.",
-    // twitter:image is supplied by app/twitter-image.tsx via the file-based convention.
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
+    description,
+    keywords: [
+      "opencode",
+      "oh-my-opencode",
+      "openagent",
+      "oh-my-openagent",
+      "ai agent",
+      "code agent",
+      "multi-model",
+      "team mode",
+      "agent orchestration",
+      "claude",
+      "gpt",
+      "coding assistant",
+      "lazycodex",
+      "lazycodex-ai",
+      "codex cli",
+      "codex plugin",
+    ],
+    authors: [{ name: "Yeongyu Kim", url: "https://github.com/code-yeongyu" }],
+    creator: "Yeongyu Kim",
+    alternates: {
+      canonical: "/",
+      languages: {
+        en: "/",
+        ko: "/ko",
+        ja: "/ja",
+        zh: "/zh",
+      },
+    },
+    openGraph: {
+      type: "website",
+      locale: "en_US",
+      alternateLocale: ["ko_KR", "ja_JP", "zh_CN"],
+      url: primarySiteUrl,
+      siteName: "Oh My OpenAgent",
+      title: "Oh My OpenAgent — The Best Agent Harness",
+      description,
+      // Next.js supplies the dynamic image from app/opengraph-image.tsx.
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Oh My OpenAgent — The Best Agent Harness",
+      description,
+      // app/twitter-image.tsx shares the Open Graph image generator.
+    },
+    robots: {
       index: true,
       follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
     },
-  },
+  }
 }
 
 const jsonLd = {
@@ -88,7 +96,7 @@ const jsonLd = {
     url: "https://github.com/code-yeongyu",
   },
   description:
-    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 60+ lifecycle hooks.",
+    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 55 lifecycle hooks.",
   offers: {
     "@type": "Offer",
     price: "0",

@@ -10,7 +10,7 @@ const MEMORIAN_NUDGE_DESCRIPTION =
 
 export const MemorianNudgeParams = Type.Object({
   path: Type.String({ description: "Memory path copied exactly from the candidates input." }),
-  hint: Type.String({ description: "One factual sentence, at most 200 characters, on a single line." }),
+  hint: Type.String({ description: "One factual sentence carrying the useful information from the memory, at most 200 characters, on a single line. State the fact itself, not a judgment about whether to nudge, and never filler such as 'placeholder'." }),
 }, { additionalProperties: false })
 
 export interface MemorianNudgeToolInput {
@@ -82,7 +82,7 @@ function rejectNudge(params: Static<typeof MemorianNudgeParams>, input: Memorian
     return `"${params.path}" is a system/ path and cannot be nudged.`
   }
   if (!isValidHint(params.hint)) {
-    return "The hint must be one non-empty line of at most 200 characters."
+    return "The hint must state a memory fact in one non-empty line of at most 200 characters, not comment on whether the memory is relevant or worth nudging."
   }
   if (containsSecretLikeMaterial(params.hint)) {
     return "The hint was rejected because it contains secret-like material."

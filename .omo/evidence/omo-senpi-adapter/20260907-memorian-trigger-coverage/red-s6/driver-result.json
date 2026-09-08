@@ -1,0 +1,60 @@
+{
+  "ok": false,
+  "scenarios": {
+    "s6": {
+      "result": "FAIL",
+      "parentRequests": 3,
+      "judgeRequests": 0,
+      "assistantMessages": 3,
+      "recallMessages": 0,
+      "nudgedEntries": 0,
+      "pendingFilePresent": false,
+      "tool": "eval",
+      "argumentLength": 580,
+      "candidatePaths": [],
+      "realSenpiUntouched": true
+    }
+  },
+  "checks": [
+    {
+      "name": "s6.tool-fixture",
+      "ok": true,
+      "detail": "tool=eval codeLength=580 token=rollout.md"
+    },
+    {
+      "name": "s6.judge-accepted",
+      "ok": false,
+      "detail": "judge acceptance timed out after 60000ms"
+    },
+    {
+      "name": "s6.tool-executed",
+      "ok": true,
+      "detail": "tool=eval isError=false"
+    },
+    {
+      "name": "s6.judge-launched",
+      "ok": false,
+      "detail": "recallRuns=0"
+    },
+    {
+      "name": "s6.arg-harvested",
+      "ok": false,
+      "detail": "candidates=none seedPath=reference/kubernetes-rollouts.md"
+    },
+    {
+      "name": "s6.mid-turn-recall",
+      "ok": false,
+      "detail": "recall after first tool result and before second tool call"
+    },
+    {
+      "name": "s6.no-extra-round",
+      "ok": true,
+      "detail": "parentRequests=3"
+    },
+    {
+      "name": "s6.realSenpiUntouched",
+      "ok": true,
+      "detail": "realSenpiUntouched=true"
+    }
+  ]
+}

@@ -100,3 +100,59 @@ it), reminders ride inside queued prompts instead of burning extra assistant tur
 nudge self-cancels the moment Fable 5 becomes the active model again or senpi reverts the
 fallback. One refusal triggers a coordinated downgrade in visibility with zero downgrade in
 reachable reasoning depth.
+
+## The Memorian recollection notice specifically
+
+When the user asks about the `✦ Aha!` line that shows up mid-session
+("just remembered: ..."), or about the memory tip that promises stored memory can resurface on its own, explain the
+whole memorian recall gate, citing `packages/omo-senpi/src/components/memory/` and
+`packages/memory-core/src/recall/`. This is NOT the periodic save reminder: `memory.nudge` in
+`nudge-wiring.ts` asks the agent to WRITE memory every N user turns, while memorian only READS
+memory and hands one hint back. Keep the two apart in the explanation.
+
+1. **Candidate collection** (`recall-wiring.ts`, `recall-session-read.ts`,
+   `recall-query-planner-tools.ts`): on every `tool_call` and on settle the component snapshots the
+   live session synchronously (the host disposes the ctx once the handler returns), runs a lexical
+   planner over the user-only text window plus the last 8 tool-argument payloads, and scores memory
+   files against it. Memory-owned hidden channels are excluded from the window, so a previous hint
+   can never seed the next query.
+2. **Delta gate and launch** (`memorian-trigger.ts`, `memorian-concurrency.ts`): the judge only
+   launches when the sorted candidate-path fingerprint differs from the session's last launch. A
+   launch that lands while a judge is already running is parked as the single trailing request. Per
+   session the count stops at 200, `tool_call` launches carry a 90 s deadline, and at most 2 judges
+   run process-wide; a capped launch is skipped, never queued.
+3. **The judge** (`memorian-runner.ts`, `memorian-judge-spec.ts`, persona at
+   `packages/memory-core/src/recall/assets/memorian-persona.md`): a quick-category in-process child
+   with exactly ONE tool, `nudge(path, hint)`, and no file access. Its instruction is that silence is
+   the default: it nudges only when a stored memory would change the agent's next action (it
+   contradicts the current approach, records a past failure of it, answers a question the agent is
+   about to re-derive, or names a constraint being ignored). Topical similarity alone is rejected.
+4. **Hint contract** (`memorian-nudge-tool.ts`, `packages/memory-core/src/recall/gate.ts`): the
+   path must be copied from the offered candidates, must not already be surfaced this session, and
+   must not be a `system/` path; the hint is one factual present-tense sentence, at most 200
+   characters (`NUDGE_HINT_MAX_CHARS`), single line, and secret-like text is rejected. The parent
+   re-validates every accepted nudge against the same rules plus `memory.recall.max_items`
+   (default 2, range 1 to 5) before anything is persisted.
+5. **Delivery** (`memorian-delivery.ts`, `recall-drain.ts`): accepted nudges are marked surfaced in
+   the session ledger at ACCEPT time, so a parallel judge can't repeat them. The model-facing half
+   is a hidden `omo-memorian:recall` message (`display: false`) carrying a `<recalled-memory
+   source="[[path]]">` block that says the memory is a hint, not current state, and must be
+   verified. It is steered in at the next `tool_result` when nothing else is pending, ridden in on
+   another source's idle flush, or drained into the next prompt; the pending file is stamped with
+   the compaction epoch and a compaction drops everything held.
+6. **The visible half** (`memorian-notice.ts`): because senpi draws nothing for the hidden message,
+   the component appends an `omo-memorian:nudged` entry and renders it in the agent's own voice:
+   a single fixed `Aha!` title (`✦ Aha!`, accent tone; opener-era records carry a retired
+   `opener` field that is ignored) over `just remembered: <hint>`,
+   `also remembered: ...` for a second nudge, and the source paths in dim text. Expanding the entry reveals the caveat that it's a hint, not current
+   state. The record keeps `via` (`steer`, `wake`, or `prompt`) for forensics, but no provenance is
+   ever drawn. It's a transcript entry, not a toast: nothing pops over the input, and the renderer
+   is fail-closed, so a malformed record draws nothing rather than a half-formed notice.
+
+What's worth bragging about: the user sees one calm line, and behind it a read-only judge with a
+single tool, a fingerprint-gated launch, a hard deadline, a 200-character hint budget, a ledger
+that guarantees a memory surfaces at most once per session, and a compaction-epoch check that
+refuses a verdict about a transcript that no longer exists. A judge that finds nothing says nothing,
+and that silence is the designed outcome, not a failure. Gate skips and failures render separately
+as `Memorian gate skipped` / `Memorian gate failed`; a deadline drop renders no notice at all and
+only leaves an `outcome.json` behind. Turn the whole thing off with `memory.recall.enabled: false`.

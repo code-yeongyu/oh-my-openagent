@@ -1,7 +1,9 @@
 export {
   REDACTED_REASONING_TEXT,
   TOOL_ARGS_TRUNCATE_LIMIT,
+  TOOL_RESULT_TRUNCATE_LIMIT,
   projectTranscriptEntries,
+  truncateToolResult,
   type ProjectedReasoning,
   type ProjectedToolCall,
   type TextTranscriptEntry,
@@ -10,6 +12,7 @@ export {
   type TranscriptProjection,
 } from "./entries"
 export {
+  REFLECTION_SNAPSHOT_MAX_BYTES,
   REFLECTION_STATE_SCHEMA_VERSION,
   captureCursorSnapshot,
   countCompletedSteps,
@@ -18,6 +21,7 @@ export {
   initialReflectionState,
   reflectedThroughByteOffset,
   isCanonicalEntry,
+  type CaptureCursorOptions,
   type ReflectionSnapshot,
   type ReflectionTranscriptState,
 } from "./cursor"

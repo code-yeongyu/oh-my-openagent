@@ -47,7 +47,7 @@ describe("checkpointUlwLoop final story surface resolution", () => {
 		expect(result.plan.aggregateCompletion?.status).toBe("complete");
 	});
 
-	it("#given the same codeReview-free gate #when the surface is lazycodex #then the final story is rejected", async () => {
+	it("#given the same codeReview-free gate #when the surface is lazycodex #then the final story completes", async () => {
 		const repo = await repoWith(
 			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
 		);
@@ -59,17 +59,16 @@ describe("checkpointUlwLoop final story surface resolution", () => {
 		requiredSection(gate, "manualQa")["by"] = "main-session";
 		requiredSection(gate, "gateReview")["by"] = "category:deep";
 
-		await expectCode(
-			() =>
-				checkpointUlwLoop(repo, {
-					goalId: "G002",
-					status: "complete",
-					evidence: "final work complete and validation passed",
-					codexGoalJson: snapshot("complete"),
-					qualityGateJson: JSON.stringify(gate),
-				}),
-			"ULW_LOOP_QUALITY_GATE_INVALID",
-		);
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G002",
+			status: "complete",
+			evidence: "final work complete and validation passed",
+			codexGoalJson: snapshot("complete"),
+			qualityGateJson: JSON.stringify(gate),
+		});
+
+		expect(result.aggregateCompletion?.status).toBe("complete");
+		expect(result.plan.aggregateCompletion?.status).toBe("complete");
 	});
 
 	it("#given the omo-senpi surface #when the gate includes codeReview #then the final story is rejected", async () => {

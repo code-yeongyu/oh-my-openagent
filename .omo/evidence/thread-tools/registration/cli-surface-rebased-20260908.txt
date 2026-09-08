@@ -1,0 +1,12 @@
+host pid=46811 socket=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-t13-cli-surface-ltNdqT/rpc.sock
+PASS cli-surface/caller-session-hosted fallback=none cause=null
+PASS cli-surface/caller-visible-in-host sessions=1 caller_durable=01a07ed5-9fd6-7747-9e50-0a9b51c84206
+peer routing=rpc-2 durable=01a07ed5-a054-7667-9c55-4c2ff341d050
+PASS cli-surface/create-transcript user_turns=1 roles=["user","assistant"]
+PASS cli-surface/address-book-resolves-peer resolution=name entries=2
+PASS cli-surface/send-transcript delivery=started user_turns=1
+PASS cli-surface/steer-transcript user_turns=1 roles=["user","assistant","user","assistant","user","assistant","user","assistant"]
+PASS cli-surface/unknown-target-typed-error tool_code=not_found wire_error=unknown_session transcript_unchanged=true
+PASS cli-surface/reader-sees-peer-turns reader_kind=ok items=16
+PASS cli-surface/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+PASS cli-surface assertions_failed=0

@@ -1,0 +1,23 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-codex\src\install\install-codex-packaged.test.ts:
+(pass) #given packaged lazycodex tarball layout #when installing Codex plugin #then uses bundled artifacts without source builds [222.68ms]
+(pass) #given packaged lazycodex tarball layout #when simulating Windows install #then links bin shims for that platform [101.71ms]
+
+packages\omo-codex\src\install\install-codex.test.ts:
+(pass) install-codex > #given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package [4.78ms]
+(pass) install-codex > #given wrapper root env #when resolving vendored repo root #then prefers wrapper package root [3.65ms]
+(pass) install-codex > #given canonical installer package nesting #when resolving vendored repo root #then walks past the legacy five-parent cap [5.44ms]
+(pass) install-codex > #given default CODEX_HOME #when resolving installer bin dir without override #then preserves user local bin precedence [1.00ms]
+(pass) install-codex > #given custom CODEX_HOME #when resolving installer bin dir without override #then keeps generated omo inside that Codex home [0.84ms]
+(pass) install-codex > #given explicit CODEX_LOCAL_BIN_DIR #when resolving installer bin dir #then preserves installed omo precedence [0.81ms]
+(pass) install-codex > #given codex installer #when installing omo #then registers local marketplace and cached plugin [7000.32ms]
+(pass) install-codex > #given codex installer #when installing omo #then never spawns a repo script that is not shipped [6851.22ms]
+(pass) install-codex > #given repoRoot without root CLI dist #when installing omo #then warns about the skipped omo runtime wrapper [216.98ms]
+(pass) install-codex > #given a live unverifiable legacy daemon dir #when installing omo #then it warns and does not copy legacy IPC state into the OMO home [6949.75ms]
+(pass) install-codex > #given autonomous permissions requested #when installing omo #then writes Codex autonomy settings [6997.80ms]
+
+ 13 pass
+ 0 fail
+ 70 expect() calls
+Ran 13 tests across 2 files. [29.91s]

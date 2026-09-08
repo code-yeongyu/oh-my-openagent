@@ -1,0 +1,2 @@
+assert uncertain-operation child_sigkill=true state=idempotency_uncertain host_get_messages=true delivered_count=1 auto_redelivered=false
+PASS uncertain-operation

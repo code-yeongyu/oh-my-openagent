@@ -1,0 +1,323 @@
+{
+  "taskId": "st_01a08128",
+  "startedAt": "2026-09-08T13:17:56.395Z",
+  "expectedHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+  "branch": "lcx/gate-softening",
+  "primary": "mengmotaMac",
+  "fallback": "gorky",
+  "fallbackUsed": false,
+  "transcript": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-gate-softening/.omo/evidence/20260908-lcx-gate-softening/task-gate-b-remote-tests.log",
+  "attempts": [
+    {
+      "machine": "mengmotaMac",
+      "gates": [
+        {
+          "id": "a",
+          "name": "ulw-loop",
+          "command": "bun --cwd packages/omo-codex/plugin/components/ulw-loop test",
+          "timeoutMs": 600000,
+          "machine": "mengmotaMac",
+          "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+          "exitCode": 0,
+          "shellExit": 0,
+          "counts": [
+            " Test Files  54 passed (54)",
+            "      Tests  547 passed (547)"
+          ],
+          "captureSuccess": true
+        },
+        {
+          "id": "b",
+          "name": "ultrawork",
+          "command": "bun --cwd packages/omo-codex/plugin/components/ultrawork test",
+          "timeoutMs": 600000,
+          "machine": "mengmotaMac",
+          "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+          "exitCode": 0,
+          "shellExit": 0,
+          "counts": [
+            " Test Files  5 passed (5)",
+            "      Tests  24 passed (24)"
+          ],
+          "captureSuccess": true
+        },
+        {
+          "id": "c",
+          "name": "ulw-execute-continuation",
+          "command": "bun --cwd packages/omo-codex/plugin/components/ulw-execute-continuation test",
+          "timeoutMs": 600000,
+          "machine": "mengmotaMac",
+          "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+          "exitCode": 0,
+          "shellExit": 0,
+          "counts": [
+            " Test Files  3 passed (3)",
+            "      Tests  43 passed (43)"
+          ],
+          "captureSuccess": true
+        },
+        {
+          "id": "d",
+          "name": "plugin Node tests",
+          "command": "cd packages/omo-codex/plugin && node --test test/*.test.mjs && cd ../../..",
+          "timeoutMs": 900000,
+          "machine": "mengmotaMac",
+          "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+          "exitCode": 0,
+          "shellExit": 0,
+          "counts": [
+            "\u2139 tests 327",
+            "\u2139 suites 0",
+            "\u2139 pass 327",
+            "\u2139 fail 0",
+            "\u2139 cancelled 0",
+            "\u2139 skipped 0",
+            "\u2139 todo 0"
+          ],
+          "captureSuccess": true
+        },
+        {
+          "id": "e",
+          "name": "prompts-core and installer freshness",
+          "command": "bun test ./packages/prompts-core ./script/codex-install-bundle-freshness.test.ts",
+          "timeoutMs": 300000,
+          "machine": "mengmotaMac",
+          "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+          "exitCode": 0,
+          "shellExit": 0,
+          "counts": [
+            " 28 pass",
+            " 0 fail",
+            " 43 expect() calls",
+            "Ran 28 tests across 6 files. [1077.00ms]"
+          ],
+          "captureSuccess": true
+        },
+        {
+          "id": "f",
+          "name": "test:codex",
+          "command": "bun run test:codex",
+          "timeoutMs": 1800000,
+          "machine": "mengmotaMac",
+          "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+          "exitCode": 0,
+          "shellExit": 0,
+          "counts": [
+            " Test Files  25 passed (25)",
+            "      Tests  97 passed (97)",
+            " Test Files  54 passed (54)",
+            "      Tests  547 passed (547)",
+            " 418 pass",
+            " 1 skip",
+            " 0 fail",
+            " 1276 expect() calls",
+            "Ran 419 tests across 66 files. [23.52s]",
+            "\u2139 tests 486",
+            "\u2139 suites 0",
+            "\u2139 pass 486",
+            "\u2139 fail 0",
+            "\u2139 cancelled 0",
+            "\u2139 skipped 0",
+            "\u2139 todo 0"
+          ],
+          "captureSuccess": true
+        }
+      ],
+      "setupExit": 0,
+      "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+      "cleanup": {
+        "exitCode": 0,
+        "stdout": "CLEANUP_EXIT=0\nREMOVAL_RECEIPT: /tmp/lcx-gate-b5-20260908 REMOVED\n",
+        "stderr": ""
+      }
+    }
+  ],
+  "gates": [
+    {
+      "id": "a",
+      "name": "ulw-loop",
+      "command": "bun --cwd packages/omo-codex/plugin/components/ulw-loop test",
+      "timeoutMs": 600000,
+      "machine": "mengmotaMac",
+      "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " Test Files  54 passed (54)",
+        "      Tests  547 passed (547)"
+      ],
+      "captureSuccess": true
+    },
+    {
+      "id": "b",
+      "name": "ultrawork",
+      "command": "bun --cwd packages/omo-codex/plugin/components/ultrawork test",
+      "timeoutMs": 600000,
+      "machine": "mengmotaMac",
+      "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " Test Files  5 passed (5)",
+        "      Tests  24 passed (24)"
+      ],
+      "captureSuccess": true
+    },
+    {
+      "id": "c",
+      "name": "ulw-execute-continuation",
+      "command": "bun --cwd packages/omo-codex/plugin/components/ulw-execute-continuation test",
+      "timeoutMs": 600000,
+      "machine": "mengmotaMac",
+      "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " Test Files  3 passed (3)",
+        "      Tests  43 passed (43)"
+      ],
+      "captureSuccess": true
+    },
+    {
+      "id": "d",
+      "name": "plugin Node tests",
+      "command": "cd packages/omo-codex/plugin && node --test test/*.test.mjs && cd ../../..",
+      "timeoutMs": 900000,
+      "machine": "mengmotaMac",
+      "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        "\u2139 tests 327",
+        "\u2139 suites 0",
+        "\u2139 pass 327",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0",
+        "\u2139 todo 0"
+      ],
+      "captureSuccess": true
+    },
+    {
+      "id": "e",
+      "name": "prompts-core and installer freshness",
+      "command": "bun test ./packages/prompts-core ./script/codex-install-bundle-freshness.test.ts",
+      "timeoutMs": 300000,
+      "machine": "mengmotaMac",
+      "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " 28 pass",
+        " 0 fail",
+        " 43 expect() calls",
+        "Ran 28 tests across 6 files. [1077.00ms]"
+      ],
+      "captureSuccess": true
+    },
+    {
+      "id": "f",
+      "name": "test:codex",
+      "command": "bun run test:codex",
+      "timeoutMs": 1800000,
+      "machine": "mengmotaMac",
+      "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " Test Files  25 passed (25)",
+        "      Tests  97 passed (97)",
+        " Test Files  54 passed (54)",
+        "      Tests  547 passed (547)",
+        " 418 pass",
+        " 1 skip",
+        " 0 fail",
+        " 1276 expect() calls",
+        "Ran 419 tests across 66 files. [23.52s]",
+        "\u2139 tests 486",
+        "\u2139 suites 0",
+        "\u2139 pass 486",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0",
+        "\u2139 todo 0"
+      ],
+      "captureSuccess": true
+    }
+  ],
+  "localVerification": {
+    "startedAt": "2026-09-08T13:16:31.736329+00:00",
+    "head": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+    "bunVersion": "1.4.0",
+    "installerBuildExit": 0,
+    "installerTreeUnchanged": true,
+    "requestedPluginBuildExit": 0,
+    "requestedPluginBuildNote": "Bun 1.4.0 argument order can print help only; additionally run repository-declared order.",
+    "actualPluginBuildExit": 0,
+    "gitStatusPorcelain": "",
+    "treeClean": true
+  },
+  "tsgo": "COMMAND: tsgo --noEmit -p packages/omo-codex/tsconfig.json\nTSGO_EXIT=0\n",
+  "interpretation": "mengmotaMac primary, gorky availability/setup fallback; no retries of test failures. Fresh clone rather than overlaid source verifies the pushed SHA. Gate evidence stays ignored to preserve the requested 13 commits and clean tree.",
+  "directory": [
+    {
+      "alias": "mengmotaHost",
+      "os": "macos",
+      "arch": "aarch64",
+      "state": "offline"
+    },
+    {
+      "alias": "vultr-tokyo",
+      "os": "linux",
+      "arch": "x86_64",
+      "state": "online"
+    },
+    {
+      "alias": "sionicMac",
+      "os": "macos",
+      "arch": "aarch64",
+      "state": "online"
+    },
+    {
+      "alias": "gorky",
+      "os": "linux",
+      "arch": "x86_64",
+      "state": "online"
+    },
+    {
+      "alias": "mengmotaMac",
+      "os": "macos",
+      "arch": "aarch64",
+      "state": "online"
+    }
+  ],
+  "machine": "mengmotaMac",
+  "remoteHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+  "allGatesPassed": true,
+  "finishedAt": "2026-09-08T13:21:19.072Z",
+  "finalVerification": {
+    "verifiedAt": "2026-09-08T13:21:58.474685+00:00",
+    "head": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+    "originHead": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+    "commitsOverOriginDev": 13,
+    "gitStatusPorcelain": "",
+    "testExitLineCount": 6,
+    "testExits": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "diagnostics": {
+      "testSupport": "No diagnostics found",
+      "testSuite": "No diagnostics found",
+      "packageJson": "Biome unavailable; JSON parse passed"
+    },
+    "skip": "Existing Windows named-pipe daemon test skipped on macOS (1 skip in gate f).",
+    "localCleanup": "REMOVAL_RECEIPT: /tmp/lcx-gate-b5-driver.ts REMOVED",
+    "evidenceDisposition": "Task-10 and current task-13 evidence committed with the fixes. New b5 gate logs and receipts remain ignored, not committed, preserving 13 commits. Superseded task-13-drift-plan.md was not staged.",
+    "scope": "No product source edited; sync-skills.test.mjs was already identical to HEAD; no tracked skill regeneration diff."
+  }
+}

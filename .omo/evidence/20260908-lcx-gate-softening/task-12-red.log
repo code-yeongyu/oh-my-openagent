@@ -1,0 +1,16 @@
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-01659993/omo && bun test packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts packages/omo-codex/plugin/test/aggregate-manifest.test.mjs packages/omo-codex/plugin/test/aggregate-hooks.test.mjs packages/omo-codex/plugin/test/hook-status-message.test.mjs
+EXIT: 1
+STDOUT:
+bun test v1.4.0 (34cbb9a40)
+
+STDERR:
+The following filters did not match any test files:
+ packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts packages/omo-codex/plugin/test/aggregate-manifest.test.mjs packages/omo-codex/plugin/test/aggregate-hooks.test.mjs packages/omo-codex/plugin/test/hook-status-message.test.mjs
+7193 files were searched [75.00ms]
+
+note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
+note: To treat the "packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts" filter as a path, run "bun test ./packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts"
+
+Learn more about bun test: https://bun.com/docs/cli/test
+

@@ -1,0 +1,132 @@
+{
+  "base": "7c1c66c61b83a0dce97e2b30f9d8971a1ff7d881",
+  "branch": "lcx/gate-softening",
+  "recovery": "Untouched working files; six new commits retain original base parent. No reset or rebase requested.",
+  "strategy": "Stage exact declared files and task-prefixed evidence; split shared manifest in index only, rather than editing product source. Preserve undeclared dirty work.",
+  "commits": [
+    {
+      "todo": 8,
+      "sha": "a94df2085339d87b6c54cee09fe28fddaab478e7",
+      "subject": "feat(ulw-loop): soften lazycodex quality gate to optional codeReview and self-review acceptors",
+      "issues": [
+        "7577",
+        "155"
+      ],
+      "paths": [
+        ".omo/evidence/20260908-lcx-gate-softening/task-8-doneclaim.json",
+        ".omo/evidence/20260908-lcx-gate-softening/task-8-gate.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-8-red-green.log",
+        "packages/omo-codex/plugin/components/ulw-loop/README.md",
+        "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md",
+        "packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-template.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/src/checkpoint.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/src/domain-types.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/src/quality-gate.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/src/surface.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-lazycodex-surface.test.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts"
+      ]
+    },
+    {
+      "todo": 9,
+      "sha": "1999be1f646f453ae758f88df13bd09ab9e28960",
+      "subject": "fix(ulw-loop): explain accepted quality-gate input forms in errors and help",
+      "issues": [
+        "155"
+      ],
+      "paths": [
+        ".omo/evidence/20260908-lcx-gate-softening/task-9-doneclaim.json",
+        ".omo/evidence/20260908-lcx-gate-softening/task-9-errors.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-9-green.log",
+        "packages/omo-codex/plugin/components/ulw-loop/src/cli-output.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/src/quality-gate-fields.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/src/status-next-actions.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/test/quality-gate.test.ts"
+      ]
+    },
+    {
+      "todo": 11,
+      "sha": "0889c24678a2ce1c1e55bd8440cc7bca016289fc",
+      "subject": "feat(prompts-core): trigger ultrawork verification gate only on explicit review demands",
+      "issues": [],
+      "paths": [
+        ".omo/evidence/20260908-lcx-gate-softening/task-11-directive.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-11-doneclaim.json",
+        "packages/omo-codex/plugin/components/ultrawork/src/directive-content.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/directive.md",
+        "packages/prompts-core/prompts/ultrawork/codex.md"
+      ]
+    },
+    {
+      "todo": 12,
+      "sha": "b08bcbe5142b4edf79e678f6c1e1ccb6d4e6f1c3",
+      "subject": "fix(omo-codex): relax ulw-execute final gate and stop injecting root plans into subagents",
+      "issues": [
+        "160",
+        "144"
+      ],
+      "paths": [
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-cleanup.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-continuation.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-doneclaim.json",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-green.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-red-correct-path.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-red.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-remote-build.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-remote-inspect.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-remote-install-no-scripts.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-remote-install.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-remote-setup.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-12-remote.json",
+        "packages/omo-codex/plugin/.codex-plugin/plugin.json",
+        "packages/omo-codex/plugin/components/ulw-execute-continuation/AGENTS.md",
+        "packages/omo-codex/plugin/components/ulw-execute-continuation/README.md",
+        "packages/omo-codex/plugin/components/ulw-execute-continuation/directive.md",
+        "packages/omo-codex/plugin/components/ulw-execute-continuation/hooks/hooks.json",
+        "packages/omo-codex/plugin/components/ulw-execute-continuation/src/codex-hook.ts",
+        "packages/omo-codex/plugin/components/ulw-execute-continuation/src/types.ts",
+        "packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts",
+        "packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts",
+        "packages/omo-codex/plugin/hooks/subagent-stop-checking-ulw-execute-continuation.json",
+        "packages/omo-codex/plugin/test/aggregate-hooks.test.mjs",
+        "packages/omo-codex/plugin/test/aggregate-manifest.test.mjs",
+        "packages/omo-codex/plugin/test/component-hook-contract-cases.mjs",
+        "packages/omo-codex/plugin/test/hook-status-message.test.mjs"
+      ]
+    },
+    {
+      "todo": 13,
+      "sha": "61acee06e99086da2dad02ab5ee4108362c5bea7",
+      "subject": "fix(omo-codex): make Codex final verification self-review by default and warn on empty spawn fields",
+      "issues": [
+        "153"
+      ],
+      "paths": [
+        ".omo/evidence/20260908-lcx-gate-softening/task-13-doneclaim.json",
+        ".omo/evidence/20260908-lcx-gate-softening/task-13-node-test.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-13-red.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-13-sync-skills-full-node-test.log",
+        ".omo/evidence/20260908-lcx-gate-softening/task-13-sync-skills.log",
+        "packages/omo-codex/plugin/scripts/sync-skills.mjs",
+        "packages/omo-codex/plugin/test/sync-skills-codex-compatibility.test.mjs"
+      ]
+    },
+    {
+      "todo": 10,
+      "sha": "7f807167828b1dd86b837106bb0dcf6aaff116ae",
+      "subject": "feat(ulw-loop): add subagent admission circuit breaker and align lazycodex gate artifacts",
+      "issues": [
+        "143"
+      ],
+      "paths": [
+        ".omo/evidence/20260908-lcx-gate-softening/task-10-doneclaim.json",
+        "packages/omo-codex/plugin/.codex-plugin/plugin.json",
+        "packages/omo-codex/plugin/components/ulw-loop/hooks/hooks.json",
+        "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts",
+        "packages/omo-codex/plugin/components/ulw-loop/src/spawn-guard.ts",
+        "packages/omo-codex/plugin/hooks/post-tool-use-recording-spawn-admission.json"
+      ]
+    }
+  ]
+}

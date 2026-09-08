@@ -93,9 +93,11 @@ test("#given aggregate Codex skills #when source wiring is inspected #then share
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/index.mjs"), true);
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/skills"), true);
 	assert.equal(sharedSkillDependency, "file:../../shared-skills");
-	assert.match(syncScript, /from "\.\.\/\.\.\/\.\.\/shared-skills\/index\.mjs"/);
-	assert.match(syncScript, /from "\.\.\/\.\.\/\.\.\/shared-skills\/skill-source-filter\.mjs"/);
-	assert.doesNotMatch(syncScript, /from "@oh-my-opencode\/shared-skills/);
+	assert.match(syncScript, /from "@oh-my-opencode\/shared-skills"/);
+	assert.match(syncScript, /from "@oh-my-opencode\/shared-skills\/skill-source-filter"/);
+	// A checkout-relative path dangles once the installer flattens plugin/ into
+	// <CODEX_HOME>/plugins/cache/<marketplace>/omo/<version> (see canonical-ultrawork-directive.mjs).
+	assert.doesNotMatch(syncScript, /from "\.\.\/\.\.\/\.\.\/shared-skills\//);
 	assert.doesNotMatch(syncScript, /shared-skills",\s*"skills"/);
 });
 

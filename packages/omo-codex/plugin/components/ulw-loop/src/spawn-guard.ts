@@ -1,21 +1,12 @@
 import { randomBytes } from "node:crypto";
-import {
-	existsSync,
-	mkdirSync,
-	openSync,
-	readdirSync,
-	readFileSync,
-	renameSync,
-	statSync,
-	unlinkSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { PreToolUsePayload } from "./codex-hook.js";
 import { parsePreToolUsePayload } from "./codex-hook.js";
 import { isFinalRunCompletionCandidate } from "./goal-status.js";
-import { ulwLoopAttemptEvidenceDir, ulwLoopDir } from "./paths.js";
+import { ulwLoopAttemptEvidenceDir, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
+import { isStateLockTimeout, type StateLockOptions, withStateLockSync } from "./state-lock.js";
 import {
 	GATE_REVIEWER_AGENT_NAMES,
 	REVIEWER_ROLES_BY_SURFACE,
@@ -28,7 +19,7 @@ import type { UlwLoopPlan } from "./types.js";
 // hook token from codex-rs hook_names.rs; collaboration.spawn_agent = the
 // dotted token observed live in the task-1 probe (hook-tool-tokens.txt).
 const SPAWN_TOOL_TOKENS = new Set(["spawn_agent", "collaborationspawn_agent", "collaboration.spawn_agent"]);
-const DEFAULT_FANOUT_LIMIT = 60;
+export const DEFAULT_FANOUT_LIMIT = 24;
 const DEFAULT_REVIEW_SPAWN_LIMIT = 3;
 const GATE_MESSAGE_PATTERN = /lazycodex-gate-reviewer|omo-senpi-gate-reviewer|final gate review/i;
 const REVIEW_AGENT_TYPES = [
@@ -38,21 +29,75 @@ const REVIEW_AGENT_TYPES = [
 ] as const;
 const REVIEW_AGENT_TYPE_SET = new Set<string>(REVIEW_AGENT_TYPES);
 
-export function applySpawnGuards(payload: PreToolUsePayload): string {
+export interface SpawnGuardOptions {
+	readonly lockTimeoutMs?: number;
+}
+
+export function applySpawnGuards(payload: PreToolUsePayload, options: SpawnGuardOptions = {}): string {
 	if (payload.hook_event_name !== "PreToolUse" || !SPAWN_TOOL_TOKENS.has(payload.tool_name)) return "";
-	const stateDir = ulwLoopDir(payload.cwd, { sessionId: payload.session_id });
+	const breaker = readAdmissionBreaker(payload.session_id);
+	if (breaker !== null)
+		return deny(
+			`Subagent admission failed earlier in this session (${breaker}). Do not spawn more workers or reviewers; report the capacity block and wait for the user.`,
+		);
+	const scope = { sessionId: payload.session_id } as const;
+	const stateDir = ulwLoopDir(payload.cwd, scope);
 	const plan = readPlan(join(stateDir, "goals.json"));
 	if (plan === null) return "";
+	const lockOptions: StateLockOptions =
+		options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs };
+	try {
+		return withStateLockSync(
+			ulwLoopStateLockPath(payload.cwd, scope),
+			() => evaluateGuards(payload, plan, stateDir),
+			lockOptions,
+		);
+	} catch (error) {
+		if (isStateLockTimeout(error))
+			return deny(`ulw-loop spawn guard could not take the session state lock: ${error.message}`);
+		throw error;
+	}
+}
+
+function evaluateGuards(payload: PreToolUsePayload, plan: UlwLoopPlan, stateDir: string): string {
 	const fanOutPeek = peekFanOutBudget(stateDir);
 	if (fanOutPeek !== null) return deny(fanOutPeek);
 	const missingArtifact = missingGateArtifact(payload, plan);
 	if (missingArtifact !== null)
-		return deny(`spawn code-review + QA first; gate audits their artifacts: missing ${missingArtifact}`);
+		return deny(`record manual QA first; gate audits its artifacts: missing ${missingArtifact}`);
 	const reviewDenial = consumeReviewSpawnBudget(payload, plan, stateDir);
 	if (reviewDenial !== null) return deny(reviewDenial);
 	const fanOutDenial = consumeFanOutBudget(stateDir);
 	if (fanOutDenial !== null) return deny(fanOutDenial);
 	return "";
+}
+
+export async function runSpawnAdmissionRecorderCli(
+	stdin: NodeJS.ReadableStream,
+	stdout: NodeJS.WritableStream,
+): Promise<void> {
+	const chunks: Buffer[] = [];
+	for await (const chunk of stdin) chunks.push(Buffer.from(chunk));
+	try {
+		const payload = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+		const response =
+			typeof payload["tool_response"] === "string"
+				? payload["tool_response"]
+				: JSON.stringify(payload["tool_response"] ?? "");
+		if (!/too many active cells|AgentLimitReached|max_threads|max_concurrent_threads_per_session/i.test(response))
+			return;
+		const dataDir = process.env["PLUGIN_DATA"];
+		if (typeof dataDir !== "string" || typeof payload["session_id"] !== "string") return;
+		const markerDir = join(dataDir, "spawn-breaker");
+		mkdirSync(markerDir, { recursive: true });
+		atomicWriteJson(join(markerDir, `${payload["session_id"]}.json`), {
+			reason: response,
+			at: new Date().toISOString(),
+		});
+	} catch {
+		/* malformed hook input is ignored */
+	}
+	void stdout;
 }
 
 export async function runSpawnGuardCli(stdin: NodeJS.ReadableStream, stdout: NodeJS.WritableStream): Promise<void> {
@@ -99,18 +144,15 @@ function consumeReviewSpawnBudget(payload: PreToolUsePayload, plan: UlwLoopPlan,
 		plan.goals.find((candidate) => isFinalRunCompletionCandidate(plan, candidate));
 	if (goal === undefined) return null;
 	const counterPath = join(stateDir, "review-spawn-counts.json");
-	const lockPath = `${counterPath}.lock`;
 	const limit = reviewSpawnLimit();
-	return withExclusiveLock(lockPath, () => {
-		const counts = readCounts(counterPath);
-		const key = `${agentType}:${goal.id}:a${goal.attempt}`;
-		const count = (counts[key] ?? 0) + 1;
-		if (count > limit)
-			return `ulw-loop reviewer no-progress cap reached (${agentType} ${count}/${limit}) for ${goal.id} attempt ${goal.attempt}. Consolidate existing review findings, or checkpoint and start a new attempt after concrete progress.`;
-		counts[key] = count;
-		atomicWriteJson(counterPath, counts);
-		return null;
-	});
+	const counts = readCounts(counterPath);
+	const key = `${agentType}:${goal.id}:a${goal.attempt}`;
+	const count = (counts[key] ?? 0) + 1;
+	if (count > limit)
+		return `ulw-loop reviewer no-progress cap reached (${agentType} ${count}/${limit}) for ${goal.id} attempt ${goal.attempt}. Consolidate existing review findings, or checkpoint and start a new attempt after concrete progress.`;
+	counts[key] = count;
+	atomicWriteJson(counterPath, counts);
+	return null;
 }
 
 function missingGateArtifact(payload: PreToolUsePayload, plan: UlwLoopPlan): string | null {
@@ -119,9 +161,7 @@ function missingGateArtifact(payload: PreToolUsePayload, plan: UlwLoopPlan): str
 	if (goal === undefined || goal.status === "complete") return null;
 	if (!goal.successCriteria.every((criterion) => criterion.status === "pass")) return null;
 	const scope = { sessionId: payload.session_id } as const;
-	const surface = resolveToolkitSurface();
-	const requiredArtifacts =
-		surface === "omo-senpi" ? [`${goal.id}-manual-qa.md`] : [`${goal.id}-code-review.md`, `${goal.id}-manual-qa.md`];
+	const requiredArtifacts = [`${goal.id}-manual-qa.md`];
 	if (plan.evidenceLayoutVersion === 2) {
 		const attemptDir = ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope);
 		for (const name of requiredArtifacts) {
@@ -130,16 +170,8 @@ function missingGateArtifact(payload: PreToolUsePayload, plan: UlwLoopPlan): str
 		}
 		return null;
 	}
-	const flatReport = `.omo/evidence/${goal.id}-code-review.md`;
-	if (surface !== "omo-senpi" && !isNonEmptyFile(join(payload.cwd, flatReport))) return flatReport;
-	if (surface === "omo-senpi") {
-		const manualQa = `.omo/evidence/${goal.id}-manual-qa.md`;
-		return isNonEmptyFile(join(payload.cwd, manualQa)) ? null : manualQa;
-	}
-	// v1 manual-QA approximation: any other non-empty evidence file counts.
-	if (!hasOtherEvidenceFile(join(payload.cwd, ".omo", "evidence"), `${goal.id}-code-review.md`))
-		return `.omo/evidence/${goal.id}-manual-qa.md`;
-	return null;
+	const manualQa = `.omo/evidence/${goal.id}-manual-qa.md`;
+	return isNonEmptyFile(join(payload.cwd, manualQa)) ? null : manualQa;
 }
 
 function isGateReviewerSpawn(toolInput: unknown): boolean {
@@ -190,45 +222,6 @@ function activeSurfaceReviewerAlias(reviewer: string): string {
 	return reviewer;
 }
 
-function withExclusiveLock<T>(lockPath: string, fn: () => T): T {
-	mkdirSync(dirname(lockPath), { recursive: true });
-	const maxAttempts = 10;
-	const baseDelayMs = 10;
-	for (let attempt = 0; attempt < maxAttempts; attempt++) {
-		let fd: number | null = null;
-		try {
-			fd = openSync(lockPath, "wx");
-			writeFileSync(fd, process.pid.toString());
-			try {
-				return fn();
-			} finally {
-				try {
-					unlinkSync(lockPath);
-				} catch {
-					/* empty */
-				}
-			}
-		} catch (error) {
-			if (fd !== null) {
-				try {
-					unlinkSync(lockPath);
-				} catch {
-					/* empty */
-				}
-			}
-			if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
-				return fn();
-			}
-			const delayMs = baseDelayMs * 2 ** attempt + Math.random() * baseDelayMs;
-			const deadline = Date.now() + delayMs;
-			while (Date.now() < deadline) {
-				/* spin */
-			}
-		}
-	}
-	return fn();
-}
-
 function atomicWriteJson(targetPath: string, data: unknown): void {
 	const tmp = join(dirname(targetPath), `.tmp-${randomBytes(6).toString("hex")}`);
 	writeFileSync(tmp, JSON.stringify(data));
@@ -244,6 +237,19 @@ function deny(reason: string): string {
 			additionalContext: reason,
 		},
 	})}\n`;
+}
+
+function readAdmissionBreaker(sessionId: string): string | null {
+	const dataDir = process.env["PLUGIN_DATA"];
+	if (typeof dataDir !== "string") return null;
+	try {
+		const value = JSON.parse(readFileSync(join(dataDir, "spawn-breaker", `${sessionId}.json`), "utf8")) as {
+			reason?: unknown;
+		};
+		return typeof value.reason === "string" ? value.reason : "capacity limit";
+	} catch {
+		return null;
+	}
 }
 
 function fanOutLimit(): number {
@@ -263,15 +269,6 @@ function reviewSpawnLimit(): number {
 function isNonEmptyFile(path: string): boolean {
 	try {
 		return existsSync(path) && statSync(path).size > 0;
-	} catch (error) {
-		if (error instanceof Error) return false;
-		throw error;
-	}
-}
-
-function hasOtherEvidenceFile(evidenceDir: string, excludedName: string): boolean {
-	try {
-		return readdirSync(evidenceDir).some((name) => name !== excludedName && isNonEmptyFile(join(evidenceDir, name)));
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;

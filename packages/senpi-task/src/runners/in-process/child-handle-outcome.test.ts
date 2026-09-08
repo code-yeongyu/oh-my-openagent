@@ -44,7 +44,13 @@ function createEmittingSession(sessionId = "child-session-1"): EmittingSessionCo
   }
 }
 
-function assistantEnd(text: string, stopReason: string, errorMessage?: string): ChildSessionEvent {
+function assistantEnd(
+  text: string,
+  stopReason: string,
+  errorMessage?: string,
+  provider?: string,
+  model?: string,
+): ChildSessionEvent {
   return {
     type: "message_end",
     message: {
@@ -52,6 +58,8 @@ function assistantEnd(text: string, stopReason: string, errorMessage?: string): 
       content: text.length > 0 ? [{ type: "text", text }] : [],
       stopReason,
       ...(errorMessage === undefined ? {} : { errorMessage }),
+      ...(provider === undefined ? {} : { provider }),
+      ...(model === undefined ? {} : { model }),
     },
   } as ChildSessionEvent
 }
@@ -207,5 +215,33 @@ describe("createChildHandle turn outcomes", () => {
 
     // then
     expect(await handle.waitForIdle()).toEqual({ status: "completed", finalResponse: "all done" })
+  })
+
+  test("#given a completed turn whose last assistant message names its provider and model #when the prompt resolves #then the outcome records that model", async () => {
+    const fake = createEmittingSession()
+    const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge" })
+
+    fake.emit(assistantEnd("all done", "stop", undefined, "omo-mock", "healthy-fallback"))
+    fake.resolvePrompt()
+
+    expect(await handle.waitForIdle()).toEqual({
+      status: "completed",
+      finalResponse: "all done",
+      model: "omo-mock/healthy-fallback",
+    })
+  })
+
+  test("#given an error turn whose failing assistant message names its provider and model #when the prompt resolves #then the outcome records that model", async () => {
+    const fake = createEmittingSession()
+    const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge" })
+
+    fake.emit(assistantEnd("", "error", "upstream gateway timeout", "omo-mock", "healthy-fallback"))
+    fake.resolvePrompt()
+
+    expect(await handle.waitForIdle()).toEqual({
+      status: "error",
+      failure: { kind: "child-turn-failed", message: "upstream gateway timeout" },
+      model: "omo-mock/healthy-fallback",
+    })
   })
 })

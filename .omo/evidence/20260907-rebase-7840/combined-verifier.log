@@ -1,0 +1,4 @@
+imports present: 2 of 2 (npm-pack-paths.mjs + npm-payload-required-paths.mjs)
+npm payload containment OK (1260 packed paths, 0 offenders)
+exit=0
+note: the npm spawn was temporarily substituted with saved npm 12.0.2 pack output for this capture because the Windows spawn fix lives in PR #7844; the substitution was reverted with git checkout -- and git status is clean.

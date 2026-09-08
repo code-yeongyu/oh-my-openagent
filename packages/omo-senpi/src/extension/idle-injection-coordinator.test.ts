@@ -227,6 +227,47 @@ describe("IdleInjectionCoordinator", () => {
     expect(events).toEqual(["provider rejected"])
   })
 
+  it("#given only a passive memorian entry #when flushOnIdle runs #then nothing is delivered and the entry stays queued", () => {
+    const { coordinator, calls } = createCoordinator()
+    coordinator.enqueue({ key: "memorian:1", source: "memorian", content: "recall", passive: true })
+
+    expect(coordinator.flushOnIdle()).toBe(0)
+    expect(calls).toHaveLength(0)
+    expect(coordinator.pendingCount()).toBe(1)
+  })
+
+  it("#given a passive memorian entry and a task-completion entry #when flushOnIdle runs #then one delivery carries both contents with memorian last and the passive onFlushed fires", () => {
+    const events: string[] = []
+    const { coordinator, calls } = createCoordinator()
+    coordinator.enqueue({
+      key: "memorian:1",
+      source: "memorian",
+      content: "recall",
+      passive: true,
+      onFlushed: () => events.push("memorian"),
+    })
+    coordinator.enqueue({ key: "task:1", source: "task-completion", content: "task done" })
+
+    expect(coordinator.flushOnIdle()).toBe(2)
+    expect(calls[0]?.content).toBe("task done\n\nrecall")
+    expect(events).toEqual(["memorian"])
+  })
+
+  it("#given a passive entry #when scheduleFlush's deferred pass runs #then nothing is delivered", () => {
+    const calls: DeliveredCall[] = []
+    const scheduled: Array<() => void> = []
+    const coordinator = new IdleInjectionCoordinator((message, options) => calls.push({ content: message.content, options }), {
+      scheduleFlush: (flush) => scheduled.push(flush),
+    })
+    coordinator.enqueue({ key: "memorian:1", source: "memorian", content: "recall", passive: true })
+
+    coordinator.scheduleFlush()
+    scheduled[0]?.()
+
+    expect(calls).toHaveLength(0)
+    expect(coordinator.pendingCount()).toBe(1)
+  })
+
   it("#given an injection callback w2lead #when the queue flushes #then onFlushed runs synchronously after delivery returns", () => {
     // given
     const order: string[] = []

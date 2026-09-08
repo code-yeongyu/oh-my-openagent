@@ -8,7 +8,7 @@ import { dagDefinitionAmendedEvent, dagRunCreatedEvent, type DagRunEventType } f
 import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprintInputV1 } from "./fingerprint"
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
 import { createDagJournal, type DagJournalCheckpoint } from "./journal"
-import type { DagEventPage, DagFileStore } from "./store"
+import { readDagDirectory, type DagEventPage, type DagFileStore } from "./store"
 import { DAG_SETTINGS_DEFAULTS } from "./types"
 import type {
   AmendRecord,
@@ -256,7 +256,7 @@ export function createDagManager(options: DagManagerOptions): DagManager {
     list(parentSessionId, listOptions) {
       const limit = resolveLimit(listOptions?.limit, LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT)
       const summaries: DagRunSummary[] = []
-      for (const entry of fs.readdirSync(store.paths.runs, { withFileTypes: true })) {
+      for (const entry of readDagDirectory(store.paths.runs)) {
         if (!entry.isFile() || !entry.name.endsWith(".json")) continue
         const record = store.readCheckpoint<DagRunRecordV1>(entry.name.slice(0, -5) as DagRunId)
         if (record === null || record.parentSessionId !== parentSessionId) continue

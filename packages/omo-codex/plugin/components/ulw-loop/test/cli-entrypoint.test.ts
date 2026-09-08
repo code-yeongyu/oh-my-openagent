@@ -74,7 +74,7 @@ afterEach(async () => {
 
 describe("dist/cli.js entrypoint dispatch", () => {
 	it("#given no plan #when invoked with bare 'status --json' #then routes into ulw-loop instead of unknown command", async () => {
-		const result = await runCli(["status", "--json"]);
+		const result = await runCli(["status", "--session-id", "s1", "--json"]);
 
 		const combined = `${result.stdout}${result.stderr}`;
 		expect(combined).toContain("No ulw-loop plan found");
@@ -83,12 +83,22 @@ describe("dist/cli.js entrypoint dispatch", () => {
 	});
 
 	it("#given no plan #when invoked with legacy 'ulw-loop status --json' #then still routes into ulw-loop", async () => {
-		const result = await runCli(["ulw-loop", "status", "--json"]);
+		const result = await runCli(["ulw-loop", "status", "--session-id", "s1", "--json"]);
 
 		const combined = `${result.stdout}${result.stderr}`;
 		expect(combined).toContain("No ulw-loop plan found");
 		expect(combined).not.toContain("[omo] unknown command");
 		expect(result.code).toBe(1);
+	});
+
+	it("#given no session flag and no session env #when invoked with 'status --json' #then refuses the unscoped root instead of reading it", async () => {
+		const result = await runCli(["status", "--json"]);
+
+		expect(result.code).toBe(1);
+		expect(JSON.parse(result.stdout)).toMatchObject({
+			ok: false,
+			error: { code: "ULW_LOOP_SESSION_SCOPE_REQUIRED", details: { flag: "--session-id" } },
+		});
 	});
 
 	it("#given the top-level entrypoint #when invoked with 'help' #then prints the merged hook and subcommand usage and exits 0", async () => {

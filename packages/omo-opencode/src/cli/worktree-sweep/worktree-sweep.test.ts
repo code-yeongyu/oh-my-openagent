@@ -15,6 +15,9 @@ import type { WorktreeSweepRepoReport } from "./types"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const GIT_COMMAND_TIMEOUT_MS = 10_000
+// Windows CI runners have much slower git/fs I/O than the 5 s Bun default;
+// give every git-heavy test enough room to avoid flakes.
+const GIT_HEAVY_TEST_TIMEOUT_MS = 30_000
 const temporaryDirectories: string[] = []
 
 afterAll(async () => {
@@ -401,7 +404,7 @@ describe("sweepWorktrees --older-than", () => {
     })
     expect(result.sweepCount).toBe(1)
     expect(result.keepCount).toBe(2)
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("olderThanDays 0 never sweeps unmerged worktrees regardless of age", async () => {
     const { base, repo } = await createFixture("wt-sweep-age0-")
@@ -440,7 +443,7 @@ describe("sweepWorktrees --apply", () => {
     expect(porcelain).not.toContain(toPosix(missing))
     expect(porcelain).not.toContain(toPosix(merged))
     expect(porcelain).toContain(toPosix(kept))
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("leaves locked and dirty worktrees in place even under --apply", async () => {
     const { base, repo } = await createFixture("wt-sweep-apply2-")
@@ -459,7 +462,7 @@ describe("sweepWorktrees --apply", () => {
     expect(await fs.stat(locked)).toBeTruthy()
     expect(await fs.stat(dirty)).toBeTruthy()
     expect(result.sweepCount).toBe(0)
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 })
 
 describe("worktreeSweep output", () => {
@@ -492,7 +495,7 @@ describe("worktreeSweep output", () => {
     expect(summary).toBe(
       "SUMMARY mode=dry-run repos=1 sweep=1 keep=1 prune=0 removed=0 failed=0",
     )
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("returns exit code 1 and a stderr message for a non-repository path", async () => {
     const base = await newTmpDir("wt-sweep-bad-")

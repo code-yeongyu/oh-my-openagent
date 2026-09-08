@@ -34,8 +34,8 @@ export type RunnerFailure = {
 }
 
 export type RunnerOutcome =
-  | { readonly status: "completed"; readonly finalResponse: string }
-  | { readonly status: "error"; readonly failure: RunnerFailure; readonly killed?: boolean }
+  | { readonly status: "completed"; readonly finalResponse: string; readonly model?: string }
+  | { readonly status: "error"; readonly failure: RunnerFailure; readonly killed?: boolean; readonly model?: string }
   | { readonly status: "cancelled" }
 
 export type ChildCompletionPolicy = "final-text" | "turn"
@@ -73,6 +73,8 @@ type TurnObservation = {
   text: string | undefined
   stopReason: string | undefined
   errorMessage: string | undefined
+  provider: string | undefined
+  model: string | undefined
   baseline: string | undefined
 }
 
@@ -84,6 +86,8 @@ function observeTurnEvent(observation: TurnObservation, event: ChildSessionEvent
   if (text !== undefined) observation.text = text
   observation.stopReason = typeof message.stopReason === "string" ? message.stopReason : undefined
   observation.errorMessage = typeof message.errorMessage === "string" ? message.errorMessage : undefined
+  observation.provider = typeof message.provider === "string" ? message.provider : undefined
+  observation.model = typeof message.model === "string" ? message.model : undefined
 }
 
 function assistantText(message: Record<string, unknown>): string | undefined {
@@ -107,23 +111,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // is only trusted when it CHANGED during this turn (baseline diff): on a revive, the previous run's
 // text must never masquerade as a fresh completion.
 function turnOutcome(session: ChildSession, observation: TurnObservation, completion: ChildCompletionPolicy): RunnerOutcome {
+  const provenance = observation.provider !== undefined && observation.model !== undefined
+    ? { model: `${observation.provider}/${observation.model}` }
+    : {}
   if (observation.stopReason === "error" || observation.stopReason === "aborted") {
     return {
       status: "error",
+      ...provenance,
       failure: {
         kind: "child-turn-failed",
         message: observation.errorMessage ?? `child turn ended with stopReason "${observation.stopReason}"`,
       },
     }
   }
-  if (observation.text !== undefined) return { status: "completed", finalResponse: observation.text }
+  if (observation.text !== undefined) return { status: "completed", finalResponse: observation.text, ...provenance }
   const final = session.getLastAssistantText()
   if (final !== undefined && final.length > 0 && final !== observation.baseline) {
-    return { status: "completed", finalResponse: final }
+    return { status: "completed", finalResponse: final, ...provenance }
   }
-  if (completion === "turn") return { status: "completed", finalResponse: "" }
+  if (completion === "turn") return { status: "completed", finalResponse: "", ...provenance }
   return {
     status: "error",
+    ...provenance,
     failure: {
       kind: "child-turn-failed",
       message: observation.errorMessage ?? "child turn produced no assistant output",
@@ -189,7 +198,9 @@ function createTrackedChildHandle(
   let turnActive = false
   // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
   let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session, completion))
-  const observation: TurnObservation = { text: undefined, stopReason: undefined, errorMessage: undefined, baseline: undefined }
+  const observation: TurnObservation = {
+    text: undefined, stopReason: undefined, errorMessage: undefined, baseline: undefined, provider: undefined, model: undefined,
+  }
   const unsubscribeObserver = session.subscribe((event) => observeTurnEvent(observation, event))
 
   // Start a fresh tracked turn and mark it active until it settles. waitForIdle() always returns the
@@ -200,6 +211,8 @@ function createTrackedChildHandle(
     observation.text = undefined
     observation.stopReason = undefined
     observation.errorMessage = undefined
+    observation.provider = undefined
+    observation.model = undefined
     observation.baseline = session.getLastAssistantText()
     running = runTurn(session, text, () => aborted, observation, completion)
     void running.then(

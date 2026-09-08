@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Oh My OpenAgent",
     short_name: "OMO",
     description:
-      "The Best Agent Harness. Meet Sisyphus: The batteries-included agent that codes like you.",
+      "The Best Agent Harness. Meet OmO: the batteries-included agent harness that codes like you.",
     start_url: "/",
     display: "standalone",
     background_color: "#0a0a0a",

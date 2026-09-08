@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, type SpawnOptions, spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { Socket } from "node:net";
 import { dirname, isAbsolute } from "node:path";
@@ -120,14 +120,26 @@ export function pingDaemon(
 	});
 }
 
-export function spawnDaemonProcess(paths: DaemonPaths): void {
+export interface SpawnDaemonProcessDeps {
+	spawn: (executable: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
+	resolveExecutable: () => string;
+}
+
+export function spawnDaemonProcess(paths: DaemonPaths, deps: Partial<SpawnDaemonProcessDeps> = {}): void {
 	mkdirSync(dirname(paths.log), { recursive: true });
 	const logFd = openSync(paths.log, "a");
 	try {
-		const child = spawn(resolveDaemonNodeExecutable(), [paths.cliPath, "daemon"], {
+		const spawnDaemonChild = deps.spawn ?? spawn;
+		const executable = deps.resolveExecutable?.() ?? resolveDaemonNodeExecutable();
+		const child = spawnDaemonChild(executable, [paths.cliPath, "daemon"], {
 			detached: true,
 			stdio: ["ignore", logFd, logFd],
 			windowsHide: true,
+			// Under the packaged runtime execPath is the compiled omo binary, not a
+			// node interpreter; without BUN_BE_BUN it runs its embedded entrypoint, so
+			// the CLI argv boots a billable agent session instead of the daemon
+			// (issue #7914). Inert for node and for the bun interpreter itself.
+			env: { ...process.env, BUN_BE_BUN: "1" },
 		});
 		child.once("spawn", () => closeSync(logFd));
 		child.once("error", (error) => {

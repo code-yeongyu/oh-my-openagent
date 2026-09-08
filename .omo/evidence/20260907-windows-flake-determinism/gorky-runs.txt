@@ -1,0 +1,215 @@
+=== g001-run.log ===
+1.4.0
+b885f13f8
+### BASELINE (origin/dev, full file, timings)
+(pass) createTeamSendMessageTool > #given generic fallback wakes cover two messages #when the first is acknowledged #then the second message still wakes [2474.94ms]
+(pass) createTeamSendMessageTool > inbox stays intact when live delivery fails so the fallback path still works [8632.94ms]
+ 41 pass
+ 0 fail
+Ran 41 tests across 1 file. [25.87s]
+### RED (test diff only)
+ M packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts
+bun test v1.4.0 (34cbb9a40)
+packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts:
+145 |   description: string,
+146 |   timeoutMs = TEST_EVENT_TIMEOUT_MS,
+147 | ): Promise<T> {
+148 |   let timeoutID: ReturnType<typeof setTimeout> | undefined
+149 |   const timeout = new Promise<never>((_resolve, reject) => {
+150 |     timeoutID = realSetTimeout(() => reject(new Error(`timed out waiting for ${description}`)), timeoutMs)
+                                                      ^
+error: timed out waiting for fallback wake after pre-send transport failure
+      at <anonymous> (/tmp/flake-fix-20260907/omo/packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts:150:49)
+(fail) createTeamSendMessageTool > inbox stays intact when live delivery fails so the fallback path still works [3024.71ms]
+ 0 pass
+ 40 filtered out
+ 1 fail
+Ran 1 test across 1 file. [4.16s]
+RED_RC=1
+### GREEN (full diff)
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-fallback-wake.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-live-delivery-recipient.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-live-delivery.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-runtime.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts
+bun test v1.4.0 (34cbb9a40)
+packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts:
+(pass) createTeamSendMessageTool > inbox stays intact when live delivery fails so the fallback path still works [100.61ms]
+ 1 pass
+ 40 filtered out
+ 0 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [1138.00ms]
+### GREEN full file
+(pass) createTeamSendMessageTool > #given generic fallback wakes cover two messages #when the first is acknowledged #then the second message still wakes [2476.65ms]
+(pass) createTeamSendMessageTool > inbox stays intact when live delivery fails so the fallback path still works [79.49ms]
+ 41 pass
+ 0 fail
+Ran 41 tests across 1 file. [14.63s]
+GREEN_FILE_RC=0
+=== g2-run.log ===
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-fallback-wake.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-live-delivery-recipient.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-live-delivery.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-runtime.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts
+ M script/fixtures/senpi-hooks-state-legacy-reader.ts
+ D script/fixtures/senpi-hooks-state-legacy-writer.ts
+ M script/senpi-hooks-state.test.ts
+### G001 full file timings (slowest 8)
+560.71 #given a message waits behind pending live delivery #when that prompt clears #then a queued wake exposes the waiting message
+447.16 #given a queued fallback message is pending acknowledgement #when the prompt gate clears #then the obsolete wake is cancelled
+410.16 #given a queued fallback message was already injected #when the prompt gate clears #then the obsolete wake is cancelled
+409.30 #given a queued fallback team was deleted #when the prompt gate clears #then the obsolete wake is cancelled
+381.28 #given live delivery falls back for an idle recipient #when the prompt gate clears #then a queued wake exposes the unread message
+324.77 #given a queued fallback recipient shut down #when the prompt gate clears #then the obsolete wake is cancelled
+291.77 #given transform already listed a peer message while recipient becomes idle #when live delivery races it #then only the live prompt receives the message
+248.72 #given generic fallback wakes cover two messages #when the first is acknowledged #then the second message still wakes
+ 41 pass
+ 0 fail
+Ran 41 tests across 1 file. [7.96s]
+### G002 fixture direct
+53 | const lockSync = (file: string, options: Record<string, unknown> | undefined): (() => void) => {
+54 |   lockAttempts += 1
+55 |   try {
+56 |     return actualLockfile.lockSync(file, options)
+57 |   } catch (error) {
+58 |     if (!released && isLockHeldError(error)) completeLegacyWrite()
+                          ^
+RangeError: Maximum call stack size exceeded.
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:58:22)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+
+Bun v1.4.0 (Linux x64)
+FIXTURE_RC=1
+### G002 test file GREEN
+(pass) patched Senpi hooks state snapshots > reads the last complete snapshot while the exact writer lock is held [2.70ms]
+error: 53 | const lockSync = (file: string, options: Record<string, unknown> | undefined): (() => void) => {
+57 |   } catch (error) {
+58 |     if (!released && isLockHeldError(error)) completeLegacyWrite()
+(fail) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [1045.54ms]
+(pass) patched Senpi hooks state snapshots > keeps malformed state fail-closed when no writer lock exists [8.06ms]
+(pass) patched Senpi hooks state snapshots > publishes by replacing the destination and leaves no temporary snapshot [7.74ms]
+(pass) patched Senpi hooks state snapshots > preserves an existing POSIX snapshot mode under a restrictive umask [331.65ms]
+(pass) patched Senpi hooks state snapshots > creates a new POSIX snapshot with mode 0600 under a permissive umask [0.97ms]
+ 5 pass
+ 1 fail
+Ran 6 tests across 1 file. [5.38s]
+### G002 MUTATION: writer never releases the lock
+58:    if (false) completeLegacyWrite()
+55 |     expect(child.status, child.stderr).toBe(0)
+                                            ^
+error: 51 | }))
+52 | 
+53 | const lockSync = (file: string, options: Record<string, unknown> | undefined): (() => void) => {
+54 |   lockAttempts += 1
+55 |   try {
+56 |     return actualLockfile.lockSync(file, options)
+                               ^
+RangeError: Maximum call stack size exceeded.
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+      at lockSync (/tmp/flake-fix-20260907/omo/script/fixtures/senpi-hooks-state-legacy-reader.ts:56:27)
+Bun v1.4.0 (Linux x64)
+Expected: 0
+Received: 1
+      at <anonymous> (/tmp/flake-fix-20260907/omo/script/senpi-hooks-state.test.ts:55:40)
+(fail) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [1452.86ms]
+ 0 pass
+ 5 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [4.70s]
+MUTATION_RC=1
+### G002 restored GREEN
+(fail) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [1091.10ms]
+ 0 pass
+ 1 fail
+### typecheck omo-opencode + script
+TSGO_OPENCODE_RC=0
+TSGO_SCRIPT_RC=0
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-fallback-wake.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-live-delivery-recipient.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-live-delivery.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging-runtime.ts
+ M packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts
+ M script/fixtures/senpi-hooks-state-legacy-reader.ts
+ D script/fixtures/senpi-hooks-state-legacy-writer.ts
+ M script/senpi-hooks-state.test.ts
+=== g3-run.log ===
+8
+### G002 fixture direct
+{"released":true,"truncatedReads":1,"lockAttempts":2,"state":{"version":1,"hooks":{"hk_trusted":{"enabled":true,"trustedHash":"sha256:trusted","scope":"project","sourcePath":"/project/hooks.json","commandPreview":"echo trusted","updatedAt":"2026-08-31T00:00:00.000Z"}}}}
+FIXTURE_RC=0
+### G002 test file GREEN
+(pass) patched Senpi hooks state snapshots > reads the last complete snapshot while the exact writer lock is held [2.06ms]
+(pass) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [366.72ms]
+(pass) patched Senpi hooks state snapshots > keeps malformed state fail-closed when no writer lock exists [3.08ms]
+(pass) patched Senpi hooks state snapshots > publishes by replacing the destination and leaves no temporary snapshot [5.41ms]
+(pass) patched Senpi hooks state snapshots > preserves an existing POSIX snapshot mode under a restrictive umask [297.37ms]
+(pass) patched Senpi hooks state snapshots > creates a new POSIX snapshot with mode 0600 under a permissive umask [0.97ms]
+ 6 pass
+ 0 fail
+Ran 6 tests across 1 file. [3.73s]
+### G002 MUTATION: writer never releases the lock
+1
+script/senpi-hooks-state.test.ts:
+52 |     const runner = join(import.meta.dir, "fixtures", "senpi-hooks-state-legacy-reader.ts")
+-   "lockAttempts": 2,
+-   "released": true,
++   "lockAttempts": 10,
++   "released": false,
+-     "hooks": {
+-       "hk_trusted": {
+-         "commandPreview": "echo trusted",
+-         "enabled": true,
+-         "scope": "project",
+-         "sourcePath": "/project/hooks.json",
+-         "trustedHash": "sha256:trusted",
+-         "updatedAt": "2026-08-31T00:00:00.000Z",
+-       },
+-     },
++     "hooks": {},
+- Expected  - 12
++ Received  + 3
+      at <anonymous> (/tmp/flake-fix-20260907/omo/script/senpi-hooks-state.test.ts:56:38)
+(fail) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [332.82ms]
+MUTATION_RC=1
+### G002 MUTATION 2: boundary never hit (snapshot complete before read)
+2
+-   "lockAttempts": 2,
+-   "released": true,
++   "lockAttempts": 0,
++   "released": false,
+-   "truncatedReads": 1,
++   "truncatedReads": 0,
+- Expected  - 3
++ Received  + 3
+(fail) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [291.59ms]
+MUTATION2_RC=1
+### G002 restored GREEN
+(pass) patched Senpi hooks state snapshots > reads the last complete snapshot while the exact writer lock is held [3.28ms]
+(pass) patched Senpi hooks state snapshots > recovers a trusted snapshot at a synchronized legacy truncate/write boundary [494.93ms]
+(pass) patched Senpi hooks state snapshots > keeps malformed state fail-closed when no writer lock exists [11.56ms]
+(pass) patched Senpi hooks state snapshots > publishes by replacing the destination and leaves no temporary snapshot [1.36ms]
+(pass) patched Senpi hooks state snapshots > preserves an existing POSIX snapshot mode under a restrictive umask [302.26ms]
+(pass) patched Senpi hooks state snapshots > creates a new POSIX snapshot with mode 0600 under a permissive umask [0.89ms]
+ 6 pass
+ 0 fail
+### typecheck script
+TSGO_SCRIPT_RC=0

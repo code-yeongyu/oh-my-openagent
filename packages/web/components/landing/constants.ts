@@ -1,87 +1,5 @@
-import type { Brain } from "lucide-react"
-import {
-  Check,
-  Eye,
-  Search,
-  Code2,
-  MessageSquare,
-  Target,
-  Shield,
-  Lightbulb,
-  Zap,
-  Route,
-  HardDrive,
-  Globe,
-  Users,
-  FileImage,
-} from "lucide-react"
-
-export const SUB_AGENT_KEYS = [
-  "oracle",
-  "librarian",
-  "explore",
-  "metis",
-  "momus",
-  "atlas",
-  "sisyphusJunior",
-  "multimodalLooker",
-] as const
-export type SubAgentKey = (typeof SUB_AGENT_KEYS)[number]
-
-type AgentStyle = {
-  readonly color: string
-  readonly border: string
-  readonly bg: string
-  readonly icon: typeof Brain
-}
-
-// Consolidated: single secondary accent (violet) for all sub-agents.
-// The visual differentiation comes from the icon, not a rainbow of colors.
-export const AGENT_STYLES: Readonly<Record<SubAgentKey, AgentStyle>> = {
-  oracle: { color: "text-violet-300", border: "border-zinc-800", bg: "bg-violet-400/5", icon: Eye },
-  librarian: {
-    color: "text-violet-300",
-    border: "border-zinc-800",
-    bg: "bg-violet-400/5",
-    icon: Search,
-  },
-  explore: {
-    color: "text-violet-300",
-    border: "border-zinc-800",
-    bg: "bg-violet-400/5",
-    icon: Code2,
-  },
-  metis: {
-    color: "text-violet-300",
-    border: "border-zinc-800",
-    bg: "bg-violet-400/5",
-    icon: MessageSquare,
-  },
-  momus: {
-    color: "text-violet-300",
-    border: "border-zinc-800",
-    bg: "bg-violet-400/5",
-    icon: Check,
-  },
-  atlas: {
-    color: "text-violet-300",
-    border: "border-zinc-800",
-    bg: "bg-violet-400/5",
-    icon: Globe,
-  },
-  sisyphusJunior: {
-    color: "text-violet-300",
-    border: "border-zinc-800",
-    bg: "bg-violet-400/5",
-    icon: Users,
-  },
-  multimodalLooker: {
-    color: "text-violet-300",
-    border: "border-zinc-800",
-    bg: "bg-violet-400/5",
-    icon: FileImage,
-  },
-}
+import type { LucideIcon } from "lucide-react"
+import { HardDrive, Lightbulb, Route, Shield, Target, Zap } from "lucide-react"
 
 export const PRINCIPLE_KEYS = [
   "specialization",
@@ -93,7 +11,7 @@ export const PRINCIPLE_KEYS = [
 ] as const
 export type PrincipleKey = (typeof PRINCIPLE_KEYS)[number]
 
-export const PRINCIPLE_ICONS: Readonly<Record<PrincipleKey, typeof Brain>> = {
+export const PRINCIPLE_ICONS: Readonly<Record<PrincipleKey, LucideIcon>> = {
   specialization: Target,
   trustVerify: Shield,
   wisdom: Lightbulb,
@@ -112,14 +30,22 @@ export const REVIEW_KEYS = [
 ] as const
 export type ReviewKey = (typeof REVIEW_KEYS)[number]
 
+export const ORCHESTRATION_KEYS = ["prometheus", "metis", "momus", "atlas"] as const
+export type OrchestrationKey = (typeof ORCHESTRATION_KEYS)[number]
+
+/** Evidence for the "Category system" principle row. */
 export const CATEGORY_ROUTING = [
-  { cat: "visual-engineering", model: "Gemini 3.1 Pro" },
-  { cat: "ultrabrain", model: "GPT 5.6 Sol xHigh" },
-  { cat: "artistry", model: "Gemini 3.1 Pro" },
-  { cat: "quick", model: "GPT 5.6 Luna Fast" },
-  { cat: "deep", model: "GPT 5.6 Terra xHigh" },
-  { cat: "writing", model: "Kimi K2.5" },
-  { cat: "git", model: "Claude Haiku 4.5" },
+  { cat: "visual-engineering", model: "Claude Fable 5.1 Max" },
+  { cat: "ultrabrain", model: "GPT 6 Astra Max" },
+  { cat: "artistry", model: "Claude Fable 5.1 Max" },
+  { cat: "quick", model: "Kimi For Coding Highspeed" },
+  { cat: "deep", model: "GPT 6 Astra High" },
+  { cat: "writing", model: "Claude Fable 5.1 Medium" },
+  { cat: "unspecified-low", model: "Grok 4.6 xHigh" },
 ] as const
 
+/** Evidence for the "Specialization" principle row. */
 export const SKILL_INJECTIONS = ["playwright", "git-master", "frontend", "team-mode"] as const
+
+export const INSTALL_TAB_IDS = ["opencode", "codex", "senpi"] as const
+export type InstallTabId = (typeof INSTALL_TAB_IDS)[number]

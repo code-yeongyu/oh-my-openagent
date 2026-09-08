@@ -14,6 +14,7 @@ import {
 } from "./in-process/child-handle"
 import { buildChildSessionOptions, requireChildSessionDir, resolveMemberScopedToolNames } from "./in-process/child-options"
 import { RunnerError } from "./in-process/runner-error"
+import type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
 
 export type {
@@ -25,6 +26,7 @@ export type {
   RunnerFailure,
   RunnerOutcome,
 } from "./in-process/child-handle"
+export type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
 export {
   filterSharedParentTools,
   isTaskOrTeamFamilyTool,
@@ -59,6 +61,12 @@ export type ChildSpec = {
   readonly requestedModel?: ResolvedModelRecord
   readonly fallbackModels?: readonly ResolvedModelRecord[]
   readonly resolvedModel?: ResolvedModelRecord
+  /**
+   * Same-model retry budget merged over the engine defaults. A child racing a short deadline uses
+   * it so the runtime reaches `fallbackModels` in seconds instead of spending the default
+   * exponential same-model backoff first. Absent keeps the engine default for every existing caller.
+   */
+  readonly retry?: ChildRetryOverride
   readonly toolAllowlist?: readonly string[]
   // Denylist mapped onto senpi's real deny field `excludeTools` (`tools:` is the allowlist and does
   // NOT deny). Sourced from record.tool_deny (the agent definition's disallowedTools).

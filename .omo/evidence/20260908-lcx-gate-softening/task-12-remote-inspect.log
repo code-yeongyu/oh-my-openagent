@@ -1,0 +1,11 @@
+
+COMMAND (mengmotaMac): find /tmp/lcx-t12-20260908-8fafc772/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test -maxdepth 1 -type f -print; find /tmp/lcx-t12-20260908-8fafc772/omo -maxdepth 2 -name package.json -print | head
+EXIT: 0
+STDOUT:
+/tmp/lcx-t12-20260908-8fafc772/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/boulder-reader.test.ts
+/tmp/lcx-t12-20260908-8fafc772/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts
+/tmp/lcx-t12-20260908-8fafc772/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts
+/tmp/lcx-t12-20260908-8fafc772/omo/package.json
+
+STDERR:
+

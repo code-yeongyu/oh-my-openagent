@@ -8,6 +8,7 @@ import {
   activeStatus,
   createLogger,
   createTempOmoBin,
+  createTempEnvEchoScript,
   createTempStderrFloodScript,
   readRealCwd,
   readRunnerArgv,
@@ -50,6 +51,20 @@ describe("omo-senpi ulw-loop runtime", () => {
       expect(result).toEqual({ code: 0, stdout: `${activeStatus("FLOOD")}\n` })
     } finally {
       flood.cleanup()
+    }
+  }, { timeout: 20000 })
+
+  it("#given a .js target #when runOmoCommand spawns it through process.execPath #then the child sees BUN_BE_BUN=1 so a packaged omo binary runs the script instead of itself", async () => {
+    const echo = createTempEnvEchoScript()
+    try {
+      const result = await __testInternals.runOmoCommand(echo.script, ["ulw-loop", "status", "--json"], {
+        cwd: echo.dir,
+      })
+
+      expect(result.code).toBe(0)
+      expect(JSON.parse(result.stdout)).toEqual({ bunBeBun: "1" })
+    } finally {
+      echo.cleanup()
     }
   }, { timeout: 20000 })
 

@@ -46,6 +46,25 @@ function writePersistedRecord(project: string, taskId: string, fields: Record<st
   return path
 }
 
+describe("record-parse legacy team linkage", () => {
+  test("#given a legacy record without team linkage #when listed #then it still decodes without team fields", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    writePersistedRecord(project, "st_02000000", {})
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.records[0]?.team_run_id).toBeUndefined()
+    expect(result.records[0]?.team_name).toBeUndefined()
+    expect(result.records[0]?.team_member_name).toBeUndefined()
+    expect(result.records[0]?.team_role).toBeUndefined()
+  })
+})
+
 describe("record-parse notify_on_terminal legacy default", () => {
   test("#given a legacy record without notify_on_terminal #when listed #then the field defaults to false", () => {
     // given

@@ -5,8 +5,12 @@ const NPM_FIRST_PUBLISH_YEAR = 2025
 
 const CACHE_TTL_MS = 60 * 60 * 1000
 
+export const FALLBACK_DESCRIPTION =
+  'OmO: Just type "mass ulw" keyword with your prompt. Now you are the master of graph engineering.'
+
 export const FALLBACK_STATS_DATA: StatsData = {
-  stars: 40_000,
+  stars: 68_000,
+  description: FALLBACK_DESCRIPTION,
   totalDownloads: 1_000_000,
   monthlyDownloads: 580_000,
   weeklyDownloads: 90_000,
@@ -19,6 +23,7 @@ interface StatsCache {
 
 export interface StatsData {
   stars: number
+  description: string
   totalDownloads: number
   monthlyDownloads: number
   weeklyDownloads: number
@@ -26,6 +31,7 @@ export interface StatsData {
 
 export interface FormattedStatsData {
   readonly stars: string
+  readonly description: string
   readonly totalDownloads: string
   readonly monthlyDownloads: string
   readonly weeklyDownloads: string
@@ -45,7 +51,7 @@ function formatCount(num: number): string {
   return String(num)
 }
 
-async function fetchGitHubStars(): Promise<number> {
+async function fetchGitHubStats(): Promise<Pick<StatsData, "stars" | "description">> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github.v3+json",
     "User-Agent": "oh-my-openagent-web",
@@ -66,7 +72,13 @@ async function fetchGitHubStars(): Promise<number> {
   }
 
   const data = await res.json()
-  return data.stargazers_count
+  return {
+    stars: data.stargazers_count,
+    description:
+      typeof data.description === "string" && data.description.trim()
+        ? data.description
+        : FALLBACK_DESCRIPTION,
+  }
 }
 
 async function fetchNpmDownloadsForPackage(period: string, pkg: string): Promise<number> {
@@ -131,14 +143,14 @@ export async function getStats(): Promise<StatsData> {
     return cache.data
   }
 
-  const [stars, monthlyDownloads, weeklyDownloads, totalDownloads] = await Promise.all([
-    fetchGitHubStars(),
+  const [github, monthlyDownloads, weeklyDownloads, totalDownloads] = await Promise.all([
+    fetchGitHubStats(),
     fetchNpmDownloads("last-month"),
     fetchNpmDownloads("last-week"),
     fetchAllNpmDownloads(),
   ])
 
-  const data: StatsData = { stars, totalDownloads, monthlyDownloads, weeklyDownloads }
+  const data: StatsData = { ...github, totalDownloads, monthlyDownloads, weeklyDownloads }
   cache = { data, timestamp: now }
 
   return data
@@ -147,6 +159,7 @@ export async function getStats(): Promise<StatsData> {
 export function formatStats(stats: StatsData): FormattedStatsData {
   return {
     stars: formatCount(stats.stars),
+    description: stats.description,
     totalDownloads: formatCount(stats.totalDownloads),
     monthlyDownloads: formatCount(stats.monthlyDownloads),
     weeklyDownloads: formatCount(stats.weeklyDownloads),
