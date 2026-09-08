@@ -124,6 +124,24 @@ export function getRegisteredBackgroundTask(taskID: string): BackgroundTask | un
   return completedTask ? cloneRegisteredTask(completedTask) : undefined
 }
 
+export function findRegisteredBackgroundTaskBySessionId(sessionID: string): BackgroundTask | undefined {
+  const registry = getRegistry()
+  for (const resolveActive of registry.activeTasks.values()) {
+    const task = resolveActive()
+    if (task.sessionId === sessionID) {
+      return task
+    }
+  }
+
+  for (const task of registry.completedTasks.values()) {
+    if (task.sessionId === sessionID) {
+      return cloneRegisteredTask(task)
+    }
+  }
+
+  return undefined
+}
+
 export function forgetBackgroundTask(taskID: string): void {
   const registry = getRegistry()
   registry.activeTasks.delete(taskID)

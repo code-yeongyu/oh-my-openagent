@@ -31,4 +31,4 @@ export type BackgroundCancelClient = {
   }
 }
 
-export type BackgroundOutputManager = Pick<BackgroundManager, "getTask">
+export type BackgroundOutputManager = Pick<BackgroundManager, "getTask" | "getTaskBySessionId">

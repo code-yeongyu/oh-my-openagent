@@ -26,6 +26,7 @@ const mockContext: ToolContext = {
 function createMockManager(task: BackgroundTask): BackgroundOutputManager {
   return {
     getTask: (id: string) => (id === task.id ? task : undefined),
+    getTaskBySessionId: (sessionId: string) => (sessionId === task.sessionId ? task : undefined),
   }
 }
 
@@ -350,6 +351,7 @@ describe("background_output blocking", () => {
     let pollCount = 0
     const task = createTask({ status: "running", sessionId: "ses-blocking-default" })
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: (id: string) => {
         if (id !== task.id) return undefined
         pollCount++
