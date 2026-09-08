@@ -3,7 +3,7 @@
 // discovery-disabled child that can actually see a configured mock model, and durable delivery
 // into the next live session. Completion is observed through a pre-subscribed fs.watch signal,
 // not a 250ms poll loop.
-import { spawnSync } from "node:child_process"
+import { spawn } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, watch, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, join, sep } from "node:path"
@@ -19,10 +19,14 @@ const SUCCESSFUL_OUTCOMES = new Set(["merged", "no_changes"])
 
 ensurePosixMkdirOnPath()
 const sandbox = drive.createSandbox()
+// Keep the throwaway HOME as the cwd's ancestor so Senpi's nearest-parent project config lookup
+// cannot walk through the real user profile and import its settings.
+sandbox.homeDir = sandbox.root
 drive.seedSandbox(sandbox)
 
 const senpiBin = resolveSenpiBin()
 const mockProvider = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "task-e2e-mock-provider.ts")
+const environmentReceipt = join(repoRoot, "packages", "omo-senpi", "scripts", "qa", "environment-receipt.ts")
 const memoryHome = join(sandbox.root, "memory")
 const sessionsDir = join(sandbox.agentDir, "sessions")
 const omoDir = join(sandbox.cwd, ".omo")
@@ -91,43 +95,77 @@ function writeScript(parentSteps) {
 
 function sandboxEnv() {
   const env = { ...process.env }
-  delete env.OMO_CODING_AGENT_DIR
-  delete env.PI_CODING_AGENT_DIR
   delete env.SENPI_BIN
   return {
     ...env,
+    OMO_CODING_AGENT_DIR: sandbox.agentDir,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+    PI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     XDG_DATA_HOME: sandbox.xdgDataHome,
     XDG_CACHE_HOME: sandbox.xdgCacheHome,
     HOME: sandbox.homeDir,
     USERPROFILE: sandbox.homeDir,
     OMO_MEMORY_HOME: memoryHome,
+    PI_OFFLINE: "1",
     OMO_SENPI_QA: "1",
   }
 }
 
-function run(prompt) {
-  return spawnSync(senpiBin.command, [
-    ...senpiBin.prefixArgs,
-    "-e", mockProvider,
-    "-p",
-    "--mode", "json",
-    "--provider", "omo-mock",
-    "--model", "mock-1",
-    "--session-dir", sessionsDir,
-    prompt,
-  ], {
-    cwd: sandbox.cwd,
-    env: sandboxEnv(),
-    encoding: "utf8",
-    timeout: 120_000,
+async function run(prompt) {
+  const child = spawn(senpiBin.command, [
+      ...senpiBin.prefixArgs,
+      "-e", environmentReceipt,
+      "-e", mockProvider,
+      "-p",
+      "--mode", "json",
+      "--provider", "omo-mock",
+      "--model", "mock-1",
+      "--session-dir", sessionsDir,
+      "--offline",
+      prompt,
+    ], {
+      cwd: sandbox.cwd,
+      env: sandboxEnv(),
+      windowsHide: true,
+    })
+  const stdout = []
+  const stderr = []
+  child.stdin?.end()
+  child.stdout?.on("data", (chunk) => stdout.push(String(chunk)))
+  child.stderr?.on("data", (chunk) => stderr.push(String(chunk)))
+  return await new Promise((resolve) => {
+    let settled = false
+    const finish = (result) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve({
+        ...result,
+        stdout: stdout.join(""),
+        stderr: stderr.join(""),
+      })
+    }
+    const timer = setTimeout(() => {
+      child.kill()
+      finish({ status: null, signal: "SIGTERM", timedOut: true })
+    }, 120_000)
+    child.once("error", (error) => finish({ status: null, signal: null, error: String(error) }))
+    child.once("close", (status, signal) => finish({ status, signal, timedOut: false }))
   })
 }
 
 function collectFiles(root, files = []) {
   if (!existsSync(root)) return files
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
+  let entries
+  try {
+    entries = readdirSync(root, { withFileTypes: true })
+  } catch (error) {
+    // Completed reflection worktrees can disappear between the existence check and traversal.
+    if (error?.code === "ENOENT") return files
+    throw error
+  }
+  for (const entry of entries) {
     const path = join(root, entry.name)
     if (entry.isDirectory()) collectFiles(path, files)
     else if (entry.isFile()) files.push(path)
@@ -281,7 +319,7 @@ writeScript([
   },
   { type: "text", text: "seeded" },
 ])
-const seed = run("seed isolated memory")
+const seed = await run("seed isolated memory")
 
 writeConfig(true)
 writeScript([{ type: "text", text: "OK" }])
@@ -291,7 +329,7 @@ const completionWait = waitForCondition(() => {
   return successful.length > 0 ? snapshot : undefined
 }, COMPLETION_TIMEOUT_MS, "successful shutdown completion")
 
-const probe = run(`Return exactly OK. ${"x".repeat(10_000)}`)
+const probePromise = run(`Return exactly OK. ${"x".repeat(10_000)}`)
 let completionSnapshot
 let completionError
 try {
@@ -300,6 +338,7 @@ try {
   completionError = error
   completionSnapshot = readShutdownCompletions()
 }
+const probe = await probePromise
 
 writeConfig(false)
 writeScript([{ type: "text", text: "delivered" }])
@@ -310,7 +349,7 @@ const deliveryWait = waitForCondition(() => {
   ))
   return delivered.length > 0 ? snapshot : undefined
 }, DELIVERY_TIMEOUT_MS, "durable consumed delivery")
-const deliveryProbe = run("confirm shutdown delivery")
+const deliveryProbePromise = run("confirm shutdown delivery")
 let deliverySnapshot
 let deliveryError
 try {
@@ -319,6 +358,7 @@ try {
   deliveryError = error
   deliverySnapshot = readShutdownCompletions()
 }
+const deliveryProbe = await deliveryProbePromise
 
 const transcript = `${probe.stdout ?? ""}\n${probe.stderr ?? ""}`
 const observedAssistantTexts = assistantTexts(probe.stdout ?? "")
@@ -340,6 +380,8 @@ const checks = {
 const report = {
   result: Object.values(checks).every(Boolean) ? "PASS" : "FAIL",
   checks,
+  sandboxAgentDir: redact(sandbox.agentDir),
+  sandboxCwd: redact(sandbox.cwd),
   errors: {
     ...(completionError === undefined ? {} : { completion: String(completionError) }),
     ...(deliveryError === undefined ? {} : { delivery: String(deliveryError) }),

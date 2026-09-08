@@ -1,0 +1,28 @@
+{
+  "result": "PASS",
+  "checks": {
+    "seedExitZero": true,
+    "probeExitZero": true,
+    "exactAnswerObserved": true,
+    "staleExtensionContextAbsent": true,
+    "shutdownOriginRecorded": true,
+    "shutdownOutcomeSuccessful": true,
+    "durableDeliveryConsumed": true,
+    "realSenpiUntouched": true
+  },
+  "sandboxAgentDir": "<sandbox>/agent",
+  "sandboxCwd": "<sandbox>/project",
+  "errors": {},
+  "observedAssistantTexts": [
+    "OK"
+  ],
+  "shutdownRecords": [
+    {
+      "path": "<sandbox>/memory/agents/project-5a320ebe/runtime/reflection/completions/reflection-run-1.json",
+      "outcome": "no_changes",
+      "origin": "shutdown",
+      "deliveryStatus": "consumed"
+    }
+  ],
+  "parseErrors": []
+}
