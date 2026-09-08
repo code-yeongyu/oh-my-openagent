@@ -193,12 +193,13 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
     // given
     const { notifier, promptAsyncCalls } = createNotifier()
     const sessionID = "parent-hold-reply-upgrade"
+    // silent wake to idle parent force-replies
     notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, false)
 
     try {
       await notifier.flushPendingParentWake(sessionID)
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
 
       // when
       notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)

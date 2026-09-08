@@ -48,6 +48,7 @@ export class ParentWakeFlushRunner {
       return
     }
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
+    const forceIdleReply = !sessionActive && !latestWake.shouldReply
     const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
     if (sessionActive && !forceDispatchAfterActiveDefer) {
       this.schedulePendingParentWakeFlush(sessionID)
@@ -60,6 +61,32 @@ export class ParentWakeFlushRunner {
     if (!forceDispatchAfterActiveDefer && this.hasRecentParentSessionActivity(sessionID)) {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
         return
+      }
+      // The user-message race guard (issue #4120) must hold on the forced-reply
+      // fast path too: recent recorded parent activity and a just-sent user
+      // message can overlap (activity window 5s vs user-message window 2s), so
+      // a fresh user turn must never be raced by a reply-producing wake. Fall
+      // through to the admit-only noReply deposit so the user's own turn can
+      // consume the notification without forking another assistant chain.
+      if (forceIdleReply && !(await this.isUserMessageInProgress(sessionID))) {
+        // The running-tool-call history guard must hold on the forced-reply
+        // fast path too (PR #7166 review): a reply-producing wake must never
+        // be forced while the session history still blocks internal prompts
+        // (finish:"tool-calls" / running tool state). Fall through to the
+        // admit-only noReply deposit so the live tool turn can finish without
+        // forking a concurrent assistant chain.
+        const historyDecision = await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)
+        if (!historyDecision.defer) {
+          await this.sendParentWakePrompt(sessionID, latestWake, {
+            emptyAssistantTurnRetry: false,
+            toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+            forceReply: true,
+          })
+          log("[background-agent] Forced reply parent wake because parent session is idle", {
+            sessionID,
+          })
+          return
+        }
       }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry: false,
@@ -140,10 +167,16 @@ export class ParentWakeFlushRunner {
       return
     }
 
+    if (forceIdleReply) {
+      log("[background-agent] Forced reply parent wake because parent session is idle", {
+        sessionID,
+      })
+    }
     await this.sendParentWakePrompt(sessionID, latestWake, {
       emptyAssistantTurnRetry,
       toolWaitDecision: finalToolWaitDecision,
       ...(forceDispatchAfterActiveDefer ? { skipPromptGateStatusCheck: true } : {}),
+      ...(forceIdleReply ? { forceReply: true } : {}),
     })
     if (forceDispatchAfterActiveDefer) {
       log("[background-agent] Sent parent wake after active-session defer ceiling:", {
@@ -209,6 +242,7 @@ export class ParentWakeFlushRunner {
       readonly emptyAssistantTurnRetry: boolean
       readonly toolWaitDecision: ToolWaitDeferralDecision
       readonly forceNoReply?: boolean
+      readonly forceReply?: boolean
       readonly retainPendingWake?: boolean
       readonly skipPromptGateStatusCheck?: boolean
     },
@@ -231,6 +265,7 @@ export class ParentWakeFlushRunner {
         sessionID,
         latestWake,
         ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
+        ...(options.forceReply !== undefined ? { forceReply: options.forceReply } : {}),
         ...(options.retainPendingWake !== undefined ? { retainPendingWake: options.retainPendingWake } : {}),
         ...(options.skipPromptGateStatusCheck !== undefined
           ? { skipPromptGateStatusCheck: options.skipPromptGateStatusCheck }

@@ -17,6 +17,7 @@ type ParentWakePromptDispatchInput = {
   readonly sessionID: string
   readonly latestWake: PendingParentWake
   readonly forceNoReply?: boolean
+  readonly forceReply?: boolean
   readonly retainPendingWake?: boolean
   readonly skipPromptGateStatusCheck?: boolean
   readonly emptyAssistantTurnRetry: boolean
@@ -30,6 +31,7 @@ type ParentWakePromptDispatchInput = {
 
 export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput): Promise<void> {
   const notificationContent = input.latestWake.notifications.join("\n\n")
+  const reply = input.forceNoReply !== true && (input.forceReply === true || input.latestWake.shouldReply)
   let dispatchStartedAt = Date.now()
   try {
     dispatchStartedAt = Date.now()
@@ -48,10 +50,10 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       input: {
         path: { id: input.sessionID },
         body: {
-          noReply: input.forceNoReply === true || !input.latestWake.shouldReply,
+          noReply: !reply,
           ...input.latestWake.promptContext,
           parts: [
-            input.forceNoReply === true || !input.latestWake.shouldReply
+            !reply
               ? withInternalNoReplyMarker(createInternalAgentTextPart(notificationContent))
               : createInternalAgentTextPart(notificationContent),
           ],
