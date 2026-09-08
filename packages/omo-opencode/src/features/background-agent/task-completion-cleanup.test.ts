@@ -636,7 +636,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       }
     })
 
-    test("#when stale tool-call history keeps blocking an all-complete wake #then the wake is admitted as noReply with reply liveness retained", async () => {
+    test("#when stale tool-call history keeps blocking an all-complete wake past the hold ceiling #then the wake is force-delivered as a reply", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "idle" },
@@ -681,13 +681,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
-      expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
+      expect(getPendingParentWakes(manager).get("parent-1")).toBeUndefined()
     })
 
-    test("#when stale sdk tool-call part keeps blocking an all-complete wake #then the wake is admitted as noReply with reply liveness retained", async () => {
+    test("#when stale sdk tool-call part keeps blocking an all-complete wake past the hold ceiling #then the wake is force-delivered as a reply", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "idle" },
@@ -732,10 +732,10 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
-      expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
+      expect(getPendingParentWakes(manager).get("parent-1")).toBeUndefined()
     })
 
     test("#when stale deferral age is exceeded but latest tool turn is recent #then all-complete wake records a no-reply wake", async () => {

@@ -26,6 +26,7 @@ type ParentWakeSessionInspectorOptions = {
   readonly directory: string
   readonly acceptedMessageSkewMs: number
   readonly toolCallDeferMaxMs: number
+  readonly staleToolBlockMaxHoldMs?: number
   readonly userMessageInProgressWindowMs: number
   readonly parentSessionActivityInProgressWindowMs?: number
 }
@@ -73,6 +74,7 @@ export class ParentWakeSessionInspector {
       messages,
       wake,
       toolCallDeferMaxMs: this.options.toolCallDeferMaxMs,
+      staleToolBlockMaxHoldMs: this.options.staleToolBlockMaxHoldMs,
     })
   }
 
