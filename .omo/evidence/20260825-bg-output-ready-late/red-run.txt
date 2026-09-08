@@ -1,0 +1,16 @@
+RED RUN (before fix) — bun test packages/omo-opencode/src/features/background-agent/parent-wake-midturn-admit.test.ts
+
+(fail) parent wake mid-turn admission > #given partial completion wake while parent is mid-turn #then it admits a noReply notification immediately
+error: expect(received).toHaveLength(expected)
+Expected length: 1
+Received length: 0
+
+(fail) parent wake mid-turn admission > #given reply-required completion wake while parent is mid-turn #then it admits noReply once and retains the reply obligation
+error: expect(received).toHaveLength(expected)
+Expected length: 1
+Received length: 0
+
+ 1 pass (failure-wake deferral control)
+ 2 fail
+
+GREEN RUN (after fix) — see green-run.txt: 746 pass / 0 fail across 60 files.
