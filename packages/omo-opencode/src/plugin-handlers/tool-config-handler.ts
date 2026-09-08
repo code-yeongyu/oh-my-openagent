@@ -2,7 +2,10 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names";
 import { isTaskSystemEnabled } from "../shared";
 
-type AgentWithPermission = { permission?: Record<string, unknown> };
+type AgentWithPermission = {
+  permission?: Record<string, unknown>;
+  tools?: Record<string, boolean>;
+};
 
 const TASK_DENIED_SUBAGENT_KEYS = [
   "librarian",
@@ -12,6 +15,17 @@ const TASK_DENIED_SUBAGENT_KEYS = [
   "metis",
   "momus",
 ] as const;
+
+// Prometheus keeps bash for exactly the ulw-plan scaffold script; the catch-all
+// deny preserves the #1839/#1428 closure of the cat-based write bypass.
+// Rule order is load-bearing: opencode resolves rules with findLast, and it
+// hides a tool entirely when the LAST matching rule is a wildcard deny, so the
+// catch-all must come first with the scoped allows after it.
+export const PROMETHEUS_BASH_PERMISSION = {
+  "*": "deny",
+  "node *scaffold-plan.mjs*": "allow",
+  "bun *scaffold-plan.mjs*": "allow",
+} as const;
 
 function getConfigQuestionPermission(): string | null {
   const configContent = process.env.OPENCODE_CONFIG_CONTENT;
@@ -139,7 +153,7 @@ export function applyToolConfig(params: {
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,
-      bash: "deny",
+      bash: PROMETHEUS_BASH_PERMISSION,
       interactive_bash: "deny",
     };
   }
