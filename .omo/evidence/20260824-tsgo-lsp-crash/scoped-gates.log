@@ -1,0 +1,11 @@
+# Scoped gates for issue #7165 regression coverage
+
+## bun test packages/lsp-core (scoped suite)
+
+ 102 pass
+ 0 fail
+ 297 expect() calls
+Ran 102 tests across 24 files. [6.91s]
+
+## tsgo --noEmit -p packages/lsp-core/tsconfig.json
+typecheck: PASS (exit 0)
