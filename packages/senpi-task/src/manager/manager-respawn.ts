@@ -230,14 +230,21 @@ export async function reattachManagedTask(input: {
     unsubscribe = input.attachLive(fresh, input.handle)
     attached = true
     if (isTerminalRecord(fresh)) {
-      if (input.handle.pid !== undefined) {
-        input.store.mutate(fresh.task_id, (current) => ({ ...current, pid: input.handle.pid }))
+      const pid = input.handle.pid
+      const sessionId = input.handle.sessionId
+      if (pid !== undefined || (sessionId !== undefined && sessionId.length > 0)) {
+        input.store.mutate(fresh.task_id, (current) => ({
+          ...current,
+          ...(pid === undefined ? {} : { pid }),
+          ...(sessionId === undefined || sessionId.length === 0 ? {} : { child_session_id: sessionId }),
+        }))
       }
       return { ok: true }
     }
     const { error_message: _error, final_response: _final, killed: _killed, ...rest } = fresh
     const epoch = fresh.notification.run_epoch + 1
     const timestamp = nowIso(input.now)
+    const sessionId = input.handle.sessionId
     const reattached: TaskRecord = {
       ...rest,
       status: "running",
@@ -245,6 +252,7 @@ export async function reattachManagedTask(input: {
       updated_at: timestamp,
       notification: { ...fresh.notification, run_epoch: epoch },
       ...(input.handle.pid === undefined ? {} : { pid: input.handle.pid }),
+      ...(sessionId === undefined || sessionId.length === 0 ? {} : { child_session_id: sessionId }),
     }
     input.store.replace(reattached)
     input.armOutcome(reattached, input.handle, epoch)

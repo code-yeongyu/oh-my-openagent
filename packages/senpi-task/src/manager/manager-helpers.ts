@@ -178,6 +178,17 @@ export function recordSpawnedPid(record: TaskRecord, pid: number | undefined): T
   return { ...record, pid }
 }
 
+// Fold the spawned child's own session id onto its record. External readers join a grandchild
+// session's parent_session_id back to this field. Empty/missing ids and already-terminal records
+// leave the record untouched so a settled task is never resurrected.
+export function recordSpawnedChildSession(
+  record: TaskRecord,
+  sessionId: string | undefined,
+): TaskRecord | undefined {
+  if (sessionId === undefined || sessionId.length === 0 || isTerminalRecord(record)) return undefined
+  return { ...record, child_session_id: sessionId }
+}
+
 export function isTerminalRecord(record: TaskRecord): boolean {
   return (
     record.status === "completed" ||

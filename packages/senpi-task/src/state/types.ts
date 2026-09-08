@@ -200,6 +200,9 @@ export type TaskRecord = TaskRecordInput & {
   // project distinguish "previous process died" from "a live process still owns this child" during
   // reconciliation, so cross-process session starts never falsely mark live in-process children lost.
   readonly host_pid?: number
+  // Child's own session id, taken from the spawn handle at launch (and rewritten on reattach).
+  // External readers join a grandchild record's parent_session_id to this field. Absent on records
+  // written before the field was persisted and on children whose handle never exposed a session id.
   readonly child_session_id?: string
   readonly spawn_spec?: TaskSpawnSpec
   readonly final_response?: string
