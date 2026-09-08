@@ -1,0 +1,23 @@
+WHAT WAS TESTED
+
+bun test packages/senpi-task/src/steering/residency-regression.test.ts \
+  --test-name-pattern 'exactly one RPC child is respawned|one detached revival happens'
+
+WHAT WAS OBSERVED
+
+- A terminal `rpc_detached` record with a persisted transcript was targeted by
+  `task_send`.
+- The manager respawned exactly one RPC child and delivered the message.
+- The lower steering boundary produced the same `revived` outcome and delivered
+  the message exactly once.
+- Result: 2 passed, 10 filtered, 0 failed, 9 assertions.
+
+WHY IT IS ENOUGH
+
+The production change is confined to adapter `session_start`. These tests target
+the separate explicit `task_send` manager/steering path and pin the required
+lazy detached-RPC revival behavior directly.
+
+WHAT WAS OMITTED
+
+No credentials, environment dumps, or external provider traffic were involved.

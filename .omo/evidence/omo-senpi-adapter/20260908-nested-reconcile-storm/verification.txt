@@ -1,0 +1,52 @@
+CHANGED-FILE DIAGNOSTICS
+
+LSP diagnostics returned no errors, warnings, information, or hints for:
+- packages/omo-senpi/src/components/task/event-bridge.ts
+- packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts
+- packages/omo-senpi/scripts/qa/task-resume-e2e-mock-provider.ts
+- packages/omo-senpi/scripts/qa/task-child-reconcile-e2e.mjs
+
+PACKAGE TYPECHECKS
+
+./node_modules/.bin/tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+Result: exit 0, no diagnostics.
+
+./node_modules/.bin/tsgo --noEmit -p packages/senpi-task/tsconfig.json
+Result: exit 0, no diagnostics.
+
+FOCUSED TESTS
+
+bun test packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts
+Result: 10 passed, 0 failed.
+
+bun test packages/omo-senpi/scripts/qa/resume-e2e-runtime.test.mjs
+Result: exit 0, all tests passed.
+
+bun packages/omo-senpi/scripts/qa/task-child-reconcile-e2e.mjs --self-test
+Result: SELF-TEST OK.
+
+FULL TASK ENGINE SUITE
+
+bun test packages/senpi-task
+Result: 1969 passed, 1 skipped, 0 failed across 266 files.
+
+MANDATORY SENPI ADAPTER GATE
+
+PATH=<worktree>/node_modules/.bin:$PATH bun run test:senpi
+Result: exit 0.
+- Adapter suite: 3032 passed, 3 skipped, 0 failed across 392 files.
+- Evidence-path suite: 10 passed, 0 failed.
+- The command rebuilt all production Senpi artifacts and completed the adapter
+  typecheck before running tests.
+
+BUNDLE AND DIFF GATES
+
+node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+Result: exit 0; every generated extension and staged runtime reported current.
+
+git diff --check
+Result: exit 0.
+
+No type, lint, or test failure was suppressed. An extra unchanged broad live
+driver emitted its own FAIL verdict and is documented separately in README.md;
+it is not represented here as a passing gate.

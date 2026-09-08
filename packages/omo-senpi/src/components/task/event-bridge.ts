@@ -49,7 +49,7 @@ export function wireEventBridge(
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
-    if (process.env[OMO_SENPI_TASK_RPC_CHILD] === "1" && sessionId === undefined) return
+    if (process.env[OMO_SENPI_TASK_RPC_CHILD] === "1") return
     transitions.onSessionStart(sessionId)
     const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
