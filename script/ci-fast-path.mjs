@@ -15,6 +15,7 @@ const platformSensitiveExactPaths = new Set([
   "bunfig.win2.parallel.toml",
   "script/root-test-serial-quarantine.ts",
   "packages/openclaw-core/src/reply-listener-process.ts",
+  "packages/team-core/src/team-state-store/locks.ts",
 ])
 
 function parseArguments(argv) {
