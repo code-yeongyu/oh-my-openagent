@@ -27,7 +27,7 @@ The focused wiring suite passed all 21 tests, and the Senpi typecheck passed. Th
 
 The residual comparison is captured in [`base-comparison-summary.md`](base-comparison-summary.md). The seven symlink and task-RPC failures reproduce on the unmodified merge parent `4e921602...` and on unmodified `origin/dev` `adecbcf3...` under the same Windows environment. The status-spend and supervisor cases pass both on the merge parent and in a focused current-head rerun; they were not reproducible outside the full-suite run, and their paths have no diff between the merge parent and this head. They remain full-suite instability evidence rather than changes made in this PR.
 
-The final hosted state is recorded in [`hosted-checks-final.md`](hosted-checks-final.md): head `fee304c790...` is `OPEN` and `MERGEABLE`, with all checks terminal and no failed check. The PR remains blocked by the existing `CHANGES_REQUESTED` review decision.
+The final hosted state is recorded in [`hosted-checks-final.md`](hosted-checks-final.md): head `dce35de8b1...` is `OPEN` and `MERGEABLE`, with all checks terminal and no failed check. The PR remains blocked by the existing `CHANGES_REQUESTED` review decision.
 
 ## Why it is enough
 
