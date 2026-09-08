@@ -23,8 +23,8 @@ describe("renderMemorianNudgedEntry", () => {
     const component = renderMemorianNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)
     expect(component).toBeDefined()
     const lines = component!.render(120).join("\\n")
-    expect(lines).toContain("Memorian nudged")
-    expect(lines).toContain("Use the rollout policy.")
+    expect(lines).toContain("✦ Aha!")
+    expect(lines).toContain("just remembered: Use the rollout policy.")
     expect(lines).toContain("memory/a.md")
   })
 
@@ -32,6 +32,24 @@ describe("renderMemorianNudgedEntry", () => {
     expect(renderMemorianNudgedEntry({ data: { version: 1, nudges: [] } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
     expect(renderMemorianNudgedEntry({ data: { version: 1, nudges: [{ path: "a", hint: 4 }] } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
     expect(renderMemorianNudgedEntry({ data: null } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+  })
+
+  test.each([
+    "No stored memory clears the bar for this planning step; the transcript already contains the full methodology, QA approach, and rollout.",
+    "This memory covers OAuth login prompts and remote-test helpers, not the goal continuation timer delay.",
+  ])("#given a meta hint %s #when rendered #then nothing is drawn", (hint) => {
+    const record = { version: 1, nudges: [{ path: "memory/a.md", hint }] }
+    expect(renderMemorianNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+  })
+
+  test.each([
+    "The fix is on senpi main, not the extension.",
+    "senpi monitors have a verified two-flag desync where registry.paused can remain set.",
+    "The regression test does not cover Windows process cleanup.",
+    "The outage is unrelated to the database migration.",
+  ])("#given a factual hint %s #when rendered #then it remains renderable", (hint) => {
+    const record = { version: 1, nudges: [{ path: "memory/a.md", hint }] }
+    expect(renderMemorianNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)).toBeDefined()
   })
 
   test("#given a multiline hint #when rendered #then nothing is drawn", () => {
@@ -105,7 +123,7 @@ describe("renderMemorianGateEntry reason and runId", () => {
 
   test("#given a skipped gate record without reason #when rendered #then the output is byte-identical to before", () => {
     const component = renderMemorianGateEntry({ data: { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 } } as never, { expanded: false }, PLAIN_THEME as never)
-    expect(JSON.stringify(component?.render(120))).toBe(JSON.stringify(["                                                                                                                        ", " \u001b[1m⚠ Memorian gate skipped · quick_category_unavailable\u001b[22m                                                                   ", " Memorian could not judge the stored memories for the previous turn.                                                    ", "                                                                                                                        "]))
+    expect(JSON.stringify(component?.render(120))).toBe(JSON.stringify(["                                                                                                                        ", " \u001b[1m⚠ Memorian gate skipped · quick_category_unavailable\u001b[22m                                                                   ", " Memorian could not judge the recalled memory candidates for the previous turn.                                         ", "                                                                                                                        "]))
   })
 
   test("#given a failed gate with an invalid reason but a valid runId #when rendered #then the title and the run line are drawn and the reason line is absent", () => {

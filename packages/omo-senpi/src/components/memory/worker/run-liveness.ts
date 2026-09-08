@@ -26,6 +26,21 @@ export async function classifyRunProcess(
   return actualStart === recordedStart ? "alive" : "dead"
 }
 
+/** Launcher liveness: dead on ESRCH, or on a live pid whose recorded start identity no longer matches (pid reuse). */
+export async function isLauncherDead(
+  pid: number,
+  recordedStart: string | null | undefined,
+  seams: RunLivenessSeams,
+): Promise<boolean> {
+  const liveness = (seams.getPidLiveness ?? readPidLiveness)(pid)
+  if (liveness === "dead") return true
+  if (liveness === "alive" && recordedStart !== null && recordedStart !== undefined) {
+    const actualStart = await (seams.getProcessStartIdentity ?? readProcessStartIdentity)(pid)
+    return actualStart !== null && actualStart !== recordedStart
+  }
+  return false
+}
+
 export function signalRecordedProcessGroup(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(process.platform === "win32" ? pid : -pid, signal)

@@ -16,7 +16,7 @@ The category chains below are edition-aware. Senpi uses `kimi-coding` for Kimi r
 | **librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
 | **explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
 | **multimodal-looker** | `gpt-5.6-sol` | `openai\|openai-codex\|opencode/gpt-5.6-sol (low)` → `opencode-go/kimi-k3` → `zai-coding-plan/glm-4.6v` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5-nano`
-| **prometheus** | `claude-fable-5` | `anthropic\|github-copilot\|opencode/claude-fable-5 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
+| **prometheus** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
 | **metis** | `claude-opus-5` | `anthropic\|github-copilot\|opencode/claude-opus-5 (high)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (low)`
 | **momus** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|openai-codex\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 | **atlas** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7`
@@ -36,7 +36,7 @@ Ask @explore for the policy on this feature
 
 | Agent             | Restrictions                                                                            |
 | ----------------- | --------------------------------------------------------------------------------------- |
-| oracle            | Read-only: cannot write or edit (blocked: write, edit, apply_patch, task); call_omo_agent is allowed for research delegation |
+| oracle            | Read-only: cannot write or edit (blocked: write, edit, apply_patch, task, call_omo_agent)            |
 | librarian         | Cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent)            |
 | explore           | Cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent)            |
 | multimodal-looker | Allowlist: `read` only                                                                  |
@@ -137,8 +137,8 @@ See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spe
 ### Architecture Snapshot (current)
 
 - **Feature modules**: `packages/omo-opencode/src/features/` has 23 modules.
-- **Tool system**: `packages/omo-opencode/src/tools/` has 14 tool-producing directories plus a shared helper directory. The registry exposes **12 to 38 tools** depending on config gates. The 8 LSP aliases are served by the built-in `lsp` MCP, not by the tool registry.
-- **Hook system**: the 5-tier composers define **58 slots** (Session 24 + Tool Guard 18 + Transform 7 + Continuation 7 + Skill 2). Default config activates about 50-51; the maximum is 62 when the 4 direct Team Mode event handlers are included.
+- **Tool system**: `packages/omo-opencode/src/tools/` has 14 tool-producing directories plus a shared helper directory. The registry exposes **12 to 38 tools** depending on config gates. The 9 LSP aliases are served by the built-in `lsp` MCP, not by the tool registry.
+- **Hook system**: the 5-tier composers define **58 slots** (Session 23 + Tool Guard 18 + Transform 8 + Continuation 7 + Skill 2). Default config activates about 50-51; the maximum is 62 when the 4 direct Team Mode event handlers are included.
 - **MCP system**: 3 tiers: built-in MCPs with 3 remote servers (`websearch`, `context7`, `grep_app`) plus local stdio `lsp`, `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
 - **Managers and controllers**: startup creates TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler, and ModelFallbackControllerAccessor fields, plus optional TuiStateMirror and MonitorManager fields.
 - **Config pipeline**: 6 phases in order: provider, plugin-components, agents, tools, MCPs, commands.
@@ -163,7 +163,7 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | `visual-engineering` | `anthropic/claude-fable-5-1` (max) → `anthropic/claude-opus-5` (max) → `kimi-for-coding/kimi-k3` (max) | Frontend, UI/UX, design, styling, animation                                                                                |
 | `ultrabrain`         | `openai/gpt-6-astra` (max)      | Deep logical reasoning, complex architecture decisions requiring extensive analysis. Falls back to `gpt-5.6-sol` (max).     |
 | `deep`               | `openai/gpt-6-astra` (high)     | Deep autonomous work for 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one. |
-| `artistry`           | `anthropic/claude-fable-5` (xhigh) | Highly creative/artistic tasks, novel ideas                                                                                 |
+| `artistry`           | `anthropic/claude-fable-5-1` (max) → `kimi-for-coding/kimi-k3` (max) → `anthropic/claude-opus-5` (xhigh) | Highly creative/artistic tasks, novel ideas                                                                                 |
 | `quick`              | `kimi-for-coding/kimi-for-coding-highspeed` | Trivial tasks - single file changes, typo fixes, simple modifications                                                  |
 | `unspecified-low`    | `xai/grok-4.6` (xhigh)          | Tasks that don't fit other categories, low effort required                                                                  |
 | `unspecified-high`   | `openai/gpt-6-astra` (high)     | Tasks that don't fit other categories, high effort required. Falls back to Claude Opus 5, GLM 5.3, then Kimi K3.          |
@@ -503,7 +503,7 @@ The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`
 
 ### Browser Automation Options
 
-Oh-My-OpenAgent provides two browser automation providers, configurable via `browser_automation_engine.provider`.
+Oh-My-OpenAgent provides four browser automation providers (`playwright`, `agent-browser`, `dev-browser`, `playwright-cli`), configurable via `browser_automation_engine.provider`.
 
 #### Option 1: Playwright MCP (Default)
 
@@ -653,7 +653,7 @@ Hashline IDs use characters from `ZPMQVRWSNKTXJBYH`.
 
 ### LSP Tools (IDE Features for Agents)
 
-All 8 aliases below are served by the built-in `lsp` MCP rather than the native tool registry.
+All 9 aliases below are served by the built-in `lsp` MCP rather than the native tool registry.
 
 | Tool                    | Description                                 |
 | ----------------------- | ------------------------------------------- |
@@ -661,6 +661,7 @@ All 8 aliases below are served by the built-in `lsp` MCP rather than the native 
 | **lsp_diagnostics**     | Get errors/warnings before build            |
 | **lsp_prepare_rename**  | Validate rename operation                   |
 | **lsp_rename**          | Rename symbol across workspace              |
+| **lsp_format**          | Format a source file via its language server      |
 | **lsp_goto_definition** | Jump to symbol definition                   |
 | **lsp_find_references** | Find all usages across workspace            |
 | **lsp_symbols**         | Get file outline or workspace symbol search |
@@ -841,13 +842,13 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 
 Current composition counts:
 
-- Session: 24
+- Session: 23
 - Tool Guard: 18 (17 non-Team slots plus `teamToolGating`)
-- Transform: 7
+- Transform: 8
 - Continuation: 7
 - Skill: 2
 - Total composed slots: 58
-- About 50-51 are active with default config; the maximum is 62 when the 4 direct Team Mode event handlers are included
+- Default config leaves several slots null (gated by team_mode, hashline_edit, preemptive_compaction, etc.); the maximum is 62 when the 4 direct Team Mode event handlers are included
 
 ### Hook Events
 
@@ -941,7 +942,7 @@ Current composition counts:
 | Hook                         | Event               | Description                                             |
 | ---------------------------- | ------------------- | ------------------------------------------------------- |
 | **claude-code-hooks**        | Message + PreToolUse + PostToolUse | Executes supported Claude Code hook handlers for `chat.message` and `tool.execute.before`/`tool.execute.after`; it does not run on every OMO hook event. |
-| **atlas**                    | Multiple            | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7`
+| **atlas**                    | Event + PreToolUse + PostToolUse | Continuation-tier boulder orchestrator: on session.idle continues incomplete boulder work; enforces write/edit policy for subagent sessions; first-prompt watchdog. |
 | **interactive-bash-session** | PostToolUse + Event | Manages tmux sessions for interactive CLI.              |
 | **non-interactive-env**      | PreToolUse          | Handles non-interactive environment constraints.        |
 
@@ -1079,7 +1080,7 @@ When a skill MCP has `oauth` configured:
 - **Dynamic Client Registration**: Auto-registers with servers supporting RFC 7591 (clientId becomes optional)
 - **PKCE**: Mandatory for all flows
 - **Resource Indicators**: Auto-generated from MCP URL per RFC 8707
-- **Token Storage**: Persisted in `~/.config/opencode/mcp-oauth.json` (chmod 0600)
+- **Token Storage**: Per-server files under `~/.config/opencode/mcp-oauth/<hash>.json` (mode 0600). Legacy `~/.config/opencode/mcp-oauth.json` is still read.
 - **Auto-refresh**: Tokens refresh on 401; step-up authorization on 403 with `WWW-Authenticate`
 - **Dynamic Port**: OAuth callback server uses an auto-discovered available port
 

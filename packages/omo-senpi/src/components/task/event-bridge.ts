@@ -8,7 +8,7 @@ import type { LiveTaskContext } from "./runtime-context"
 import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
-import { wireTaskRpcBridge } from "./task-rpc-bridge"
+import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
@@ -19,6 +19,11 @@ type EventBridgeState = {
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
   // Live DAG runs veto a reload alongside running children: a reload pauses them mid-flight.
   readonly dagReloadSource?: ReloadGuardDagSource
+}
+
+// Test-only seams; production wiring omits this and every dependency falls back to its real default.
+type EventBridgeDeps = {
+  readonly taskRpc?: TaskRpcBridgeDeps
 }
 
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
@@ -34,9 +39,10 @@ export function wireEventBridge(
   statusUi: TaskStatusUi,
   transitions: SessionTransitionBridge,
   state: EventBridgeState,
+  deps: EventBridgeDeps = {},
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
-  const taskRpc = wireTaskRpcBridge(pi, engine)
+  const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
 

@@ -1,52 +1,40 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
+
+import { InstallCommand } from "@/components/landing/install-command"
+import { Reveal } from "@/components/landing/motion-wrappers"
+import { Eyebrow } from "@/components/ledger/eyebrow"
+import { Frame } from "@/components/ledger/frame"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/i18n/routing"
 
+/** Full-bleed `--ink-1` band: Title + CommandBar + primary/secondary actions. */
 export async function CtaSection(): Promise<JSX.Element> {
   const t = await getTranslations("landing")
 
   return (
-    <section className="bg-black py-24" data-section="cta">
-      <div className="reveal-on-enter container mx-auto px-4 md:px-6">
-        <div>
-          <div className="relative overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900/30 p-8 text-center md:p-16">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(0,212,255,0.08)_0%,_transparent_70%)]" />
-            <div className="relative z-10 mx-auto max-w-3xl space-y-8">
-              <h2 className="text-4xl font-bold text-white md:text-5xl">{t("cta.title")}</h2>
-              <p className="text-lg text-zinc-400">{t("cta.subtitle")}</p>
-              <div className="flex justify-center">
-                <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-black px-6 py-3 font-mono text-sm text-zinc-300">
-                  <span className="text-cyan-500">$</span>
-                  {t("cta.installCommand")}
-                </div>
-              </div>
-              <div className="flex flex-col justify-center gap-4 sm:flex-row">
-                <Link
-                  href="https://github.com/code-yeongyu/oh-my-openagent"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button
-                    size="lg"
-                    className="h-12 bg-cyan-500 px-8 font-bold text-black hover:bg-cyan-600"
-                  >
-                    {t("cta.installNow")}
-                  </Button>
-                </Link>
-                <Link href="/docs">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 border-zinc-700 px-8 text-white hover:bg-zinc-800"
-                  >
-                    {t("cta.readTheDocs")}
-                  </Button>
-                </Link>
-              </div>
+    <section data-section="cta" aria-labelledby="cta-title" className="mt-[var(--space-40)]">
+      <div className="border-line bg-ink-1 border-t border-b">
+        <Frame>
+          <Reveal className="flex flex-col items-start gap-8 py-16 lg:py-24">
+            <Eyebrow rule dot="accent">
+              {t("cta.eyebrow")}
+            </Eyebrow>
+            <h2 id="cta-title" className="type-title text-text-hi max-w-3xl">
+              {t("cta.title")}
+            </h2>
+            <p className="text-text-mid max-w-xl text-lg leading-[1.6]">{t("cta.subtitle")}</p>
+            <InstallCommand command={t("cta.installCommand")} className="max-w-xl" />
+            <div className="flex flex-wrap items-center gap-6">
+              <Button size="lg" asChild>
+                <Link href="/docs#installation">{t("cta.installNow")}</Link>
+              </Button>
+              <Button variant="secondary" size="lg" asChild>
+                <Link href="/docs">{t("cta.readTheDocs")}</Link>
+              </Button>
             </div>
-          </div>
-        </div>
+          </Reveal>
+        </Frame>
       </div>
     </section>
   )

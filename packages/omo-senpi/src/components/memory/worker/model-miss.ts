@@ -1,4 +1,4 @@
-import { isRetryableModelError } from "@oh-my-opencode/model-core"
+import { isContextOverflowMessage, isRetryableModelError } from "@oh-my-opencode/model-core"
 
 export type ModelMissResult = {
   readonly code: number | null
@@ -10,6 +10,7 @@ export type ModelMissResult = {
 export type RetryableModelMiss =
   | { readonly kind: "model_not_visible"; readonly id: string }
   | { readonly kind: "auth_missing"; readonly provider: string }
+  | { readonly kind: "context_overflow"; readonly detail: string }
   | { readonly kind: "provider_unavailable"; readonly detail: string }
 
 const MODEL_NOT_FOUND_PATTERN = /^Error: Model "([^"]+)" not found\. Use --list-models to see available models\.$/m
@@ -30,6 +31,11 @@ export function classifyRetryableModelMiss(result: ModelMissResult): RetryableMo
   // model cannot fix - those stay non-retryable so a burnt budget never burns the whole chain.
   const detail = providerFailureDetail(result)
   if (detail === undefined) return undefined
+  if (isContextOverflowMessage(detail)) return { kind: "context_overflow", detail }
+  // A provider-side outage (cooldown, 429/503, overload) says nothing about THIS model being wrong,
+  // so the reflection chain must move to the next candidate instead of recording a dead run. The
+  // shared classifier owns the pattern table, including the billing/quota STOP cases that another
+  // model cannot fix - those stay non-retryable so a burnt budget never burns the whole chain.
   const statusCode = Number.parseInt(HTTP_STATUS_PATTERN.exec(detail)?.[1] ?? "", 10)
   return isRetryableModelError({
     message: detail,

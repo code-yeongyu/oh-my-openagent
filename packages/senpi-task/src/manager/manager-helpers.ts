@@ -33,6 +33,10 @@ export function buildRecordInput(input: {
     notify_on_terminal: runInBackground,
     ...(spec.task_summary !== undefined ? { task_summary: spec.task_summary } : {}),
     ...(spec.description !== undefined ? { description: spec.description } : {}),
+    ...(spec.team_run_id !== undefined ? { team_run_id: spec.team_run_id } : {}),
+    ...(spec.team_name !== undefined ? { team_name: spec.team_name } : {}),
+    ...(spec.team_member_name !== undefined ? { team_member_name: spec.team_member_name } : {}),
+    ...(spec.team_role !== undefined ? { team_role: spec.team_role } : {}),
     ...(plan.requested_model !== undefined
       ? { requested_model: plan.requested_model }
       : {}),
@@ -172,6 +176,17 @@ export function inSession(record: TaskRecord, sessionId: string): boolean {
 export function recordSpawnedPid(record: TaskRecord, pid: number | undefined): TaskRecord | undefined {
   if (pid === undefined || isTerminalRecord(record)) return undefined
   return { ...record, pid }
+}
+
+// Fold the spawned child's own session id onto its record. External readers join a grandchild
+// session's parent_session_id back to this field. Empty/missing ids and already-terminal records
+// leave the record untouched so a settled task is never resurrected.
+export function recordSpawnedChildSession(
+  record: TaskRecord,
+  sessionId: string | undefined,
+): TaskRecord | undefined {
+  if (sessionId === undefined || sessionId.length === 0 || isTerminalRecord(record)) return undefined
+  return { ...record, child_session_id: sessionId }
 }
 
 export function isTerminalRecord(record: TaskRecord): boolean {

@@ -17,7 +17,6 @@ import { reapLspDaemons } from "./lsp-daemon-reaper"
 import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
 import { writeInstalledCodexBinDir } from "./codex-installed-bin-dir"
 import { removeGitBashHooksOffWindows } from "./codex-git-bash-hooks"
-import { seedAndMigrateOmoSot } from "./omo-sot-migration"
 import { installAstGrepForCodex } from "./install-ast-grep-sg"
 import { trackCodexInstallTelemetry } from "./codex-install-telemetry"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
@@ -199,7 +198,6 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     autonomousPermissions: options.autonomousPermissions !== false,
     ...(options.reasoning === undefined ? {} : { reasoning: options.reasoning }),
   })
-  await seedAndMigrateOmoSot({ env, log, repoRoot, runCommand })
 
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
     startDirectory: projectDirectory,

@@ -1,0 +1,3 @@
+old reader THROWS: TypeError: parsed is not iterable
+new reader -> 1222 paths
+new reader first path: .agents/command/get-unpublished-changes.md

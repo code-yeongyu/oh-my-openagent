@@ -1,0 +1,26 @@
+Verification performed after writing the evidence narratives and PR body.
+
+LSP diagnostics requested for the evidence directory: unavailable.
+Tool output: LSP server 'biome' is NOT INSTALLED. Command not found: biome.
+No dependency or global installation was made for this evidence-only task.
+
+NEW_JSON_PARSE=PASS
+All task-14 JSON artifacts parsed with Python json.loads.
+NARRATIVE_ARTIFACT_REFERENCES=PASS
+All five authored Markdown files are ASCII, contain the recorded config digest, and reference existing task artifacts.
+PLATFORM_MANIFEST_DIFFERENCE=CONFIRMED
+Installed marketplace hooks=21; native macOS cache hooks=19.
+The difference is exactly the two Windows-only Git Bash hooks filtered by the unchanged installer.
+Requested native installed-cache count=21 remains FAILED; not suppressed.
+NAMED_RULES_ULTRAWORK_HOOK_PAIRS=PASS
+session-start-loading-project-rules.json and user-prompt-submit-checking-ultrawork-trigger.json each have exactly one hook/started and one successful hook/completed in the captured real app-server result.
+NEW_EVIDENCE_TARGETED_SECRET_AND_EXCLUDED_NAME_SCAN=PASS
+No matching token/bearer patterns or excluded organization name found in new task-14 artifacts. This is a targeted scan, not an exhaustive secret-detector guarantee.
+TRACKED_TREE_STILL_CLEAN=PASS
+Before evidence staging, git status --porcelain returned empty.
+SHELL_SYNTAX=PASS
+bash -n .omo/evidence/20260908-lcx-gate-softening/task-14-qa.sh exited 0.
+LOCAL_TSGO_EXIT=0
+See task-14-tsgo.log.
+REAL_CODEX_SHA_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+REAL_CODEX_SHA_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd

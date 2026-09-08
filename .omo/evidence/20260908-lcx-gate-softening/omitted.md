@@ -1,0 +1,15 @@
+# What was omitted and what remains
+
+- No agentic QA: no codex exec, lazycodex doctor, interactive model task, real model API, worker spawning, or TUI prompt. App-server turns used only the bundled localhost mock-model response. Raw hook payloads do not spawn actual agents.
+- No local Bun tests. The six-command remote gate is pre-existing execution evidence at 3451c0a8b, inspected and checksum-verified during this task, not a newly executed gate. Its existing Windows-only named-pipe skip remains disclosed.
+- Evidence-directory LSP diagnostics could not run because Biome is not installed. No dependency changes were made. JSON parsing, shell syntax validation, artifact-reference checks, and local Codex tsgo passed; see `task-14-static-verification.log`.
+- No changes to product source, shared skills, installer source/bundle, real user configuration, model defaults, agents, or marketplace distribution. Generated build outputs were produced only by the normal build commands, and tracked status remained clean.
+- No real auth files, tokens, credentials, environment dumps, or authorization headers were copied into evidence. The allowed read of real Codex configuration was its checksum only. The QA runner isolated HOME, CODEX_HOME, XDG paths, and agent-home overrides rather than using the real `~/.omo`.
+- No Windows runtime execution. The installed full marketplace manifest has 21 paths, but the macOS runtime cache has 19 because the unchanged installer filters two Windows-only Git Bash hooks. The literal native-cache assertion is a recorded failure, not an omitted pass. Resolving the plan's platform-independent count requirement requires an orchestrator decision; this evidence-only task does not change installer behavior.
+- The first mktemp wrapper assumption and noncanonical Node entrypoint path failed during QA setup. Their logs are retained and excluded from live-harness success claims. The final canonical-path app-server summaries contain actual completed notifications. The original todo-12 installer error's historical root cause is still unclassified because the initial stderr was discarded; later installed-plugin probes succeeded, as the round-6 verifier states.
+- The task-9 missing-manualQa CLI result is preserved as the round-5 verifier's recorded execution report, not a new raw transcript in task-9-errors.log. That original file contains validator/help RED evidence. This distinction is intentional.
+- CI watching, review-work/Cubic completion, rebasing, and merge are outside this child's stop condition and remain with the orchestrator. No merge command, required-check override, release, publish, or mirror push was run.
+
+The four narratives and task-14 artifacts are an evidence-only PR handoff, not a claim that the PR is merged or that the native installed-count assertion passed.
+
+Real `~/.codex/config.toml` SHA-1 before: `b012e531f5aa9fb1bce9003593c3eadf07081fcd`; after: `b012e531f5aa9fb1bce9003593c3eadf07081fcd`. Sandbox removal receipts are in `task-14-ship.log` and the retained initial setup log.

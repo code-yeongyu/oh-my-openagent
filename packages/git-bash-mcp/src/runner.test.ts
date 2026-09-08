@@ -21,6 +21,8 @@ afterEach(() => {
 });
 
 describe("Git Bash runner", () => {
+  // Windows CI compiles a fake bash.exe via Bun.build and then spawns it; both
+  // steps are much slower than the 5 s Bun default on the shared runners.
   it("#given fake bash executable #when command runs #then invokes bash with -lc and command payload", async () => {
     const directory = createTemporaryDirectory("omo-git-bash-runner-");
     const argvPath = join(directory, "argv.txt");
@@ -71,5 +73,5 @@ describe("Git Bash runner", () => {
       stderr: `fake stderr${expectedLineEnding}`,
       timedOut: false,
     });
-  });
+  }, { timeout: 30_000 });
 });

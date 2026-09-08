@@ -8,7 +8,8 @@ import { createFactsRecordTool, FACTS_RECORD_TOOL_NAME } from "./facts-record-to
 import type { FactsQueuedKey } from "./facts-failure-recording"
 import { type ReflectionModelCandidate, type ReflectionModelResolution } from "./worker/resolve-model"
 import type { ChildModelRegistry } from "@oh-my-opencode/senpi-task"
-import { updateRunLedger, writeRunJsonAtomic, type RunOutcome, type RunAttempt } from "./worker/run-artifacts"
+import { childModelChainSpec } from "./memory-child-model-chain"
+import { updateRunLedger, writeRunJsonAtomic, type RunOutcome } from "./worker/run-artifacts"
 import type { FactsExtractorRunnerOptions } from "./facts-runner-types"
 
 type ResolvedChildModel = NonNullable<StartChildInput["model"]>
@@ -50,11 +51,7 @@ export async function launchFactsInProcess(input: FactsInProcessLaunchInput): Pr
       })
       continue
     }
-    const result = await launchCandidate(input, candidate, model, attempt, candidates[index + 1] === undefined ? undefined : {
-      attempt: attempt + 1,
-      model: candidates[index + 1].model,
-      ...(candidates[index + 1].thinking === undefined ? {} : { thinking: candidates[index + 1].thinking }),
-    })
+    const result = await launchCandidate(input, candidate, model, attempt, candidates.slice(index + 1))
     if (result.status === "completed") return false
     if (result.cause === "cancelled") return true
     if (result.cause !== "session_create_failed") return false
@@ -67,7 +64,7 @@ async function launchCandidate(
   candidate: ReflectionModelCandidate,
   model: ResolvedChildModel,
   attempt: number,
-  _nextAttempt: RunAttempt | undefined,
+  fallbacks: readonly ReflectionModelCandidate[],
 ): Promise<MemoryChildResult> {
   const payloadText = serializeFactsPayload(input.payload)
   const payloadPath = join(input.runDir, "facts-payload.json")
@@ -99,7 +96,7 @@ async function launchCandidate(
         // therefore treats a missing child identity as unknown liveness and abandons, not fails.
       })
     },
-    buildStart: () => buildStart(input, candidate, model, payloadText, tool),
+    buildStart: () => buildStart(input, candidate, model, fallbacks, payloadText, tool),
     onHandle: () => undefined,
     ...(input.onState === undefined ? {} : { onState: input.onState }),
   })
@@ -120,6 +117,7 @@ function buildStart(
   input: FactsInProcessLaunchInput,
   candidate: ReflectionModelCandidate,
   model: ResolvedChildModel,
+  fallbacks: readonly ReflectionModelCandidate[],
   payloadText: string,
   tool: ReturnType<typeof createFactsRecordTool>,
 ): StartChildInput {
@@ -131,6 +129,7 @@ function buildStart(
     agentDir: resolveAgentHome({ env: input.env }),
     modelRegistry: childRegistry,
     model,
+    ...childModelChainSpec({ model: candidate.model, fallbacks }),
     ...(candidate.thinking === undefined ? {} : { thinkingLevel: candidate.thinking }),
     toolAllowlist: [FACTS_RECORD_TOOL_NAME],
     memberScopedTools: [tool],
@@ -139,6 +138,7 @@ function buildStart(
     rootSessionId: `facts-${input.runId}`,
     systemPrompt: loadFactsPersona(),
     promptEnvelope: "bare",
+    completion: "turn",
     prompt: `Extract durable facts from this payload and record each accepted fact with ${FACTS_RECORD_TOOL_NAME}.\n\n${payloadText}`,
   }
 }

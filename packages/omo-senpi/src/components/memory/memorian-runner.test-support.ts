@@ -5,12 +5,11 @@ import { join } from "node:path"
 
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 import {
-  PendingNudges,
   buildIdentityPaths,
   type MemoryIdentityPaths,
   type RecallCandidate,
 } from "@oh-my-opencode/memory-core"
-import type { ChildHandle, ChildModelRegistry, ChildSession, ChildSessionListener, CreateChildSession } from "@oh-my-opencode/senpi-task"
+import type { ChildHandle, ChildModelRegistry, ChildSession, ChildSessionEvent, ChildSessionListener, CreateChildSession } from "@oh-my-opencode/senpi-task"
 
 import { ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 import type { MemorianGateRunner } from "./memorian-runner"
@@ -59,6 +58,12 @@ export function registrySnapshot(models: readonly { readonly id: string }[] = [{
   return registry
 }
 
+/** How a scripted turn ends after its script ran: the default nudge-then-stop pair, or one settled error. */
+export type ScriptedSettle = {
+  readonly stopReason: "error"
+  readonly errorMessage: string
+}
+
 interface ScriptedSession {
   readonly createSession: CreateChildSession
   readonly promptTexts: string[]
@@ -67,14 +72,24 @@ interface ScriptedSession {
   whenPrompted(): Promise<void>
   /** Settle the open turn; safe to call before the turn starts (the request is deferred). */
   resolve(): void
+  /** Emit a session event to every subscriber exactly as a live session would. */
+  emit(event: ChildSessionEvent): void
 }
 
 /**
  * A fake in-process child session: prompt() runs the script against the session options the
  * runner assembled (custom tools, model, loader), so the script can drive real `nudge` tool calls.
- * The turn settles when the test resolves it; a never-resolved script pins the turn open.
+ * The turn settles when the test resolves it; a never-resolved script pins the turn open. The
+ * script's second argument emits session events mid-turn (a provider failure surfaces on the
+ * event stream while prompt() is still pending), and `emit` on the stub does the same from the
+ * test side. A `settled` error ends the turn the way the engine does once its retry budget and
+ * fallback chain are exhausted: one error message_end, then prompt() returns without waiting for
+ * `resolve()`.
  */
-export function scriptedSession(script: (options: CreateAgentSessionOptions) => Promise<void>): ScriptedSession {
+export function scriptedSession(
+  script: (options: CreateAgentSessionOptions, emit: (event: ChildSessionEvent) => void) => Promise<void>,
+  settled?: ScriptedSettle,
+): ScriptedSession {
   let captured: CreateAgentSessionOptions | undefined
   let settle: (() => void) | undefined
   let resolveRequested = false
@@ -85,6 +100,9 @@ export function scriptedSession(script: (options: CreateAgentSessionOptions) => 
   const promptTexts: string[] = []
   const listeners = new Set<ChildSessionListener>()
   let created = 0
+  const emit = (event: ChildSessionEvent): void => {
+    for (const listener of listeners) listener(event)
+  }
   const session: ChildSession = {
     sessionId: "memorian-child-1",
     async prompt(text) {
@@ -92,7 +110,11 @@ export function scriptedSession(script: (options: CreateAgentSessionOptions) => 
       onPrompted?.()
       const options = captured
       if (options === undefined) throw new Error("session options were not captured")
-      await script(options)
+      await script(options, emit)
+      if (settled !== undefined) {
+        emit({ type: "message_end", message: { role: "assistant", content: [], stopReason: settled.stopReason, errorMessage: settled.errorMessage } })
+        return
+      }
       for (const listener of listeners) {
         listener({ type: "message_end", message: { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "nudge", arguments: {} }], stopReason: "toolUse" } })
         listener({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "" }], stopReason: "stop" } })
@@ -122,6 +144,7 @@ export function scriptedSession(script: (options: CreateAgentSessionOptions) => 
       resolveRequested = true
       settle?.()
     },
+    emit,
     createSession: async (options) => {
       created += 1
       captured = options

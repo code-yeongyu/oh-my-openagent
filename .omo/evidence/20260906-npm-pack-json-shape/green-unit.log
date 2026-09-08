@@ -1,0 +1,11 @@
+bun test v1.3.14 (0d9b296a)
+
+script\npm-pack-paths.test.ts:
+(pass) npm pack path reader > #given npm 11 array output #when packed paths are read #then every packed path is returned [2.74ms]
+(pass) npm pack path reader > #given npm 12 object output keyed by package name #when packed paths are read #then the same paths are returned [1.02ms]
+(pass) npm pack path reader > #given output of neither shape #when packed paths are read #then it fails naming npm pack instead of throwing on undefined [9.17ms]
+
+ 3 pass
+ 0 fail
+ 6 expect() calls
+Ran 3 tests across 1 file. [1.66s]

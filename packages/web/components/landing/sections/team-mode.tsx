@@ -1,112 +1,90 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
-import { Network, Users, Terminal, Wrench, Sparkles, Sword, Shield } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
+import { Reveal } from "@/components/landing/motion-wrappers"
+import { SectionHeader } from "@/components/landing/section-header"
+import { Eyebrow } from "@/components/ledger/eyebrow"
+import { Frame } from "@/components/ledger/frame"
+
+const FEATURES = ["lead", "parallel", "tmux", "tools"] as const
+const PANES = [
+  { pane: "paneLead", status: "statusLead", line: "lineLead" },
+  { pane: "paneImpl", status: "statusImpl", line: "lineImpl" },
+  { pane: "paneReview", status: "statusReview", line: "lineReview" },
+  { pane: "paneTest", status: "statusTest", line: "lineTest" },
+] as const
+
+/** Team Mode: compact copy beside a CSS tmux grid mockup (chrome + 2×2 panes). */
 export async function TeamModeSection(): Promise<JSX.Element> {
-  const t = await getTranslations("landing")
+  const t = await getTranslations("landing.teamMode")
 
   return (
     <section
       id="team-mode"
-      className="relative overflow-hidden border-t border-white/5 bg-[#0a0a0a] py-24"
       data-section="team-mode"
+      aria-labelledby="team-mode-title"
+      className="border-line border-t py-16 lg:py-24"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-900/10 via-black to-black opacity-70" />
-      <div className="reveal-on-enter relative z-10 container mx-auto px-4 md:px-6">
-        <div className="mx-auto max-w-5xl">
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <Badge className="border-violet-500/20 bg-violet-500/10 px-4 py-1.5 font-mono text-violet-300">
-              {t("teamMode.badge")}
-            </Badge>
-            <Badge variant="outline" className="border-zinc-700 text-xs text-zinc-400">
-              opt-in
-            </Badge>
-          </div>
-
-          <h2 className="mb-4 text-4xl font-bold tracking-tight md:text-5xl">
-            <span className="text-cyan-400">{t("teamMode.title")}</span>
-          </h2>
-          <h3 className="mb-6 text-2xl font-bold text-zinc-200 md:text-3xl">
-            {t("teamMode.headline")}
-          </h3>
-          <p className="mb-12 max-w-3xl text-xl leading-relaxed text-zinc-400">
-            {t("teamMode.description")}
-          </p>
-
-          <div className="mb-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {(
-              [
-                { key: "lead", icon: Network },
-                { key: "parallel", icon: Users },
-                { key: "tmux", icon: Terminal },
-                { key: "tools", icon: Wrench },
-              ] as const
-            ).map(({ key, icon: Icon }) => (
-              <div key={key}>
-                <Card className="h-full border-zinc-800 bg-zinc-900/30 transition-colors hover:border-cyan-500/30">
-                  <CardHeader className="pb-3">
-                    <div className="w-fit rounded-lg bg-cyan-500/10 p-2 text-cyan-300">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <CardTitle className="mt-3 text-lg text-cyan-200">
-                      {t(`teamMode.features.${key}.title`)}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm leading-relaxed text-zinc-400">
-                      {t(`teamMode.features.${key}.description`)}
-                    </p>
-                  </CardContent>
-                </Card>
+      <Frame>
+        <div className="grid gap-12 lg:grid-cols-[1fr_minmax(0,34rem)] lg:gap-16">
+          <Reveal>
+            <SectionHeader
+              id="team-mode-title"
+              eyebrow={t("eyebrow")}
+              dot="busy"
+              title={t("title")}
+              intro={t("description")}
+            />
+            <dl className="border-line divide-line mt-12 divide-y">
+              {FEATURES.map((key) => (
+                <div key={key} className="grid gap-1 py-5 sm:grid-cols-[minmax(0,11rem)_1fr]">
+                  <dt className="text-text-hi text-base leading-[1.35] font-medium tracking-[-0.01em]">
+                    {t(`features.${key}.title`)}
+                  </dt>
+                  <dd className="text-text-mid text-sm leading-[1.55]">
+                    {t(`features.${key}.description`)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-8">
+              <code className="border-line bg-ink-2 text-text-hi rounded-[2px] border px-2 py-1 font-mono text-sm">
+                {t("optIn")}
+              </code>
+            </p>
+          </Reveal>
+          <Reveal index={1}>
+            <div className="border-line grid grid-rows-[auto_1fr] border">
+              <div className="bg-ink-2 border-line flex h-10 items-center justify-between border-b px-4">
+                <span className="text-text-lo text-meta tracking-meta font-mono">
+                  {t("mockup.title")}
+                </span>
+                <Eyebrow dot="busy">{t("mockup.status")}</Eyebrow>
               </div>
-            ))}
-          </div>
-
-          <div className="mb-10 flex items-center gap-3">
-            <Sparkles className="h-4 w-4 text-violet-400" />
-            <span className="font-mono text-sm tracking-widest text-violet-400 uppercase">
-              {t("teamMode.poweredBy")}
-            </span>
-            <div className="h-px flex-1 bg-gradient-to-r from-violet-500/30 to-transparent" />
-          </div>
-
-          <div className="mb-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {(
-              [
-                { key: "hyperplan", icon: Sword },
-                { key: "securityResearch", icon: Shield },
-              ] as const
-            ).map(({ key, icon: Icon }) => (
-              <div key={key}>
-                <Card className="h-full border-zinc-800 bg-zinc-900/30 transition-colors hover:border-violet-500/40">
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-violet-500/10 p-2 text-violet-300">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <CardTitle className="font-mono text-lg text-violet-300">
-                        {t(`teamMode.skills.${key}.name`)}
-                      </CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="leading-relaxed text-zinc-300">
-                      {t(`teamMode.skills.${key}.description`)}
-                    </p>
-                  </CardContent>
-                </Card>
+              <div className="bg-code-bg grid gap-px p-px sm:grid-cols-2">
+                {PANES.map((pane) => (
+                  <div key={pane.pane} className="bg-ink-0 flex min-h-32 flex-col gap-2 p-4">
+                    <span className="text-text-lo text-meta tracking-meta flex items-center gap-2 font-mono">
+                      <span
+                        aria-hidden="true"
+                        className="bg-status-ok pulse-dot size-2 rounded-full"
+                      />
+                      {t(`mockup.${pane.pane}`)}
+                    </span>
+                    <span className="text-text-mid font-mono text-[13px] leading-[1.55]">
+                      {t(`mockup.${pane.status}`)}
+                    </span>
+                    <span className="text-text-faint mt-auto truncate font-mono text-[13px]">
+                      {t(`mockup.${pane.line}`)}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-
-          <div className="flex flex-col items-start gap-4 rounded-xl border border-zinc-800 bg-black/40 p-6 sm:flex-row sm:items-center sm:justify-between">
-            <code className="font-mono text-sm break-all text-cyan-300">{t("teamMode.optIn")}</code>
-            <p className="text-sm text-zinc-400 italic sm:text-right">{t("teamMode.tagline")}</p>
-          </div>
+            </div>
+            <p className="text-text-lo mt-4 text-sm leading-[1.55]">{t("mockup.caption")}</p>
+          </Reveal>
         </div>
-      </div>
+      </Frame>
     </section>
   )
 }

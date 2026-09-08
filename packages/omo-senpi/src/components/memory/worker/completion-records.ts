@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "@oh-my-opencode/memory-core/
 import { basename, join } from "node:path"
 
 import type { ReflectionCompletionRecord } from "./completion-contracts"
+import { unlinkRunArtifact } from "./run-artifacts"
 
 export async function ensureReflectionCompletion(
   completionsDir: string,
@@ -34,8 +35,14 @@ export async function writeCompletionRecord(
   await mkdir(completionsDir, { recursive: true, mode: 0o700 })
   const target = join(completionsDir, `${safeRunId(record.runId)}.json`)
   const temporary = `${target}.tmp-${randomUUID()}`
-  await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
-  await rename(temporary, target)
+  let renamed = false
+  try {
+    await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
+    await rename(temporary, target)
+    renamed = true
+  } finally {
+    if (!renamed) await unlinkRunArtifact(temporary)
+  }
 }
 
 export async function readCompletionRecord(path: string): Promise<ReflectionCompletionRecord | null> {

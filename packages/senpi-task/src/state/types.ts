@@ -166,6 +166,10 @@ export type TaskRecordInput = {
   // Durable prelaunch steering queue, drained in order once the child starts. Omitted when empty.
   readonly pending_steering?: readonly PendingSteeringEntry[]
   readonly owner?: DagTaskOwner
+  readonly team_run_id?: string
+  readonly team_name?: string
+  readonly team_member_name?: string
+  readonly team_role?: "member"
   // Session-local spawn ordinal, assigned once per parent session at spawn. A relational key for
   // grouping a logical task's runs; absent on records persisted before ordinals shipped.
   readonly task_seq?: number
@@ -184,6 +188,10 @@ export type TaskRecord = TaskRecordInput & {
   readonly residency_state: ResidencyState
   readonly created_at: string
   readonly updated_at: string
+  // Durable launch boundary, committed before the first start/respawn runner invocation.
+  // Reattachment and later outcomes (including lost) preserve it. Absent on never-launched tasks
+  // and records written before this field shipped.
+  readonly started_at?: string
   // Stable timestamp for the terminal run. Residency claims may refresh updated_at, but must not
   // extend the retention window of a completed run.
   readonly terminal_at?: string
@@ -192,6 +200,9 @@ export type TaskRecord = TaskRecordInput & {
   // project distinguish "previous process died" from "a live process still owns this child" during
   // reconciliation, so cross-process session starts never falsely mark live in-process children lost.
   readonly host_pid?: number
+  // Child's own session id, taken from the spawn handle at launch (and rewritten on reattach).
+  // External readers join a grandchild record's parent_session_id to this field. Absent on records
+  // written before the field was persisted and on children whose handle never exposed a session id.
   readonly child_session_id?: string
   readonly spawn_spec?: TaskSpawnSpec
   readonly final_response?: string

@@ -1,0 +1,18 @@
+=== kill-mid-turn ===
+assert kill-mid-turn real_host_pid=53890 live_host_present=false source=session_jsonl source_incomplete=true completed=false
+PASS kill-mid-turn
+=== version-capability ===
+assert real-cli-start pid=54053 reused=false version=2026.8.28
+assert version-mismatch-replaced oldPid=54178 newPid=54198
+PASS ensure-host real CLI auto-start and replacement
+cleanup=managed-host,fake-host,socket,scratch-removed
+assert unmanaged-incompatible-refusal typed_kind=unmanaged_host adopted=false fixture_survived=true version_mismatch=true (0.0.0-t14-stale!=2026.8.28) missing_capabilities=["extension_events"]
+PASS version-capability
+=== queued-resume ===
+assert queued-resume host_get_messages=true dead_host_pid=54350 pending_after_restart=1 pending_after_drain=0 delivered_count=1
+PASS queued-resume
+=== uncertain-operation ===
+assert uncertain-operation child_sigkill=true state=idempotency_uncertain host_get_messages=true delivered_count=1 auto_redelivered=false
+PASS uncertain-operation
+=== summary ===
+PASS task-14 resilience injections

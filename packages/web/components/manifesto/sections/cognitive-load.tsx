@@ -1,84 +1,96 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
-import { ArrowRight, Terminal } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Section } from "@/components/ui/section"
+import { ArrowDown } from "lucide-react"
+import { Eyebrow } from "@/components/ledger/eyebrow"
+import {
+  HEADING_CLASS,
+  LEAD_CLASS,
+  ManifestoSection,
+  PROSE_LIMIT,
+  TITLE_CLASS,
+} from "@/components/manifesto/manifesto-section"
+
+const STEP_INDEX = ["01", "02", "03", "04", "05"] as const
 
 export async function CognitiveLoadSection(): Promise<JSX.Element> {
   const t = await getTranslations("manifesto")
   const ultraworkStepKeys = ["analyze", "breakdown", "execute", "verify", "commit"] as const
 
   return (
-    <Section data-section="manifesto-cognitive-load" className="mx-auto max-w-5xl">
-      <div className="mb-16 text-center">
-        <h2 className="mb-4 text-3xl font-bold md:text-4xl">{t("cognitiveLoad.title")}</h2>
-        <p className="text-muted-foreground mx-auto max-w-2xl text-xl">
-          {t("cognitiveLoad.subtitle")}
-        </p>
+    <ManifestoSection
+      data-section="manifesto-cognitive-load"
+      labelledBy="manifesto-cognitive-load-title"
+    >
+      <div className={`${PROSE_LIMIT} space-y-4`}>
+        <h2 id="manifesto-cognitive-load-title" className={TITLE_CLASS}>
+          {t("cognitiveLoad.title")}
+        </h2>
+        <p className={LEAD_CLASS}>{t("cognitiveLoad.subtitle")}</p>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-2">
-        <Card className="from-background to-primary/5 border-primary/20 relative overflow-hidden bg-gradient-to-br">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Terminal className="h-24 w-24" />
+      <div className="border-line mt-12 grid border-t lg:grid-cols-2">
+        <article className="border-line flex flex-col gap-6 border-b py-8 lg:border-r lg:pr-8">
+          <Eyebrow rule as="p">
+            {t("cognitiveLoad.ultrawork.badge")}
+          </Eyebrow>
+          <div className="space-y-2">
+            <h3 className={HEADING_CLASS}>{t("cognitiveLoad.ultrawork.title")}</h3>
+            <p className="text-text-mid leading-[1.6]">{t("cognitiveLoad.ultrawork.subtitle")}</p>
           </div>
-          <CardHeader>
-            <Badge className="mb-2 w-fit">{t("cognitiveLoad.ultrawork.badge")}</Badge>
-            <CardTitle className="text-2xl">{t("cognitiveLoad.ultrawork.title")}</CardTitle>
-            <p className="text-muted-foreground">{t("cognitiveLoad.ultrawork.subtitle")}</p>
-          </CardHeader>
-          <CardContent>
-            <div className="border-primary/20 relative ml-2 space-y-6 border-l pl-4">
-              {ultraworkStepKeys.map((key) => (
-                <div key={key} className="relative">
-                  <div className="bg-primary border-background absolute top-1.5 -left-[21px] h-3 w-3 rounded-full border-2" />
-                  <p className="text-sm">{t(`cognitiveLoad.ultrawork.steps.${key}`)}</p>
-                </div>
-              ))}
-            </div>
-            <div className="border-border/50 text-primary mt-8 border-t pt-6 text-center font-bold">
-              {t("cognitiveLoad.ultrawork.footer")}
-            </div>
-          </CardContent>
-        </Card>
+          <ol className="border-line divide-line divide-y border-y">
+            {ultraworkStepKeys.map((key, i) => (
+              <li key={key} className="grid grid-cols-[54px_1fr] items-baseline gap-x-4 py-3">
+                <span
+                  aria-hidden="true"
+                  className="text-text-faint font-mono text-sm tracking-[-0.01em] tabular-nums"
+                >
+                  {STEP_INDEX[i]}
+                </span>
+                <span className="text-text-mid text-sm leading-[1.55]">
+                  {t(`cognitiveLoad.ultrawork.steps.${key}`)}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="text-text-hi mt-auto text-sm font-medium">
+            {t("cognitiveLoad.ultrawork.footer")}
+          </p>
+        </article>
 
-        <Card className="bg-secondary/10 border-border/50">
-          <CardHeader>
-            <Badge variant="secondary" className="mb-2 w-fit">
-              {t("cognitiveLoad.prometheus.badge")}
-            </Badge>
-            <CardTitle className="text-2xl">{t("cognitiveLoad.prometheus.title")}</CardTitle>
-            <p className="text-muted-foreground">{t("cognitiveLoad.prometheus.subtitle")}</p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="bg-background/50 border-border/50 rounded-lg border p-4">
-                <h3 className="text-primary mb-1 font-semibold">
-                  {t("cognitiveLoad.prometheus.prometheusTitle")}
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  {t("cognitiveLoad.prometheus.prometheusDescription")}
-                </p>
-              </div>
-              <div className="flex justify-center">
-                <ArrowRight className="text-muted-foreground/50 rotate-90 md:rotate-0" />
-              </div>
-              <div className="bg-background/50 border-border/50 rounded-lg border p-4">
-                <h3 className="text-primary mb-1 font-semibold">
-                  {t("cognitiveLoad.prometheus.atlasTitle")}
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  {t("cognitiveLoad.prometheus.atlasDescription")}
-                </p>
-              </div>
+        <article className="border-line flex flex-col gap-6 border-b py-8 lg:pl-8">
+          <Eyebrow rule as="p">
+            {t("cognitiveLoad.prometheus.badge")}
+          </Eyebrow>
+          <div className="space-y-2">
+            <h3 className={HEADING_CLASS}>{t("cognitiveLoad.prometheus.title")}</h3>
+            <p className="text-text-mid leading-[1.6]">{t("cognitiveLoad.prometheus.subtitle")}</p>
+          </div>
+          <div className="border-line border-y">
+            <div className="py-4">
+              <h4 className="text-text-hi text-lg leading-[1.35] font-medium tracking-[-0.01em]">
+                {t("cognitiveLoad.prometheus.prometheusTitle")}
+              </h4>
+              <p className="text-text-mid mt-1 text-sm leading-[1.55]">
+                {t("cognitiveLoad.prometheus.prometheusDescription")}
+              </p>
             </div>
-            <div className="border-border/50 text-muted-foreground mt-4 border-t pt-6 text-center font-bold">
-              {t("cognitiveLoad.prometheus.footer")}
+            <div className="border-line text-text-lo flex items-center gap-3 border-y py-2">
+              <ArrowDown aria-hidden="true" className="size-4" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="py-4">
+              <h4 className="text-text-hi text-lg leading-[1.35] font-medium tracking-[-0.01em]">
+                {t("cognitiveLoad.prometheus.atlasTitle")}
+              </h4>
+              <p className="text-text-mid mt-1 text-sm leading-[1.55]">
+                {t("cognitiveLoad.prometheus.atlasDescription")}
+              </p>
+            </div>
+          </div>
+          <p className="text-text-hi mt-auto text-sm font-medium">
+            {t("cognitiveLoad.prometheus.footer")}
+          </p>
+        </article>
       </div>
-    </Section>
+    </ManifestoSection>
   )
 }

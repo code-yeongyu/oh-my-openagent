@@ -74,6 +74,52 @@ describe("selectRecallCandidates", () => {
     expect(paths(candidates)).toEqual(["reference/d.md"])
   })
 
+  it("#given transcript-visible paths #when candidates are selected #then excluded paths do not consume the cap", () => {
+    // given
+    const documents = [
+      doc("reference/a.md", "Kubernetes", "ingress review"),
+      doc("reference/b.md", "Kubernetes", "rollout review"),
+    ]
+    const excludePaths: ReadonlySet<string> = new Set(["reference/a.md"])
+    const options = { ...BASE_OPTS, maxItems: 1, excludePaths }
+
+    // when
+    const candidates = selectRecallCandidates(documents, ["kubernetes"], options)
+
+    // then
+    expect(paths(candidates)).toEqual(["reference/b.md"])
+    expect(excludePaths).toEqual(new Set(["reference/a.md"]))
+  })
+
+  it("#given surfaced and transcript-visible paths #when candidates are selected #then both exclusions apply", () => {
+    // given
+    const documents = ["a", "b", "c"].map((name) => doc(`reference/${name}.md`, "Kubernetes", "review"))
+    const options = {
+      ...BASE_OPTS,
+      surfaced: new Set(["reference/a.md"]),
+      excludePaths: new Set(["reference/b.md"]),
+    }
+
+    // when
+    const candidates = selectRecallCandidates(documents, ["kubernetes"], options)
+
+    // then
+    expect(paths(candidates)).toEqual(["reference/c.md"])
+  })
+
+  it("#given an empty exclusion set #when candidates are selected #then omitted and empty options are equivalent", () => {
+    // given
+    const documents = [doc("reference/a.md", "Kubernetes", "ingress review")]
+    const options = { ...BASE_OPTS, excludePaths: new Set<string>() }
+
+    // when
+    const candidates = selectRecallCandidates(documents, ["kubernetes"], options)
+
+    // then
+    expect(candidates).toEqual(selectRecallCandidates(documents, ["kubernetes"], BASE_OPTS))
+    expect(paths(candidates)).toEqual(["reference/a.md"])
+  })
+
   it("#given more matches than maxItems #when candidates are selected #then only the best capped set returns", () => {
     // given
     const documents = [

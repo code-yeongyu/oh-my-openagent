@@ -28,6 +28,7 @@ export const THREAD_ERROR_CODES = [
   "unsupported",
   "overloaded",
   "transport_closed",
+  "host_unavailable",
   "internal_error",
 ] as const
 

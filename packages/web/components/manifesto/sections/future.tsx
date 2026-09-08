@@ -1,28 +1,32 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
-import { Section } from "@/components/ui/section"
+import {
+  HEADING_CLASS,
+  LEAD_CLASS,
+  ManifestoSection,
+  PROSE_LIMIT,
+  RuledList,
+  TITLE_CLASS,
+} from "@/components/manifesto/manifesto-section"
 
 export async function FutureSection(): Promise<JSX.Element> {
   const t = await getTranslations("manifesto")
   const futureKeys = ["focus", "quality", "complexity", "promptEngineering"] as const
 
   return (
-    <Section data-section="manifesto-future" className="mx-auto max-w-3xl text-center">
-      <h2 className="mb-8 text-3xl font-bold md:text-4xl">{t("future.title")}</h2>
+    <ManifestoSection data-section="manifesto-future" labelledBy="manifesto-future-title">
+      <div className={`${PROSE_LIMIT} space-y-10`}>
+        <h2 id="manifesto-future-title" className={TITLE_CLASS}>
+          {t("future.title")}
+        </h2>
 
-      <div className="mx-auto mb-12 max-w-2xl space-y-4 text-left">
-        {futureKeys.map((key) => (
-          <div key={key} className="flex items-center gap-3">
-            <div className="bg-primary h-2 w-2 shrink-0 rounded-full" />
-            <span className="text-lg">{t(`future.items.${key}`)}</span>
-          </div>
-        ))}
-      </div>
+        <RuledList items={futureKeys.map((key) => ({ key, label: t(`future.items.${key}`) }))} />
 
-      <div className="space-y-6">
-        <p className="text-2xl font-light">{t("future.quote1")}</p>
-        <p className="text-primary text-3xl font-bold">{t("future.quote2")}</p>
+        <div className="space-y-4">
+          <p className={LEAD_CLASS}>{t("future.quote1")}</p>
+          <p className={HEADING_CLASS}>{t("future.quote2")}</p>
+        </div>
       </div>
-    </Section>
+    </ManifestoSection>
   )
 }

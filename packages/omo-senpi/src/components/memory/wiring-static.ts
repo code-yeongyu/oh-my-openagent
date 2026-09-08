@@ -19,6 +19,7 @@ import { registerSkillsUsage, type SkillsUsageTracker } from "./skills-usage"
 import { registerMemoryUsage, type MemoryUsageTracker } from "./memory-usage"
 import type { createMemoryNoticeWiring } from "./memory-notice-wiring"
 import type { MemorianGateWiring } from "./memorian-wiring"
+import type { MemorianComposition } from "./wiring-memorian"
 import type { createMemoryRecallWiring } from "./recall-wiring"
 import { createReflectionTriggerWiring } from "./trigger-wiring"
 import { registerMemoryToolSurface } from "./tools"
@@ -42,6 +43,7 @@ export function registerMemoryStatic(input: {
   readonly noticeWiring: ReturnType<typeof createMemoryNoticeWiring>
   readonly recallWiring: ReturnType<typeof createMemoryRecallWiring>
   readonly memorianGateWiring: MemorianGateWiring
+  readonly memorian: MemorianComposition
   readonly dreamTriggerWiring: DreamTriggerWiring
   readonly completionApi: (pi: SenpiExtensionAPI) => ReflectionCompletionApi | undefined
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
@@ -102,6 +104,10 @@ export function registerMemoryStatic(input: {
   // senpi merges one message per handler in registration order, so the hint lands last and the
   // prompt handler stays the only writer of systemPrompt.
   if (hasMemoryCapabilities(pi)) recallWiring.register(pi)
+  // Memorian hooks come LAST: their before_agent_start handler never contributes a message, and
+  // registering it after the projection handler keeps handler results ordered projection-first,
+  // the same invariant the recall registration above documents.
+  if (hasMemoryCapabilities(pi)) input.memorian.registerHooks(pi)
   pi.on("session_start", (_payload, eventCtx) => {
     if (eventCtx !== undefined) lastEventCtx.current = eventCtx
   })
@@ -119,7 +125,7 @@ export function registerMemoryStatic(input: {
     const result = await journalWiringFor(identity).reconcileSession(eventCtx)
     await factsWiringFor(identity).onSettled(sessionId)
     // Fire-and-forget by contract: the gate advises the NEXT turn, so this one never waits for it.
-    memorianGateWiring.onSettled(eventCtx)
+    input.memorian.trigger.onSettled(eventCtx)
     await onSettled?.(sessionId, eventCtx)
     return result
   })
@@ -209,7 +215,7 @@ export function registerMemoryStatic(input: {
     resolveSession: triggerSessionFor,
     onLaunch: () => {},
     // A compaction rewrites the transcript the pending nudges were judged against, so they die with it.
-    onCompactionAccepted: (conversationId) => memorianGateWiring.onCompactionAccepted(conversationId),
+    onCompactionAccepted: (conversationId) => input.memorian.onCompactionAccepted(conversationId, resolveContext(conversationId)),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   triggerWiring.register(pi)

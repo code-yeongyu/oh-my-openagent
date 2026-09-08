@@ -29,7 +29,7 @@ Add to the `[opencode]` block of `~/.omo/omo.jsonc` (user) or `.omo/omo.jsonc` (
 
 After enabling, restart opencode. The 12 `team_*` tools become available.
 
-> Bug-fix note: v4.2.1 adds a fresh-install regression test for this minimal config and logs the resolved `team_mode` state plus team tool count during startup. If the tools still do not appear after restart, inspect `oh-my-opencode.log` for the loaded config path and `[tool-registry] Built tool registry` entry.
+> Bug-fix note: a fresh-install regression test covers this minimal config and startup logs the resolved `team_mode` state plus team tool count (`[tool-registry] Built tool registry`). If the tools still do not appear after restart, inspect `oh-my-opencode.log` for the loaded config path and `[tool-registry] Built tool registry` entry.
 
 ## Config schema (11 fields)
 
@@ -74,7 +74,8 @@ When both scopes define the same team name, project scope wins.
 
 ## Eligible agents
 
-- **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`, `hephaestus` (OpenCode grants `teammate: "allow"` by default).
+- **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`.
+- **Conditional:** `hephaestus` (registry verdict `conditional`; OpenCode still sets `teammate: "allow"` in `tool-config-handler.ts`).
 - **Hard-reject:** `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`.
 
 Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state. Use the `task` tool for those agents; its implementation module is named `delegate-task`.
@@ -114,7 +115,7 @@ Add `"worktreePath": "../wt-scout"` to a member entry. Path is filesystem-relati
 
 Set `tmux_visualization: true`. Requires running inside a tmux session and tmux on PATH. Failures are isolated - a missing tmux never blocks team creation.
 
-When enabled, each member gets a dedicated tmux pane attached to that member's session via `opencode attach`. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
+When enabled, each member gets a dedicated tmux pane attached to that member's session via `opencode attach`. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise `process.cwd()`.
 
 `team_delete` closes the panes and tears down the team layout. Per-member shutdown closes just that pane and rebalances the remaining layout.
 

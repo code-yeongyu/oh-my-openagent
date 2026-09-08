@@ -1,0 +1,32 @@
+# package gate on box bx_g365jfas at f56a05368 (clean git archive + OMO_SKIP_MATERIALIZE=1 install)
+SRC_FILES=10207
+INSTALL_RC=0
+TSGO_RC=0
+TEST_RC=1
+(fail) reflection worker OS sandbox > #given Linux with bwrap available #when spawn arguments are transformed #then the root is read-only while worktree and git state are rebound writable [14.37ms]
+(fail) reflection worker OS sandbox > #given a bare inner command available on the child PATH #when sandbox arguments are transformed #then the wrapper receives its absolute path [2.25ms]
+(fail) reflection worker OS sandbox > #given a bare inner command missing from the child PATH #when sandbox arguments are transformed #then it degrades to identity with an explicit warning [2.28ms]
+(fail) renderMemorianGateEntry reason and runId > #given a skipped gate record without reason #when rendered #then the output is byte-identical to before [1.13ms]
+(fail) reflection sandbox with not-yet-created paths > #given a Linux runtime write dir that does not exist yet #when the bwrap transform is built #then that exact path is rebound writable [2.22ms]
+(fail) reflection worker OS sandbox > #given Linux with bwrap available #when spawn arguments are transformed #then the root is read-only while worktree and git state are rebound writable [14.37ms]
+(fail) reflection worker OS sandbox > #given a bare inner command available on the child PATH #when sandbox arguments are transformed #then the wrapper receives its absolute path [2.25ms]
+(fail) reflection worker OS sandbox > #given a bare inner command missing from the child PATH #when sandbox arguments are transformed #then it degrades to identity with an explicit warning [2.28ms]
+(fail) renderMemorianGateEntry reason and runId > #given a skipped gate record without reason #when rendered #then the output is byte-identical to before [1.13ms]
+(fail) reflection sandbox with not-yet-created paths > #given a Linux runtime write dir that does not exist yet #when the bwrap transform is built #then that exact path is rebound writable [2.22ms]
+ 3535 pass
+ 5 fail
+Ran 3543 tests across 457 files. [346.22s]
+
+## tsgo
+## failing test files
+(fail) reflection sandbox with not-yet-created paths > #given a Linux runtime write dir that does not exist yet #when the bwrap transform is built #then that exact path is rebound writable
+(fail) reflection worker OS sandbox > #given a bare inner command available on the child PATH #when sandbox arguments are transformed #then the wrapper receives its absolute path
+(fail) reflection worker OS sandbox > #given a bare inner command missing from the child PATH #when sandbox arguments are transformed #then it degrades to identity with an explicit warning
+(fail) reflection worker OS sandbox > #given Linux with bwrap available #when spawn arguments are transformed #then the root is read-only while worktree and git state are rebound writable
+(fail) renderMemorianGateEntry reason and runId > #given a skipped gate record without reason #when rendered #then the output is byte-identical to before
+## per-file summary lines
+ 3535 pass
+ 5 fail
+Ran 3543 tests across 457 files. [346.22s]
+
+NOTE: the 4 'reflection worker OS sandbox' / 'reflection sandbox with not-yet-created paths' failures are the pre-existing bwrap uid-map limitation of the Linux box (identical 4 fail on origin/dev content, see wave1-verify.md); the recall-notice.test.ts failure is a real pin regression fixed by todo 7b before merge.

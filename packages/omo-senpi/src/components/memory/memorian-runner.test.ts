@@ -1,19 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
-import type { CreateAgentSessionOptions, ToolDefinition } from "@code-yeongyu/senpi"
+import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 import type { CreateChildSession } from "@oh-my-opencode/senpi-task"
-import { PendingNudges } from "@oh-my-opencode/memory-core"
-import type { ChildHandle } from "@oh-my-opencode/senpi-task"
 import { MemorianGateRunner } from "./memorian-runner"
-import { CANDIDATE_PATH, fixture, launchInput, nudgeOnce, registrySnapshot, roots, runnerOptions, scriptedSession, SESSION_ID } from "./memorian-runner.test-support"
+import { CANDIDATE_PATH, fixture, launchInput, nudgeOnce, registrySnapshot, roots, runnerOptions, scriptedSession } from "./memorian-runner.test-support"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))) })
 
 describe("MemorianGateRunner", () => {
-  test("#given a gate child that calls nudge on a valid candidate #when the runner launches #then the validated nudge lands in the pending store", async () => {
+  test("#given a gate child that calls nudge on a valid candidate #when the runner launches #then the result is nudged with the validated list", async () => {
     // given
     const { identityPaths } = await fixture()
     const stub = scriptedSession(nudgeOnce)
@@ -25,10 +22,10 @@ describe("MemorianGateRunner", () => {
     const result = await pending
 
     // then
-    expect(result.status).toBe("nudged")
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([
-      { path: CANDIDATE_PATH, hint: "Drain nodes before a rollout." },
-    ])
+    expect(result).toMatchObject({
+      status: "nudged",
+      nudges: [{ path: CANDIDATE_PATH, hint: "Drain nodes before a rollout." }],
+    })
   })
 
   test("#given a snapshotted registry on the input #when the ctx behind it is already disposed #then the launch still succeeds", async () => {
@@ -44,10 +41,10 @@ describe("MemorianGateRunner", () => {
     const result = await pending
 
     // then
-    expect(result.status).toBe("nudged")
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([
-      { path: CANDIDATE_PATH, hint: "Drain nodes before a rollout." },
-    ])
+    expect(result).toMatchObject({
+      status: "nudged",
+      nudges: [{ path: CANDIDATE_PATH, hint: "Drain nodes before a rollout." }],
+    })
   })
 
   test("#given no registry snapshot on the input #when the runner launches #then it warns, skips and creates no child session", async () => {
@@ -69,7 +66,6 @@ describe("MemorianGateRunner", () => {
     expect(result.status).toBe("skipped")
     expect(stub.created).toBe(0)
     expect(warnings).toEqual(["memorian gate registry snapshot unavailable"])
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
   })
 
   test("#given the quick category cannot resolve #when the runner launches #then it warns, skips and creates no child session", async () => {
@@ -90,7 +86,6 @@ describe("MemorianGateRunner", () => {
     expect(result.status).toBe("skipped")
     expect(stub.created).toBe(0)
     expect(warnings).toHaveLength(1)
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
   })
 
   test("#given no quick category but another usable registry model #when the runner launches #then it warns, skips and never rides the beyond-category ladder", async () => {
@@ -113,7 +108,6 @@ describe("MemorianGateRunner", () => {
     expect(result.status).toBe("skipped")
     expect(stub.created).toBe(0)
     expect(warnings).toEqual(["memorian gate quick category unavailable"])
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
   })
 
   test("#given a launch already in flight #when a second trigger arrives #then only one child session is created", async () => {
@@ -141,7 +135,7 @@ describe("MemorianGateRunner", () => {
     expect([firstResult.status, secondResult.status].sort()).toEqual(["active", "nudged"])
   })
 
-  test("#given a child that nudges the same valid candidate twice #when the runner validates the result #then one pending nudge is written", async () => {
+  test("#given a child that nudges the same valid candidate twice #when the runner validates the result #then the result is nudged with one validated nudge", async () => {
     // given
     const { identityPaths } = await fixture()
     const stub = scriptedSession(async (options) => {
@@ -156,10 +150,10 @@ describe("MemorianGateRunner", () => {
     const result = await pending
 
     // then
-    expect(result.status).toBe("nudged")
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([
-      { path: CANDIDATE_PATH, hint: "Drain nodes before a rollout." },
-    ])
+    expect(result).toMatchObject({
+      status: "nudged",
+      nudges: [{ path: CANDIDATE_PATH, hint: "Drain nodes before a rollout." }],
+    })
   })
 
   test("#given a child session that cannot be created #when the runner launches #then the failure names the creation cause", async () => {
@@ -176,7 +170,6 @@ describe("MemorianGateRunner", () => {
 
     // then
     expect(result).toMatchObject({ status: "failed", cause: "session_create_failed" })
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
   })
 
   test("#given a child turn that ends with an error #when the runner launches #then the failure names the child cause", async () => {
@@ -193,7 +186,6 @@ describe("MemorianGateRunner", () => {
     // then
     expect(result).toMatchObject({ status: "failed", cause: "child_failed", reason: "provider exploded" })
     expect(result.runId).toMatch(/^[0-9a-f-]{36}$/)
-    expect(await new PendingNudges(identityPaths.recallPending).take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
   })
 
   test("#given a completed run #when the runner finishes #then the run directory is kept with its auditable artifacts", async () => {
@@ -253,4 +245,5 @@ describe("MemorianGateRunner", () => {
     expect(captured?.tools).toEqual(["nudge"])
     const toolNames = (captured?.customTools ?? []).map((tool) => tool.name)
     expect(toolNames).toEqual(["nudge"])
-  })})
+  })
+})

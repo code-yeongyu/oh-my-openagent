@@ -121,6 +121,7 @@ async function runCliLocal(
     cwd: repoRoot,
     env: {
       ...process.env,
+      HOME: join(agentDir, "home"),
       OMO_CODING_AGENT_DIR: agentDir,
       SENPI_CODING_AGENT_DIR: agentDir,
       PI_CODING_AGENT_DIR: agentDir,
@@ -154,14 +155,16 @@ describe("cli-local", () => {
 
     // then
     expect(install.exitCode).toBe(0)
-    const installResult = JSON.parse(install.stdout) as { readonly pluginPath: string }
+    const installResult = JSON.parse(install.stdout) as { readonly pluginPath: string; readonly launcherPath?: string }
     expect(installResult).toMatchObject({ ok: true, action: "install" })
     expect(install.stdout.trim().split("\n")).toHaveLength(1)
     expect(installedSettings.packages).toEqual([installResult.pluginPath])
+    expect(installResult.launcherPath).toBe(join(agentDir, "home", ".local", "bin", "omo"))
     expect(uninstall.exitCode).toBe(0)
     expect(JSON.parse(uninstall.stdout)).toMatchObject({ ok: true, action: "uninstall" })
     expect(uninstall.stdout.trim().split("\n")).toHaveLength(1)
     expect(uninstalledSettings.packages).toEqual([])
+    await expect(readFile(join(agentDir, "home", ".local", "bin", "omo"), "utf8")).rejects.toThrow()
     expect(install.stderr).toBe("")
   })
 

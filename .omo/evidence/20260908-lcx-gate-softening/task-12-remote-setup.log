@@ -1,0 +1,35 @@
+
+COMMAND (mengmotaMac): mkdir -p /tmp/lcx-t12-20260908-6894330b/omo
+EXIT: 0
+STDOUT:
+
+STDERR:
+
+
+COMMAND (mengmotaMac): mkdir -p /tmp/lcx-t12-20260908-01659993/omo
+EXIT: 0
+STDOUT:
+
+STDERR:
+
+
+COMMAND (mengmotaMac): mkdir -p /tmp/lcx-t12-20260908-f6b2180e/omo
+EXIT: 0
+STDOUT:
+
+STDERR:
+
+
+COMMAND (mengmotaMac): mkdir -p /tmp/lcx-t12-20260908-8fafc772/omo
+EXIT: 0
+STDOUT:
+
+STDERR:
+
+
+COMMAND (mengmotaMac): mkdir -p /tmp/lcx-t12-20260908-2eff9a4d/omo
+EXIT: 0
+STDOUT:
+
+STDERR:
+

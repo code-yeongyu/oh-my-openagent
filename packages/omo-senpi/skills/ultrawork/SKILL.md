@@ -84,12 +84,18 @@ exercises the surface; capture the artifact.
      real/main browser profile — it wipes their logged-in state. If you
      need that profile's login state, clone it first (`rsync -a
      <profile>/ <tmp-clone>/`) and point the browser at the clone as
-     its user-data-dir; run any clearing there only.
+     its user-data-dir; run any clearing there only. For frontend work,
+     screenshot after each change and look before the next one; check
+     desktop and mobile widths for blank, misframed, or overlapping
+     output.
   4. Computer use — when the surface is a desktop/GUI app rather than a
      page, drive it via OS-level automation (a computer-use agent,
      AppleScript, xdotool, etc.) against the running app; capture
      action log + screenshot. USE THIS for any non-browser GUI
-     criterion; do not substitute a CLI dump for it.
+     criterion; do not substitute a CLI dump for it. For 3D or spatial
+     work (a modeling tool, a game scene, CAD), render from several
+     angles after each change and compare with the reference or the
+     stated intent before the next change.
 
 For EVERY scenario name the exact tool and the exact invocation
 upfront: the literal command / API call / page action with its concrete
@@ -257,8 +263,9 @@ production code before its failing test → rewrite.
 
 # Finding things (lead with these, code-mode the first wave)
 Never guess from memory — locate with the right tool, and re-read before
-you claim or change. **Every bounded wave goes through `# Parallel
-execution` below — one js eval cell, everything dispatched at once.**
+you claim or change. **The independent lookups of a wave go through `# Parallel
+execution` below - one js eval cell; a result you must inspect before
+the next call is sequenced, not batched.**
 Discovery order:
 1. **SYMBOLS REQUIRE LSP** — definitions, references, rename impact,
    workspace symbols, diagnostics: the built-in `lsp_*` tools, not
@@ -277,32 +284,39 @@ Research outside the repo (library/API/docs/web) → `librarian`;
 unfamiliar layouts → `explore` (read-only, absolute paths). Run both
 in background; keep working.
 
-# Parallel execution (JS EVAL MAXXING — ONE FUCKING CELL, EVERYTHING IN IT)
-**`eval` WITH `language: "js"` IS YOUR DEFAULT EXECUTION SURFACE — NOT
-`bash`, NOT a parade of one-off tool calls, NOT `python3 -c`.** If the
-eval tool reports a Bun kernel (the `bun-1-4` skill is listed), read
-that skill before your first cell; use its builtins (`Bun.$` for a
-command that finishes inside the cell, `Bun.Glob`, `fetch`) over
-shelling out; a command that can outlive one reply starts through
-`tool.monitor` (Waiting discipline). A step needing MORE THAN ONE call gets ONE GODDAMN PROGRAM: a
-LONG cell with REAL control flow — `if`/`else` per case, `for` over
-every target, `try`/`catch` PER ITEM so one failure degrades only
-that item — firing every independent read, search, git/`lsp_*`/web
-query, and `task(...)` spawn AT ONCE via `Promise.all` /
-`parallel(thunks)`. A result feeding the next call is STILL the same
-cell: sequence and branch in code. **CRUSH THE DATA IN THE KERNEL**
-(`.map().filter().reduce()`, `Object.groupBy`, `Set` dedupe, joins)
-and return ONLY distilled, decision-ready facts: a raw dump pasted
-back is a FUCKING DEFECT, and so are ten calls where one cell would
-do. Kernel busy with a detached cell? HOP to `py` — NEVER bash +
-`python3 -c`. DEFAULT to fan-out: spawn independent `task(...)`
-children in the same wave (`run_in_background: true`, each routed to
-its fitting `category`). Fan-out is SAFE only with disjoint write
-scopes: no two children edit the same files; overlapping units go to
-a team with per-member worktrees or run in sequence. Doing parts
-yourself serially needs a reason — your priors under-delegate; keep
-only what needs your judgment. Step outside eval ONLY for one tiny
-call, judgment between calls, or approvals / side effects.
+# Parallel execution (batch what is independent, observe what is not)
+**`eval` with `language: "js"` is the default surface for the independent
+part of a step - reads, searches, symbol lookups, git/`lsp_*`/web
+queries, `task(...)` spawns - not `bash`, not a parade of one-off calls,
+not `python3 -c`.** If the eval tool reports a Bun kernel (the `bun-1-4` skill is listed),
+read that skill before your first cell; use its builtins (`Bun.$` for a
+command that finishes inside the cell, `Bun.Glob`, `fetch`) over shelling
+out; a command that can outlive one reply starts through `tool.monitor`
+(Waiting discipline). Sort the step before you write the cell: every
+independent lookup fires AT ONCE via `Promise.all` / `parallel(thunks)`
+with real control flow - `if`/`else` per case, `for` over every target, a
+`try`/`catch` per item - and a result that feeds a later lookup may still
+be sequenced inside the same cell. Edits, side-effecting commands,
+deploys, approvals, and any call whose input you have not seen yet run
+ONE ACTION AT A TIME, each observed before the next. Before a cell runs,
+name the state it should produce; when it returns, compare the returned
+evidence with that state, and check a mutating cell for changes beyond
+it. Reduce in the kernel to the facts the decision needs, but keep every
+failed or missing item verbatim - a `try`/`catch` that turns a failure
+into an absent row makes the aggregate lie - and re-read truncated output
+before deciding on it. When the result must be SEEN rather than read - a
+page, a component, an image, a 3D scene, a layout - make one change,
+render or screenshot it, look, then make the next; check a 3D scene from
+several angles and a page at desktop and mobile widths, compare with the
+reference or the stated intent, and ask only where two readings of that
+intent diverge. Kernel busy with a detached cell? HOP to `py` - never
+bash + `python3 -c`. Spawn independent `task(...)` children in the same
+wave (`run_in_background: true`, each routed to its fitting `category`);
+fan-out is SAFE only with disjoint write scopes - no two children edit the
+same files; overlapping units go to a team with per-member worktrees or
+run in sequence. Keep for yourself what needs your judgment, and step
+outside eval for one tiny call, judgment between calls, or approvals /
+side effects.
 
 # Execution loop (PIN → RED → GREEN → SURFACE → CLEAN)
 Until every success criterion PASSES with its evidence captured:
@@ -377,7 +391,7 @@ Until every success criterion PASSES with its evidence captured:
 Within a step, follow Finding things; NEVER parallelise RED and GREEN of
 the same criterion.
 
-# Waiting discipline (MONITOR MAXXING — SUBSCRIBE TO EVERY FUCKING THING, NEVER SLEEP)
+# Waiting discipline (subscribe, never sleep)
 **EVERY CONDITION YOU WOULD OTHERWISE CHECK ON GETS A SUBSCRIPTION,
 REGISTERED IN THE SAME EVAL CELL THAT STARTS THE WORK:
 `tool.monitor({ description, command, filter })` for a command or a
@@ -401,8 +415,7 @@ always woken.
 names any such state, work out what they will want next and watch it
 RIGHT THEN: "check the deploy" = watch its status, "I pushed a fix" =
 watch that CI run, "the other session is doing X" = watch its output.
-A session without monitors while state moves around it is FUCKING
-ASLEEP. Peek (`bash_output`, `task_output({ mode: "tail" })`) ONLY for
+A session without monitors while state moves around it is asleep. Peek (`bash_output`, `task_output({ mode: "tail" })`) ONLY for
 a midpoint decision, never to wait.
 
 # omo-senpi task + team tools

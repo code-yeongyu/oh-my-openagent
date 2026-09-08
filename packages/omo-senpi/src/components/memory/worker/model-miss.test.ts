@@ -8,77 +8,60 @@ function result(stderr: string) {
 
 describe("classifyRetryableModelMiss", () => {
   test("#given a model-not-found child failure #when classified #then it returns the missing model id", () => {
-    // given
     const child = result('Error: Model "extension-only/primary" not found. Use --list-models to see available models.')
-
-    // when
-    const miss = classifyRetryableModelMiss(child)
-
-    // then
-    expect(miss).toEqual({ kind: "model_not_visible", id: "extension-only/primary" })
+    expect(classifyRetryableModelMiss(child)).toEqual({ kind: "model_not_visible", id: "extension-only/primary" })
   })
 
   test("#given a missing API key child failure #when classified #then it returns the provider separately from model visibility", () => {
-    // given
     const child = result("No API key found for anthropic")
+    expect(classifyRetryableModelMiss(child)).toEqual({ kind: "auth_missing", provider: "anthropic" })
+  })
 
-    // when
-    const miss = classifyRetryableModelMiss(child)
+  test("#given an OpenAI context overflow #when classified #then it returns context_overflow", () => {
+    expect(classifyRetryableModelMiss(result("Your input exceeds the context window of this model"))).toEqual({
+      kind: "context_overflow",
+      detail: "Your input exceeds the context window of this model",
+    })
+  })
 
-    // then
-    expect(miss).toEqual({ kind: "auth_missing", provider: "anthropic" })
+  test("#given an Anthropic context overflow #when classified #then it returns context_overflow", () => {
+    expect(classifyRetryableModelMiss(result("prompt is too long: 213462 tokens > 200000 maximum"))).toEqual({
+      kind: "context_overflow",
+      detail: "prompt is too long: 213462 tokens > 200000 maximum",
+    })
   })
 
   test("#given a provider cooldown 503 child failure #when classified #then it is retryable as a provider outage", () => {
-    // given: the exact stderr a reflection child died with while apitopia was cooling down
     const child = result('503: {"message":"All providers are temporarily cooling down"}')
-
-    // when
-    const miss = classifyRetryableModelMiss(child)
-
-    // then
-    expect(miss).toEqual({
+    expect(classifyRetryableModelMiss(child)).toEqual({
       kind: "provider_unavailable",
       detail: '503: {"message":"All providers are temporarily cooling down"}',
     })
   })
 
   test("#given an exhausted senpi fallback chain #when classified #then the provider outage is still retryable on the next candidate", () => {
-    // given
-    const child = result("All configured providers are temporarily unavailable")
-
-    // when
-    const miss = classifyRetryableModelMiss(child)
-
-    // then
-    expect(miss).toEqual({
+    expect(classifyRetryableModelMiss(result("All configured providers are temporarily unavailable"))).toEqual({
       kind: "provider_unavailable",
       detail: "All configured providers are temporarily unavailable",
     })
   })
 
   test("#given a billing exhaustion child failure #when classified #then it is not retryable because another model cannot fix it", () => {
-    // given
-    const child = result("Error: quota exceeded for this organization")
-
-    // when / then
-    expect(classifyRetryableModelMiss(child)).toBeUndefined()
+    expect(classifyRetryableModelMiss(result("Error: quota exceeded for this organization"))).toBeUndefined()
   })
 
-  test("#given a prompt-shaped child failure #when classified #then it is not retryable", () => {
-    // given
-    const child = result("Error: context length exceeded for the submitted transcript")
-
-    // when / then
-    expect(classifyRetryableModelMiss(child)).toBeUndefined()
+  test("#given a prompt-shaped child failure #when classified #then it is a context overflow the next candidate may fit", () => {
+    // Before #7838 this was pinned as not retryable, which left the run dead with the same backlog
+    // replaying forever; an overflow says THIS candidate is too small, not that reflection is impossible.
+    expect(classifyRetryableModelMiss(result("Error: context length exceeded for the submitted transcript"))).toEqual({
+      kind: "context_overflow",
+      detail: "Error: context length exceeded for the submitted transcript",
+    })
   })
 
   test("#given a timeout or successful child #when classified #then it is not retryable", () => {
-    // given
     const timeout = { ...result("No API key found for anthropic"), timedOut: true }
     const success = { ...result("No API key found for anthropic"), code: 0 }
-
-    // when / then
     expect(classifyRetryableModelMiss(timeout)).toBeUndefined()
     expect(classifyRetryableModelMiss(success)).toBeUndefined()
   })

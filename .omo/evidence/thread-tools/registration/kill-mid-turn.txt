@@ -1,0 +1,2 @@
+assert kill-mid-turn real_host_pid=53890 live_host_present=false source=session_jsonl source_incomplete=true completed=false
+PASS kill-mid-turn

@@ -1,0 +1,42 @@
+{
+  "task": "13 independent overlay drift repair",
+  "task_id": "st_01a08120",
+  "status": "PASS",
+  "outcome": "Restored independent generated-copy drift coverage without removing or skipping any test or assertion. The local suite passed 13/13; the remote aggregate suite passed 327/327 on mengmotaMac with TEST_EXIT=0, including both generated-copy drift cases.",
+  "changed_files": [
+    "packages/omo-codex/plugin/test/sync-skills-test-support.mjs",
+    "packages/omo-codex/plugin/test/sync-skills.test.mjs"
+  ],
+  "changed_files_note": "Both files were restored by writing git show HEAD:<path> bytes, undoing the rejected pre-task patch. sync-skills.test.mjs now matches HEAD byte-for-byte; only the support file has a net source diff from HEAD. Evidence files are reporting artifacts. The sibling ulw-loop/package.json was copied unchanged for remote verification, not edited or claimed.",
+  "decision": "Keep the hand-maintained exact inverse rather than importing the production overlay: production-derived expectations would make overlay errors agree on both sides. Updated independent completion, hard-rule, review-work gate, and compatibility terminator expectations preserve full shared/component shipped-copy equality.",
+  "inverse_changes": [
+    "Compatibility removal covers the new final-verification row, Omit optional keys paragraph, and fork_turns/fork_context note; current exact end markers preserve payload boundaries without a following structural heading.",
+    "ulw-execute completion and hard-rule blocks reverse to the current shared source bytes, including the last-phase worktree anchor and the complete hard-rule block.",
+    "review-work strips the exact opt-in/self-review gate overlay, including its selected-review blocking clause.",
+    "The existing ulw-research inverse is unchanged. All 34 aggregate-test assertions and all 3 support assertions are retained. No prose-pinning tests were added."
+  ],
+  "verification": {
+    "diagnostics": "No LSP diagnostics on either repair-owned file; node --check passed for both; git diff --check passed.",
+    "local": "cd packages/omo-codex/plugin && bun scripts/sync-skills.mjs && node --test test/sync-skills.test.mjs: 13 passed, 0 failed, 0 skipped; LOCAL_TEST_EXIT=0.",
+    "manual_qa": "In-memory mutations inside ulwExecuteCodexCompletion, ulwExecuteCodexHardRule, and reviewWorkCodexGate each caused unequal source comparison. Compatibility fallback preserved a sentinel payload for ulw-execute and review-work. No generated file was modified by these probes.",
+    "remote_machine": "mengmotaMac",
+    "remote_sha": "eeeb3287e3af75148ecd3318800610a5e814af4a",
+    "remote_setup": "Fresh shallow clone of lcx/gate-softening; copied exactly the two test files and sibling ulw-loop/package.json with SHA-256 verification; bun install --frozen-lockfile and plugin npm ci succeeded.",
+    "remote_tests": "cd packages/omo-codex/plugin && node --test test/*.test.mjs: 327 passed, 0 failed, 0 skipped; TEST_EXIT=0. Executed once; full transcript retained.",
+    "remote_build": "The actual plugin build completed in a second fresh clone at the same SHA with identical overlaid hashes: cd packages/omo-codex/plugin && bun run build; ACTUAL_BUILD_EXIT=0. Full transcript retained.",
+    "build_command_correction": "The initial bun --cwd ... run build invocation printed usage with exit 0, so it is not counted as a completed build. The corrected standalone build executed successfully. Passing aggregate tests were not rerun after this build-only correction."
+  },
+  "cleanup": [
+    "REMOTE_CLEANUP_EXIT=0; REMOVAL_RECEIPT: /tmp/lcx-fix13c-20260908 REMOVED, captured after both remote runs.",
+    "Task-owned local transfer staging and /tmp/lcx-fix13c-driver.ts removed."
+  ],
+  "guardrails": [
+    "No local git mutation, commit, push, checkout, reset, or stash was performed; remote cloning was explicitly requested.",
+    "No local bun test or bun run test:* command was run.",
+    "No generator, shared-skills, or generated source file was hand-edited; their tracked diffs remain empty.",
+    "The main checkout and real Codex home were not edited; no live model QA was run for this test-only repair."
+  ],
+  "evidence": [
+    "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-gate-softening/.omo/evidence/20260908-lcx-gate-softening/task-13-drift.log"
+  ]
+}

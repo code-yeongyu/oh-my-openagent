@@ -41,7 +41,7 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Opus 5 for orchestration and visual work. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. Kimi K3 and GLM 5.2 as visual fallbacks. Kimi high-speed for quick tasks. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Opus 5 for orchestration. Visual work uses `claude-fable-5-1` max, then `claude-opus-5` max, then `kimi-k3` max. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. Kimi high-speed for quick tasks. All working together, automatically.
 
 ---
 
@@ -67,7 +67,7 @@ Planning path (sibling primary agents, not Sisyphus subagents):
 User → Tab or /agent → [Prometheus] (plan) → /ulw-execute → [Atlas] (execute)
 ```
 
-When Sisyphus delegates to a subagent, it doesn't pick a model name. It picks a **category** — `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`. The category automatically maps to the right model. You touch nothing.
+When Sisyphus delegates, it does not pick a model name. Specialists (`oracle`, `explore`, `librarian`, …) are invoked with `task(subagent_type=...)`. Implementation work uses a **category** — `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`. The category automatically maps to the right model. You touch nothing.
 
 For a deep dive into how agents collaborate, see the [Orchestration System Guide](./orchestration.md).
 
@@ -101,7 +101,7 @@ Use Hephaestus when you need deep architectural reasoning, complex debugging acr
 
 **Why this beats vanilla Codex CLI:**
 
-- **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. Opus 5 for orchestration and visual work. GPT-6 Astra for deep reasoning. Kimi high-speed for quick tasks. The right brain for the right job.
+- **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. Opus 5 for orchestration. Fable 5.1, then Opus 5, then Kimi K3 for visual work. GPT-6 Astra for deep reasoning. Kimi high-speed for quick tasks. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
 - **Category system.** Tasks are routed by intent, not model name. `visual-engineering` covers visual design, UI/UX, frontend, styling, animation, and design systems. `ultrabrain` prefers GPT-6 Astra max, while `deep` handles 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal work, and complex research. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
@@ -188,7 +188,7 @@ You can override specific agents or categories in your config:
   },
 
   "categories": {
-    // Frontend/UI work: Opus 5, then Kimi K3 and GLM 5.2
+    // Frontend/UI work: Fable 5.1 max, then Opus 5 max, then Kimi K3 max
     "visual-engineering": {
       "model": "anthropic/claude-opus-5",
       "variant": "max",

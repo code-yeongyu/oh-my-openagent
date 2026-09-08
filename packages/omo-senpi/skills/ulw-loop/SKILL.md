@@ -13,7 +13,7 @@ This skill is compact by design: the run contract below is the whole bootstrap. 
 
 ## Run contract
 
-1. Create goals: `omo-agent-toolkit ulw-loop create-goals --brief "<brief>" --json`. The ulw-loop skill-pointer message carries the resolved absolute CLI path for this installation; use that path verbatim. If the CLI reports the existing aggregate complete, start fresh with `--session-id <new-id>`.
+1. Create goals: `omo-agent-toolkit ulw-loop create-goals --session-id <id> --brief "<brief>" --json`. The ulw-loop skill-pointer message carries the resolved absolute CLI path and this session's id; use both verbatim on every ulw-loop command — the CLI refuses unscoped state (`ULW_LOOP_SESSION_SCOPE_REQUIRED`) rather than touching the shared `.omo/ulw-loop` root, and eval kernels do not inherit the session env. If the CLI reports this session's aggregate complete, start fresh with a new `--session-id` (and resume that run by hand: automatic continuation follows the session's own id).
 2. Register the aggregate objective from the printed handoff with `create_goal`, shaped by `references/define-goal.md`. Goal creation is NEVER skipped.
 3. Mirror every atomic step into the live `todo` checklist: one granular step per action, exactly one in_progress, transitions marked the instant they happen.
 4. Treat each goal as a phase: create its own worktree off the integration base; dispatch its dependency-ordered lanes as ONE `workflow` run (read the mass-ulw skill first; ordering-free lanes stay a `task` batch); verify every criterion with real-surface evidence; land the worktree on the integration base at `checkpoint --status complete` per the repository's flow (direct merge or merged PR); define the next goal's run from what this one proved. Tests alone never prove done. When a mass-ulw pointer accompanies this skill, this contract still owns goals, criteria, evidence, and checkpoints.
@@ -23,10 +23,10 @@ When the injected ultrawork directive accompanies this skill, its goal/notepad/t
 
 ## Non-Negotiables
 
-- Use the ulw-loop CLI state under `.omo/ulw-loop`; do not hand-edit goal state.
+- Use the ulw-loop CLI state under `.omo/ulw-loop/<session-id>/`; do not hand-edit goal state. Mutations are serialized across processes by the session's `.state.lock`, so parallel `record-evidence` calls from workers are safe.
 - Register goals up front, shaped by `references/define-goal.md` (`omo-agent-toolkit ulw-loop create-goals`, then `create_goal` from the printed handoff), and mirror every atomic step into the live `todo` checklist: one ultra-granular step per action, exactly one in_progress, transitions marked the instant they happen.
 - After any compaction or context loss, re-read brief + goals + ledger FIRST plus `omo-agent-toolkit ulw-loop status --json`, then resume; never re-plan from scratch.
-- If `omo-agent-toolkit ulw-loop create-goals` says the existing aggregate is already complete, start unrelated new work with a fresh `--session-id <new-id>` instead of steering or forcing the completed default state. Use `--force` only to intentionally overwrite completed evidence.
+- If `omo-agent-toolkit ulw-loop create-goals` says this session's aggregate is already complete, start unrelated new work with a fresh `--session-id <new-id>` (passed on every later call) instead of steering or forcing the completed state. Use `--force` only to intentionally overwrite completed evidence.
 - Every success criterion needs observable evidence from a real surface: a channel (terminal/TUI via the xterm.js web terminal, HTTP, browser, computer-use) or, for CLI- or data-shaped criteria, an auxiliary surface (CLI stdout, DB diff, parsed config dump).
 - Evidence is bound to the tree it was captured at (`git rev-parse --short "HEAD^{tree}"`); it goes stale only when tracked content changes — a rebase or amend that keeps the tree identical keeps it valid. When the tree differs, re-run at the current HEAD and re-record, never relabel or regenerate. Record only after cleanup receipts exist.
 - Delegate code edits, test writes, fixes, and QA execution to right-sized omo-senpi subagents through the native `task` tool or through `workflow` nodes when the phase's lanes carry ordering.

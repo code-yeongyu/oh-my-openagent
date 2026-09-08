@@ -10,9 +10,20 @@ export type TeamRuntimeDetails = {
   activeMembers: string[]
 }
 
+// Prompt-gate timing for a team message's live delivery and its fallback mailbox
+// wake. Every field falls back to the gate default when omitted, so production
+// callers never set this; tests inject it to observe a retrying wake through its
+// event instead of the durable-retry backoff wall clock.
+export type TeamSendMessageDispatchTiming = {
+  readonly postDispatchHoldMs?: number
+  readonly queueRetryMs?: number
+  readonly fallbackWakeSettleMs?: number
+}
+
 export type TeamSendMessageToolDeps = {
   loadRuntimeState: typeof loadRuntimeState
   liveDeliverySettleMs?: number
+  dispatchTiming?: TeamSendMessageDispatchTiming
 }
 
 export const defaultTeamSendMessageToolDeps: TeamSendMessageToolDeps = {

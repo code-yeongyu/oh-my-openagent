@@ -4,36 +4,40 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * DESIGN.md §5 Button. Radius 2px, 150ms color transitions, 1px press.
+ * `outline` is a compatibility alias of `secondary` for sections not yet migrated.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 rounded-[2px] font-medium whitespace-nowrap transition-[color,background-color,border-color,transform] duration-[var(--dur-micro)] ease-standard select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-32 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        primary: "bg-accent text-ink-0 hover:bg-accent-dim",
+        secondary:
+          "border border-line-strong bg-ink-1 text-text-hi hover:border-accent-32 hover:text-accent",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "border border-line-strong bg-ink-1 text-text-hi hover:border-accent-32 hover:text-accent",
+        ghost: "text-text-mid hover:text-text-hi",
+        link: "underline-grow h-auto rounded-none px-0 font-mono text-xs tracking-nav text-text-mid uppercase hover:text-text-hi",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
+        sm: "h-9 px-3 text-sm",
+        md: "h-11 px-5 text-sm",
+        lg: "h-12 px-6 text-base",
+        icon: "size-11",
       },
     },
     defaultVariants: {
-      variant: "default",
-      size: "default",
+      variant: "primary",
+      size: "md",
     },
   },
 )
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
-  asChild?: boolean
+  readonly asChild?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(

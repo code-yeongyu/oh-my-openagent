@@ -1,0 +1,25 @@
+Senpi LSP runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-tool-boundary-prep/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Senpi ast-grep-mcp runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-tool-boundary-prep/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js sha256=73c8be0b3098809e001fe61355e11b3d7991c9eb352e1b4b6f10f2a25d83f555
+Senpi agent-toolkit runtime is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-tool-boundary-prep/packages/omo-senpi/plugin/runtime/agent-toolkit sha256=7d04074702bf778453fdf86f7029f452c881e5493bed823bdca8bde34e10b778
+x-search conditional skill is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-tool-boundary-prep/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 874 modules in 63ms
+
+  omo.js  1.52 MB  (entry point)
+
+Bundled 675 modules in 41ms
+
+  omo-task.js  0.97 MB  (entry point)
+
+Bundled 212 modules in 33ms
+
+  omo-member.js  176.26 KB  (entry point)
+
+Bundled 138 modules in 8ms
+
+  memory-run-supervisor.mjs  36.90 KB  (entry point)
+
+Bundled 118 modules in 12ms
+
+  omo-init-deep-advisor.js  84.59 KB  (entry point)
+
+omo-senpi extension build is current: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-tool-boundary-prep/packages/omo-senpi/plugin/extensions/omo.js

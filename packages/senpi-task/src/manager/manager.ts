@@ -30,6 +30,7 @@ import {
   isTerminalRecord,
   nowIso,
   promotedBackgroundMode,
+  recordSpawnedChildSession,
   recordSpawnedPid,
 } from "./manager-helpers"
 import { createOutcomeTracker, type OutcomeTracker } from "./manager-outcome"
@@ -571,6 +572,14 @@ class TaskManagerImpl implements TaskManager {
       stateDir: this.#options.store.stateDir,
       runners: this.#options.runners,
       rpcRunner: this.#rpcRespawnRunner,
+      beforeLaunch: () => {
+        // Respawn bypasses start's status transition; persist the same durable launch boundary
+        // without changing the status or epoch that lifecycle reattachment owns.
+        const stamped = this.#options.store.mutate(record.task_id, (fresh) =>
+          fresh.started_at === undefined ? { ...fresh, started_at: nowIso(this.#now) } : fresh,
+        )
+        if (stamped === null) throw new Error(`Task record not found before respawn: ${record.task_id}`)
+      },
       ...(this.#options.trustedRespawnLaunch === undefined
         ? {}
         : { trustedLaunch: this.#options.trustedRespawnLaunch }),
@@ -691,9 +700,6 @@ class TaskManagerImpl implements TaskManager {
     return { ok: true }
   }
 
-  // Persist the spawned child's OS pid onto the running record so task_output(status) and session_start
-  // reconciliation can see (and, for an orphan, signal) the live process. The pure decision lives in
-  // recordSpawnedPid; in-process children (no pid) and already-terminal records are left untouched.
   #attachChildSubscribers(taskId: string, handle: ManagedChildHandle): void {
     const subscribers = this.#childSubscribers.get(taskId)
     if (subscribers === undefined) return
@@ -707,17 +713,22 @@ class TaskManagerImpl implements TaskManager {
     }
   }
 
+  // Persist spawn-time facts onto the running record: OS pid (rpc children) and the child's own
+  // session id (both modes) so task_output, session_start reconciliation, and external readers
+  // (omo-desktop) can join a grandchild session back to this task. Pure folds live in
+  // recordSpawnedPid / recordSpawnedChildSession; already-terminal records are left untouched.
   #recordSpawnFacts(taskId: string, handle: ManagedChildHandle): void {
     const current = this.#tryLoad(taskId)
     if (current === null || isTerminalRecord(current)) return
     const withPid = recordSpawnedPid(current, handle.pid) ?? current
+    const withSession = recordSpawnedChildSession(withPid, handle.sessionId) ?? withPid
     const spawnSpec = handle.spawnSpec
     // A v1 spawn_spec persisted at spawn is authoritative: the rpc echo would rewrite it as the
     // legacy {cwd, extensions, member_env} shape, dropping the rebuild facts v1 carries.
     const updated: TaskRecord = spawnSpec === undefined || (current.spawn_spec !== undefined && isSpawnSpecV1(current.spawn_spec))
-      ? withPid
+      ? withSession
       : {
-          ...withPid,
+          ...withSession,
           spawn_spec: {
             cwd: spawnSpec.cwd,
             ...(spawnSpec.extensions === undefined ? {} : { extensions: spawnSpec.extensions }),

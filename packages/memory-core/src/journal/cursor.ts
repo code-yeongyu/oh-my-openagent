@@ -3,6 +3,14 @@ import type { TranscriptEntry } from "./entries"
 
 export const REFLECTION_STATE_SCHEMA_VERSION = "v3_assistant_steps" as const
 
+/**
+ * Upper bound on the serialized bytes a single reflection payload may carry. The backlog grows
+ * without bound whenever reflection fails (the cursor intentionally stays put), so an unbounded
+ * payload replays an ever larger transcript into a fixed context window. Capture ships the OLDEST
+ * window that fits and leaves the rest for the next run.
+ */
+export const REFLECTION_SNAPSHOT_MAX_BYTES = 131_072
+
 export type ReflectionTranscriptState = {
   readonly schema_version: typeof REFLECTION_STATE_SCHEMA_VERSION
   readonly reflected_through_message_id?: string
@@ -13,6 +21,8 @@ export type ReflectionTranscriptState = {
   readonly last_reflection_started_at?: string
   readonly last_reflection_succeeded_at?: string
   readonly pending_compaction?: boolean
+  /** Derived: serialized bytes of the entries after the reflected cursor. */
+  readonly unreflected_bytes?: number
 }
 
 export type ReflectionSnapshot = {
@@ -21,6 +31,32 @@ export type ReflectionSnapshot = {
   readonly start_line: number
   readonly end_snapshot_line: number
   readonly entries: readonly TranscriptEntry[]
+  /** Entries left after `end_snapshot_line`, i.e. the backlog a later run still has to cover. */
+  readonly backlog_remaining?: number
+}
+
+export type CaptureCursorOptions = {
+  readonly maxBytes?: number
+}
+
+function entryBytes(entry: TranscriptEntry): number {
+  return Buffer.byteLength(`${JSON.stringify(entry)}\n`, "utf8")
+}
+
+/**
+ * Index of the last row belonging to the reflected message, so a resumed capture starts after the
+ * WHOLE message group (its trailing tool rows included) rather than replaying them.
+ */
+function anchorRowIndex(
+  entries: readonly TranscriptEntry[],
+  reflectedThroughMessageId: string | undefined,
+): number {
+  if (reflectedThroughMessageId === undefined) return -1
+  let anchor = -1
+  for (const [index, entry] of entries.entries()) {
+    if (entry.source_message_id === reflectedThroughMessageId) anchor = index
+  }
+  return anchor
 }
 
 export function isCanonicalEntry(
@@ -51,6 +87,7 @@ export function deriveState(
     Math.max(0, Math.trunc(state.reflected_completed_steps)),
     totalCompletedSteps,
   )
+  const anchorIndex = anchorRowIndex(entries, state.reflected_through_message_id)
   return {
     ...state,
     schema_version: REFLECTION_STATE_SCHEMA_VERSION,
@@ -60,43 +97,75 @@ export function deriveState(
       0,
       totalCompletedSteps - reflectedCompletedSteps,
     ),
+    unreflected_bytes: entries
+      .slice(anchorIndex + 1)
+      .reduce((total, entry) => total + entryBytes(entry), 0),
   }
 }
 
 export function captureCursorSnapshot(
   entries: readonly TranscriptEntry[],
   state: ReflectionTranscriptState,
+  options: CaptureCursorOptions = {},
 ): ReflectionSnapshot | null {
-  const anchorIndex = state.reflected_through_message_id
-    ? entries.findIndex(
-        (entry) =>
-          isCanonicalEntry(entry) &&
-          entry.source_message_id === state.reflected_through_message_id,
-      )
-    : -1
+  const anchorIndex = anchorRowIndex(entries, state.reflected_through_message_id)
   const startIndex = entries.findIndex(
     (entry, index) => index > anchorIndex && isCanonicalEntry(entry),
   )
   if (startIndex < 0) return null
+  const start = entries[startIndex]
+  if (!start || !isCanonicalEntry(start)) return null
 
-  let endIndex = -1
-  for (let index = entries.length - 1; index >= startIndex; index -= 1) {
+  const maxBytes = options.maxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES
+  const windowStart = anchorIndex + 1
+  let bytes = entries.slice(windowStart, startIndex).reduce((total, entry) => total + entryBytes(entry), 0)
+  let endMessageId: string | undefined
+  let endLine = -1
+  let budgetExhausted = false
+
+  for (let index = startIndex; index < entries.length; index += 1) {
     const entry = entries[index]
-    if (entry && isCanonicalEntry(entry)) {
-      endIndex = index
+    if (!entry) break
+    bytes += entryBytes(entry)
+    if (!isCanonicalEntry(entry)) continue
+    // A canonical row closes at the last contiguous row sharing its message id, so the payload
+    // never ends mid-message.
+    let groupEnd = index
+    let groupBytes = bytes
+    for (let next = index + 1; next < entries.length; next += 1) {
+      const trailing = entries[next]
+      if (!trailing || trailing.source_message_id !== entry.source_message_id) break
+      groupEnd = next
+      groupBytes += entryBytes(trailing)
+    }
+    // Progress guarantee: the first group always ships, even when it alone busts the budget.
+    if (groupBytes > maxBytes && endMessageId !== undefined) {
+      budgetExhausted = true
+      break
+    }
+    endMessageId = entry.source_message_id
+    endLine = groupEnd + 1
+    bytes = groupBytes
+    index = groupEnd
+    if (groupBytes >= maxBytes) {
+      budgetExhausted = true
       break
     }
   }
-  const start = entries[startIndex]
-  const end = entries[endIndex]
-  if (!start || !end || !isCanonicalEntry(start) || !isCanonicalEntry(end)) return null
 
+  if (endMessageId === undefined || endLine < 0) return null
+  // Rows after the last canonical message (a tool-only tail) belong to this window when the
+  // whole backlog fit: leaving them behind would strand them until a later canonical row arrives.
+  if (!budgetExhausted && bytes <= maxBytes) endLine = entries.length
+
+  const backlogRemaining = entries.length - endLine
   return {
     start_message_id: start.source_message_id,
-    end_message_id: end.source_message_id,
-    start_line: anchorIndex + 1,
-    end_snapshot_line: entries.length,
-    entries: entries.slice(anchorIndex + 1),
+    end_message_id: endMessageId,
+    start_line: windowStart,
+    end_snapshot_line: endLine,
+    entries: entries.slice(windowStart, endLine),
+    ...(backlogRemaining > 0 ? { backlog_remaining: backlogRemaining } : {}),
   }
 }
 

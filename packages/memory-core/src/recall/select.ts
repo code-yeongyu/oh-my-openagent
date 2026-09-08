@@ -20,6 +20,8 @@ export interface SelectRecallOptions {
   readonly maxItems: number
   /** Paths already surfaced earlier in the session; they never repeat. */
   readonly surfaced: ReadonlySet<string>
+  /** Additional paths to skip, such as memories already visible in the transcript. Empty when omitted. */
+  readonly excludePaths?: ReadonlySet<string>
 }
 
 export function selectRecallCandidates(
@@ -34,7 +36,7 @@ export function selectRecallCandidates(
   const queryTerms = collectQueryTerms(parsedQueries)
   const scored: RecallCandidate[] = []
   for (const document of documents) {
-    if (options.surfaced.has(document.path)) continue
+    if (options.surfaced.has(document.path) || options.excludePaths?.has(document.path)) continue
 
     const haystack = `${document.description}\n${document.body}`
     let best: number | null = null

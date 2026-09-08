@@ -141,7 +141,7 @@ interface UlwLoopQualityGateCommon {
 
 export interface UlwLoopQualityGateLazycodex extends UlwLoopQualityGateCommon {
 	readonly surface: "lazycodex";
-	readonly codeReview: {
+	readonly codeReview?: {
 		readonly by: string;
 		readonly recommendation: "APPROVE";
 		readonly codeQualityStatus: "CLEAR" | "WATCH";

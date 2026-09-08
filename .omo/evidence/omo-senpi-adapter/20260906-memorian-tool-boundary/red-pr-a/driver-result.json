@@ -1,0 +1,47 @@
+{
+  "ok": false,
+  "scenarios": {
+    "s3": {
+      "result": "FAIL",
+      "parentRequests": 3,
+      "judgeRequests": 0,
+      "assistantMessages": 3,
+      "recallMessages": 0,
+      "nudgedEntries": 0,
+      "pendingFilePresent": false,
+      "realSenpiUntouched": true
+    }
+  },
+  "checks": [
+    {
+      "name": "s3.judge-accepted",
+      "ok": false,
+      "detail": "timed out after 60000ms waiting for judge accepted (pending or nudged)"
+    },
+    {
+      "name": "s3.mid-turn-recall",
+      "ok": false,
+      "detail": "recall after first tool result and before second tool call"
+    },
+    {
+      "name": "s3.nudged-steer",
+      "ok": false,
+      "detail": "count=0 via=undefined"
+    },
+    {
+      "name": "s3.parent-requests",
+      "ok": true,
+      "detail": "parentRequests=3"
+    },
+    {
+      "name": "s3.pending-absent",
+      "ok": true,
+      "detail": "pending=false"
+    },
+    {
+      "name": "s3.realSenpiUntouched",
+      "ok": true,
+      "detail": "realSenpiUntouched=true"
+    }
+  ]
+}

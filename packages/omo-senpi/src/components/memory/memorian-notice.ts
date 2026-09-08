@@ -10,6 +10,7 @@ export const GATE_REASON_MAX_CHARS = 160
 export interface MemorianNudgedRecord {
   readonly version: 1
   readonly nudges: readonly { readonly path: string; readonly hint: string }[]
+  readonly via?: "steer" | "wake" | "prompt"
 }
 
 export interface MemorianGateRecord {
@@ -26,7 +27,7 @@ export interface MemorianGateRecord {
 // nothing rather than a half-formed notice. The session file is user-writable and older or
 // foreign producers may append entries under these types, so shape is re-validated here even
 // though the producer already validated it.
-export const renderMemorianNudgedEntry: EntryRenderer<MemorianNudgedRecord> = (entry, options, theme) => {
+export const renderMemorianNudgedEntry: EntryRenderer<unknown> = (entry, options, theme) => {
   const record = entry.data
   if (!isRecord(record) || record.version !== 1 || !Array.isArray(record.nudges) || record.nudges.length === 0) return undefined
   const nudges: Array<{ readonly path: string; readonly hint: string }> = []
@@ -37,15 +38,20 @@ export const renderMemorianNudgedEntry: EntryRenderer<MemorianNudgedRecord> = (e
   }
   const [first, ...rest] = nudges
   if (first === undefined) return undefined
+  // The notice is written in the agent's own voice: a nudge is a recollection the agent just had,
+  // not a third-party act report. `via` stays in the record for forensics but is never drawn. The
+  // title is one fixed "Aha!" — opener-era records may still carry an `opener` field, and it is
+  // ignored so every notice reads the same.
   return noticeComponent({
-    glyph: "·",
-    title: joinFields(["Memorian nudged", first.hint]),
-    tone: "muted",
-    why: "Memorian judged a stored memory relevant to the previous turn; it is a hint, not current state.",
+    glyph: "✦",
+    title: "Aha!",
+    tone: "accent",
+    why: `just remembered: ${first.hint}`,
     extra: [
-      ...rest.map((nudge) => ({ text: nudge.hint, tone: "dim" as const })),
+      ...rest.map((nudge) => ({ text: `also remembered: ${nudge.hint}`, tone: "dim" as const })),
       ...nudges.map((nudge) => ({ text: nudge.path, tone: "dim" as const })),
     ],
+    detail: "Memorian surfaced this from stored memory; it is a hint, not current state.",
   }, options, theme)
 }
 
@@ -99,8 +105,8 @@ export const renderMemorianGateEntry: EntryRenderer<MemorianGateRecord> = (entry
     title: joinFields([`Memorian gate ${record.status === "skipped" ? "skipped" : "failed"}`, cause]),
     tone: record.status === "skipped" ? "warning" : "error",
     why: record.status === "skipped"
-      ? "Memorian could not judge the stored memories for the previous turn."
-      : "Memorian failed while judging the stored memories for the previous turn.",
+      ? "Memorian could not judge the recalled memory candidates for the previous turn."
+      : "Memorian failed while judging the recalled memory candidates for the previous turn.",
     ...(extra.length === 0 ? {} : { extra }),
   }, options, theme)
 }

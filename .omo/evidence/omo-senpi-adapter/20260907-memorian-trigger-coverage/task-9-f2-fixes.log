@@ -1,0 +1,108 @@
+task-9-f2-fixes
+worktree: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage
+branch: feat/memorian-trigger-coverage
+head: a2bef60aa (plus uncommitted task-9 edits; not committed)
+review: final-f2-code-quality-round1-BLOCK.md (B1, B2, N1, N2, N3)
+
+WHAT CHANGED
+- B1 AGENTS.md "Run supervisor" bullet: reverted the false clause
+  "; run directories are pruned after 7 days (30 for nudged, failed, or deadline runs)".
+  Retention only walks identityPaths.recall runs. Intro line and rows 28/30 already
+  state the memorian policy correctly.
+- B2 planner.ts: tool singles prefer path-derived terms. A term is path-derived when
+  it appears in any tool text matching /\/|\.[a-z0-9]{1,6}$/i. Path-derived ranks
+  before non-path; newest-first / rarity / length / sequence stay as secondary keys
+  (stable sort after rankedTerms). COMMAND_STOPWORDS + user-single exclusion unchanged.
+- N1 writeMemorianRunOutcome: mkdir(runDir, { recursive: true, mode: 0o700 }) before
+  writing outcome.json so a setup-phase deadline still records the outcome.
+- N2 memorian-runner launchOnce: after the judge recorded completed, a post-judge
+  dropped/cancelled or dropped/compaction overwrites outcome.json via
+  writeMemorianRunOutcome with { status: "dropped", cause, nudged: [] }.
+- N3 prune newestFileMtime: empty run dirs fall back to the directory's own mtime;
+  non-empty dirs still use newest inner file (running-judge guard).
+
+TDD: tests written first, RED captured (tests only), then implementation, GREEN captured.
+No bun test on this machine. Remote box bx_g365jfas.
+
+pure LOC (awk '!/^[[:space:]]*$/ && !/^[[:space:]]*\/\//'):
+  planner.ts 144
+  memorian-run-retention.ts 217
+  memorian-runner.ts 204
+  all <= 250; no memorian-run-outcome.ts split.
+
+================================================================
+1. RED — new tests synced, sources NOT synced
+================================================================
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/memory-core/src/recall/planner.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-compaction.test.ts \
+    -- packages/memory-core/src/recall/planner.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-compaction.test.ts
+
+output:
+  RBT_SYNCED=3
+  (fail) planRecallQueries > #given toolTexts cargo then rollout then rollout.md #when queries are planned #then the tool singles are rollout then cargo
+    expected ["rollout","cargo"] received ["cargo","rollout"]
+  (fail) planRecallQueries > #given a user single colliding with cargo #when the remaining tool slot is filled #then the surviving tool single is rollout
+    Expected: "rollout"  Received: "console"
+  (fail) MemorianGateRunner > #given a compaction-epoch bump mid-flight #when the child finishes #then outcome.json records dropped compaction
+    expected status dropped / cause compaction / nudged []
+    received status completed / nudged ["reference/kubernetes-rollouts.md"]
+  (fail) writeMemorianRunOutcome > #given a runDir that does not exist yet #when writeMemorianRunOutcome runs #then it creates the directory and the file
+    existsSync(outcome.json) Expected: true  Received: false
+  (fail) pruneMemorianRuns > #given a 400-day-old empty dir and an 8-day-old dir with a 1-minute-old file #when pruning #then the empty dir is removed and the fresh-file dir is kept
+    expected {removed:1, kept:1} received {removed:0, kept:2}
+  30 pass
+  5 fail
+  Ran 35 tests across 3 files. [3.23s]
+  PASS_LINES=30
+  RBT_LOG=/tmp/rbt-178876434019170.log
+  RBT_RC=1
+
+  User-only characterization pins stayed green on this RED run:
+  - distinctive newest text / repeated terms / short stopword tokens
+
+================================================================
+2. GREEN — sources + tests synced
+================================================================
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/memory-core/src/recall/planner.ts \
+    --sync packages/memory-core/src/recall/planner.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-run-retention.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-compaction.test.ts \
+    --sync packages/omo-senpi/src/components/memory/AGENTS.md \
+    -- packages/memory-core/src/recall/planner.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-compaction.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner.test.ts \
+       packages/omo-senpi/src/components/memory/recall-wiring.test.ts
+
+output:
+  RBT_SYNCED=7
+  69 pass
+  0 fail
+  Ran 69 tests across 6 files. [5.87s]
+  PASS_LINES=69
+  RBT_LOG=/tmp/rbt-178876440329225.log
+  RBT_RC=0
+
+================================================================
+3. LOCAL TYPECHECK
+================================================================
+command:
+  cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage \
+    && bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json \
+    && bunx tsgo --noEmit -p packages/memory-core/tsconfig.json
+
+output:
+  TSGO_SENPI=0
+  TSGO_CORE=0
+
+No commit, no push.

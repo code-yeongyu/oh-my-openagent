@@ -1,0 +1,12 @@
+{
+  "removedTaskOwnedSandboxes": [
+    "<temp>/omo-senpi-qa-xdhszh",
+    "<temp>/omo-senpi-qa-8OA5ah",
+    "<temp>/omo-senpi-qa-m8ZFWN"
+  ],
+  "childProcessCheck": {
+    "command": "tasklist /FI 'IMAGENAME eq bun.exe' /FO CSV",
+    "bunProcessesRemaining": 0
+  },
+  "driverResult": "PASS"
+}

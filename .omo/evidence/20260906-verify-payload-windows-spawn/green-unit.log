@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+script\npm-invocation.test.ts:
+(pass) npm spawn options > #given win32 #when npm spawn options are resolved #then a shell is requested [4.46ms]
+(pass) npm spawn options > #given linux and darwin #when npm spawn options are resolved #then no shell is requested [7.87ms]
+
+ 2 pass
+ 0 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [1.65s]

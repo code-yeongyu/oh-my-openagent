@@ -142,6 +142,34 @@ describe("createMemorianNudgeTool", () => {
     expect(accepted).toEqual([])
   })
 
+  test.each([
+    "No stored memory clears the bar for this planning step; the transcript already contains the full methodology, QA approach, and rollout.",
+    "This memory covers OAuth login prompts and remote-test helpers, not the goal continuation timer delay.",
+  ])("#given a meta hint %s #when nudge is called #then it is rejected and a factual correction can still use the cap", async (hint) => {
+    const { accepted, tool } = launch({ maxItems: 1 })
+
+    const rejected = await tool.execute("call-meta", params(CANDIDATE_PATH, hint))
+    expect(rejected.isError).toBe(true)
+    expect(accepted).toEqual([])
+
+    const corrected = await tool.execute("call-fact", params(CANDIDATE_PATH, HINT))
+    expect(corrected.isError).toBeUndefined()
+    expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: HINT }])
+  })
+
+  test.each([
+    "The fix is on senpi main, not the extension.",
+    "senpi monitors have a verified two-flag desync where registry.paused can remain set.",
+    "The regression test does not cover Windows process cleanup.",
+    "The outage is unrelated to the database migration.",
+  ])("#given a factual hint %s #when nudge is called #then it is accepted unchanged", async (hint) => {
+    const { accepted, tool } = launch()
+    const result = await tool.execute("call-fact", params(CANDIDATE_PATH, hint))
+
+    expect(result.isError).toBeUndefined()
+    expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint }])
+  })
+
   test("#given the maxItems budget already spent #when nudge is called again #then an error result returns and the accepted set is unchanged", async () => {
     // given
     const { accepted, tool } = launch({ maxItems: 1 })

@@ -23,6 +23,9 @@ export const PENDING_NUDGES_VERSION = 1
 /** Hint budget: one factual sentence. Internal, deliberately not a config knob. */
 export const NUDGE_HINT_MAX_CHARS = 200
 
+/** Decision commentary is not a memory fact. Internal, deliberately not a config knob. */
+const NUDGE_DECISION_LANGUAGE_PATTERN = /\b(?:no\s+stored\s+memory|clears\s+the\s+bar|not?\s+relevant|memor(?:y|ies)\s+(?:(?:is|are)\s+(?:unrelated\s+to|not\s+about)|(?:does|do)\s+not\s+(?:cover|address|pertain))|memor(?:y|ies)\s+covers?\s+.*\s+not\s+the)\b/i
+
 /** Pending payloads older than this are junk from an abandoned session. */
 const PENDING_TTL_MS = 24 * 60 * 60_000
 
@@ -67,11 +70,11 @@ export interface ValidateNudgesOptions {
 
 /**
  * Hint budget predicate, shared with the in-process judge's nudge tool: one factual sentence,
- * non-empty, at most `NUDGE_HINT_MAX_CHARS`, on a single line.
+ * non-empty, at most `NUDGE_HINT_MAX_CHARS`, on a single line, without nudge-decision commentary.
  */
 export function isValidHint(hint: string): boolean {
   if (hint.length === 0 || hint.length > NUDGE_HINT_MAX_CHARS) return false
-  return !/[\r\n]/.test(hint)
+  return !/[\r\n]/.test(hint) && !NUDGE_DECISION_LANGUAGE_PATTERN.test(hint)
 }
 
 /**

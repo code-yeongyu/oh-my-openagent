@@ -1,0 +1,5 @@
+$ git show HEAD:... | rg -n -F "task(subagent_type=\\\"oracle"
+53:| \`task(subagent_type="oracle", ...)\` for final verification | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"lazycodex-gate-reviewer","fork_context":false})\` |
+oracle-row-result=0
+$ git show HEAD:... | rg -n "Omit optional keys|fork_context is rejected|self-review"
+new-guidance-result=1 (expected RED: new guidance absent; old oracle row is present above)

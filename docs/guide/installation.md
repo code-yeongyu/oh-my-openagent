@@ -3,7 +3,7 @@
 oh-my-openagent ships in **three editions** of the same product: two plugins that load into a host you already run, plus one standalone edition.
 
 - **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. 11 discipline agents, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ulw-loop, hashline edits, the works.
-- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** - the portable components that fit Codex's plugin system: `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `rules`, `lsp`, `telemetry`, `teammode`, `ulw-execute-continuation`, `ulw-loop`, and `ultrawork`, plus plugin-scoped MCPs for `grep_app`, `context7`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It has no OpenCode agent registry or `team_*` tool family, but ships Codex-native agent roles and the script-and-skill-driven `teammode` component.
+- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** - the portable components that fit Codex's plugin system: `bootstrap`, `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `rules`, `lsp`, `telemetry`, `teammode`, `ulw-execute-continuation`, `ulw-loop`, and `ultrawork`, plus plugin-scoped MCPs for `grep_app`, `context7`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It has no OpenCode agent registry or `team_*` tool family, but ships Codex-native agent roles and the script-and-skill-driven `teammode` component.
 - **Senpi Edition (standalone, beta)** — the native `omo` command with the OMO extension built in. It installs from `omo-ai@beta` instead of loading as a plugin into OpenCode or Codex.
 
 Most users want **Ultimate**. Pick **Light** if you are already invested in Codex CLI. Pick **both** if you want OMO available wherever you happen to be working that day.
@@ -139,7 +139,7 @@ A detached worker finishes the install in the background (the `sg` download is t
 | Proxy limitation | Binary downloads fail behind an HTTP(S) proxy. The logged error says it plainly: the bootstrap downloader "does not tunnel through HTTP(S) proxies in v1; the download was attempted directly." | Run one session on a direct connection, or provide `sg` via `OMO_AST_GREP_SG_PATH`/`PATH`. Verify with `npx lazycodex-ai doctor`. |
 | OpenCode Windows proxy preinstall | OpenCode starts before OMO loads, shows only default agents, or logs `fetch() proxy.url must be a non-empty string` while trying to install `oh-my-openagent@latest`. | Set `HTTP_PROXY`/`HTTPS_PROXY` for the shell that launches OpenCode, then preinstall into OpenCode's Windows config prefix: `npm install oh-my-openagent@latest --prefix "%APPDATA%\\opencode"`. Restart OpenCode and run `bunx oh-my-openagent doctor --json`. |
 
-**Windows status.** On native Windows the marketplace bootstrap runs through a PowerShell 5.1-compatible `bootstrap.ps1`: it provisions the pinned Node LTS zip when `node` is absent, prepares Git Bash the same way the npx installer does, and writes its transcript to `ps-bootstrap.log` in the plugin data dir (degraded lines look like `degraded component=node reason=... hint=npx lazycodex-ai doctor`). Windows provisioning is shipped with static test coverage; real-device validation is still tracked separately in [code-yeongyu/lazycodex#52](https://github.com/code-yeongyu/lazycodex/issues/52). Do not treat static coverage as proof that a physical Windows install was exercised.
+**Windows status.** On native Windows the marketplace bootstrap runs through a PowerShell 5.1-compatible `bootstrap.ps1`: it provisions the pinned Node LTS zip when `node` is absent, prepares Git Bash the same way the npx installer does, and writes its transcript to `ps-bootstrap.log` in the plugin data dir (degraded lines look like `degraded component=node reason=... hint=npx lazycodex-ai doctor`). Windows provisioning is shipped with static test coverage; real-device validation is still tracked separately as an external tracker, not a code-backed fact. Do not treat static coverage as proof that a physical Windows install was exercised.
 
 ### A note on direct install
 
@@ -497,7 +497,7 @@ opencode auth login
 # Optional: Add more Google accounts for multi-account load balancing
 ```
 
-The plugin supports up to 10 Google accounts. When one account hits rate limits, it automatically switches to the next available account.
+The opencode-antigravity-auth plugin can use multiple Google accounts. When one account hits rate limits, it automatically switches to the next available account.
 
 ##### Amazon Bedrock
 
@@ -541,12 +541,12 @@ GitHub Copilot is supported as a **fallback provider** when native providers are
 
 | Agent         | Model                              |
 | ------------- | ---------------------------------- |
-| **Sisyphus**  | `github-copilot/claude-opus-4.7`   |
+| **Sisyphus**  | `github-copilot/claude-opus-5`     |
 | **Oracle**    | `github-copilot/gpt-5.6-sol`           |
-| **Explore**   | `github-copilot/claude-haiku-4-5`  |
-| **Atlas**     | `github-copilot/claude-sonnet-4.6` |
+| **Explore**   | `github-copilot/gpt-5-mini`        |
+| **Atlas**     | `github-copilot/claude-sonnet-5`   |
 
-Copilot acts as a proxy provider, routing requests to underlying models based on your subscription. Some agents (like Librarian) are not installed from Copilot alone and instead rely on other providers or runtime fallback.
+Copilot acts as a proxy provider, routing requests to underlying models based on your subscription. Copilot-only installs still resolve Librarian to `github-copilot/claude-haiku-4-5`.
 
 ##### Z.ai Coding Plan
 
@@ -557,7 +557,6 @@ When Z.ai is the primary provider, the most important fallbacks are:
 | Agent                  | Model                      |
 | ---------------------- | -------------------------- |
 | **Sisyphus**           | `zai-coding-plan/glm-5.2`  |
-| **visual-engineering** | `zai-coding-plan/glm-5.2`  |
 | **unspecified-high**   | `zai-coding-plan/glm-5.3`  |
 | **Multimodal-Looker**  | `zai-coding-plan/glm-4.6v` |
 
@@ -571,7 +570,7 @@ When OpenCode Zen is the best available provider, common examples:
 | ------------- | ---------------------------------------------------- |
 || **Sisyphus**  | `opencode/claude-opus-5` / `opencode-go/kimi-k3`   |
 | **Oracle**    | `opencode/gpt-5.6-sol`                                   |
-| **Explore**   | `opencode/minimax-m2.7`                              |
+| **Explore**   | `opencode/gpt-5-nano`                                |
 
 Run the installer with `--opencode-zen=yes` and select "Yes" for OpenCode Zen at the prompt. If your OpenCode environment prompts for provider authentication, follow the OpenCode provider flow for `opencode/` models.
 
@@ -616,7 +615,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | **MiniMax M3**             | opencode-go                      | Latest MiniMax flagship. Primary utility fallback, ahead of M2.7.   |
 | **MiniMax M2.7**           | opencode-go                      | Fast and smart. Utility fallback for various chains.        |
 | **MiniMax M2.7 Highspeed** | opencode (manual choice)         | Faster utility variant. No longer a built-in Explore or Librarian rung.|
-| **Qwen 3.7 Plus**          | opencode-go                      | 1M context, high-speed reasoning. Default for Explore and Librarian when GPT 5.6 Luna Fast is unavailable. |
+| **Qwen 3.7 Plus**          | opencode-go                      | 1M context, high-speed reasoning. OpenCode Go utility fallback for Explore and Librarian after GPT 5.6 Luna Fast and DeepSeek v4 Flash. |
 
 **Speed-Focused Models**:
 
@@ -642,7 +641,7 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent          | Role              | Default Chain                                                                      | Prompt behavior |
 | -------------- | ----------------- | ---------------------------------------------------------------------------------- | --------------- |
-| **Prometheus** | Strategic planner | anthropic\|github-copilot\|opencode/claude-fable-5 (xhigh) → opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max) | Single thin prompt backed by `ulw-plan`; model family does not switch the prompt |
+| **Prometheus** | Strategic planner | anthropic\|github-copilot\|opencode/claude-fable-5-1 (xhigh) → opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max) | Single thin prompt backed by `ulw-plan`; model family does not switch the prompt |
 | **Atlas**      | Todo orchestrator | anthropic\|github-copilot\|opencode/claude-sonnet-5 → opencode-go/kimi-k3 → openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium) → opencode-go/minimax-m3 → minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3 → opencode-go/minimax-m2.7 | GPT-optimized todo management path |
 
 **GPT-Native Agents** (built for GPT, don't override to Claude):
@@ -734,7 +733,7 @@ All built-in slash commands are **Ultimate-only** — Codex CLI does not have a 
 | `/refactor` | Ultimate | LSP + AST-grep + TDD-verified intelligent refactor |
 | `/handoff` | Ultimate | Generate detailed context summary to continue in a new session |
 | `/remove-ai-slops` | Ultimate | Strip AI-generated code smells from recent changes |
-| `/hyperplan` | Ultimate | Direct invocation of hyperplan skill |
+| `/hyperplan` | Ultimate | Builtin command that instructs the agent to `skill(name="hyperplan")`; OpenCode does not register a builtin skill named `hyperplan` |
 
 #### Agents (11) — Ultimate only
 
@@ -842,7 +841,6 @@ To enable, edit your plugin config:
     "max_messages_per_run": 10000,
     "max_wall_clock_minutes": 120,
     "max_member_turns": 500,
-    "base_dir": null,                  // overrides default ~/.omo/teams or <project>/.omo/teams
     "message_payload_max_bytes": 32768,
     "recipient_unread_max_bytes": 262144,
     "mailbox_poll_interval_ms": 3000
@@ -862,8 +860,8 @@ Member eligibility:
 
 Two skills already ride on top of Team Mode:
 
-- **`hyperplan`** — 5 hostile agents tear a plan apart from orthogonal angles before any code is written.
-- **`security-research`** — 3 vulnerability hunters + 2 PoC engineers audit your codebase in parallel.
+- **`security-research`** (builtin) — 3 vulnerability hunters + 2 PoC engineers audit your codebase in parallel.
+- **`hyperplan`** is a keyword/command that tells the agent to load a `hyperplan` skill; that skill is not in OpenCode `createBuiltinSkills`.
 
 Full guide: [`docs/guide/team-mode.md`](team-mode.md).
 
@@ -929,7 +927,7 @@ Every agent, hook, skill, MCP, command, and tool is configurable via `disabled_*
 
 #### Hash-anchored edits (Hashline)
 
-Every `Read` tool output is tagged with `LINE#ID` content hashes. The `hashline_edit` tool rejects edits when the file has changed since the last read. No whitespace reproduction issues, no stale-line errors. Disable with `hashline_edit.enabled: false` if you need the legacy edit behavior.
+Hash-anchored edits are off by default (`hashline_edit` is a boolean, default false). Set `"hashline_edit": true` to tag Read output with `LINE#ID` hashes and replace the edit tool. The `hashline_edit` tool rejects edits when the file has changed since the last read.
 
 #### OpenClaw (optional outbound notifications)
 

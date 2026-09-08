@@ -46,6 +46,7 @@ export interface MemoryWiring {
   registerShutdownEvaluator(evaluator: ShutdownEvaluator): void
   /** Clears the memory status footer for the session behind this event context. */
   clearStatus(eventCtx: unknown): void
+  whenIdle(): Promise<void>
 }
 
 export type StatusUi = {

@@ -1,3 +1,45 @@
+## 2026-09-08 — Persist child_session_id on senpi-task records
+
+Spawned senpi-task children now persist `child_session_id` (the child's own session id from the spawn handle) on their `st_*.json` record. Reattach/resume rewrites keep the field. `packages/team-core/AGENTS.md` documents the on-disk `st_*.json` identity fields so external readers can join a grandchild session (`parent_session_id`) back to its parent task.
+
+## 2026-09-08 — Expose team runtime layout and member linkage
+
+Team member task records now carry durable team identity fields, and `packages/team-core/AGENTS.md` documents the runtime state, tasklist, and mailbox paths and JSON shapes consumed by external readers.
+
+## 2026-09-07 — Make the two Windows-flaky tests from #7898 deterministic
+
+Both tests raced the wall clock and lost on the slowest CI runner. The team-mode case
+`inbox stays intact when live delivery fails so the fallback path still works` ran the production
+prompt-gate schedule in real time: the failed live delivery placed a 2 s post-dispatch hold on the
+recipient, then each refused fallback wake waited `max(postDispatchHoldMs, 250*2^n)` = 2 s, 2 s, 2 s
+before the fifth `promptAsync` was allowed, so the test needed ~8.6 s on Linux against a 12 s event
+budget and exceeded it on Windows. Five neighbouring cases each spent ~2.5 s because the queue re-arms
+after a *cancelled* wake with that same 2 s hold. `TeamSendMessageToolDeps` now carries an optional
+`dispatchTiming` (`postDispatchHoldMs`, `queueRetryMs`, `fallbackWakeSettleMs`) that
+`deliverLive` threads into the live dispatch and into `enqueueFallbackMailboxWake`; every field
+falls back to the gate default when omitted, so production behaviour is unchanged and only tests set
+it. The six tests inject near-zero timing through `createImmediateTeamSendMessageTool` and wait on
+their deferred event with the file's default 3 s circuit breaker; the Windows-only 15 s budgets are
+gone. Captured on gorky (bun 1.4.0): tightened test RED on unchanged production code ("timed out
+waiting for fallback wake after pre-send transport failure" at 3 s), GREEN at ~100 ms after plumbing;
+the whole file dropped from 25.9 s to 8.0 s with no test above 0.6 s.
+
+The hooks-state case `recovers a trusted snapshot at a synchronized legacy truncate/write boundary`
+spawned a detached legacy writer that completed its write only after an `fs.watch` notification of
+a release file, while senpi's `FileHookStateStorage.read` retries `lockSync` 10 x 20 ms before
+returning the fail-closed empty state; cross-process watch latency on Windows exceeded that window and
+the reader returned `{ version: 1, hooks: {} }`. `script/fixtures/senpi-hooks-state-legacy-reader.ts`
+now simulates the writer in-process: the lock dir is held and the snapshot truncated before the reader
+starts, the reader's first `lockSync` is refused by the real `proper-lockfile` (the fixture mocks the
+nested copy senpi resolves, capturing the real function before `mock.module` rewires the live
+binding), and the writer's remaining work runs inside that refusal, so the boundary is crossed at the
+same instruction on every run. The fixture reports `truncatedReads` and `lockAttempts` and the
+test pins them at exactly 1 and 2, proving the contention path ran. Two mutations fail the test
+(writer never releases -> empty state; snapshot already complete -> no truncated read, one lock
+attempt). The detached writer fixture and the `taskkill`/`SIGTERM` timed-out-writer cleanup helper
+with its three unit tests are removed because nothing spawns a writer any more. Future syncs must keep
+the counters exact and must not reintroduce a second process or a real-time wait into this fixture.
+
 ## 2026-09-05 — Sweep the remaining task examples and the delegate schema to background-by-default
 
 The gate review of #7795 found model-facing text that still prescribed `run_in_background=false`: the

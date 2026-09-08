@@ -1,0 +1,40 @@
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-01659993/omo && bun install --frozen-lockfile --ignore-scripts
+EXIT: 0
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+
+3 packages installed [129.00ms]
+
+STDERR:
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-f6b2180e/omo && bun install --frozen-lockfile --ignore-scripts
+EXIT: 0
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+
+3 packages installed [129.00ms]
+
+STDERR:
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-8fafc772/omo && bun install --frozen-lockfile --ignore-scripts
+EXIT: 0
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+
+3 packages installed [149.00ms]
+
+STDERR:
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-2eff9a4d/omo && bun install --frozen-lockfile --ignore-scripts
+EXIT: 0
+STDOUT:
+bun install v1.4.0 (34cbb9a40)
+
+3 packages installed [124.00ms]
+
+STDERR:
+

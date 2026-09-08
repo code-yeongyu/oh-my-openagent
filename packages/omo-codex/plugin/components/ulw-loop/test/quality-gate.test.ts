@@ -136,6 +136,16 @@ describe("validateQualityGate", () => {
 		expect(gate.manualQa.artifactRefs).toHaveLength(5);
 	});
 
+	it("#given missing manualQa section #when validated #then it explains accepted input forms", () => {
+		const input = makeGate();
+		delete input["manualQa"];
+
+		const error = getQualityGateError(input);
+
+		expect(error.message).toContain("accepted input");
+		expect(error.message).toContain('top-level "qualityGate" key');
+	});
+
 	it("#given missing manualQa surface evidence #when validated #then it fails closed", () => {
 		// given
 		const input = makeGate({

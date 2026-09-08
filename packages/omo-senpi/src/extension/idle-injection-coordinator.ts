@@ -1,4 +1,4 @@
-export type IdleInjectionSource = "task-completion" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run"
+export type IdleInjectionSource = "task-completion" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run" | "memorian"
 
 export interface IdleInjection {
   // Dedupe/order key. Task completions key on their task id; the ulw continuation keys on its source
@@ -8,6 +8,8 @@ export interface IdleInjection {
   readonly customType?: string
   readonly content: string
   readonly display?: boolean
+  /** Rides a flush that carries at least one non-passive entry; never causes a flush by itself. */
+  readonly passive?: boolean
   readonly details?: unknown
   readonly onFlushed?: () => void
   readonly onDeliveryFailed?: (error: unknown) => void
@@ -43,6 +45,7 @@ const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
   "boulder-continuation": 3,
   "ulw-continuation": 4,
   "dag-run": 5,
+  memorian: 6,
 }
 
 /**
@@ -107,6 +110,7 @@ export class IdleInjectionCoordinator {
 
   #flush(deliverAs: "steer" | "followUp"): number {
     if (this.#pending.size === 0) return 0
+    if ([...this.#pending.values()].every((injection) => injection.passive === true)) return 0
     const ordered = [...this.#pending.values()].sort(
       (left, right) => SOURCE_RANK[left.source] - SOURCE_RANK[right.source],
     )

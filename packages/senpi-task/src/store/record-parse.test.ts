@@ -21,6 +21,25 @@ function persisted(fields: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
+describe("record-parse launch evidence", () => {
+  test("#given a lost record with started_at #when persisted JSON is parsed #then the task-level launch evidence round-trips", () => {
+    const startedAt = "2026-08-21T00:00:01.000Z"
+    const stored = persisted({ status: "lost", started_at: startedAt })
+    const parsed = parseTaskRecord(JSON.parse(JSON.stringify(stored)), "record.json")
+    expect(parsed).toMatchObject({ status: "lost", started_at: startedAt })
+  })
+
+  test.each(["pending", "running", "lost"])("#given a legacy %s record without started_at #when parsed #then it stays readable without inventing launch evidence", (status) => {
+    const parsed = parseTaskRecord(persisted({ status }), "record.json")
+    expect(parsed.status).toBe(status)
+    expect(parsed).not.toHaveProperty("started_at")
+  })
+
+  test.each([123, null])("#given malformed started_at %s #when parsed #then the persisted record is rejected", (startedAt) => {
+    expect(() => parseTaskRecord(persisted({ started_at: startedAt }), "record.json")).toThrow(/started_at/)
+  })
+})
+
 describe("record-parse run_stats token totals", () => {
   test("#given a persisted run_stats without the new token fields #when parsed #then the record round-trips and the new fields stay undefined", () => {
     // given
@@ -96,6 +115,32 @@ describe("record-parse run_stats token totals", () => {
 
     // when / then
     expect(() => parseTaskRecord(rogue, "record.json")).toThrow(/cache_write_tokens/)
+  })
+})
+
+describe("record-parse child_session_id", () => {
+  test("#given a persisted record with child_session_id #when parsed #then the field round-trips", () => {
+    // given
+    const stored = persisted({ child_session_id: "01a0815e-3d9d-743a-8a5a-3a443aeb8f70" })
+
+    // when
+    const record = parseTaskRecord(stored, "record.json")
+
+    // then
+    expect(record.child_session_id).toBe("01a0815e-3d9d-743a-8a5a-3a443aeb8f70")
+  })
+
+  test("#given a legacy record without child_session_id #when parsed #then the record still loads", () => {
+    // given a record written before the field was persisted
+    const stored = persisted({})
+
+    // when
+    const record = parseTaskRecord(stored, "record.json")
+
+    // then the optional field stays absent rather than being invented or rejected
+    expect(record.task_id).toBe("st_1a2b3c4d")
+    expect(record.child_session_id).toBeUndefined()
+    expect("child_session_id" in record).toBe(false)
   })
 })
 

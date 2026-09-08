@@ -10,20 +10,24 @@ export async function FinalCtaSection(): Promise<JSX.Element> {
   return (
     <section
       data-section="manifesto-final-cta"
-      className="from-primary/10 to-background bg-gradient-to-t px-6 py-32 text-center"
+      aria-labelledby="manifesto-final-cta-title"
+      className="hairline-x py-24 lg:py-40"
     >
-      <div className="space-y-8">
-        <h2 className="text-foreground text-6xl font-black tracking-tighter md:text-8xl">
+      <div className="flex flex-col items-start gap-10">
+        <h2
+          id="manifesto-final-cta-title"
+          className="text-text-hi font-mono text-[clamp(2.5rem,1.35rem+4.4vw,5.25rem)] leading-[0.98] font-medium tracking-[-0.03em]"
+        >
           {t("finalCta.title")}
         </h2>
 
-        <Button size="lg" className="rounded-full px-8 py-6 text-lg" asChild>
+        <Button size="lg" asChild>
           <Link
             href="https://github.com/code-yeongyu/oh-my-openagent"
             target="_blank"
             rel="noopener noreferrer"
           >
-            {t("finalCta.button")} <ArrowRight className="ml-2 h-5 w-5" />
+            {t("finalCta.button")} <ArrowRight aria-hidden="true" />
           </Link>
         </Button>
       </div>

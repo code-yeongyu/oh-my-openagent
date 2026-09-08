@@ -58,14 +58,20 @@ export async function readRunJson<T>(path: string): Promise<T> {
 export async function writeRunJsonAtomic(path: string, value: unknown, mode = 0o600): Promise<void> {
   const temporary = `${path}.tmp-${process.pid}-${randomUUID()}`
   const file = await open(temporary, "wx", mode)
+  let renamed = false
   try {
-    await file.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8")
-    await file.sync()
+    try {
+      await file.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8")
+      await file.sync()
+    } finally {
+      await file.close()
+    }
+    await rename(temporary, path)
+    renamed = true
+    await syncDirectory(dirname(path))
   } finally {
-    await file.close()
+    if (!renamed) await unlinkRunArtifact(temporary)
   }
-  await rename(temporary, path)
-  await syncDirectory(dirname(path))
 }
 
 async function syncDirectory(path: string): Promise<void> {

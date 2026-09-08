@@ -1,125 +1,168 @@
 "use client"
 
 import type { JSX } from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import Image from "next/image"
 import { useTranslations } from "next-intl"
-import { Menu, X } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Link } from "@/i18n/routing"
+import { Menu, Star, X } from "lucide-react"
 
-function GitHubMark({ className }: { readonly className?: string }): JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
-      <path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49v-1.9c-2.78.62-3.37-1.22-3.37-1.22-.46-1.2-1.11-1.52-1.11-1.52-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.85.09-.67.35-1.12.63-1.38-2.22-.26-4.55-1.14-4.55-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.94c.85 0 1.7.12 2.5.34 1.9-1.33 2.74-1.05 2.74-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.95.68 1.91v2.84c0 .27.18.59.69.49A10.18 10.18 0 0 0 22 12.25C22 6.58 17.52 2 12 2" />
-    </svg>
-  )
+import { GithubIcon } from "@/components/icons/github-icon"
+import { useLiveStats } from "@/components/landing/live-stats"
+import { Button } from "@/components/ui/button"
+import { Chip } from "@/components/ui/badge"
+import { Link, usePathname } from "@/i18n/routing"
+import { cn } from "@/lib/utils"
+
+const GITHUB_URL = "https://github.com/code-yeongyu/oh-my-openagent"
+const SCROLL_THRESHOLD = 24
+
+type NavLinkKey = "agents" | "docs" | "manifesto"
+
+interface NavItem {
+  readonly key: NavLinkKey
+  readonly href: "/#agents" | "/docs" | "/manifesto"
+  readonly isActive: (pathname: string) => boolean
 }
 
-export function NavHeader(): JSX.Element {
+const NAV_ITEMS: readonly NavItem[] = [
+  { key: "agents", href: "/#agents", isActive: () => false },
+  { key: "docs", href: "/docs", isActive: (p) => p.startsWith("/docs") },
+  { key: "manifesto", href: "/manifesto", isActive: (p) => p.startsWith("/manifesto") },
+]
+
+export interface NavHeaderProps {
+  /** Formatted star count rendered on the server ("68.8k"); refreshed client-side. */
+  readonly stars: string
+}
+
+function useScrolled(threshold: number): boolean {
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const update = (): void => setScrolled(window.scrollY > threshold)
+    update()
+    window.addEventListener("scroll", update, { passive: true })
+    return () => window.removeEventListener("scroll", update)
+  }, [threshold])
+  return scrolled
+}
+
+/**
+ * DESIGN.md §5 Nav: sticky 60px, transparent until scrollY > 24 then `--ink-0/72%` +
+ * blur(12px); mono uppercase links with a growing underline; GitHub star chip; Install.
+ */
+export function NavHeader({ stars }: NavHeaderProps): JSX.Element {
   const t = useTranslations("nav")
+  const pathname = usePathname()
+  const scrolled = useScrolled(SCROLL_THRESHOLD)
   const [isOpen, setIsOpen] = useState(false)
+  const live = useLiveStats({
+    stars,
+    totalDownloads: "",
+    monthlyDownloads: "",
+    weeklyDownloads: "",
+  })
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/50 backdrop-blur-xl">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-lg font-bold tracking-tight text-white">{t("brand")}</span>
-          </Link>
-          <nav className="hidden items-center gap-6 text-sm font-medium text-zinc-400 md:flex">
-            <Link href="/#features" className="transition-colors hover:text-cyan-400">
-              {t("features")}
-            </Link>
-            <Link href="/#agents" className="transition-colors hover:text-cyan-400">
-              {t("agents")}
-            </Link>
-            <Link href="/docs" className="transition-colors hover:text-cyan-400">
-              {t("docs")}
-            </Link>
-            <Link href="/manifesto" className="transition-colors hover:text-cyan-400">
-              {t("manifesto")}
-            </Link>
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
+    <header
+      data-scrolled={scrolled ? "true" : "false"}
+      className="border-line data-[scrolled=true]:bg-ink-0/72 ease-standard sticky top-0 z-50 w-full border-b bg-transparent transition-colors duration-[var(--dur-micro)] data-[scrolled=true]:backdrop-blur-md"
+    >
+      <div className="mx-auto flex h-[60px] w-full max-w-[90rem] items-center justify-between px-4 sm:px-5 lg:px-8">
+        <Link
+          href="/"
+          className="focus-visible:outline-accent-32 flex items-center gap-2.5 rounded-[2px] focus-visible:outline-2 focus-visible:outline-offset-2"
+        >
+          <Image src="/brand/omo-mark.svg" alt="" width={24} height={24} priority />
+          <span className="text-text-hi text-[15px] font-medium tracking-[-0.02em]">
+            {t("brand")}
+          </span>
+        </Link>
+
+        <nav aria-label={t("primary")} className="hidden items-center gap-8 md:flex">
+          {NAV_ITEMS.map((item) => {
+            const active = item.isActive(pathname)
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "underline-grow focus-visible:outline-accent-32 tracking-nav ease-standard font-mono text-xs uppercase transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:outline-offset-2",
+                  active ? "text-text-hi" : "text-text-mid hover:text-text-hi",
+                )}
+              >
+                {t(item.key)}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="flex items-center gap-3">
           <a
-            href="https://github.com/code-yeongyu/oh-my-openagent"
+            href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex"
+            aria-label={t("githubStars", { count: live.stars })}
+            className="focus-visible:outline-accent-32 rounded-[2px] focus-visible:outline-2 focus-visible:outline-offset-2"
           >
-            <Badge
-              variant="secondary"
-              className="gap-1 border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-            >
-              <GitHubMark className="h-3 w-3" />
-              <span>{t("starOnGitHub")}</span>
-            </Badge>
+            <Chip className="bg-ink-1 hover:border-line-strong hover:text-text-hi">
+              <GithubIcon className="size-3.5" />
+              <Star aria-hidden="true" className="size-3" />
+              <span className="tabular-nums">{live.stars}</span>
+            </Chip>
           </a>
+          <Button size="sm" className="hidden md:inline-flex" asChild>
+            <Link href="/docs#installation">{t("install")}</Link>
+          </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-11 w-11 text-zinc-400 hover:bg-zinc-800 hover:text-white md:hidden"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-label={isOpen ? "Close menu" : "Open menu"}
+            className="md:hidden"
+            onClick={() => setIsOpen((open) => !open)}
+            aria-label={isOpen ? t("closeMenu") : t("openMenu")}
             aria-expanded={isOpen}
             aria-controls="mobile-nav"
           >
-            {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {isOpen ? <X className="size-5" /> : <Menu className="size-5" />}
           </Button>
         </div>
       </div>
 
       <div
         id="mobile-nav"
-        className={
-          `overflow-hidden bg-black/95 backdrop-blur-xl transition-[max-height,opacity] duration-200 ease-in-out md:hidden ` +
-          (isOpen
-            ? "max-h-[420px] border-b border-white/10 opacity-100"
-            : "pointer-events-none max-h-0 opacity-0")
-        }
         aria-hidden={!isOpen}
+        className={cn(
+          "bg-ink-3 ease-standard grid transition-[grid-template-rows] duration-[var(--dur-micro)] md:hidden",
+          isOpen ? "border-line grid-rows-[1fr] border-t" : "pointer-events-none grid-rows-[0fr]",
+        )}
       >
-        <nav className="flex flex-col gap-1 p-3 text-sm font-medium text-zinc-400">
-          <Link
-            href="/#features"
-            className="flex min-h-11 items-center rounded-md px-3 transition-colors hover:bg-zinc-900 hover:text-cyan-400"
-            onClick={() => setIsOpen(false)}
-          >
-            {t("features")}
-          </Link>
-          <Link
-            href="/#agents"
-            className="flex min-h-11 items-center rounded-md px-3 transition-colors hover:bg-zinc-900 hover:text-cyan-400"
-            onClick={() => setIsOpen(false)}
-          >
-            {t("agents")}
-          </Link>
-          <Link
-            href="/docs"
-            className="flex min-h-11 items-center rounded-md px-3 transition-colors hover:bg-zinc-900 hover:text-cyan-400"
-            onClick={() => setIsOpen(false)}
-          >
-            {t("docs")}
-          </Link>
-          <Link
-            href="/manifesto"
-            className="flex min-h-11 items-center rounded-md px-3 transition-colors hover:bg-zinc-900 hover:text-cyan-400"
-            onClick={() => setIsOpen(false)}
-          >
-            {t("manifesto")}
-          </Link>
-          <a
-            href="https://github.com/code-yeongyu/oh-my-openagent"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex min-h-11 items-center gap-2 rounded-md px-3 transition-colors hover:bg-zinc-900 hover:text-cyan-400 sm:hidden"
-            onClick={() => setIsOpen(false)}
-          >
-            <GitHubMark className="h-4 w-4" />
-            <span>{t("starOnGitHub")}</span>
-          </a>
+        <nav aria-label={t("primary")} className="min-h-0 overflow-hidden">
+          <ul className="flex flex-col p-3">
+            {NAV_ITEMS.map((item) => (
+              <li key={item.key}>
+                <Link
+                  href={item.href}
+                  tabIndex={isOpen ? undefined : -1}
+                  aria-current={item.isActive(pathname) ? "page" : undefined}
+                  onClick={() => setIsOpen(false)}
+                  className="text-text-mid hover:text-text-hi hover:bg-accent-4 aria-[current=page]:text-text-hi focus-visible:outline-accent-32 tracking-nav ease-standard flex min-h-11 items-center px-3 font-mono text-xs uppercase transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:-outline-offset-2"
+                >
+                  {t(item.key)}
+                </Link>
+              </li>
+            ))}
+            <li className="p-3">
+              <Button size="sm" className="w-full" asChild>
+                <Link
+                  href="/docs#installation"
+                  tabIndex={isOpen ? undefined : -1}
+                  onClick={() => setIsOpen(false)}
+                >
+                  {t("install")}
+                </Link>
+              </Button>
+            </li>
+          </ul>
         </nav>
       </div>
     </header>

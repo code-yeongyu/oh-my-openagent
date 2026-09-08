@@ -7,9 +7,12 @@
 // to processed/ and lost. The fix verifies session.messages history and requeues
 // unconfirmed messages back to the inbox instead.
 
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdtemp, mkdir, readdir, rm } from "node:fs/promises"
+
+// Windows CI runners can exceed the 5 s Bun default on fs-heavy team-mode tests.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 10_000)
 import { tmpdir } from "node:os"
 import path from "node:path"
 
