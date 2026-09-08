@@ -142,6 +142,18 @@ describe("event-bridge session_start recovery chain", () => {
 })
 
 describe("event-bridge session_shutdown", () => {
+  it("#given a running resident child #when session_before_reload fires #then reload is not vetoed by the child", async () => {
+    const running = {
+      task_id: "task-running",
+      parent_session_id: "parent-session",
+      host_pid: process.pid,
+      status: "running",
+    } as TaskRecord
+    const { pi } = wireHarness("parent-session", { records: { [running.task_id]: running } })
+
+    expect(await pi.dispatch("session_before_reload", {})).toEqual([undefined])
+  })
+
   it("#given a session_shutdown with a reason and a captured session id #when the event fires #then it suspends with parentSessionId and reason", async () => {
     const { pi, calls, order } = wireHarness("parent-session")
 
