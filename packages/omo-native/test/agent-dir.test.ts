@@ -124,6 +124,22 @@ describe("omo agent directory", () => {
     })
   })
 
+  describe("#given a stale legacy engine variable exported by the shell", () => {
+    describe("#when the launcher adopts the flat state", () => {
+      test("#then the carry-forward still lands in the canonical branded directory", () => {
+        const home = createHome()
+        write(join(legacyFlatAgentDir(home), "settings.json"), FLAT_SETTINGS)
+
+        const result = adoptLegacyFlatState({ SENPI_CODING_AGENT_DIR: join(home, ".senpi", "agent") }, home)
+
+        const canonical = canonicalAgentDir({}, home)
+        expect(result.adopted).toBe(true)
+        expect(result.copied).toEqual(["settings.json"])
+        expect(readJson(join(canonical, "settings.json"))).toEqual(JSON.parse(FLAT_SETTINGS))
+      })
+    })
+  })
+
   describe("#given a home the adoption must not touch", () => {
     describe("#when the launcher runs", () => {
       test("#then an explicit override is respected and nothing is adopted", () => {
