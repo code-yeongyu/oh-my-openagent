@@ -39,6 +39,8 @@ export const FINISHED_CHILD_TOKEN = "FINISHED_CHILD_DONE"
 export const CANCEL_CHILD_TOKEN = "CANCEL_CHILD_DONE"
 export const LRU_CHILD_TOKEN = "LRU_CHILD_DONE"
 export const TTL_CHILD_TOKEN = "TTL_CHILD_DONE"
+export const NESTED_RECOVERY_PARENT = "nested-recovery-parent"
+export const NESTED_RECOVERY_CHILD = "nested-recovery-child"
 
 type MockStep =
   | { type: "text"; text: string }
@@ -140,6 +142,20 @@ export function routeChildStep(context: Context): MockStep {
   if (lastUser.includes(PING_TOKEN)) return { type: "text", text: `${PONG_TOKEN} steerability proven` }
   const thread = threadText(context)
   const hasAssistant = (context.messages ?? []).some((message) => message.role === "assistant")
+  if (thread.includes(NESTED_RECOVERY_PARENT)) {
+    return hasAssistant
+      ? { type: "hang" }
+      : {
+          type: "tool_call",
+          name: "task",
+          arguments: {
+            category: "mockcat",
+            prompt: `midturn-child ${NESTED_RECOVERY_CHILD}`,
+            run_in_background: true,
+            name: NESTED_RECOVERY_CHILD,
+          },
+        }
+  }
   if (thread.includes("midturn-child")) {
     // Turn one persists an assistant message via an instant read; turn two hangs MID-TURN at the
     // model so the quit suspends a child that already owns a session file (never fresh-relaunch).

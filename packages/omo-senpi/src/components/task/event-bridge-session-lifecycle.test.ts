@@ -99,7 +99,7 @@ describe("event-bridge session_start recovery chain", () => {
     }
   })
 
-  it("#given the dedicated marker and a captured child session #when session_start fires #then child recovery still reconciles and redelivers notifications", async () => {
+  it("#given the dedicated marker and a captured child session #when session_start fires #then automatic child-tree recovery is skipped", async () => {
     const previousMarker = process.env[OMO_SENPI_TASK_RPC_CHILD]
     process.env[OMO_SENPI_TASK_RPC_CHILD] = "1"
     try {
@@ -107,11 +107,9 @@ describe("event-bridge session_start recovery chain", () => {
 
       await pi.dispatch("session_start", {}, {})
 
-      expect(reconcileCalls).toEqual(["child-session"])
-      expect(notifyCalls).toEqual([{ sessionId: "child-session", parentState: { kind: "idle" } }])
-      expect(order).toContain("cleanup:start")
-      expect(order).toContain("poll")
-      expect(order).toContain("statusSync")
+      expect(reconcileCalls).toHaveLength(0)
+      expect(notifyCalls).toHaveLength(0)
+      expect(order).toEqual(["capture"])
     } finally {
       if (previousMarker === undefined) {
         delete process.env[OMO_SENPI_TASK_RPC_CHILD]

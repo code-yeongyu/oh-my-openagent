@@ -1,0 +1,12 @@
+{
+  "pluginMode": "explicit-plugin",
+  "pluginPath": "/home/thewind/.omo/worktrees/oh-my-openagent-nested-reconcile-storm/packages/omo-senpi/plugin",
+  "taskId": "st_01a081b4",
+  "initialParentPid": 3028527,
+  "replacementParentPid": 3028896,
+  "outcome": "continued",
+  "cleanup": {
+    "leakedPids": [],
+    "sandboxRemoved": true
+  }
+}

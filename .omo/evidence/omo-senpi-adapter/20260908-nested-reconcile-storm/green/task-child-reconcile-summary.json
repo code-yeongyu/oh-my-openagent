@@ -1,0 +1,17 @@
+{
+  "pluginMode": "explicit-plugin",
+  "pluginPath": "/home/thewind/.omo/worktrees/oh-my-openagent-nested-reconcile-storm/packages/omo-senpi/plugin",
+  "parentSessionId": "01a081b2-e3c8-74a6-9f28-6372b8db037a",
+  "nestedTaskId": "st_01a081b2",
+  "originalNestedPid": 3011916,
+  "observedNestedPid": 3011916,
+  "recursiveReconcileObserved": false,
+  "reconcileEventObserved": false,
+  "isolatedAgentDir": "/tmp/omo-senpi-qa-AQOpk4/agent",
+  "realSenpiAgentDir": "/home/thewind/.senpi/agent",
+  "realSenpiUntouched": true,
+  "cleanup": {
+    "leakedPids": [],
+    "sandboxRemoved": true
+  }
+}
