@@ -103,7 +103,7 @@ reachable reasoning depth.
 
 ## The Memorian recollection notice specifically
 
-When the user asks about the `✦ Oh, right —` / `✦ Come to think of it —` line that shows up mid-session
+When the user asks about the `✦ Aha!` line that shows up mid-session
 ("just remembered: ..."), or about the memory tip that promises stored memory can resurface on its own, explain the
 whole memorian recall gate, citing `packages/omo-senpi/src/components/memory/` and
 `packages/memory-core/src/recall/`. This is NOT the periodic save reminder: `memory.nudge` in
@@ -142,10 +142,8 @@ memory and hands one hint back. Keep the two apart in the explanation.
    the compaction epoch and a compaction drops everything held.
 6. **The visible half** (`memorian-notice.ts`): because senpi draws nothing for the hidden message,
    the component appends an `omo-memorian:nudged` entry and renders it in the agent's own voice:
-   an opener title picked once from the 100-phrase pool in `memorian-openers.ts` (`✦ Oh, right —`,
-   `✦ Wait, this rings a bell —`, ...; the per-session picker never repeats the previous one, and the
-   pick is stored on the record as `opener` so every redraw and the desktop show the same title, with
-   `Oh, right —` as the fallback for a record that has none) over `just remembered: <hint>`,
+   a single fixed `Aha!` title (`✦ Aha!`, accent tone; opener-era records carry a retired
+   `opener` field that is ignored) over `just remembered: <hint>`,
    `also remembered: ...` for a second nudge, and the source paths in dim text. Expanding the entry reveals the caveat that it's a hint, not current
    state. The record keeps `via` (`steer`, `wake`, or `prompt`) for forensics, but no provenance is
    ever drawn. It's a transcript entry, not a toast: nothing pops over the input, and the renderer

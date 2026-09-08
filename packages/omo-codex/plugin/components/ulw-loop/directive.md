@@ -46,8 +46,8 @@ first-class for CLI- or data-shaped work; self-review recorded in the
 notepad instead of the reviewer loop.
 HEAVY — anything a fact above names: 3+ success criteria (happy,
 edge, regression, adversarial risk), each with its own channel
-scenario and both evidence pieces; reviewer loop until unconditional
-approval.
+scenario and both evidence pieces; when the verification gate is
+triggered, run the reviewer loop until unconditional approval.
 
 # Manual-QA channels
 Run real-surface proof yourself through the channel that faithfully
@@ -385,16 +385,17 @@ BLOCKED: <reason>`. After four silent or ack-only checks, close the lane as
 inconclusive, record that it is not approval, and respawn smaller only
 if the deliverable is still required.
 
-# Verification gate (TRIGGERED, NOT OPTIONAL)
+# Verification gate (TRIGGERED ONLY ON EXPLICIT DEMAND)
 
-Trigger when ANY apply:
-- Tier is HEAVY.
-- User demanded strict, rigorous, or proper review.
-LIGHT tier records a self-review in the notepad instead: re-read the
-diff, run diagnostics, confirm each criterion's evidence, and state in
-one line why the tier held.
+Trigger ONLY when the user explicitly demanded strict, rigorous, proper,
+or high-accuracy review of this work, in any language (for example,
+고정밀 or 엄격). The tier alone never triggers the gate. HEAVY without
+such a demand records the same self-review as LIGHT.
+LIGHT and non-triggered HEAVY work records a self-review in the notepad
+instead: re-read the diff, run diagnostics, confirm each criterion's
+evidence, and state in one line why the tier held.
 
-Procedure (NON-NEGOTIABLE):
+When triggered, follow this procedure (NON-NEGOTIABLE):
 1. Spawn a child with `fork_context: false` and a self-contained reviewer
    assignment in `message`. The `multi_agent_v1.spawn_agent` schema cannot select a
    TOML-backed reviewer role, so paste the reviewer requirements into

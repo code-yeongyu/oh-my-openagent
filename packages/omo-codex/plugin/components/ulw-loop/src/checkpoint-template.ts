@@ -31,7 +31,7 @@ function gateTemplate(surface: UlwLoopToolkitSurface, base: string): Record<stri
 		},
 	];
 	const manualQa = {
-		by: surface === "omo-senpi" ? "main-session" : "lazycodex-qa-executor",
+		by: "main-session",
 		status: "passed",
 		evidence: "<replace:manual QA evidence>",
 		surfaceEvidence: [
@@ -68,7 +68,7 @@ function gateTemplate(surface: UlwLoopToolkitSurface, base: string): Record<stri
 	const common = {
 		manualQa,
 		gateReview: {
-			by: surface === "omo-senpi" ? "category:deep" : "lazycodex-gate-reviewer",
+			by: surface === "omo-senpi" ? "category:deep" : "main-session",
 			recommendation: "APPROVE",
 			reportPath: artifactPath(base, "gate-review.md"),
 			evidence: "<replace:gate review evidence>",
@@ -90,18 +90,7 @@ function gateTemplate(surface: UlwLoopToolkitSurface, base: string): Record<stri
 			adversarialClassesCovered: ["<replace:adversarial class>"],
 		},
 	};
-	if (surface === "omo-senpi") return common;
-	return {
-		codeReview: {
-			by: "lazycodex-code-reviewer",
-			recommendation: "APPROVE",
-			codeQualityStatus: "CLEAR",
-			reportPath: artifactPath(base, "code-review.md"),
-			evidence: "<replace:code review evidence>",
-			blockers: [],
-		},
-		...common,
-	};
+	return common;
 }
 
 export async function checkpointTemplate(
@@ -121,6 +110,11 @@ export async function checkpointTemplate(
 		"Fill every <replace:...> value with plausible non-empty evidence and use real, non-empty artifact files.",
 		'Passing codex-goal-json example: {"goal":{"objective":"<plan codexObjective verbatim>","status":"complete"}}.',
 		'Passing quality-gate-json example requires gateReview {"by":"category:deep","recommendation":"APPROVE","evidence":"review passed","reportPath":"<attemptDir>/gate-review.md","blockers":[],"notes":[]}, manualQa.artifactRefs objects, iteration, and criteriaCoverage.',
+		...(resolveToolkitSurface() === "lazycodex"
+			? [
+					"Self-review defaults: manualQa.by and gateReview.by are main-session. Alternatives: manualQa.by accepts lazycodex-qa-executor; gateReview.by accepts lazycodex-gate-reviewer, category:deep, category:unspecified-high, or category:unspecified-low. Optional codeReview.by accepts lazycodex-code-reviewer or main-session.",
+				]
+			: []),
 		...(hasAttempt ? [] : ["This plan is evidence-layout v1; artifacts go under .omo/evidence/."]),
 	].join(" ");
 	return {

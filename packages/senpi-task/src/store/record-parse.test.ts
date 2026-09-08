@@ -118,6 +118,32 @@ describe("record-parse run_stats token totals", () => {
   })
 })
 
+describe("record-parse child_session_id", () => {
+  test("#given a persisted record with child_session_id #when parsed #then the field round-trips", () => {
+    // given
+    const stored = persisted({ child_session_id: "01a0815e-3d9d-743a-8a5a-3a443aeb8f70" })
+
+    // when
+    const record = parseTaskRecord(stored, "record.json")
+
+    // then
+    expect(record.child_session_id).toBe("01a0815e-3d9d-743a-8a5a-3a443aeb8f70")
+  })
+
+  test("#given a legacy record without child_session_id #when parsed #then the record still loads", () => {
+    // given a record written before the field was persisted
+    const stored = persisted({})
+
+    // when
+    const record = parseTaskRecord(stored, "record.json")
+
+    // then the optional field stays absent rather than being invented or rejected
+    expect(record.task_id).toBe("st_1a2b3c4d")
+    expect(record.child_session_id).toBeUndefined()
+    expect("child_session_id" in record).toBe(false)
+  })
+})
+
 describe("record-parse task ordinals and background mode", () => {
   test("#given a persisted record with task_seq, config_generation and background_mode #when parsed #then all three round-trip exactly", () => {
     // given

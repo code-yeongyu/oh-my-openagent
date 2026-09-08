@@ -1,0 +1,22 @@
+{
+  "pass": true,
+  "replicaRoot": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/ghost-replica-RkUYff",
+  "results": [
+    {
+      "runId": "reflection-run-1",
+      "outcome": "failed"
+    }
+  ],
+  "launched": [
+    "reflection-run-2"
+  ],
+  "promotedActiveRunId": "reflection-run-2",
+  "healthySecondPass": [],
+  "retiredArtifactsPreserved": {
+    "ledger": true,
+    "final": true,
+    "prelaunch": true,
+    "runDirPresent": true
+  },
+  "repoHeadUnchanged": true
+}

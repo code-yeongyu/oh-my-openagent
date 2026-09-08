@@ -128,6 +128,18 @@ export function dagKeyHash(parentSessionId: string, runKey: string): string {
   return sha256(`${parentSessionId}\0${runKey}`)
 }
 
+// The state directory can vanish under a live session (git clean, rm -rf .omo, worktree teardown).
+// Every listing reads a missing directory as empty: it holds no runs, and the next write recreates it.
+// Only a present-but-unreadable directory is an error worth raising.
+export function readDagDirectory(directory: string): readonly fs.Dirent[] {
+  try {
+    return fs.readdirSync(directory, { withFileTypes: true })
+  } catch (error) {
+    if (hasCode(error, "ENOENT")) return []
+    throw error
+  }
+}
+
 export function createDagFileStore(config: DagStoreConfig, options: StoreOptions = {}): DagFileStore {
   const stateDir = resolveStateDir(config)
   const paths = createPaths(stateDir)
@@ -263,7 +275,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
     pruneExpired(pruneNow = now()) {
       const cutoff = pruneNow - retentionDays * 24 * 60 * 60 * 1000
       const pruned: DagRunId[] = []
-      for (const entry of fs.readdirSync(paths.runs, { withFileTypes: true })) {
+      for (const entry of readDagDirectory(paths.runs)) {
         if (!entry.isFile() || !entry.name.endsWith(".json")) continue
         const path = join(paths.runs, entry.name)
         const value = readJsonFile(path, entry.name.slice(0, -5) as DagRunId, now)
@@ -330,7 +342,7 @@ function writeCheckpointWithinSessionLimit(
       return
     }
     let runCount = 0
-    for (const entry of fs.readdirSync(paths.runs, { withFileTypes: true })) {
+    for (const entry of readDagDirectory(paths.runs)) {
       if (!entry.isFile() || !entry.name.endsWith(".json")) continue
       const existingRunId = entry.name.slice(0, -5) as DagRunId
       const existingPath = join(paths.runs, entry.name)
@@ -395,7 +407,7 @@ function inspectExistingEventLogs(
   recoveredPaths: Set<string>,
   now: () => number,
 ): void {
-  for (const entry of fs.readdirSync(paths.events, { withFileTypes: true })) {
+  for (const entry of readDagDirectory(paths.events)) {
     if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue
     const runId = entry.name.slice(0, -6) as DagRunId
     inspectEventLog(join(paths.events, entry.name), runId, diagnostics, recoveredPaths, now)
@@ -625,7 +637,7 @@ function publishLockExclusively(path: string, content: string, fsyncWrites: bool
   }
 }
 
-function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boolean {
+function tryCreateLock(path: string, content: string, fsyncWrites: boolean, recreateMissingDirectory = true): boolean {
   const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`
   let fd: number | undefined
   try {
@@ -638,6 +650,12 @@ function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boo
     return true
   } catch (error) {
     if (hasCode(error, "EEXIST")) return false
+    if (hasCode(error, "ENOENT") && recreateMissingDirectory) {
+      // The locks directory vanished under a live session: recreate it and retry exactly once, so a
+      // directory that keeps disappearing still surfaces as the ENOENT it is.
+      fs.mkdirSync(dirname(path), { recursive: true })
+      return tryCreateLock(path, content, fsyncWrites, false)
+    }
     if (hasCode(error, "EPERM") || hasCode(error, "EACCES")) {
       return publishLockExclusively(path, content, fsyncWrites)
     }
@@ -757,7 +775,7 @@ function pruneRunArtifacts(paths: DagStorePaths, checkpoint: RetentionCheckpoint
   fs.rmSync(join(paths.results, runId), { recursive: true, force: true })
   fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
   fs.rmSync(paths.runLock(runId), { force: true })
-  for (const entry of fs.readdirSync(paths.keys, { withFileTypes: true })) {
+  for (const entry of readDagDirectory(paths.keys)) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue
     const keyPath = join(paths.keys, entry.name)
     const value = readJsonFile(keyPath)
@@ -768,7 +786,7 @@ function pruneRunArtifacts(paths: DagStorePaths, checkpoint: RetentionCheckpoint
   for (const node of checkpoint.nodes ?? []) {
     if (node.taskId !== undefined) fs.rmSync(paths.taskOwnerLock(node.taskId), { force: true })
   }
-  for (const entry of fs.readdirSync(paths.locks, { withFileTypes: true })) {
+  for (const entry of readDagDirectory(paths.locks)) {
     if (!entry.isFile() || !entry.name.endsWith(".lock")) continue
     const lockPath = join(paths.locks, entry.name)
     try {

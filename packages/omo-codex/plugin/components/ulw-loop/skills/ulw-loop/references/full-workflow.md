@@ -198,7 +198,7 @@ omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --status complete --evidence
 omo-agent-toolkit ulw-loop complete-goals
 ```
 
-The lazycodex gate uses all five sections shown in the sample below, including `codeReview`.
+The lazycodex gate requires `manualQa`, `gateReview`, `iteration`, and `criteriaCoverage`; `codeReview` is optional. Self-review defaults to `main-session`, while gate review may use `main-session` or an approved `category:*` acceptor. Spawn reviewer lanes only when strict review is explicitly requested.
 
 ## Final Quality Gate
 Trigger only for the final aggregate goal after every criterion in every goal is `pass`.

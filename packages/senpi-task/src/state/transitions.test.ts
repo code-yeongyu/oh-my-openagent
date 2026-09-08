@@ -401,6 +401,7 @@ describe("transitionTaskRecord suspension residency", () => {
     const running: TaskRecord = {
       ...started,
       host_pid: 777,
+      child_session_id: "01a0815e-child-session",
       notification: { run_epoch: 3, notified_epoch: 1 },
     }
 
@@ -418,6 +419,7 @@ describe("transitionTaskRecord suspension residency", () => {
     expect("host_pid" in result.record).toBe(false)
     expect(result.record.pid).toBeUndefined()
     expect("pid" in result.record).toBe(false)
+    expect(result.record.child_session_id).toBe("01a0815e-child-session")
     expect(result.record.notification).toEqual({ run_epoch: 3, notified_epoch: 1 })
   })
 

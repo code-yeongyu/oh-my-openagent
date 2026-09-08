@@ -1,0 +1,38 @@
+{
+  "task": "11 prompts-core Verification gate trigger + regen",
+  "changed_files": [
+    "packages/prompts-core/prompts/ultrawork/codex.md",
+    "packages/omo-codex/plugin/components/ultrawork/src/directive-content.ts",
+    "packages/omo-codex/plugin/components/ulw-loop/directive.md"
+  ],
+  "red_proof": "Before editing origin/dev 7c1c66c61, awk '/^# Verification gate/{f=1} f && /^# / && !/^# Verification gate/{f=0} f' packages/prompts-core/prompts/ultrawork/codex.md | rg -c 'Tier is HEAVY' -> 1 (the old gate treated HEAVY as a trigger).",
+  "tests": [
+    "packages/omo-codex/plugin/components/ultrawork/test/directive-source.test.ts -> pending remote gate",
+    "packages/omo-codex/plugin/components/ultrawork/test/codex-hook-trigger-policy.test.ts -> pending remote gate",
+    "packages/omo-codex/plugin/components/ultrawork/test/codex-hook.test.ts -> pending remote gate",
+    "packages/omo-codex/plugin/components/ultrawork/test/skill-pointer.test.ts -> pending remote gate",
+    "bun test packages/omo-codex/plugin/components/ultrawork packages/prompts-core -> pending remote gate (not run locally per task prohibition)",
+    "tsgo --noEmit -p packages/omo-codex/tsconfig.json -> blocked locally: error TS2688 Cannot find type definition file for 'bun-types'"
+  ],
+  "manual_qa": [
+    ".omo/evidence/20260908-lcx-gate-softening/task-11-directive.log -> fresh ultrawork dist raw-pipe UserPromptSubmit with the full required payload emitted strict camelCase hookSpecificOutput.additionalContext pointing to /skills/ultrawork/SKILL.md; the identical required-field shape with prompt 'fix the bug' emitted 0-byte stdout; real ~/.codex/config.toml SHA-1 stayed b012e531f5aa9fb1bce9003593c3eadf07081fcd"
+  ],
+  "acceptance": [
+    "awk '/^# Verification gate/{f=1} f && /^# / && !/^# Verification gate/{f=0} f' packages/prompts-core/prompts/ultrawork/codex.md | rg -c 'Tier is HEAVY' -> no match, count 0",
+    "cmp -s packages/prompts-core/prompts/ultrawork/codex.md packages/omo-codex/plugin/components/ulw-loop/directive.md -> exit 0",
+    "node --input-type=module identity check -> source === ULTRAWORK_DIRECTIVE_TEXT === ulw-loop/directive.md",
+    "rg -n 'Verification gate' packages/omo-codex/plugin/skills/ultrawork/SKILL.md packages/omo-codex/plugin/components/ulw-loop/directive.md -> both generated artifacts contain 'TRIGGERED ONLY ON EXPLICIT DEMAND'",
+    "rg -c 'Tier is HEAVY' packages/omo-codex/plugin/skills/ultrawork/SKILL.md packages/omo-codex/plugin/components/ulw-loop/directive.md -> exit 1 with no matches",
+    "chosen approach: edit the canonical prompts-core source and regenerate with sync-directive.mjs, rather than hand-editing generated copies; this preserved byte identity and the generated skill/runtime surfaces"
+  ],
+  "cleanup": [
+    "cqa_cleanup -> isolated CODEX_HOME /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.9GiYEFYq30 REMOVED",
+    "rm -rf packages/omo-codex/plugin/components/ultrawork/node_modules packages/omo-codex/plugin/components/ultrawork/dist -> temporary build aliases and dist REMOVED",
+    "rm -rf packages/omo-codex/plugin/node_modules packages/omo-codex/plugin/components/ultrawork/dist -> earlier QA-created dependencies and dist REMOVED; final qa-temp-clean=PASS"
+  ],
+  "risks": [
+    "packages/shared-skills/upstreams/designpowers is dirty in the shared worktree outside todo 11; it was not touched or fixed",
+    "Local tsgo verification is blocked by the worktree's missing bun-types dependency; remote gate remains pending",
+    "Committed installer-bundle QA is deferred to todo 7 because todo 11 does not own the bundle"
+  ]
+}

@@ -298,6 +298,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     })),
     runSnapshots: () => snapshotsForActiveSession(manager, deps.engine),
     parentSessionId: () => deps.engine.runtime.sessionId(),
+    logger: deps.logger,
     ...(dagSettings?.heartbeat_ms === undefined ? {} : { heartbeatMs: dagSettings.heartbeat_ms }),
     ...(deps.bridgeTimers === undefined ? {} : { timers: deps.bridgeTimers }),
   })

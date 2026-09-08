@@ -1,0 +1,55 @@
+--- /Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-gate-softening/.agents/skills/codex-qa/scripts/lib/common.sh	2026-09-08 17:11:59
++++ /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/scripts/lib/common.sh	2026-09-08 22:56:06
+@@ -46,7 +46,7 @@
+   command -v codex 2>/dev/null
+ }
+ 
+-cqa_real_codex_home() { printf '%s' "${HOME}/.codex"; }
++cqa_real_codex_home() { printf '%s' "$CQA_PROTECTED_CONFIG_HOME"; }
+ 
+ # Snapshot the real ~/.codex/config.toml so we can prove QA never touched it.
+ cqa_guard_real_home() {
+@@ -75,7 +75,7 @@
+ # IMPORTANT: call this DIRECTLY, never via $(...). A subshell would discard the
+ # exports and the cleanup registration.
+ cqa_mk_isolated_home() {
+-  local root; root="$(mktemp -d -t cqa-home.XXXXXX)" || return 1
++  local root; root="$(mktemp -d "$TMPDIR/cqa-home.XXXXXX")" || return 1
+   CQA_TMPDIRS+=("$root")
+   # CODEX_HOME must EXIST before codex launches, or codex hard-errors.
+   mkdir -p "$root/codex" "$root/proj"
+@@ -92,18 +92,23 @@
+ # Start the local mock model server. Sets CQA_MOCK_PID + exports MOCK_PORT.
+ # Call DIRECTLY (not via $(...)) so the PID + export land in the caller.
+ cqa_start_mock() {
+-  local lib_dir log; lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-  log="$(mktemp -t cqa-mock.XXXXXX)"; CQA_TMPDIRS+=("$log")
+-  node "$lib_dir/mock-model.mjs" >"$log" 2>&1 &
++  local lib_dir fifo marker port extra
++  lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
++  fifo="$CQA_HOME_ROOT/mock-ready.fifo"
++  mkfifo "$fifo" || return 1
++  exec 9<> "$fifo"
++  node "$lib_dir/mock-model.mjs" > "$fifo" 2> "$CQA_HOME_ROOT/mock.stderr" &
+   CQA_MOCK_PID=$!; CQA_PIDS+=("$CQA_MOCK_PID")
+-  local i port=""
+-  for i in $(seq 1 100); do
+-    port="$(awk '/MOCK_LISTENING/{print $2; exit}' "$log" 2>/dev/null)"
+-    [ -n "$port" ] && break
+-    kill -0 "$CQA_MOCK_PID" 2>/dev/null || { cqa_log "mock model died:"; cat "$log" >&2; return 1; }
+-    sleep 0.1
+-  done
+-  [ -n "$port" ] || { cqa_log "mock model never reported a port"; return 1; }
++  if ! read -r -t 10 marker port extra <&9; then
++    exec 9>&-
++    cqa_fail "mock readiness event did not arrive within 10 seconds"
++    return 1
++  fi
++  exec 9>&-
++  if [ "$marker" != "MOCK_LISTENING" ] || [ -z "$port" ] || [ -n "$extra" ]; then
++    cqa_fail "invalid mock readiness event"
++    return 1
++  fi
+   export MOCK_PORT="$port"
+ }
+ 

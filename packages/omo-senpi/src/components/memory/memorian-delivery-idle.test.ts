@@ -168,7 +168,7 @@ describe("memorian delivery idle lifecycle", () => {
     expect(delivered).toHaveLength(1)
     expect(delivered[0]).toContain(NUDGE.hint)
     expect(delivered[0]).toContain("done")
-    expect(wakeEntry).toEqual({ version: 1, nudges: [NUDGE], via: "wake", opener: expect.any(String) })
+    expect(wakeEntry).toEqual({ version: 1, nudges: [NUDGE], via: "wake" })
     expect(coordinator.pendingCount()).toBe(0)
     expect(delivery.drainForPrompt(SESSION_ID, f.context)).toEqual([])
     await expect(f.pending.take(SESSION_ID, { currentEpoch: 0 })).resolves.toEqual([])

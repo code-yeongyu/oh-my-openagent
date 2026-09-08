@@ -1,50 +1,53 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
 import { X } from "lucide-react"
-import { Section } from "@/components/ui/section"
 import { Link } from "@/i18n/routing"
+import {
+  HEADING_CLASS,
+  LEAD_CLASS,
+  ManifestoSection,
+  PROSE_LIMIT,
+  RuledList,
+} from "@/components/manifesto/manifesto-section"
 
 export async function PainPointsSection(): Promise<JSX.Element> {
   const t = await getTranslations("manifesto")
   const painPointKeys = ["fixing", "syntax", "copyPasting", "reviewing"] as const
 
   return (
-    <Section data-section="manifesto-pain-points" className="mx-auto max-w-3xl">
-      <div className="space-y-12">
-        <div className="text-primary/90 border-primary/20 bg-primary/5 border-y py-8 text-center font-mono text-lg md:text-xl">
+    <ManifestoSection data-section="manifesto-pain-points" labelledBy="manifesto-why-different">
+      <div className={`${PROSE_LIMIT} space-y-10`}>
+        <p className="border-line bg-code-bg text-text-hi border px-4 py-4 font-mono text-sm leading-[1.55] tracking-[-0.01em] sm:px-6 sm:text-base">
           {t("bottleneck")}
-        </div>
+        </p>
 
-        <div className="prose prose-invert prose-lg max-w-none">
-          <p>{t("autonomousCar")}</p>
+        <p className={LEAD_CLASS}>{t("autonomousCar")}</p>
 
-          <h2 className="mt-8 mb-4 text-2xl font-bold">{t("whyDifferent")}</h2>
+        <h2 id="manifesto-why-different" className={HEADING_CLASS}>
+          {t("whyDifferent")}
+        </h2>
 
-          <p>{t("micromanagement")}</p>
+        <p className="text-text-mid leading-[1.6]">{t("micromanagement")}</p>
 
-          <ul className="my-6 list-none space-y-4 pl-0">
-            {painPointKeys.map((key) => (
-              <li key={key} className="flex items-start gap-3">
-                <span className="mt-1 text-red-500" aria-hidden="true">
-                  <X className="size-4" />
-                </span>
-                <span>{t(`painPoints.${key}`)}</span>
-              </li>
-            ))}
-          </ul>
+        <RuledList
+          icon={<X className="size-4" />}
+          items={painPointKeys.map((key) => ({ key, label: t(`painPoints.${key}`) }))}
+        />
 
-          <p className="my-8 border-l-4 border-red-500 bg-red-500/5 py-2 pl-6 text-xl font-semibold">
-            {t("notCollaboration")}
-          </p>
+        <p className="border-line-strong text-text-hi border-l-2 pl-6 text-xl leading-[1.35] font-medium tracking-[-0.01em]">
+          {t("notCollaboration")}
+        </p>
 
-          <p>
-            <Link href="/" className="text-primary underline-offset-4 hover:underline">
-              {t("premiseLinkText")}
-            </Link>{" "}
-            {t("premise", { linkText: "" })}
-          </p>
-        </div>
+        <p className="text-text-mid leading-[1.6]">
+          <Link
+            href="/"
+            className="text-accent underline-grow focus-visible:outline-accent-32 focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            {t("premiseLinkText")}
+          </Link>{" "}
+          {t("premise", { linkText: "" })}
+        </p>
       </div>
-    </Section>
+    </ManifestoSection>
   )
 }

@@ -1,0 +1,8 @@
+installing local omo into /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Dw6h9Rcd54/codex ...
+PASS: plugin cache present (5.0.0-beta.48)
+PASS: config.toml enables omo@sisyphuslabs
+PASS: component bins linked in sandbox (9 bins)
+PASS: agent TOMLs linked in sandbox
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+kept isolated home: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Dw6h9Rcd54/codex
+PASS: install-verify

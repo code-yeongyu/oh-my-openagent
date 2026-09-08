@@ -132,7 +132,7 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
     await dispatch(pi, eventContext([userEntry("m1", "anything at all")]))
 
     // then
-    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt", opener: expect.any(String) } }])
+    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } }])
   }, 30_000)
 
   test("#given a failing ledger #when a nudge is injected #then the injection still lands and the failure is logged", async () => {

@@ -1,3 +1,13 @@
+## 2026-09-08 — Regenerate task and member extensions for durable team linkage
+
+Regenerated `plugin/extensions/omo-task.js` and `omo-member.js` with the CI-pinned Bun 1.4.0 build. The shipped extensions now preserve team run, team name, member name, and member role on senpi-task records; the repository's extension freshness check passes.
+
+## 2026-09-08 — A bind superseded by session replacement is a skip, not a failure
+
+`logBindReconcileFailure` classifies senpi's retired-context error ("This extension ctx is stale after session replacement or reload.") the same way it already classifies reflection-lock contention: a recoverable `info` skip with `reason: "session replaced before the bind completed"`. Bind-time reconcile floats past `session_start` by design, so when the host replaces the session mid-bind it retires the ctx that bind was handed and the replacement session runs its own bind - nothing is lost and nothing needs operator attention. Genuinely unexpected errors keep `warn`.
+
+Observed live on omo-desktop (mengmotaHost, packaged runtime under `--mode rpc --multi-session`): every desktop restart that resumed a session logged `memory bind-time reconcile failed` or its downstream `memory reflection launch failed` with that message; the boot with zero resumed sessions was clean until the next session bound.
+
 ## 2026-09-08 — Run the bundled agent toolkit under Bun mode from the packaged binary
 
 `ulw-loop/omo-command.ts` spawns a `.js` toolkit entry through `process.execPath`. Under the packaged runtime (omo-desktop's compiled `omo`, omob) that path IS the omo binary, so without `BUN_BE_BUN` it ran its own embedded entrypoint with the toolkit path as a prompt: `ulw-loop status` exited 1 with `Unknown option: --json`, the hook logged `omo-senpi ulw-loop status ignored { reason: "non-zero-exit" }` on every input, and every desktop thread with a plan read as inactive so no continuation fired. The `.js` spawn target now carries `env: { ...process.env, BUN_BE_BUN: "1" }` (the same guard `lsp-daemon` gained in #7916); plain executables keep their inherited env.

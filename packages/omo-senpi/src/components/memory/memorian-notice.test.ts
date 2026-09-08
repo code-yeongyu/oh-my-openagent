@@ -44,31 +44,31 @@ describe("memorian gate notice", () => {
 })
 
 describe("memorian nudged recollection", () => {
-  test("#given a nudged record with an opener #when rendered #then the opener is the title", () => {
+  test("#given a nudged record #when rendered #then the title is the single Aha!", () => {
+    const component = renderMemorianNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], via: "steer" }), { expanded: false }, theme)
+    const rendered = component?.render(120).join("\n")
+    expect(rendered).toContain("✦ Aha!")
+    expect(rendered).toContain("just remembered: Use it.")
+    expect(rendered).toContain("a.md")
+  })
+
+  test("#given a nudged record from an opener-era producer #when rendered #then the stored opener is ignored for the unified title", () => {
     const component = renderMemorianNudgedEntry(
       entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], via: "steer", opener: "Come to think of it —" }),
       { expanded: false },
       theme,
     )
     const rendered = component?.render(120).join("\n")
-    expect(rendered).toContain("✦ Come to think of it —")
-    expect(rendered).not.toContain("Aha moment")
-    expect(rendered).toContain("just remembered: Use it.")
-    expect(rendered).toContain("a.md")
-  })
-
-  test("#given a nudged record without an opener #when rendered #then the default opener is the title", () => {
-    const component = renderMemorianNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], via: "steer" }), { expanded: false }, theme)
-    const rendered = component?.render(120).join("\n")
-    expect(rendered).toContain("✦ Oh, right —")
+    expect(rendered).toContain("✦ Aha!")
+    expect(rendered).not.toContain("Come to think of it")
     expect(rendered).toContain("just remembered: Use it.")
   })
 
-  test("#given an invalid opener #when rendered #then the notice still draws with the default opener", () => {
+  test("#given an invalid stored opener #when rendered #then the notice still draws the unified title", () => {
     for (const opener of ["x".repeat(41), "Oh,\u001b[31m right —", "two\nlines —", 7, ""]) {
       const component = renderMemorianNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], opener }), { expanded: false }, theme)
       const rendered = component?.render(120).join("\n")
-      expect(rendered).toContain("✦ Oh, right —")
+      expect(rendered).toContain("✦ Aha!")
       expect(rendered).toContain("just remembered: Use it.")
     }
   })

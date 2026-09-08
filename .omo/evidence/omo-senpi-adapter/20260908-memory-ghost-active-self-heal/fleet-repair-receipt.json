@@ -1,0 +1,22 @@
+{
+  "when": "2026-09-08T03:35Z..03:40Z (pre-repair) -> applied 2026-09-08 ~12:40 KST",
+  "scope": "mengmotaHost /Users/yeongyu/.omo/memory/agents (501 identities)",
+  "backupDir": "/Users/yeongyu/.omo/wedge-backup-20260908 (6.7MB: active.lock, scheduler locks, pending.json 64KB heads, manifest)",
+  "actions": {
+    "identitiesRepaired": 26,
+    "activeLockDeleted": 26,
+    "pendingJsonDeleted": 21,
+    "pendingTmpOrphansDeleted": 14,
+    "staleSchedulerLocksDeleted": 4,
+    "ghostWorktreesRemoved": 14,
+    "ghostBranchesDeleted": 14,
+    "freedApproxBytes": 1700000000,
+    "errors": 0,
+    "skippedLiveSessions": 0
+  },
+  "safety": [
+    "launcher pid liveness + ps-lstart process-identity comparison before every delete (recycled pids treated as dead)",
+    "identities with a live reflection-scheduler.lock holder were skipped (none were live)",
+    "pending.json drop is lossless: TranscriptJournal.captureReflectionSnapshot only stamps last_reflection_started_at; reflection cursors advance only in finalizeReflection, so unreflected conversations are re-captured by the next selector pass"
+  ]
+}

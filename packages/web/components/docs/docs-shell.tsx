@@ -1,70 +1,42 @@
 "use client"
 
 import * as React from "react"
-import { Menu, Search } from "lucide-react"
-import { Link } from "@/i18n/routing"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { DOC_SECTION_IDS, type DocSectionId } from "@/lib/docs-sections"
+import { ChevronDown } from "lucide-react"
+import { DocsSidebar, type DocsShellSection } from "@/components/docs/docs-sidebar"
+import { useDocsNavigation } from "@/components/docs/use-docs-navigation"
+import type { DocSectionId } from "@/lib/docs-sections"
+import { cn } from "@/lib/utils"
 
-type DocsShellSection = {
-  id: DocSectionId
-  title: string
+export type { DocsShellSection }
+
+export interface DocsShellProps {
+  /** Label for the sidebar disclosure (< lg) and the scroll region. */
+  readonly mobileHeader: string
+  readonly searchPlaceholder: string
+  readonly sections: readonly DocsShellSection[]
+  readonly children: React.ReactNode
 }
 
+/**
+ * DESIGN.md §4/§5 `fixed-sidenav-shell`: `16rem minmax(0,1fr)` at >= lg with
+ * `min-block-size: 0` on the grid and both children; the content column owns the scroll
+ * (`overflow: auto`, `min-inline-size: 0`) and the sidebar sits sticky in its column.
+ * Below lg the sidebar folds into a top disclosure (`grid-template-rows: 0fr -> 1fr`)
+ * and the document scrolls.
+ *
+ * The page shell already renders the document `<main>`, so the scroll owner here is a
+ * labelled `role="region"` (§8) rather than a second `<main>`.
+ */
 export function DocsShell({
   mobileHeader,
   searchPlaceholder,
   sections,
   children,
-}: {
-  mobileHeader: string
-  searchPlaceholder: string
-  sections: DocsShellSection[]
-  children: React.ReactNode
-}) {
+}: DocsShellProps): React.JSX.Element {
+  const scrollerRef = React.useRef<HTMLDivElement | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [activeSection, setActiveSection] = React.useState<DocSectionId>("overview")
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
-
-  const activeSectionRef = React.useRef<DocSectionId>("overview")
-
-  const findHashSectionId = React.useCallback((hash: string): DocSectionId | null => {
-    const id = hash.replace(/^#/, "")
-    return DOC_SECTION_IDS.find((sectionId) => sectionId === id) ?? null
-  }, [])
-
-  const scrollToSection = React.useCallback((id: DocSectionId, updateHash = true) => {
-    const element = document.getElementById(id)
-    if (!element) return
-
-    window.scrollTo({ top: element.offsetTop - 80, behavior: "auto" })
-    if (updateHash && window.location.hash !== `#${id}`) {
-      window.history.pushState(null, "", `#${id}`)
-    }
-
-    activeSectionRef.current = id
-    setActiveSection(id)
-    setIsMobileMenuOpen(false)
-  }, [])
-
-  React.useEffect(() => {
-    activeSectionRef.current = activeSection
-  }, [activeSection])
-
-  React.useEffect(() => {
-    const scrollToHashSection = () => {
-      const sectionId = findHashSectionId(window.location.hash)
-      if (!sectionId) return
-
-      window.requestAnimationFrame(() => scrollToSection(sectionId, false))
-    }
-
-    scrollToHashSection()
-    window.addEventListener("hashchange", scrollToHashSection)
-
-    return () => window.removeEventListener("hashchange", scrollToHashSection)
-  }, [findHashSectionId, scrollToSection])
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false)
+  const { activeSection, scrollToSection, handleInternalLinkClick } = useDocsNavigation(scrollerRef)
 
   const filteredSections = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -72,122 +44,65 @@ export function DocsShell({
     return sections.filter((section) => section.title.toLowerCase().includes(query))
   }, [searchQuery, sections])
 
-  React.useEffect(() => {
-    const sectionEls = DOC_SECTION_IDS.map((id) => document.getElementById(id))
-    let rafId: number | null = null
-
-    const handleScroll = () => {
-      if (rafId !== null) return
-
-      rafId = window.requestAnimationFrame(() => {
-        rafId = null
-
-        const scrollPosition = window.scrollY + 100
-        let nextActive: DocSectionId | null = null
-
-        for (let i = 0; i < sectionEls.length; i++) {
-          const el = sectionEls[i]
-          if (!el) continue
-          if (el.offsetTop <= scrollPosition && el.offsetTop + el.offsetHeight > scrollPosition) {
-            nextActive = el.id as DocSectionId
-            break
-          }
-        }
-
-        if (nextActive && nextActive !== activeSectionRef.current) {
-          activeSectionRef.current = nextActive
-          setActiveSection(nextActive)
-        }
-      })
-    }
-
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    handleScroll()
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll)
-      if (rafId !== null) window.cancelAnimationFrame(rafId)
-    }
-  }, [])
-
-  const handleDocsClick = (event: React.MouseEvent<HTMLElement>) => {
-    if (!(event.target instanceof Element)) return
-
-    const anchor = event.target.closest("a[href]")
-    if (!(anchor instanceof HTMLAnchorElement)) return
-
-    const sectionId = findHashSectionId(anchor.hash)
-    if (!sectionId) return
-
-    const href = anchor.getAttribute("href")
-    const isSamePath =
-      anchor.origin === window.location.origin && anchor.pathname === window.location.pathname
-    if (!href?.startsWith("#") && !isSamePath) return
-
-    event.preventDefault()
-    scrollToSection(sectionId)
-  }
+  const handleSelect = React.useCallback(
+    (id: DocSectionId) => {
+      scrollToSection(id)
+      setIsMenuOpen(false)
+    },
+    [scrollToSection],
+  )
 
   return (
-    <div className="bg-background text-foreground flex min-h-screen">
-      <div className="bg-background/95 fixed top-0 right-0 left-0 z-50 flex items-center justify-between border-b px-4 py-3 backdrop-blur md:hidden">
-        <Link href="/" className="font-bold">
-          {mobileHeader}
-        </Link>
-        <Button
-          variant="ghost"
-          size="icon"
+    <div className="mx-auto grid min-h-0 w-full max-w-[90rem] grid-cols-[minmax(0,1fr)] lg:h-[calc(100dvh-60px)] lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <aside className="border-line min-h-0 min-w-0 border-b lg:overflow-y-auto lg:border-r lg:border-b-0">
+        <button
           type="button"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          aria-label="Toggle sidebar menu"
+          aria-expanded={isMenuOpen}
+          aria-controls="docs-sidebar-panel"
+          onClick={() => setIsMenuOpen((open) => !open)}
+          className="text-text-hi focus-visible:outline-accent-32 ease-standard flex min-h-11 w-full items-center justify-between gap-3 px-4 text-sm font-medium transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-5 lg:hidden"
         >
-          <Menu className="h-5 w-5" />
-        </Button>
-      </div>
+          <span>{mobileHeader}</span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn(
+              "text-text-lo ease-standard size-4 shrink-0 transition-transform duration-[var(--dur-micro)] motion-reduce:transition-none",
+              isMenuOpen && "rotate-180",
+            )}
+          />
+        </button>
 
-      <aside
-        className={`bg-background fixed inset-y-0 left-0 z-40 w-64 transform border-r transition-transform duration-200 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} pt-16`}
-      >
-        <div className="flex h-full flex-col">
-          <div className="p-4">
-            <div className="relative">
-              <Search className="text-muted-foreground absolute top-2.5 left-2 h-4 w-4" />
-              <Input
-                placeholder={searchPlaceholder}
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
+        <div
+          id="docs-sidebar-panel"
+          data-open={isMenuOpen ? "true" : "false"}
+          className="ease-standard grid grid-rows-[0fr] transition-[grid-template-rows] duration-[var(--dur-underline)] data-[open=true]:grid-rows-[1fr] motion-reduce:transition-none lg:sticky lg:top-0 lg:grid-rows-[1fr]"
+        >
+          <div className="min-h-0 overflow-hidden lg:overflow-visible">
+            <DocsSidebar
+              sections={filteredSections}
+              activeSection={activeSection}
+              searchQuery={searchQuery}
+              searchPlaceholder={searchPlaceholder}
+              onSearchChange={setSearchQuery}
+              onSelect={handleSelect}
+              className="px-4 pt-4 pb-6 sm:px-5 lg:p-5"
+            />
           </div>
-          <nav className="flex-1 overflow-y-auto px-2 pb-4">
-            <ul className="space-y-1">
-              {filteredSections.map((section) => (
-                <li key={section.id}>
-                  <button
-                    type="button"
-                    onClick={() => scrollToSection(section.id)}
-                    className={`w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${
-                      activeSection === section.id
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    } `}
-                  >
-                    {section.title}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </nav>
         </div>
       </aside>
 
-      <main
-        className="flex-1 px-4 pt-20 pb-20 md:ml-64 md:px-8 md:pt-8"
-        onClickCapture={handleDocsClick}
+      <div
+        ref={scrollerRef}
+        role="region"
+        aria-label={mobileHeader}
+        tabIndex={0}
+        onClickCapture={handleInternalLinkClick}
+        className="focus-visible:outline-accent-32 min-h-0 min-w-0 focus-visible:outline-2 focus-visible:-outline-offset-2 lg:overflow-auto"
       >
-        <div className="mx-auto max-w-4xl space-y-12">{children}</div>
-      </main>
+        <div className="mx-auto w-full max-w-3xl px-4 pt-10 pb-24 sm:px-5 lg:px-8 lg:pt-12">
+          {children}
+        </div>
+      </div>
     </div>
   )
 }

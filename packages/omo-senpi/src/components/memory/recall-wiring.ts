@@ -28,7 +28,6 @@ import {
 import type { ComponentLogger } from "../../extension/types"
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
-import { createRecallOpenerPicker, type RecallOpenerPicker } from "./memorian-openers"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createRecallDrain, type PendingNudgesPort } from "./recall-drain"
 import {
@@ -79,8 +78,6 @@ export interface MemoryRecallWiringOptions {
    * matching the gate wiring's own default for an unknown session.
    */
   readonly currentCompactionEpoch?: (sessionId: string) => number
-  /** Shared opener picker; the prompt-path drain and the memorian delivery must draw from ONE per-session history. */
-  readonly openerPicker?: RecallOpenerPicker
   readonly logger?: ComponentLogger
 }
 
@@ -102,8 +99,6 @@ export interface CollectedRecallCandidates {
 }
 
 export interface MemoryRecallWiring {
-  /** The opener history the visible nudged records of this wiring draw from, per session. */
-  readonly openers: RecallOpenerPicker
   register(pi: MemoryExtensionAPI): void
   /** Settle-time seam: lexical candidates for the completed turn, or undefined when there are none. */
   collectCandidates(
@@ -134,14 +129,12 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
   const createRepo = options.createRepo ?? defaultCreateRepo
   const ledgerFor = options.ledgerFor ?? ((context) => new RecallLedger(context.identityPaths.recallLedger))
   const pendingFor = options.pendingFor ?? ((context) => new PendingNudges(context.identityPaths.recallPending))
-  const openers = options.openerPicker ?? createRecallOpenerPicker()
   const drain = createRecallDrain({
     resolveContext: options.resolveContext,
     resolveSettings: options.resolveSettings,
     env: options.env,
     ledgerFor,
     pendingFor,
-    pickOpener: (sessionId) => openers.pick(sessionId),
     ...(options.drainQueued === undefined ? {} : { drainQueued: options.drainQueued }),
     ...(options.currentCompactionEpoch === undefined ? {} : { currentCompactionEpoch: options.currentCompactionEpoch }),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
@@ -209,7 +202,6 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
   }
 
   return {
-    openers,
     register(pi): void {
       drain.register(pi)
     },

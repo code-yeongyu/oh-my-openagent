@@ -37,6 +37,11 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const description = readOptionalString(value, "description")
   const agentType = readOptionalString(value, "agent_type")
   const category = readOptionalString(value, "category")
+  const teamRunId = readOptionalString(value, "team_run_id")
+  const teamName = readOptionalString(value, "team_name")
+  const teamMemberName = readOptionalString(value, "team_member_name")
+  const teamRole = readOptionalString(value, "team_role")
+  if (teamRole !== undefined && teamRole !== "member") throw new Error("team_role must be member")
   const toolAllow = readOptionalStringArray(value, "tool_allow")
   const toolDeny = readOptionalStringArray(value, "tool_deny")
   const pid = readOptionalNumber(value, "pid")
@@ -84,6 +89,10 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(description === undefined ? {} : { description }),
     ...(agentType === undefined ? {} : { agent_type: agentType }),
     ...(category === undefined ? {} : { category }),
+    ...(teamRunId === undefined ? {} : { team_run_id: teamRunId }),
+    ...(teamName === undefined ? {} : { team_name: teamName }),
+    ...(teamMemberName === undefined ? {} : { team_member_name: teamMemberName }),
+    ...(teamRole === undefined ? {} : { team_role: teamRole }),
     ...(toolAllow === undefined ? {} : { tool_allow: toolAllow }),
     ...(toolDeny === undefined ? {} : { tool_deny: toolDeny }),
     ...(requestedModel === undefined ? {} : { requested_model: requestedModel }),

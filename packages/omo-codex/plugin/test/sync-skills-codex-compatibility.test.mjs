@@ -9,8 +9,12 @@ import { fileURLToPath } from "node:url";
 import { canonicalUltraworkDirectiveRelativePath } from "../scripts/canonical-ultrawork-directive.mjs";
 
 import {
+	applyCodexSkillOverlays,
 	codexHarnessToolCompatibility,
 	insertCodexCompatibilityGuidance,
+	reviewWorkAnchor,
+	ulwExecuteOriginalCompletion,
+	ulwExecuteOriginalHardRule,
 } from "../scripts/sync-skills.mjs";
 
 const frontmatter = "---\nname: fixture-sentinel\n---\n\n";
@@ -18,6 +22,7 @@ const opencodeExample = "# SENTINEL_SECTION\ntask(SENTINEL_INPUT)\n";
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repositoryRoot = join(pluginRoot, "..", "..");
 const opencodeToolPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
+const sharedSkillsRoot = join(repositoryRoot, "shared-skills", "skills");
 
 test("#given sentinel OpenCode tool content #when compatibility guidance is inserted #then the production artifact is placed after frontmatter and before the tool token", () => {
 	const input = `${frontmatter}${opencodeExample}`;
@@ -26,6 +31,23 @@ test("#given sentinel OpenCode tool content #when compatibility guidance is inse
 
 	assert.equal(actual, `${frontmatter}${codexHarnessToolCompatibility}${opencodeExample}`);
 	assert.ok(actual.indexOf(codexHarnessToolCompatibility) < actual.indexOf(opencodeExample));
+});
+
+test("#given shared skill source anchors #when Codex overlays are applied #then exact anchors transform and match the generated artifacts", async () => {
+	const ulwExecuteSource = await readFile(join(sharedSkillsRoot, "ulw-execute", "SKILL.md"), "utf8");
+	const reviewWorkSource = await readFile(join(sharedSkillsRoot, "review-work", "SKILL.md"), "utf8");
+
+	assert.ok(ulwExecuteSource.includes(ulwExecuteOriginalCompletion), "ulw-execute completion anchor drifted from shared source");
+	assert.ok(ulwExecuteSource.includes(ulwExecuteOriginalHardRule), "ulw-execute hard-rule anchor drifted from shared source");
+	assert.ok(reviewWorkSource.includes(reviewWorkAnchor), "review-work anchor drifted from shared source");
+
+	for (const [skillName, source] of [["ulw-execute", ulwExecuteSource], ["review-work", reviewWorkSource]]) {
+		const compatible = insertCodexCompatibilityGuidance(source);
+		const overlaid = applyCodexSkillOverlays(skillName, compatible);
+		assert.notEqual(overlaid, compatible, `${skillName} overlay must change the shared source`);
+		assert.equal(applyCodexSkillOverlays(skillName, overlaid), overlaid, `${skillName} overlay must be idempotent`);
+		assert.equal(await readFile(join(pluginRoot, "skills", skillName, "SKILL.md"), "utf8"), overlaid);
+	}
 });
 
 test("#given already transformed sentinel content #when compatibility guidance is inserted again #then the transform is idempotent", () => {
@@ -99,7 +121,7 @@ test("#given the aggregate sync implementation #when its skill adaptation pipeli
 
 	assert.match(
 		script,
-		/applyCodexSkillOverlays\(\s*skillName,\s*insertCodexCompatibilityGuidance\(content\),?\s*\)/,
+		/applyCodexSkillOverlays\(\s*skillName,\s*insertCodexCompatibilityGuidance\(content,\s*needsSpawnPayloadGuidance\),?\s*\)/,
 	);
 	assert.match(script, /await adaptSkillForCodex\(skillName\)/);
 });

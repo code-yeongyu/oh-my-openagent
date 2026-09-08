@@ -989,3 +989,32 @@ describe("createDagFileStore locks and retention", () => {
     expect(fs.existsSync(liveSkills)).toBe(true)
   })
 })
+
+describe("createDagFileStore state directory loss", () => {
+  test("#given the whole dag state directory vanished after the store opened #when a run lock and a checkpoint are written #then both recreate their directories", () => {
+    // given - a worktree cleanup (git clean, rm -rf .omo) removes the state dir while the session is live
+    const store = createDagFileStore({ project_dir: tempProject() })
+    fs.rmSync(store.paths.root, { recursive: true, force: true })
+
+    // when
+    const guarded = store.withRunLock(runId, () => "ran")
+    store.writeCheckpoint(runId, checkpoint())
+
+    // then
+    expect(guarded).toBe("ran")
+    expect(fs.existsSync(store.paths.locks)).toBe(true)
+    expect(store.readCheckpoint<{ readonly runId: DagRunId }>(runId)?.runId).toBe(runId)
+  })
+
+  test("#given the runs directory vanished after the store opened #when retention runs #then nothing is pruned and nothing throws", () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject() })
+    fs.rmSync(store.paths.runs, { recursive: true, force: true })
+
+    // when
+    const pruned = store.pruneExpired()
+
+    // then
+    expect(pruned).toEqual([])
+  })
+})

@@ -1110,3 +1110,20 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
     expect(rehomed?.parentSessionId).toBe(parentSessionId)
   })
 })
+
+describe("DAG recovery state directory loss", () => {
+  test("#given the runs directory vanished after the store opened #when shutdown pauses and startup resumes runs #then recovery sees no runs instead of an ENOENT crash", async () => {
+    // given - a worktree cleanup (git clean, rm -rf .omo) removes the state dir while the session is live
+    const store = createDagFileStore({ project_dir: tempProject() })
+    fs.rmSync(store.paths.runs, { recursive: true, force: true })
+    const recovery = createDagRecovery({ store, taskManager: new RecoveryTaskManager(), hostPid: 101 })
+
+    // when
+    const paused = recovery.pauseRunsForShutdown(parentSessionId)
+    const outcomes = await recovery.resumePausedRuns(parentSessionId)
+
+    // then
+    expect(paused).toEqual([])
+    expect(outcomes).toEqual([])
+  })
+})

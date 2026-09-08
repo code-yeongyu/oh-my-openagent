@@ -10,7 +10,7 @@ const MEMORIAN_NUDGE_DESCRIPTION =
 
 export const MemorianNudgeParams = Type.Object({
   path: Type.String({ description: "Memory path copied exactly from the candidates input." }),
-  hint: Type.String({ description: "One factual sentence, at most 200 characters, on a single line. State the memory fact, not a judgment about whether to nudge." }),
+  hint: Type.String({ description: "One factual sentence carrying the useful information from the memory, at most 200 characters, on a single line. State the fact itself, not a judgment about whether to nudge, and never filler such as 'placeholder'." }),
 }, { additionalProperties: false })
 
 export interface MemorianNudgeToolInput {

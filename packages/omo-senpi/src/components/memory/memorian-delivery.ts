@@ -5,7 +5,6 @@ import type { ComponentLogger } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import { GATE_SURFACE_HASH } from "./recall-drain"
 import { NUDGED_ENTRY_TYPE, type MemorianNudgedRecord } from "./memorian-notice"
-import { createRecallOpenerPicker } from "./memorian-openers"
 import { RECALL_CUSTOM_TYPE } from "./recall-session-read"
 
 export interface MemorianDeliveryOptions {
@@ -17,9 +16,6 @@ export interface MemorianDeliveryOptions {
     options: { readonly deliverAs: "steer" },
   ) => unknown
   readonly appendEntry: (customType: string, data: unknown) => void
-  /** Opener for the visible nudged record; defaults to a picker private to this delivery. */
-  readonly pickOpener?: (sessionId: string) => string
-  readonly forgetOpener?: (sessionId: string) => void
   readonly logger?: ComponentLogger
 }
 
@@ -43,9 +39,6 @@ interface DeliveryState {
 
 export function createMemorianDelivery(options: MemorianDeliveryOptions): MemorianDelivery {
   const sessions = new Map<string, DeliveryState>()
-  const fallbackPicker = createRecallOpenerPicker()
-  const pickOpener = options.pickOpener ?? ((sessionId: string) => fallbackPicker.pick(sessionId))
-  const forgetOpener = options.forgetOpener ?? ((sessionId: string) => fallbackPicker.forget(sessionId))
   const runningSessions = new Set<string>()
 
   function stateFor(sessionId: string): DeliveryState {
@@ -149,7 +142,6 @@ export function createMemorianDelivery(options: MemorianDeliveryOptions): Memori
   }
 
   function onSessionShutdown(sessionId: string): void {
-    forgetOpener(sessionId)
     runningSessions.delete(sessionId)
     const state = sessions.get(sessionId)
     if (state === undefined) return
@@ -177,7 +169,7 @@ export function createMemorianDelivery(options: MemorianDeliveryOptions): Memori
       warn("omo-senpi memorian pending rewrite skipped", { sessionId, error })
     }
     try {
-      options.appendEntry(NUDGED_ENTRY_TYPE, { version: 1, nudges: delivered, via, opener: pickOpener(sessionId) } satisfies MemorianNudgedRecord)
+      options.appendEntry(NUDGED_ENTRY_TYPE, { version: 1, nudges: delivered, via } satisfies MemorianNudgedRecord)
     } catch (error) {
       warn("omo-senpi memorian nudged entry skipped", { sessionId, error })
     }

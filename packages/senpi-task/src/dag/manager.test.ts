@@ -432,6 +432,19 @@ describe("createDagManager list", () => {
     expect(clamped).toHaveLength(3)
     expect(() => dag.list(parentSessionId, { limit: 0 })).toThrow(DagManagerError)
   })
+
+  test("#given the runs directory vanished after the store opened #when listed #then the session has no runs instead of an ENOENT crash", async () => {
+    // given - a worktree cleanup (git clean, rm -rf .omo) removes the state dir while the session is live
+    const { store, dag } = manager(tempProject())
+    await dag.start({ definition: definition(), parentSessionId, rootSessionId })
+    fs.rmSync(store.paths.runs, { recursive: true, force: true })
+
+    // when
+    const listed = dag.list(parentSessionId)
+
+    // then
+    expect(listed).toEqual([])
+  })
 })
 
 describe("createDagManager amend", () => {

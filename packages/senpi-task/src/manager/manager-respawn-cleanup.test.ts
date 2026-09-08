@@ -491,6 +491,7 @@ describe("TaskManager guarded reattach", () => {
     expect(store.load(record.task_id)).toMatchObject({
       status: "running",
       notification: { run_epoch: 5, notified_epoch: 3 },
+      child_session_id: `sess-${record.task_id}`,
     })
     expect(store.load(record.task_id)?.error_message).toBeUndefined()
     expect(store.load(record.task_id)?.final_response).toBeUndefined()

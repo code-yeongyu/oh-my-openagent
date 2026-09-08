@@ -11,7 +11,6 @@ import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
 import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, renderMemorianGateEntry, renderMemorianNudgedEntry, type MemorianNudgedRecord } from "./memorian-notice"
-import { createRecallOpenerPicker } from "./memorian-openers"
 import { renderRecallEntry } from "./recall-notice"
 import { RECALL_CUSTOM_TYPE, readSession } from "./recall-session-read"
 
@@ -34,8 +33,6 @@ export interface RecallDrainOptions {
    * matching the gate wiring's own default for an unknown session.
    */
   readonly currentCompactionEpoch?: (sessionId: string) => number
-  /** Opener for the visible prompt-path record; defaults to a picker private to this drain. */
-  readonly pickOpener?: (sessionId: string) => string
   readonly logger?: ComponentLogger
 }
 
@@ -56,9 +53,6 @@ const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as con
 export const GATE_SURFACE_HASH = "memorian-gate"
 
 export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
-  const fallbackPicker = createRecallOpenerPicker()
-  const pickOpener = options.pickOpener ?? ((sessionId: string) => fallbackPicker.pick(sessionId))
-
   /** Drain the gate's pending nudges for this turn. Returns undefined when there is nothing to say. */
   async function inject(payload: unknown, eventCtx: unknown): Promise<RecallInjection | undefined> {
     if (!isBeforeAgentStart(payload)) return undefined
@@ -132,7 +126,6 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
               version: 1,
               nudges: injection.nudges.map(({ path, hint }) => ({ path, hint })),
               via: "prompt",
-              opener: pickOpener(injection.sessionId),
             } satisfies MemorianNudgedRecord)
           } catch (error) {
             // Fail-open: the visible trace is bookkeeping - its failure must never suppress a

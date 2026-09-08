@@ -2,18 +2,22 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable, Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { PreToolUsePayload } from "../src/codex-hook.ts";
-import { applySpawnGuards } from "../src/spawn-guard.ts";
+import { applySpawnGuards, DEFAULT_FANOUT_LIMIT, runSpawnAdmissionRecorderCli } from "../src/spawn-guard.ts";
 
 let workDir: string;
 let originalLimit: string | undefined;
 let originalReviewLimit: string | undefined;
 let originalToolkitSurface: string | undefined;
+let originalPluginData: string | undefined;
 
 beforeEach(async () => {
 	workDir = await mkdtemp(join(tmpdir(), "ulw-spawn-guard-"));
+	originalPluginData = process.env["PLUGIN_DATA"];
+	process.env["PLUGIN_DATA"] = join(workDir, "plugin-data");
 	originalLimit = process.env["OMO_SPAWN_FANOUT_LIMIT"];
 	originalReviewLimit = process.env["OMO_ULW_LOOP_REVIEW_SPAWN_LIMIT"];
 	originalToolkitSurface = process.env["OMO_AGENT_TOOLKIT_SURFACE"];
@@ -30,6 +34,8 @@ afterEach(async () => {
 	else process.env["OMO_ULW_LOOP_REVIEW_SPAWN_LIMIT"] = originalReviewLimit;
 	if (originalToolkitSurface === undefined) delete process.env["OMO_AGENT_TOOLKIT_SURFACE"];
 	else process.env["OMO_AGENT_TOOLKIT_SURFACE"] = originalToolkitSurface;
+	if (originalPluginData === undefined) delete process.env["PLUGIN_DATA"];
+	else process.env["PLUGIN_DATA"] = originalPluginData;
 	await rm(workDir, { recursive: true, force: true });
 });
 
@@ -98,7 +104,66 @@ function deny(output: string): { permissionDecision: string; permissionDecisionR
 	return JSON.parse(output).hookSpecificOutput;
 }
 
+describe("spawn admission breaker", () => {
+	async function record(response: unknown): Promise<string> {
+		let output = "";
+		const stdout = new Writable({
+			write(chunk, _encoding, callback) {
+				output += chunk.toString();
+				callback();
+			},
+		});
+		await runSpawnAdmissionRecorderCli(
+			Readable.from([
+				JSON.stringify({
+					...payload("spawn_agent", { message: "scan" }),
+					hook_event_name: "PostToolUse",
+					tool_response: response,
+				}),
+			]),
+			stdout,
+		);
+		return output;
+	}
+
+	it.each(["too many active cells", "AgentLimitReached", "max_threads", "max_concurrent_threads_per_session"])(
+		"records %s silently and denies without a plan while isolating other sessions",
+		async (reason) => {
+			expect(await record(reason)).toBe("");
+			const marker = JSON.parse(readFileSync(join(workDir, "plugin-data", "spawn-breaker", "s1.json"), "utf8"));
+			expect(Object.keys(marker).sort()).toEqual(["at", "reason"]);
+			expect(marker.reason).toBe(reason);
+			expect(Number.isFinite(Date.parse(marker.at))).toBe(true);
+			expect(deny(applySpawnGuards(payload("spawn_agent", {}))).permissionDecision).toBe("deny");
+			expect(applySpawnGuards({ ...payload("spawn_agent", {}), session_id: "clean" })).toBe("");
+		},
+	);
+
+	it("does not record a successful admission", async () => {
+		expect(await record({ agent_id: "worker-1" })).toBe("");
+		expect(existsSync(join(workDir, "plugin-data", "spawn-breaker", "s1.json"))).toBe(false);
+	});
+
+	it("denies before artifact, quota, and state lock guards", async () => {
+		writeGoals();
+		writeFileSync(
+			join(sessionDir(), ".state.lock"),
+			JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString(), token: "live" }),
+		);
+		await record("AgentLimitReached");
+		const output = deny(
+			applySpawnGuards(payload("spawn_agent", { agent_type: "lazycodex-gate-reviewer" }), { lockTimeoutMs: 0 }),
+		);
+		expect(output.permissionDecisionReason).toContain("AgentLimitReached");
+		expect(existsSync(join(sessionDir(), "spawn-count.json"))).toBe(false);
+		expect(existsSync(join(sessionDir(), "review-spawn-counts.json"))).toBe(false);
+	});
+});
+
 describe("applySpawnGuards fan-out cap", () => {
+	it("defaults to 24 spawns", () => {
+		expect(DEFAULT_FANOUT_LIMIT).toBe(24);
+	});
 	it("#given spawns under the limit #when guarded #then allows and counts", () => {
 		writeGoals();
 
@@ -251,7 +316,7 @@ describe("applySpawnGuards gate-artifact guard", () => {
 		);
 
 		expect(output).not.toBe("");
-		expect(deny(output).permissionDecisionReason).toContain("g1-code-review.md");
+		expect(deny(output).permissionDecisionReason).toContain("g1-manual-qa.md");
 		expect(existsSync(join(sessionDir(), "review-spawn-counts.json"))).toBe(false);
 	});
 
@@ -265,7 +330,7 @@ describe("applySpawnGuards gate-artifact guard", () => {
 		const parsed = deny(output);
 		expect(parsed.permissionDecision).toBe("deny");
 		expect(parsed.permissionDecisionReason).toContain("missing");
-		expect(parsed.permissionDecisionReason).toContain("g1-code-review.md");
+		expect(parsed.permissionDecisionReason).toContain("g1-manual-qa.md");
 	});
 
 	it("#given senpi main-session QA is present but code review is absent #when the gate reviewer spawns #then the self-check allows it", () => {
@@ -366,10 +431,9 @@ describe("applySpawnGuards gate-artifact guard", () => {
 		expect(counters["lazycodex-code-reviewer:g1:a1"]).toBeUndefined();
 	});
 
-	it("#given v1 artifacts on disk #when the gate spawns #then allows", () => {
+	it("#given only v1 manual QA on disk #when the gate spawns #then allows", () => {
 		writeGoals();
 		mkdirSync(join(workDir, ".omo", "evidence"), { recursive: true });
-		writeFileSync(join(workDir, ".omo", "evidence", "g1-code-review.md"), "report\n");
 		writeFileSync(join(workDir, ".omo", "evidence", "g1-manual-qa.md"), "matrix\n");
 
 		const output = applySpawnGuards(
@@ -388,14 +452,13 @@ describe("applySpawnGuards gate-artifact guard", () => {
 			payload("spawn_agent", { agent_type: "lazycodex-gate-reviewer", message: "final gate review" }),
 		);
 
-		expect(deny(output).permissionDecisionReason).toContain(".omo/evidence/ulw/s1/g1/a1/g1-code-review.md");
+		expect(deny(output).permissionDecisionReason).toContain(".omo/evidence/ulw/s1/g1/a1/g1-manual-qa.md");
 	});
 
 	it("#given a v2 plan with attempt-dir artifacts #when the gate spawns #then allows", () => {
 		writeGoals({ evidenceLayoutVersion: 2 });
 		const attemptDir = join(workDir, ".omo", "evidence", "ulw", "s1", "g1", "a1");
 		mkdirSync(attemptDir, { recursive: true });
-		writeFileSync(join(attemptDir, "g1-code-review.md"), "report\n");
 		writeFileSync(join(attemptDir, "g1-manual-qa.md"), "matrix\n");
 
 		const output = applySpawnGuards(

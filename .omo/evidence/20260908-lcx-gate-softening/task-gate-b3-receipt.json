@@ -1,0 +1,176 @@
+{
+  "taskId": "st_01a0810a",
+  "branch": "lcx/gate-softening",
+  "commit": "eeeb3287e3af75148ecd3318800610a5e814af4a",
+  "primary": "mengmotaMac",
+  "fallback": "gorky",
+  "fallbackUsed": false,
+  "gates": [
+    {
+      "id": "a",
+      "name": "ulw-loop",
+      "command": "bun --cwd packages/omo-codex/plugin/components/ulw-loop test",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " Test Files  54 passed (54)",
+        "      Tests  547 passed (547)"
+      ]
+    },
+    {
+      "id": "b",
+      "name": "ultrawork",
+      "command": "bun --cwd packages/omo-codex/plugin/components/ultrawork test",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " Test Files  5 passed (5)",
+        "      Tests  24 passed (24)"
+      ]
+    },
+    {
+      "id": "c",
+      "name": "ulw-execute-continuation",
+      "command": "bun --cwd packages/omo-codex/plugin/components/ulw-execute-continuation test",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " Test Files  3 passed (3)",
+        "      Tests  43 passed (43)"
+      ]
+    },
+    {
+      "id": "d",
+      "name": "plugin Node tests",
+      "command": "cd packages/omo-codex/plugin && node --test test/*.test.mjs && cd ../../..",
+      "exitCode": 1,
+      "shellExit": 0,
+      "counts": [
+        "ℹ tests 327",
+        "ℹ suites 0",
+        "ℹ pass 325",
+        "ℹ fail 2",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ]
+    },
+    {
+      "id": "e",
+      "name": "prompts-core and installer freshness",
+      "command": "bun test ./packages/prompts-core ./script/codex-install-bundle-freshness.test.ts",
+      "exitCode": 0,
+      "shellExit": 0,
+      "counts": [
+        " 28 pass",
+        " 0 fail",
+        " 43 expect() calls",
+        "Ran 28 tests across 6 files. [1.52s]"
+      ]
+    },
+    {
+      "id": "f",
+      "name": "test:codex",
+      "command": "bun run test:codex",
+      "exitCode": 1,
+      "shellExit": 0,
+      "counts": [
+        " Test Files  25 passed (25)",
+        "      Tests  97 passed (97)",
+        " Test Files  54 passed (54)",
+        "      Tests  547 passed (547)",
+        " 418 pass",
+        " 1 skip",
+        " 0 fail",
+        " 1276 expect() calls",
+        "Ran 419 tests across 66 files. [26.62s]",
+        "ℹ tests 486",
+        "ℹ suites 0",
+        "ℹ pass 485",
+        "ℹ fail 1",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ]
+    }
+  ],
+  "startedAt": "2026-09-08T12:34:12.937Z",
+  "transcript": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-gate-softening/.omo/evidence/20260908-lcx-gate-softening/task-gate-b-remote-tests.log",
+  "machine": "mengmotaMac",
+  "setupExit": 0,
+  "remoteHead": "eeeb3287e3af75148ecd3318800610a5e814af4a",
+  "cleanup": {
+    "exitCode": 0,
+    "stdout": "CLEANUP_EXIT=0\nREMOVAL_RECEIPT: /tmp/lcx-gate-b3-20260908 REMOVED\n",
+    "stderr": ""
+  },
+  "finishedAt": "2026-09-08T12:38:32.809Z",
+  "allGatesPassed": false,
+  "cleanupAttempts": [
+    {
+      "exitCode": 124,
+      "stdout": "",
+      "stderr": "bunshin-exec: line 2: 12366 Terminated: 15          bash -c 'cd /tmp || exit $?\nrm -rf '\\''/tmp/lcx-gate-b3-20260908'\\''\nrc=$?; echo CLEANUP_EXIT=$rc\nif [[ $rc == 0 && ! -e '\\''/tmp/lcx-gate-b3-20260908'\\'' ]]; then echo '\\''REMOVAL_RECEIPT: /tmp/lcx-gate-b3-20260908 REMOVED'\\''; else echo '\\''REMOVAL_RECEIPT: FAILED'\\''; exit 1; fi'\n"
+    },
+    {
+      "exitCode": 0,
+      "stdout": "CLEANUP_EXIT=0\nREMOVAL_RECEIPT: /tmp/lcx-gate-b3-20260908 REMOVED\n",
+      "stderr": ""
+    }
+  ],
+  "localVerification": {
+    "bunVersion": "1.4.0",
+    "installerBuildExit": 0,
+    "installerTreeUnchanged": true,
+    "requestedPluginBuildExit": 0,
+    "requestedPluginBuildNote": "bun --cwd packages/omo-codex/plugin run build printed help only; ran the repository-declared argument order as well.",
+    "actualPluginBuildCommand": "bun run --cwd packages/omo-codex/plugin build",
+    "actualPluginBuildExit": 0,
+    "tsgoCommand": "tsgo --noEmit -p packages/omo-codex/tsconfig.json",
+    "tsgoExit": 0,
+    "checkpointFinalDiagnostics": "No diagnostics found",
+    "head": "eeeb3287e3af75148ecd3318800610a5e814af4a",
+    "originHead": "eeeb3287e3af75148ecd3318800610a5e814af4a",
+    "commitsOverOriginDev": 11,
+    "gitStatusPorcelain": "",
+    "testExitLineCount": 6,
+    "testExits": [
+      0,
+      0,
+      0,
+      1,
+      0,
+      1
+    ]
+  },
+  "scope": "Committed only checkpoint-final.test.ts and its two task-8 evidence updates; no product-source edits. New gate evidence remains ignored to preserve the requested clean tree and 11-commit history.",
+  "limitations": [
+    "First attempt failed in the temporary capture driver: ReadLimitError: read limitBytes 33554432 exceeds the 10485760-byte ceiling; read in chunks instead. The first gate result was not saved before cleanup. Prior capture transcript and receipt are preserved separately; the complete captured run used the corrected 10 MiB limit.",
+    "Initial final cleanup timed out with exit 124 after 30 seconds; the same scoped deletion completed with a 300-second budget. Both attempts are preserved.",
+    "mengmotaMac was the requested primary; gorky remained the unused availability fallback. This was not a fleet fanout.",
+    "Requested Plan footer was included verbatim; the referenced plan is not present in this worktree."
+  ],
+  "failures": [
+    {
+      "gate": "d",
+      "file": "packages/omo-codex/plugin/test/component-bundled-cli.test.mjs:49:1",
+      "assertion": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+      "actual": [
+        "ulw-loop: ./cli-commands.js",
+        "ulw-loop: ./cli-output.js",
+        "ulw-loop: ./codex-hook.js",
+        "ulw-loop: ./spawn-guard.js",
+        "ulw-loop: ./stop-resume-hook.js"
+      ],
+      "expected": []
+    },
+    {
+      "gates": [
+        "d",
+        "f"
+      ],
+      "file": "packages/omo-codex/plugin/test/sync-skills.test.mjs:104:1",
+      "assertion": "AssertionError [ERR_ASSERTION]: review-work drifted from shared-skills"
+    }
+  ]
+}

@@ -29,8 +29,8 @@ export function OgTagline({ text }: { readonly text: string }) {
         overflow: "hidden",
         fontFamily: "Geist",
         fontWeight: 500,
-        fontSize: 48,
-        lineHeight: 1.12,
+        fontSize: 54,
+        lineHeight: 1.08,
         letterSpacing: -1.6,
         color: ogPalette.textHi,
       }}

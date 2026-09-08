@@ -1,0 +1,3 @@
+gate-review fix round 2 (2026-09-08): the ghost-owned prelaunch cleanup now inspects the ReflectionCleanupReceipt from discardReflectionWorktree — the prelaunch file is removed only when BOTH worktreeRemoved and branchRemoved are true; an incomplete discard (e.g. a locked worktree whose registration survives) preserves prelaunch.json and surfaces as cleanupError while the ghost still completes as failed. Regression: run-reconciliation-ghost.test.ts locked-worktree case asserts prelaunch preserved + registration still listed + cleanupError. Verified: ghost 10/10, worker 245/245, tsgo clean.
+
+Superseded: after rebasing onto dev d69e67401 the prelaunch-cleanup lane this note refers to was removed entirely (dev's policy: retired artifacts are never touched).

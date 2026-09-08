@@ -53,6 +53,7 @@ Recovery resolves the newest owned task before consulting the checkpoint's `task
 - NEVER put activity events or journal seq/lane metadata into boundary builders.
 - Missing skills never fail a run; they become `missing_skill` diagnostics. Resumed runs read creation-time materialization, never current `SKILL.md`.
 - Wait surfaces resolve (not reject) failed/cancelled runs; callers inspect `DagRunResult`.
+- A vanished `<stateDir>/dag/*` directory (worktree cleanup, `rm -rf .omo`) reads as empty through `readDagDirectory` and is recreated by the next checkpoint/event/lock write; it must never surface as an ENOENT from `list`, retention, or recovery. The omo-senpi rpc bridge additionally treats any store read fault on its timer paths as "nothing to publish" (one warning per distinct fault), because a throw there is an `uncaughtException` that ends the session.
 
 ## QA
 

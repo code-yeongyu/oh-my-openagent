@@ -9,7 +9,6 @@ import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordin
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { createMemoryBinding } from "./binding"
 import { createMemorianDelivery } from "./memorian-delivery"
-import { RECALL_OPENERS } from "./memorian-openers"
 
 const SESSION_ID = "delivery-session"
 const NUDGE: RecallNudge = { path: "reference/rollouts.md", hint: "Drain nodes before rollout." }
@@ -43,10 +42,6 @@ function pendingPath(context: MemoryIdentityContext): string {
   return join(context.identityPaths.recallPending, `${SESSION_ID}.json`)
 }
 
-function isRecordWithOpener(value: unknown): value is { readonly opener: unknown } {
-  return value !== null && typeof value === "object" && "opener" in value
-}
-
 describe("createMemorianDelivery", () => {
   test("#given accepted nudges #when accepted #then ledger is surfaced and pending lists every path", async () => {
     const f = await fixture()
@@ -61,45 +56,19 @@ describe("createMemorianDelivery", () => {
     const f = await fixture()
     const calls: unknown[] = []
     const coordinator = new IdleInjectionCoordinator(() => undefined)
-    const picked: string[] = []
     const delivery = createMemorianDelivery({
       ledgerFor: () => f.ledger,
       pendingFor: () => f.pending,
       coordinator,
       sendMessage: (message, options) => calls.push({ message, options }),
       appendEntry: (...entry) => calls.push(entry),
-      pickOpener: (sessionId) => { picked.push(sessionId); return "Come to think of it —" },
     })
     await delivery.accept(SESSION_ID, f.context, [NUDGE], 0)
     await delivery.onToolResult(SESSION_ID, f.context, { hasPendingMessages: () => false, isIdle: () => false })
     expect(calls).toHaveLength(2)
     expect(calls[0]).toEqual({ message: { customType: "omo-memorian:recall", content: expect.stringContaining("Drain nodes before rollout."), display: false }, options: { deliverAs: "steer" } })
-    expect(calls[1]).toEqual(["omo-memorian:nudged", { version: 1, nudges: [NUDGE], via: "steer", opener: "Come to think of it —" }])
-    expect(picked).toEqual([SESSION_ID])
+    expect(calls[1]).toEqual(["omo-memorian:nudged", { version: 1, nudges: [NUDGE], via: "steer" }])
     await expect(f.pending.take(SESSION_ID, { currentEpoch: 0 })).resolves.toEqual([])
-  })
-
-  test("#given no injected picker #when two deliveries land in one session #then each record carries a pool opener and they differ", async () => {
-    const f = await fixture()
-    const records: unknown[] = []
-    const delivery = createMemorianDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, sendMessage: () => undefined, appendEntry: (_type, data) => records.push(data) })
-    await delivery.accept(SESSION_ID, f.context, [NUDGE], 0)
-    await delivery.onToolResult(SESSION_ID, f.context, { hasPendingMessages: () => false, isIdle: () => false })
-    await delivery.accept(SESSION_ID, f.context, [{ path: "notes/checklist.md", hint: "Check the deployment." }], 0)
-    await delivery.onToolResult(SESSION_ID, f.context, { hasPendingMessages: () => false, isIdle: () => false })
-    expect(records).toHaveLength(2)
-    const openers = records.map((record) => (isRecordWithOpener(record) ? record.opener : undefined))
-    expect(openers.every((opener) => typeof opener === "string" && RECALL_OPENERS.includes(opener))).toBe(true)
-    expect(openers[0]).not.toBe(openers[1])
-  })
-
-  test("#given a session that shut down #when a picker is shared #then its opener history is forgotten", async () => {
-    const f = await fixture()
-    const forgotten: string[] = []
-    const delivery = createMemorianDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, sendMessage: () => undefined, appendEntry: () => undefined, pickOpener: () => "Come to think of it —", forgetOpener: (sessionId) => forgotten.push(sessionId) })
-    await delivery.accept(SESSION_ID, f.context, [NUDGE], 0)
-    delivery.onSessionShutdown(SESSION_ID)
-    expect(forgotten).toEqual([SESSION_ID])
   })
 
   test("#given pending host messages #when tool_result fires #then it stays silent and intact", async () => {

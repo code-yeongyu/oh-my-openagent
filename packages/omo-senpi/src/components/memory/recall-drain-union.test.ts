@@ -24,7 +24,6 @@ async function setup(tempDirs: string[], options: {
   readonly take?: () => Promise<typeof NUDGE[]>
   readonly logs?: Array<{ message: string; details?: unknown }>
   readonly drainQueued?: () => typeof NUDGE[]
-  readonly pickOpener?: (sessionId: string) => string
 } = {}) {
   const { context } = await fixture(tempDirs)
   const pending = new PendingNudges(context.identityPaths.recallPending)
@@ -41,7 +40,6 @@ async function setup(tempDirs: string[], options: {
     ...(options.drainQueued === undefined
       ? queued === undefined ? {} : { drainQueued: () => [...queued] }
       : { drainQueued: options.drainQueued }),
-    ...(options.pickOpener === undefined ? {} : { pickOpener: options.pickOpener }),
     logger: {
       info: (message, details) => logs.push({ message, details }),
       warn: (message, details) => logs.push({ message, details }),
@@ -71,20 +69,8 @@ describe("recall prompt-drain union", () => {
 
     expect(result?.message?.content).toBe(renderNudgeBlock(NUDGE))
     expect(typeof result?.message?.content === "string" ? result.message.content.match(/<recalled-memory /g) : []).toHaveLength(1)
-    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt", opener: expect.any(String) } }])
+    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } }])
     expect(await pending.take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
-  })
-
-  test("#given an injected opener picker #when the prompt entry is appended #then it carries the picked opener for this session", async () => {
-    const picked: string[] = []
-    const { pi } = await setup(tempDirs, {
-      pending: [NUDGE],
-      pickOpener: (sessionId) => { picked.push(sessionId); return "Come to think of it —" },
-    })
-    await dispatch(pi)
-
-    expect(picked).toEqual([SESSION_ID])
-    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt", opener: "Come to think of it —" } }])
   })
 
   test("#given a queued path is already ledgered #when the prompt starts #then the queued nudge still injects", async () => {

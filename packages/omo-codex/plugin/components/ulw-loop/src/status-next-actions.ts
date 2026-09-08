@@ -28,9 +28,9 @@ function activeGoalActions(plan: UlwLoopPlan, active: UlwLoopItem): readonly str
 		];
 	if (hasAllCriteriaPass(active) && isFinalRunCompletionCandidate(plan, active))
 		return [
-			`${active.id} passes every criterion and is the final story: update_goal complete, then checkpoint --print-template to build the final quality gate.`,
+			`${active.id} passes every criterion and is the final story: update_goal complete, then checkpoint --print-template to build the final quality gate. Use status --json's currentAttemptDir for all quality-gate artifacts.`,
 		];
 	return [
-		`${active.id} passes every criterion: close it with \`omo-agent-toolkit ulw-loop checkpoint --goal-id ${active.id} --status complete --evidence "<proof>" --codex-goal-json '<get_goal json>'\`.`,
+		`${active.id} passes every criterion: close it with \`omo-agent-toolkit ulw-loop checkpoint --goal-id ${active.id} --status complete --evidence "<proof>" --codex-goal-json '<get_goal json>'\`. Put quality-gate artifacts under the currentAttemptDir shown by status --json.`,
 	];
 }

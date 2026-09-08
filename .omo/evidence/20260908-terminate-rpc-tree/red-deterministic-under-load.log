@@ -1,0 +1,30 @@
+run=38
+bun test v1.4.0 (34cbb9a40)
+
+packages/senpi-task/src/runners/rpc/terminate.test.ts:
+(pass) terminateRpcChild > #given a cooperating child #when terminating #then SIGTERM ends it without escalation [24.32ms]
+(pass) terminateRpcChild > #given a TERM-ignoring child #when terminating #then it escalates to SIGKILL within the budget [172.69ms]
+(pass) terminateRpcChild > #given a non-group-leader child #when terminating #then direct escalation remains available [189.66ms]
+(pass) terminateRpcChild > #given an already-exited child #when terminating #then it resolves without throwing [2.87ms]
+100 |   }
+101 | }
+102 | 
+103 | function signalProcessGroup(pid: number, signal: NodeJS.Signals): void {
+104 |   try {
+105 |     process.kill(-pid, signal)
+                  ^
+SystemError: kill() failed: EPERM: Operation not permitted
+ syscall: "kill",
+   errno: 1,
+    code: "EPERM"
+
+      at signalProcessGroup (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-rpc-terminate-tree/packages/senpi-task/src/runners/rpc/terminate.ts:105:13)
+      at terminatePosixProcessGroup (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-rpc-terminate-tree/packages/senpi-task/src/runners/rpc/terminate.ts:33:5)
+      at async terminateRpcChild (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-rpc-terminate-tree/packages/senpi-task/src/runners/rpc/terminate.ts:21:9)
+      at async <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix-rpc-terminate-tree/packages/senpi-task/src/runners/rpc/terminate.test.ts:93:13)
+(fail) terminateRpcChild > #given an immediately exiting parent with a TERM-ignoring descendant #when terminating #then the immediate assertion exposes the race [26.39ms]
+
+ 4 pass
+ 1 fail
+ 4 expect() calls
+Ran 5 tests across 1 file. [2.31s]

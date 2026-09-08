@@ -1,0 +1,24 @@
+COMMAND tsgo --noEmit -p packages/omo-codex/tsconfig.json
+TSGO_EXIT=0
+COMMAND bun run build
+$ tsc -p tsconfig.build.json
+error TS2688: Cannot find type definition file for 'node'.
+  The file is in the program because:
+    Entry point of type library 'node' specified in compilerOptions
+BUILD_EXIT=2
+COMMAND npm --prefix packages/omo-codex/plugin ci --ignore-scripts
+
+added 71 packages, and audited 89 packages in 1s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+DEPENDENCIES_EXIT=0
+COMMAND cd packages/omo-codex/plugin/components/ulw-loop && bun run build
+$ tsc -p tsconfig.build.json
+BUILD_EXIT=0
+COMMAND node JSON parse hook manifest
+JSON_PARSE=PASS
+COMMAND git diff --check (todo-10 product files)
+DIFF_CHECK_EXIT=0

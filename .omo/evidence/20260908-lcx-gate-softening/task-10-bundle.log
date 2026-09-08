@@ -1,0 +1,10 @@
+BEFORE component bun run build: exit 0 (tsc only)
+Import specifiers: ['./cli-commands.js', './cli-output.js', './codex-hook.js', './spawn-guard.js', './stop-resume-hook.js']
+Root cause: component build runs plain tsc, overwriting the aggregate bundle with modular JavaScript. origin/dev has the same tsc-only component script. Aggregate build-components.mjs separately bundles after component builds and propagates failures; no swallowed bundler failure. A later component-only build bypasses that aggregate step.
+AFTER component bun run build: exit 0; bundled 45 modules, 186.85 KB
+Import specifiers (unique): ['node:async_hooks', 'node:crypto', 'node:fs', 'node:fs/promises', 'node:path', 'node:readline', 'node:timers/promises', 'node:url']
+Fix: component build now chains bun build src/cli.ts --target node --format esm --outfile dist/cli.js after tsc with &&. Declarations and modular library output remain; CLI is always bundled on successful component build.
+Local inspection RED: 1 passed, 1 failed with the five relative imports above. GREEN: 2 passed, 0 failed. Only the two file-inspection cases were run locally using --test-name-pattern.
+Local tsgo --noEmit -p packages/omo-codex/tsconfig.json: TSGO_EXIT=0. JSON diagnostics unavailable (Biome missing); package JSON parsed successfully.
+Remote mengmotaMac first aggregate: 326 passed, 1 failed (separately owned review-work drift). Second clone failed: connection reset by peer. Fallback gorky with sibling task-13 changes overlaid: frozen install and aggregate build plus subsequent component-only build succeeded; node --test test/*.test.mjs: 327 passed, 0 failed, TEST_EXIT=0; self-contained case explicitly printed PASS. All remote scratch directories removed with ls absence receipts. See task-10-bundle-remote.log.
+WHAT WAS OMITTED: no local behavioral tests; no new test or changes to aggregate bundling assertions; no edits outside component build config and evidence.
