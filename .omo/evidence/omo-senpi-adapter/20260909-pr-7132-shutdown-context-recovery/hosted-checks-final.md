@@ -2,7 +2,7 @@
 
 - Repository: `code-yeongyu/oh-my-openagent`
 - PR: `#7132`
-- Head: `dce35de8b1610363a84b34ec59b01639fef25e16`
+- Head: `f094adaf0748e8c2afdcd2dd4e92c6cf5f41c7f7`
 - Base: `adecbcf318ff33a9612996f5fa2994f9e8533707`
 - State: `OPEN`
 - Mergeability: `MERGEABLE`
