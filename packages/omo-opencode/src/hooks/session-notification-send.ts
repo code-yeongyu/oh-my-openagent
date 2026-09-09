@@ -4,12 +4,17 @@ import { logOperationFailure } from "./session-notification-log"
 import { sendMacosSessionNotification } from "./session-notification-macos"
 import type { Platform } from "./session-notification-platform"
 import { sendWindowsSessionNotification } from "./session-notification-windows"
+import {
+  executeNotificationScript,
+  type NotificationScriptContext,
+} from "./session-notification-script-executor"
 
 export async function sendSessionNotification(
   ctx: PluginInput,
   platform: Platform,
   title: string,
-  message: string
+  message: string,
+  script?: NotificationScriptContext
 ): Promise<void> {
   try {
     switch (platform) {
@@ -29,5 +34,11 @@ export async function sendSessionNotification(
     } else {
       logOperationFailure("send", String(error))
     }
+  }
+
+  if (script) {
+    void executeNotificationScript(script, title, message).catch((error) => {
+      logOperationFailure("custom-script", error instanceof Error ? error : String(error))
+    })
   }
 }

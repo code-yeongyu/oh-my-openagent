@@ -820,15 +820,23 @@ Customize the comment quality checker:
 
 ### Notification
 
-Force-enable session notifications:
+Force-enable session notifications and optionally run a custom script after the built-in notification:
 
 ```json
-{ "notification": { "force_enable": true } }
+{
+  "[opencode]": {
+    "notification": {
+      "force_enable": true,
+      "script": "~/.config/opencode/notification.sh"
+    }
+  }
+}
 ```
 
 `force_enable` (`false`) - force session-notification even if external notification plugins are detected.
 
 OpenCode also has native TUI Attention notifications in `tui.json`. Use either native Attention or OmO `session-notification` for the same events, not both, or you may receive duplicate desktop notifications. OmO auto-disables `session-notification` when it detects known external notification plugins such as `opencode-notifier`, but native Attention is OpenCode TUI config rather than a plugin entry, so OmO cannot detect it through the plugin list. Keep `session-notification` enabled when you want OmO's richer idle notification body with session title and recent message context; otherwise prefer native Attention for basic TUI notification and sound events.
+`script` - executable invoked asynchronously with the hook type as its first argument and notification context as JSON on stdin. See [Custom Notification Script](../custom-notification-script.md).
 
 ### MCPs
 

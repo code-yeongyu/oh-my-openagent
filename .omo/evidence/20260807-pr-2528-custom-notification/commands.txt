@@ -1,0 +1,30 @@
+PASS  bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+PASS  script/agent/qa-docker.sh --no-config exec opencode --version
+      observed: 1.18.14
+PASS  script/agent/qa-docker.sh --no-config exec bash .agents/skills/opencode-qa/scripts/sse-hook-probe.sh --self-test
+      observed: server.connected
+PASS  sse-hook-probe.sh --attach http://127.0.0.1:4096 --directory /workspaces/oh-my-openagent --event session.created --timeout 30
+PASS  sse-hook-probe.sh --attach http://127.0.0.1:4096 --directory /workspaces/oh-my-openagent --event session.idle --timeout 120
+PASS  docker exec <qa-container> sh -lc 'test -f /tmp/opencode-notifications.log && tail -20 /tmp/opencode-notifications.log'
+PASS  host OpenCode session count before/after: 732 / 732
+PASS  bun test packages/omo-opencode/src/hooks/session-notification-script-executor.test.ts packages/omo-opencode/src/hooks/session-notification-input-needed.test.ts packages/omo-opencode/src/hooks/session-notification-sender.test.ts
+      observed: 21 pass, 0 fail
+PASS  bun run typecheck
+PASS  bun run build:schema && git diff --exit-code HEAD -- assets/oh-my-opencode.schema.json assets/omo.schema.json
+PASS  sh -n examples/notification.sh
+
+POST-HARDENING RERUN
+PASS  Docker OpenCode 1.18.14 SSE probe: session.created
+PASS  Docker OpenCode 1.18.14 SSE probe: session.idle
+PASS  current production sendSessionNotification returned in 4ms after rebasing onto latest dev
+      raw output: docker-qa-output.txt
+PASS  current production script executor delivered matching idle JSON over stdin
+PASS  host OpenCode session count before/after: 732 / 732
+PASS  bun test packages/utils/src/process-tree.test.ts packages/omo-opencode/src/hooks/session-notification-script-executor.test.ts packages/omo-opencode/src/hooks/session-notification-sender.test.ts
+      observed: 21 pass, 0 fail
+PASS  bun run typecheck
+PASS  bun run build:omo-schema && git diff --exit-code -- assets/omo.schema.json
+PASS  sh -n examples/notification.sh
+PASS  git diff --check
+KNOWN BASELINE  bun test packages/omo-opencode/src/hooks/session-notification.test.ts
+      one test calls unavailable Bun 1.2.19 API jest.clearAllTimers; the subsequent timer test passes alone
