@@ -73,7 +73,7 @@ async function runScenario(kind, options) {
   try {
     const seed = await seedMemoryRepo(options, sandbox, env, router)
     if (seed.status !== 0) {
-      record(`${kind}.memory-seeded`, false, `seed turn exited ${seed.status}: ${seed.stderr.slice(-400)}`)
+      record(`${kind}.memory-seeded`, false, `seed turn exited ${seed.status}: ${seed.stderr}`)
       return facts
     }
     const seeded = identityDirs(sandbox.memoryHome).map((dir) => join(dir, "repo", SEED_PATH)).filter(existsSync)

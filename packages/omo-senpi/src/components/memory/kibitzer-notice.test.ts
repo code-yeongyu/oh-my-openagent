@@ -31,15 +31,27 @@ describe("kibitzer gate notice", () => {
   })
 
   test("#given a skipped gate record #when rendered #then the why line names recalled memory candidates", () => {
-    const record: KibitzerGateRecord = { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 }
+    const record: KibitzerGateRecord = { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2, consecutiveFailures: 3 }
     const component = renderKibitzerGateEntry(entry(record), { expanded: false }, theme)
     expect(component?.render(120).join("\n")).toContain("Kibitzer could not judge the recalled memory candidates for the previous turn.")
   })
 
   test("#given a failed gate record #when rendered #then the why line names recalled memory candidates", () => {
-    const record: KibitzerGateRecord = { version: 1, status: "failed", cause: "child_failed", candidateCount: 2 }
+    const record: KibitzerGateRecord = { version: 1, status: "failed", cause: "child_failed", candidateCount: 2, consecutiveFailures: 3 }
     const component = renderKibitzerGateEntry(entry(record), { expanded: false }, theme)
     expect(component?.render(120).join("\n")).toContain("Kibitzer failed while judging the recalled memory candidates for the previous turn.")
+  })
+
+  test("#given a persistent failed gate record #when rendered #then the notice gives an actionable settings hint", () => {
+    const record: KibitzerGateRecord = {
+      version: 1,
+      status: "failed",
+      cause: "child_failed",
+      candidateCount: 2,
+      consecutiveFailures: 3,
+    }
+    const component = renderKibitzerGateEntry(entry(record), { expanded: false }, theme)
+    expect(component?.render(120).join("\n")).toContain("check Kibitzer model/provider settings")
   })
 })
 

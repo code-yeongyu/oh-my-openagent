@@ -47,6 +47,7 @@ export interface KibitzerTriggerOptions {
     epoch: number,
   ) => Promise<void>
   readonly report: (sessionId: string, outcome: LaunchResult, collected: CollectedRecallCandidates) => void
+  readonly resetFailureStreak?: (sessionId: string) => void
   readonly currentCompactionEpoch: (sessionId: string) => number
   readonly argWindow: ToolArgWindow
   readonly logger?: ComponentLogger
@@ -196,9 +197,9 @@ export function createKibitzerTrigger(options: KibitzerTriggerOptions): Kibitzer
       }
       if (result.status === "nudged") {
         await options.onAccepted(collected.sessionId, context, result.nudges ?? [], launchEpoch)
-      } else if (result.status === "skipped" || result.status === "failed" || result.status === "dropped") {
-        options.report(collected.sessionId, result, collected)
       }
+      if (result.status === "empty" || result.status === "nudged") options.resetFailureStreak?.(collected.sessionId)
+      else options.report(collected.sessionId, result, collected)
     } catch (error) {
       warn("kibitzer trigger launch failed", error)
       } finally {

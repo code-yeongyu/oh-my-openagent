@@ -69,7 +69,7 @@ describe("renderKibitzerNudgedEntry", () => {
 
 describe("renderKibitzerGateEntry", () => {
   test("#given a skipped gate #when rendered #then it uses the warning notice", () => {
-    const record: KibitzerGateRecord = { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 }
+    const record: KibitzerGateRecord = { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2, consecutiveFailures: 3 }
     const component = renderKibitzerGateEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)
     expect(component).toBeDefined()
     expect(component!.render(120).join("\\n")).toContain("Kibitzer gate skipped")
@@ -103,7 +103,7 @@ describe("renderKibitzerGateEntry reason and runId", () => {
   }
 
   test("#given a failed gate with a valid reason and runId #when rendered #then the dim reason and run lines follow the title", () => {
-    const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "provider failed", runId: "run-123", candidateCount: 2 })
+    const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "provider failed", runId: "run-123", candidateCount: 2, consecutiveFailures: 3 })
     expect(output).toContain("Kibitzer gate failed")
     expect(output).toContain("provider failed")
     expect(output).toContain("run run-123")
@@ -111,7 +111,7 @@ describe("renderKibitzerGateEntry reason and runId", () => {
 
   test("#given a failed gate whose reason is multiline, overlong or secret-like #when rendered #then the notice is drawn without the reason line", () => {
     for (const reason of ["line1\nline2", "x".repeat(161), "Authorization: Bearer sk-live-abcdefghijklmnop"]) {
-      const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason, candidateCount: 2 })
+      const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason, candidateCount: 2, consecutiveFailures: 3 })
       expect(output).toContain("Kibitzer gate failed")
       expect(output).not.toContain(reason)
     }
@@ -121,13 +121,15 @@ describe("renderKibitzerGateEntry reason and runId", () => {
     expect(renderKibitzerGateEntry({ data: { version: 1, status: "dropped", cause: "cancelled", reason: "why", candidateCount: 1 } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
   })
 
-  test("#given a skipped gate record without reason #when rendered #then the output is byte-identical to before", () => {
-    const component = renderKibitzerGateEntry({ data: { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 } } as never, { expanded: false }, PLAIN_THEME as never)
-    expect(JSON.stringify(component?.render(120))).toBe(JSON.stringify(["                                                                                                                        ", " \u001b[1m⚠ Kibitzer gate skipped · quick_category_unavailable\u001b[22m                                                                   ", " Kibitzer could not judge the recalled memory candidates for the previous turn.                                         ", "                                                                                                                        "]))
+  test("#given a persistent skipped gate record without reason #when rendered #then the output includes the actionable settings hint", () => {
+    const component = renderKibitzerGateEntry({ data: { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2, consecutiveFailures: 3 } } as never, { expanded: false }, PLAIN_THEME as never)
+    const output = component?.render(120).join("\n")
+    expect(output).toContain("Kibitzer gate skipped")
+    expect(output).toContain("check Kibitzer model/provider settings")
   })
 
   test("#given a failed gate with an invalid reason but a valid runId #when rendered #then the title and the run line are drawn and the reason line is absent", () => {
-    const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "line1\nline2", runId: "safe-123", candidateCount: 1 })
+    const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "line1\nline2", runId: "safe-123", candidateCount: 1, consecutiveFailures: 3 })
     expect(output).toContain("Kibitzer gate failed")
     expect(output).toContain("run safe-123")
     expect(output).not.toContain("line1")
@@ -135,13 +137,13 @@ describe("renderKibitzerGateEntry reason and runId", () => {
 
   test("#given a reason of exactly 160 characters and one of 161 #when rendered #then the first is drawn and the second is omitted", () => {
     const exact = "x".repeat(160)
-    expect(renderGate({ version: 1, status: "failed", cause: "child_failed", reason: exact, candidateCount: 1 }, 300)).toContain(exact)
-    expect(renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "x".repeat(161), candidateCount: 1 }, 300)).not.toContain("x".repeat(161))
+    expect(renderGate({ version: 1, status: "failed", cause: "child_failed", reason: exact, candidateCount: 1, consecutiveFailures: 3 }, 300)).toContain(exact)
+    expect(renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "x".repeat(161), candidateCount: 1, consecutiveFailures: 3 }, 300)).not.toContain("x".repeat(161))
   })
 
   test("#given a reason containing CR/LF or a bearer token #when rendered #then the line is omitted while the title remains", () => {
     for (const reason of ["line1\r\nline2", "Authorization: Bearer sk-live-abcdefghijklmnop"]) {
-      const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason, candidateCount: 1 })
+      const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason, candidateCount: 1, consecutiveFailures: 3 })
       expect(output).toContain("Kibitzer gate failed")
       expect(output).not.toContain("line1")
       expect(output).not.toContain("Bearer")

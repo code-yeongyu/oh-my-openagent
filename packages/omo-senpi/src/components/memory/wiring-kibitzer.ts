@@ -64,6 +64,7 @@ export function createKibitzerComposition(
     resolveContext: runtime.resolveContext,
     onAccepted: delivery.accept,
     report: gate.reportOutcome,
+    resetFailureStreak: gate.resetFailureStreak,
     currentCompactionEpoch: gate.currentCompactionEpoch,
     argWindow: new ToolArgWindow(),
     ...(logger === undefined ? {} : { logger }),

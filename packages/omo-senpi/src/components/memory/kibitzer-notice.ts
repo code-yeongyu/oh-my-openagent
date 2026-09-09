@@ -21,6 +21,7 @@ export interface KibitzerGateRecord {
   readonly candidateCount: number
   readonly reason?: string
   readonly runId?: string
+  readonly consecutiveFailures?: number
 }
 
 // Both renderers are fail-closed: a record that does not match the producer contract draws
@@ -91,12 +92,17 @@ export const renderKibitzerGateEntry: EntryRenderer<KibitzerGateRecord> = (entry
   if (typeof candidateCount !== "number" || !Number.isInteger(candidateCount) || candidateCount < 0) return undefined
   if (record.status === "dropped") return undefined
   if (record.status !== "skipped" && record.status !== "failed") return undefined
+  if (typeof record.consecutiveFailures !== "number"
+    || !Number.isInteger(record.consecutiveFailures)
+    || record.consecutiveFailures < 1) return undefined
   const cause = typeof record.cause === "string" ? normalizeRendererText(record.cause) : undefined
   const reason = validGateReason(record.reason)
   const runId = validRunId(record.runId)
+  const consecutiveFailures = record.consecutiveFailures
   const extra = [
     ...(reason === undefined ? [] : [{ text: reason, tone: "dim" as const }]),
     ...(runId === undefined ? [] : [{ text: `run ${runId}`, tone: "dim" as const }]),
+    { text: `after ${consecutiveFailures} consecutive failures; check Kibitzer model/provider settings`, tone: "dim" as const },
   ]
   return noticeComponent({
     glyph: record.status === "skipped" ? "⚠" : "✗",

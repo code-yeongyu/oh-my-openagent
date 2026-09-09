@@ -74,6 +74,9 @@ export function sandboxEnv(sandbox) {
   delete env.OMO_CODING_AGENT_DIR
   delete env.PI_CODING_AGENT_DIR
   delete env.SENPI_CODING_AGENT_DIR
+  delete env.SENPI_PACKAGE_DIR
+  delete env.OMO_PACKAGE_DIR
+  delete env.PI_PACKAGE_DIR
   delete env.SENPI_BIN
   delete env.RPC_CLIENT_CAPABILITIES
   delete env.SENPI_RPC_CLIENT_CAPABILITIES
@@ -86,7 +89,7 @@ export function assertSandboxEnv(sandbox, env) {
     if (env[name] !== expected) throw new Error(`env ${name} is ${env[name]}, expected the sandbox path ${expected}`)
     if (!env[name].startsWith(sandbox.root)) throw new Error(`env ${name} escapes the sandbox root ${sandbox.root}`)
   }
-  for (const name of ["OMO_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR", "SENPI_BIN"]) {
+  for (const name of ["OMO_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR", "SENPI_BIN", "SENPI_PACKAGE_DIR", "OMO_PACKAGE_DIR", "PI_PACKAGE_DIR"]) {
     if (env[name] !== undefined) throw new Error(`env ${name} must be scrubbed before spawning`)
   }
 }

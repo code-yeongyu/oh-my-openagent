@@ -62,3 +62,30 @@ test("#given a compaction #when the same candidates arrive #then the fingerprint
   trigger.onSettled({}); await trigger.whenIdle()
   expect(launches).toBe(2)
 })
+
+test("#given a failed judge for unchanged candidates #when the same candidates arrive #then the fingerprint still suppresses a relaunch", async () => {
+  let launches = 0
+  const trigger = createKibitzerTrigger({
+    snapshotSession: () => ({ id: "session-1", entries: [] }),
+    resolveModelRegistry: () => undefined,
+    collectCandidatesFromSnapshot: async () => makeCollected("a"),
+    runnerFor: () => ({
+      launch: async () => {
+        launches += 1
+        return { status: "failed" as const, cause: "child_failed" }
+      },
+    }),
+    resolveContext: () => context,
+    onAccepted: async () => {},
+    report: () => {},
+    currentCompactionEpoch: () => 0,
+    argWindow: new ToolArgWindow(),
+  })
+
+  trigger.onSettled({})
+  await trigger.whenIdle()
+  trigger.onSettled({})
+  await trigger.whenIdle()
+
+  expect(launches).toBe(1)
+})
