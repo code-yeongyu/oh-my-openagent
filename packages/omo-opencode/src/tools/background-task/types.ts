@@ -48,7 +48,7 @@ export type BackgroundCancelClient = {
   }
 }
 
-export type BackgroundOutputManager = Pick<import("../../features/background-agent").BackgroundManager, "getTask">
+export type BackgroundOutputManager = Pick<import("../../features/background-agent").BackgroundManager, "getTask" | "getTaskBySessionId">
 
 export type FullSessionMessagePart = {
   type?: string

@@ -78,16 +78,44 @@ async function getTaskWithMissingRetry(
   return retriedTask
 }
 
+async function getTaskBySessionIdWithRetry(
+  manager: BackgroundOutputManager,
+  sessionId: string,
+): Promise<BackgroundTask | undefined> {
+  const task = manager.getTaskBySessionId(sessionId)
+  if (task) {
+    return task
+  }
+
+  await delay(MISSING_BACKGROUND_TASK_RETRY_DELAY_MS)
+  return manager.getTaskBySessionId(sessionId)
+}
+
+async function resolveTask(
+  manager: BackgroundOutputManager,
+  taskId: string,
+): Promise<BackgroundTask | undefined> {
+  const direct = await getTaskWithMissingRetry(manager, taskId)
+  if (direct || !isSessionId(taskId)) {
+    return direct
+  }
+
+  log("[background_output] resolving session ID against registered background tasks", { taskId })
+  return getTaskBySessionIdWithRetry(manager, taskId)
+}
+
 function formatTaskNotFoundMessage(taskId: string): string {
-  if (!isSessionId(taskId)) {
-    return `Task not found: ${taskId}`
+  if (isSessionId(taskId)) {
+    return `Task not found: ${taskId}
+
+No background task is registered for this session ID.
+To inspect the session directly, use \`session_read(session_id="${taskId}")\`, \`session_info\`, or \`session_search\`.`
   }
 
   return `Task not found: ${taskId}
 
-background_output expects a background task ID such as \`bg_...\`, not a session ID.
-Use the \`background_task_id\` / \`Background Task ID\` from the task launch output or completion notification.
-To inspect this session directly, use \`session_read(session_id="${taskId}")\`, \`session_info\`, or \`session_search\`.`
+The background task ID may have been evicted from the in-process archive (completed tasks are retained up to a cap), never registered in this process (for example after a plugin reload), or mistyped.
+Check the launch output or completion notification for the exact \`bg_...\` ID, or use \`session_read(session_id="ses_...")\` with the Session ID from the launch metadata to read the task session directly.`
 }
 
 export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
@@ -96,7 +124,9 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
     args: {
       task_id: tool.schema
         .string()
-        .describe("background task ID (`bg_...`) from launch/completion; not a session ID (`ses_...`)."),
+        .describe(
+          "background task ID (`bg_...`) from launch/completion; a session ID (`ses_...`) is also accepted and reverse-resolved via the task registry as a fallback."
+        ),
       block: tool.schema
         .boolean()
         .optional()
@@ -115,7 +145,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
     async execute(args: BackgroundOutputArgs, toolContext) {
       try {
         const ctx = toolContext as ToolContextWithMetadata
-        const task = await getTaskWithMissingRetry(manager, args.task_id)
+        const task = await resolveTask(manager, args.task_id)
         if (!task) {
           return formatTaskNotFoundMessage(args.task_id)
         }
@@ -145,7 +175,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             const remainingMs = timeoutMs - (Date.now() - startTime)
             await delay(Math.min(BACKGROUND_OUTPUT_POLL_INTERVAL_MS, Math.max(1, remainingMs)))
 
-            const currentTask = await getTaskWithMissingRetry(manager, args.task_id)
+            const currentTask = await resolveTask(manager, args.task_id)
             if (!currentTask) {
               return `Task was deleted: ${args.task_id}`
             }
@@ -158,7 +188,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           }
 
           if (isTaskActiveStatus(resolvedTask.status)) {
-            const finalCheck = await getTaskWithMissingRetry(manager, args.task_id)
+            const finalCheck = await resolveTask(manager, args.task_id)
             if (finalCheck) {
               resolvedTask = finalCheck
             }
