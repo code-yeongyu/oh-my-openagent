@@ -134,10 +134,13 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
     }
   })
 
-  test("#given old assistant turn has recent state-level tool activity #when checking parent wake history #then stale tool escape stays deferred", async () => {
-    // given
+  test("#given old assistant turn has tool block activity older than the deferral age ceiling #when checking parent wake history #then the deferral clock resets instead of deferring forever", async () => {
+    // given — now is 700_000 and the tool block's last activity is 80_000,
+    // so the block has been silent for 620_000ms > the 10-minute ceiling
+    // (600_000ms): the deferral must not be unbounded on a wedged/blind tool
+    // block, so the deferral clock resets.
     const originalDateNow = Date.now
-    Date.now = () => 100_000
+    Date.now = () => 700_000
     const client = unsafeTestValue<ParentWakeClient>({
       session: {
         messages: async () => ({
@@ -152,13 +155,13 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
                 {
                   type: "tool",
                   tool: "bash",
-                  state: { status: "running", time: { updated: 99_500 } },
+                  state: { status: "running", time: { updated: 80_000 } },
                 },
               ],
             },
           ],
         }),
-        status: async () => ({ data: { "parent-fresh-tool-state-activity": { type: "idle" } } }),
+        status: async () => ({ data: { "parent-stale-tool-block": { type: "idle" } } }),
         promptAsync: async () => {
           return { data: {} }
         },
@@ -181,27 +184,34 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
       },
     )
     notifier.queuePendingParentWake(
-      "parent-fresh-tool-state-activity",
+      "parent-stale-tool-block",
       "task complete",
       { agent: "sisyphus" },
       true,
     )
-    const pendingWake = notifier.getPendingParentWakes().get("parent-fresh-tool-state-activity")
+    const pendingWake = notifier.getPendingParentWakes().get("parent-stale-tool-block")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {
       throw new Error("Missing pending parent wake")
     }
-    pendingWake.toolCallDeferralStartedAt = 90_000
+    // The deferral clock starts just now (within toolCallDeferMaxMs) so the
+    // pre-existing stale-tool branch (which requires deferMaxMs elapsed) does
+    // not fire first — only the new age-ceiling branch can reset the clock.
+    pendingWake.toolCallDeferralStartedAt = 698_000
 
     try {
-      // when
+      // when — the tool block's activity (80_000) is older than the ceiling
+      // (700_000 - 600_000), so the deferral clock must reset
       const decision = await notifier["shouldDeferParentWakeForSessionHistory"](
-        "parent-fresh-tool-state-activity",
+        "parent-stale-tool-block",
         pendingWake,
       )
 
-      // then
-      expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: false })
+      // then — still deferred (a wedged tool block never forks a concurrent
+      // reply) but the deferral clock is reset so the bounded admission cycle
+      // can proceed instead of deferring forever (#6546 round 5).
+      expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: true })
+      expect(pendingWake.toolCallDeferralStartedAt).toBeUndefined()
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
