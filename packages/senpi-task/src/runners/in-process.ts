@@ -93,7 +93,7 @@ export type ChildSpec = {
    * How `prompt` is delivered. "subagent" (the default) wraps it in the task ancestry envelope;
    * "bare" passes it VERBATIM as the initial user message - for children whose prompt is a
    * self-contained data block that must not be prefixed with "You are running as an omo
-   * senpi-task child" lines (the memorian judge persona/payload split).
+   * senpi-task child" lines (the kibitzer judge persona/payload split).
    */
   readonly promptEnvelope?: "subagent" | "bare"
   /**

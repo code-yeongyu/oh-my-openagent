@@ -1,7 +1,7 @@
 import type { ChildHandle, CreateChildSession, InProcessRunnerLike } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
-import { abortAndDispose } from "./memorian-lifecycle"
+import { abortAndDispose } from "./kibitzer-lifecycle"
 
 const DEFAULT_DEADLINE_MS = 5 * 60_000
 
@@ -114,7 +114,7 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
     if (turn.status !== "completed") return { status: "failed", cause: "child_failed" }
     return { status: "completed" }
   } catch (error: unknown) {
-    input.logger?.warn("memorian gate child session creation failed", {
+    input.logger?.warn("kibitzer gate child session creation failed", {
       error: error instanceof Error ? error.message : String(error),
       runId: input.runId,
     })

@@ -32,7 +32,7 @@ export const OmoMemorySearchSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
-// Recall (memorian gate; on/off plus how many nudges one turn may carry)
+// Recall (kibitzer gate; on/off plus how many nudges one turn may carry)
 // ---------------------------------------------------------------------------
 
 export const OmoMemoryRecallSchema = z.object({

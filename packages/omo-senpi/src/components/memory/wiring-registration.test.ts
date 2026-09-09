@@ -7,14 +7,14 @@ import { buildIdentityPaths, GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext } from "./context"
-import { NUDGED_ENTRY_TYPE } from "./memorian-notice"
+import { NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { createMemoryWiring } from "./wiring"
 
 const roots: string[] = []
 afterEach(async () => { for (const root of roots.splice(0)) await Bun.$`rm -rf ${root}` })
 
-describe("memorian registration wiring", () => {
+describe("kibitzer registration wiring", () => {
   test("#given a fake runner and idle coordinator #when tool_call then tool_result dispatches #then one steer and one nudged entry are emitted", async () => {
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-tool-boundary-")))
     roots.push(root)
@@ -29,7 +29,7 @@ describe("memorian registration wiring", () => {
     const pi = new MemoryFakeExtensionAPI()
     const wiring = createMemoryWiring({
       sessions: new Map([[sessionId, { context }]]), loadConfig: () => loadedMemoryConfig(memorySettings()), cwd: () => root, env: {},
-      createMemorianRunner: () => ({ launch: async () => { launch?.(); return { status: "nudged" as const, nudges: [{ path: "reference/rollouts.md", hint: "Drain nodes first." }], runId: "run-tool-boundary" } }, whenIdle: async () => {} }),
+      createKibitzerRunner: () => ({ launch: async () => { launch?.(); return { status: "nudged" as const, nudges: [{ path: "reference/rollouts.md", hint: "Drain nodes first." }], runId: "run-tool-boundary" } }, whenIdle: async () => {} }),
     })
     const eventCtx = { sessionManager: { getSessionId: () => sessionId, getEntries: () => [{ type: "message", message: { role: "user", content: "Drain nodes before rollout." } }], getBranch: () => [{ type: "message", message: { role: "user", content: "Drain nodes before rollout." } }] }, hasPendingMessages: () => false, isIdle: () => false, modelRegistry: { find: () => undefined, getProviderAuth: () => undefined } }
     wiring.registerStatic(pi, { ...componentContext(), idleCoordinator: new IdleInjectionCoordinator(() => {}) })

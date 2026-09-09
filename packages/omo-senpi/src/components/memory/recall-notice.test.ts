@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { ThemeColor } from "@code-yeongyu/senpi"
 
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
-import { renderMemorianGateEntry, renderMemorianNudgedEntry, type MemorianGateRecord, type MemorianNudgedRecord } from "./memorian-notice"
+import { renderKibitzerGateEntry, renderKibitzerNudgedEntry, type KibitzerGateRecord, type KibitzerNudgedRecord } from "./kibitzer-notice"
 import { renderRecallEntry, type MemoryRecallRecord } from "./recall-notice"
 
 const PLAIN_THEME = {
@@ -17,21 +17,21 @@ function render(data: MemoryRecallRecord | undefined): string[] {
   return component!.render(120).slice(1, -1).map((line) => line.slice(1).trimEnd())
 }
 
-describe("renderMemorianNudgedEntry", () => {
+describe("renderKibitzerNudgedEntry", () => {
   test("#given nudges #when rendered #then title and dim paths are shown", () => {
-    const record: MemorianNudgedRecord = { version: 1, nudges: [{ path: "memory/a.md", hint: "Use the rollout policy." }] }
-    const component = renderMemorianNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)
+    const record: KibitzerNudgedRecord = { version: 1, nudges: [{ path: "memory/a.md", hint: "Use the rollout policy." }] }
+    const component = renderKibitzerNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)
     expect(component).toBeDefined()
     const lines = component!.render(120).join("\\n")
-    expect(lines).toContain("✦ Aha!")
-    expect(lines).toContain("just remembered: Use the rollout policy.")
+    expect(lines).toContain("✦ Kibitzer")
+    expect(lines).toContain("recalled memory: Use the rollout policy.")
     expect(lines).toContain("memory/a.md")
   })
 
   test("#given malformed nudges #when rendered #then nothing is drawn", () => {
-    expect(renderMemorianNudgedEntry({ data: { version: 1, nudges: [] } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
-    expect(renderMemorianNudgedEntry({ data: { version: 1, nudges: [{ path: "a", hint: 4 }] } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
-    expect(renderMemorianNudgedEntry({ data: null } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: { version: 1, nudges: [] } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: { version: 1, nudges: [{ path: "a", hint: 4 }] } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: null } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
   })
 
   test.each([
@@ -39,7 +39,7 @@ describe("renderMemorianNudgedEntry", () => {
     "This memory covers OAuth login prompts and remote-test helpers, not the goal continuation timer delay.",
   ])("#given a meta hint %s #when rendered #then nothing is drawn", (hint) => {
     const record = { version: 1, nudges: [{ path: "memory/a.md", hint }] }
-    expect(renderMemorianNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
   })
 
   test.each([
@@ -49,30 +49,30 @@ describe("renderMemorianNudgedEntry", () => {
     "The outage is unrelated to the database migration.",
   ])("#given a factual hint %s #when rendered #then it remains renderable", (hint) => {
     const record = { version: 1, nudges: [{ path: "memory/a.md", hint }] }
-    expect(renderMemorianNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)).toBeDefined()
+    expect(renderKibitzerNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)).toBeDefined()
   })
 
   test("#given a multiline hint #when rendered #then nothing is drawn", () => {
     const multiline = { version: 1, nudges: [{ path: "memory/a.md", hint: "first\nsecond" }] }
-    expect(renderMemorianNudgedEntry({ data: multiline } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: multiline } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
   })
 
   test("#given a hint that normalizes to nothing or exceeds the gate budget #when rendered #then nothing is drawn", () => {
     const blank = { version: 1, nudges: [{ path: "memory/a.md", hint: "   \u001b[31m\t" }] }
-    expect(renderMemorianNudgedEntry({ data: blank } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: blank } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
     const overlong = { version: 1, nudges: [{ path: "memory/a.md", hint: "x".repeat(201) }] }
-    expect(renderMemorianNudgedEntry({ data: overlong } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: overlong } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
     const atBudget = { version: 1, nudges: [{ path: "memory/a.md", hint: "y".repeat(200) }] }
-    expect(renderMemorianNudgedEntry({ data: atBudget } as never, { expanded: false }, PLAIN_THEME as never)).toBeDefined()
+    expect(renderKibitzerNudgedEntry({ data: atBudget } as never, { expanded: false }, PLAIN_THEME as never)).toBeDefined()
   })
 })
 
-describe("renderMemorianGateEntry", () => {
+describe("renderKibitzerGateEntry", () => {
   test("#given a skipped gate #when rendered #then it uses the warning notice", () => {
-    const record: MemorianGateRecord = { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 }
-    const component = renderMemorianGateEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)
+    const record: KibitzerGateRecord = { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 }
+    const component = renderKibitzerGateEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)
     expect(component).toBeDefined()
-    expect(component!.render(120).join("\\n")).toContain("Memorian gate skipped")
+    expect(component!.render(120).join("\\n")).toContain("Kibitzer gate skipped")
   })
 
   test("#given a null or count-malformed gate record #when rendered #then nothing is drawn and nothing throws", () => {
@@ -85,26 +85,26 @@ describe("renderMemorianGateEntry", () => {
       { version: 1, status: "skipped", cause: "x", candidateCount: 1.5 },
       { version: 1, status: "failed", cause: "x", candidateCount: -1 },
     ]) {
-      expect(() => renderMemorianGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)).not.toThrow()
-      expect(renderMemorianGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+      expect(() => renderKibitzerGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)).not.toThrow()
+      expect(renderKibitzerGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
     }
   })
 
   test("#given a dropped gate #when rendered #then nothing is drawn", () => {
-    expect(renderMemorianGateEntry({ data: { version: 1, status: "dropped", cause: "compaction", candidateCount: 1 } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerGateEntry({ data: { version: 1, status: "dropped", cause: "compaction", candidateCount: 1 } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
   })
 })
 
-describe("renderMemorianGateEntry reason and runId", () => {
+describe("renderKibitzerGateEntry reason and runId", () => {
   const renderGate = (data: unknown, width = 120): string => {
-    const component = renderMemorianGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)
+    const component = renderKibitzerGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)
     expect(component).toBeDefined()
     return component!.render(width).join("\\n")
   }
 
   test("#given a failed gate with a valid reason and runId #when rendered #then the dim reason and run lines follow the title", () => {
     const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "provider failed", runId: "run-123", candidateCount: 2 })
-    expect(output).toContain("Memorian gate failed")
+    expect(output).toContain("Kibitzer gate failed")
     expect(output).toContain("provider failed")
     expect(output).toContain("run run-123")
   })
@@ -112,23 +112,23 @@ describe("renderMemorianGateEntry reason and runId", () => {
   test("#given a failed gate whose reason is multiline, overlong or secret-like #when rendered #then the notice is drawn without the reason line", () => {
     for (const reason of ["line1\nline2", "x".repeat(161), "Authorization: Bearer sk-live-abcdefghijklmnop"]) {
       const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason, candidateCount: 2 })
-      expect(output).toContain("Memorian gate failed")
+      expect(output).toContain("Kibitzer gate failed")
       expect(output).not.toContain(reason)
     }
   })
 
   test("#given a dropped gate with a reason #when rendered #then nothing is drawn", () => {
-    expect(renderMemorianGateEntry({ data: { version: 1, status: "dropped", cause: "cancelled", reason: "why", candidateCount: 1 } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerGateEntry({ data: { version: 1, status: "dropped", cause: "cancelled", reason: "why", candidateCount: 1 } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
   })
 
   test("#given a skipped gate record without reason #when rendered #then the output is byte-identical to before", () => {
-    const component = renderMemorianGateEntry({ data: { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 } } as never, { expanded: false }, PLAIN_THEME as never)
-    expect(JSON.stringify(component?.render(120))).toBe(JSON.stringify(["                                                                                                                        ", " \u001b[1m⚠ Memorian gate skipped · quick_category_unavailable\u001b[22m                                                                   ", " Memorian could not judge the recalled memory candidates for the previous turn.                                         ", "                                                                                                                        "]))
+    const component = renderKibitzerGateEntry({ data: { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2 } } as never, { expanded: false }, PLAIN_THEME as never)
+    expect(JSON.stringify(component?.render(120))).toBe(JSON.stringify(["                                                                                                                        ", " \u001b[1m⚠ Kibitzer gate skipped · quick_category_unavailable\u001b[22m                                                                   ", " Kibitzer could not judge the recalled memory candidates for the previous turn.                                         ", "                                                                                                                        "]))
   })
 
   test("#given a failed gate with an invalid reason but a valid runId #when rendered #then the title and the run line are drawn and the reason line is absent", () => {
     const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "line1\nline2", runId: "safe-123", candidateCount: 1 })
-    expect(output).toContain("Memorian gate failed")
+    expect(output).toContain("Kibitzer gate failed")
     expect(output).toContain("run safe-123")
     expect(output).not.toContain("line1")
   })
@@ -142,7 +142,7 @@ describe("renderMemorianGateEntry reason and runId", () => {
   test("#given a reason containing CR/LF or a bearer token #when rendered #then the line is omitted while the title remains", () => {
     for (const reason of ["line1\r\nline2", "Authorization: Bearer sk-live-abcdefghijklmnop"]) {
       const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason, candidateCount: 1 })
-      expect(output).toContain("Memorian gate failed")
+      expect(output).toContain("Kibitzer gate failed")
       expect(output).not.toContain("line1")
       expect(output).not.toContain("Bearer")
     }
@@ -174,6 +174,6 @@ describe("renderRecallEntry", () => {
 
   test("#given the renderer channel #when its custom type is read #then it matches the injected recall message", () => {
     // given / when / then
-    expect(RECALL_CUSTOM_TYPE).toBe("omo-memorian:recall")
+    expect(RECALL_CUSTOM_TYPE).toBe("omo-kibitzer:recall")
   })
 })

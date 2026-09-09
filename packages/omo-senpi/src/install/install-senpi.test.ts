@@ -224,12 +224,12 @@ describe("runSenpiInstaller", () => {
     expect(await backupFiles(agentDir)).toHaveLength(0)
   })
 
-  test("#given a packed plugin missing the memorian persona #when installing #then artifact validation fails before settings change", async () => {
-    // given: the memorian gate child boots from extensions/memorian-persona.md, so packing must
+  test("#given a packed plugin missing the kibitzer persona #when installing #then artifact validation fails before settings change", async () => {
+    // given: the kibitzer gate child boots from extensions/kibitzer-persona.md, so packing must
     // validate it exactly like the sibling personas the runtime needs.
     const agentDir = await makeAgentDir()
     const pluginPath = await makePluginFixture()
-    await rm(join(pluginPath, "extensions", "memorian-persona.md"))
+    await rm(join(pluginPath, "extensions", "kibitzer-persona.md"))
     await mkdir(agentDir, { recursive: true })
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 

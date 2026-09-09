@@ -1,3 +1,13 @@
+## 2026-09-09 — Rename the memory advisor to Kibitzer
+
+Renamed the Memorian implementation, persona asset, packaging references, QA drivers and documentation to Kibitzer. Recall notices now identify Kibitzer instead of the former Aha! wording, and English/Korean model-facing hints name their source.
+
+New entries use `omo-kibitzer:nudged`, `omo-kibitzer:gate` and `omo-kibitzer:recall`. Legacy `omo-memorian:*` entries remain renderable, and both recall channels are excluded from recall search and transcript ingestion. Existing recall settings, hint validation, scheduling, pending files and the separate `memory.nudge` write reminder retain their behavior. Tracking issue: #7993.
+
+## 2026-09-09 — Make thread discovery test paths platform-native
+
+`src/components/thread/live-surface.test.ts` builds agent-home fixture paths and expected socket paths with `node:path`. Windows resolves configured directories to drive-qualified paths and uses backslashes; fixed POSIX literals caused three CI failures and made the fake settings-file lookup miss the intended directory. Override priority, canonical/flat/standalone discovery, and unavailable-host assertions are preserved. Runtime code is unchanged.
+
 ## 2026-09-08 — Regenerate task and member extensions for durable team linkage
 
 Regenerated `plugin/extensions/omo-task.js` and `omo-member.js` with the CI-pinned Bun 1.4.0 build. The shipped extensions now preserve team run, team name, member name, and member role on senpi-task records; the repository's extension freshness check passes.

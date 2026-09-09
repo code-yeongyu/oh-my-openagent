@@ -46,10 +46,10 @@ export interface SenpiSessionProviderOptions {
 const ARCHIVED_SUFFIX = ".archived"
 const SESSION_SUFFIX = ".jsonl"
 
-// Memory-owned hidden custom-message channels injected by the omo memory stack (memorian recall
+// Memory-owned hidden custom-message channels injected by the omo memory stack (kibitzer recall
 // hints and memory notices). Any OTHER custom message belongs to a foreign extension and is real
 // content: it stays searchable, exactly as it was before the recall feature.
-const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set(["omo-memorian:recall", "omo-memory:notice"])
+const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set(["omo-kibitzer:recall", "omo-memorian:recall", "omo-memory:notice"])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)

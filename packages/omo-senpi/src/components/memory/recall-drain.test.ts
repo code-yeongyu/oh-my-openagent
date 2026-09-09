@@ -8,7 +8,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
-import { NUDGED_ENTRY_TYPE } from "./memorian-notice"
+import { NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
 import { RECALL_CUSTOM_TYPE, createMemoryRecallWiring } from "./recall-wiring"
 import { createRecallDrain } from "./recall-drain"
 import { rmEfaultTolerant } from "./teardown.test-support"

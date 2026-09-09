@@ -7,6 +7,6 @@ import { fileURLToPath } from "node:url"
 // works on every runtime (same reason as reflection/assets/assets.ts).
 const ASSETS_DIR = dirname(fileURLToPath(import.meta.url))
 
-export function loadMemorianPersona(): string {
-  return readFileSync(join(ASSETS_DIR, "memorian-persona.md"), "utf8")
+export function loadKibitzerPersona(): string {
+  return readFileSync(join(ASSETS_DIR, "kibitzer-persona.md"), "utf8")
 }

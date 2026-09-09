@@ -242,7 +242,7 @@ describe("Windows flake soak workflow", () => {
       "uses: actions/setup-node@v7",
       'node-version: "24"',
       "uses: oven-sh/setup-bun@v2",
-      'bun-version: "1.4.0"',
+      'bun-version: "1.4.2"',
       "name: Install dependencies",
       "run: bun install --frozen-lockfile",
       "name: Remove stale self-package test copies",

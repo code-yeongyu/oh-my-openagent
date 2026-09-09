@@ -1,0 +1,27 @@
+Initial scope: packages/omo-codex, LSP .ts directory scan capped at 50 files.
+The LSP output reported 14 diagnostics in unchanged bootstrap paths:
+- plugin/components/bootstrap/test/provision.test.ts: TS2305 missing SG_PINNED_VERSION, SgFetch, SgManifestAsset, SgRuntimeSlug exports; TS7006 implicit-any url parameters at 131 and 325.
+- plugin/components/bootstrap/src/provision.ts: TS2305 missing findSgBinarySync, provisionSgBinary, runtimeSlug, SG_PINNED_VERSION, sgBinaryName, SgFetch, SgManifestAsset, SgRuntimeSlug exports.
+These are NOT a clean broad-LSP result. git diff --name-only origin/dev...HEAD -- packages/omo-codex/plugin/components/bootstrap packages/utils/src/ast-grep returned no paths. No source edits or suppression were made.
+
+Requested scoped validator:
+./node_modules/.bin/tsgo --noEmit -p packages/omo-codex/tsconfig.json
+TYPECHECK_EXIT=0
+Captured separately in task-7-typecheck.log.
+
+New evidence-driver diagnostics:
+First pass: missing Bun/Node globals in the ignored evidence directory.
+Repair: explicit reference to the installed bun-types declarations.
+Second pass: Bun.TOML.parse returns object, so property access needed an explicit Record<string, unknown> boundary type.
+Repair: typed parsed records; runtime assertions retained without non-null assertions or suppressions.
+Final lsp_diagnostics on task-7-install-assertions.ts: No diagnostics found.
+The final typing changes are erased at runtime; the observed installer assertions are unchanged.
+
+bash -n task-7-install-qa.sh task-7-app-server-qa.sh task-7-cqa-env.sh
+Exit 0 before execution. New shell drivers add no polling or sleeps.
+
+Failure retention:
+- task-7-install-qa.log: initial runtime-cache count assumption failed (19 !== 21).
+- task-7-install-qa-continued.log: all four intended install configurations passed; malformed-config refusal assertion failed (installer exit 0, rewritten bytes).
+- task-7-app-server-qa.log: bare self-test passed; plugin invocation exited 1 at its original deadline after required hook completion pairs.
+No failed assertion was deleted or skipped, and no product source was changed to force a pass.

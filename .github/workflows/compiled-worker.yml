@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.0"
+          bun-version: "1.4.2"
       - name: Exercise relocated compiled workers without repository dependencies
         shell: bash
         run: |
@@ -41,7 +41,7 @@ jobs:
           JOB_SUMMARY_TITLE: Compiled session worker (${{ matrix.os }})
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Bun 1.4.0; directory, Bun-link, and external-link layouts.
+            - Bun 1.4.2; directory, Bun-link, and external-link layouts.
             - Source trees removed before relocated executables start two workers.
           JOB_SUMMARY_NEXT: Inspect the test log for runtime revision and executable SHA-256 values.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

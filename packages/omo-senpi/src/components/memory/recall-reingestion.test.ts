@@ -2,7 +2,7 @@
 //
 // The facts queue payload and the reflection/dream transcript payload are BOTH derived from the
 // transcript journal, and the journal is written from projectSessionEntries over the senpi branch.
-// That single seam is therefore the narrowest place where an injected omo-memorian:recall hint
+// That single seam is therefore the narrowest place where an injected omo-kibitzer:recall hint
 // could re-enter memory, so it is pinned here for both consumers at once.
 
 import { afterEach, describe, expect, test } from "bun:test"
@@ -14,7 +14,7 @@ import { TranscriptJournal, buildIdentityPaths } from "@oh-my-opencode/memory-co
 
 import { createMemoryJournalWiring, projectSessionEntries } from "./journal-wiring"
 import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
-import { NUDGED_ENTRY_TYPE } from "./memorian-notice"
+import { NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 

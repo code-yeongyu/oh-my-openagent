@@ -26,7 +26,7 @@ describe("toolArgTexts", () => {
   })
 
   test("keeps grep patterns", () => {
-    expect(toolArgTexts("grep", { pattern: "memorian nudged" })).toEqual(["memorian nudged"])
+    expect(toolArgTexts("grep", { pattern: "kibitzer nudged" })).toEqual(["kibitzer nudged"])
   })
 
   test("removes secret-bearing strings", () => {
@@ -42,9 +42,9 @@ describe("toolArgTexts", () => {
   })
 
   test("#given eval code reading a file path #when toolArgTexts harvests it #then the file name and path words are kept", () => {
-    const texts = toolArgTexts("eval", { code: "await Bun.file('/a/b/memorian-trigger.ts').text(); if (x) { y() }" })
-    expect(texts).toContain("memorian-trigger.ts")
-    expect(texts).toContain("memorian")
+    const texts = toolArgTexts("eval", { code: "await Bun.file('/a/b/kibitzer-trigger.ts').text(); if (x) { y() }" })
+    expect(texts).toContain("kibitzer-trigger.ts")
+    expect(texts).toContain("kibitzer")
   })
 
   test("#given a bash command longer than 120 characters #when toolArgTexts harvests it #then the trailing path file name is kept", () => {

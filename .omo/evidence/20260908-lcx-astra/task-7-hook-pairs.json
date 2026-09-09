@@ -1,0 +1,32 @@
+{
+  "requiredHookPairsPassed": true,
+  "pairs": [
+    {
+      "hookFile": "session-start-loading-project-rules.json",
+      "eventName": "sessionStart",
+      "runId": "session-start:0:/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.vh49tagKNu/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.48/hooks/session-start-loading-project-rules.json",
+      "started": true,
+      "completed": true
+    },
+    {
+      "hookFile": "user-prompt-submit-loading-project-rules.json",
+      "eventName": "userPromptSubmit",
+      "runId": "user-prompt-submit:4:/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.vh49tagKNu/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.48/hooks/user-prompt-submit-loading-project-rules.json",
+      "started": true,
+      "completed": true
+    },
+    {
+      "hookFile": "user-prompt-submit-checking-ultrawork-trigger.json",
+      "eventName": "userPromptSubmit",
+      "runId": "user-prompt-submit:5:/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.vh49tagKNu/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.48/hooks/user-prompt-submit-checking-ultrawork-trigger.json",
+      "started": true,
+      "completed": true
+    }
+  ],
+  "wholeScriptPassed": false,
+  "turnStatus": null,
+  "assistantText": null,
+  "missingHooks": [],
+  "failedHooks": [],
+  "limitation": "The driver reached its 90000ms deadline without turn/completed. Hook pair proof is not a full-turn pass."
+}

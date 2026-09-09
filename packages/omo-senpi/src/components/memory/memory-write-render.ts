@@ -1,7 +1,7 @@
-// Tool-result row for memory writes.
+// Shared call/result frame for memory writes.
 //
 // The model still receives the plain "Memory <command> committed locally (<sha7>)." string; this
-// module only replaces what the HUMAN sees with the house notice contract (noticeComponent, the
+// module only replaces what the HUMAN sees with the house notice contract (buildNoticeBox, the
 // same shape senpi's cache-warm notice uses): a bold accent title, a dim prose "why", visible
 // quantitative extra lines carrying their own tone, and a dim expanded-only detail line.
 //
@@ -9,13 +9,17 @@
 // its own fragment, and a wholly missing payload (gate off, error result, degraded gather) falls
 // back to the plain message so the row never renders emptier than it did before.
 
-import type { AgentToolResult, Theme, ThemeColor } from "@code-yeongyu/senpi"
+import type { AgentToolResult, Theme, ToolDefinition } from "@code-yeongyu/senpi"
+import { Box, Text } from "@earendil-works/pi-tui"
+import { buildNoticeBox, type NoticeSpec } from "@oh-my-opencode/senpi-task/notice-box"
 import { normalizeRendererText } from "@oh-my-opencode/senpi-task/renderer-text"
 import { linesComponent } from "@oh-my-opencode/senpi-task/task-renderers"
+import type { Static } from "typebox"
 
 import { formatRelativeAge } from "./status"
-import type { MemoryToolResultDetails, MemoryWriteNotice } from "./tools"
-import { joinFields, noticeComponent, type EntryRenderTheme } from "./worker/entry-renderers"
+import { MEMORY_TOOL_NAME } from "./tool-metadata"
+import type { MemoryToolParams, MemoryToolResultDetails, MemoryWriteNotice } from "./tools"
+import { joinFields, type EntryRenderTheme } from "./worker/entry-renderers"
 
 /** A consolidation older than this reads as neglect, not cadence. */
 const STALE_CONSOLIDATION_MS = 7 * 24 * 60 * 60 * 1_000
@@ -33,29 +37,71 @@ export interface MemoryWriteRenderDeps {
   readonly now?: () => number
 }
 
-/**
- * Builds the senpi `ToolDefinition.renderResult` callback for both memory write tools.
- */
+type MemoryRenderArgs = Partial<Static<typeof MemoryToolParams>>
+type MemoryRenderContext = Parameters<NonNullable<ToolDefinition<
+  typeof MemoryToolParams, MemoryToolResultDetails, { callComponent?: Box }
+>["renderCall"]>>[2]
+
+function getMemoryCallComponent(context: MemoryRenderContext): Box {
+  const component = context.lastComponent instanceof Box
+    ? context.lastComponent
+    : context.state.callComponent ?? new Box(1, 1)
+  context.state.callComponent = component
+  return component
+}
+
+function buildMemoryCall(component: Box, args: MemoryRenderArgs, theme: Theme): void {
+  const argument = args.file_path ?? args.old_path ?? args.new_path ?? args.reason
+  const summary = [args.command, argument].filter((part) => typeof part === "string").join(" ")
+  // pi-tui 0.84's clear() detaches children without disposing them (Senpi calls it detachAll()).
+  component.clear()
+  component.addChild(new Text(`${theme.bold(MEMORY_TOOL_NAME)} ${normalizeRendererText(summary)}`.trimEnd(), 0, 0))
+}
+
+export function renderMemoryWriteCall(args: MemoryRenderArgs, theme: Theme, context: MemoryRenderContext): RenderComponent {
+  const component = getMemoryCallComponent(context)
+  if (!context.hasResult) component.setBgFn((text) => theme.bg("toolPendingBg", text))
+  buildMemoryCall(component, args, theme)
+  // Senpi mounts the call and result slots separately; only the result slot may mount this Box.
+  return context.hasResult ? linesComponent([]) : component
+}
+
+/** Builds the memory tool's result renderer, completing its shared call frame. */
 export function createMemoryWriteRenderResult(
   deps: MemoryWriteRenderDeps,
 ): (
   result: AgentToolResult<MemoryToolResultDetails>,
   options: { readonly expanded: boolean; readonly isPartial: boolean },
   theme: Theme,
-  context: { readonly isError?: boolean },
+  context: MemoryRenderContext | { readonly isError?: boolean },
 ) => RenderComponent {
   return (result, options, theme, context) => {
-    const notice = result.details?.writeNotice
-    if (notice === undefined || context?.isError === true || !deps.enabled()) {
-      return plainComponent(resultText(result))
+    const notice = context.isError || !deps.enabled() ? undefined : result.details?.writeNotice
+    // Result-only consumers have no call frame; preserve the standalone callback contract.
+    if (!("state" in context)) {
+      return notice === undefined
+        ? linesComponent(normalizeRendererText(resultText(result)).split("\n"))
+        : renderMemoryWriteNotice(notice, options, theme, (deps.now ?? Date.now)())
     }
-    return renderMemoryWriteNotice(notice, options, theme, (deps.now ?? Date.now)())
+    const component = getMemoryCallComponent(context)
+    buildMemoryCall(component, context.args, theme)
+    if (notice === undefined) {
+      component.setBgFn((text) => theme.bg(context.isError ? "toolErrorBg" : "toolSuccessBg", text))
+      component.addChild(new Text(resultText(result).split("\n").map(normalizeRendererText).join("\n"), 0, 0))
+      return component
+    }
+    component.setBgFn((text) => theme.bg("customMessageBg", text))
+    const spec = memoryWriteNoticeSpec(notice, (deps.now ?? Date.now)())
+    component.addChild(new Text(theme.fg(spec.tone ?? "accent", `\u001b[1m${spec.title}\u001b[22m`), 0, 0))
+    component.addChild(new Text(theme.fg("dim", spec.why), 0, 0))
+    for (const line of spec.extra ?? []) {
+      component.addChild(new Text(theme.fg(line.tone ?? "dim", line.text), 0, 0))
+    }
+    if (options.expanded && spec.expandedLine !== undefined) {
+      component.addChild(new Text(theme.fg("dim", spec.expandedLine), 0, 0))
+    }
+    return component
   }
-}
-
-/** The unchanged pre-notice row: the tool's own message text, one line per newline. */
-function plainComponent(text: string): RenderComponent {
-  return linesComponent(normalizeRendererText(text).split("\n"))
 }
 
 function resultText(result: AgentToolResult<MemoryToolResultDetails>): string {
@@ -68,8 +114,8 @@ function resultText(result: AgentToolResult<MemoryToolResultDetails>): string {
 }
 
 /**
- * The notice row itself, shared with the MCP surface's `omo-memory:write-updated` transcript
- * entry so both surfaces render byte-identical rows from the same payload.
+ * Standalone notice frame for the MCP surface's `omo-memory:write-updated` transcript entry.
+ * Its content matches the tool notice, without the tool's call line.
  */
 export function renderMemoryWriteNotice(
   notice: MemoryWriteNotice,
@@ -77,27 +123,23 @@ export function renderMemoryWriteNotice(
   theme: EntryRenderTheme,
   now: number,
 ): RenderComponent {
+  return buildNoticeBox(memoryWriteNoticeSpec(notice, now), options, theme)
+}
+
+function memoryWriteNoticeSpec(notice: MemoryWriteNotice, now: number): NoticeSpec {
   const size = sizeLine(notice)
   const timeline = timelineLine(notice, now)
-  return noticeComponent(
-    {
-      glyph: "●",
-      title: titleLine(notice),
-      tone: "accent",
-      why: whyLine(notice),
-      extra: [
-        ...(size === undefined ? [] : [{ text: size, tone: "dim" as ThemeColor }]),
-        ...(timeline === undefined ? [] : [{ text: timeline.text, tone: timeline.tone }]),
-      ],
-      detail: joinFields([
-        shortSha(notice.sha),
-        optional(notice.identity),
-        optional(notice.subject),
-      ]),
-    },
-    options,
-    theme,
-  )
+  const detail = joinFields([shortSha(notice.sha), optional(notice.identity), optional(notice.subject)])
+  return {
+    title: `● ${titleLine(notice)}`,
+    tone: "accent",
+    why: whyLine(notice),
+    extra: [
+      ...(size === undefined ? [] : [{ text: size, tone: "dim" as const }]),
+      ...(timeline === undefined ? [] : [timeline]),
+    ],
+    ...(detail.length === 0 ? {} : { expandedLine: detail }),
+  }
 }
 
 /** "Memory updated · 4th entry today"; the count drops out when the commit walk failed. */
@@ -156,7 +198,7 @@ function sizeLine(notice: MemoryWriteNotice): string | undefined {
 function timelineLine(
   notice: MemoryWriteNotice,
   now: number,
-): { readonly text: string; readonly tone: ThemeColor } | undefined {
+): { readonly text: string; readonly tone: "warning" | "dim" } | undefined {
   const timeline = notice.timeline
   const entryAge = relativeAge(timeline.previousEntryAtISO, now)
   const consolidationAge = relativeAge(timeline.lastConsolidationAtISO, now)

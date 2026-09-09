@@ -7,10 +7,11 @@
 // corrupted helper cannot keep them green.
 import { describe, expect, test } from "bun:test"
 
-import type { ThemeColor } from "@code-yeongyu/senpi"
+import type { Theme, ThemeColor, ToolDefinition } from "@code-yeongyu/senpi"
+import { Box, Container, Text } from "@earendil-works/pi-tui"
 
-import { createMemoryWriteRenderResult } from "./memory-write-render"
-import type { MemoryToolResultDetails, MemoryWriteNotice } from "./tools"
+import { createMemoryWriteRenderResult, renderMemoryWriteNotice } from "./memory-write-render"
+import { createMemoryTools, MEMORY_TOOL_NAME, type MemoryToolExecutionResult, type MemoryToolParams, type MemoryToolResultDetails, type MemoryWriteNotice } from "./tools"
 
 const BOLD = "\u001b[1m"
 const BOLD_OFF = "\u001b[22m"
@@ -80,14 +81,154 @@ function render(
   const component = renderResult(
     { content: [{ type: "text", text: details?.message ?? MESSAGE }], details } as never,
     { expanded: options.expanded ?? false, isPartial: false },
-    (options.theme ?? PLAIN_THEME) as never,
-    { isError: options.isError ?? false } as never,
+    { bold, ...(options.theme ?? PLAIN_THEME) as object } as Theme,
+    { ...callContext(), isError: options.isError ?? false, hasResult: true },
   )
   const lines = (component as { render(width: number): string[] }).render(options.width ?? WIDE)
-  if (details?.writeNotice === undefined || options.isError === true || options.enabled === false) return lines
   if (lines[0]?.startsWith("<notice-bg>")) return lines
-  return lines.slice(1, -1).map((line) => line.slice(1).trimEnd())
+  // These existing expectations describe the result content, not its call header or padding.
+  return lines.slice(2, -1).map((line) => line.slice(1).trimEnd())
 }
+
+const CALL_ARGS = { command: "str_replace" as const, reason: "Track deploy", file_path: "knowledge/deploy.md" }
+const FRAME_THEME = {
+  ...PLAIN_THEME,
+  bold,
+  bg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+} as Theme
+
+function callContext(): Parameters<NonNullable<ToolDefinition<
+  typeof MemoryToolParams, MemoryToolResultDetails, { callComponent?: Box }
+>["renderCall"]>>[2] {
+  return {
+    args: CALL_ARGS, toolCallId: "memory-frame", state: {}, lastComponent: undefined,
+    cwd: "/tmp", executionStarted: true, argsComplete: true, isPartial: false,
+    expanded: false, showImages: false, isError: false, hasResult: false,
+    invalidate() {},
+  }
+}
+
+function framedTool(enabled = true) {
+  const [tool] = createMemoryTools(() => undefined, { writeNotice: { enabled } })
+  const renderCall = tool.renderCall
+  const renderResult = tool.renderResult
+  if (renderCall === undefined || renderResult === undefined) throw new Error("memory call/result renderers missing")
+  return { renderCall, renderResult }
+}
+
+function assertBackground(lines: string[], color: string): void {
+  expect(lines.length).toBeGreaterThan(2)
+  for (const line of lines) {
+    expect(line.startsWith(`<${color}>`)).toBe(true)
+    expect(line.endsWith(`</${color}>`)).toBe(true)
+    for (const other of ["toolPendingBg", "toolErrorBg", "customMessageBg", "toolSuccessBg"]) {
+      expect(line.split(`<${other}>`).length - 1).toBe(other === color ? 1 : 0)
+    }
+  }
+}
+
+function frameResult(writeNotice?: MemoryWriteNotice): MemoryToolExecutionResult {
+  return { content: [{ type: "text", text: MESSAGE }], details: { message: MESSAGE, writeNotice } }
+}
+
+describe("memory tool row framing", () => {
+  test("#when pending #then one padded Box owns the call line and pending background", () => {
+    const { renderCall } = framedTool()
+    const context = callContext()
+    const component = renderCall(CALL_ARGS, FRAME_THEME, context)
+    expect(component).toBeInstanceOf(Box)
+    expect(context.state.callComponent === component).toBe(true)
+    const lines = component.render(WIDE)
+    assertBackground(lines, "toolPendingBg")
+    expect(lines).toHaveLength(3)
+    expect(lines[1]).toContain(`${bold(MEMORY_TOOL_NAME)} ${CALL_ARGS.command} ${CALL_ARGS.file_path}`)
+  })
+
+  test("#when a result errors #then the original Box carries error background and plain text", () => {
+    const { renderCall, renderResult } = framedTool()
+    const context = callContext()
+    const call = renderCall(CALL_ARGS, FRAME_THEME, context)
+    context.isError = true
+    context.hasResult = true
+    const result = { ...frameResult(notice()), isError: true }
+    const component = renderResult(result, { expanded: false, isPartial: false }, FRAME_THEME, context)
+    expect(component).toBe(call)
+    assertBackground(component.render(WIDE), "toolErrorBg")
+    expect(component.render(WIDE)[2]).toContain(MESSAGE)
+    expect(component.render(WIDE)).toHaveLength(4)
+  })
+
+  test.each([false, true])("#when a notice is enabled (expanded=%s) #then call and notice share one custom background", (expanded) => {
+    const { renderCall } = framedTool()
+    const renderResult = createMemoryWriteRenderResult({ enabled: () => true, now: () => NOW })
+    const context = callContext()
+    const call = renderCall(CALL_ARGS, FRAME_THEME, context)
+    context.hasResult = true
+    const payload = notice()
+    const component = renderResult(frameResult(payload), { expanded, isPartial: false }, FRAME_THEME, context)
+    expect(component).toBe(call)
+    const lines = component.render(WIDE)
+    assertBackground(lines, "customMessageBg")
+    expect(lines[1]).toContain(`${bold(MEMORY_TOOL_NAME)} ${CALL_ARGS.command}`)
+    const entryLines = renderMemoryWriteNotice(payload, { expanded }, FRAME_THEME, NOW).render(WIDE)
+    expect([lines[0], ...lines.slice(2)]).toEqual(entryLines)
+    expect((component as Box).children.every((child) => child instanceof Text)).toBe(true)
+  })
+
+  test.each([false, true])("#when success has no enabled notice (enabled=%s) #then the same Box carries plain success", (enabled) => {
+    const { renderCall, renderResult } = framedTool(enabled)
+    const context = callContext()
+    const call = renderCall(CALL_ARGS, FRAME_THEME, context)
+    context.hasResult = true
+    const component = renderResult(frameResult(enabled ? undefined : notice()), { expanded: false, isPartial: false }, FRAME_THEME, context)
+    expect(component).toBe(call)
+    assertBackground(component.render(WIDE), "toolSuccessBg")
+    expect(component.render(WIDE)[2]).toContain(MESSAGE)
+  })
+
+  test("#when Senpi mounts both slots on redraw #then the call yields and the result appears exactly once", () => {
+    const { renderCall, renderResult } = framedTool()
+    const context = callContext()
+    const original = renderCall(CALL_ARGS, FRAME_THEME, context)
+    context.lastComponent = original
+    context.hasResult = true
+    const callSlot = renderCall(CALL_ARGS, FRAME_THEME, context)
+    expect(callSlot.render(WIDE)).toEqual([])
+    context.lastComponent = undefined
+    const resultSlot = renderResult(frameResult(), { expanded: false, isPartial: false }, FRAME_THEME, context)
+    expect(resultSlot).toBe(original)
+    const surface = new Container()
+    surface.addChild(callSlot)
+    surface.addChild(resultSlot)
+    const lines = surface.render(WIDE)
+    expect(lines).toHaveLength(4)
+    expect(lines.join("\n").split(MESSAGE)).toHaveLength(2)
+    context.lastComponent = resultSlot
+    renderResult(frameResult(), { expanded: false, isPartial: false }, FRAME_THEME, context)
+    expect(surface.render(WIDE)).toEqual(lines)
+  })
+
+  test("#when redrawn with a previous Box #then it is reused without leaking between calls", () => {
+    const { renderCall } = framedTool()
+    const context = callContext()
+    const prior = new Box(1, 1)
+    prior.addChild(new Text("stale", 0, 0))
+    context.lastComponent = prior
+    expect(renderCall(CALL_ARGS, FRAME_THEME, context)).toBe(prior)
+    expect(context.state.callComponent).toBe(prior)
+    expect(prior.children).toHaveLength(1)
+    context.lastComponent = undefined
+    expect(renderCall(CALL_ARGS, FRAME_THEME, context)).toBe(prior)
+    expect(renderCall(CALL_ARGS, FRAME_THEME, callContext())).not.toBe(prior)
+  })
+
+  test("#when a rename streams multiline arguments #then its old path stays on one call line", () => {
+    const { renderCall } = framedTool()
+    const component = renderCall({ command: "rename", reason: "rename", old_path: "knowledge/old\nname.md" }, FRAME_THEME, callContext())
+    expect(component.render(WIDE)).toHaveLength(3)
+    expect(component.render(WIDE)[1]).toContain("rename knowledge/old name.md")
+  })
+})
 
 describe("memory write notice rendering", () => {
   test("#when rendered with a background theme #then every padded line carries customMessageBg", () => {

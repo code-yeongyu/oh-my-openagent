@@ -1,0 +1,70 @@
+# task-6 docs RED (before edits) 2026-09-08T09:21:13Z HEAD=7c1c66c61
+## rg -n 'gpt-5.6-sol' five files
+## rg -n 'max_threads = 1000|1000 threads' (expect 0)
+packages/omo-codex/AGENTS.md:73:The installer (`src/install/codex-multi-agent-v2-config.ts`) mirrors the migration's model awareness via `resolveCodexMultiAgent
+count=1
+## rg -n 'gpt-6-astra' (expect >=1 per file that named the default)
+count=0
+## rg -n '= 16\b' (expect 0)
+count=0
+## limit table mention in README.md
+38:The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, 
+
+# task-6 docs GREEN (after edits) 2026-09-08T09:23:14Z
+## shasum ~/.codex/config.toml (never touched by this todo)
+b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml
+## rg -n 'gpt-5.6-sol' five files (must describe only the legacy profile)
+packages/omo-codex/plugin/README.md:20:`model-catalog.json` (version `2026-09-08.gpt-6-astra-600k-high`) is the managed default the installer and the SessionStart config migration apply: `gpt-6-astra`
+packages/omo-codex/README.md:42:The managed catalog (`plugin/model-catalog.json`, version `2026-09-08.gpt-6-astra-600k-high`) sets the root model to `gpt-6-astra` with `model_context_window = 600000`,
+packages/omo-codex/AGENTS.md:77:Three mirrored sources define the managed model defaults and must agree: `plugin/model-catalog.json`, `plugin/scripts/migrate-codex-config/catalog.mjs` (`FALLBACK_CATAL
+## rg -n 'max_threads = 1000|1000 threads' (expect 0)
+packages/omo-codex/AGENTS.md:73:The installer (`src/install/codex-multi-agent-v2-config.ts`) mirrors the migration's model awareness via `resolveCodexMultiAgentVersion()` (root `model` against `models_cache.json` next to config.toml; `gpt-6*` and `gpt-5.6*` count as V2 when the catalog is missing): it never enables V2 and never writes a thread cap. Neither `agents.max_threads` nor `features.multi_agent_v2.max_concurrent_threads_per_session` is inserted; an existing key holding a value LazyCodex previously wrote (`max_threads = 1000`; `max_concurrent_threads_per_session = 1000` or `16`) is removed so Codex stock defaults apply, and any other user-set value is left untouched, never raised. On V1/unknown models it converts a `multi_agent_v2 = false` shorthand into table-form `enabled = false`; on V2-preferred models it removes `agents.max_threads` and does NOT materialize the disable (a config-level disable 400s the reserved collaboration.spawn_agent schema, #6008). The migration's `ensureSubagentConcurrencyLimit()` mirrors the same no-insert / remove-own-value / preserve-user-value rules.
+count=1
+## rg -c 'gpt-6-astra' per file
+packages/omo-codex/plugin/components/rules/README.md:1
+packages/omo-codex/plugin/README.md:1
+packages/omo-codex/README.md:1
+packages/omo-codex/plugin/components/ultrawork/README.md:1
+packages/omo-codex/AGENTS.md:1
+## rg -n '= 16\b' (expect 0)
+count=0
+## em/en dash check in changed hunks (expect 0)
+0
+## defaults-to-16 / 1000 writes wording check
+none
+## git status
+ M packages/omo-codex/AGENTS.md
+ M packages/omo-codex/README.md
+ M packages/omo-codex/plugin/README.md
+ M packages/omo-codex/plugin/components/rules/README.md
+ M packages/omo-codex/plugin/components/ultrawork/README.md
+## shasum ~/.codex/config.toml after
+b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml
+
+# task-6 docs GREEN re-run after AGENTS.md:73 reword 2026-09-08T09:23:43Z
+## rg -n 'max_threads = 1000|1000 threads' (expect 0)
+count=0
+## rg -n '= 16\b' count=0
+## rg -c gpt-6-astra
+packages/omo-codex/plugin/README.md:1
+packages/omo-codex/plugin/components/ultrawork/README.md:1
+packages/omo-codex/README.md:1
+packages/omo-codex/AGENTS.md:1
+packages/omo-codex/plugin/components/rules/README.md:1
+## gpt-5.6-sol lines (legacy-profile context only)
+3
+## dash check in added lines: 0
+## git diff --stat
+ packages/omo-codex/AGENTS.md                             | 8 ++++++--
+ packages/omo-codex/README.md                             | 6 +++++-
+ packages/omo-codex/plugin/README.md                      | 4 ++++
+ packages/omo-codex/plugin/components/rules/README.md     | 2 ++
+ packages/omo-codex/plugin/components/ultrawork/README.md | 2 ++
+ 5 files changed, 19 insertions(+), 3 deletions(-)
+## shasum ~/.codex/config.toml
+b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml
+
+WHAT WAS TESTED: the five doc files named by todo 6, before and after edits, with the todo's acceptance and QA greps.
+WHAT WAS OBSERVED: RED had AGENTS.md:73 stating 'defaults it to 16' and 'writes agents.max_threads = 1000' and zero gpt-6-astra mentions in any file; GREEN has 0 hits for the cap patterns, 0 hits for '= 16', 1+ gpt-6-astra per file, and every gpt-5.6-sol mention sits in a legacy-profile sentence.
+WHY IT IS ENOUGH: prose-only todo; acceptance is grep-shaped and fully satisfied; no generated files touched; real ~/.codex/config.toml shasum identical.
+WHAT WAS OMITTED: no raw-pipe hook probe (todo 6 QA is grep-only); no bun test (remote gate); no commit.
