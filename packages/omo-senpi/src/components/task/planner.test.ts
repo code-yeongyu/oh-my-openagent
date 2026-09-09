@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { BUILTIN_AGENTS, type SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import { BUILTIN_AGENTS, findModelReference, type SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import { createTaskChildPlanner, type TaskModelRegistry } from "./planner"
 
@@ -128,6 +128,120 @@ describe("createTaskChildPlanner", () => {
         display: "openai/gpt-5.5",
       },
     })
+  })
+
+  test("#given an explicit provider model with a :low suffix #when planned #then model_id is unsuffixed and variant is low", () => {
+    // given
+    const planner = createTaskChildPlanner({}, {}, () => undefined)
+
+    // when
+    const result = planner({
+      prompt: "Use Astra at low effort.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "openai/gpt-6-astra:low",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan).toEqual({
+      model: "openai/gpt-6-astra",
+      variant: "low",
+      resolved_model: {
+        source: "explicit",
+        provider: "openai",
+        model_id: "gpt-6-astra",
+        display: "openai/gpt-6-astra",
+        variant: "low",
+      },
+    })
+    const calls: Array<{ provider: string; modelId: string }> = []
+    const model = findModelReference({
+      find: (provider, modelId) => {
+        calls.push({ provider, modelId })
+        return provider === "openai" && modelId === "gpt-6-astra" ? { provider, id: modelId } : undefined
+      },
+    }, resolved.plan.model)
+    expect(calls).toEqual([{ provider: "openai", modelId: "gpt-6-astra" }])
+    expect(model).toEqual({ provider: "openai", id: "gpt-6-astra" })
+  })
+
+  test("#given an explicit openrouter model whose id contains slashes #when planned #then embedded slashes stay in model_id", () => {
+    // given
+    const planner = createTaskChildPlanner({}, {}, () => undefined)
+
+    // when
+    const result = planner({
+      prompt: "Use the routed model.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "openrouter/anthropic/claude-3.5",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan).toEqual({
+      model: "openrouter/anthropic/claude-3.5",
+      resolved_model: {
+        source: "explicit",
+        provider: "openrouter",
+        model_id: "anthropic/claude-3.5",
+        display: "openrouter/anthropic/claude-3.5",
+      },
+    })
+  })
+
+  test("#given an explicit non-level colon suffix #when planned #then it stays part of model_id and invents no variant", () => {
+    // given
+    const planner = createTaskChildPlanner({}, {}, () => undefined)
+
+    // when
+    const result = planner({
+      prompt: "Use the free routed model.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "openrouter/openai/gpt:free",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan).toEqual({
+      model: "openrouter/openai/gpt:free",
+      resolved_model: {
+        source: "explicit",
+        provider: "openrouter",
+        model_id: "openai/gpt:free",
+        display: "openrouter/openai/gpt:free",
+      },
+    })
+  })
+
+  test("#given an explicit :low model with subagent_type #when planned #then the agent persona is kept and the suffix becomes the applied variant", () => {
+    // given
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => undefined)
+
+    // when
+    const result = planner({
+      prompt: "Review this design.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "momus",
+      model: "openai/gpt-6-astra:low",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("openai/gpt-6-astra")
+    expect(resolved.plan.variant).toBe("low")
+    expect(resolved.plan.resolved_model).toEqual({
+      source: "explicit",
+      provider: "openai",
+      model_id: "gpt-6-astra",
+      display: "openai/gpt-6-astra",
+      variant: "low",
+    })
+    expect(resolved.plan.agentType).toBe("momus")
+    expect(resolved.plan.instructions).toBeDefined()
   })
 
   test("#given subagent_type naming a builtin agent #when planned against a registry serving its chain #then the plan carries the agent persona and an agent-sourced model", () => {

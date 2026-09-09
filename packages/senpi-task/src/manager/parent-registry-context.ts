@@ -1,5 +1,6 @@
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
+import { RunnerError } from "../runners/in-process"
 import { asSenpiThinkingLevel } from "../senpi/thinking-level"
 import type {
   InProcessSessionContext,
@@ -38,6 +39,12 @@ export function createParentRegistrySessionContext(
     const registry = resolveRegistry()
     if (registry === undefined) return {}
     const model = spec.model === undefined ? undefined : findModelReference(registry, spec.model)
+    if (spec.model !== undefined && model === undefined) {
+      throw new RunnerError({
+        kind: "model_unavailable",
+        message: `model "${spec.model}" not found in the live registry`,
+      })
+    }
     const modelRuntime = registry.modelRuntime
     const thinkingLevel = asSenpiThinkingLevel(spec.variant)
     return {

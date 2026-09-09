@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import { ModelRegistry, ModelRuntime } from "@code-yeongyu/senpi"
 
+import { RunnerError } from "../runners/in-process"
 import { createParentRegistrySessionContext, findModelReference, resolveResumeContext } from "./parent-registry-context"
+import { createInProcessManagedRunner, type InProcessRunnerLike } from "./runner"
 import type { ManagedStartSpec } from "./types"
 import type { ResolvedModelRecord } from "../state"
 
@@ -162,17 +164,52 @@ describe("createParentRegistrySessionContext", () => {
     expect(context.thinkingLevel).toBeUndefined()
   })
 
-  test("#given a model reference absent from the parent registry #when the context is built #then registry is still threaded but no Model is set", () => {
+  test("#given a model reference absent from the parent registry #when the context is built #then it refuses with model_unavailable instead of omitting the model", () => {
     // given
     const registry = registryWithMockProvider()
     const provide = createParentRegistrySessionContext(() => registry)
 
     // when
-    const context = provide(baseSpec({ model: "omo-mock/does-not-exist" }))
+    let thrown: unknown
+    try {
+      provide(baseSpec({ model: "omo-mock/does-not-exist" }))
+    } catch (error) {
+      thrown = error
+    }
 
     // then
-    expect(context.modelRegistry).toBe(registry)
-    expect(context.model).toBeUndefined()
+    expect(RunnerError.is(thrown)).toBe(true)
+    if (!RunnerError.is(thrown)) throw new Error("expected RunnerError")
+    expect(thrown.failure.kind).toBe("model_unavailable")
+    expect(thrown.failure.message).toContain("omo-mock")
+    expect(thrown.failure.message).toContain("does-not-exist")
+  })
+
+  test("#given a requested unknown model #when the in-process runner starts #then it refuses launch and never creates a child session", async () => {
+    // given
+    const registry = registryWithMockProvider()
+    let startCalls = 0
+    const runner: InProcessRunnerLike = {
+      start: () => {
+        startCalls += 1
+        throw new Error("child session must not launch for an unknown model")
+      },
+    }
+    const managed = createInProcessManagedRunner(runner, createParentRegistrySessionContext(() => registry))
+
+    // when
+    let thrown: unknown
+    try {
+      await managed.start(baseSpec({ model: "omo-mock/does-not-exist" }))
+    } catch (error) {
+      thrown = error
+    }
+
+    // then
+    expect(startCalls).toBe(0)
+    expect(RunnerError.is(thrown)).toBe(true)
+    if (!RunnerError.is(thrown)) throw new Error("expected RunnerError")
+    expect(thrown.failure.kind).toBe("model_unavailable")
   })
 })
 

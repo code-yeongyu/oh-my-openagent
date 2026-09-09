@@ -1,0 +1,215 @@
+{
+  "result": "PASS",
+  "realCredentialsUntouched": true,
+  "sandboxCleanupComplete": true,
+  "cases": [
+    {
+      "name": "explicit-low",
+      "result": "PASS",
+      "exit": 0,
+      "signal": null,
+      "sandboxAgentDir": "/tmp/omo-senpi-qa-JLOOuW/agent",
+      "captures": [
+        {
+          "model": "parent",
+          "reasoning": "medium"
+        },
+        {
+          "model": "gpt-6-astra",
+          "reasoning": "low"
+        },
+        {
+          "model": "parent",
+          "reasoning": "medium"
+        }
+      ],
+      "tasks": [
+        {
+          "status": "completed",
+          "model": "omo-suffix/gpt-6-astra",
+          "resolved": {
+            "provider": "omo-suffix",
+            "model_id": "gpt-6-astra",
+            "display": "omo-suffix/gpt-6-astra",
+            "source": "explicit",
+            "variant": "low"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "isError": false,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "CHILD_OK\n\n[task_id: st_01a0843a - continue with task_send(to=\"st_01a0843a\", message=\"...\")]"
+              }
+            ],
+            "details": {
+              "task_id": "st_01a0843a",
+              "status": "completed",
+              "task_summary": "Verify explicit model routing",
+              "name": "st_01a0843a",
+              "execution_mode": "in-process",
+              "model": "omo-suffix/gpt-6-astra",
+              "run_stats": {
+                "runtime_ms": 19,
+                "turns": 1,
+                "tool_calls": 0,
+                "generation_ms": 1,
+                "cost_usd": 0,
+                "token_status": "complete",
+                "cost_status": "reported",
+                "duration_status": "monotonic"
+              },
+              "mode": "spawn",
+              "subagent_type": "explore",
+              "resolved_model": {
+                "provider": "omo-suffix",
+                "model_id": "gpt-6-astra",
+                "display": "omo-suffix/gpt-6-astra",
+                "source": "explicit",
+                "variant": "low"
+              },
+              "run_in_background": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "plain-model",
+      "result": "PASS",
+      "exit": 0,
+      "signal": null,
+      "sandboxAgentDir": "/tmp/omo-senpi-qa-IUWWYC/agent",
+      "captures": [
+        {
+          "model": "parent",
+          "reasoning": "medium"
+        },
+        {
+          "model": "gpt-6-astra",
+          "reasoning": "medium"
+        },
+        {
+          "model": "parent",
+          "reasoning": "medium"
+        }
+      ],
+      "tasks": [
+        {
+          "status": "completed",
+          "model": "omo-suffix/gpt-6-astra",
+          "resolved": {
+            "provider": "omo-suffix",
+            "model_id": "gpt-6-astra",
+            "display": "omo-suffix/gpt-6-astra",
+            "source": "explicit"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "isError": false,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "CHILD_OK\n\n[task_id: st_01a0843a - continue with task_send(to=\"st_01a0843a\", message=\"...\")]"
+              }
+            ],
+            "details": {
+              "task_id": "st_01a0843a",
+              "status": "completed",
+              "task_summary": "Verify explicit model routing",
+              "name": "st_01a0843a",
+              "execution_mode": "in-process",
+              "model": "omo-suffix/gpt-6-astra",
+              "run_stats": {
+                "runtime_ms": 10,
+                "turns": 1,
+                "tool_calls": 0,
+                "cost_usd": 0,
+                "token_status": "complete",
+                "cost_status": "reported",
+                "duration_status": "monotonic"
+              },
+              "mode": "spawn",
+              "subagent_type": "explore",
+              "resolved_model": {
+                "provider": "omo-suffix",
+                "model_id": "gpt-6-astra",
+                "display": "omo-suffix/gpt-6-astra",
+                "source": "explicit"
+              },
+              "run_in_background": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "unknown-model",
+      "result": "PASS",
+      "exit": 0,
+      "signal": null,
+      "sandboxAgentDir": "/tmp/omo-senpi-qa-yTbH7l/agent",
+      "captures": [
+        {
+          "model": "parent",
+          "reasoning": "medium"
+        },
+        {
+          "model": "parent",
+          "reasoning": "medium"
+        }
+      ],
+      "tasks": [
+        {
+          "status": "error",
+          "model": "omo-suffix/not-registered",
+          "resolved": {
+            "provider": "omo-suffix",
+            "model_id": "not-registered",
+            "display": "omo-suffix/not-registered",
+            "source": "explicit",
+            "variant": "low"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "isError": false,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Task runner failed to start."
+              }
+            ],
+            "details": {
+              "task_id": "st_01a0843a",
+              "status": "error",
+              "mode": "spawn",
+              "name": "st_01a0843a",
+              "subagent_type": "explore",
+              "execution_mode": "in-process",
+              "model": "omo-suffix/not-registered",
+              "resolved_model": {
+                "source": "explicit",
+                "provider": "omo-suffix",
+                "model_id": "not-registered",
+                "display": "omo-suffix/not-registered",
+                "variant": "low"
+              },
+              "run_in_background": false,
+              "reason": "Task runner failed to start."
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

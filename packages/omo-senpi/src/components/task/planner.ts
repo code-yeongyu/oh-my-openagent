@@ -1,4 +1,5 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { parseModelString } from "@oh-my-opencode/model-core"
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import {
@@ -27,7 +28,8 @@ const NO_REGISTRY_MESSAGE = "No senpi model registry is available yet to resolve
 // 1. a subagent_type naming a known agent wins: an explicit `model` keeps the headless explicit
 //    path (agent persona attached, no registry access); otherwise the agent's model chain resolves
 //    against the live registry and a missing registry fails closed as model_unavailable.
-// 2. an explicit `model` alone is honored verbatim, before any registry access.
+// 2. an explicit `model` alone is honored before any registry access; known reasoning suffixes
+//    are split onto variant so parent-registry lookup keys the unsuffixed model id.
 // 3. a category (or a subagent_type naming a category) resolves against omo.json + the registry.
 // Whatever path resolved, the plan then inherits the parent's effective execution tier
 // (fast-mode-inheritance.ts) so a fast parent never delegates to a standard-tier child.
@@ -46,11 +48,13 @@ export function createTaskChildPlanner(
 
     if (spec.model !== undefined && spec.model.length > 0) {
       const resolvedModel = explicitModelMetadata(spec.model)
+      const appliedVariant = appliedPlanVariant(resolvedModel)
       return {
         kind: "resolved",
         plan: {
-          model: spec.model,
+          model: resolvedModel !== undefined ? `${resolvedModel.provider}/${resolvedModel.model_id}` : spec.model,
           ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
+          ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
         },
       }
     }
@@ -134,9 +138,9 @@ function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedMod
   const resolvedModel = resolution.resolved_model ?? explicitModel
   // Identical precedence to the category path below: reasoning outranks reasoningEffort outranks
   // variant, and whichever is chosen becomes the child's thinking level through asSenpiThinkingLevel.
-  const appliedVariant = resolution.resolved_model?.reasoning ?? resolution.resolved_model?.reasoning_effort ?? resolution.resolved_model?.variant
+  const appliedVariant = appliedPlanVariant(resolvedModel)
   return {
-    model: resolution.model,
+    model: resolvedModel !== undefined ? `${resolvedModel.provider}/${resolvedModel.model_id}` : resolution.model,
     ...(resolution.requested_model !== undefined
       ? { requested_model: resolution.requested_model }
       : {}),
@@ -224,15 +228,18 @@ function toPlanResolution(
   }
 }
 
+function appliedPlanVariant(resolvedModel: ResolvedModelMetadata | undefined): string | undefined {
+  return resolvedModel?.reasoning ?? resolvedModel?.reasoning_effort ?? resolvedModel?.variant
+}
+
 function explicitModelMetadata(model: string): ResolvedModelMetadata | undefined {
-  const separatorIndex = model.indexOf("/")
-  if (separatorIndex <= 0 || separatorIndex === model.length - 1) {
-    return undefined
-  }
+  const parsed = parseModelString(model)
+  if (parsed === undefined) return undefined
   return {
     source: "explicit",
-    provider: model.slice(0, separatorIndex),
-    model_id: model.slice(separatorIndex + 1),
-    display: model,
+    provider: parsed.providerID,
+    model_id: parsed.modelID,
+    display: `${parsed.providerID}/${parsed.modelID}`,
+    ...(parsed.variant !== undefined ? { variant: parsed.variant } : {}),
   }
 }
