@@ -1,0 +1,4 @@
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+[features.multi_agent_v2]
+max_concurrent_threads_per_session = 4

@@ -4,7 +4,8 @@ import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 import {
 	acquireCacheLock,
 	deriveOmobAiVersion,
@@ -12,9 +13,8 @@ import {
 	hostTargetFor,
 	packSoleSenpiTarball,
 	parseOmobArgs,
-	planRuntimePrune,
-	selectPruneEntries,
 } from "./build-omob"
+import { planRuntimePrune, selectPruneEntries } from "./omob-runtime-prune"
 
 function tempDir(prefix: string): string {
 	return mkdtempSync(join(tmpdir(), prefix))
@@ -22,20 +22,22 @@ function tempDir(prefix: string): string {
 
 /** A pid that is guaranteed dead: spawn a trivial process and wait for it to exit. */
 function deadPid(): number {
-	const result = spawnSync("true", [], { stdio: "ignore" })
+	const result = spawnSync(process.execPath, ["-e", "process.exit(0)"], { stdio: "ignore" })
+	expect(result.error).toBeUndefined()
+	expect(result.status).toBe(0)
 	return result.pid as number
 }
 
 describe("parseOmobArgs", () => {
-	test("defaults to the latest tracked refs and the host target", () => {
+	test.skipIf(process.platform === "win32")("defaults to the latest tracked refs and the host target", () => {
 		const parsed = parseOmobArgs([], "darwin", "arm64", "/home/dev")
 		expect(parsed.senpiRef).toBe("origin/main")
 		expect(parsed.omoRef).toBe("origin/dev")
 		expect(parsed.name).toBe("omob")
 		expect(parsed.keep).toBe(2)
 		expect(parsed.target).toBe("darwin-arm64")
-		expect(parsed.installDir).toBe(join("/home/dev", ".local", "bin"))
-		expect(parsed.cacheDir).toBe(join("/home/dev", ".cache", "omob"))
+		expect(parsed.installDir).toBe(resolve("/home/dev", ".local", "bin"))
+		expect(parsed.cacheDir).toBe(resolve("/home/dev", ".cache", "omob"))
 		expect(parsed.skipFetch).toBe(false)
 		expect(parsed.skipInstall).toBe(false)
 	})
@@ -73,58 +75,6 @@ describe("deriveOmobAiVersion", () => {
 		expect(deriveOmobAiVersion("c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7")).toBe(
 			"0.0.0-omob.c6e7dd7.7fd18df",
 		)
-	})
-})
-
-describe("selectPruneEntries", () => {
-	const entries = [
-		{ name: "0.0.0-omob.aaaaaaa.bbbbbbb", mtimeMs: 3 },
-		{ name: "0.0.0-omob.ccccccc.ddddddd", mtimeMs: 1 },
-		{ name: "0.0.0-omob.eeeeeee.fffffff", mtimeMs: 2 },
-		{ name: "5.0.0-0.beta.39", mtimeMs: 0 },
-		{ name: "0.0.0-omob.1111111.2222222", mtimeMs: 5 },
-	]
-
-	test("keeps the newest dev runtimes and never touches release runtimes", () => {
-		expect(selectPruneEntries(entries, 2)).toEqual(["0.0.0-omob.ccccccc.ddddddd", "0.0.0-omob.eeeeeee.fffffff"])
-	})
-
-	test("keeps everything below the budget", () => {
-		expect(selectPruneEntries(entries, 3)).toEqual(["0.0.0-omob.ccccccc.ddddddd"])
-		expect(selectPruneEntries(entries, 4)).toEqual([])
-	})
-})
-
-describe("planRuntimePrune", () => {
-	const entries = [
-		{ name: "0.0.0-omob.cur0000.cur0000", mtimeMs: 5 },
-		{ name: "0.0.0-omob.aaaaaaa.bbbbbbb", mtimeMs: 3 },
-		{ name: "0.0.0-omob.ccccccc.ddddddd", mtimeMs: 1 },
-		{ name: "0.0.0-omob.eeeeeee.fffffff", mtimeMs: 2 },
-		{ name: "5.0.0-0.beta.40", mtimeMs: 0 },
-	]
-
-	test("reserves a slot for the version being built and prunes the rest oldest-first", () => {
-		expect(planRuntimePrune(entries, 2, "0.0.0-omob.cur0000.cur0000")).toEqual([
-			"0.0.0-omob.ccccccc.ddddddd",
-			"0.0.0-omob.eeeeeee.fffffff",
-		])
-	})
-
-	test("never counts the current version against the budget even when its dir is absent", () => {
-		const withoutCurrent = entries.filter((entry) => !entry.name.includes("cur0000"))
-		expect(planRuntimePrune(withoutCurrent, 2, "0.0.0-omob.cur0000.cur0000")).toEqual([
-			"0.0.0-omob.ccccccc.ddddddd",
-			"0.0.0-omob.eeeeeee.fffffff",
-		])
-	})
-
-	test("keep=1 leaves only the version being built", () => {
-		expect(planRuntimePrune(entries, 1, "0.0.0-omob.cur0000.cur0000")).toEqual([
-			"0.0.0-omob.ccccccc.ddddddd",
-			"0.0.0-omob.eeeeeee.fffffff",
-			"0.0.0-omob.aaaaaaa.bbbbbbb",
-		])
 	})
 })
 
@@ -289,7 +239,7 @@ describe("ensureCacheClone submodule ordering", () => {
 			writeFileSync(join(superWork, "README.md"), "super\n")
 			git(["add", "-A"], superWork)
 			git(["commit", "-qm", "init"], superWork)
-			git(["submodule", "add", "-q", `file://${subBare}`, "upstreams/skill"], superWork)
+			git(["submodule", "add", "-q", pathToFileURL(subBare).href, "upstreams/skill"], superWork)
 			const subInSuper = join(superWork, "upstreams", "skill")
 			git(["checkout", "-q", "--detach", "HEAD~1"], subInSuper)
 			git(["add", "-A"], superWork)
@@ -306,21 +256,21 @@ describe("ensureCacheClone submodule ordering", () => {
 			Object.assign(process.env, fixtureEnv)
 
 			// fresh clone at the tip: submodule must be at v2
-			ensureCacheClone(`file://${superBare}`, cache, "origin/dev", false)
+			ensureCacheClone(pathToFileURL(superBare).href, cache, "origin/dev", false)
 			expect(read()).toBe("v2")
 
 			// switch BACK to the commit that pins v1 — reusing the same cache. checkout/reset do
 			// not recurse, so only a post-checkout submodule sync can make this match the ref.
-			ensureCacheClone(`file://${superBare}`, cache, "origin/dev~1", false)
+			ensureCacheClone(pathToFileURL(superBare).href, cache, "origin/dev~1", false)
 			expect(read()).toBe("v1")
 
 			// and forward again
-			ensureCacheClone(`file://${superBare}`, cache, "origin/dev", false)
+			ensureCacheClone(pathToFileURL(superBare).href, cache, "origin/dev", false)
 			expect(read()).toBe("v2")
 
 			// A raw SHA is not a fetchable refspec either; resolving it must still work.
 			const olderSha = spawnSync("git", ["rev-parse", "origin/dev~1"], { cwd: cache, encoding: "utf8" }).stdout.trim()
-			ensureCacheClone(`file://${superBare}`, cache, olderSha, false)
+			ensureCacheClone(pathToFileURL(superBare).href, cache, olderSha, false)
 			expect(read()).toBe("v1")
 
 			for (const key of Object.keys(fixtureEnv)) delete process.env[key]

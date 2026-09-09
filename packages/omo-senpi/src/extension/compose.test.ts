@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, spyOn } from "bun:test"
 
 import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "./compose"
@@ -253,5 +253,32 @@ describe("composeOmoSenpiExtension", () => {
         },
       },
     ])
+  })
+
+  it("#given the default logger #when a component logs without details #then console receives only the message", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const info = spyOn(console, "info").mockImplementation(() => {})
+    const components: OmoSenpiComponent[] = [
+      {
+        name: "alpha",
+        register(_api, ctx) {
+          ctx.logger.info("alpha ready")
+          ctx.logger.info("alpha detail", { count: 1 })
+        },
+      },
+    ]
+
+    // when
+    let alphaCalls: unknown[][] = []
+    try {
+      await composeOmoSenpiExtension(components)(pi)
+      alphaCalls = info.mock.calls.filter((call) => String(call[0]).startsWith("alpha"))
+    } finally {
+      info.mockRestore()
+    }
+
+    // then
+    expect(alphaCalls).toStrictEqual([["alpha ready"], ["alpha detail", { count: 1 }]])
   })
 })

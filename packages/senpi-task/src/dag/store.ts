@@ -11,6 +11,8 @@ import type { DagRunEventType } from "./events"
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
 const LOCK_WAIT_TIMEOUT_MS = 1_000
+const WINDOWS_CLEANUP_RETRIES = 8
+const WINDOWS_CLEANUP_RETRY_MS = 5
 const READ_BUFFER_BYTES = 64 * 1024
 const TERMINAL_STATUSES = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
 const sleeper = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
@@ -757,8 +759,24 @@ function removeObservedLock(
     restoreQuarantinedLock(path, quarantinePath)
     return false
   }
-  fs.rmSync(quarantinePath, { force: true })
+  removeWindowsContendedFile(quarantinePath)
   return true
+}
+
+// Windows may keep a just-closed lock handle briefly. The lock is already exclusively owned by
+// this process at this point; retry only this cleanup, rather than turning a successful start into
+// a failure (POSIX unlink does not have this sharing violation).
+function removeWindowsContendedFile(path: string): void {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.rmSync(path, { force: true })
+      return
+    } catch (error) {
+      if (process.platform !== "win32" || attempt >= WINDOWS_CLEANUP_RETRIES ||
+        (!hasCode(error, "EPERM") && !hasCode(error, "EBUSY"))) throw error
+      Atomics.wait(sleeper, 0, 0, WINDOWS_CLEANUP_RETRY_MS)
+    }
+  }
 }
 
 function restoreQuarantinedLock(path: string, quarantinePath: string): void {

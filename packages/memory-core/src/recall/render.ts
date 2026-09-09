@@ -6,10 +6,10 @@
 import type { RecallNudge } from "./gate"
 
 export const RECALL_HINT_HEADER =
-  "A stored memory surfaced. It is a hint, not current state — verify before relying on it; read the source path for full context."
+  "Kibitzer recalled a stored memory. It is a hint, not current state — verify before relying on it; read the source path for full context."
 
 export const RECALL_HINT_HEADER_KO =
-  "저장된 메모리가 떠올랐습니다. 현재 상태가 아니라 힌트입니다 — 의존하기 전에 확인하고, 전체 맥락은 출처 경로를 읽으세요."
+  "키비처가 저장된 메모리를 짚어줬습니다. 현재 상태가 아니라 힌트입니다 — 의존하기 전에 확인하고, 전체 맥락은 출처 경로를 읽으세요."
 
 /**
  * A gate-judged nudge in the same sourced framing as a lexical candidate: the judge's one-sentence

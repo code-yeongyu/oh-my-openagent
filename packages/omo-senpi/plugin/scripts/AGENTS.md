@@ -15,7 +15,7 @@ Build, staging, sync, and install pipeline for the `@code-yeongyu/omo-senpi` Pi 
 | `senpi-skill-roster-overlay.mjs` | Senpi-specific skill roster overlay applied on top of synced skills. |
 | `embed-directive.mjs` | Embeds `skills/ultrawork/SKILL.md` into `src/components/ultrawork/generated-directive.ts`; rejects forbidden directive tokens/patterns (multi_agent, spawn_agent, codex, ...). `--check` verifies freshness. |
 | `sync-version.mjs` | Version sync for the plugin manifest. |
-| `persona-artifacts.mjs` | Persona staging/freshness (dream, facts, reflection) consumed by the extension build. |
+| `persona-artifacts.mjs` | Persona staging/freshness (reflection, dream, facts, kibitzer) consumed by the extension build. Node cannot import the TypeScript manifest, so the names are literal here and locked to `memory-core/src/personas/manifest.ts` by `build-extension.test.mjs`. |
 | `stage-agent-toolkit.mjs`, `stage-ast-grep-mcp-runtime.mjs`, `stage-lsp-daemon-runtime.mjs` | Stage vendored runtimes into `plugin/runtime/` with manifest + SHA-256 + mode verification and `check*Fresh` freshness gates; `stage-lsp-daemon-runtime.d.mts` is the explicit type surface. |
 
 ## CONVENTIONS

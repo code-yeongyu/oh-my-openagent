@@ -18,15 +18,15 @@ export type CodexModelCatalog = {
 
 const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
   current: {
-    model: "gpt-5.6-sol",
-    modelContextWindow: 650_000,
+    model: "gpt-6-astra",
+    modelContextWindow: 600_000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh",
   },
   managedProfiles: [
     {
       model: "gpt-5.5",
-      modelContextWindow: 650_000,
+      modelContextWindow: 400_000,
       modelReasoningEffort: "high",
       planModeReasoningEffort: "xhigh",
     },
@@ -37,6 +37,12 @@ const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
       planModeReasoningEffort: "xhigh",
     },
     { model: "gpt-5.5", modelContextWindow: 272_000 },
+    {
+      model: "gpt-5.6-sol",
+      modelContextWindow: 650_000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh",
+    },
   ],
 }
 

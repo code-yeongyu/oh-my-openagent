@@ -1,0 +1,31 @@
+plugin-root: /private/tmp/omo-persona-20260909/packages/omo-senpi/plugin
+senpi-cli: /private/tmp/omo-persona-20260909/node_modules/@code-yeongyu/senpi/dist/cli.js
+scenario: all
+PASS s1.sandbox-isolated :: agentDir=/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-iqpUOj/agent memoryHome=/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-iqpUOj/memory
+PASS s1.memory-seeded :: /private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-iqpUOj/memory/agents/project-c4ffd3c7/repo/reference/kubernetes-rollouts.md
+PASS s1.seed-turn-gate-quiet :: runs=0 judgeRequests=0
+PASS s1.session-identified :: sessionId=01a0852b-ea43-73de-b5e5-d0a4b42d243a sessionFile=/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-iqpUOj/agent/sessions/2026-09-09T07-57-22-883Z_01a0852b-ea43-73de-b5e5-d0a4b42d243a.jsonl
+PASS s1.judge-settled :: {"pending":["/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-iqpUOj/memory/agents/project-c4ffd3c7/runtime/recall/pending/01a0852b-ea43-73de-b5e5-d0a4b42d243a.json"]}
+PASS s1.nudged-entry :: count=1 path=reference/kubernetes-rollouts.md
+PASS s1.recall-injected :: count=1
+PASS s1.no-failed-gate :: no failed gate entry
+PASS s1.run-dir-artifacts :: runs=1 candidates=true stopReason=stop
+PASS s1.judge-request-count :: judgeRequests=2
+cleanup: pid 92987 exited, server closed, sandbox removed
+PASS s2.sandbox-isolated :: agentDir=/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-hFhEog/agent memoryHome=/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-hFhEog/memory
+PASS s2.memory-seeded :: /private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-hFhEog/memory/agents/project-978ea7f0/repo/reference/kubernetes-rollouts.md
+PASS s2.seed-turn-gate-quiet :: runs=0 judgeRequests=0
+PASS s2.session-identified :: sessionId=01a0852c-04fc-720c-9b59-0c2f58e2fd87 sessionFile=/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-hFhEog/agent/sessions/2026-09-09T07-57-29-724Z_01a0852c-04fc-720c-9b59-0c2f58e2fd87.jsonl
+PASS s2.judge-settled :: {"gate":["failed"]}
+PASS s2.gate-child-failed :: count=1 cause=child_failed
+PASS s2.gate-reason-sanitized :: reason="500: {\"message\":\"mock judge outage\\nline2\"}" length=43
+PASS s2.gate-run-id :: runId=a2b8d7e4-3506-4e00-be1a-49c4bc42e126
+PASS s2.no-nudged-entry :: count=0
+PASS s2.no-pending-file :: no pending nudges
+cleanup: pid 93463 exited, server closed, sandbox removed
+evidence: /tmp/omo-persona-20260909/.omo/evidence/omo-senpi-adapter/20260909-persona-single-source/kibitzer-gate-e2e.json
+{
+  "ok": true,
+  "total": 20,
+  "failures": []
+}

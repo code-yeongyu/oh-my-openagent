@@ -104,12 +104,12 @@ describe("InProcessRunner child system prompt", () => {
     })
 
     // when
-    const handle = await runner.start(baseSpec({ systemPrompt: "# Memorian\n\nYou judge turns." }))
+    const handle = await runner.start(baseSpec({ systemPrompt: "# Kibitzer\n\nYou judge turns." }))
     fake.resolvePrompt()
     await handle.waitForIdle()
 
     // then
-    expect(captured?.resourceLoader?.getSystemPrompt()).toBe("# Memorian\n\nYou judge turns.")
+    expect(captured?.resourceLoader?.getSystemPrompt()).toBe("# Kibitzer\n\nYou judge turns.")
   })
 
   test("#given a spec without a system prompt #when the child session is created #then the minimal loader keeps returning none", async () => {
@@ -138,7 +138,7 @@ describe("InProcessRunner prompt envelope", () => {
     // given
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })
-    const prompt = "<memorian-input>\ncandidates and transcript only\n</memorian-input>"
+    const prompt = "<kibitzer-input>\ncandidates and transcript only\n</kibitzer-input>"
 
     // when
     const handle = await runner.start(baseSpec({ prompt, promptEnvelope: "bare" }))

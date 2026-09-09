@@ -1,0 +1,95 @@
+{
+  "task": 5,
+  "task_id": "st_01a08100",
+  "status": "done",
+  "summary": "Fixed managed reasoning endpoint recognition without changing the failing relink test. Remote RED and GREEN captured, installer bundle regenerated, isolated installer QA passed.",
+  "worktree": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-astra-default-models",
+  "root_cause": "The old pairs already had Astra upgrade steps. The latest-only guard stopped recognizing the regression fixture's momus gpt-5.6-terra/high cached bundle, preserving gpt-5.5/xhigh instead of upgrading to high.",
+  "decision": "Recognize exact earlier chain endpoints only when their effort equals the newest bundled effort. This preserves model-only upgrade compatibility while retaining custom-pair and obsolete-effort guards. Rewriting the regression fixture was rejected because it would hide the compatibility failure.",
+  "changed_files": [
+    "packages/omo-codex/src/install/managed-agent-reasoning-defaults.ts",
+    "packages/omo-codex/src/install/managed-agent-reasoning-defaults.test.ts",
+    "packages/omo-codex/scripts/install-dist/install-local.mjs",
+    ".omo/evidence/20260908-lcx-astra/task-5-regression.log",
+    ".omo/evidence/20260908-lcx-astra/task-5-doneclaim.json"
+  ],
+  "red_proof": {
+    "machine": "mengmotaMac",
+    "task_id": "st_01a08154",
+    "evidence": "task-5-red-green.log",
+    "method": "Executed failing-first reconstruction: pristine dev plus only branch test files, then exact pushed branch, in one remote SDK session without product/test edits.",
+    "red_source": "8bd0c35b3ba532ab0cb0df49ea71467303aa92ba",
+    "green_source": "b97e0acdf4264d0d4c989dbb8a41a3808147f3dd",
+    "command": "bun test ./packages/omo-codex/src/install/managed-agent-reasoning-defaults.test.ts ./packages/omo-codex/src/install/link-cached-plugin-agents-regression.test.ts",
+    "output": "RED: 38 pass / 9 fail, TEST_EXIT=1; GREEN: 47 pass / 0 fail, TEST_EXIT=0. RED failures are managed reasoning assertions; the unchanged relink regression passes against this pristine dev baseline.",
+    "aggregate_command": "cd packages/omo-codex/plugin && node --test test/aggregate-agents.test.mjs",
+    "aggregate_output": "RED: 2 pass / 1 fail, TEST_EXIT=1; named each-role model/effort/evidence assertion expected model gpt-6-astra but received explorer gpt-5.6-luna. GREEN: 3 pass / 0 fail, TEST_EXIT=0.",
+    "aggregate_red_raw_output_sha256": "672b8fb186fde7e571c4f33026b04ce776bb99f85e9266e64697aff984a1d274",
+    "aggregate_green_raw_output_sha256": "bb4f59cccb8eda262bfd086146c53a178eb308afe89e942b91818396b841fc40",
+    "cleanup": "/tmp/lcx-reda-20260908 dir REMOVED; CLEANUP_EXIT=0; receipt included in task-5-red-green.log",
+    "historical_note": "The earlier reasoning-regression RED remains in task-5-regression.log; other fields below retain their historical results and are not re-certified by this scoped capture."
+  },
+  "green_proof": {
+    "machine": "gorky",
+    "command": "bun test ./packages/omo-codex/src/install",
+    "output": "326 pass / 1 existing Windows-only skip / 0 fail; 1074 expect() calls; 327 tests across 49 files; TEST_EXIT=0",
+    "raw_output_sha256": "6f6a1b5d60970ac46e6c9f5531905c41886d886e7d82b080bc16565b1b95c914",
+    "agent_suite_pass_counts": {
+      "managed-agent-reasoning-defaults.test.ts": 44,
+      "link-cached-plugin-agents.test.ts": 15,
+      "lazycodex-install-surface.test.ts": 5,
+      "link-cached-plugin-agents-regression.test.ts": 3
+    },
+    "aggregate_command": "cd packages/omo-codex/plugin && node --test test/aggregate-agents.test.mjs",
+    "aggregate_output": "3 pass / 0 fail; TEST_EXIT=0",
+    "aggregate_raw_output_sha256": "523105b0648a6bf67206d6e6bbc2b7319c07fe0c62d3f97ed80156daa6d2ea83"
+  },
+  "acceptance": [
+    "tsgo --noEmit -p packages/omo-codex/tsconfig.json: TYPECHECK_EXIT=0",
+    "LSP diagnostics on changed source, test, and generated bundle: No diagnostics found",
+    "node --check packages/omo-codex/scripts/install-dist/install-local.mjs: BUNDLE_SYNTAX_EXIT=0",
+    "git diff --check for changed source/test/bundle: SOURCE_DIFF_CHECK_EXIT=0"
+  ],
+  "bundle": {
+    "command": "bun run build:codex-install",
+    "exit_code": 0,
+    "diff_stat": "packages/omo-codex/scripts/install-dist/install-local.mjs | 6 +++---; 1 file changed, 3 insertions(+), 3 deletions(-)",
+    "sha256_before": "ae62401619b873f589123eafcc3ac3a02fc09ad1b8a421c86556bddff7d354d7",
+    "sha256_after": "6b1cbf2fec0998b2053d623161950629d4f767e62b37bf634c782d0138973d4a",
+    "source_digest": "b5afc7408180d5c1661c76a4c639607941de5e8b936ae1e99b2a5eba9c66aedd",
+    "body_digest": "55ee1891c5647811a3cf5669fec1edd2827cf926fd51d3e4b6b42d9986604202",
+    "digest_validation": "BUNDLE_DIGEST_MATCH"
+  },
+  "manual_qa": {
+    "command": "node packages/omo-codex/scripts/install-local.mjs install",
+    "exit_code": 0,
+    "surface": "Rebuilt Node installer, codex-qa isolation helpers, isolated HOME/CODEX_HOME/bin/XDG directories; no mocked installer commands and no model calls.",
+    "observed": "12 Astra TOMLs and 12 agent registrations; momus gpt-5.5/xhigh -> Astra/high; explorer gpt-5.6-luna/xhigh -> Astra/xhigh; librarian luna-fast/low -> Astra/low.",
+    "real_codex_config_sha1_before_after": "b012e531f5aa9fb1bce9003593c3eadf07081fcd",
+    "real_omo_config_sha1_before_after": "50a36cf5ed53c8719f3265d4a2786381d793b6dc",
+    "cleanup": "Local isolated QA home removed."
+  },
+  "failed_attempts_retained": [
+    "macOS source overlay initially removed built CLIs: 319 pass / 1 skip / 7 missing-hook-target failures.",
+    "macOS preparation command bun --cwd <dir> run build printed help and exited zero without building; same seven failures. Corrected to explicit cd && bun run build and validated hook targets.",
+    "macOS with actual built runtimes: 325 pass / 1 skip / 1 unrelated install-codex.test.ts timeout at 20000ms. Authorized gorky fallback passed unchanged tests and deadlines on its first run."
+  ],
+  "cleanup": [
+    "mengmotaMac: rm -rf /tmp/lcx-fix5-20260908; ls -d -> No such file or directory; LS_EXIT=1.",
+    "gorky: rm -rf /tmp/lcx-fix5-20260908; ls -d -> No such file or directory; LS_EXIT=2.",
+    "No commits, pushes, checkout, stash, local bun test, or agentic probes. No worktree packages/shared-skills or main checkout edits.",
+    "Regression test unchanged: SHA256 af27e4ac6d57a56e3adced0313c726d7dfaae16f5df994c74d98fc3767226645.",
+    "task-5-regression.log is gitignored; gate node must force-add the new evidence log along with the changed source, test, bundle, and DoneClaim."
+  ],
+  "assumptions": [
+    "Existing regression assertions and fixture remain binding; no new historical model pairs were invented. The model continues to follow the shipped bundle independently of preserved effort."
+  ],
+  "omitted": [
+    "Full test:codex and agentic/live model QA were not run in this repair; existing Windows-only test skip remains unchanged."
+  ],
+  "evidence": {
+    "path": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-astra-default-models/.omo/evidence/20260908-lcx-astra/task-5-regression.log",
+    "sha256": "9d5a74df3d46d11de50f02c97ae173aeeb6a0677d1e2cd37a5ce6ef1fc10d8dc",
+    "bytes": 381988
+  }
+}

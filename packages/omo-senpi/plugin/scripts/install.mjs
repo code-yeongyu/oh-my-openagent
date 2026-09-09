@@ -143,6 +143,20 @@ import { constants as constants2 } from "node:fs";
 import { access as access2, readFile as readFile2, stat } from "node:fs/promises";
 import { dirname as dirname3, join as join4 } from "node:path";
 
+// packages/memory-core/src/personas/manifest.ts
+var PERSONA_ASSET_FILENAMES = {
+  reflection: "reflection-persona.md",
+  dream: "dream-persona.md",
+  facts: "facts-persona.md",
+  kibitzer: "kibitzer-persona.md"
+};
+var PERSONA_ASSET_FILES = [
+  PERSONA_ASSET_FILENAMES.reflection,
+  PERSONA_ASSET_FILENAMES.dream,
+  PERSONA_ASSET_FILENAMES.facts,
+  PERSONA_ASSET_FILENAMES.kibitzer
+];
+
 // packages/omo-senpi/src/install/senpi-settings.ts
 import { constants } from "node:fs";
 import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -266,10 +280,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "omo-task.js"),
   join4("extensions", "omo-member.js"),
   join4("extensions", "memory-run-supervisor.mjs"),
-  join4("extensions", "reflection-persona.md"),
-  join4("extensions", "dream-persona.md"),
-  join4("extensions", "facts-persona.md"),
-  join4("extensions", "memorian-persona.md"),
+  ...PERSONA_ASSET_FILES.map((filename) => join4("extensions", filename)),
   join4("skills", "ast-grep", "SKILL.md"),
   join4("skills", "coding-agent-sessions", "SKILL.md"),
   join4("skills", "debugging", "SKILL.md"),

@@ -1,0 +1,4 @@
+ISOLATED_AGENT_TOML_COUNT=12
+ISOLATED_CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.qkhieMVewN/codex
+PASS: real ~/.codex/config.toml unchanged (5ba341ba17ef6709651a43d2dbf9ba6c14b2b58c)
+ISOLATED_AGENT_COUNT_EXIT=0

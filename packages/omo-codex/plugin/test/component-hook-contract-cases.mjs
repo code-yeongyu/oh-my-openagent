@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 export function componentHookContractCases(tempRoot) {
+	mkdirSync(join(tempRoot, ".omo", "evidence"), { recursive: true });
+	writeFileSync(join(tempRoot, ".omo", "evidence", "receipt.txt"), "command output PASS\n".repeat(10));
 	const spawnPayload = {
 		cwd: tempRoot, hook_event_name: "PreToolUse", model: "gpt-6-astra",
 		permission_mode: "default", session_id: "s-spawn-admission", tool_input: { message: "scan" },
@@ -239,6 +241,28 @@ export function componentHookContractCases(tempRoot) {
 				const output = JSON.parse(stdout);
 				assert.equal(output.decision, "block");
 				assert.match(output.reason, /\.omo\/evidence\//);
+			},
+		},
+		{
+			name: "lazycodex worker verifier passes receipt with nonexistent transcript",
+			component: "lazycodex-executor-verify",
+			event: "subagent-stop",
+			payload: {
+				hook_event_name: "SubagentStop",
+				agent_type: "lazycodex-worker-medium",
+				agent_id: "agent-task12",
+				session_id: "s-task12",
+				turn_id: "t-task12",
+				transcript_path: join(tempRoot, "transcript.jsonl"),
+				agent_transcript_path: join(tempRoot, "agent-transcript.jsonl"),
+				cwd: tempRoot,
+				model: "gpt-6-astra",
+				permission_mode: "default",
+				stop_hook_active: true,
+				last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/receipt.txt",
+			},
+			assertOutput(stdout) {
+				assert.equal(stdout, "");
 			},
 		},
 		{

@@ -4,12 +4,15 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
+
 import {
   buildExtension,
   checkExtensionCurrent,
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
+import { runtimePersonaSources } from "./persona-artifacts.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
@@ -101,15 +104,23 @@ describe("checkExtensionCurrent", () => {
       ["reflection-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md")],
       ["dream-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "dream-persona.md")],
       ["facts-persona.md", join(repoRoot, "packages", "memory-core", "src", "facts", "assets", "facts-persona.md")],
-      // The memorian gate loads its persona from beside the BUNDLE, so an unstaged asset makes
+      // The kibitzer gate loads its persona from beside the BUNDLE, so an unstaged asset makes
       // every live gate launch fail with ENOENT while every source-reading unit test still passes.
-      ["memorian-persona.md", join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "memorian-persona.md")],
+      ["kibitzer-persona.md", join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "kibitzer-persona.md")],
     ]
 
     // then
     for (const [name, source] of personas) {
       expect(await readFile(join(dirname(outputs.outputPath), name), "utf8")).toBe(await readFile(source, "utf8"))
     }
+  })
+
+  test("#given the runtime persona manifest #when staging sources are listed #then the staged names match it", () => {
+    // given / when
+    const staged = runtimePersonaSources(repoRoot).map(([name]) => name)
+
+    // then
+    expect(staged).toEqual([...PERSONA_ASSET_FILES])
   })
 
   test("#given platform-specific source paths #when normalized #then build markers use portable separators", () => {

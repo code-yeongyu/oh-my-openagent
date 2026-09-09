@@ -2,7 +2,19 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 
+export interface CompactReadClassification {
+  readonly kind: "docs" | "resource" | "skill" | "memory"
+  readonly label: string
+  readonly headline?: string
+}
+
+export type ReadClassifier = (input: {
+  readonly absolutePath: string
+  readonly cwd: string
+}) => CompactReadClassification | undefined
+
 export interface SenpiExtensionAPI {
+  readonly sharedHostEnabled?: boolean
   /**
    * Absolute cwd of the session this extension instance was loaded for. senpi builds one
    * ExtensionAPI per session and already knows the value at load time. Optional because hosts
@@ -31,6 +43,8 @@ export interface SenpiExtensionAPI {
   getFlag(name: string): boolean | string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  /** Feature-detected until the pinned Senpi runtime exports read classifiers. */
+  registerReadClassifier?(classifier: ReadClassifier): () => void
   registerRemovedToolHint?(name: string, hint: string): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
   appendEntry?(customType: string, data?: unknown): void
@@ -47,6 +61,7 @@ export interface ComponentLogger {
 
 export interface ComponentContext {
   logger: ComponentLogger
+  sharedHostEnabled?: boolean
   config: {
     getFlag(name: string): boolean | string | undefined
   }

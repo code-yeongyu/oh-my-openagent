@@ -7,7 +7,7 @@ import { join } from "node:path"
 import { launchFactsInProcess } from "./facts-in-process-launch"
 import { FACTS_RECORD_TOOL_NAME } from "./facts-record-tool"
 import { fixture, runnerOptions } from "./facts-runner.test-support"
-import { registrySnapshot } from "./memorian-runner.test-support"
+import { registrySnapshot } from "./kibitzer-runner.test-support"
 import type { ReflectionModelCandidate } from "./worker/resolve-model"
 import { writeRunJsonAtomic, type RunOutcome } from "./worker/run-artifacts"
 

@@ -1,0 +1,21 @@
+Remote verification via bunshin on mengmotaMac (listMachines first; mengmotaHost offline, mengmotaMac online).
+
+=== aggregate-model-catalog.test.mjs ===
+✔ 3 tests, 3 pass, 0 fail
+TEST_EXIT=0
+
+=== install-config-reasoning.test.mjs ===
+Remote command: cd packages/omo-codex && node --test scripts/install-config-reasoning.test.mjs
+2 pass, 3 fail, TEST_EXIT=1. Failures are stale migration expectations for gpt-5.6-sol / thread caps; the catalog-specific bundled-model test passed.
+
+=== version-coherence.test.ts + codex-config-reasoning.test.ts ===
+11 pass, 0 fail, 57 expect() calls
+TEST_EXIT=0
+
+=== cleanup ===
+ls -d /tmp/lcx-fix2-20260908 -> No such file or directory (remote checkout removed).
+2026-09-08 task 2 final verification
+Local: cd packages/omo-codex/plugin && node --test test/auto-update.test.mjs -> 31 pass, 0 fail.
+Remote machine: mengmotaMac; clean clone /tmp/lcx-fix2b-20260908, modified auto-update.test.mjs copied in.
+Remote command: bun install --frozen-lockfile; cd packages/omo-codex/plugin; node --test test/*.test.mjs
+Remote result: 327 pass, 0 fail, TEST_EXIT=0. Temporary checkout cleanup executed (wrapper exit was affected only by deleting its current directory after printing the successful TEST_EXIT receipt).

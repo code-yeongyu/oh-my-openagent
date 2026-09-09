@@ -1,0 +1,82 @@
+{
+  "mode": "legacy",
+  "home": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.jxQn3Ad6kp/codex",
+  "model": "gpt-6-astra",
+  "model_context_window": 600000,
+  "model_reasoning_effort": "high",
+  "plan_mode_reasoning_effort": "xhigh",
+  "agents": [
+    {
+      "role": "explorer",
+      "model": "gpt-6-astra",
+      "effort": "low"
+    },
+    {
+      "role": "lazycodex-clone-fidelity-reviewer",
+      "model": "gpt-6-astra",
+      "effort": "high"
+    },
+    {
+      "role": "lazycodex-code-reviewer",
+      "model": "gpt-6-astra",
+      "effort": "medium"
+    },
+    {
+      "role": "lazycodex-gate-reviewer",
+      "model": "gpt-6-astra",
+      "effort": "low"
+    },
+    {
+      "role": "lazycodex-qa-executor",
+      "model": "gpt-6-astra",
+      "effort": "high"
+    },
+    {
+      "role": "lazycodex-worker-high",
+      "model": "gpt-6-astra",
+      "effort": "medium"
+    },
+    {
+      "role": "lazycodex-worker-low",
+      "model": "gpt-6-astra",
+      "effort": "high"
+    },
+    {
+      "role": "lazycodex-worker-medium",
+      "model": "gpt-6-astra",
+      "effort": "high"
+    },
+    {
+      "role": "librarian",
+      "model": "gpt-6-astra",
+      "effort": "low"
+    },
+    {
+      "role": "metis",
+      "model": "gpt-6-astra",
+      "effort": "high"
+    },
+    {
+      "role": "momus",
+      "model": "gpt-6-astra",
+      "effort": "high"
+    },
+    {
+      "role": "plan",
+      "model": "gpt-6-astra",
+      "effort": "high"
+    }
+  ],
+  "agentBlocks": 12,
+  "installedHookCount": 21,
+  "sourceHookCount": 21,
+  "installedManifestSurface": ".tmp/marketplaces/sisyphuslabs/plugins/omo/.codex-plugin/plugin.json",
+  "cacheHookCount": 19,
+  "cacheVsSourceCountEqual": false,
+  "cacheRemovedHooks": [
+    "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
+    "./hooks/post-compact-resetting-git-bash-mcp-reminder.json"
+  ],
+  "customV2Cap": null,
+  "passed": true
+}

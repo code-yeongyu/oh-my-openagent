@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
@@ -24,9 +25,10 @@ test.each(["directory", "bun-link", "external-link"])("#given a %s worker engine
     writeFileSync(worker, `import { parentPort } from "node:worker_threads"; parentPort.postMessage("ready");`)
     const entry = join(root, "entry.ts")
     writeFileSync(entry, `import { Worker } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
 const path = typeof SENPI_RPC_SESSION_WORKER_ENTRY === "string" ? SENPI_RPC_SESSION_WORKER_ENTRY : "./src/modes/rpc/session-worker.ts";
 await Promise.all([1, 2].map(() => new Promise((resolve, reject) => {
-  const worker = new Worker(new URL(path, import.meta.url));
+  const worker = new Worker(fileURLToPath(new URL(path, import.meta.url)).replaceAll("\\\\", "/"));
   worker.once("error", reject);
   worker.once("message", async (message) => { await worker.terminate(); resolve(message); });
 })));
@@ -35,6 +37,7 @@ console.log("two-workers-ready");`)
     // when: use the same args as the release builder, then remove the entire source.
     const built = spawnSync(process.execPath, ["build", "--compile", entry, ...senpiWorkerCompileArgs(root), "--outfile", binary], { cwd: root, encoding: "utf8", timeout: 30_000 })
     expect(built.status, built.stderr).toBe(0)
+    console.log(JSON.stringify({ layout, bun: Bun.version, revision: Bun.revision, platform: process.platform, arch: process.arch, binarySha256: createHash("sha256").update(readFileSync(binary)).digest("hex") }))
     const relocated = join(scratch, "relocated")
     mkdirSync(relocated)
     const moved = join(relocated, process.platform === "win32" ? "omo.exe" : "omo")

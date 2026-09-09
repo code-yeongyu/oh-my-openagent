@@ -652,13 +652,13 @@ Reminds the agent to save when durable facts have gone unwritten.
 #### Recall (recollections)
 
 The nudge above asks the agent to write. Recall is the other direction: a read-only judge called
-Memorian watches each turn, checks stored memory against what the agent is doing, and hands back
+Kibitzer watches each turn, checks stored memory against what the agent is doing, and hands back
 a hint only when that memory would change the next step (a constraint being ignored, a past
 failure of the same approach, an answer about to be re-derived). Silence is the default. Most
 turns produce nothing, and a judge that finds nothing leaves no trace.
 
-When it does fire, you see a recollection in the transcript written in the agent's own voice: a
-single fixed `Aha!` title, then `just remembered: <hint>`,
+When it does fire, you see a recollection in the transcript identified as Kibitzer advice: a
+single fixed `Kibitzer` title, then `recalled memory: <hint>`,
 with the memory path beneath it. It's a transcript entry, not a
 toast. The hint is one sentence of at most 200 characters, and the same memory surfaces at most
 once per session. Treat it as a hint, not current state: the agent is told to verify before
@@ -666,7 +666,7 @@ relying on it, and expanding the entry shows that caveat.
 
 | Option              | Default | Description                                                     |
 | ------------------- | ------- | --------------------------------------------------------------- |
-| `recall.enabled`    | `true`  | Run the Memorian judge and surface recollections                |
+| `recall.enabled`    | `true`  | Run the Kibitzer judge and surface recollections                |
 | `recall.max_items`  | `2`     | Most memories one judge run may surface (1-5)                   |
 
 #### Facts

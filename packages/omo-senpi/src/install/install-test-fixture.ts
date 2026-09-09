@@ -34,7 +34,7 @@ export async function createPluginFixture(options: { readonly runtime?: boolean 
   await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "memorian-persona.md"), "# memorian persona fixture\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "kibitzer-persona.md"), "# kibitzer persona fixture\n")
   for (const skillName of REQUIRED_SKILL_NAMES) {
     await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
   }

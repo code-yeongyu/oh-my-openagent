@@ -22,15 +22,20 @@ const REQUIRED_CAPABILITIES = [
 
 type RequiredCapability = (typeof REQUIRED_CAPABILITIES)[number]
 
+// Forward `details` only when present: `console.info(message, undefined)` renders a trailing "undefined".
+function consoleArgs(message: string, details: unknown): [string] | [string, unknown] {
+  return details === undefined ? [message] : [message, details]
+}
+
 const defaultLogger: ComponentLogger = {
   info(message, details) {
-    console.info(message, details)
+    console.info(...consoleArgs(message, details))
   },
   warn(message, details) {
-    console.warn(message, details)
+    console.warn(...consoleArgs(message, details))
   },
   error(message, details) {
-    console.error(message, details)
+    console.error(...consoleArgs(message, details))
   },
 }
 
@@ -112,6 +117,7 @@ export function composeOmoSenpiExtension(
 
     const ctx: ComponentContext = {
       logger,
+      sharedHostEnabled: pi.sharedHostEnabled === true,
       config: {
         getFlag(name) {
           return pi.getFlag(name)

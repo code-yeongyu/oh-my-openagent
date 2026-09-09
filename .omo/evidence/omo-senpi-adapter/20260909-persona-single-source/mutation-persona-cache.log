@@ -1,0 +1,23 @@
+# mutation proof for the process-pinned persona read
+# machine: gorky (Linux x86_64), bun test v1.4.2 (744846f84)
+# command: sed -i "s|^  contentByPath.set(path, content)$|  // MUTATION: cache write removed|" packages/memory-core/src/personas/load.ts
+#          bun test packages/memory-core/src/personas
+# 2026-09-09T07:52Z
+
+18:  // MUTATION: cache write removed
+bun test v1.4.2 (744846f84)
+
+packages/memory-core/src/personas/load.test.ts:
+error: ENOENT: no such file or directory, open '/tmp/persona-cache-zKwWid/kibitzer-persona.md'
+      at retryOnEintrSync (/tmp/omo-persona-20260909/packages/memory-core/src/fs/retry.ts:23:79)
+      at <anonymous> (/tmp/omo-persona-20260909/packages/memory-core/src/personas/load.test.ts:22:14)
+(fail) loadPersonaAsset > #given a persona already read #when its file leaves the tree #then the process keeps serving the same content [1.32ms]
+(pass) loadPersonaAsset > #given a read that failed #when the asset appears later #then the repaired tree is served without a restart [0.39ms]
+
+ 1 pass
+ 1 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [911.00ms]
+
+# The mutated read reproduces the production symptom exactly (ENOENT on the persona filename).
+# Restoring the cache write returns the file to 2 pass / 0 fail, recorded in green-persona-suites.log.
