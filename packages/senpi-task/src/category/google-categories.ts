@@ -88,6 +88,10 @@ Design-first mindset (AFTER design system is established):
 
 AVOID: Generic fonts, purple gradients on white, predictable layouts, cookie-cutter patterns.
 </DESIGN_QUALITY>
+
+<OBSERVE_EACH_CHANGE>
+Visual state is not text: after each change, render or screenshot the affected surface and look at it before making the next change. Check desktop and mobile widths for blank, misframed, or overlapping output; check a 3D scene from several angles. Compare what you see with the reference or the stated intent, and ask only where two readings of that intent diverge. A change you have not looked at is not done.
+</OBSERVE_EACH_CHANGE>
 </Category_Context>`
 
 const ARTISTRY_CATEGORY_PROMPT_APPEND = `<Category_Context>

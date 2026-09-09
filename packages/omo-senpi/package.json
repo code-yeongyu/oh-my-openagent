@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "5.0.0-beta.48",
+  "version": "5.0.0-beta.49",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
@@ -46,7 +46,7 @@
     "typebox": "1.3.18"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.9.7-2"
+    "@code-yeongyu/senpi": "2026.9.8"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
@@ -54,7 +54,7 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.9.7-2",
+    "@code-yeongyu/senpi": "2026.9.8",
     "terser": "5.50.0"
   }
 }

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { join, resolve } from "node:path"
 import { createLiveThreadSurface, resolveThreadSocket } from "./live-surface"
 
 describe("live thread socket discovery", () => {
@@ -11,17 +12,19 @@ describe("live thread socket discovery", () => {
   test("#given brand and legacy RPC_SOCKET names #when several are set #then the brand name wins and blanks are skipped", () => {
     expect(resolveThreadSocket({ OMO_RPC_SOCKET: "/brand.sock", SENPI_RPC_SOCKET: "/legacy.sock", OMO_RPC_SOCKET_PATH: "/desktop.sock" })).toBe("/brand.sock")
     expect(resolveThreadSocket({ OMO_RPC_SOCKET: "  ", PI_RPC_SOCKET: "/pi.sock", OMO_RPC_SOCKET_PATH: "/desktop.sock" })).toBe("/pi.sock")
-    expect(resolveThreadSocket({ OMO_CODING_AGENT_DIR: "/configured" })).toBe("/configured/rpc/rpc.sock")
+    expect(resolveThreadSocket({ OMO_CODING_AGENT_DIR: "/configured" })).toBe(join(resolve("/configured"), "rpc", "rpc.sock"))
   })
   test("canonical and env branches resolve through resolveAgentHome", async () => {
     const { resolveAgentHome } = await import("../agent-home/resolve-agent-home")
-    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === "/h/.omo/agent/settings.json" })).toBe("/h/.omo/agent")
-    expect(resolveAgentHome({ env: { OMO_CODING_AGENT_DIR: "/configured" }, homeDir: "/h", exists: () => false })).toBe("/configured")
+    const canonical = join("/h", ".omo", "agent")
+    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === join(canonical, "settings.json") })).toBe(canonical)
+    expect(resolveAgentHome({ env: { OMO_CODING_AGENT_DIR: "/configured" }, homeDir: "/h", exists: () => false })).toBe(resolve("/configured"))
   })
   test("resolveAgentHome supports flat and standalone fallback", async () => {
     const { resolveAgentHome } = await import("../agent-home/resolve-agent-home")
-    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === "/h/.omo/settings.json" })).toBe("/h/.omo")
-    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: () => false })).toBe("/h/.senpi/agent")
+    const flat = join("/h", ".omo")
+    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: (path) => path === join(flat, "settings.json") })).toBe(flat)
+    expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: () => false })).toBe(join("/h", ".senpi", "agent"))
   })
   test("always constructs a surface when the socket is absent at registration", () => {
     expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false })).toBeDefined()
